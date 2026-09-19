@@ -1,0 +1,16 @@
+$ npx jest src/modules/bussiness/audit/export-my-data.handler.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/audit/export-my-data.handler.spec.ts
+  ExportMyDataHandler
+    √ fr.audit.export: the export contains no other person's lines (8 ms)
+    √ exceptionFlow: once the person's key has been destroyed by a completed erasure, export returns nothing (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        2.388 s
+Ran all test suites matching /src\\modules\\bussiness\\audit\\export-my-data.handler.spec.ts/i.
+

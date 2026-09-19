@@ -1,0 +1,17 @@
+$ npx jest src/modules/bussiness/plan/create-precondition.contract.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/plan/create-precondition.contract.spec.ts
+  contract.plan.create-precondition
+    √ the task create path calls the guard before writing and honors a refusal, naming the cap and the upgrade path (10 ms)
+    √ nothing is written when the create is refused (2 ms)
+    √ a paid person is never refused by the same real create path (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        2.36 s
+Ran all test suites matching /src\\modules\\bussiness\\plan\\create-precondition.contract.spec.ts/i.
+

@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.notify.unsubscribe.honored.suppresses-future-sends
-rule: br.notify.unsubscribe.honored
-given: A person who has unsubscribed from a channel
-when: An event that would otherwise notify them on that channel is enqueued
-then:
-  - The resulting delivery is suppressed, not queued and not sent.
-  - Re-subscribing lets a later event reach the digest window again.

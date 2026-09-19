@@ -1,0 +1,256 @@
+schema: starci/uat-run-manifest@1
+id: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
+nodeId: uat.notify.digest-and-unsubscribe
+inputDigest: 7c0608bc723fdd99735972e9274fc0907d0c4cd21c0e8325dc45a6561a3efa8c
+outcome: partial-pass
+assertions:
+  - id: ux.notify.preferences.reachable
+    expected: yes
+    observed: yes
+    note: The signed-in owner reached /notify/preferences and the screen settled into a real state (not
+      loading, not refused) - the record's step-1 expectation.
+  - id: br.notify.digest.window
+    expected: yes
+    observed: yes
+    note: Both task completions landed as notify_notifications rows sharing one digest_group_id
+      (d1f12ffe-7c3e-441a-9871-cb5b19e6bd98) - the second event joined the still-open window the
+      first one opened. Read back from the stack's own Postgres because the product exposes no
+      notifications query.
+  - id: fr.notify.digest
+    expected: yes
+    observed: yes
+    note: 'The shared window (d1f12ffe-7c3e-441a-9871-cb5b19e6bd98) flushed once after its 1-minute
+      close and the real scheduler dispatched both members as ONE batch
+      (DeliveryService.dispatchBatch renders a single message per flushed group - "2 updates" naming
+      both tasks). Read back from Postgres: one window, one flush, one batch.'
+  - id: ux.notify.inbox-arrival
+    expected: yes
+    observed: not-run
+    note: "The record's step 3 asks to read the owner's inbox and see the one message. The product's
+      only inbox is the person's external email mailbox: no in-app inbox UI exists and this stack
+      has no reachable SMTP host (integration.notify.smtp / gap.notify.smtp-host-unreachable), so
+      the rendered message was dispatched, refused transiently by the transport, and never arrived
+      anywhere a walk could read. Per the owner directive, external-provider legs are never faked;
+      this leg stays unproven."
+  - id: fr.notify.unsubscribe
+    expected: yes
+    observed: yes
+    note: "The preferences screen's \"Unsubscribe from email\" action settled the screen on
+      unsubscribed, and a correctly-headed notificationPreferences read-back returns unsubscribed:
+      true - the preference is saved, not merely displayed."
+  - id: br.notify.unsubscribe.honored
+    expected: yes
+    observed: yes
+    note: The third event was recorded (its notify_notifications row exists) but its delivery attempt
+      was created already suppressed with failure_class=unsubscribed and attempt=0 - no dispatch was
+      ever made, so no message could have arrived. That is the provable form of the record's step 6
+      ("no new message arrives") given that no reachable inbox exists.
+assets:
+  - path: screens/owner-signed-in.png
+    sha256: 782ee79686136158ba1db65a47ee6bf3ffb8d09c9d164e9efebc70fabf0db7b0
+    size: 48760
+  - path: screens/preferences-reachable.png
+    sha256: fd1785db0a5306b16d3e21734d96404cdb36e7c937b7ee8ceb59eb42fe46f122
+    size: 36474
+  - path: screens/two-events-one-window.png
+    sha256: 9a03dc325ce42eecf1c77e711d03e84a45e677642a6b9bc1d1a692616a4b8d4f
+    size: 58289
+  - path: screens/digest-flushes-one-message.png
+    sha256: 9a03dc325ce42eecf1c77e711d03e84a45e677642a6b9bc1d1a692616a4b8d4f
+    size: 58289
+  - path: screens/unsubscribed-in-preferences.png
+    sha256: a1ea056fe5a59447bceec9477a02807a7a02768500ea62001bbb4ad6d19f038d
+    size: 38880
+  - path: screens/third-event-suppressed.png
+    sha256: c00d87249e65cb9f75ee5aa1563056911f7cee90023fda15904a19a413651f34
+    size: 64236
+  - path: screens/cleaned-up.png
+    sha256: 4bf45025aadca0b642f0635475e0f7133943d94d2c2f6b986c28110cc7ac9704
+    size: 59808
+  - path: screens/screenshot.png
+    sha256: 4bf45025aadca0b642f0635475e0f7133943d94d2c2f6b986c28110cc7ac9704
+    size: 59808
+  - path: videos/digest-and-unsubscribe.webm
+    sha256: 4b42ffc06f448ae8cc9b345becc95b611367a7ec46910b68ad24acc3d04610e8
+    size: 1470781
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:3000
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.notify.digest-and-unsubscribe
+    ownedResourcesCreated:
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-a
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-b
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: notify-pipeline-rows
+        id: d1f12ffe-7c3e-441a-9871-cb5b19e6bd98
+        note: Notification, delivery-attempt and digest-window rows this run's task completions wrote into
+          the stack's Postgres - internal rows no UI surface ever shows.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-post-unsubscribe
+        note: Run-owned task created and completed through the UI after the unsubscribe.
+    ownedResourcesDeleted:
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-a
+        note: Deleted through the UI two-step confirm.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-b
+        note: Deleted through the UI two-step confirm.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-post-unsubscribe
+        note: Deleted through the UI two-step confirm.
+      - kind: notify-pipeline-rows
+        id: d1f12ffe-7c3e-441a-9871-cb5b19e6bd98
+        note: Deleted from notify_notifications, notify_delivery_attempts and notify_digest_windows.
+    verifiedAbsent:
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-a
+        note: The title resolves to zero rows in the re-read owner list.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-b
+        note: The title resolves to zero rows in the re-read owner list.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-post-unsubscribe
+        note: The title resolves to zero rows in the re-read owner list.
+      - kind: notify-pipeline-rows
+        id: d1f12ffe-7c3e-441a-9871-cb5b19e6bd98
+        note: Zero notify_notifications rows remain for the run's taskIds on read-back.
+    note: Every run-owned resource this run created was deleted and its absence verified by read-back.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.notify.digest-and-unsubscribe
+      title: Two events settle into one digest, then an unsubscribe silences the next one
+      steps:
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+      proves:
+        - fr.notify.digest
+        - fr.notify.unsubscribe
+        - br.notify.digest.window
+        - br.notify.unsubscribe.honored
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.notify.digest-and-unsubscribe
+    checked:
+      - ux.notify.preferences.reachable
+      - br.notify.digest.window
+      - fr.notify.digest
+      - fr.notify.unsubscribe
+      - br.notify.unsubscribe.honored
+    notRun:
+      - ux.notify.inbox-arrival
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T144517Z-5c10a673
+    flow: uat.notify.digest-and-unsubscribe
+    started: 2026-09-19T14:45:18.352Z
+    finished: 2026-09-19T14:46:26.597Z
+    accountsDeclared:
+      - role: owner
+        username: demo@todo.dev
+    reused: []
+    created:
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-a
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-digest-b
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: notify-pipeline-rows
+        id: d1f12ffe-7c3e-441a-9871-cb5b19e6bd98
+        note: Notification, delivery-attempt and digest-window rows this run's task completions wrote into
+          the stack's Postgres - internal rows no UI surface ever shows.
+      - kind: task
+        id: uat-20260919T144517Z-5c10a673-post-unsubscribe
+        note: Run-owned task created and completed through the UI after the unsubscribe.
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.notify.digest-and-unsubscribe
+    checks:
+      - id: ux.notify.preferences.reachable
+        expected: yes
+        observed: yes
+        note: The signed-in owner reached /notify/preferences and the screen settled into a real state (not
+          loading, not refused) - the record's step-1 expectation.
+      - id: br.notify.digest.window
+        expected: yes
+        observed: yes
+        note: Both task completions landed as notify_notifications rows sharing one digest_group_id
+          (d1f12ffe-7c3e-441a-9871-cb5b19e6bd98) - the second event joined the still-open window the
+          first one opened. Read back from the stack's own Postgres because the product exposes no
+          notifications query.
+      - id: fr.notify.digest
+        expected: yes
+        observed: yes
+        note: 'The shared window (d1f12ffe-7c3e-441a-9871-cb5b19e6bd98) flushed once after its 1-minute
+          close and the real scheduler dispatched both members as ONE batch
+          (DeliveryService.dispatchBatch renders a single message per flushed group - "2 updates"
+          naming both tasks). Read back from Postgres: one window, one flush, one batch.'
+      - id: ux.notify.inbox-arrival
+        expected: yes
+        observed: not-run
+        note: "The record's step 3 asks to read the owner's inbox and see the one message. The product's
+          only inbox is the person's external email mailbox: no in-app inbox UI exists and this
+          stack has no reachable SMTP host (integration.notify.smtp /
+          gap.notify.smtp-host-unreachable), so the rendered message was dispatched, refused
+          transiently by the transport, and never arrived anywhere a walk could read. Per the owner
+          directive, external-provider legs are never faked; this leg stays unproven."
+      - id: fr.notify.unsubscribe
+        expected: yes
+        observed: yes
+        note: "The preferences screen's \"Unsubscribe from email\" action settled the screen on
+          unsubscribed, and a correctly-headed notificationPreferences read-back returns
+          unsubscribed: true - the preference is saved, not merely displayed."
+      - id: br.notify.unsubscribe.honored
+        expected: yes
+        observed: yes
+        note: The third event was recorded (its notify_notifications row exists) but its delivery attempt
+          was created already suppressed with failure_class=unsubscribed and attempt=0 - no dispatch
+          was ever made, so no message could have arrived. That is the provable form of the record's
+          step 6 ("no new message arrives") given that no reachable inbox exists.
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.notify.digest-and-unsubscribe
+    steps:
+      - step: owner-signed-in
+        startedAt: 2026-09-19T14:45:18.504Z
+        endedAt: 2026-09-19T14:45:18.855Z
+        screenshot: owner-signed-in
+      - step: preferences-reachable
+        startedAt: 2026-09-19T14:45:18.913Z
+        endedAt: 2026-09-19T14:45:19.181Z
+        screenshot: preferences-reachable
+      - step: two-events-one-window
+        startedAt: 2026-09-19T14:45:19.209Z
+        endedAt: 2026-09-19T14:45:19.819Z
+        screenshot: two-events-one-window
+      - step: digest-flushes-one-message
+        startedAt: 2026-09-19T14:45:19.862Z
+        endedAt: 2026-09-19T14:46:23.695Z
+        screenshot: digest-flushes-one-message
+      - step: unsubscribed-in-preferences
+        startedAt: 2026-09-19T14:46:23.745Z
+        endedAt: 2026-09-19T14:46:23.913Z
+        screenshot: unsubscribed-in-preferences
+      - step: third-event-suppressed
+        startedAt: 2026-09-19T14:46:23.976Z
+        endedAt: 2026-09-19T14:46:24.486Z
+        screenshot: third-event-suppressed
+      - step: cleaned-up
+        startedAt: 2026-09-19T14:46:24.533Z
+        endedAt: 2026-09-19T14:46:25.775Z
+        screenshot: cleaned-up

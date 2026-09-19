@@ -1,0 +1,40 @@
+schema: work/business-rule
+id: br.task.complete.once
+title: Completing a task twice changes nothing
+state: done
+statements:
+  - Completing a task that is already complete leaves it unchanged and is not an error.
+  - The owner may reopen a task they completed.
+acceptance:
+  - id: ac.task.complete.once.is-idempotent
+    given: A task already complete
+    when: It is completed again
+    then:
+      - The task is unchanged.
+      - The response is success, not an error.
+  - id: ac.task.complete.once.is-reversible
+    given: A task the owner completed
+    when: The owner reopens it
+    then:
+      - The task reads incomplete.
+      - Its completion timestamp is cleared.
+module: [src/modules/bussiness/task]
+change:
+change:
+  rev: 3
+  kind: editorial
+  at: 2026-09-19T15:44:01.435Z
+  withdraws: ["A complete task is never reopened."]
+  reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+    becomes history and the rule returns to todo until the reversible statement is proven in its place.
+    rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.task.complete.once#<former-ac-id>. Encoding change only, no semantic change.
+# gap.task.collaborator-completion closed (lane be-share), and this lane has now regenerated the
+# evidence for both rev-2 statements: ac.task.complete.once.is-idempotent and ac.task.complete.once
+# .is-reversible are each re-proved by the named jest tests in src/modules/bussiness/task
+# (complete-task.handler.spec.ts asserts the second completion is byte-identical on completedAt,
+# title and owner; reopen-task.handler.spec.ts asserts reopen clears complete and completedAt), plus
+# a full re-run of scripts/live-proof.sh against a live API built from this source tree on a
+# dedicated dev-stack port (22/22 steps, real Postgres, two demo identities; the shared :3001 was
+# held by a parallel lane's API at capture time, so API_URL was pinned to that instance). The
+# collaborator half of completion authority is br.task.single-owner's business, not this rule's;
+# this record's two statements are proven at their current rev, so the record is done.

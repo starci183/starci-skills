@@ -1,0 +1,38 @@
+
+### impl.plan.todo-app-frontend.usage
+wrote examples/todo-app-backend/.starciwork/features/plan/impl/todo-app-frontend/usage/evidence.yaml: outcome pass
+  PASS typecheck: npx tsc --noEmit exited 0
+  PASS unit: npx vitest run exited 0
+  PASS lint: npx eslint . exited 0
+  PASS build: npx next build exited 0
+exit=0 
+
+### impl.recur.todo-app-frontend.schedule
+wrote examples/todo-app-backend/.starciwork/features/recur/impl/todo-app-frontend/schedule/evidence.yaml: outcome pass
+  PASS typecheck: npx tsc --noEmit exited 0
+  PASS vitest-suite-green: npx vitest run exited 0
+  PASS build: npm run build exited 0
+exit=0 
+
+### impl.notify.todo-app-frontend.preferences
+wrote examples/todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/evidence.yaml: outcome fail
+  PASS typecheck: npx tsc --noEmit exited 0
+  PASS unit-tests: npx vitest run exited 0
+  PASS lint: npx eslint src/ exited 0
+  PASS build: npm run build exited 0
+  FAIL architecture: node ../../cli/main.mjs architecture check . --config architecture.json exited 1
+  PASS rendered-captures: node -e "const fs=require('fs'),p='../todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/assets/';const states=['subscribed','loading','unsubscribed','refused','saving'];const vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of vps){for(const ext of ['png','html']){const f=p+'preferences-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}for(const v of vps){for(const ext of ['png','html']){const f=p+'unsubscribe-link-unsubscribed-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const refused=fs.readFileSync(p+'preferences-refused-desktop-1280.html','utf8');if(!refused.includes('We could')){ok=false;console.log('refused markup lacks refusal sentence');}if(!ok)process.exit(1);console.log('12 state captures verified');" exited 0
+exit=1 
+
+### impl.share.todo-app-frontend.invite-screen
+  PASS lint: npx eslint . exited 0
+  FAIL architecture: node ../../cli/main.mjs architecture check . --config architecture.json exited 1
+  FAIL scoped-lint: node -e "require('fs').rmSync('.next',{recursive:true,force:true})" && node ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config architecture.json --all exited 2
+  PASS captures: node verify-captures.mjs assets exited 0
+  FAIL render-entity-list-in-card: node verify-captures.mjs entity-list exited 1
+  PASS render-primary-absent: node verify-captures.mjs primary exited 0
+  FAIL render-palette-off-brand: node verify-captures.mjs palette exited 1
+  PASS build: npx next build exited 0
+exit=1 
+
+DONE

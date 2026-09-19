@@ -1,0 +1,158 @@
+[1] exit=0   5 matched 5s features/audit/br/append-only :: ac.audit.append-only.chain-detects-tamper
+[2] exit=0   1 matched 5s features/audit/br/erasure/logged :: ac.audit.erasure.logged.request-and-completion-are-lines
+[3] exit=0   1 matched 5s features/audit/br/erasure/right :: ac.audit.erasure.right.identifying-fields-unreadable
+[4] exit=0   2 matched 5s features/audit/br/retention :: ac.audit.retention.available-through-window
+[5] exit=0   7 matched 3s features/audit/fr/log/read :: fr.audit.log.read
+[6] exit=0  10 matched 3s features/audit/fr/log/read :: operator-check-and-refusal
+[7] exit=0  13 matched 4s features/audit/impl/todo-app-backend/erasure :: sds.audit.erasure-request
+[8] exit=0   1 matched 6s features/audit/impl/todo-app-backend/erasure :: fr.audit.erasure.request
+[9] exit=0   6 matched 5s features/audit/impl/todo-app-backend/erasure :: fr.audit.erasure.complete
+[10] exit=0  11 matched 3s features/audit/impl/todo-app-backend/log :: br.audit.append-only
+[11] exit=0  17 matched 4s features/audit/impl/todo-app-backend/log :: sds.audit.log-chain
+[12] exit=0  10 matched 5s features/audit/impl/todo-app-backend/operator-read :: filtered-whole-chain-read
+[13] exit=0   2 matched 5s features/audit/impl/todo-app-backend/operator-read :: fail-closed-refusal
+[14] exit=0   4 matched 3s features/audit/impl/todo-app-backend/operator-read :: operator-claim-source
+[15] exit=0   5 matched 5s features/audit/impl/todo-app-backend/operator-read :: gap.audit.operator-role
+HEAVY-SKIP features/audit/impl/todo-app-frontend/privacy typecheck
+[16] exit=0   0 matched 6s features/audit/impl/todo-app-frontend/privacy :: unit-tests
+HEAVY-SKIP features/audit/impl/todo-app-frontend/privacy lint
+HEAVY-SKIP features/audit/impl/todo-app-frontend/privacy build
+HEAVY-SKIP features/audit/impl/todo-app-frontend/privacy architecture
+[17] exit=0   0 matched 0s features/audit/impl/todo-app-frontend/privacy :: rendered-captures
+[18] exit=1   0 matched 1s features/audit/impl/todo-app-frontend/privacy :: render-proof
+[19] exit=0   1 matched 5s features/audit/sds/erasure-request :: t-request
+[20] exit=0   2 matched 5s features/audit/sds/erasure-request :: t-verify
+[21] exit=0   2 matched 5s features/audit/sds/erasure-request :: t-refuse
+[22] exit=0  10 matched 3s features/audit/sds/erasure-request :: t-execute
+[23] exit=0   1 matched 5s features/audit/sds/erasure-request :: t-complete
+[24] exit=0   2 matched 20s features/login/br/password/sign-in :: ac.login.password.sign-in.wrong-pair-is-refused
+[25] exit=0   1 matched 20s features/login/br/password/sign-in :: ac.login.password.sign-in.refusal-does-not-name-the-half
+[26] exit=0   1 matched 4s features/login/br/session/restores :: ac.login.session.restores.returning-within-the-window-stays-signed-in
+[27] exit=0  28 matched 4s features/login/impl/todo-app-backend/auth :: unit-suite-green
+[28] exit=0   5 matched 5s features/login/impl/todo-app-backend/auth :: contract.login.identity-for-task
+HEAVY-SKIP features/login/impl/todo-app-backend/auth typecheck
+[29] exit=0   0 matched 4s features/login/impl/todo-app-frontend/sign-in :: vitest-suite-green
+[30] exit=1   0 matched 0s features/login/integration/keycloak :: real-keycloak-token-exchange
+[31] exit=1   0 matched 0s features/login/integration/postgres :: migrations-applied
+[32] exit=1   0 matched 0s features/login/journey/first-sign-in :: uat-login-sign-in-run
+[33] exit=0   2 matched 4s features/login/sds/session-store :: t-accept
+[34] exit=0   1 matched 4s features/login/sds/session-store :: t-refuse
+[35] exit=0   1 matched 4s features/login/sds/session-store :: t-expire
+[36] exit=0   1 matched 4s features/login/sds/session-store :: t-revoke
+[37] exit=0   1 matched 4s features/login/sds/session-store :: t-begin
+[38] exit=0   1 matched 3s features/notify/br/delivery/once :: dedupe-collapses-retry
+[39] exit=0   3 matched 4s features/notify/br/digest/window :: collapses-into-one-message
+[40] exit=0   1 matched 3s features/notify/br/failure/classified :: retries-transient
+[41] exit=0   1 matched 3s features/notify/br/failure/classified :: suppresses-bounced-address
+[42] exit=0   1 matched 3s features/notify/br/failure/classified :: suppresses-unsubscribed
+[43] exit=0   5 matched 4s features/notify/br/unsubscribe/honored :: suppresses-future-sends
+[44] exit=0  78 matched 18s features/notify/impl/todo-app-backend/pipeline :: unit
+HEAVY-SKIP features/notify/impl/todo-app-backend/pipeline typecheck
+[45] exit=1   0 matched 0s features/notify/impl/todo-app-backend/pipeline :: live
+HEAVY-SKIP features/notify/impl/todo-app-frontend/preferences typecheck
+HEAVY-SKIP features/notify/impl/todo-app-frontend/preferences lint
+HEAVY-SKIP features/notify/impl/todo-app-frontend/preferences build
+HEAVY-SKIP features/notify/impl/todo-app-frontend/preferences architecture
+[46] exit=0   0 matched 0s features/notify/impl/todo-app-frontend/preferences :: rendered-captures
+[47] exit=1   0 matched 1s features/notify/integration/queue :: live-redis-roundtrip
+[48] exit=0   1 matched 3s features/notify/sds/delivery-lifecycle :: t-dispatch
+[49] exit=0   1 matched 3s features/notify/sds/delivery-lifecycle :: t-give-up
+[50] exit=0   2 matched 16s features/plan/br/active-scope :: ac.plan.active-scope.excludes-complete
+[51] exit=0   1 matched 17s features/plan/br/caps/limit :: ac.plan.caps.limit.refuses-over-cap
+[52] exit=0   1 matched 17s features/plan/br/downgrade/freeze :: ac.plan.downgrade.freeze.over-cap-blocks-create
+[53] exit=0   1 matched 20s features/plan/br/downgrade/freeze :: ac.plan.downgrade.freeze.existing-tasks-untouched
+[54] exit=0   1 matched 21s features/plan/br/lapse/reverts-on-read :: ac.plan.lapse.reverts-on-read.read-after-grace-is-free
+[55] exit=0   2 matched 17s features/plan/br/payment/idempotent :: ac.plan.payment.idempotent.replay-is-noop
+[56] exit=0   6 matched 3s features/plan/contract/create-precondition :: provider
+[57] exit=0   3 matched 3s features/plan/contract/create-precondition :: consumer
+[58] exit=0  45 matched 6s features/plan/impl/todo-app-backend/plan :: br.plan.caps.limit
+[59] exit=0   2 matched 3s features/plan/impl/todo-app-backend/plan :: br.plan.downgrade.freeze
+[60] exit=0  13 matched 4s features/plan/impl/todo-app-backend/plan :: br.plan.payment.idempotent
+[61] exit=0  11 matched 3s features/plan/impl/todo-app-backend/plan :: br.plan.lapse.reverts-on-read
+HEAVY-SKIP features/plan/impl/todo-app-frontend/usage typecheck
+HEAVY-SKIP features/plan/impl/todo-app-frontend/usage lint
+HEAVY-SKIP features/plan/impl/todo-app-frontend/usage build
+[62] exit=0   1 matched 16s features/plan/sds/cap-guard :: t-under-cap
+[63] exit=0   1 matched 17s features/plan/sds/cap-guard :: t-at-cap
+[64] exit=0   2 matched 17s features/plan/sds/subscription-lifecycle :: t-checkout-started
+[65] exit=0   2 matched 16s features/plan/sds/subscription-lifecycle :: t-gateway-confirmed
+[66] exit=0   3 matched 17s features/plan/sds/subscription-lifecycle :: t-gateway-abandoned
+[67] exit=0   1 matched 17s features/plan/sds/subscription-lifecycle :: t-renewal-due
+[68] exit=0   2 matched 16s features/plan/sds/subscription-lifecycle :: t-renewal-confirmed
+[69] exit=0   1 matched 17s features/plan/sds/subscription-lifecycle :: t-lapse
+[70] exit=0   3 matched 17s features/plan/sds/subscription-lifecycle :: t-downgrade
+[71] exit=0   1 matched 16s features/recur/br/ending/preserves-history :: ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences
+[72] exit=0   0 matched 15s features/recur/br/generation/once :: ac.recur.generation.once.is-idempotent-on-rerun
+[73] exit=0   2 matched 15s features/recur/br/impossible-date/skips :: ac.recur.impossible-date.skips.skips-nonexistent-day
+[74] exit=0   3 matched 17s features/recur/br/occurrence/owned-by-rule-owner :: ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner
+[75] exit=0   1 matched 19s features/recur/br/timezone/owner-local-time :: ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap
+[76] exit=0   1 matched 17s features/recur/br/timezone/owner-local-time :: ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest
+[77] exit=0   3 matched 18s features/recur/br/timezone/owner-local-time :: ac.recur.timezone.owner-local-time.distinct-zones-differ
+[78] exit=0  50 matched 8s features/recur/impl/todo-app-backend/engine :: unit
+[79] exit=1   0 matched 0s features/recur/impl/todo-app-backend/engine :: live-e2e
+HEAVY-SKIP features/recur/impl/todo-app-frontend/schedule typecheck
+HEAVY-SKIP features/recur/impl/todo-app-frontend/schedule build
+[80] exit=0  20 matched 5s features/recur/sds/generation-engine :: implementation
+[81] exit=0   1 matched 19s features/recur/sds/occurrence-lifecycle :: t-materialise
+[82] exit=0   5 matched 22s features/recur/sds/occurrence-lifecycle :: t-complete
+[83] exit=0   3 matched 21s features/recur/sds/occurrence-lifecycle :: t-skip
+[84] exit=0   1 matched 24s features/recur/sds/occurrence-lifecycle :: t-orphan
+[85] exit=0   1 matched 4s features/share/br/editor/no-delete :: delete-refused-for-editor
+[86] exit=1   0 matched 0s features/share/br/editor/no-delete :: live-proof
+[87] exit=0   1 matched 3s features/share/br/invite/expiry :: expires-after-14-days
+[88] exit=0   1 matched 3s features/share/br/invite/expiry :: accept-before-expiry-succeeds
+[89] exit=0   2 matched 7s features/share/br/revoke/on-read :: removed-loses-access-next-read
+[90] exit=0   1 matched 4s features/share/br/role/permissions :: viewer-read-only
+[91] exit=0   1 matched 4s features/share/br/role/permissions :: editor-can-complete
+[92] exit=0   5 matched 5s features/share/impl/todo-app-backend/access :: unit
+HEAVY-SKIP features/share/impl/todo-app-backend/access typecheck
+[93] exit=0  23 matched 8s features/share/impl/todo-app-backend/invitations :: unit
+HEAVY-SKIP features/share/impl/todo-app-backend/invitations typecheck
+HEAVY-SKIP features/share/impl/todo-app-frontend/invite-screen typecheck
+HEAVY-SKIP features/share/impl/todo-app-frontend/invite-screen lint
+HEAVY-SKIP features/share/impl/todo-app-frontend/invite-screen architecture
+[94] exit=2   0 matched 131s features/share/impl/todo-app-frontend/invite-screen :: scoped-lint
+[95] exit=0   0 matched 0s features/share/impl/todo-app-frontend/invite-screen :: captures
+[96] exit=0   0 matched 0s features/share/impl/todo-app-frontend/invite-screen :: render-entity-list-in-card
+[97] exit=0   0 matched 1s features/share/impl/todo-app-frontend/invite-screen :: render-primary-absent
+[98] exit=1   0 matched 1s features/share/impl/todo-app-frontend/invite-screen :: render-palette-off-brand
+HEAVY-SKIP features/share/impl/todo-app-frontend/invite-screen build
+[99] exit=0   1 matched 4s features/share/sds/invitation-lifecycle :: t-invite
+[100] exit=0   1 matched 4s features/share/sds/invitation-lifecycle :: t-revoke-pending
+[101] exit=0   1 matched 4s features/share/sds/invitation-lifecycle :: t-revoke-accepted
+[102] exit=0  37 matched 7s features/share/sds/invitation-lifecycle :: implementation
+[103] exit=0   1 matched 4s features/task/br/complete/once :: ac.task.complete.once.is-idempotent
+[104] exit=0   1 matched 4s features/task/br/complete/once :: ac.task.complete.once.is-reversible
+[105] exit=0   1 matched 4s features/task/br/complete/once :: sds.task.completion-state.t-complete
+[106] exit=7   0 matched 3s features/task/br/complete/once :: br.task.complete.once.live-proof
+[107] exit=0   1 matched 4s features/task/br/delete/final :: ac.task.delete.final.stays-gone
+[108] exit=0   1 matched 4s features/task/br/list/owned :: ac.task.list.owned.excludes-others
+[109] exit=0   3 matched 26s features/task/br/title/required :: ac.task.title.required.refuses-empty
+[110] exit=0   1 matched 5s features/task/event/completed :: event.task.completed
+[111] exit=0   1 matched 4s features/task/event/created :: event.task.created
+[112] exit=0   1 matched 5s features/task/event/deleted :: event.task.deleted
+[113] exit=1   0 matched 2s features/task/fr/complete :: e2e
+[114] exit=0  35 matched 9s features/task/fr/create :: unit-composed-rules
+[115] exit=0   1 matched 9s features/task/fr/create :: boot-drives-real-create-route
+[116] exit=1   0 matched 2s features/task/fr/reopen :: e2e
+[117] exit=0   3 matched 5s features/task/impl/todo-app-backend/complete-task :: br.task.complete.once
+[118] exit=0   6 matched 5s features/task/impl/todo-app-backend/complete-task :: sds.task.completion-state
+[119] exit=0   5 matched 5s features/task/impl/todo-app-backend/create-task :: fr.task.create
+[120] exit=0   3 matched 5s features/task/impl/todo-app-backend/delete-task :: br.task.delete.final
+[121] exit=0   1 matched 4s features/task/impl/todo-app-backend/list :: br.task.list.owned
+[122] exit=0   2 matched 5s features/task/impl/todo-app-backend/list :: contract.task.list-for-dashboard.provider
+[123] exit=0   6 matched 5s features/task/impl/todo-app-backend/ownership :: sds.task.ownership-guard
+[124] exit=0  14 matched 6s features/task/impl/todo-app-backend/platform-database :: session-store
+[125] exit=0   2 matched 4s features/task/impl/todo-app-backend/reopen-task :: br.task.complete.once
+[126] exit=0   0 matched 22s features/task/impl/todo-app-frontend/task-list :: focused-vitest
+HEAVY-SKIP features/task/impl/todo-app-frontend/task-list typecheck
+HEAVY-SKIP features/task/impl/todo-app-frontend/task-list production-build
+HEAVY-SKIP features/task/impl/todo-app-frontend/task-list uat-typecheck
+HEAVY-SKIP features/task/impl/todo-app-frontend/task-list render-capture
+[127] exit=0   0 matched 3s features/task/impl/todo-app-frontend/task-list :: render-check
+[128] exit=0   1 matched 6s features/task/sds/completion-state :: sds.task.completion-state.t-complete-again
+[129] exit=0   1 matched 4s features/task/sds/completion-state :: sds.task.completion-state.t-reopen
+[130] exit=0   1 matched 4s features/task/sds/ownership-guard :: sds.task.ownership-guard.t-owner
+[131] exit=0   1 matched 5s features/task/sds/ownership-guard :: sds.task.ownership-guard.t-collaborator
+[132] exit=0   1 matched 5s features/task/sds/ownership-guard :: sds.task.ownership-guard.t-stranger
+probe complete: 132 command runs this pass, 132 total cached

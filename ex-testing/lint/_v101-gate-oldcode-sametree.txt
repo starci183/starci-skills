@@ -1,0 +1,10 @@
+REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.cart.assets
+REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/direction-check.yaml: id is undefined, but its place says ui.checkout.landing-home.assets
+REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.landing-home.assets
+REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.shop-browse.assets
+REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.stock-refused.assets
+REFUSED examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/assets/generation-receipts.yaml: id is undefined, but its place says ui.identity.sign-in.assets
+REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/impl/ecommerce-app-be/order-checkout/evidence.yaml: recordDigest 94f13aee9483c70d77557f67d59796287a2d1ffb137579176027d2cd007c42ee no longer matches impl.checkout.ecommerce-app-be.order-checkout's current digest 9d59106e5fcac8d4a0475af7aeba8675df0b51353bbfd6185f166b0551b74a8d; refused unless it carries stale: true
+REFUSED examples/ecommerce-app-be/.starciwork/features/identity/impl/ecommerce-app-be/identity-account/evidence.yaml: recordDigest f675e1c03218f49e82ee027e0dfb73f875605fd1807a633b9e0a9870b2257ca8 no longer matches impl.identity.ecommerce-app-be.identity-account's current digest 5ac90ad2227ca2d80fa89de5cb385d7017a4ceeeb30c75e97423173e7199faa5; refused unless it carries stale: true
+REFUSED examples/ecommerce-app-be/.starciwork/features/identity/contract/internal/sessions/index.yaml: state is done with no sibling evidence.yaml and no verificationSource: authored-claim + because
+345 record(s), 2860 ref(s), 124 evidence file(s): 9 refused

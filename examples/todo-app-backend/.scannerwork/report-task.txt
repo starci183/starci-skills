@@ -1,0 +1,6 @@
+projectKey=starci-todo-app-backend
+serverUrl=https://sonar.starci.org
+serverVersion=26.8.0.126808
+dashboardUrl=https://sonar.starci.org/dashboard?id=starci-todo-app-backend
+ceTaskId=690d9ef8-9ea7-4abb-b9d6-0add30be3f9f
+ceTaskUrl=https://sonar.starci.org/api/ce/task?id=690d9ef8-9ea7-4abb-b9d6-0add30be3f9f

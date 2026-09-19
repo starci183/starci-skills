@@ -1,0 +1,102 @@
+{
+  "name": "starci",
+  "version": "1.0.4",
+  "description": "StarCi: one skill, bounded workflow matrices, complete operators and verified direct tasks.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "bin": {
+    "starci": "bin/starci.mjs"
+  },
+  "files": [
+    ".dist/",
+    "bin/",
+    "init/",
+    "skills/",
+    "SKILL.md",
+    "config.example.yaml",
+    "knowledge/",
+    "workflows/",
+    "ops/",
+    "model/",
+    "kernel/",
+    "hosts/",
+    "models/",
+    "checks/",
+    "upgrades/",
+    "providers/",
+    "approvals/",
+    "execution/",
+    "contracts/",
+    "core/",
+    "schemas/",
+    "specifications/",
+    "examples/",
+    "fixtures/",
+    "cli/",
+    "tests/",
+    "scripts/",
+    "docs/",
+    "README.yaml",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "UPDATE.yaml",
+    "INDEX.yaml",
+    "sites/skills/src/",
+    "sites/skills/scripts/",
+    "sites/skills/public/",
+    "sites/skills/package.json",
+    "sites/skills/index.html",
+    "sites/skills/vite.config.ts",
+    "sites/skills/tsconfig.json",
+    "sites/skills/tsconfig.app.json",
+    "sites/skills/tsconfig.node.json",
+    "sites/docs/package.json",
+    "sites/docs/build.mjs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/starci183/starci-skills.git"
+  },
+  "homepage": "https://github.com/starci183/starci-skills#readme",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "agent",
+    "skills",
+    "starci"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test tests/*.spec.mjs",
+    "starci": "node bin/starci.mjs",
+    "prepack": "npm run build && npm run build:check",
+    "build": "node scripts/build-workflows.mjs",
+    "build:check": "node scripts/build-workflows.mjs --check",
+    "build:declarative": "node scripts/compile-declarative.mjs",
+    "build:declarative:check": "node scripts/compile-declarative.mjs --check",
+    "build:knowledge": "node scripts/compile-knowledge.mjs",
+    "build:knowledge:check": "node scripts/compile-knowledge.mjs --check",
+    "build:ensure": "node scripts/ensure-build.mjs",
+    "build:sites": "node scripts/build-docs.mjs && npm --prefix sites/skills run build && npm --prefix sites/docs run build && node scripts/assemble-site.mjs",
+    "build:yaml": "node scripts/build-yaml.mjs"
+  },
+  "devDependencies": {
+    "@jest/globals": "29.7.0",
+    "@nestjs/common": "11.1.27",
+    "@nestjs/core": "11.1.27",
+    "@nestjs/testing": "11.1.27",
+    "@types/jest": "29.5.14",
+    "ajv": "8.20.0",
+    "esbuild": "^0.28.2",
+    "next": "16.3.1",
+    "swr": "2.5.1",
+    "typescript": "5.9.3",
+    "yaml": "^2.9.0"
+  }
+}

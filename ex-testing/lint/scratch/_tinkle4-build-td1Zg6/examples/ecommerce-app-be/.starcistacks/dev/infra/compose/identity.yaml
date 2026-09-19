@@ -1,0 +1,15 @@
+services:
+  identity:
+    # The api container is a placeholder image with no build context: the canonical dev run keeps
+    # only postgres/redis here (`docker compose up -d`) and drives the API on the host with
+    # `npm run start:identity`, exactly the split nivo's example uses so migrations and env stay
+    # one-command reproducible without a container build in the loop.
+    image: ecommerce-app-be/identity
+    profiles: [app]
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      ECOMMERCE_APP_BE_METADATA: /repo/examples/ecommerce-app-be/metadata.json
+    ports:
+      - "5070:5070"

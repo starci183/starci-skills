@@ -1,0 +1,30 @@
+schema: work/gap
+id: gap.identity.live-proof
+title: No UAT run has executed the sign-in flow against the running product
+state: done
+statement: >-
+  uat.identity.sign-in names its entry, actor, ordered steps, effects and cleanup in the op's own
+  shape, and everything it walks now exists and answers live. Lane v9-8 landed the harness
+  (ecommerce-app-fe/uat, proven by a smoke run under checkout/uat/place-order/runs/). Lane v9-6
+  landed the surface itself: the signed-out /en/account renders the auth split with a working
+  register/sign-in form (apps/shop/src/components/blocks/SessionForm), the landing-to-shop session
+  handoff is settled as the httpOnly northwind-session cookie the shop's own /api/session door
+  sets after calling the identity GraphQL register/signIn server-side, and register + sign-in +
+  the four refusals (INVALID_CREDENTIALS, REQUEST_INVALID, EMAIL_TAKEN, SESSION_INVALID) were
+  exercised against the live identity service with curl - see ex-testing/lint/v9-6-REPORT.md.
+  The shop-wide SSR 500 is also closed: the fe-kit/@shared source aliases resolved a second
+  next-intl (and second react) from fe-kit's link-peers junctions, and the apps' next.config now
+  prepends its own node_modules to resolve.modules. What remains is exactly one thing - no
+  uat/identity run has executed: there is no runs/<runId>/ folder with screens, video and a
+  passing result.md. The flow's steps are all manually proven; the harness just has not walked
+  them. Closed by lane v9-9: the ported harness ran uat.identity.sign-in for real against the
+  live shop (npm run dev:shop, :4069) and identity service (:5070), producing
+  features/identity/uat/sign-in/runs/20260919T152145Z-5c10a673 - all five authored steps walked,
+  Outcome: pass, every assertion observed yes, screens + video + cleanup verified.
+closedBy: uat.identity.sign-in
+verificationSource: authored-claim
+because: A gap closes through its closer being done, not through its own replayable command;
+  uat.identity.sign-in (this gap's closedBy) carries the real evidence - its evidence.yaml names
+  runs/20260919T152145Z-5c10a673, whose result.md records outcome pass with screens, a playable
+  video and honest cleanup metadata.
+change: {rev: 4, kind: editorial, at: 2026-09-19T15:26:00.000Z, reason: "state flips to done now that the live UAT run this gap named actually happened; the statement's history of why it was open is retained rather than deleted."}

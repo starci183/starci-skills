@@ -1,0 +1,1 @@
+v7-4 done 2026-09-19: rooted all 4 BLOCKER_UNROOTED chains via new gap.task.single-owner-editor-arm + br.task.single-owner rev-4 edge; authored decision.audit.deleted-task-target resolving log-line vs delete-final; fixed fr.task.create's plan-cap gap and dropped 5 misuse/resolved conflictsWith edges; gate now warns 0.

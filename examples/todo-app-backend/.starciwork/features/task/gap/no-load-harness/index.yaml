@@ -1,0 +1,11 @@
+schema: work/gap
+id: gap.task.no-load-harness
+title: No k6 load-test harness exists to measure the task list's latency
+state: todo
+statement: nfr.task.list.latency's own measurement names "k6 run scripts/load/list.js with 1000
+  seeded tasks and 50 virtual users for 60 seconds", but no scripts/load directory or k6 script
+  exists anywhere in this repository, and no k6 binary was installed by setup - the list read
+  itself is built and proven (br.task.list.owned, impl.task.todo-app-backend.list), so what is
+  missing is the harness to measure it against, not the read.
+closedBy: nfr.task.list.latency
+change: {rev: 1, kind: initial, at: 2026-09-19T20:00:00.000Z}

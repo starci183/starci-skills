@@ -1,0 +1,13 @@
+$ npx jest src/modules/bussiness/session -t "sds.login.session-store: expiry is enforced on read"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/session/session.service.spec.ts
+
+Test Suites: 2 skipped, 1 passed, 1 of 3 total
+Tests:       13 skipped, 1 passed, 14 total
+Snapshots:   0 total
+Time:        3.005 s
+Ran all test suites matching /src\\modules\\bussiness\\session/i with tests matching "sds.login.session-store: expiry is enforced on read".
+

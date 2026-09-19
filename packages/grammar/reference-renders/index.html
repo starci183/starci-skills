@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>Grammar reference renders</title>
+<style>body{font-family:system-ui;margin:24px;background:#f5f5f4}h1{font-size:18px}figure{margin:0 0 32px}img{max-width:100%;border:1px solid #ddd;border-radius:8px;display:block}figcaption{font:12px monospace;margin:6px 0;color:#666}</style>
+<h1>Directions for owner review (todo-app)</h1>
+<figure><figcaption><b>dir-task-list.png — PASS</b> label outside card, rows inside, edge-to-edge separators, secondary input, completed state</figcaption><img src="dir-task-list.png"></figure>
+<figure><figcaption><b>dir-sign-in.png — PASS</b> split-screen (turtle left, form right), forgot password, create account, policy links</figcaption><img src="dir-sign-in.png"></figure>
+<figure><figcaption><b>dir-invite.png — PASS</b> share/invite flow, card anatomy</figcaption><img src="dir-invite.png"></figure>
+<figure><figcaption><b>dir-preferences.png — PASS</b> refused state + error message, toggle states, unsubscribe section</figcaption><img src="dir-preferences.png"></figure>
+<figure><figcaption><b>dir-usage.png — PASS</b> over-cap frozen state, stat numbers, upgrade CTA</figcaption><img src="dir-usage.png"></figure>
+<figure><figcaption><b>dir-schedule.png — FLAG</b> breadcrumb links drawn blue (brand: primary only on button/checkbox/selected); error text ~#ff676a vs --starci-core-danger; "Back to task" duplicates breadcrumb</figcaption><img src="dir-schedule.png"></figure>
+<figure><figcaption><b>dir-privacy.png — FLAG</b> error message not danger-toned (black); export + erasure = 2 subjects in one SurfaceCard (grammar: one subject per card); blue text on "Export my data"</figcaption><img src="dir-privacy.png"></figure>
+<figure><figcaption><b>direction-formula-B4.png — UX-THINKING WINNER</b>: nav left-cluster, turtle-in-avatar, muted breadcrumb, two-column card (form + functional Next-runs aside — no dead space)</figcaption><img src="direction-formula-B4.png"></figure><figure><figcaption><b>direction-formula-B7.png — SPECIAL CARD RECIPE</b>: isHighlight gradient edge + accent hero slab w/ anchored 3D art + success-soft claimed band + flush separators (DailyQuest/ProSubscriptionBlock pattern)</figcaption><img src="direction-formula-B7.png"></figure><figure><figcaption><b>direction-formula-B6.png — ACADEMY LANGUAGE</b>: rail + ONE joined panel card, edge-to-edge section dividers, functional header/composer/collection/footer bands</figcaption><img src="direction-formula-B6.png"></figure>
+<figure><figcaption><b>direction-formula-B5.png — COMPACT JOINED CARD</b>: formCompact measure, joined sections, functional Next-runs preview band, accent-tinted nearest row</figcaption><img src="direction-formula-B5.png"></figure><h1>Prompt formula proof</h1>
+<h1>@starci/grammar — real component renders (core family, accent #2F6BFF)</h1>
+<figure><figcaption>sign-in-screen.png — split-screen: illustration left + real form right</figcaption><img src="sign-in-screen.png"></figure>
+<figure><figcaption>tasks-screen.png — shell + composer SurfaceCard + SurfaceListCard bounding rows</figcaption><img src="tasks-screen.png"></figure>
+<figure><figcaption>empty-state.png — EmptyNotice inside SurfaceListCard</figcaption><img src="empty-state.png"></figure>
+<figure><figcaption>primitives.png — Button variants, Input variants, Text/TextAction</figcaption><img src="primitives.png"></figure>
+<figure><figcaption>direction-formula-B3.png — FINAL: edge-to-edge separators, labels correct inside/outside per component, bounded creativity</figcaption><img src="direction-formula-B3.png"></figure><figure><figcaption>direction-formula-B2.png — WINNING FORMULA: literal anatomy + brand tokens + bounded creative license (turtle, progress hint, metadata)</figcaption><img src="direction-formula-B2.png"></figure><h1>Earlier single-component renders</h1>
+<figure><figcaption>sign-in-card.png</figcaption><img src="sign-in-card.png"></figure>
+<figure><figcaption>task-list.png</figcaption><img src="task-list.png"></figure>
+<figure><figcaption>app-shell.png</figcaption><img src="app-shell.png"></figure>
+<figure><figcaption>task-composer.png</figcaption><img src="task-composer.png"></figure>
+<figure><figcaption>inputs.png</figcaption><img src="inputs.png"></figure>
+<figure><figcaption>buttons.png</figcaption><img src="buttons.png"></figure>
+<figure><figcaption>text-and-actions.png</figcaption><img src="text-and-actions.png"></figure>

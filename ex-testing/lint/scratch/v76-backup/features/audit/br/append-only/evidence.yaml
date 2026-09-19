@@ -1,0 +1,95 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: br.audit.append-only
+recordDigest: f5f7e253d9371c2c8ca953d05b74d91396fbd6fc6fc0b7a05d96601b120917be
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/audit/append-log-line.command.ts
+      sha256: fdde0ba6da67b6a4e7c9cdb2b545bd0a559fe2d1bc23d640c508b9d764bc0014
+    - path: src/modules/bussiness/audit/append-log-line.handler.spec.ts
+      sha256: 36f8679ace7e5e6605df4edc641298c31ed76c34d0f59bff30ce1ea351fb1e69
+    - path: src/modules/bussiness/audit/append-log-line.handler.ts
+      sha256: 0c1869f3cc0be68459f58d11339ff914358e03a147bbb914a4ddf436f3432571
+    - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
+      sha256: cd720e2d4a148e99adbb90efdafe2c739ea1d32d54c36d4262f81a4dbd5cf104
+    - path: src/modules/bussiness/audit/audit-erasure.service.ts
+      sha256: 8b1698d72ca4236339dbd98724306ccec86c4c2ca8aa7b973efa308a0b29c14f
+    - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+      sha256: d077a37500a145c8d66570334c4a6d40e849cafb1ae624946d1c193b74ff7066
+    - path: src/modules/bussiness/audit/audit-event.subscriber.ts
+      sha256: 5c01c71eb8f4c4e133e3e117d1bb5383f90c184440db2e15abbcfa92d1f0e309
+    - path: src/modules/bussiness/audit/audit-keystore.service.spec.ts
+      sha256: 93b9712ebfb09fab686fc8659389d8d4f59d159a8af0fc1c5cb2f700cd88b855
+    - path: src/modules/bussiness/audit/audit-keystore.service.ts
+      sha256: f2cc333ed1d11b029d428be373452949508864125986d0c5b1473e083f041267
+    - path: src/modules/bussiness/audit/audit-log.handler.spec.ts
+      sha256: f60ff43de8e53a4beb81b70d485bbb8e8de6001c6d3e3f48a0f29fe6352edd24
+    - path: src/modules/bussiness/audit/audit-log.handler.ts
+      sha256: 5d4962d78d6cef1451e755fcc9883f893d0fe5d9baa193c613b7655f7dbb8142
+    - path: src/modules/bussiness/audit/audit-log.query.ts
+      sha256: 87e5a2dda13c22ce799d5bf06713340497914e496bbf3e53fb0c07b073da45a9
+    - path: src/modules/bussiness/audit/audit-log.service.spec.ts
+      sha256: cefa03c5c1412d51166345b836771f4fc19d18d0dfbab897a183d7b2be99f3fc
+    - path: src/modules/bussiness/audit/audit-log.service.ts
+      sha256: 4b5e27e36546320d4f6247c04358bb0bf2a8f88cfe5e77cd60f8a8ecdb867cbd
+    - path: src/modules/bussiness/audit/audit-operator-read.ts
+      sha256: 7d6dc38c66e2410649167422ca2c0bf4db5b950fdeabdfda2a5bb0cfb79ad45f
+    - path: src/modules/bussiness/audit/audit-operator-role.guard.ts
+      sha256: d3e2a8ff939acf5f3d06c00e1fbcb3ca3b75452b2a7438f91a4285a60c834fbb
+    - path: src/modules/bussiness/audit/audit-operator.guard.spec.ts
+      sha256: d24e68a69649fc27478cbae18777901fa6bb578c0d8e2cd2cec40c67bcb640a1
+    - path: src/modules/bussiness/audit/audit-operator.guard.ts
+      sha256: cb20ecf154f0e16c93b64dddb26f2f7f717c433004b244db1570c581fc4ca25e
+    - path: src/modules/bussiness/audit/audit-operator.service.spec.ts
+      sha256: 2b27bb6978b7896d5f21bd0c9a8a89e97c9a5004fd5cbb7701ed8cb507a43836
+    - path: src/modules/bussiness/audit/audit-operator.service.ts
+      sha256: 31f5bf40a3e2c77680c6f8de058c627ff6a066d2b8325b062b4ffd99235a34de
+    - path: src/modules/bussiness/audit/audit.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/audit/audit.module.ts
+      sha256: 64ef8c04e90d018c8622235d263d016c5cfa0055c23b987217df801703fe6378
+    - path: src/modules/bussiness/audit/complete-erasure.command.ts
+      sha256: 66f601bb3412b09cd047ba5ed3ae58a6a4e003dc458d2b7f7c965af1d71aba82
+    - path: src/modules/bussiness/audit/complete-erasure.handler.spec.ts
+      sha256: 27479e59fe026f0c094d59a14db48a0699f11ba8c94abdc5e18f21b89d825e0b
+    - path: src/modules/bussiness/audit/complete-erasure.handler.ts
+      sha256: d1eb4b5b178cf536ea8aafda5aa8596b9d1cb08d485607ca66b49bbb82ffd268
+    - path: src/modules/bussiness/audit/export-my-data.handler.spec.ts
+      sha256: 2d9e74a6f57f1d2c9ead0efe0f246025cdf29e8e2c2e05c2f62c805a3e0935af
+    - path: src/modules/bussiness/audit/export-my-data.handler.ts
+      sha256: c0aed303bb6058bad4eef34038c8ca83872bb2e263d78fa59b3e220f9ed8d669
+    - path: src/modules/bussiness/audit/export-my-data.query.ts
+      sha256: 1e7756a93e84c771e87fa5fa5f18d687f273ddb966872df5a6860db56113ea6b
+    - path: src/modules/bussiness/audit/index.ts
+      sha256: a964371c73ac0c9c9d344b6c2860935e49d6c6a0493affcb32edce6233a302e3
+    - path: src/modules/bussiness/audit/request-erasure.command.ts
+      sha256: 34258bccb4ef9a8e4a01a1ff8437b234353992ad30cd52be11bb712d51674598
+    - path: src/modules/bussiness/audit/request-erasure.handler.spec.ts
+      sha256: 88442c0fd64d5179971a15f37cc57e5b2057a8fd22a0d033e049ab9796ba5288
+    - path: src/modules/bussiness/audit/request-erasure.handler.ts
+      sha256: 0b62601f784eeb69ff5a80f7f70ba5aed6b713b334ab850a5458917cf6c7b07f
+    - path: src/modules/bussiness/audit/testing/fake-audit-entity-manager.ts
+      sha256: c69009b3b18c01ae2af68b24211af4ed991822810cf05329f26b2e0d089fd3d3
+    - path: src/modules/bussiness/audit/types/audit-erasure-request-record.ts
+      sha256: 431e2fe18e4184753aec5cc504bbe0d4fce6949b26ca3ddaf4065fcfb9e980d8
+    - path: src/modules/bussiness/audit/types/audit-log-line-record.ts
+      sha256: 6da1043d230a77172dffd07ab554c547f49eedf70181dcc9aeb1c50c8cdd9e1e
+    - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
+      sha256: 6d217fbf835ab1f7b25c820c796876ae60f3acdaa7713efed415ba06c8ca8971
+  digest: ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e
+outcome: pass
+assertions:
+  - id: ac.audit.append-only.chain-detects-tamper
+    command: npx jest src/modules/bussiness/audit --runInBand -t "ac.audit.append-only.chain-detects-tamper"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/audit --runInBand -t
+      "ac.audit.append-only.chain-detects-tamper" exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T18:27:04.233Z

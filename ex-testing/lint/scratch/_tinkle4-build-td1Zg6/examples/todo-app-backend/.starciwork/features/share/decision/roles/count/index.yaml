@@ -1,0 +1,26 @@
+schema: work/policy-decision
+id: decision.share.roles.count
+title: Why exactly two roles, viewer and editor
+state: done
+outcome: decided
+chosen: two-roles
+question: How many roles should a collaborator be able to hold - one undifferentiated "collaborator", two
+  (viewer, editor), or a finer set (viewer, commenter, editor, co-owner)?
+options:
+  - id: one-role
+    summary: Every collaborator can read and complete; there is no viewer.
+    consequence: Simplest record set, but an owner who wants a second pair of eyes with no write access has
+      no way to ask for that; every share is a write grant.
+  - id: two-roles
+    summary: Exactly viewer and editor. Viewer reads; editor reads and completes.
+    consequence: Matches the two things a task can be done to short of delete - read it, complete it - with
+      one role each. Delete is never a role, so the role set does not grow when delete is discussed.
+  - id: finer-set
+    summary: Add commenter and co-owner, each a distinct permission bundle.
+    consequence: More expressive, but commenter has no acceptance criterion this feature currently owns, and
+      co-owner reopens exactly the single-owner question br.task.single-owner rev 2 just settled.
+recommendation: two-roles
+recommendationReason: A task only has two things worth sharing short of ownership itself - reading it and
+  completing it - so two roles map onto real capabilities instead of onto imagined future ones. A third role
+  can be added later without withdrawing br.share.role.permissions; starting with a role nothing currently
+  asks for cannot be justified by an acceptance criterion.

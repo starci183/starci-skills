@@ -1,0 +1,5 @@
+schema: work/feature
+id: plan
+title: A paid plan that caps what the product will do
+description: A free plan holds at most 20 active tasks; a paid plan holds any number. Every record of this
+  feature lives under this directory.

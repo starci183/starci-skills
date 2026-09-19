@@ -1,0 +1,24 @@
+schema: work/gap
+id: gap.share.render-proof
+title: The invite-screen captures fail the canonical render checks - impl.share.todo-app-frontend.invite-screen cannot claim done
+state: todo
+statement: "impl.share.todo-app-frontend.invite-screen keeps real captures - all five mapped
+  states of /tasks/<id>/share at desktop-1280 and mobile-390, produced by ./assets/capture.mjs
+  driving the served build against the live API. The artifacts are real; the proof is not. Run
+  through checks/render.mjs, entity-list-in-card fails on running-page-accepted at both
+  viewports: 3 `border-(--separator)` items sit in a `ul` inside `starci-core-surface` - a list
+  of entities is a page section with a heading; a card is one item. The inviting-state captures
+  additionally fail palette-off-brand on #97b5ff (60-63% of saturated pixels, nearest
+  --starci-core-border at deltaE 16.42). Both findings are properties of the shipped markup and
+  paint in todo-app-frontend, outside the .starciwork record scope, so the done claim is
+  unproven and the record is held at todo, blockedBy this gap. Repro: node
+  scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork --record
+  impl.share.todo-app-frontend.invite-screen"
+closedBy: impl.share.todo-app-frontend.invite-screen
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-19T21:30:00.000Z
+  reason: "Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
+    palette failures above on real markup and bytes. Neither editing checks/*.mjs nor staging
+    captures can close this - the rendered page itself violates the design system's laws."

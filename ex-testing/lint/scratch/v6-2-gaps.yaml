@@ -1,0 +1,133 @@
+gaps:
+  - components:
+      - GrammarRoot
+    missing: |
+      `GrammarRoot` publishes `theme` (`system`/`light`/`dark`) and writes `data-grammar-theme`, but
+      `src/common/styles.css` reads no `data-grammar-theme` anywhere, and every shipped rule that does is
+      conjoined with a family scope. A page that imports `@starci/grammar/common/styles.css` alone writes
+      the attribute and binds nothing to it, so an explicit `theme="dark"` is inert
+    evidence:
+      - packages/grammar/src/core/primitive/GrammarRoot/index.tsx:17
+      - packages/grammar/src/common/styles.css
+      - packages/grammar/src/core/styles.css:78
+      - packages/grammar/src/heritage/styles.css:50
+      - packages/grammar/src/offset-pop/styles.css:61
+  - components:
+      - GrammarRoot
+    missing: |
+      the published rhythm reaches nothing the Common sheet draws: it assigns the five `--grammar-*`
+      values and reads none of them, so a gap can only be steered through the `--starci-core-*` names a
+      family sheet aliases, and no Common-only rule responds to the scale it owns
+    evidence:
+      - packages/grammar/src/common/styles.css:6
+      - packages/grammar/src/common/spacing.ts:15
+      - packages/grammar/src/core/styles.css:34
+  - components:
+      - PageContainer
+    missing: |
+      `MARGIN-AUTO` is stamped on every `PageContainer` root, while the generated canonical catalog
+      publishes MARGIN-0..6 only. A family that names the id `defineGrammarRuleConformance` cannot list
+      it: `unknown` rejects any id absent from `COMMON_UI_RULE_IDS`, so a shipped claim is unusable in
+      family conformance
+    evidence:
+      - packages/grammar/src/core/primitive/PageContainer/index.tsx:17
+      - packages/grammar/src/common/rule-catalog.generated.ts:32
+      - packages/grammar/src/common/conformance.ts:32
+      - knowledge/ui/presentation/margin.yaml:204
+  - components:
+      - RankArtwork
+      - SurfaceCard
+    missing: |
+      the only two classes the Common renderers emit that no shipped sheet draws. `RankArtwork` writes
+      `starci-core-rank-artwork` and no layer of the package mentions it; `SurfaceCard` writes
+      `starci-core-surface-card--fill` for `height: fill` while the fill form is realized by
+      `[data-grammar-surface-height="fill"]`, which the same element also carries. The other 133 emitted
+      classes have at least one rule in `src/common/styles.css`, so these two are hooks with no paint
+    evidence:
+      - packages/grammar/src/core/primitive/RankArtwork/index.tsx:60
+      - packages/grammar/src/core/branch/SurfaceCard/classNames.ts:28
+      - packages/grammar/src/core/branch/SurfaceCard/index.tsx:142
+      - packages/grammar/src/common/styles.css:573
+      - packages/grammar/src/common/styles.css
+      - packages/grammar/src/core/styles.css
+  - components:
+      - SurfaceAccordionCard
+    missing: |
+      no card-suffix class on its own root. Its root is `starci-core-surface-accordion-card`, which ends
+      in neither `-surface` nor `-surface-card`, so a host that identifies card surfaces by that suffix
+      — the rule `checks/render.mjs` `cardClassesOf` applies — does not see an accordion card as a card,
+      while its inner label row still carries `starci-core-surface-label`
+    evidence:
+      - packages/grammar/src/core/branch/SurfaceAccordionCard/classNames.ts
+      - checks/render.mjs:337
+  - components:
+      - Badge
+      - Heading
+      - VerticalScrollRegion
+      - StateMark
+      - StaticStateRow
+      - LeadingNumber
+      - OtpInput
+    missing: |
+      a class hook of their own on some paths. `Badge`, `Heading`, `VerticalScrollRegion` and `StateMark`
+      emit no `starci-core-*` class at all — they are addressed by `data-component`/`data-tier`/
+      `data-contract` attributes and by the vendor's own classes — while `StaticStateRow`,
+      `LeadingNumber` and `OtpInput` reach theirs only through constants imported from
+      `src/core/classNames.ts`. A stylesheet that selects on `.starci-core-*` silently skips the first
+      group
+    evidence:
+      - packages/grammar/src/core/primitive/Badge/index.tsx
+      - packages/grammar/src/core/primitive/Heading/index.tsx
+      - packages/grammar/src/core/composite/VerticalScrollRegion/index.tsx
+      - packages/grammar/src/core/StateMark.tsx
+      - packages/grammar/src/core/classNames.ts
+  - components:
+      - Common token contract
+    missing: |
+      any programmatic list of the names a consumer may override. `STARCI_CORE_DNA`,
+      `STARCI_CORE_TOKEN_NAMES`, `STARCI_CORE_BAND_TOKEN_NAMES` and the light/dark default maps are all
+      declared in `src/core/dna.ts`, and `src/common/index.ts` re-exports only state, spacing,
+      conformance, renderers and registry — so the public entry publishes no token vocabulary, and the
+      table above exists only because the CSS was read
+    evidence:
+      - packages/grammar/src/common/index.ts
+      - packages/grammar/src/core/dna.ts:95
+      - packages/grammar/src/core/dna.ts:162
+  - components:
+      - Common spacing vocabulary
+    missing: |
+      a published token for any padding step. `COMMON_SPACING_TOKENS` names five things (four gaps and a
+      page inset) over a seven-step scale; the insets and corners Common actually draws come from
+      `--starci-core-surface-inset`, `--starci-core-row-inset` and the vendor radius ramp
+      (`--radius`, `--radius-sm|md|lg|xl`), none of which Common assigns
+    evidence:
+      - packages/grammar/src/common/spacing.ts:2
+      - packages/grammar/src/common/styles.css:287
+      - packages/grammar/src/common/styles.css:563
+      - packages/grammar/src/common/styles.css:2219
+  - components:
+      - WorkspaceShell
+      - NavigationFeatureNav
+      - Subnav
+      - SurfaceCard
+    missing: |
+      an elevation or stacking prop. Order lives in three token defaults Common only reads
+      (`--starci-core-navbar-z` 50, `--starci-core-subnav-z` 40, `--starci-core-workspace-floating-z` 40)
+      and in literal `z-index` values written on surface parts (20 at styles.css:452, 1 at 521 and 610),
+      so a product that must reorder a band against a floating layer has names to override only for the
+      first three
+    evidence:
+      - packages/grammar/src/common/styles.css:452
+      - packages/grammar/src/common/styles.css:1265
+      - packages/grammar/src/common/styles.css:1445
+      - packages/grammar/src/common/styles.css:1686
+  - components:
+      - Common overlay owner
+    missing: |
+      a general overlay or dialog owner in the published set. `Tooltip` is the only floating primitive and
+      `ChatWorkspace` owns its own drawer; there is no modal, popover, toast or command-palette renderer
+      among the 42, and `WorkspaceShell` exposes a `floatingLayer` slot it does not itself position
+    evidence:
+      - packages/grammar/src/common/registry.tsx
+      - packages/grammar/src/core/branch/Tooltip/index.tsx
+      - packages/grammar/src/core/composition/WorkspaceShell/index.tsx

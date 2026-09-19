@@ -1,0 +1,24 @@
+schema: starci/claude-recipes@1
+api: api.json
+recipes:
+  solo-workflow:
+    host: current-claude-chat
+    controlLayers:
+      - plan
+      - coordinator
+      - workflow-wrapper
+    operationSequence:
+      - Task
+      - normalize-operation-output
+    concurrency: multiple-independent-Task-calls-in-one-tool-turn-up-to-three
+  bootstrap-orca:
+    host: external-claude-chat
+    sequence:
+      - load-providers-orca-contracts
+      - create-native-orca-plan-coordinator
+      - hand-off-run
+      - leave-control-loop
+forbidden:
+  - claude-hosted-orchestration
+  - assume-Agent-or-AgentOutput-tool-without-runtime-schema
+  - op-agent-spawns-subagent

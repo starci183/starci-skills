@@ -1,0 +1,7 @@
+PASS src/modules/bussiness/plan/cap-guard.policy.spec.ts (6.501 s)
+
+Test Suites: 116 skipped, 1 passed, 1 of 117 total
+Tests:       700 skipped, 1 passed, 701 total
+Snapshots:   0 total
+Time:        28.189 s
+Ran all test suites with tests matching "ac.plan.caps.limit.refuses-over-cap".

@@ -1,0 +1,22 @@
+schema: work/uat-flow
+id: uat.audit.right-to-be-forgotten
+title: Sign in, create tasks, request erasure, confirm it held
+state: todo
+entry: /privacy
+actor: person
+accounts: accounts.yaml
+environment: environment.todo-app.dev
+fixtures: [fixture.todo-app.seed]
+steps:
+    - {order: 1, actor: person, action: "Sign in with the seeded person and create two tasks.", expected: "both tasks appear in the list", checks: [{id: completion, expected: yes}]}
+    - {order: 2, actor: person, action: "Request erasure and confirm it.", expected: "the erasure moves to pending then complete", checks: [{id: loading, expected: yes}, {id: completion, expected: yes}]}
+    - {order: 3, actor: person, action: "Export the person's data.", expected: "the export returns nothing for the erased person", checks: [{id: completion, expected: yes}]}
+    - {order: 4, actor: operator, action: "As the seeded operator, read the log for the same window.", expected: "the lines exist and are unnamed (no personal identifier retained)", checks: []}
+effects:
+  - "insert two task rows for the seeded person"
+  - "run the erasure transaction against the seeded person"
+cleanup:
+  - "confirm the erased rows remain absent; no further deletion needed since erasure already removed them"
+proves: [fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export, fr.audit.log.read]
+blockedBy:
+  - {record: gap.audit.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/right-to-be-forgotten/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}

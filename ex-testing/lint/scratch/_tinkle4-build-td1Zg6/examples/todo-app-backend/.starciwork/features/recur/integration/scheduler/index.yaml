@@ -1,0 +1,23 @@
+schema: work/integration
+id: integration.recur.scheduler
+title: A scheduled tick materialises every rule's due occurrences
+state: done
+provider: nestjs-schedule
+boundary: "This product owns the generation logic entirely (sds.recur.generation-engine): the provider's
+  only job is to fire a callback at a configured interval, in-process, inside the same NestJS application
+  as the API. There is no external service to be down independently of the app itself; the \"outage\"
+  decision.recur.generation.backfill answers is the app process not running, not a provider being
+  unreachable."
+endpoints:
+  - {name: tick, method: CRON, path: "*/5 * * * *"}
+sandbox: The dev environment runs the same in-process scheduler as production, on the same interval; there
+  is no separate sandbox instance to run it against, only a shorter observation window.
+refs: [sds.recur.generation-engine]
+
+requiresProof:
+  live:
+    required: true
+    note: A run of the real in-process scheduler on the dev server producing a materialised occurrence,
+      not a manually invoked function call standing in for the tick.
+
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "Implemented: SchedulerService (src/modules/bussiness/recur/scheduler.service.ts) registers a real @nestjs/schedule CronJob via SchedulerRegistry, interval from AppConfigService.getRecurTickCron() (default */5 * * * *, this integration's own declared endpoint). The gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed. requiresProof.live's own note (\"a run of the real in-process scheduler..., not a manually invoked function call\") is satisfied by scripts/live-proof-recur.sh: the API was started with RECUR_TICK_CRON='*/5 * * * * *' (a short interval used only for this live run, never touching the declared production default) and the script polled upcomingOccurrences until a real tick materialised a real occurrence - observed directly, not stood in for."}

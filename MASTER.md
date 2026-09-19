@@ -13,7 +13,7 @@ deleted when the last workstream below is closed.
 | Kernel | `kernel/` 66 files, 23 809 lines; `kernel/kernel.mjs` alone 5 005 lines |
 | Declared data | `model/kinds.yaml` 32 kinds; `ops/` 30 operator dirs; 5 kinds without an operator (`architecture.revise`, `business.revise`, `frontend.implement`, `goal.validate`, `implementation.plan`), 2 operators without a kind (`interface.implement`, `task.execute`) |
 | Layout debt | 20 of 30 `ops/*/operator.yaml` still read `<business>/business/**` and write `work/node@2` fields; 4 name `features/` |
-| Validator debt | `starci validate examples/todo-app-backend/.starciwork` = 2 916 errors (UNKNOWN_FIELD 1 226, SCHEMA_VALUE 705, SCHEMA 217, NODE_KIND 216, REQUIRED 216, EMPTY_SPEC 201); the example gate `scripts/check-example-work.mjs` passes the same tree (217 records, 723 refs) |
+| Validator debt | `starci validate examples/todo-app-backend/.starciwork` = 2 916 errors (UNKNOWN_FIELD 1 226, SCHEMA_VALUE 705, SCHEMA 217, NODE_KIND 216, REQUIRED 216, EMPTY_SPEC 201); the example gate `scripts/checks/check-example-work.mjs` passes the same tree (217 records, 723 refs) |
 | Layout schema | `schemas/work-layout.yaml` (`starci/work-layout@3`) still describes `business/srs/**`, `architecture/sds/**`, `implementation/{frontend,backend}`; the example uses `br/ fr/ nfr/ data/ journey/ decision/ event/ gap/ sds/ contract/ impl/ ui/ uat/` with 18 `work/*` schema families; `model/records.yaml` knows about a dozen record classes, none named `work/*` |
 | Digest | the kernel digests the whole record file (`kernel/reconciliation.mjs`), so hand-authored evidence is digest-stale by construction |
 | Docs | `docs/` 78 files; six are dated plans or handovers (`v4-plan`, `v4.1-supervision-plan`, `v5-plan`, `5-plus`, `handover-2026-09-14`, `design-pattern-source-review-20260916`) |
@@ -80,7 +80,7 @@ it with zero errors. This is the pivot; nothing in WS-C..WS-F starts before B3.
 | --- | --- | --- |
 | B1 layout schema | `schemas/work-layout.yaml` → `starci/work-layout@4` naming the example's folder families (`br fr nfr data journey decision event gap sds contract impl ui uat integration`) and `brand/` | the layout lists every folder the example has and nothing it lacks |
 | B2 record catalog | `model/records.yaml` → one entry per `work/*` schema family (18), each naming its validator and its `carries` const; `model/kinds.yaml` `reads`/`writes` re-pointed to those classes | `validateGraph` accepts the catalog; no kind reads or writes a class the catalog lacks |
-| B3 core validator | `core/` accepts `work/*` records by their own schema; `starci/work-layout@3` shapes stay readable, never authoring authority | `starci validate examples/todo-app-backend/.starciwork` = 0 errors; `scripts/check-example-work.mjs` rules move into `core/` (one validator, the example spec becomes a fixture test) |
+| B3 core validator | `core/` accepts `work/*` records by their own schema; `starci/work-layout@3` shapes stay readable, never authoring authority | `starci validate examples/todo-app-backend/.starciwork` = 0 errors; `scripts/checks/check-example-work.mjs` rules move into `core/` (one validator, the example spec becomes a fixture test) |
 | B4 digest | `kernel/reconciliation.mjs` digests `statements` + `acceptanceCriteria` (the designed slice), not the file | a title edit does not stale a proof; a rule edit does; both pinned by spec |
 | B5 stale/proven | `stale`/`staleSince`/`proven` semantics as the layout states them | the kept breaking change shows as `stale` with its dependents; ledger summary counts agreed and proven separately |
 
@@ -92,7 +92,7 @@ Goal: every operator reads and writes the example's records; kinds and operators
 | --- | --- |
 | C1 re-point 20 operators from `<business>/business/**` + `work/node@2` to the `work/*` classes | `ops/validate.mjs` + `IO_DRIFT` refuse a stale path; `tests/ops.spec.mjs` runs each operator's declared IO against the example tree |
 | C2 close the kind/operator gap | operator dirs for `architecture.revise`, `business.revise`, `implementation.plan`, `goal.validate`; `frontend.implement` and `interface.implement` become one name (keep the kinds.yaml name); `task.execute` gets a kind or is deleted |
-| C3 knowledge/checks/stacks inputs | each kind's declared `knowledge`, `checks`, `stacks` lists resolve to real files; pattern-coverage parity: every `knowledge/patterns/{fe,be}/*` has a `checks/code-patterns/*` or a `check: manual` with a reason |
+| C3 knowledge/checks/stacks inputs | each kind's declared `knowledge`, `checks`, `stacks` lists resolve to real files; pattern-coverage parity: every `knowledge/patterns/{fe,be}/*` has a `scripts/checks/code-patterns/*` or a `check: manual` with a reason |
 | C4 one end-to-end dry run | `workflow-goal` → `workflow-approve` → `workflow-run --host-adapter headless` on the example for one feature; all ops launch with the new IO and the ledger accepts |
 
 ### WS-D  Kernel by concept, not by history
@@ -166,7 +166,7 @@ WS-A (example)  ──►  WS-B (layout/catalog/validator)  ──►  WS-C (ope
 
 - The example's folder names (`br`, `fr`, `impl`, ...) win over the layout schema's
   (`business/srs`, `implementation/backend`). The schema follows the example.
-- `scripts/check-example-work.mjs` is not a second validator; its rules move into `core/` and
+- `scripts/checks/check-example-work.mjs` is not a second validator; its rules move into `core/` and
   the script becomes a thin caller or is deleted.
 - Kinds keep their names from `model/kinds.yaml`; operator directories rename to match.
 - Nothing in `execution/` gains new behaviour; it is wired or retired in D4.

@@ -1,0 +1,24 @@
+
+# token sonarqube-todo-app-backend-token.key (len 44, prefix sqp_***)
+users/search -> HTTP 200
+  projectKeys=starci-todo-app-backend -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-todo-app-backend\u0027 cannot be parsed as an int
+  projectKeys=starci-ecommerce-app-be -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-ecommerce-app-be\u0027 cannot be parsed as an int
+  id=starci-todo-app-backend -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271id\u003dstarci-todo-app-backend\u0027 cannot be parsed as an integer"}]}
+  projectKeys=starci-todo-app-nope -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-todo-app-nope\u0027 cannot be parsed as an intege
+  (no selector) -> total=58
+
+# token sonarqube-ecommerce-app-be-token.key (len 44, prefix sqp_***)
+users/search -> HTTP 200
+  projectKeys=starci-todo-app-backend -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-todo-app-backend\u0027 cannot be parsed as an int
+  projectKeys=starci-ecommerce-app-be -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-ecommerce-app-be\u0027 cannot be parsed as an int
+  id=starci-todo-app-backend -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271id\u003dstarci-todo-app-backend\u0027 cannot be parsed as an integer"}]}
+  projectKeys=starci-todo-app-nope -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-todo-app-nope\u0027 cannot be parsed as an intege
+  (no selector) -> total=58
+
+# token sonarqube-admin-token.key (len 44, prefix squ_***)
+users/search -> HTTP 200
+  projectKeys=starci-todo-app-backend -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-todo-app-backend\u0027 cannot be parsed as an int
+  projectKeys=starci-ecommerce-app-be -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-ecommerce-app-be\u0027 cannot be parsed as an int
+  id=starci-todo-app-backend -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271id\u003dstarci-todo-app-backend\u0027 cannot be parsed as an integer"}]}
+  projectKeys=starci-todo-app-nope -> HTTP 400 {"errors":[{"msg":"\u0027ps\u0027 value \u00271projectKeys\u003dstarci-todo-app-nope\u0027 cannot be parsed as an intege
+  (no selector) -> total=58

@@ -1,0 +1,173 @@
+schema: starci/knowledge-source@1
+id: ui.proof.focus
+title: Focus proof
+appliesTo:
+  - ui
+family: proof
+purpose: |-
+  This file answers one question: for a reader working without a pointer, where is focus, where can it
+  go, and where does it come back to?
+  Focus is only ever proved at runtime. A `:focus-visible` rule in a stylesheet does not establish a
+  visible indicator, and a correct DOM order does not establish that traversal reached every stop.
+  Each rule below names the observation that would falsify it.
+rules:
+  - id: FOCUS-1
+    title: The visible indicator sits on the actual target
+    governs: Governs whether a focused thing looks focused.
+    cases:
+      - id: case-1
+        when: |-
+          Keyboard focus lands on an interactive or scrollable published owner
+        observe: |-
+          An indicator appears on that exact target, identifying it unambiguously. A focused element with no perceivable change falsifies it
+      - id: case-2
+        when: |-
+          The indicator sits against adjacent paint or a coloured surface
+        observe: |-
+          It remains distinguishable there, in the current computed styles rather than in the intended ones
+      - id: case-3
+        when: |-
+          The viewport narrows, the page zooms, or the target sits at a scroll edge
+        observe: The indicator is not clipped by any ancestor's overflow
+      - id: case-4
+        when: The application or a family styled over the published owner
+        observe: |-
+          The indicator survives. An `outline: none` with no equivalent replacement falsifies it, and hover feedback is not a substitute
+      - id: case-5
+        when: Focus arrives by pointer rather than by keyboard
+        observe: |-
+          The indicator appears only where the published treatment intends it, so its presence still means something
+  - id: FOCUS-2
+    title: Sequential order equals task order
+    governs: Governs the path focus takes through a composite.
+    cases:
+      - id: case-1
+        when: |-
+          Tabs, disclosures, navigation peers, or scroll regions create several stops
+        observe: |-
+          Visible order, DOM order, and sequential focus order agree with the task dependency. A visual reorder that leaves focus behind falsifies it
+      - id: case-2
+        when: The composite publishes arrow-key behaviour
+        observe: |-
+          Traversal reaches every enabled peer and skips what is disabled or hidden. Arrow focus landing on a disabled peer falsifies it
+      - id: case-3
+        when: Traversal is run backwards
+        observe: |-
+          Reverse order mirrors forward order, and no stop is reachable in only one direction
+      - id: case-4
+        when: |-
+          Peers overflow their container, or the layout reflows at a narrower width
+        observe: |-
+          Every peer is still reachable, and focusing one brings it into view
+      - id: case-5
+        when: The application set an explicit tab order
+        observe: |-
+          A positive tab index that jumps a later action ahead of earlier required fields falsifies the order; the source order is what should have changed
+  - id: FOCUS-3
+    title: Containment follows modality
+    governs: Governs how far focus may travel while a region is open.
+    cases:
+      - id: case-1
+        when: A modal region opens above the current task
+        observe: |-
+          Focus enters the dialog, stays inside it, reaches an explicit close path, and responds to Escape. Focus escaping to the page behind it falsifies containment
+      - id: case-2
+        when: The modal closes
+        observe: |-
+          Focus returns to the exact control that opened it. A return to the document body falsifies restoration
+      - id: case-3
+        when: The compact conversation rail is the modal in question
+        observe: |-
+          `ChatWorkspace` owns that lifecycle through `isRailOpen` and `onRailOpenChange`; the runtime focus sequence is observed rather than inferred from the vendor name behind it
+      - id: case-4
+        when: A non-modal region appears beside the task
+        observe: |-
+          Focus moves in and out of it freely. A non-modal region that traps focus falsifies it
+      - id: case-5
+        when: |-
+          A different reusable modal is needed and no published owner fits
+        observe: |-
+          The gap is recorded. Application-local focus machinery is a tracked workaround, never presented as the contract
+  - id: FOCUS-4
+    title: Focus evidence and falsifiers
+    governs: Governs what closes a focus claim.
+    cases:
+      - id: case-1
+        when: Any focus claim is being closed
+        observe: |-
+          The active element, the visible indicator, the computed style, the DOM order, the target rectangle, and the accessibility tree are captured together. A screenshot without an active-element trace closes nothing
+      - id: case-2
+        when: A branch is conditionally absent
+        observe: |-
+          It contributes no focus stop. A visually hidden control still in the sequence falsifies its absence
+      - id: case-3
+        when: A control is disabled or unavailable
+        observe: |-
+          Focus behaves as the published owner intends, and activation produces no effect
+      - id: case-4
+        when: The page is zoomed or reflowed
+        observe: |-
+          Every path above is rerun there, because a ring that fits at one width may be clipped at another
+      - id: case-5
+        when: A family or the application adds a delta
+        observe: |-
+          The isolated published output, the family delta, and the application delta are separated, so the failing layer is named
+  - id: FOCUS-5
+    title: Pointer and keyboard reach the same outcome
+    governs: |-
+      Governs parity between input methods across every interactive owner.
+    cases:
+      - id: case-1
+        when: A whole-surface action, a tab, or a disclosure is exercised
+        observe: |-
+          Pointer and keyboard produce the same product outcome. An action available only by pointer falsifies parity
+      - id: case-2
+        when: One activation is delivered by either route
+        observe: |-
+          It produces at most one accepted effect. Two callbacks for one key press falsifies the owner
+      - id: case-3
+        when: Targets sit near or over one another
+        observe: |-
+          Their rectangles do not collide, and no independent control hides behind a whole-surface overlay
+      - id: case-4
+        when: A required action is revealed by hovering
+        observe: That falsifies it. A required action is never hover-only
+      - id: case-5
+        when: |-
+          The paths are run across default, selected, expanded, disabled, pending, and absent states
+        observe: |-
+          Each state is exercised by both routes, and a desktop pointer pass alone closes nothing
+  - id: FOCUS-6
+    title: The focus verdict
+    governs: |-
+      Governs how selected observations are summarized in the current `.starciwork` node's evidence.
+    cases:
+      - id: case-1
+        when: The lens runs
+        observe: |-
+          `FOCUS-1` to `FOCUS-5` are each judged from the element that actually held focus, at every state the coverage declares
+      - id: case-2
+        when: The verdict is computed
+        observe: |-
+          The gating set is the whole set: `pass` requires every criterion to pass, because focus that is lost once is lost for the person who navigates that way
+      - id: case-3
+        when: A criterion has no observation behind it
+        observe: |-
+          The verdict is `blocked`, and a partial pass over the criteria that were observed falsifies it
+      - id: case-4
+        when: A failure has been measured
+        observe: |-
+          Record whether the failure concerns indicator values, reading order/containment/return, or a capability absent from the verified installed API. Identify the owner without executing another op.
+    notes:
+      - |-
+        The scored set is `FOCUS-1` to `FOCUS-5`; this rule only summarizes and is not itself scored.
+      - |-
+        Store assertions, observations and artifact references in the selected node's evidence; there is
+    remark: |-
+      no separate receipt table or downstream verdict-copying rule. Missing evidence never earns a pass.
+doesNotDecide: |-
+  Which reading order the task requires is [Hierarchy](../composition/hierarchy.yaml), which surfaces are
+  interactive and which values persist is [State](../composition/state.yaml), and which effect an
+  activation may reach is [Action](../composition/action.yaml). Names, relationships, and target sizes
+  are [Accessibility](accessibility.yaml); movement and reduced-motion equivalence are
+  [Motion](motion.yaml).

@@ -1,0 +1,21 @@
+{
+  "name": "@starci-examples/fe-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared hand-rolled theme provider, display controls and next-intl plumbing for the StarCi example frontends. Source-only package: consumers compile src/ through their own Next/Vitest pipelines via the @fe-kit/* tsconfig path alias and declare it as a file: dependency.",
+  "exports": {
+    "./package.json": "./package.json",
+    "./*": "./src/*"
+  },
+  "peerDependencies": {
+    "@starci/grammar": ">=0.4.0",
+    "next-intl": ">=4",
+    "react": ">=19"
+  },
+  "scripts": {
+    "link-peers": "node scripts/link-peers.mjs",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -1,0 +1,305 @@
+# modules/ops/ops/brand.decide.yaml - TINKLE-1 pure-yaml port of .claude/ops/brand.decide/operator.yaml
+# The operator contract below is verbatim; the trailing 'business:' block is the added
+# analysis (inference marked where the contract does not state it literally).
+
+id: brand.decide
+goal:
+  en: Settle one product's visual identity in the single brand record - colour tokens traced to the real
+    source files, typography, mascot, logo, iconography, imagery rules, voice and motion - so every later
+    drawing and build reads an identity instead of inventing one.
+nodeKinds:
+  - brand
+completionProfile: brand
+sideEffects:
+  - generated placeholder mascot/logo asset bytes under the brand record's own assets
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected brand record, its ancestor scope, declared refs/dependencies/assertions,
+        its current `rev` and validator freshness. There is exactly one brand record per product: this op
+        revises that record rather than adding a second identity. An absent target is a scope/graph gap:
+        report it and propose a separately selected scope op; never create a second brand owner here."
+  - id: owner
+    path: .starciwork/<business>/business/**/index.yaml + the selected request and the owner's recorded
+      rulings
+    purpose:
+      en: "Read the accepted business scope and the owner's actual rulings about identity - the name, the
+        primary hue, whether danger may match primary, the mascot and what it may never appear in, the
+        voice. A taste decision belongs to the owner: an unanswered one is a question with the closed
+        options, never a choice this op makes on the owner's behalf. Inferring identity from a competitor,
+        a template or a screenshot is not a ruling."
+  - id: grammar
+    path: consuming app manifest/lockfile + resolved component package exports/types/renderers/CSS + app
+      family root/style imports
+    purpose:
+      en: "Resolve the installed design grammar from the actual consuming app, honoring workspace aliases
+        and bundler resolution, and record package identity, version, resolved path and inspected file
+        hashes. The family's own token names are the vocabulary this record may use: a colour is declared
+        as the grammar token the renderer actually consumes, never as a free-floating hex value with an
+        invented name. A similarly named family variable is not proof it is wired."
+  - id: sources
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: "Read the real token and style files of the frontend repository - the app's global CSS, the family
+        root, the theme and token files the owner named or that this repository actually contains - and
+        record each file path with the exact declaration every token value comes from. These files are the
+        source of truth for a value: this op copies them, it never proposes a palette the product does not
+        already serve. A source file the record names and that does not exist is an environment blocker,
+        never a value filled in from memory."
+  - id: assets
+    path: N/assets/* + repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Read the mascot, logo and icon-set assets that already exist - beside the record and in the
+        frontend repository - with their formats, dimensions and provenance. Reuse an existing verified
+        asset before producing any new one; an asset whose rights or origin are unknown is reported, not
+        adopted.
+  - id: knowledge
+    path: knowledge/INDEX.json + applicable UI presentation/composition and installed family topics
+    purpose:
+      en: Read the applicable presentation, composition and family topics before mapping a decision onto a
+        token name, a contrast floor or an icon rule. Knowledge explains ownership and composition; the
+        installed package and the real source files determine what a value may actually be.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles, and establish whether an image generator is actually available to this runtime. Use
+        current host model configuration; historical model names are not availability proof. Capabilities
+        are the intersection of actual tools, selected profile policy, op permissions and existing task
+        authority.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - schema
+      - "brand: {identity,colors,typography,mascot,logo,iconography,imagery,voice,motion,forbidden,sources,artworkSlots}"
+      - assets:[{path}]
+      - assertions
+      - rev
+    content:
+      en: "Write the whole identity into the one brand record (schema work/node@2): identity (name and the installed grammar
+        family), colour tokens as grammar token name -> value with role and the policy that governs them
+        (`dangerMayMatchPrimary`, `minContrast`), typography, mascot, logo, iconography, imagery, voice,
+        motion, the explicit forbidden list, the `artworkSlots` conventions every later prompt fills, and
+        `sources` naming the real files each value was read from. Every asset path recorded under
+        `brand.mascot`/`brand.logo` is also declared in top-level assets for byte binding. Bump `rev` once
+        per accepted revision and state what changed. No product code, no second brand owner and no
+        identity claim the owner did not rule."
+  - id: brandAssets
+    path: N/assets/<asset>
+    fields:
+      - brand.mascot.assets:[{path,sha256}]
+      - brand.logo.assets:[{path,sha256}]
+      - assets:[{path}]
+    content:
+      en: "Store reused or newly generated identity bytes under the brand record's own assets in their actual
+        formats, each with its sha256 and its provenance. A mascot the product does not yet have may be
+        produced once as an explicit placeholder from the owner's description with the available image
+        generator; it is recorded as a placeholder, never as the final mascot and never as a capture of a
+        shipped surface. When no generator is actually available, record a concrete deferred brief instead
+        and leave the slot empty: a missing file is never described as generated."
+  - id: evidence
+    path: E/manifest.yaml + E/brand-check.txt + E/token-trace.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - extensions
+    content:
+      en: Retain the actual output of the brand checks with their exit status, the token-to-source trace
+        (token name, value, file and declaration it was read from), the resolved package/family evidence and
+        the provenance of every asset. An honest not-run or failing check cannot earn done.
+steps:
+  - reads:
+      - target
+      - owner
+      - grammar
+      - profile
+    writes:
+      - node
+    action:
+      en: "Freeze the brief before writing anything: the product name, the actually installed grammar
+        family, and each identity decision the owner has ruled - primary hue, whether danger may match
+        primary, the mascot and where it may never appear, typography, voice. Record the decisions as
+        closed options with the ruling that selected them; an unruled taste decision is a question with the
+        options, never a preference this op supplies. Resolve the execution profile and whether an image
+        generator is actually available before planning any asset work; this selects no model and spawns no
+        worker."
+  - reads:
+      - sources
+      - grammar
+      - knowledge
+    writes:
+      - node
+    action:
+      en: "Derive every colour token from the real source files and nothing else: open the app's global CSS,
+        family root and theme/token files, and for each value record the token name the renderer consumes,
+        the value, and the exact file and declaration it came from. Map the owner's decisions onto those
+        grammar token names rather than inventing a parallel palette. A value you cannot trace to a
+        declaration in a real file is not written: it is a question naming the token and the file it should
+        live in. Declare `sources` as that exact file list."
+  - reads:
+      - sources
+      - knowledge
+      - owner
+    writes:
+      - node
+    action:
+      en: Give every token its role (primary, danger and the rest) and write the policy that governs the
+        set - whether danger may match primary, and the minimum contrast every text-on-surface pair must
+        hold. Check the pairs the record itself declares against that floor and against the policy, and
+        record the measured ratios. A token set that cannot satisfy the owner's ruling and the floor at the
+        same time is reported with both numbers, never quietly adjusted to pass.
+  - reads:
+      - assets
+      - owner
+      - profile
+    writes:
+      - brandAssets
+      - node
+    action:
+      en: "Settle the mascot, the logo and the icon set. Reuse the assets the repository already has, with
+        their real paths and provenance. Only when the product has no mascot asset at all, generate one
+        explicit placeholder from the owner's description with the available image generator, store it under
+        the record's own assets with its sha256, and record it as a placeholder pending the owner's
+        acceptance; if the runtime has no generator, write a concrete deferred brief instead and never claim
+        a file exists. Write `allowedIn`, `forbiddenIn` and the usage rules for each, and name the single
+        icon set the product may use so no later screen introduces a second one."
+  - reads:
+      - target
+      - knowledge
+      - owner
+    writes:
+      - node
+    action:
+      en: "Write the rules that make every later surface derive from this record rather than from taste:
+        imagery style with its explicit forbidden list and `promptRules` that require every later image
+        prompt to state this brand by name, family, palette and mascot policy; the `artworkSlots`
+        conventions a drawing fills; voice; motion; and one forbidden list the record is judged against. A
+        rule nobody could check from the record is rewritten until it can be."
+  - reads:
+      - target
+      - sources
+    writes:
+      - node
+      - evidence
+    action:
+      en: "Run the brand checks against the real frontend repository and keep their output: token values
+        match their declared sources, every declared text pair holds the contrast floor, primary and danger
+        are distinct unless the policy permits otherwise, every declared mascot asset exists with its
+        recorded hash, and the icon set is the only one named. Bump `rev` and record what changed. Report
+        `done` exactly once with the new `rev`, the checks and the token-to-source trace; a failing check is
+        `failed` with its output; a value that cannot be traced to a source is `ask` naming the token and
+        the file; a source file the record needs and that does not exist is `blocked` with `environment` and
+        the exact path. Never report done on unrun checks."
+proofs:
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn done.
+  - id: token-traceability
+    requirement:
+      en: Every colour token in the record names the grammar token the renderer consumes and the exact source
+        file and declaration its value was read from, and `sources` lists those files. A value with no
+        traceable source is a question, never a record entry; a resolved package name and version alone is
+        not a trace.
+  - id: brand-checks
+    requirement:
+      en: "The machine checks ran against the actual frontend repository and their real output is retained
+        with its exit status: source match, contrast floor, primary/danger distinctness under the declared
+        policy, mascot assets present with their recorded hashes, and a single icon set. A green summary
+        without retained output is not proof."
+  - id: asset-provenance
+    requirement:
+      en: Every identity asset the record declares exists under the record's own assets with its sha256 and
+        its provenance, and a generated placeholder is recorded as a placeholder. A deferred asset carries a
+        concrete brief and an empty slot; no missing file is described as generated or accepted.
+blockers:
+  - code: BRAND_SOURCE_MISSING
+    condition:
+      en: A token/style source file this record must read does not exist in the selected repository, or the
+        repository itself is not resolvable. Report `blocked` with `environment` and the exact path; never
+        substitute a remembered value for an unreadable file.
+  - code: BRAND_TOKEN_UNTRACEABLE
+    condition:
+      en: A required token value cannot be traced to a declaration in a real source file, or two sources
+        disagree about it. Report `ask` naming the token, the candidate values and the files; never write
+        the value you would have chosen.
+  - code: BRAND_DECISION_UNRULED
+    condition:
+      en: An identity decision the record needs - primary hue, whether danger may match primary, the mascot
+        and its forbidden placements - has no owner ruling, or the ruling contradicts the contrast floor.
+        Report `ask` with the closed options and what each one costs.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never run
+        predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  write-ceiling: Explicit owned source paths
+  environment: Resolved environment label
+  identity: Selected actor label
+  fixture: Selected fixture path
+  resource: Selected owned asset name
+  asset: Actual selected source asset filename/format
+  piece: Stable selected piece slug
+  flow: Selected UAT journey slug
+  screen: Selected surface/state slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+# ---------------------------------------------------------------------------
+# TINKLE-1 business analysis (not part of the source contract; inference marked).
+business:
+  question: >-
+    "What is this product's single settled visual identity - colors traced to
+    real source files, typography, mascot, logo, iconography, imagery, voice,
+    motion, forbidden shapes - that every later draw/build reads instead of
+    inventing?"
+  whenNeeded:
+    - Before interface.draw / interface.asset need an identity to draw against.
+    - When the one brand record must be authored or revised (rev bump, files touched list).
+    - When identity values must be grounded in the installed grammar family and real token/source files rather than taste.
+  whenNot:
+    - Never a second brand record - one product identity per product (declared).
+    - Not for product code changes; not to invent palette/typography the bound source does not serve.
+    - Not for taste calls the owner never ruled - open ruling questions go to ask, not silent choice (BRAND_DECISION_UNRULED).
+  consumes:
+    - The one brand record target; accepted owner brand rulings.
+    - Installed grammar family + real token/style source files; existing brand asset masters.
+    - Applicable UI knowledge topics; environment/identity resources.
+  produces:
+    - The brand record: identity/colors/typography/mascot/logo/iconography/imagery/voice/motion/forbidden/sources + artworkSlots declarations.
+    - Brand asset files with sha256 provenance; brand-check and token-trace evidence; node completion.review.
+    - Downstream authority consumed by interface.draw candidates and interface.asset slot generation.
+  failureModes:
+    - BRAND_SOURCE_MISSING (blocked/environment), BRAND_TOKEN_UNTRACEABLE (ask), BRAND_DECISION_UNRULED (ask), DECLARED_DEPENDENCY_UNMET.
+    - done cannot be earned on unrun checks - brand-check + token-trace must actually execute.
+# ---------------------------------------------------------------------------
+# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
+# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
+# block alone — an agent never reads the whole contract to route.
+route:
+  nodeKinds: [brand]
+  phase: [decide, pre-implementation]
+  intent: [brand, identity, tokens, decide]
+  prerequisites: ["scope defined"]
+  riskHints: [generates-assets]

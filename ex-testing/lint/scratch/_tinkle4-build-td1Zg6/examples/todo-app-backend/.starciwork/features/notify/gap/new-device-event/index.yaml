@@ -1,0 +1,11 @@
+schema: work/gap
+id: gap.notify.new-device-event
+title: login never emits a new-device sign-in signal today
+state: todo
+statement: login exposes no device field on a session today and calls contract.notify.new-device-signal's
+  onNewDeviceSignIn from nowhere. decision.login.session.devices is now decided (single-device), so the
+  question of how many devices a session model allows is settled; what this gap still names is that no
+  device field exists on a session or person to actually implement that decision against - the same
+  absence gap.login.device-field names.
+closedBy: event.login.new-device-signin
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

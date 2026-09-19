@@ -1,0 +1,48 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: br.login.session.restores
+recordDigest: 9c9a80579234df378ac7732dbf3dc1f601d4fe1c92ea2cb179623b194e99ccce
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/session/index.ts
+      sha256: 98a6c860795008ed0aaea1657fbecf7e8a73afbb9393b7efdc3f0c3946251c5f
+    - path: src/modules/bussiness/session/session.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/session/session.module.ts
+      sha256: 2d14aaadfe1d0d9d1f6d6960f8c445f79fcc5ae66657fd4edecca4b244d03984
+    - path: src/modules/bussiness/session/session.service.spec.ts
+      sha256: f6fc245c4f8ff5ae2f1a1b6808c54ae29782ebec8aef81e25f49aed66d4889d5
+    - path: src/modules/bussiness/session/session.service.ts
+      sha256: b6e0b0f0f260c9f43dc204466d29795230475ba132183b93812b47b17fade7ad
+    - path: src/modules/bussiness/session/sign-in.command.ts
+      sha256: 6de433b280b1358369e98cbf31025ee05fb799f58c9540bbc74b98b22cbd2d5a
+    - path: src/modules/bussiness/session/sign-in.handler.spec.ts
+      sha256: 37ab10b3096952f9c8a43f5b5f410aadb856825d3f379ccb9ea57eb9dd6ccf58
+    - path: src/modules/bussiness/session/sign-in.handler.ts
+      sha256: 6f412dc4be7a273ea860ea5914f24ad60fc5498b965733dac60759b651a69ef2
+    - path: src/modules/bussiness/session/sign-out.command.ts
+      sha256: df6ef31df63b6eaf5f9e103c9c117429342a4535dd80962396292f8b076b6f0b
+    - path: src/modules/bussiness/session/sign-out.handler.spec.ts
+      sha256: 03eb016c94862eb3bf029654d9a533237f896c79c946a528aef7d22743a75f74
+    - path: src/modules/bussiness/session/sign-out.handler.ts
+      sha256: 401ced0572a611bb29b9667dccacb7b9e2a086a8bc2654e5fda4daaebcbd9673
+    - path: src/modules/bussiness/session/types/session-record.ts
+      sha256: 9f77414952e6b2c9559e9dcddf88e11d456ed18be4bb5fd93c78cc747ffca85c
+  digest: 93bb96740706c484e9a6ff6ae0a94f43ecad7fa4173362725ee6dbb737766205
+outcome: pass
+assertions:
+  - id: ac.login.session.restores.returning-within-the-window-stays-signed-in
+    command: npx jest src/modules/bussiness/session -t
+      "ac.login.session.restores.returning-within-the-window-stays-signed-in"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/session -t
+      "ac.login.session.restores.returning-within-the-window-stays-signed-in" exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T08:38:06.074Z

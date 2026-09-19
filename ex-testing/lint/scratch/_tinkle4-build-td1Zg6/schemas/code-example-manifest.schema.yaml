@@ -1,0 +1,128 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci/code-example@1
+title: StarCi code example manifest
+type: object
+additionalProperties: true
+required:
+  - schema
+  - id
+  - title
+  - purpose
+  - appliesTo
+  - relatedRules
+  - files
+  - entrypoint
+  - adapt
+  - dependencies
+  - verification
+  - provenance
+properties:
+  schema:
+    const: starci/code-example@1
+  id:
+    type: string
+    minLength: 1
+    pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+  title:
+    type: string
+    minLength: 1
+  purpose:
+    type: string
+    minLength: 1
+  appliesTo:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - backend
+        - frontend
+        - ui
+        - grammar
+        - runtime
+  relatedRules:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  files:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - role
+      properties:
+        path:
+          type: string
+          minLength: 1
+        role:
+          type: string
+          minLength: 1
+        relations:
+          type: array
+          items:
+            type: string
+  entrypoint:
+    type: string
+    minLength: 1
+  adapt:
+    type: array
+    minItems: 1
+    items:
+      oneOf:
+        - type: string
+          minLength: 1
+        - type: object
+          additionalProperties: true
+  dependencies:
+    type: object
+    additionalProperties: false
+    required:
+      - packages
+      - assumptions
+    properties:
+      packages:
+        type: array
+        items:
+          type: string
+      assumptions:
+        type: string
+  verification:
+    type: object
+    additionalProperties: false
+    required:
+      - syntax
+      - typecheck
+      - lint
+      - tests
+      - limitations
+    properties:
+      syntax:
+        type: boolean
+      typecheck:
+        type: boolean
+      lint:
+        type: boolean
+      tests:
+        type: array
+        items:
+          type: string
+      limitations:
+        type: string
+  provenance:
+    type: object
+    additionalProperties: false
+    required:
+      - sources
+      - simplifications
+    properties:
+      sources:
+        type: array
+        items:
+          type: string
+      simplifications:
+        type: string

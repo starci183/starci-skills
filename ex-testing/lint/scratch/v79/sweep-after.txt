@@ -1,0 +1,79 @@
+
+=== features/audit/impl/todo-app-frontend/privacy (12 png) cardClasses=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  privacy-erasure-complete-desktop-1280.png: palette=fail primary=pass entity-list=pass | #91cbf5(10% dE11.96) #7976a0(10% dE7.06) #fddda8(10% dE7.68) #be8c79(7% dE14.68) #4ba1e8(5% dE15.39) #e9b990(5% dE11.2) #739fd1(4% dE16.47) #f9ba68(4% dE14.05) #bb661c(4% dE12.63) #1f6abe(3% dE10.17) #1b1968(3% dE14.87) #9a6d67(3% dE6.33) #4b1b1c(3% dE11.08) #19429c(3% dE18.7) #db933d(3% dE15.12) #983b1b(3% dE14.98) #18183c(2% dE7.06)
+  privacy-erasure-complete-mobile-390.png: palette=fail primary=pass entity-list=pass | #90caf5(10% dE12.13) #7977a0(9% dE7.14) #fddda8(9% dE7.7) #be8d79(8% dE14.91) #739ed1(5% dE16.45) #4aa1e7(5% dE15.29) #e9b990(5% dE11.19) #f8ba68(3% dE14.07) #ba661c(3% dE12.68) #dc943d(3% dE15.26) #1f6abe(3% dE10.16) #19419c(3% dE18.82) #4a1b1c(3% dE11.05) #9b6d67(3% dE6.35) #1b1967(3% dE14.86) #983b1b(3% dE14.97) #18183c(2% dE7.06)
+  privacy-erasure-pending-desktop-1280.png: palette=fail primary=pass entity-list=pass | #7976a0(12% dE7.04) #8fc5f3(12% dE12.95) #fddcab(10% dE7.32) #be8c79(9% dE14.69) #79a0d3(7% dE16.9) #e9b88f(6% dE11.33) #9a6d68(4% dE6.3) #51a6eb(4% dE16.46) #4d1c1c(3% dE11.64) #f4b868(2% dE14.33) #d8903c(2% dE14.73) #18183c(2% dE6.98) #256dbe(2% dE10.16) #1b489c(2% dE17.81)
+  privacy-erasure-pending-mobile-390.png: palette=fail primary=pass entity-list=pass | #7976a0(12% dE7.1) #90c5f3(12% dE13.06) #be8d79(11% dE14.89) #fddcab(10% dE7.31) #789fd3(7% dE16.84) #e9b890(6% dE11.31) #9a6e6a(4% dE6.26) #52a7eb(3% dE16.72) #4e1c1c(3% dE11.78) #f4b868(2% dE14.32)
+  privacy-erasure-refused-desktop-1280.png: palette=fail primary=pass entity-list=pass | #7a76a0(11% dE7.13) #8fc8f4(10% dE12.43) #fdddaa(9% dE7.52) #bd8c79(8% dE14.64) #e9b991(5% dE11.15) #739fd1(5% dE16.53) #4ea3e9(4% dE15.86) #1f48a4(4% dE16.6) #246dbf(3% dE9.88) #f7ba68(3% dE14.13) #9b6d66(3% dE6.37) #4b1b1c(3% dE11.08) #b9651c(3% dE12.86) #d9923d(3% dE14.96) #18183c(2% dE7.02) #1a1967(2% dE14.73)
+  privacy-erasure-refused-mobile-390.png: palette=fail primary=pass entity-list=pass | #90c8f4(11% dE12.48) #7a76a1(11% dE7.21) #be8d79(9% dE14.87) #fdddaa(9% dE7.52) #739fd2(5% dE16.48) #e9b991(5% dE11.13) #4ea4e9(4% dE16.07) #1f48a4(4% dE16.68) #f8ba68(3% dE14.1) #9a6d68(3% dE6.32) #246cbf(3% dE9.85) #4b1b1c(3% dE11.14) #da923d(2% dE15.03) #b9651c(2% dE12.82) #18183c(2% dE7.04) #1a1967(2% dE14.8)
+  privacy-exporting-desktop-1280.png: palette=fail primary=pass entity-list=pass | #7976a0(12% dE7.05) #90c6f2(11% dE12.74) #fcdcab(10% dE7.32) #bd8c79(9% dE14.63) #78a0d3(6% dE16.93) #e9b990(6% dE11.23) #51a6eb(4% dE16.46) #9b6d66(4% dE6.37) #4d1c1c(3% dE11.64) #f4b868(3% dE14.33) #d8903c(2% dE14.73) #18183c(2% dE6.98) #256dbe(2% dE10.16) #1b489c(2% dE17.81)
+  privacy-exporting-mobile-390.png: palette=fail primary=pass entity-list=pass | #90c6f2(12% dE12.77) #7977a0(11% dE7.13) #be8d79(10% dE14.9) #fcdcab(9% dE7.32) #77a0d3(7% dE16.86) #e9b990(6% dE11.22) #51a6ea(4% dE16.52) #9b6c66(4% dE6.39) #4d1c1c(3% dE11.64) #f4b868(3% dE14.33) #d8903c(2% dE14.73) #18183c(2% dE6.98) #266dbe(2% dE10.16) #1b489c(2% dE17.81)
+  privacy-idle-desktop-1280.png: palette=fail primary=pass entity-list=pass | #7976a0(12% dE7.13) #8fc6f3(11% dE12.79) #fcdcab(9% dE7.32) #bd8c79(9% dE14.63) #e9b991(6% dE11.15) #739fd2(5% dE16.54) #51a5ea(4% dE16.41) #9b6d66(4% dE6.37) #214ca6(3% dE15.82) #4d1c1c(3% dE11.64) #286fc0(3% dE9.84) #f4b868(3% dE14.33) #d8903c(2% dE14.73) #18183c(2% dE6.98)
+  privacy-idle-mobile-390.png: palette=fail primary=pass entity-list=pass | #7a76a1(11% dE7.21) #8fc6f3(11% dE12.82) #be8d79(10% dE14.9) #fcdcab(9% dE7.32) #739fd2(6% dE16.5) #e9b991(6% dE11.14) #51a5ea(4% dE16.48) #9b6c66(4% dE6.39) #214ca6(3% dE15.82) #4d1c1c(3% dE11.64) #286fc0(3% dE9.84) #f4b868(3% dE14.33) #d8903c(2% dE14.73) #18183c(2% dE6.98)
+  privacy-requesting-erasure-desktop-1280.png: palette=fail primary=pass entity-list=pass | #7976a0(12% dE7.13) #8fc6f3(11% dE12.89) #fcdcab(9% dE7.29) #bd8c79(9% dE14.6) #e9b991(6% dE11.12) #739fd1(5% dE16.53) #51a6ea(4% dE16.53) #9a6d67(4% dE6.33) #214ba7(3% dE15.76) #4e1c1c(3% dE11.94) #276ec0(3% dE9.86) #f4b768(2% dE14.36) #d7903c(2% dE14.68) #18183c(2% dE6.95)
+  privacy-requesting-erasure-mobile-390.png: palette=fail primary=pass entity-list=pass | #7a76a1(12% dE7.21) #8fc6f2(11% dE12.92) #be8d79(10% dE14.88) #fcdcab(9% dE7.28) #739fd2(6% dE16.49) #e9b991(6% dE11.11) #51a6ea(4% dE16.59) #9b6d67(4% dE6.35) #214ba7(3% dE15.76) #4e1c1c(3% dE11.94) #276ec0(3% dE9.86) #f4b768(2% dE14.36) #d7903c(2% dE14.68) #18183c(2% dE6.95)
+
+=== features/login/impl/todo-app-frontend/sign-in (8 png) cardClasses=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  sign-in-empty-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  sign-in-empty-mobile-390.png: palette=pass primary=pass entity-list=pass
+  sign-in-filled-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  sign-in-filled-mobile-390.png: palette=pass primary=pass entity-list=pass
+  sign-in-refused-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  sign-in-refused-mobile-390.png: palette=pass primary=pass entity-list=pass
+  sign-in-working-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  sign-in-working-mobile-390.png: palette=pass primary=pass entity-list=pass
+
+=== features/notify/impl/todo-app-frontend/preferences (12 png) cardClasses=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  preferences-loading-desktop-1280.png: palette=fail primary=pass entity-list=pass | #92b0fa(56% dE17.63)
+  preferences-loading-mobile-390.png: palette=fail primary=pass entity-list=pass | #92b0fa(58% dE17.63)
+  preferences-refused-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  preferences-refused-mobile-390.png: palette=pass primary=pass entity-list=pass
+  preferences-saving-desktop-1280.png: palette=fail primary=pass entity-list=pass | #92b0fa(49% dE17.62)
+  preferences-saving-mobile-390.png: palette=fail primary=pass entity-list=pass | #92b0fa(52% dE17.62)
+  preferences-subscribed-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  preferences-subscribed-mobile-390.png: palette=pass primary=pass entity-list=pass
+  preferences-unsubscribed-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  preferences-unsubscribed-mobile-390.png: palette=pass primary=pass entity-list=pass
+  unsubscribe-link-unsubscribed-desktop-1280.png: palette=fail primary=pass entity-list=pass | #90a4d5(13% dE18.5) #acbde7(2% dE11.85)
+  unsubscribe-link-unsubscribed-mobile-390.png: palette=fail primary=pass entity-list=pass | #90a4d5(13% dE18.5) #acbde7(2% dE11.85)
+
+=== features/plan/impl/todo-app-frontend/usage (7 png) cardClasses=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  running-page-at-cap.png: palette=fail primary=pass entity-list=fail 4xstarci-core-text in div<starci-core-surface> | #2a52b4(6% dE12.92)
+  running-page-desktop.png: palette=pass primary=pass entity-list=fail 7xstarci-core-text in div<starci-core-surface>
+  running-page-loading.png: palette=pass primary=pass entity-list=pass
+  running-page-mobile.png: palette=pass primary=pass entity-list=fail 7xstarci-core-text in div<starci-core-surface>
+  running-page-paid-unlimited.png: palette=pass primary=pass entity-list=pass
+  running-page-refused.png: palette=pass primary=pass entity-list=pass
+  running-page-under-cap.png: palette=pass primary=pass entity-list=fail 3xstarci-core-text in div<starci-core-surface>
+
+=== features/recur/impl/todo-app-frontend/schedule (8 png) cardClasses=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  running-page-active-desktop.png: palette=pass primary=pass entity-list=fail 6xli in div<starci-core-surface>
+  running-page-active-mobile.png: palette=pass primary=pass entity-list=fail 6xli in div<starci-core-surface>
+  running-page-ended-desktop.png: palette=pass primary=pass entity-list=pass
+  running-page-ended-mobile.png: palette=pass primary=pass entity-list=pass
+  running-page-no-rule-desktop.png: palette=pass primary=pass entity-list=pass
+  running-page-no-rule-mobile.png: palette=fail primary=pass entity-list=pass | #6d97ff(2% dE13.28)
+  running-page-refused-desktop.png: palette=pass primary=pass entity-list=pass
+  running-page-refused-mobile.png: palette=fail primary=pass entity-list=pass | #6d97ff(2% dE13.33)
+
+=== features/share/impl/todo-app-frontend/invite-screen (10 png) cardClasses=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  running-page-accepted-desktop-1280.png: palette=pass primary=pass entity-list=fail 3xborder-(--separator) in ul<starci-core-surface>
+  running-page-accepted-mobile-390.png: palette=pass primary=pass entity-list=fail 3xborder-(--separator) in ul<starci-core-surface>
+  running-page-empty-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  running-page-empty-mobile-390.png: palette=pass primary=pass entity-list=pass
+  running-page-inviting-desktop-1280.png: palette=fail primary=pass entity-list=pass | #97b5ff(60% dE16.42)
+  running-page-inviting-mobile-390.png: palette=fail primary=pass entity-list=pass | #97b5ff(63% dE16.42)
+  running-page-pending-list-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  running-page-pending-list-mobile-390.png: palette=pass primary=pass entity-list=pass
+  running-page-refused-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  running-page-refused-mobile-390.png: palette=pass primary=pass entity-list=pass
+
+=== features/task/impl/todo-app-frontend/task-list (8 png) cardClasses=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  list-empty-desktop-1280.png: palette=fail primary=pass entity-list=pass | #6794fd(2% dE12.22)
+  list-empty-mobile-390.png: palette=fail primary=pass entity-list=pass | #6894fd(2% dE12.29)
+  list-many-tasks-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  list-many-tasks-mobile-390.png: palette=pass primary=pass entity-list=pass
+  list-one-task-desktop-1280.png: palette=pass primary=pass entity-list=pass
+  list-one-task-mobile-390.png: palette=pass primary=pass entity-list=pass
+  list-refused-desktop-1280.png: palette=fail primary=pass entity-list=pass | #6994ff(3% dE12.41)
+  list-refused-mobile-390.png: palette=fail primary=pass entity-list=pass | #6994ff(3% dE12.41)

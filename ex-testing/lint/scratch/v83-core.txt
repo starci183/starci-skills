@@ -1,0 +1,19 @@
+44:export function canonicalJSON(value) {
+45:  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
+46:  if (object(value)) return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonicalJSON(value[k])}`).join(',')}}`;
+49:export function sha256(value) { return digest(value); }
+124:    if(Object.hasOwn(shape,'const')&&canonicalJSON(value)!==canonicalJSON(shape.const))issue('SCHEMA_VALUE',p,'Metadata value does not match its required schema constant.');
+125:    if(Array.isArray(shape.enum)&&!shape.enum.some(item=>canonicalJSON(item)===canonicalJSON(value)))issue('SCHEMA_VALUE',p,'Metadata value is outside its published enum.');
+133:      if(shape.uniqueItems&&new Set(value.map(canonicalJSON)).size!==value.length)issue('SCHEMA_VALUE',p,'Metadata list must contain unique values.');
+309:    r.specDigest=digest(canonicalJSON({metadata:r.meta,files:files.sort((a,b)=>a.path.localeCompare(b.path))}));
+410:    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:semanticMetadata(n.meta),body:n.body}));
+499:            if(!output||canonicalJSON(output)!==canonicalJSON(input))issue('SPECIFICATION_BUSINESS_DRIFT',n.path,'Architecture must preserve referenced SRS '+field+' item '+input.id+' unchanged; service calls are separate.');
+504:          if (matches.length && matches.some(j => canonicalJSON(j) !== canonicalJSON(journey))) issue('SPECIFICATION_JOURNEY_DRIFT', n.path, 'Architecture must preserve referenced business journey actions and expectations.');
+554:  const workspaceDigest=workspace?digest(canonicalJSON(workspace.meta)):'';
+616:    const typedBase=target=>digest(canonicalJSON(semanticBase(target,x=>x.specDigest,input)));
+621:    n.contextDigest=digest(canonicalJSON(context));
+622:    n.inputDigest=digest(canonicalJSON({...context,children:n.children.filter(c=>!openOnly(c)).map(c=>({id:c.meta.id,digest:input(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
+629:    const spec=n=>selected.has(n.meta.id)?digest(canonicalJSON({authored:shape(n)})):n.specDigest;
+633:      const typedBase=target=>digest(canonicalJSON(semanticBase(target,spec,masked)));
+634:      const specificationLinks=[],pending=[...specificationSeedRefs(n)];while(pending.length){const ref=pending.shift(),target=nodes.find(x=>x.meta.id===ref.nodeId);if(target&&!specificationLinks.some(x=>x.id===target.meta.id)){specificationLinks.push({id:target.meta.id,digest:typedBase(target)});pending.push(...specificationOwnerRefs(target));}}specificationLinks.sort((a,b)=>a.id.localeCompare(b.id));const value=digest(canonicalJSON({...semanticBase(n,spec,masked),...(specificationLinks.length?{specificationLinks}:{}),...(bindsBrand(n)?{brand:{id:brandOwner.meta.id,digest:spec(brandOwner)}}:{}),children:n.children.map(c=>({id:c.meta.id,digest:masked(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
+760:      if(direct&&canonicalJSON(c.sourceIdentity)!==canonicalJSON(e.meta.sourceIdentity))issue('SOURCE_EVIDENCE_BINDING',n.path,'Every selected evidence record must bind the exact tested source identity and coverage.');

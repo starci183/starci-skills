@@ -1,0 +1,20 @@
+$ npx jest src/modules/bussiness/task/create-task.handler.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/task/create-task.handler.spec.ts
+  CreateTaskHandler
+    √ fr.task.create: the task is created, owned by the submitter, not complete (13 ms)
+    √ ac.task.title.required.refuses-empty: an empty or whitespace-only title is refused and nothing is written (4 ms)
+    √ event.task.created: publishes on the PlatformEventBus after the write succeeds (3 ms)
+  TaskCreationPolicyRegistry (sds.plan.cap-guard seam)
+    √ sds.plan.cap-guard: a registered policy can refuse creation before the write, and nothing is written (2 ms)
+    √ an empty registry (the default) blocks nothing (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        3.208 s, estimated 7 s
+Ran all test suites matching /src\\modules\\bussiness\\task\\create-task.handler.spec.ts/i.
+

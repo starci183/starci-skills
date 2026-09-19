@@ -1,0 +1,13 @@
+$ npx jest -t "t-orphan"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/recur/occurrence.service.spec.ts
+
+Test Suites: 116 skipped, 1 passed, 1 of 117 total
+Tests:       700 skipped, 1 passed, 701 total
+Snapshots:   0 total
+Time:        22.148 s
+Ran all test suites with tests matching "t-orphan".
+

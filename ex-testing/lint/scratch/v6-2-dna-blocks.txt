@@ -1,0 +1,1135 @@
+# cross-check vs knowledge/grammars/starci/DNA.yaml: 13 difference(s)
+#   ChatWorkspace classes: census-only starci-core-visually-hidden
+#   EmptyNotice classes: census-only starci-core-button, census-only starci-core-icon-tile
+#   GrammarRoot classes: census-only grammar-common-root
+#   LeadingNumber classes: census-only starci-core-leading-number
+#   NavigationFeatureNav classes: census-only starci-core-page-container
+#   OtpInput classes: census-only starci-core-horizontal-scroll-region
+#   Sidebar classes: census-only starci-core-icon-button
+#   StaticStateRow classes: census-only starci-core-static-row, census-only starci-core-static-row-copy
+#   SurfaceAccordionCard classes: census-only starci-core-surface-label
+#   SurfaceCard classes: census-only starci-core-form-scroll-viewport, census-only starci-core-form-surface, census-only starci-core-form-surface--compact
+#   Tabs classes: census-only starci-core-horizontal-scroll-region
+#   TextAction classes: census-only starci-core-text-action
+#   WorkspaceShell classes: census-only starci-core-visually-hidden
+# identity: renderers=42 tokens=108 classes=135 cardSurfaceClasses=starci-core-form-surface starci-core-frameless-surface starci-core-surface starci-core-surface-card
+# assigned=12 read=103 claimsTotal=174
+# registry names == barrel components: true
+
+# ---- tokens ----
+tokens:
+  - name: "--accent"
+    assignedBy: host
+    readBy: common
+    commonFallback: "Highlight"
+    uses: 5
+    source: "packages/grammar/src/common/styles.css:81"
+  - name: "--accent-soft"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--starci-core-surface-secondary, var(--surface-secondary, Canvas))"
+    uses: 4
+    source: "packages/grammar/src/common/styles.css:630"
+  - name: "--accent-soft-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--starci-core-accent, HighlightText)"
+    uses: 6
+    source: "packages/grammar/src/common/styles.css:1827"
+  - name: "--background"
+    assignedBy: host
+    readBy: common
+    commonFallback: "Canvas"
+    uses: 7
+    source: "packages/grammar/src/common/styles.css:457"
+  - name: "--border"
+    assignedBy: host
+    readBy: common
+    commonFallback: "GrayText"
+    uses: 15
+    source: "packages/grammar/src/common/styles.css:145"
+  - name: "--code-surface"
+    assignedBy: host
+    readBy: common
+    commonFallback: "color-mix(in srgb, CanvasText 6%, Canvas)"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:982"
+  - name: "--danger"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--starci-core-danger, #b91c1c)"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:710"
+  - name: "--danger-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "CanvasText"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2251"
+  - name: "--danger-soft"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--danger, Canvas)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2250"
+  - name: "--danger-soft-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--danger-foreground, CanvasText)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2251"
+  - name: "--default"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--starci-core-surface-secondary, Canvas)"
+    uses: 4
+    source: "packages/grammar/src/common/styles.css:1822"
+  - name: "--field-background"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--surface, Canvas)"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:289"
+  - name: "--field-border"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--border, ButtonBorder)"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:286"
+  - name: "--field-border-hover"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--field-border, var(--border, ButtonBorder))"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:303"
+  - name: "--field-border-width"
+    assignedBy: host
+    readBy: common
+    commonFallback: "1px"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:286"
+  - name: "--field-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--foreground, CanvasText)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:290"
+  - name: "--field-hover"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--field-background, var(--surface, Canvas))"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:304"
+  - name: "--field-placeholder"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--muted, GrayText)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:329"
+  - name: "--field-radius"
+    assignedBy: host
+    readBy: common
+    commonFallback: "calc(var(--radius, 0.5rem) * 1.5)"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:287"
+  - name: "--field-shadow"
+    assignedBy: host
+    readBy: common
+    commonFallback: "none"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:291"
+  - name: "--focus"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--starci-core-focus, Highlight)"
+    uses: 4
+    source: "packages/grammar/src/common/styles.css:308"
+  - name: "--font-mono"
+    assignedBy: host
+    readBy: common
+    commonFallback: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:653"
+  - name: "--foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "CanvasText"
+    uses: 15
+    source: "packages/grammar/src/common/styles.css:71"
+  - name: "--grammar-inline-gap"
+    value: "0.5rem"
+    assignedBy: common
+    source: "packages/grammar/src/common/styles.css:6"
+  - name: "--grammar-page-inset"
+    value: "clamp(1rem, 3vw, 2rem)"
+    assignedBy: common
+    source: "packages/grammar/src/common/styles.css:10"
+  - name: "--grammar-region-gap"
+    value: "1.5rem"
+    assignedBy: common
+    source: "packages/grammar/src/common/styles.css:9"
+  - name: "--grammar-row-gap"
+    value: "0.75rem"
+    assignedBy: common
+    source: "packages/grammar/src/common/styles.css:7"
+  - name: "--grammar-section-gap"
+    value: "1rem"
+    assignedBy: common
+    source: "packages/grammar/src/common/styles.css:8"
+  - name: "--link"
+    assignedBy: host
+    readBy: common
+    commonFallback: "LinkText"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1085"
+  - name: "--muted"
+    assignedBy: host
+    readBy: common
+    commonFallback: "GrayText"
+    uses: 15
+    source: "packages/grammar/src/common/styles.css:91"
+  - name: "--muted-surface"
+    assignedBy: host
+    readBy: common
+    commonFallback: "color-mix(in srgb, CanvasText 7%, Canvas)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:968"
+  - name: "--radius"
+    assignedBy: host
+    readBy: common
+    commonFallback: "0.5rem"
+    uses: 9
+    source: "packages/grammar/src/common/styles.css:287"
+  - name: "--radius-lg"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--radius, 0.5rem)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2219"
+  - name: "--radius-md"
+    assignedBy: host
+    readBy: common
+    commonFallback: "calc(var(--radius, 0.5rem) * 0.75)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2320"
+  - name: "--radius-sm"
+    assignedBy: host
+    readBy: common
+    commonFallback: "calc(var(--radius, 0.5rem) * 0.75)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:337"
+  - name: "--radius-xl"
+    assignedBy: host
+    readBy: common
+    commonFallback: "calc(var(--radius, 0.5rem) * 1.5)"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:1805"
+  - name: "--separator"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--border, GrayText)"
+    uses: 14
+    source: "packages/grammar/src/common/styles.css:811"
+  - name: "--shadow-surface"
+    assignedBy: host
+    readBy: common
+    commonFallback: "0 1px 3px rgb(0 0 0 / 0.16)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:553"
+  - name: "--starci-core-accent"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--accent, Highlight)"
+    uses: 15
+    source: "packages/grammar/src/common/styles.css:81"
+  - name: "--starci-core-band-height"
+    value: "calc(4rem + 1px)"
+    valueRules: 2
+    assignedBy: common
+    alsoReadBy: 2
+    source: "packages/grammar/src/common/styles.css:1291"
+  - name: "--starci-core-band-offset"
+    value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
+    assignedBy: common
+    alsoReadBy: 2
+    source: "packages/grammar/src/common/styles.css:1287"
+  - name: "--starci-core-band-subnav-height"
+    value: "calc(3.25rem + 1px)"
+    valueRules: 2
+    assignedBy: common
+    alsoReadBy: 1
+    source: "packages/grammar/src/common/styles.css:1300"
+  - name: "--starci-core-border"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--border, GrayText)"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:145"
+  - name: "--starci-core-canvas"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--background, Canvas)"
+    uses: 7
+    source: "packages/grammar/src/common/styles.css:457"
+  - name: "--starci-core-contained-max-height"
+    assignedBy: family
+    readBy: common
+    commonFallback: "calc(100dvh - 3rem)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:597"
+  - name: "--starci-core-control-min-size"
+    assignedBy: family
+    readBy: common
+    commonFallback: "2.75rem"
+    uses: 4
+    source: "packages/grammar/src/common/styles.css:1385"
+  - name: "--starci-core-control-radius"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.75rem"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:455"
+  - name: "--starci-core-copy-gap"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.25rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1095"
+  - name: "--starci-core-danger"
+    assignedBy: family
+    readBy: common
+    commonFallback: "#b91c1c"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:710"
+  - name: "--starci-core-disabled-opacity"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.55"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:643"
+  - name: "--starci-core-field-gap"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.5rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:254"
+  - name: "--starci-core-focus"
+    assignedBy: family
+    readBy: common
+    commonFallback: "Highlight"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:308"
+  - name: "--starci-core-foreground"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--foreground, CanvasText)"
+    uses: 14
+    source: "packages/grammar/src/common/styles.css:71"
+  - name: "--starci-core-form-compact-measure"
+    assignedBy: family
+    readBy: common
+    commonFallback: "28rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:235"
+  - name: "--starci-core-form-measure"
+    assignedBy: family
+    readBy: common
+    commonFallback: "30rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:228"
+  - name: "--starci-core-highlight-angle"
+    value: "360deg"
+    assignedBy: common
+    alsoReadBy: 1
+    source: "packages/grammar/src/common/styles.css:510"
+  - name: "--starci-core-highlight-inset"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:522"
+  - name: "--starci-core-inline-gap"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.5rem"
+    uses: 6
+    source: "packages/grammar/src/common/styles.css:424"
+  - name: "--starci-core-motion-duration"
+    assignedBy: family
+    readBy: common
+    commonFallback: "180ms"
+    uses: 7
+    source: "packages/grammar/src/common/styles.css:296"
+  - name: "--starci-core-motion-easing"
+    assignedBy: family
+    readBy: common
+    commonFallback: "cubic-bezier(0.2, 0, 0, 1)"
+    uses: 7
+    source: "packages/grammar/src/common/styles.css:296"
+  - name: "--starci-core-muted"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--muted, GrayText)"
+    uses: 10
+    source: "packages/grammar/src/common/styles.css:91"
+  - name: "--starci-core-navbar-z"
+    assignedBy: family
+    readBy: common
+    commonFallback: "50"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1265"
+  - name: "--starci-core-page-inset"
+    assignedBy: family
+    readBy: common
+    commonFallback: "clamp(1rem, 3vw, 2rem)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:41"
+  - name: "--starci-core-page-measure"
+    assignedBy: family
+    readBy: common
+    commonFallback: "80rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:38"
+  - name: "--starci-core-pill-radius"
+    assignedBy: family
+    readBy: common
+    commonFallback: "999px"
+    uses: 5
+    source: "packages/grammar/src/common/styles.css:1817"
+  - name: "--starci-core-rail-collapsed"
+    assignedBy: family
+    readBy: common
+    commonFallback: "4rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1121"
+  - name: "--starci-core-rail-compact"
+    assignedBy: family
+    readBy: common
+    commonFallback: "16rem"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:1117"
+  - name: "--starci-core-rail-gap"
+    assignedBy: family
+    readBy: common
+    commonFallback: "1rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1145"
+  - name: "--starci-core-rail-gap-compact"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.75rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1207"
+  - name: "--starci-core-rail-offset"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--starci-core-band-offset, 5.5rem)"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:1143"
+  - name: "--starci-core-rail-standard"
+    assignedBy: family
+    readBy: common
+    commonFallback: "20rem"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:1125"
+  - name: "--starci-core-rail-wide"
+    assignedBy: family
+    readBy: common
+    commonFallback: "24rem"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:1129"
+  - name: "--starci-core-reading-measure"
+    assignedBy: family
+    readBy: common
+    commonFallback: "72ch"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:45"
+  - name: "--starci-core-region-gap"
+    assignedBy: family
+    readBy: common
+    commonFallback: "1.5rem"
+    uses: 7
+    source: "packages/grammar/src/common/styles.css:57"
+  - name: "--starci-core-row-gap"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.75rem"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:806"
+  - name: "--starci-core-row-gap-compact"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.5rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1201"
+  - name: "--starci-core-row-inset"
+    assignedBy: family
+    readBy: common
+    commonFallback: "1rem"
+    uses: 2
+    source: "packages/grammar/src/common/styles.css:807"
+  - name: "--starci-core-section-gap"
+    assignedBy: family
+    readBy: common
+    commonFallback: "0.75rem"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:231"
+  - name: "--starci-core-separator"
+    assignedBy: family
+    readBy: common
+    commonFallback: "GrayText"
+    uses: 10
+    source: "packages/grammar/src/common/styles.css:1258"
+  - name: "--starci-core-sidebar-collapsed-width"
+    assignedBy: family
+    readBy: common
+    commonFallback: "4rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1733"
+  - name: "--starci-core-sidebar-width"
+    assignedBy: family
+    readBy: common
+    commonFallback: "16rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1726"
+  - name: "--starci-core-subnav-offset"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--starci-core-band-height, 4rem)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1447"
+  - name: "--starci-core-subnav-z"
+    assignedBy: family
+    readBy: common
+    commonFallback: "40"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1445"
+  - name: "--starci-core-success"
+    assignedBy: family
+    readBy: common
+    commonFallback: "#15803d"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:705"
+  - name: "--starci-core-surface"
+    assignedBy: family
+    readBy: common
+    commonFallback: "Canvas"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:634"
+  - name: "--starci-core-surface-inset"
+    assignedBy: family
+    readBy: common
+    commonFallback: "1rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:563"
+  - name: "--starci-core-surface-radius"
+    assignedBy: family
+    readBy: common
+    commonFallback: "1rem"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:146"
+  - name: "--starci-core-surface-secondary"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--surface-secondary, Canvas)"
+    uses: 7
+    source: "packages/grammar/src/common/styles.css:147"
+  - name: "--starci-core-surface-shadow"
+    assignedBy: family
+    readBy: common
+    commonFallback: "var(--shadow-surface, 0 1px 3px rgb(0 0 0 / 0.16))"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:553"
+  - name: "--starci-core-verdict-edge"
+    value: "inset 2px 0 0 0 var(--success, var(--starci-core-success, #15803d))"
+    valueRules: 2
+    assignedBy: common
+    alsoReadBy: 1
+    source: "packages/grammar/src/common/styles.css:705"
+  - name: "--starci-core-workspace-floating-inset"
+    assignedBy: family
+    readBy: common
+    commonFallback: "1rem"
+    uses: 4
+    source: "packages/grammar/src/common/styles.css:1687"
+  - name: "--starci-core-workspace-floating-max"
+    assignedBy: family
+    readBy: common
+    commonFallback: "22rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1689"
+  - name: "--starci-core-workspace-floating-z"
+    assignedBy: family
+    readBy: common
+    commonFallback: "40"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1686"
+  - name: "--starci-core-workspace-leading-seam"
+    assignedBy: family
+    readBy: common
+    commonFallback: "2rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1642"
+  - name: "--starci-core-workspace-navigation-track"
+    value: "minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem))"
+    valueRules: 2
+    assignedBy: common
+    alsoReadBy: 4
+    source: "packages/grammar/src/common/styles.css:1559"
+  - name: "--starci-core-workspace-navigation-width"
+    assignedBy: family
+    readBy: common
+    commonFallback: "18rem"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:1559"
+  - name: "--starci-core-workspace-rail-track"
+    value: "minmax(16rem, var(--starci-core-rail-standard, 20rem))"
+    valueRules: 3
+    assignedBy: common
+    alsoReadBy: 4
+    source: "packages/grammar/src/common/styles.css:1560"
+  - name: "--success"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--starci-core-success, #15803d)"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:705"
+  - name: "--success-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "CanvasText"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2241"
+  - name: "--success-soft"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--success, Canvas)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2240"
+  - name: "--success-soft-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--success-foreground, CanvasText)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2241"
+  - name: "--surface"
+    assignedBy: host
+    readBy: common
+    commonFallback: "Canvas"
+    uses: 5
+    source: "packages/grammar/src/common/styles.css:289"
+  - name: "--surface-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "CanvasText"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:499"
+  - name: "--surface-secondary"
+    assignedBy: host
+    readBy: common
+    commonFallback: "Canvas"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:147"
+  - name: "--warning"
+    assignedBy: host
+    readBy: common
+    commonFallback: "Canvas"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2245"
+  - name: "--warning-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "CanvasText"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2246"
+  - name: "--warning-soft"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--warning, Canvas)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2245"
+  - name: "--warning-soft-foreground"
+    assignedBy: host
+    readBy: common
+    commonFallback: "var(--warning-foreground, CanvasText)"
+    uses: 1
+    source: "packages/grammar/src/common/styles.css:2246"
+
+# ---- renderers ----
+renderers:
+  - component: "Badge"
+    propsType: "BadgeProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Badge/index.tsx"
+    claims: []
+    computedClaims: []
+    classes: []
+  - component: "Button"
+    propsType: "ButtonProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Button/index.tsx"
+    claims: []
+    computedClaims: ["MEASURE-2"]
+    classes:
+      - "starci-core-button"
+  - component: "ChatWorkspace"
+    propsType: "ChatWorkspaceProps"
+    kind: "composition"
+    source: "packages/grammar/src/core/composition/ChatWorkspace/index.tsx"
+    claims: ["BOUNDARY-1", "FONT-2", "GAP-5", "OVERFLOW-2", "OVERFLOW-4", "OVERFLOW-5", "PADDING-0", "PADDING-2", "PADDING-3", "PADDING-4", "SURFACE-2", "TONE-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-chat-workspace"
+      - "starci-core-chat-workspace-composer"
+      - "starci-core-chat-workspace-conversation"
+      - "starci-core-chat-workspace-drawer-body"
+      - "starci-core-chat-workspace-drawer-close"
+      - "starci-core-chat-workspace-drawer-content"
+      - "starci-core-chat-workspace-drawer-dialog"
+      - "starci-core-chat-workspace-header"
+      - "starci-core-chat-workspace-inline-rail"
+      - "starci-core-chat-workspace-layout"
+      - "starci-core-chat-workspace-layout-without-rail"
+      - "starci-core-chat-workspace-overlay-rail"
+      - "starci-core-chat-workspace-primary"
+      - "starci-core-chat-workspace-rail-trigger"
+      - "starci-core-chat-workspace-rail-trigger-boundary"
+      - "starci-core-visually-hidden"
+  - component: "Divider"
+    propsType: "DividerProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Divider/index.tsx"
+    claims: ["BOUNDARY-5", "GAP-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-divider"
+      - "starci-core-divider-rule"
+  - component: "EmptyNotice"
+    propsType: "EmptyNoticeProps"
+    kind: "composite"
+    source: "packages/grammar/src/core/composite/EmptyNotice/index.tsx"
+    claims: ["GAP-3", "PADDING-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-button"
+      - "starci-core-empty-notice"
+      - "starci-core-icon-tile"
+  - component: "FencedCodeBlock"
+    propsType: "FencedCodeBlockProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/MarkdownArticle/index.tsx"
+    claims: ["OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "GrammarRoot"
+    propsType: "GrammarRootProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/GrammarRoot/index.tsx"
+    claims: []
+    computedClaims: []
+    classes:
+      - "grammar-common-root"
+  - component: "Heading"
+    propsType: "HeadingProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Heading/index.tsx"
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "FONT-3", "FONT-4", "FONT-6", "TONE-2"]
+    classes: []
+  - component: "HorizontalScrollRegion"
+    propsType: "HorizontalScrollRegionProps"
+    kind: "composite"
+    source: "packages/grammar/src/core/composite/HorizontalScrollRegion/index.tsx"
+    claims: []
+    computedClaims: ["MEASURE-3", "OVERFLOW-3", "OVERFLOW-4", "OVERFLOW-5", "PADDING-1"]
+    classes:
+      - "starci-core-horizontal-scroll-region"
+  - component: "Icon"
+    propsType: "IconProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Icon/index.tsx"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-icon"
+      - "starci-core-icon-skeleton"
+  - component: "IconButton"
+    propsType: "IconButtonProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/IconButton/index.tsx"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-icon-button"
+  - component: "IconTile"
+    propsType: "IconTileProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/IconTile/index.tsx"
+    claims: []
+    computedClaims: ["OVERFLOW-2", "SURFACE-4", "SURFACE-5", "TONE-2"]
+    classes:
+      - "starci-core-icon-tile"
+  - component: "IncludedMark"
+    propsType: "IncludedMarkProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/IncludedMark/index.tsx"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-included-mark"
+  - component: "Input"
+    propsType: "InputProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Input/index.tsx"
+    claims: ["FONT-1", "GAP-2", "TONE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-input"
+      - "starci-core-input-control"
+      - "starci-core-input-field"
+      - "starci-core-input-resting-control"
+      - "starci-core-input-resting-label"
+      - "starci-core-input-reveal"
+      - "starci-core-input-reveal-icon"
+      - "starci-core-input-reveal-label"
+  - component: "Label"
+    propsType: "LabelProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Label/index.tsx"
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "MARGIN-0"]
+    classes:
+      - "starci-core-label"
+  - component: "LeadingNumber"
+    propsType: "LeadingNumberProps"
+    kind: "core"
+    source: "packages/grammar/src/core/LeadingNumber.tsx"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-leading-number"
+  - component: "MarkdownArticle"
+    propsType: "MarkdownArticleProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/MarkdownArticle/index.tsx"
+    claims: ["OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "MarkdownTableFrame"
+    propsType: "MarkdownTableFrameProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/MarkdownArticle/index.tsx"
+    claims: ["OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "MediaFrame"
+    propsType: "MediaFrameProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/MediaFrame/index.tsx"
+    claims: ["FLOW-3", "GAP-2", "MARGIN-0"]
+    computedClaims: ["BOUNDARY-5", "OVERFLOW-2", "SURFACE-1", "SURFACE-3"]
+    classes:
+      - "starci-core-media-caption"
+      - "starci-core-media-frame"
+      - "starci-core-media-viewport"
+  - component: "NavigationFeatureNav"
+    propsType: "NavigationFeatureNavProps"
+    kind: "composition"
+    source: "packages/grammar/src/core/composition/NavigationFeatureNav/index.tsx"
+    claims: ["BOUNDARY-1", "GAP-2", "GAP-3", "MEASURE-2", "PADDING-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-navigation-feature-nav"
+      - "starci-core-navigation-feature-nav-actions"
+      - "starci-core-navigation-feature-nav-compact-navigation"
+      - "starci-core-navigation-feature-nav-feature"
+      - "starci-core-navigation-feature-nav-identity"
+      - "starci-core-navigation-feature-nav-navigation"
+      - "starci-core-navigation-feature-nav-primary"
+      - "starci-core-page-container"
+  - component: "OtpInput"
+    propsType: "OtpInputProps"
+    kind: "core"
+    source: "packages/grammar/src/core/OtpInput.tsx"
+    claims: ["OVERFLOW-3", "OVERFLOW-5", "PADDING-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-horizontal-scroll-region"
+  - component: "PageContainer"
+    propsType: "PageContainerProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/PageContainer/index.tsx"
+    claims: []
+    computedClaims: ["MARGIN-AUTO", "MEASURE-1"]
+    classes:
+      - "starci-core-page-container"
+  - component: "PressableField"
+    propsType: "PressableFieldProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/PressableField/index.tsx"
+    claims: ["FLOW-4", "FONT-1", "FONT-2", "GAP-2", "MEASURE-2", "PADDING-1", "PADDING-3", "SURFACE-4", "TONE-1", "TONE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-pressable-field"
+      - "starci-core-pressable-field-content"
+      - "starci-core-pressable-field-placeholder"
+      - "starci-core-pressable-field-shortcut"
+  - component: "PrimaryRailLayout"
+    propsType: "PrimaryRailLayoutProps"
+    kind: "composition"
+    source: "packages/grammar/src/core/composition/PrimaryRailLayout/index.tsx"
+    claims: ["GAP-5"]
+    computedClaims: []
+    classes:
+      - "starci-core-primary-rail-container"
+      - "starci-core-primary-rail-layout"
+      - "starci-core-primary-region"
+      - "starci-core-rail-region"
+  - component: "Progress"
+    propsType: "ProgressProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Progress/index.tsx"
+    claims: ["MEASURE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-progress"
+  - component: "Rail"
+    propsType: "RailProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/Rail/index.tsx"
+    claims: ["GAP-4"]
+    computedClaims: ["MEASURE-6", "OVERFLOW-3", "PADDING-3", "PADDING-5"]
+    classes:
+      - "starci-core-rail"
+      - "starci-core-rail-body"
+      - "starci-core-rail-footer"
+      - "starci-core-rail-frame"
+      - "starci-core-visually-hidden"
+  - component: "RankArtwork"
+    propsType: "RankArtworkProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/RankArtwork/index.tsx"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-rank-artwork"
+  - component: "SectionHeader"
+    propsType: "SectionHeaderProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/SectionHeader/index.tsx"
+    claims: ["GAP-2", "GAP-5"]
+    computedClaims: ["FLOW-3", "MARGIN-0"]
+    classes:
+      - "starci-core-section-action"
+      - "starci-core-section-description"
+      - "starci-core-section-eyebrow"
+      - "starci-core-section-header"
+      - "starci-core-section-header-copy"
+      - "starci-core-section-title"
+  - component: "Sidebar"
+    propsType: "SidebarProps"
+    kind: "composition"
+    source: "packages/grammar/src/core/composition/Sidebar/index.tsx"
+    claims: ["FLOW-4", "FONT-2", "GAP-1", "PADDING-0", "PADDING-2", "PADDING-3"]
+    computedClaims: ["FONT-1", "GAP-3", "MEASURE-2", "MEASURE-6", "OVERFLOW-2", "PADDING-1", "SURFACE-4", "TONE-1", "TONE-2"]
+    classes:
+      - "starci-core-icon-button"
+      - "starci-core-sidebar"
+      - "starci-core-sidebar-footer"
+      - "starci-core-sidebar-header"
+      - "starci-core-sidebar-item"
+      - "starci-core-sidebar-item-label"
+      - "starci-core-sidebar-item-trailing"
+      - "starci-core-sidebar-list"
+      - "starci-core-sidebar-section"
+      - "starci-core-sidebar-section-label"
+      - "starci-core-sidebar-toggle"
+  - component: "StateMark"
+    propsType: "StateMarkProps"
+    kind: "core"
+    source: "packages/grammar/src/core/StateMark.tsx"
+    claims: []
+    computedClaims: []
+    classes: []
+  - component: "StaticStateRow"
+    propsType: "StaticStateRowProps"
+    kind: "composite"
+    source: "packages/grammar/src/core/composite/StaticStateRow/index.tsx"
+    claims: ["BOUNDARY-3", "GAP-1", "GAP-3", "PADDING-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-static-row"
+      - "starci-core-static-row-copy"
+  - component: "Subnav"
+    propsType: "SubnavProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/Subnav/index.tsx"
+    claims: ["BOUNDARY-1", "FLOW-4", "GAP-2", "GAP-3", "PADDING-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-subnav"
+      - "starci-core-subnav-identity"
+      - "starci-core-subnav-leading"
+      - "starci-core-subnav-title"
+      - "starci-core-subnav-toggle"
+  - component: "SurfaceAccordionCard"
+    propsType: "SurfaceAccordionCardProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/SurfaceAccordionCard/index.tsx"
+    claims: ["BOUNDARY-3", "GAP-2", "MARGIN-0", "PADDING-0", "PADDING-3", "PADDING-4", "PADDING-5", "TONE-1"]
+    computedClaims: ["BOUNDARY-5", "BOUNDARY-6", "OVERFLOW-1", "OVERFLOW-2", "SURFACE-1", "SURFACE-2"]
+    classes:
+      - "starci-core-accordion-body"
+      - "starci-core-accordion-heading"
+      - "starci-core-accordion-panel"
+      - "starci-core-accordion-root"
+      - "starci-core-accordion-row"
+      - "starci-core-accordion-scroll-region"
+      - "starci-core-accordion-shell"
+      - "starci-core-accordion-trigger"
+      - "starci-core-surface-accordion-card"
+      - "starci-core-surface-label"
+  - component: "SurfaceCard"
+    propsType: "SurfaceCardProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/SurfaceCard/index.tsx"
+    claims: ["GAP-2"]
+    computedClaims: ["BOUNDARY-5", "BOUNDARY-6", "GAP-0", "OVERFLOW-1", "OVERFLOW-2", "PADDING-0", "PADDING-4", "SURFACE-1", "SURFACE-2", "SURFACE-4"]
+    classes:
+      - "starci-core-form-scroll-viewport"
+      - "starci-core-form-surface"
+      - "starci-core-form-surface--compact"
+      - "starci-core-frameless-surface"
+      - "starci-core-surface"
+      - "starci-core-surface-card"
+      - "starci-core-surface-card--fill"
+      - "starci-core-surface-content"
+      - "starci-core-surface-highlight"
+      - "starci-core-surface-highlight-sweep"
+      - "starci-core-surface-label"
+  - component: "SurfaceCopyGroup"
+    propsType: "SurfaceCopyGroupProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/SurfaceCopyGroup/index.tsx"
+    claims: []
+    computedClaims: ["GAP-2", "GAP-3"]
+    classes:
+      - "starci-core-surface-copy-group"
+  - component: "SurfaceListCard"
+    propsType: "SurfaceListCardProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/SurfaceListCard/index.tsx"
+    claims: ["GAP-2", "OVERFLOW-2", "PADDING-0", "SURFACE-2"]
+    computedClaims: ["FONT-1", "FONT-2", "TONE-2"]
+    classes:
+      - "starci-core-list-shell"
+      - "starci-core-owned-collection"
+      - "starci-core-surface"
+      - "starci-core-surface-fact"
+      - "starci-core-surface-footer"
+      - "starci-core-surface-label"
+      - "starci-core-surface-list"
+  - component: "Tabs"
+    propsType: "TabsProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/Tabs/index.tsx"
+    claims: ["FLOW-2", "GAP-2", "PADDING-3"]
+    computedClaims: ["PADDING-5"]
+    classes:
+      - "starci-core-horizontal-scroll-region"
+      - "starci-core-tab-content"
+      - "starci-core-tab-label"
+      - "starci-core-tabs"
+      - "starci-core-tabs-frame"
+      - "starci-core-tabs-scroll"
+  - component: "Text"
+    propsType: "TextProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/Text/index.tsx"
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "FONT-3", "FONT-5", "GAP-2", "TONE-1", "TONE-2", "TONE-3"]
+    classes:
+      - "starci-core-text"
+  - component: "TextAction"
+    propsType: "TextActionProps"
+    kind: "primitive"
+    source: "packages/grammar/src/core/primitive/TextAction/index.tsx"
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "FONT-3", "GAP-2", "MEASURE-3", "PADDING-1", "PADDING-2", "PADDING-3", "SURFACE-4", "TONE-1", "TONE-2", "TONE-3"]
+    classes:
+      - "starci-core-text-action"
+      - "starci-core-text-action-resting"
+  - component: "Tooltip"
+    propsType: "TooltipProps"
+    kind: "branch"
+    source: "packages/grammar/src/core/branch/Tooltip/index.tsx"
+    claims: ["FLOW-2", "FONT-1", "PADDING-1", "PADDING-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-tooltip"
+      - "starci-core-tooltip-content"
+  - component: "VerticalScrollRegion"
+    propsType: "VerticalScrollRegionProps"
+    kind: "composite"
+    source: "packages/grammar/src/core/composite/VerticalScrollRegion/index.tsx"
+    claims: []
+    computedClaims: ["MEASURE-7", "OVERFLOW-3", "OVERFLOW-4"]
+    classes: []
+  - component: "WorkspaceShell"
+    propsType: "WorkspaceShellProps"
+    kind: "composition"
+    source: "packages/grammar/src/core/composition/WorkspaceShell/index.tsx"
+    claims: ["BOUNDARY-1", "BOUNDARY-4", "GAP-5", "MARGIN-5", "MEASURE-1", "OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-visually-hidden"
+      - "starci-core-workspace-shell"
+      - "starci-core-workspace-shell-compact-header"
+      - "starci-core-workspace-shell-compact-navigation"
+      - "starci-core-workspace-shell-floating-layer"
+      - "starci-core-workspace-shell-header"
+      - "starci-core-workspace-shell-layout"
+      - "starci-core-workspace-shell-leading-rule"
+      - "starci-core-workspace-shell-navigation"
+      - "starci-core-workspace-shell-primary"
+      - "starci-core-workspace-shell-rail"
+
+# ---- source digests ----
+sourceDigests:
+  - path: "packages/grammar/src/common/index.ts"
+    sha256: "962c84f025a4cd7d53d27424c434b1b7d00d6ca82c3335c894c963ba498eb5a1"
+  - path: "packages/grammar/src/common/renderers.ts"
+    sha256: "58dd5bcea875665290025aec81bf9ad4a821ec392aaed0eafa8baaa8e794828a"
+  - path: "packages/grammar/src/common/registry.tsx"
+    sha256: "60d5ebe4adc86e1b02ac566650d86e8e6fb087e001093072468dccbcc48ac357"
+  - path: "packages/grammar/src/common/styles.css"
+    sha256: "9f70f3e7507715cb77c8b8fc1c9a906811395dc6c9ed85c09d9451cee7e6cb10"
+  - path: "packages/grammar/src/common/spacing.ts"
+    sha256: "f0cbd5f51ef0aaf3db529c349489021c009c88d3187ae0946c24bd3be3168f5d"
+  - path: "packages/grammar/src/common/state.ts"
+    sha256: "367ff5ff3d2414a40962bb2908d26a0261178cfbe61ce87e0c6132ee957ce188"
+  - path: "packages/grammar/src/common/conformance.ts"
+    sha256: "1434661f2ee53825ec8de6cc5732d01d1a31d338be813237fafc4b3ec15ec532"
+  - path: "packages/grammar/src/common/rule-catalog.generated.ts"
+    sha256: "9608b068993f816ad474d4dc27cfd07d2df8fef2bbb6a8f932a6618214dd4c9c"
+  - path: "packages/grammar/src/core/styles.css"
+    sha256: "46bae8365da670b800819e0fe66d4b04ab1fc6e965d29b699ea7408174f7c6bb"
+  - path: "packages/grammar/src/core/dna.ts"
+    sha256: "9a831f2b711a6f3768d9b1523d1b84805b6ddb7509ec9bbee7fe25f4f3412091"
+  - path: "packages/grammar/src/core/classNames.ts"
+    sha256: "93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b"
+
+# ---- every class the Common entry can emit ----
+classUniverse: grammar-common-root starci-core-accordion-body starci-core-accordion-heading starci-core-accordion-panel starci-core-accordion-root starci-core-accordion-row starci-core-accordion-scroll-region starci-core-accordion-shell starci-core-accordion-trigger starci-core-button starci-core-chat-workspace starci-core-chat-workspace-composer starci-core-chat-workspace-conversation starci-core-chat-workspace-drawer-body starci-core-chat-workspace-drawer-close starci-core-chat-workspace-drawer-content starci-core-chat-workspace-drawer-dialog starci-core-chat-workspace-header starci-core-chat-workspace-inline-rail starci-core-chat-workspace-layout starci-core-chat-workspace-layout-without-rail starci-core-chat-workspace-overlay-rail starci-core-chat-workspace-primary starci-core-chat-workspace-rail-trigger starci-core-chat-workspace-rail-trigger-boundary starci-core-divider starci-core-divider-rule starci-core-empty-notice starci-core-fenced-code-block starci-core-fenced-code-header starci-core-form-scroll-viewport starci-core-form-surface starci-core-form-surface--compact starci-core-frameless-surface starci-core-horizontal-scroll-region starci-core-icon starci-core-icon-button starci-core-icon-skeleton starci-core-icon-tile starci-core-included-mark starci-core-input starci-core-input-control starci-core-input-field starci-core-input-resting-control starci-core-input-resting-label starci-core-input-reveal starci-core-input-reveal-icon starci-core-input-reveal-label starci-core-label starci-core-leading-number starci-core-list-shell starci-core-markdown-article starci-core-markdown-table-frame starci-core-media-caption starci-core-media-frame starci-core-media-viewport starci-core-navigation-feature-nav starci-core-navigation-feature-nav-actions starci-core-navigation-feature-nav-compact-navigation starci-core-navigation-feature-nav-feature starci-core-navigation-feature-nav-identity starci-core-navigation-feature-nav-navigation starci-core-navigation-feature-nav-primary starci-core-owned-collection starci-core-page-container starci-core-pressable-field starci-core-pressable-field-content starci-core-pressable-field-placeholder starci-core-pressable-field-shortcut starci-core-primary-rail-container starci-core-primary-rail-layout starci-core-primary-region starci-core-progress starci-core-rail starci-core-rail-body starci-core-rail-footer starci-core-rail-frame starci-core-rail-region starci-core-rank-artwork starci-core-section-action starci-core-section-description starci-core-section-eyebrow starci-core-section-header starci-core-section-header-copy starci-core-section-title starci-core-sidebar starci-core-sidebar-footer starci-core-sidebar-header starci-core-sidebar-item starci-core-sidebar-item-label starci-core-sidebar-item-trailing starci-core-sidebar-list starci-core-sidebar-section starci-core-sidebar-section-label starci-core-sidebar-toggle starci-core-static-row starci-core-static-row-copy starci-core-subnav starci-core-subnav-identity starci-core-subnav-leading starci-core-subnav-title starci-core-subnav-toggle starci-core-surface starci-core-surface-accordion-card starci-core-surface-card starci-core-surface-card--fill starci-core-surface-content starci-core-surface-copy-group starci-core-surface-fact starci-core-surface-footer starci-core-surface-highlight starci-core-surface-highlight-sweep starci-core-surface-label starci-core-surface-list starci-core-tab-content starci-core-tab-label starci-core-tabs starci-core-tabs-frame starci-core-tabs-scroll starci-core-text starci-core-text-action starci-core-text-action-resting starci-core-tooltip starci-core-tooltip-content starci-core-visually-hidden starci-core-workspace-shell starci-core-workspace-shell-compact-header starci-core-workspace-shell-compact-navigation starci-core-workspace-shell-floating-layer starci-core-workspace-shell-header starci-core-workspace-shell-layout starci-core-workspace-shell-leading-rule starci-core-workspace-shell-navigation starci-core-workspace-shell-primary starci-core-workspace-shell-rail

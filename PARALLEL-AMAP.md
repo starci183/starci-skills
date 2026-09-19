@@ -28,7 +28,7 @@ standard.
 3. **Evidence is produced, never written.** Digests come from
    `node scripts/example-evidence.mjs`; lifecycle states follow the evidence, not
    the wish.
-4. **`.claude` runtime is read-only** (`ops/`, `schemas/`, `checks/`, `scripts/`,
+4. **`.claude` runtime is read-only** (`ops/`, `schemas/`, `scripts/checks/`, `scripts/`,
    `kernel/`, `core/`, `model/`). Contradictions found go to
    `docs/examples/grit/ledger.md`, never to a silent workaround.
 5. A lane ends in one of three states: `merged` (gate green), `blocked` (real
@@ -75,7 +75,7 @@ fleet to ~50% Devin / ~50% Qwen as the owner requires.
 | # | lane | agent | write scope | mission |
 |---|---|---|---|---|
 | 18 | `ex-nfr` | devin | `scripts/`, `features/*/nfr/**` | live proofs: k6 latency, SMTP, SePay sandbox — needs the real stack |
-| 19 | `ex-capture` | devin | `scripts/check-example-render.mjs` wiring, `features/*/impl/**` captures | wire `render`/`brand` checks into the gate (item 55) — compares renders against direction PNGs, needs vision |
+| 19 | `ex-capture` | devin | `scripts/checks/check-example-render.mjs` wiring, `features/*/impl/**` captures | wire `render`/`brand` checks into the gate (item 55) — compares renders against direction PNGs, needs vision |
 | 20 | `ex-lint` | qwen | `examples/*/eslint*` | lint profile that the example's own config passes |
 
 **Fleet mix:** Qwen 10 (wave-1 ×9 + lint) · Devin 9 (FE ×7 + nfr + capture) ·

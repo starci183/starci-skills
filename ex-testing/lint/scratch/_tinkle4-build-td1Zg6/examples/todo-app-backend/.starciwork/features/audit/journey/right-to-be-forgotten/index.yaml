@@ -1,0 +1,32 @@
+schema: work/customer-journey
+id: journey.audit.right-to-be-forgotten
+title: A person asks to be forgotten, and later checks it held
+state: todo
+crossesFeatures: [audit, login, task]
+steps:
+  - {actor: person, does: "Signs in, creates and completes a few tasks, expects: an ordinary session."}
+  - {actor: person, does: "Requests erasure and confirms it, expects: a plain acknowledgement."}
+  - {actor: person, does: "Later exports their own data, expects: nothing comes back."}
+  - {actor: operator, does: "Reads the log for the same period, expects: the lines are still there, in
+      order, but no longer name that person."}
+requirements: [fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export]
+
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements
+
+blockedBy:
+  - {record: gap.audit.live-proof, because: "Every fr in requirements (fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export) is now done, closing the former gap.audit.unbuilt-module blocker. What remains is requiresProof.uat: no uat.verify run has walked this journey against the running product yet - the same absence gap.audit.live-proof names."}
+
+change:
+  rev: 1
+  kind: clarifying
+  at: 2026-09-19T12:00:00.000Z
+  reason: "Dropped the stale blockedBy on decision.audit.operator-role: the decision is now decided
+    (audit-verified-roster) and the operator read is built and unit-proven (fr.audit.log.read), so the
+    journey's fourth step (an operator reading the log) is no longer blocked on an unsettled who-is-an-operator
+    question - a resolved blocker's edge goes away rather than lingering on a done record. The journey
+    stays todo: its remaining blocker, gap.audit.live-proof, is the live uat run it still needs, which is
+    outside this backend lane."

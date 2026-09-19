@@ -1,0 +1,10 @@
+term_8a4f1764-563f-4068-9dc8-ab1a8ba25a69 r1-todo-infra
+term_2aace428-59fb-4621-8965-295c819083c0 r2-ec-infra
+term_a238c7ea-b34c-4566-a231-59546d5c9a48 q3-todo-platform
+term_b860d133-9378-49bb-954f-88ac9fe1bc5a q4-todo-int-shared
+term_e9d1f075-6710-44d1-9eff-042effca2e22 q5-ec-edge
+term_4ab46498-c2f6-401b-b391-6f70727a5402 q6-lint
+term_9fdb315c-4c06-49f6-ad9d-582522f74ff1 q7-sonar
+term_b7c39ec5-0e0e-4755-b782-4ce8af9c45fb q8-coverage
+term_1564f69c-21d0-4dcc-88dc-7688764a4bd4 q9-verify
+term_c88febbd-1a60-414b-8859-f6ac618276e3 q10-cleanup

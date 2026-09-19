@@ -1,0 +1,12 @@
+{
+  "app": "todo-app-frontend",
+  "runner": "vitest (v8 provider)",
+  "command": "npx vitest run --coverage",
+  "lcov": "examples/todo-app-frontend/coverage/lcov.info",
+  "suites": { "passed": 16, "total": 16 },
+  "tests": { "passed": 101, "total": 101 },
+  "lines": { "covered": 1611, "total": 2559, "pct": 62.95 },
+  "functions": { "covered": 65, "total": 114, "pct": 57.01 },
+  "branches": { "covered": 238, "total": 300, "pct": 79.33 },
+  "statements": { "covered": 1611, "total": 2559, "pct": 62.95 }
+}

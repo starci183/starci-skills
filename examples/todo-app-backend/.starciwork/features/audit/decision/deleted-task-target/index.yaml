@@ -1,0 +1,62 @@
+schema: work/policy-decision
+id: decision.audit.deleted-task-target
+title: Does a deleted task's identifier staying in the audit log violate stays-gone
+state: done
+outcome: decided
+tension:
+  records: [data.audit.log-line, br.task.delete.final]
+  statement: >-
+    data.audit.log-line keeps a deleted task's identifier byte-for-byte in the target field of the
+    task.deleted line for the full retention window - br.audit.append-only forbids scrubbing it and
+    the line's hash covers it. br.task.delete.final's acceptance criterion says a deleted task's
+    identifier "resolves to nothing, now and after a restart". Read without qualification those two
+    statements cannot both hold: the log's own read and export paths return the identifier to any
+    reader for 400 days.
+question: >-
+  When an owner deletes a task, br.task.delete.final#ac.task.delete.final.stays-gone requires the identifier to resolve to
+  nothing - but the audit subscriber writes a task.deleted line whose plaintext target is that same
+  identifier, kept for 400 days and returned verbatim by AuditLogService.readAllLines/readLine even
+  when the line is tombstoned. Which statement yields?
+options:
+  - id: scrub-target-on-delete
+    summary: Rewrite the task.deleted line's target field when the task is deleted.
+    consequence: >-
+      Not implementable without breaking the log itself: hashContent covers target
+      (audit-log.service.ts), so rewriting it invalidates the line's hash and breaks every later
+      prevHash link - br.audit.append-only and br.audit.append-only#ac.audit.append-only.chain-detects-tamper forbid it
+      outright.
+  - id: seal-target-like-actor
+    summary: Seal target under the person's keyId the way actor is sealed, so erasure tombstones it too.
+    consequence: >-
+      Contradicts br.audit.erasure.right's second statement - "the line's action, target and position
+      stay" - which keeps target readable precisely because it identifies the acted-on thing, not the
+      person; data.audit.log-line's own target note already says it is never the acting person's own
+      identifying data.
+  - id: history-not-resolution
+    summary: >-
+      Narrow "resolves to nothing" to the task domain: every task read path returns no task for the
+      identifier; the audit line's target is the historical record of the deletion event, not a
+      resolution of the task.
+    consequence: >-
+      Both records stay true as built - TaskService.delete removes the row outright so no task surface
+      ever resolves the identifier again, and the log keeps its evidence of what was deleted. The
+      criterion's wording is qualified to say so, and a reader of the log sees the identifier as an
+      inert reference, not a live task.
+recommendation: history-not-resolution
+recommendationReason: >-
+  It is the only option under which both records remain true about the same stored bytes. The other
+  two resolve the tension by breaking a rule they were supposed to keep - append-only in the first
+  case, erasure.right's second statement in the second.
+chosen: history-not-resolution
+reason: >-
+  The code already implements exactly this reading, and no other is implementable. DeleteTaskHandler
+  calls TaskService.delete, which removes the row outright - "a later read of the same identifier
+  resolves to nothing" is true of every task read path because the row is gone from the only store the
+  task feature reads. AuditLogService never issues UPDATE or DELETE against audit_log_lines and
+  hashContent covers target, so the identifier persists only as the target field of a line that
+  records the deletion - a statement about the past, not a path that returns a task. "Resolves to
+  nothing" is therefore scoped to the task domain: no task exists under that identifier on any task
+  surface, now or after a restart, while the audit log honestly keeps the identifier as evidence of
+  what happened. br.task.delete.final#ac.task.delete.final.stays-gone's wording is narrowed to say so, and
+  data.audit.log-line's conflictsWith is retired now that the tension is decided.
+change: {rev: 2, kind: editorial, at: 2026-09-19T15:50:00.000Z, reason: "Recorded by the edges lane (v7-4) after grounding both sides in code (audit-log.service.ts, delete-task.handler.ts): the tension data.audit.log-line declared on its conflictsWith is resolved by narrowing what 'resolves to nothing' means, matching what both services actually do. rev 2 (v11 ac-collapse): prose references to the retired ac.* records remapped to the compact br.*#ac.* form; encoding change only, no semantic change."}

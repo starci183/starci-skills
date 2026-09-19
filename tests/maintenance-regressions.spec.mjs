@@ -6,7 +6,7 @@ import os from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {validateWorkspace,previewCompletion,previewEvidence,sha256} from '../core/index.mjs';
 import {stringifyYaml} from '../core/yaml.mjs';
-import {checkEntry} from '../scripts/check-entry.mjs';
+import {checkEntry} from '../scripts/checks/check-entry.mjs';
 import {publishEvidence} from '../workflows/evidence.mjs';
 import {evidenceStagingRoot} from '../core/index.mjs';
 function fixture(t) {

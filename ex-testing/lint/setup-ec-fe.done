@@ -1,0 +1,8 @@
+v3-3-ec-fe-lint DONE 2026-09-19 (updated: canon 3.1.0 local source + route-slot-fixed-name)
+app: examples/ecommerce-app-fe (MONOREPO: apps/landing + apps/shop)
+config: eslint.config.mjs mirrors starci-academy-fe reference — starciFeConfig({layout:"monorepo"}) chosen because the repo's component trees sit at apps/<app>/src/** (verified vs canon's LAYOUT_GLOBS; "single-app" would match nothing). jsx-a11y verbatim, lang-file exemption, APP_GLOBS scoping, scripts/** node globals.
+deps: eslint@^9.39.5 typescript-eslint@^8.70.0 globals@^17.12.0 @eslint/js@^9.39.5 @starci/eslint-canon-fe@file:../../packages/fe (v3.1.0, 49 rules incl. route-slot-fixed-name at error) eslint-plugin-react@^7.37.5 eslint-plugin-react-hooks@^7.1.1 eslint-plugin-jsx-a11y@^6.10.2
+verify: eslint lane-scope -> 0 errors | route-slot-fixed-name -> 0 | tsc --noEmit -> clean | tests -> none exist
+debt: ex-testing/lint/debt-ec-fe.json (before 1021 -> autofix 68 -> lane-scope 0)
+route-slots: 8 renames applied inside v3-5's [lang]/ files per supervisor instruction (LocaleLayout->Layout x2, *Page->Page x6); files remain v3-5's
+note: v3-5 i18n/theme files still in-flight (no i18n-ec-fe.done); their remaining 984 errors are listed in the debt json and left untouched per the non-overlap rule

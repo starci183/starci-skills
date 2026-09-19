@@ -1,0 +1,24 @@
+
+===== SUSPECT CHANGE_KIND_SUSPECT  (38) =====
+  SUSPECT examples/todo-app-backend/.starciwork/features/audit/fr/erasure/complete/index.yaml: HEAD -> uncommitted (rev 2 -> 3): declared kind: editorial while normative content moved with no statement listed either way - checks/work-change.mjs reads the transit
+
+===== REFUSE CHANGE_UNRECORDED  (33) =====
+  REFUSE  examples/ecommerce-app-be/.starciwork/features/checkout/br/place-order/index.yaml: HEAD -> uncommitted: normative content moved (statements, module) while change.rev stayed at 1 [CHANGE_UNRECORDED]
+
+===== SUSPECT WITHDRAWS_NOT_VERBATIM  (9) =====
+  SUSPECT examples/todo-app-backend/.starciwork/features/login/data/person/index.yaml: HEAD withdraws "passwordHash is never read back out of the product.", which an older revision carries inside its normative content but never in statements[] - a withdrawal of 
+
+===== REFUSE WITHDRAWS_NOT_VERBATIM  (4) =====
+  REFUSE  examples/todo-app-backend/.starciwork/features/login/contract/identity-for-task/index.yaml: uncommitted withdraws "The session token travels as a custom "x-session-token" request header (implicit, never...", a string no committed revision of contract.l
+
+===== INFO UNTRACKED_RECORD  (2) =====
+  INFO    examples/ecommerce-app-be/.starciwork: 16 record file(s) have no git history at all - never committed, so no transition of theirs is checkable (expected while fleet lanes are mid-flight); e.g. examples/ecommerce-app-be/.starciwork/features/checkout/br/
+
+===== INFO CHANGE_UNDECLARED  (2) =====
+  INFO    examples/ecommerce-app-be/.starciwork: 2 committed transition(s) moved normative content in records that carry no change record on either side - the layout never required one, so this is a count of what a rev claim could not cover even in principle; e.
+
+===== INFO HISTORY_INCOMPLETE  (1) =====
+  INFO    examples/todo-app-backend/.starciwork/brand/index.yaml: brand claims rev 3 but only one content revision is reachable in git, so REV_NOT_BUMPED and REV_NOT_MONOTONIC had nothing to compare [HISTORY_INCOMPLETE]
+
+===== INFO REVISION_UNREADABLE  (1) =====
+  INFO    examples/todo-app-backend/.starciwork: 1 committed revision(s) did not parse as YAML 1.2 and were skipped rather than compared [REVISION_UNREADABLE]

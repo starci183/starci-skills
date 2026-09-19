@@ -1,0 +1,73 @@
+# Profile: claude-fable — the scarce deep-reasoning pool.
+# Business frame: the first seat for decide/plan cognition (business,
+# architecture, goal analysis) on its own weekly budget window. It reasons and
+# judges; it does not implement — the pool has no `implement` role at all.
+
+target: claude-fable          # registry.json + runtimes.json
+provider: claude              # runtimes.json runtimes.claude-fable.provider
+runtime: claude               # registry.json targets.claude-fable.runtime
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: null        # registry.json: deliberately null — native managed
+                            # launch inherits the host's configured model
+  headlessModel: claude-fable-5-1   # fixed identity for headless invocation only
+                                    # (docs/model-catalog.md: headlessModel exists
+                                    # for exactly this case)
+  profiles:
+    reasoning: fable-5.1      # claude.json profiles.fable-5.1 — model: null (inherits
+                            # host configuration), role reasoning; no working profile
+  note: >-
+    runtimes.json pins models.verify/decide/plan/write = claude-fable-5-1, but the
+    registry target requests no model — the same pool is model-explicit on the
+    headless path and host-inherited on the managed-agent path. Attestation still
+    applies per SKILL.md (worker-show effective model before effects).
+
+capacity:
+  maxParallel: 2              # runtimes.json — the smallest pool after devin's 0
+  budgetWindow: fableWeekly   # runtimes.json — its own weekly quota window;
+                            # saturating it does NOT overflow into claude-agent automatically
+  roles: [verify, decide, plan, write]   # runtimes.json — implement is ABSENT
+  models:
+    verify: claude-fable-5-1
+    decide: claude-fable-5-1
+    plan: claude-fable-5-1
+    write: claude-fable-5-1   # note: no `implement` key — a backend.implement job
+                            # excludes this pool by role, not by preference
+                            # (costPolicy: "Fable reasons but cannot implement")
+
+launch:
+  orca: {kind: managed-agent, agent: claude}
+  headless: claude -p --output-format json --model claude-fable-5-1   # model-functions.md HEADLESS_PROVIDERS
+  imageGeneration: false
+
+position:
+  hardTier: first in verify/decide/plan          # runtimes.json allocation.tiers.hard
+  mediumTier: first in decide/plan
+  chainLeads: [architecture.decide, business.decide, request.analyze, work.author]  # registry.json operators
+  chainSecond: [decision.prepare, provision.ask, goal.revise, scope.define, review.verify]
+  nonOperation: >-
+    model-functions.md: critiqueGoal's default pool is the host's
+    `models.nonOperation.validator` "Fable/Astra pool" — the planner/validator
+    model functions are separately typed and do NOT draw operation probation
+    budget (model-policy.mjs MODEL_KINDS comment).
+
+business:
+  question: >-
+    "Which pool do I spend on the cognition that decides what the product IS —
+    business/architecture decisions, goal critique, planning?" — Fable, while its
+    weekly window lasts.
+  whenNeeded:
+    - "decide/plan role operations where depth beats throughput: business.decide, architecture.decide, request.analyze, work.author lead here."
+    - verify work on hard tier where an independent strong reasoner is wanted first.
+    - Non-operation model functions (goal critique/validation) whose configured pool is Fable/Astra.
+  whenNot:
+    - ANY implement-role operation — structurally excluded; the pool declares no implement role (runtimes.json). Not a preference, a fact.
+    - "High-volume or easy work: maxParallel 2 on a weekly window is the scarcest capacity in the fleet — a bulk queue here starves the decide/plan lanes (inference from budgetWindow + maxParallel)."
+    - "When its quota window is cooling: the chain already falls to codex-agent then claude-agent; do not force Fable past cooldown."
+  pickedBy: >-
+    Allocator by role (decide/plan/verify/write only) + tier + qualification;
+    chains in registry.json put it first for reasoning ops.
+  failureModes:
+    - Routing implement work here is impossible by declaration, not just wasteful — candidateFor has no implement profile.
+    - "INFERRED: exhausting fableWeekly mid-workflow silently downgrades later decide/plan quality to codex-agent/claude-agent — sequence expensive reasoning early where the Plan allows."

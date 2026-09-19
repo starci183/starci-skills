@@ -1,0 +1,4 @@
+INFO    examples/ecommerce-app-be/.starciwork: 13 record file(s) have no git history at all - never committed, so no transition of theirs is checkable (expected while fleet lanes are mid-flight); e.g. examples/ecommerce-app-be/.starciwork/features/checkout/br/cart/index.yaml, examples/ecommerce-app-be/.starciwork/features/checkout/decision/ops-doors/index.yaml [UNTRACKED_RECORD]
+INFO    examples/ecommerce-app-be/.starciwork: 2 committed transition(s) moved normative content in records that carry no change record on either side - the layout never required one, so this is a count of what a rev claim could not cover even in principle; e.g. examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/index.yaml, examples/ecommerce-app-be/.starciwork/index.yaml [CHANGE_UNDECLARED]
+
+34 record(s), 21 with git history, 13 version transition(s), 7 claiming a prior revision, 0 withdrawal claim(s) checked against their baseline: 0 refused, 0 suspect, 2 info

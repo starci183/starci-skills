@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.task.delete.final.stays-gone
-rule: br.task.delete.final
-given: A task the owner deleted
-when: Any read names its identifier
-then:
-  - The identifier resolves to nothing, now and after a restart.
-

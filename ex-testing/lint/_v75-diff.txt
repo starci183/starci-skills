@@ -1,0 +1,18 @@
+lines in ex-testing\lint\_v75-gate-baseline.txt: 138; in ex-testing\lint\_v75-gate-after.txt: 147
+
+--- only in ex-testing\lint\_v75-gate-baseline.txt (cleared) 2 ---
+  REFUSED examples/todo-app-backend/.starciwork/features/task/fr/complete/evidence.yaml: recordDigest ecfbfcfd1dc5e985b93463c6c774852ea9e5d8b2a53dfbfac84221afc75649c5 no longer matches fr.task.complete'
+  REFUSED examples/todo-app-backend/.starciwork/features/task/fr/reopen/evidence.yaml: recordDigest 4fc37ed8510080f5d37ba858d1ce4174718d6e532894ff4713fac77fdb32e679 no longer matches fr.task.reopen's cu
+
+--- only in ex-testing\lint\_v75-gate-after.txt (new) 11 ---
+  REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.cart.assets
+  REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/direction-check.yaml: id is undefined, but its place says ui.checkout.landing-home.assets
+  REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.landing-home.assets
+  REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.shop-browse.assets
+  REFUSED examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/generation-receipts.yaml: id is undefined, but its place says ui.checkout.stock-refused.assets
+  REFUSED examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/assets/generation-receipts.yaml: id is undefined, but its place says ui.identity.sign-in.assets
+  REFUSED examples/todo-app-backend/.starciwork/features/audit/fr/erasure/request/evidence.yaml: recordDigest 86cf9050feac74382e735dfa7ba5161924b3c9a9fa30078b49e4c437ae09863b no longer matches fr.audit.
+  REFUSED examples/todo-app-backend/.starciwork/features/task/event/deleted/evidence.yaml: recordDigest 8545aad6f0e16b59ae4f0b591555280cd9eb135378dabf6a8055018bfbfa03ef no longer matches event.task.dele
+  REFUSED examples/todo-app-backend/.starciwork/features/task/fr/complete/evidence.yaml: recordDigest ecfbfcfd1dc5e985b93463c6c774852ea9e5d8b2a53dfbfac84221afc75649c5 no longer matches fr.task.complete'
+  REFUSED examples/todo-app-backend/.starciwork/features/task/fr/create/evidence.yaml: recordDigest 45818e4d4d72c387739eaa8e551509671ea00ad26be3a58e5cb15b8865cd08b6 no longer matches fr.task.create's cu
+  REFUSED examples/todo-app-backend/.starciwork/features/task/fr/reopen/evidence.yaml: recordDigest 4fc37ed8510080f5d37ba858d1ce4174718d6e532894ff4713fac77fdb32e679 no longer matches fr.task.reopen's cu

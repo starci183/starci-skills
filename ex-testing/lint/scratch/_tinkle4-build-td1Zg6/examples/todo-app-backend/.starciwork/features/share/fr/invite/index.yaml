@@ -1,0 +1,35 @@
+schema: work/functional-requirement
+id: fr.share.invite
+title: Invite a collaborator
+state: done
+actors: [owner]
+trigger: The owner submits an email and a role for one of their own tasks.
+mainFlow:
+  - The owner submits a well formed email and a role of viewer or editor.
+  - A pending invitation is created, bound to that task, email and role, with a fourteen-day expiry.
+exceptionFlows:
+  - An invalid email is refused and nothing is created.
+  - A role other than viewer or editor is refused and nothing is created.
+postconditions:
+  - Exactly one pending invitation exists for that submission.
+composes:
+  - {rule: br.share.role.permissions, module: src/modules/bussiness/share}
+  - {rule: br.share.invite.expiry, module: src/modules/bussiness/share}
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: br.share.role.permissions and br.share.invite.expiry are both done; InviteHandler dispatches
+    to InvitationService.invite, proven by invite.handler.spec.ts, invitation.service.spec.ts and
+    scripts/live-proof-share.sh's invite steps (including both exceptionFlows) against the real GraphQL
+    endpoint. requiresProof.uat.required is not yet satisfied by a recorded uat.verify walk - see
+    gap.share.live-proof, which uat.share.invite-and-collaborate (this fr's own journey proof) still
+    names in its own blockedBy; the live-proof script is a real end-to-end run but not that formal,
+    screenshotted UAT.

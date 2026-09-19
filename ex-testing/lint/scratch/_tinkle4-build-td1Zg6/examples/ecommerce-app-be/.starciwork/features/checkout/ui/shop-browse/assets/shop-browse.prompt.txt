@@ -1,0 +1,30 @@
+Generate a polished flat product UI screenshot, 1536x1024, light theme, straight-on browser content with no browser chrome or device frame. Use case: ui-mockup. This is a proposed visual direction, not an implementation capture.
+
+SUBJECT: shop Browse of "Northwind Supply" at http://localhost:4069/browse.
+
+FIXED ANATOMY (must not change):
+- Image 3 is the EDIT TARGET, examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/shop-browse.initial.png. Make ONE targeted colour correction: all primary teal button backgrounds and selected teal accents must be UNIFORM FLAT exact sRGB #0D9488, RGB(13,148,136). The previous image drifted too cyan. Replace that cyan with the specified slightly greener muted teal. NO gradients, noise, mottling, lighting variation or texture on UI button fills; apply an exact single colour. Preserve black button labels. Preserve all other pixels as closely as possible: same text, positions, mascot policy, external collection labels/captions, edge-to-edge dividers and all control shapes. Where the duck has a scarf, recolour its teal to #0D9488 too, but never introduce a duck on a screen that has none. References 1 and 2 remain anatomy sources only. Do not copy their blue.
+- Anatomy reference images only, not edit targets: Image 1 is examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png; Image 2 is examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png. Preserve their raised surfaces, spacing and pill-control shapes, not their blue palette or todo content.
+- White top bar with "Northwind Supply" at left and "Browse", "Cart", "Checkout", "Account" in a single horizontal navigation. "Browse" selected with one thin teal underline. No sidebar, avatar, sign-out or extra navigation.
+- Main content centered with comfortable side margins. "Browse" heading and "Everything Northwind stocks." subtitle sit ON THE PAGE BACKGROUND, OUTSIDE the cards.
+- A section line directly ON THE PAGE BACKGROUND has "The catalogue" on the left and "6 items" at the far right, ABOVE the product grid.
+- THE PRODUCT GRID: this is the part people get wrong. It is an app-owned three-column, two-row grid of six distinct SurfaceCard-shaped product tiles, NOT a SurfaceListCard. The grid has NO outer white panel. Each individual card encloses its own neutral illustration well, name, short descriptor, price, and "Add to cart" pill INSIDE its rounded white boundary. The section label and count stay OUTSIDE the grid on the page background. Do not float the price or button below the card boundary.
+- First row: brass lamp, "Aurelis Desk Lamp", "Warm, dimmable light", "$89.00"; canvas tote, "Meridian Carry Tote", "Waxed canvas carryall", "$145.00"; glass carafe, "Northwind Pour-Over Set", "A better daily ritual", "$62.00".
+- Second row: cotton jacket, "Kestrel Field Jacket", "Weatherproofed cotton", "$230.00"; notebook, "Solstice Notebook", "Lay-flat, dot-grid pages", "$24.00"; compact speaker, "Harbor Field Speaker", "Sound for the everyday", "$118.00".
+- All six product images are app-owned flat neutral illustrations within their own card wells. All six buttons say "Add to cart". These are proposed controls, their wiring is not claimed by the image.
+- Bottom-right outside all product regions, a small neutral review caption: "DIRECTION - NOT IMPLEMENTATION". This is a review-image label, not product UI.
+
+BRAND + TOKENS (non-negotiable):
+- Authority: examples/ecommerce-app-be/.starciwork/brand/index.yaml, rev 1. Primary EXACTLY #0D9488, surface #FFFFFF, Inter. Neutral canvas #F7F7F5, 12px card radius, single soft diffuse shadow. Body 16px, section labels 14px, page heading about 24px, ordinary pills about 36px high. Restrained native web density; all six complete cards fit in the frame.
+- Primary button fill #0D9488 with BLACK #000000 labels (5.61:1 contrast; white fails brand's 4.5:1 minimum). Never change the teal. Dark/neutral text links, normal ink #171B1A, muted #5E6664. Teal confined to primary buttons and the selected nav underline. No mascot anywhere on this populated browse screen.
+- Any control nested in a surface uses the secondary light-grey-filled variant; no white-on-white field. Do not add search or filtering controls.
+
+CREATIVE LICENSE:
+You MAY:
+- Refine spacing and the six flat product illustrations within their wells, maintaining a quiet coherent catalogue.
+- Give the first product well a slightly warmer neutral tint; no extra label or badge.
+You MAY NOT:
+- Enclose the section heading in a card, wrap the grid in an outer panel, move card content outside its boundary, change the palette or control geometry, add gradients/heavy shadows, invent categories, filters, search, ratings, discounts, navigation or other regions.
+- Add a duck, turtle, character illustration, or animal-shaped product.
+
+TEXT RULE: every quoted label spelled exactly, no lorem ipsum or invented text. Do not draw source paths or ports. Follow knowledge/ui/proof/anatomy-source.yaml ANATOMY-5 and prompt-shape-b2: FIXED ANATOMY -> BRAND + TOKENS -> explicit You MAY / You MAY NOT. Products use editorial sample data, not a claim about live API inventory.

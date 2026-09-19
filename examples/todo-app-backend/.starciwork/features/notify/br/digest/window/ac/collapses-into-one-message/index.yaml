@@ -1,9 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.notify.digest.window.collapses-into-one-message
-rule: br.notify.digest.window
-given: A person's window is open and one event has already joined it
-when: A second event for the same person and channel arrives before the window closes
-then:
-  - Both events are in the same group.
-  - Flushing the group at close returns both events as one message, in admission order.
-  - Flushing before the window closes returns nothing.

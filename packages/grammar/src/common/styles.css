@@ -1,0 +1,2624 @@
+/* Common owns only universal structure/scales. Families supply material DNA. */
+@layer starci-grammar-common, starci-grammar-core, starci-grammar-heritage, starci-grammar-offset-pop;
+
+@layer starci-grammar-common {
+    .grammar-common-root {
+        --grammar-inline-gap: 0.5rem;
+        --grammar-row-gap: 0.75rem;
+        --grammar-section-gap: 1rem;
+        --grammar-region-gap: 1.5rem;
+        --grammar-page-inset: clamp(1rem, 3vw, 2rem);
+        min-width: 0;
+    }
+
+    .grammar-common-root,
+    .grammar-common-root::before,
+    .grammar-common-root::after,
+    .grammar-common-root *,
+    .grammar-common-root *::before,
+    .grammar-common-root *::after {
+        box-sizing: border-box;
+    }
+
+    /* Grammar scroll remains operable without adding persistent chrome to a composition. */
+    .grammar-common-root,
+    .grammar-common-root * {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .grammar-common-root::-webkit-scrollbar,
+    .grammar-common-root *::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+    }
+
+    .starci-core-page-container {
+        width: min(100%, var(--starci-core-page-measure, 80rem));
+        min-width: 0;
+        margin-inline: auto;
+        padding-inline: var(--starci-core-page-inset, clamp(1rem, 3vw, 2rem));
+    }
+
+    .starci-core-page-container[data-grammar-page-measure="reading"] {
+        width: min(100%, var(--starci-core-reading-measure, 72ch));
+    }
+
+    .starci-core-page-container[data-grammar-page-measure="full"] {
+        width: 100%;
+    }
+
+    .starci-core-section-header {
+        display: flex;
+        min-width: 0;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: var(--starci-core-region-gap, 1.5rem);
+    }
+
+    .starci-core-section-header-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .starci-core-section-title {
+        margin: 0;
+        max-width: 100%;
+        color: var(--starci-core-foreground, var(--foreground, CanvasText));
+        font-size: clamp(1.25rem, 1rem + 0.75cqi, 1.75rem);
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+        text-wrap: balance;
+    }
+
+    .starci-core-section-eyebrow {
+        color: var(--starci-core-accent, var(--accent, Highlight));
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        line-height: 1.25rem;
+        text-transform: uppercase;
+    }
+
+    .starci-core-section-description,
+    .starci-core-media-caption {
+        color: var(--starci-core-muted, var(--muted, GrayText));
+        font-size: 0.875rem;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-section-action {
+        flex: none;
+    }
+
+    .starci-core-visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .starci-core-surface-copy-group {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .starci-core-surface-copy-group[data-grammar-copy-density="comfortable"] {
+        gap: 0.75rem;
+    }
+
+    .starci-core-included-mark {
+        display: inline-block;
+        width: 1.25rem;
+        height: 1.25rem;
+        flex: none;
+        color: inherit;
+        vertical-align: text-bottom;
+    }
+
+    .starci-core-media-frame {
+        display: flex;
+        min-width: 0;
+        margin: 0;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .starci-core-media-viewport {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--starci-core-border, var(--border, GrayText));
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        background: var(--starci-core-surface-secondary, var(--surface-secondary, Canvas));
+    }
+
+    .starci-core-media-frame[data-grammar-media-aspect="landscape"] .starci-core-media-viewport { aspect-ratio: 16 / 10; }
+    .starci-core-media-frame[data-grammar-media-aspect="portrait"] .starci-core-media-viewport { aspect-ratio: 4 / 5; }
+    .starci-core-media-frame[data-grammar-media-aspect="square"] .starci-core-media-viewport { aspect-ratio: 1; }
+
+    .starci-core-media-viewport > :where(img, picture, video, svg) {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .starci-core-media-frame[data-grammar-media-fit="contain"] .starci-core-media-viewport > :where(img, picture, video, svg) {
+        object-fit: contain;
+    }
+
+    .starci-core-media-frame[data-grammar-media-treatment="plain"] .starci-core-media-viewport {
+        border-color: transparent;
+        background: transparent;
+    }
+
+    .starci-core-primary-rail-container {
+        container: starci-core-primary-rail / inline-size;
+        min-width: 0;
+    }
+
+    /*
+     * THE COLLAPSED FORM IS THE DEFAULT. Every two-column form lives INSIDE the container query.
+     *
+     * A container query adds no specificity, so while the expanded tracks were written outside it
+     * as attribute selectors, `[data-grammar-layout-rail-width="wide"]` (0,2,0) outranked the
+     * collapse (0,1,0) and the layout never collapsed at all: in a 358px container the primary
+     * track computed to 0px and the entire primary column vanished on a phone.
+     *
+     * Restating the collapse once per attribute value would repair today's three variants and break
+     * again on the fourth one somebody adds. The two ranges are made MUTUALLY EXCLUSIVE instead:
+     * the narrow form is what remains when the query does not match, so no selector inside the
+     * query - at any specificity, with any attribute invented later - can outrank it. It is also
+     * what a renderer without container queries gets, which is the safe half of the pair.
+     */
+    .starci-core-primary-rail-layout {
+        display: grid;
+        min-width: 0;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--starci-core-region-gap, 1.5rem);
+    }
+
+    .starci-core-primary-rail-layout[data-grammar-layout-align="start"] { align-items: start; }
+    .starci-core-primary-rail-layout[data-grammar-layout-align="stretch"] { align-items: stretch; }
+
+    /* The rail track is spelled once per width, and only where there is a rail to give it to. */
+    @container starci-core-primary-rail (min-width: 56.001rem) {
+        .starci-core-primary-rail-layout[data-grammar-layout-rail="present"] { grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem); }
+        .starci-core-primary-rail-layout[data-grammar-layout-rail="present"][data-grammar-layout-rail-width="compact"] { grid-template-columns: minmax(0, 1fr) minmax(14rem, 16rem); }
+        .starci-core-primary-rail-layout[data-grammar-layout-rail="present"][data-grammar-layout-rail-width="wide"] { grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem); }
+    }
+
+    .starci-core-primary-region,
+    .starci-core-rail-region {
+        min-width: 0;
+    }
+
+    .starci-core-form-page {
+        display: flex;
+        min-height: 100dvh;
+        padding: 1.5rem 1rem;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .starci-core-form-scroll-viewport {
+        width: 100%;
+        max-height: calc(100dvh - 3rem);
+        overscroll-behavior: contain;
+    }
+
+    .starci-core-form-surface {
+        display: flex;
+        width: min(100%, var(--starci-core-form-measure, 30rem));
+        min-width: 0;
+        flex-direction: column;
+        gap: var(--starci-core-section-gap, 0.75rem);
+    }
+
+    .starci-core-form-surface--compact {
+        width: min(100%, var(--starci-core-form-compact-measure, 28rem));
+    }
+
+    .starci-core-form-surface > .card,
+    .starci-core-form-surface > .starci-core-surface,
+    .starci-core-form-surface > .starci-core-surface-highlight {
+        max-height: calc(100dvh - 3rem);
+        overflow: hidden !important;
+        padding: 0 !important;
+    }
+
+    .starci-core-form-surface > .starci-core-surface-highlight > .starci-core-surface {
+        max-height: inherit;
+    }
+
+    .starci-core-form-field {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: var(--starci-core-field-gap, 0.5rem);
+    }
+
+    .starci-core-form-label--screen-reader {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    /*
+     * A field-shaped press target is FIELD anatomy, not a button variant.
+     *
+     * Two applications had already cloned it - a search trigger that looks exactly like the input
+     * it replaces - and both did it by pushing field geometry into a Grammar Button through
+     * `className`, which is an app override of a Grammar object. The anatomy lives here instead,
+     * reading the same `--field-*` contract the Input primitive reads, so the two clones can be
+     * deleted and no application has to restate the field's height, inset, corner or paint.
+     */
+    .starci-core-pressable-field {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        height: 2.25rem;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        border: var(--field-border-width, 1px) solid var(--field-border, var(--border, ButtonBorder));
+        border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5));
+        padding-inline: 0.75rem;
+        background: var(--field-background, var(--surface, Canvas));
+        color: var(--field-foreground, var(--foreground, CanvasText));
+        box-shadow: var(--field-shadow, none);
+        font: inherit;
+        text-align: start;
+        cursor: pointer;
+        transition:
+            background-color var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1)),
+            border-color var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .starci-core-pressable-field:hover {
+        border-color: var(--field-border-hover, var(--field-border, var(--border, ButtonBorder)));
+        background: var(--field-hover, var(--field-background, var(--surface, Canvas)));
+    }
+
+    .starci-core-pressable-field:focus-visible {
+        outline: 2px solid var(--focus, var(--starci-core-focus, Highlight));
+        outline-offset: 2px;
+    }
+
+    .starci-core-pressable-field:disabled,
+    .starci-core-pressable-field[data-disabled="true"] {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .starci-core-pressable-field-content {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .starci-core-pressable-field-placeholder {
+        min-width: 0;
+        overflow: hidden;
+        font-size: 0.875rem;
+        color: var(--field-placeholder, var(--muted, GrayText));
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-pressable-field-shortcut {
+        flex-shrink: 0;
+        border: 1px solid var(--border, var(--starci-core-border, ButtonBorder));
+        border-radius: var(--radius-sm, calc(var(--radius, 0.5rem) * 0.75));
+        padding: 0.25rem;
+        background: var(--surface-secondary, var(--starci-core-surface-secondary, Canvas));
+        color: var(--muted, var(--starci-core-muted, GrayText));
+        font-family: inherit;
+        font-size: 0.75rem;
+        line-height: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-pressable-field {
+            transition: none;
+        }
+    }
+
+    /*
+     * One scrolling axis, drawn by the family's own sheet.
+     *
+     * The vendor's `.scroll-shadow--horizontal` sets `overflow-x: auto` alone, and a computed
+     * `overflow-x: auto` forces `overflow-y` to compute to `auto` as well, so the region rendered
+     * `overflow: auto auto` - two scrolling axes under an OVERFLOW-3 claim that promises one. Naming
+     * both axes here keeps the render at the one axis the claim describes.
+     */
+    .starci-core-horizontal-scroll-region {
+        width: 100%;
+        min-width: 0;
+        padding-block: 0.25rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-inline: contain;
+    }
+
+    .starci-core-horizontal-scroll-region > * {
+        width: max-content;
+        min-width: max-content;
+    }
+
+    /*
+     * The same one scrolling axis, for the vertical region.
+     *
+     * The vendor's `.scroll-shadow--vertical` sets `overflow-y: auto` alone, and every host class
+     * this region wears - the chat conversation, the chat overlay rail, the accordion region, the
+     * form scroll viewport - names that same single axis or names none at all. A computed non-visible
+     * overflow on one axis forces the other from `visible` to `auto`, so the region rendered
+     * `overflow: auto auto`: two scrolling axes under an OVERFLOW-3 claim that promises one. Naming
+     * both axes on the region's own identity holds the render at the one axis the claim describes,
+     * and needs no `!important` to do it: no host class and no vendor rule ever names `overflow-x`,
+     * so this declaration is unopposed whichever order a consumer imports the two sheets in.
+     */
+    [data-grammar-scroll-region="vertical"] {
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    @media (min-width: 40rem) {
+        .starci-core-form-page {
+            padding-block: 2.5rem;
+        }
+
+        .starci-core-form-scroll-viewport {
+            max-height: calc(100dvh - 5rem);
+        }
+
+        .starci-core-form-surface > .card,
+        .starci-core-form-surface > .starci-core-surface,
+        .starci-core-form-surface > .starci-core-surface-highlight {
+            max-height: calc(100dvh - 5rem);
+        }
+    }
+
+    .starci-core-surface-card,
+    .starci-core-surface-list,
+    .starci-core-surface-accordion-card {
+        container-name: starci-core-surface;
+        container-type: inline-size;
+        display: flex;
+        min-width: 0;
+        width: 100%;
+        flex-direction: column;
+        gap: var(--starci-core-section-gap, 0.75rem);
+    }
+
+    .starci-core-surface-label {
+        display: flex;
+        min-width: 0;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--starci-core-inline-gap, 0.5rem);
+    }
+
+    .starci-core-surface-label > :first-child {
+        min-width: 0;
+        margin: 0;
+    }
+
+    .starci-core-label {
+        min-width: 0;
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
+    }
+
+    .starci-core-label[data-grammar-label-depth="nested"] {
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    .starci-core-tooltip {
+        position: relative;
+        max-width: fit-content;
+    }
+
+    .starci-core-tooltip-content {
+        position: absolute;
+        z-index: 20;
+        pointer-events: none;
+        white-space: nowrap;
+        border-radius: var(--starci-core-control-radius, 0.75rem);
+        background: var(--starci-core-foreground, var(--foreground, CanvasText));
+        color: var(--starci-core-canvas, var(--background, Canvas));
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-weight: 500;
+        opacity: 0;
+        transition:
+            opacity var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1)),
+            visibility var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+        visibility: hidden;
+    }
+
+    .starci-core-tooltip:hover > .starci-core-tooltip-content,
+    .starci-core-tooltip:focus-within > .starci-core-tooltip-content {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .starci-core-tooltip[data-grammar-tooltip-placement="top"] > .starci-core-tooltip-content {
+        bottom: calc(100% + 0.375rem);
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .starci-core-tooltip[data-grammar-tooltip-placement="bottom"] > .starci-core-tooltip-content {
+        top: calc(100% + 0.375rem);
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-tooltip-content {
+            transition: none;
+        }
+    }
+
+    .starci-core-surface {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        background: var(--surface, Canvas);
+        color: var(--surface-foreground, CanvasText);
+    }
+
+    @property --starci-core-highlight-angle {
+        syntax: "<angle>";
+        initial-value: 0deg;
+        inherits: false;
+    }
+
+    @keyframes starci-core-highlight-spin {
+        to {
+            --starci-core-highlight-angle: 360deg;
+        }
+    }
+
+    .starci-core-surface-highlight {
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        overflow: visible;
+    }
+
+    .starci-core-surface-highlight-sweep {
+        position: absolute;
+        z-index: 1;
+        inset: var(--starci-core-highlight-inset, 0);
+        box-sizing: border-box;
+        border-radius: inherit;
+        padding: 2px;
+        background: conic-gradient(
+            from var(--starci-core-highlight-angle),
+            transparent 0%,
+            transparent 82%,
+            var(--starci-core-accent, var(--accent, Highlight)) 92%,
+            transparent 100%
+        );
+        -webkit-mask:
+            linear-gradient(#000 0 0) content-box,
+            linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask:
+            linear-gradient(#000 0 0) content-box,
+            linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        animation: starci-core-highlight-spin 3s linear infinite;
+        pointer-events: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-surface-highlight-sweep {
+            animation: none;
+        }
+    }
+
+    .starci-core-surface[data-grammar-surface-depth="top"] {
+        border: 0;
+        box-shadow: var(--starci-core-surface-shadow, var(--shadow-surface, 0 1px 3px rgb(0 0 0 / 0.16)));
+    }
+
+    .starci-core-surface[data-grammar-surface-depth="nested"] {
+        border: 1px solid var(--border, GrayText);
+        box-shadow: none;
+    }
+
+    .starci-core-surface-content {
+        min-width: 0;
+        padding: var(--starci-core-surface-inset, 1rem);
+    }
+
+    .starci-core-surface[data-grammar-surface-composition="joined"] > .starci-core-surface-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 0;
+    }
+
+    .starci-core-surface-card[data-grammar-surface-height="fill"],
+    .starci-core-surface-card[data-grammar-surface-height="fill"] > .starci-core-surface,
+    .starci-core-surface-card[data-grammar-surface-height="fill"] > .starci-core-surface-highlight,
+    .starci-core-surface-card[data-grammar-surface-height="fill"] > .starci-core-surface-highlight > .starci-core-surface,
+    .starci-core-surface-card[data-grammar-surface-height="fill"] .starci-core-surface-content {
+        height: 100%;
+    }
+
+    .starci-core-surface.starci-core-frameless-surface {
+        position: relative;
+        min-width: 0;
+        overflow: visible;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        color: inherit;
+    }
+
+    .starci-core-frameless-surface > .starci-core-surface-content {
+        padding: 0;
+    }
+
+    [data-grammar-scroll="contained"] {
+        max-height: var(--starci-core-contained-max-height, calc(100dvh - 3rem));
+        overflow: hidden;
+    }
+
+    [data-grammar-scroll="contained"] > .scroll-shadow--vertical {
+        width: 100%;
+        max-height: inherit;
+        min-height: 0;
+        overscroll-behavior: contain;
+    }
+
+    [data-grammar-whole-action] {
+        position: absolute;
+        z-index: 1;
+        inset: 0;
+        border: 0;
+        border-radius: inherit;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+    }
+
+    [data-grammar-whole-action]:focus-visible {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: -2px;
+    }
+
+    .starci-core-surface-card[data-grammar-interaction="whole-action"] .starci-core-surface {
+        transition: background-color var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, ease-out);
+    }
+
+    .starci-core-surface-card[data-grammar-interaction="whole-action"] .starci-core-surface:has([data-grammar-whole-action]:hover),
+    .starci-core-surface-card[data-grammar-interaction="whole-action"] .starci-core-surface:has([data-grammar-whole-action]:focus-visible) {
+        background: var(--accent-soft, var(--starci-core-surface-secondary, var(--surface-secondary, Canvas)));
+    }
+
+    .starci-core-surface-card[data-grammar-interaction="whole-action"] .starci-core-surface:has([data-grammar-whole-action]:active) {
+        background: color-mix(in oklab, var(--starci-core-accent, Highlight) 14%, var(--starci-core-surface, Canvas));
+    }
+
+    [data-grammar-whole-action][aria-disabled="true"],
+    [data-grammar-whole-action]:disabled {
+        cursor: not-allowed;
+    }
+
+    [data-grammar-state="unavailable"] {
+        opacity: var(--starci-core-disabled-opacity, 0.55);
+    }
+
+    [data-grammar-state="pending"] {
+        cursor: progress;
+    }
+
+    .starci-core-leading-number {
+        display: inline-block;
+        flex: none;
+        font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+        min-width: 1.25rem;
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.25rem;
+        text-align: end;
+        white-space: nowrap;
+    }
+
+    .starci-core-list-shell {
+        padding: 0;
+    }
+
+    .starci-core-static-list {
+        display: flex;
+        margin: 0;
+        padding: 0;
+        flex-direction: column;
+        list-style: none;
+    }
+
+    .starci-core-owned-collection {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* A verdict list is flush inside its shell; the shell already owns the corner. */
+    .starci-core-owned-collection[data-grammar-collection="verdict"] {
+        border-radius: 0 !important;
+    }
+
+    /*
+     * THE VERDICT EDGE IS SHIPPED.
+     *
+     * A row in a verdict collection reports an outcome, and the outcome is drawn as a 2px edge on
+     * the row's leading side. The collection already squares its corners for exactly these rows;
+     * this is the paint the squaring was preparing for, and without it an application had to reach
+     * across the Grammar boundary with its own inset shadow to get it.
+     *
+     * It is an INSET SHADOW, not a border and not a padded rule, because the rows of a verdict
+     * collection are usually the consumer's own children: a border would move their content two
+     * pixels and a padding would fight the inset they already own, while a shadow paints inside the
+     * box that is already there. The row is addressed by `data-verdict`, which is the slot contract
+     * `SurfaceListCard` documents for its collection, so a Grammar row and an application row draw
+     * the same edge from the same attribute.
+     *
+     * The offset is physical because `box-shadow` has no logical form; under `dir="rtl"` the edge
+     * stays on the left. No shipped object mirrors yet, so this is consistent rather than a new gap.
+     */
+    .starci-core-owned-collection[data-grammar-collection="verdict"] [data-verdict="success"],
+    .starci-core-static-row[data-verdict="success"] {
+        --starci-core-verdict-edge: inset 2px 0 0 0 var(--success, var(--starci-core-success, #15803d));
+    }
+
+    .starci-core-owned-collection[data-grammar-collection="verdict"] [data-verdict="danger"],
+    .starci-core-static-row[data-verdict="danger"] {
+        --starci-core-verdict-edge: inset 2px 0 0 0 var(--danger, var(--starci-core-danger, #b91c1c));
+    }
+
+    /*
+     * The edge is painted from that one property, including under hover.
+     *
+     * A hover-invariant list clears every row shadow below, which is right for decoration and wrong
+     * for a verdict: an outcome that disappears while the pointer rests on its row is a worse row
+     * than one that never drew it. Reading the same property in both places keeps one value.
+     */
+    .starci-core-owned-collection[data-grammar-collection="verdict"] [data-verdict="success"],
+    .starci-core-owned-collection[data-grammar-collection="verdict"] [data-verdict="danger"],
+    .starci-core-static-row[data-verdict="success"],
+    .starci-core-static-row[data-verdict="danger"],
+    .starci-core-list-shell[data-grammar-hover="invariant"] .starci-core-static-row[data-verdict="success"]:hover,
+    .starci-core-list-shell[data-grammar-hover="invariant"] .starci-core-static-row[data-verdict="danger"]:hover {
+        box-shadow: var(--starci-core-verdict-edge, none);
+    }
+
+    .starci-core-surface-footer {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+    }
+
+    .starci-core-tabs-frame,
+    .starci-core-tabs-scroll {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .starci-core-tabs-frame,
+    .starci-core-tabs .tabs__list,
+    .starci-core-tabs .tabs__list-container {
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .starci-core-tabs .tabs__list,
+    .starci-core-tabs .tabs__list-container {
+        border-bottom-width: 0 !important;
+    }
+
+    .starci-core-tabs .tabs__list {
+        align-items: flex-end;
+    }
+
+    .starci-core-tabs-scroll {
+        overflow-x: auto;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tabs-inset="page"] {
+        padding-inline: 1.5rem;
+    }
+
+    .starci-core-tabs {
+        width: max-content;
+        min-width: 100%;
+        white-space: nowrap;
+    }
+
+    .starci-core-tabs .tabs__tab {
+        position: relative;
+        width: auto !important;
+        flex: 0 0 auto !important;
+        padding-inline: 0.75rem !important;
+        padding-block-end: 0 !important;
+    }
+
+    .starci-core-tabs .tabs__indicator {
+        bottom: 0 !important;
+        height: 2px !important;
+        margin-block-end: 0 !important;
+    }
+
+    .starci-core-tab-content {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: var(--starci-core-inline-gap, 0.5rem);
+    }
+
+    .starci-core-tab-label {
+        display: none;
+    }
+
+    .starci-core-tabs-frame[data-grammar-tab-labels="always"] .starci-core-tab-label {
+        display: inline;
+    }
+
+    .starci-core-static-row,
+    .starci-core-empty-row {
+        display: flex;
+        min-width: 0;
+        margin: 0;
+        align-items: flex-start;
+        gap: var(--starci-core-row-gap, 0.75rem);
+        padding: var(--starci-core-row-inset, 1rem);
+    }
+
+    .starci-core-static-row + .starci-core-static-row {
+        border-top: 1px solid var(--separator, var(--border, GrayText));
+    }
+
+    .starci-core-list-shell[data-grammar-hover="invariant"] .starci-core-static-row:hover {
+        background: transparent;
+        box-shadow: none;
+        color: inherit;
+        transform: none;
+    }
+
+    .starci-core-accordion-shell {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .starci-core-accordion-row {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    /* HeroUI's `Accordion` root sizes itself; the Grammar shell owns the measure. */
+    .starci-core-accordion-root {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    .starci-core-accordion-scroll-region {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* Expanded content starts flush beneath its trigger, keeping the bottom and inline insets. */
+    .starci-core-accordion-body {
+        width: 100% !important;
+        min-width: 0;
+        padding: 0 1rem 0.75rem 1.5rem !important;
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+    }
+
+    .starci-core-accordion-row + .starci-core-accordion-row {
+        border-top: 1px solid var(--separator, var(--border, GrayText));
+    }
+
+    .starci-core-accordion-heading {
+        margin: 0 !important;
+    }
+
+    .starci-core-accordion-trigger {
+        display: block;
+        width: 100% !important;
+        min-width: 0;
+        min-height: 44px;
+        padding: var(--starci-core-row-inset, 1rem) !important;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+        text-align: left !important;
+        transform: none;
+        transition: none;
+    }
+
+    .starci-core-accordion-trigger:hover,
+    .starci-core-accordion-trigger[data-hovered="true"],
+    .starci-core-accordion-trigger:active,
+    .starci-core-accordion-trigger[aria-expanded="true"] {
+        background: transparent;
+        box-shadow: none;
+        color: inherit;
+        transform: none;
+    }
+
+    .starci-core-accordion-trigger:focus-visible,
+    .starci-core-accordion-trigger[data-focus-visible="true"] {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: -2px;
+    }
+
+    .starci-core-accordion-trigger:disabled {
+        cursor: default;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-surface-card[data-grammar-interaction="whole-action"] .starci-core-surface {
+            transition: none;
+        }
+    }
+
+    /* The animated vendor region owns no inset, so a closed panel collapses to zero height. */
+    .starci-core-accordion-panel {
+        width: 100% !important;
+        min-width: 0;
+        padding: 0 !important;
+    }
+
+    .starci-core-markdown-article {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        flex-direction: column;
+        gap: 1rem;
+        color: inherit;
+        font-size: 0.875rem;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-markdown-article[data-grammar-markdown-measure="compact"] {
+        max-width: 72ch;
+        gap: 0.75rem;
+    }
+
+    .starci-core-markdown-article > :first-child {
+        margin-top: 0;
+    }
+
+    .starci-core-markdown-article > :last-child {
+        margin-bottom: 0;
+    }
+
+    .starci-core-markdown-article :where(h1, h2, h3, h4) {
+        margin: 1.5rem 0 0.625rem;
+        color: inherit;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+
+    .starci-core-markdown-article h1 { font-size: 1.5rem; }
+    .starci-core-markdown-article h2 { font-size: 1.25rem; }
+    .starci-core-markdown-article h3 { font-size: 1.125rem; }
+    .starci-core-markdown-article h4 { font-size: 1rem; }
+
+    .starci-core-markdown-article :where(p, ul, ol, blockquote, pre, table) {
+        margin: 0;
+    }
+
+    .starci-core-markdown-article :where(ul, ol) {
+        padding-inline-start: 1.5rem;
+    }
+
+    .starci-core-markdown-article ul { list-style: disc; }
+    .starci-core-markdown-article ol { list-style: decimal; }
+
+    .starci-core-markdown-article strong { font-weight: 600; }
+    .starci-core-markdown-article em { font-style: italic; }
+
+    .starci-core-markdown-article li + li {
+        margin-top: 0.375rem;
+    }
+
+    .starci-core-markdown-article :not(pre) > code {
+        display: inline;
+        padding: 0.125rem 0.375rem;
+        border: 1px solid var(--border, GrayText);
+        border-radius: 999px;
+        background: var(--muted-surface, color-mix(in srgb, CanvasText 7%, Canvas));
+        color: inherit;
+        font: 500 0.875rem/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+        white-space: break-spaces;
+    }
+
+    .starci-core-markdown-article pre,
+    .starci-core-fenced-code-block pre {
+        max-width: 100%;
+        margin: 0;
+        padding: 1rem;
+        overflow-x: auto;
+        border: 1px solid var(--border, GrayText);
+        border-radius: 0.75rem;
+        background: var(--code-surface, color-mix(in srgb, CanvasText 6%, Canvas));
+        color: inherit;
+        overscroll-behavior-inline: contain;
+    }
+
+    .starci-core-markdown-article pre code,
+    .starci-core-fenced-code-block pre code {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: 400 0.875rem/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+        white-space: pre;
+    }
+
+    .starci-core-fenced-code-block {
+        width: 100%;
+        min-width: 0;
+        margin: 0 0 1rem;
+        overflow: auto;
+    }
+
+    .starci-core-fenced-code-header {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0 0 0.5rem;
+        color: var(--muted, GrayText);
+    }
+
+    .starci-core-fenced-code-header :where(button) {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+    }
+
+    [data-grammar-fenced-code-highlight="true"] {
+        width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        border: 1px solid var(--border, GrayText);
+        border-radius: 0.75rem;
+        background: var(--code-surface, color-mix(in srgb, CanvasText 6%, Canvas));
+        overscroll-behavior-inline: contain;
+    }
+
+    [data-grammar-fenced-code-highlight="true"] pre {
+        width: max-content;
+        min-width: 100%;
+        padding: 1rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent !important;
+    }
+
+    .starci-core-markdown-article blockquote {
+        padding-inline-start: 1rem;
+        border-inline-start: 3px solid var(--border, GrayText);
+        color: var(--muted, GrayText);
+    }
+
+    .starci-core-markdown-article table,
+    .starci-core-markdown-table-frame {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+    }
+
+    .starci-core-markdown-article table {
+        border-collapse: collapse;
+    }
+
+    .starci-core-markdown-table-frame {
+        min-width: 0;
+        border: 1px solid var(--border, GrayText);
+        border-radius: 0.75rem;
+        background: var(--code-surface, color-mix(in srgb, CanvasText 4%, Canvas));
+        box-shadow: none;
+    }
+
+    .starci-core-markdown-article hr {
+        width: 100%;
+        margin: 1rem 0;
+        border: 0;
+        border-top: 1px solid var(--separator, var(--border, GrayText));
+    }
+
+    .starci-core-markdown-article :where(th, td) {
+        min-width: 8rem;
+        padding: 0.625rem 0.75rem;
+        border-bottom: 1px solid var(--separator, var(--border, GrayText));
+        text-align: start;
+        vertical-align: top;
+    }
+
+    .starci-core-markdown-article a {
+        color: var(--link, LinkText);
+        text-decoration: underline;
+        text-underline-offset: 0.15em;
+    }
+
+    .starci-core-static-row-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        gap: var(--starci-core-copy-gap, 0.25rem);
+    }
+
+    .starci-core-static-row-copy > :last-child:not(:first-child) {
+        color: var(--muted, GrayText);
+    }
+
+    [data-grammar-state-mark="check"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        flex: none;
+        color: var(--success, #15803d);
+    }
+
+    .starci-core-rail {
+        container-name: starci-core-rail;
+        container-type: inline-size;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .starci-core-rail[data-grammar-rail-width="compact"] {
+        max-width: var(--starci-core-rail-compact, 16rem);
+    }
+
+    .starci-core-rail[data-grammar-collapse="collapsed"] {
+        max-width: var(--starci-core-rail-collapsed, 4rem);
+    }
+
+    .starci-core-rail[data-grammar-rail-width="standard"] {
+        max-width: var(--starci-core-rail-standard, 20rem);
+    }
+
+    .starci-core-rail[data-grammar-rail-width="wide"] {
+        max-width: var(--starci-core-rail-wide, 24rem);
+    }
+
+    /*
+     * A sticky rail starts where the band stops.
+     *
+     * `--starci-core-rail-offset` is still the one a consumer sets; when it does not, the rail reads
+     * the offset the sticky band publishes about itself, and only when there is no band at all does
+     * it fall back to the 5.5rem it always used. So `mode="sticky"` under a Grammar band needs no
+     * `calc()` at the call site, and a rail with no band above it is unchanged.
+     */
+    .starci-core-rail-frame {
+        display: flex;
+        min-width: 0;
+        max-height: calc(100dvh - var(--starci-core-rail-offset, var(--starci-core-band-offset, 5.5rem)) - 1.5rem);
+        flex-direction: column;
+        gap: var(--starci-core-rail-gap, 1rem);
+    }
+
+    .starci-core-rail[data-grammar-rail-mode="sticky"] .starci-core-rail-frame {
+        position: sticky;
+        top: var(--starci-core-rail-offset, var(--starci-core-band-offset, 5.5rem));
+    }
+
+    .starci-core-rail-body {
+        min-width: 0;
+        min-height: 0;
+        flex: 1 1 0%;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    /* Grammar-owned content inset, selected by the attribute the branch already emits. */
+    .starci-core-rail-body[data-grammar-rail-inset="content"] {
+        padding-inline: 0.75rem;
+        padding-block: 1.5rem;
+    }
+
+    .starci-core-rail[data-grammar-rail-height="fill"],
+    .starci-core-rail[data-grammar-rail-height="fill"] .starci-core-rail-frame,
+    .starci-core-rail[data-grammar-rail-height="fill"] .starci-core-rail-body {
+        height: 100%;
+        min-height: 0;
+    }
+
+    .starci-core-rail[data-grammar-rail-height="fill"] .starci-core-rail-frame {
+        max-height: none;
+    }
+
+    .starci-core-rail[data-grammar-rail-height="fill"] .starci-core-rail-body {
+        flex: 1 1 0%;
+        overflow: hidden;
+    }
+
+    .starci-core-rail-footer {
+        display: flex;
+        align-items: center;
+        flex: none;
+    }
+
+    .starci-core-rail :where(button, [role="button"]) {
+        min-inline-size: 44px;
+        min-block-size: 44px;
+    }
+
+    @container starci-core-surface (max-width: 28rem) {
+        .starci-core-surface-label {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .starci-core-static-row {
+            gap: var(--starci-core-row-gap-compact, 0.5rem);
+        }
+    }
+
+    @container starci-core-rail (max-width: 18rem) {
+        .starci-core-rail-frame {
+            gap: var(--starci-core-rail-gap-compact, 0.75rem);
+        }
+    }
+
+    @container starci-core-primary-rail (max-width: 56rem) {
+        /*
+         * The single column itself is the DEFAULT above, not an override here - see the note on
+         * `.starci-core-primary-rail-layout`. This block owns only what is true of the collapsed
+         * reading order, which has no counterpart outside the query to fight with.
+         *
+         * Collapsed, the rail may lead - a filter or summary a reader needs before the content.
+         */
+        .starci-core-primary-rail-layout[data-grammar-layout-collapsed-order="rail-first"] .starci-core-rail-region {
+            order: -1;
+        }
+    }
+
+    @container starci-core-primary-rail (max-width: 32rem) {
+        /*
+         * Collapsed to a column, the header stays a region boundary, not a tighter internal
+         * rhythm - `PrimaryRailLayout` and `WorkspaceShell` both hold `--starci-core-region-gap`
+         * across every collapse tier and only ever change track/area, never the gap itself. The
+         * stamped `data-contract="GAP-5"` on this root must stay true here too, so this rule may
+         * change direction and alignment but not the gap value.
+         */
+        .starci-core-section-header {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: var(--starci-core-region-gap, 1.5rem);
+        }
+    }
+
+    @media (max-width: 47.999rem) {
+        .starci-core-rail[data-grammar-rail-mode="sticky"] .starci-core-rail-frame {
+            position: static;
+            max-height: none;
+        }
+
+        .starci-core-rail-body {
+            overflow-y: visible;
+        }
+    }
+
+    @media (min-width: 48rem) {
+        .starci-core-tab-label {
+            display: inline;
+        }
+    }
+
+    .starci-core-navigation-feature-nav {
+        width: 100%;
+        border-bottom: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+        background: var(--background, var(--starci-core-canvas, Canvas));
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+    }
+
+    .starci-core-navigation-feature-nav[data-grammar-navigation-feature-nav-position="sticky"] {
+        position: sticky;
+        z-index: var(--starci-core-navbar-z, 50);
+        top: 0;
+    }
+
+    /*
+     * THE BAND PUBLISHES ITS OWN HEIGHT.
+     *
+     * A page under a sticky band needs exactly one number - where the band stops - to pin a rail
+     * beneath it, and until now every consumer RESTATED that number: `calc(4rem + 1px)` for the
+     * primary row and its separator, `calc(4rem + 2rem + 1px)` once a feature layer is stacked.
+     * Restated geometry is wrong the moment the band changes, so the band publishes it instead.
+     *
+     * It is published with `:has()` on the Grammar root, not measured in JS, because presence and
+     * stacking are already spelled by the data attributes these compositions emit, and a custom
+     * property set on the root inherits to every page inside it. The root - not `:root` - keeps the
+     * package inside its own boundary, which is the same reason no rule here touches the document.
+     *
+     * NOTHING is defined when no sticky band is present, so `var(--starci-core-band-offset, X)`
+     * still resolves to a consumer's own X exactly as it did before this property existed.
+     */
+    .grammar-common-root:has(.starci-core-navigation-feature-nav[data-grammar-navigation-feature-nav-position="sticky"]),
+    .grammar-common-root:has(.starci-core-subnav[data-grammar-subnav-position="sticky"]) {
+        --starci-core-band-offset: calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem));
+    }
+
+    .grammar-common-root:has(.starci-core-navigation-feature-nav[data-grammar-navigation-feature-nav-position="sticky"]) {
+        --starci-core-band-height: calc(4rem + 1px);
+    }
+
+    .grammar-common-root:has(.starci-core-navigation-feature-nav[data-grammar-navigation-feature-nav-position="sticky"][data-grammar-navigation-feature-nav-layers="two"]) {
+        --starci-core-band-height: calc(4rem + 2rem + 1px);
+    }
+
+    /* A sticky Subnav stacks under the band, so it adds its own height and separator to the offset. */
+    .grammar-common-root:has(.starci-core-subnav[data-grammar-subnav-position="sticky"]) {
+        --starci-core-band-subnav-height: calc(3.25rem + 1px);
+    }
+
+    .starci-core-navigation-feature-nav-primary {
+        display: grid !important;
+        min-height: 4rem;
+        grid-template-columns: minmax(0, 1fr) auto auto !important;
+        align-items: center;
+        gap: var(--starci-core-row-gap, 0.75rem);
+        padding-block: var(--starci-core-inline-gap, 0.5rem);
+    }
+
+    .starci-core-navigation-feature-nav-primary.starci-core-page-container {
+        padding-inline: 0.75rem;
+    }
+
+    .starci-core-navigation-feature-nav-identity,
+    .starci-core-navigation-feature-nav-navigation,
+    .starci-core-navigation-feature-nav-compact-navigation,
+    .starci-core-navigation-feature-nav-actions,
+    .starci-core-navigation-feature-nav-feature {
+        min-width: 0;
+    }
+
+    .starci-core-navigation-feature-nav-navigation {
+        display: none !important;
+    }
+
+    /*
+     * A bar with no primary destinations renders no `nav` at all, so the grid loses a track rather
+     * than keeping an empty one: identity leads, the remaining row belongs to what is still there.
+     */
+    .starci-core-navigation-feature-nav[data-grammar-navigation-feature-nav-destinations="absent"] .starci-core-navigation-feature-nav-primary {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+    }
+
+    .starci-core-navigation-feature-nav-compact-navigation {
+        display: block !important;
+    }
+
+    .starci-core-navigation-feature-nav-actions {
+        display: flex;
+        align-items: center;
+        justify-content: end;
+        gap: var(--starci-core-inline-gap, 0.5rem);
+    }
+
+    /*
+     * THE BAND'S OWN CONTROLS MEET THE 44px TOUCH FLOOR.
+     *
+     * Every pressable in the two action slots was the vendor button's own height - 2.25rem on
+     * desktop and 2.5rem compact - so the language menu, the cart, the account button, the compact
+     * drawer trigger and the field-shaped search trigger all sat under the floor, on the surface a
+     * reader is most likely to touch. It is a MINIMUM, not a size: `min-inline-size` and
+     * `min-block-size` are properties the vendor's rules never set, so the glyph, the label, the
+     * paint and the corner are all untouched and no `!important` is owed to the components layer.
+     *
+     * The band does NOT grow. The primary row is 4rem with a 0.5rem block inset on each side, so
+     * 44px is 4px short of the 3rem it already offers a control, and `--starci-core-band-height`
+     * stays `calc(4rem + 1px)`. The floor is spelled on the pressable, never on the slot: a slot
+     * with a min-height would pad a row that has nothing in it.
+     *
+     * The feature layer is deliberately out of scope - its tabs are a Tabs branch, and a tab's
+     * target is that branch's to answer.
+     *
+     * The primary destinations in the `navigation` slot carry the identical selector: a
+     * `route`-appearance TextAction already meets the floor on its own (below), but the slot rule
+     * is the family's general-purpose net for ANY pressable a consumer puts there, the same way the
+     * action slots protect a control regardless of which leaf renders it.
+     */
+    .starci-core-navigation-feature-nav-actions :where(button, [role="button"], a[href]),
+    .starci-core-navigation-feature-nav-navigation :where(button, [role="button"], a[href]),
+    .starci-core-navigation-feature-nav-compact-navigation :where(button, [role="button"], a[href]) {
+        min-inline-size: 44px;
+        min-block-size: 44px;
+    }
+
+    /*
+     * The identity slot's brand link is a `plain` TextAction used as a same-document pressable, not
+     * a route: `plain` elsewhere in the family stays a compact inline mark with no reserved hit
+     * area, so the floor is scoped to this one band slot instead of the bare `[data-appearance]`
+     * rule, which would grow every quiet inline action across the app that never claimed to be a
+     * touch target.
+     */
+    .starci-core-navigation-feature-nav-identity .starci-core-text-action[data-appearance="plain"] {
+        min-block-size: var(--starci-core-control-min-size, 2.75rem);
+    }
+
+    .starci-core-navigation-feature-nav-feature {
+        width: 100%;
+        padding-inline: 0.75rem;
+    }
+
+    .starci-core-course-section-navigation {
+        padding-inline-start: 0.75rem;
+        padding-inline-end: 0.75rem;
+    }
+
+    /* The navbar owns the only outer separator; HeroUI's secondary tab rail must not add a twin. */
+    .starci-core-navigation-feature-nav-feature .tabs__list-container {
+        border-bottom-width: 0 !important;
+    }
+
+    /* Feature tabs share the dashboard rail's left inset; scroll chrome must not reclaim it. */
+    .starci-core-navigation-feature-nav-feature .starci-core-tabs-scroll {
+        padding-block: 0;
+        padding-inline-start: 0;
+    }
+
+    .starci-core-navigation-feature-nav-feature .tabs__list-container__scroll-prev[disabled],
+    .starci-core-navigation-feature-nav-feature .tabs__list-container__scroll-prev[tabindex="-1"] {
+        width: 0;
+        min-width: 0;
+        padding: 0;
+        margin: 0;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .starci-core-navigation-feature-nav-feature .starci-core-tabs .tabs__indicator {
+        bottom: 0 !important;
+        inset-block-end: 0 !important;
+    }
+
+    .starci-core-course-section-navigation .tabs__list-container {
+        border-bottom-width: 0 !important;
+    }
+
+    .starci-core-subnav {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        min-height: 3.25rem;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--starci-core-row-gap, 0.75rem);
+        padding-inline: 0.75rem;
+        border-bottom: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+        background: var(--background, var(--starci-core-canvas, Canvas));
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+    }
+
+    .starci-core-subnav[data-grammar-subnav-position="sticky"] {
+        position: sticky;
+        z-index: var(--starci-core-subnav-z, 40);
+        /* The band's own published height, so a stacked Subnav no longer needs a consumer's calc. */
+        top: var(--starci-core-subnav-offset, var(--starci-core-band-height, 4rem));
+        backface-visibility: hidden;
+        transform: translateZ(0);
+        will-change: transform;
+    }
+
+    .starci-core-subnav-identity {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: var(--starci-core-inline-gap, 0.5rem);
+    }
+
+    .starci-core-subnav-leading,
+    .starci-core-subnav-toggle {
+        flex: none;
+    }
+
+    .starci-core-subnav-title {
+        display: flex;
+        min-width: 0;
+        overflow: hidden;
+        align-items: center;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /*
+     * The toggle is a HeroUI `Button`, whose own fill, corner and shadow live in the vendor's
+     * `components` layer - declared after `starci-grammar-common`, so it wins every normal
+     * declaration here regardless of specificity. These are the ones the utilities used to carry,
+     * so they are the ones that have to be important - the 2.75rem target included, because the
+     * vendor sizes its own button and a consumer was re-forcing `size-11` to get the target back.
+     */
+    .starci-core-subnav-toggle {
+        display: inline-flex;
+        width: 2.75rem !important;
+        height: 2.75rem !important;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: inherit;
+        cursor: pointer;
+    }
+
+    .starci-core-subnav-toggle:hover,
+    .starci-core-subnav-toggle[data-hovered="true"] {
+        background: transparent !important;
+    }
+
+    @media (min-width: 48rem) {
+        .starci-core-navigation-feature-nav[data-grammar-navigation-feature-nav-destinations="absent"] .starci-core-navigation-feature-nav-primary {
+            grid-template-columns: auto minmax(0, 1fr) !important;
+        }
+
+        .starci-core-navigation-feature-nav-primary {
+            grid-template-columns: auto minmax(0, 1fr) auto !important;
+        }
+
+        .starci-core-navigation-feature-nav-navigation {
+            display: block !important;
+        }
+
+        .starci-core-navigation-feature-nav-compact-navigation {
+            display: none !important;
+        }
+    }
+
+    @media (min-width: 70rem) {
+        .starci-core-subnav[data-grammar-subnav-visibility="compact"] {
+            display: none;
+        }
+
+        /* A compact Subnav is not on screen here, so it contributes no height to the band offset. */
+        .grammar-common-root:has(.starci-core-subnav[data-grammar-subnav-position="sticky"][data-grammar-subnav-visibility="compact"]) {
+            --starci-core-band-subnav-height: 0rem;
+        }
+    }
+
+    .starci-core-workspace-shell {
+        position: relative;
+        min-width: 0;
+        container: starci-core-workspace-shell / inline-size;
+    }
+
+    .starci-core-workspace-shell-header {
+        min-width: 0;
+        margin-block-end: var(--starci-core-region-gap, 1.5rem);
+    }
+
+    .starci-core-workspace-shell-compact-header,
+    .starci-core-workspace-shell-compact-navigation {
+        display: none;
+    }
+
+    /*
+     * THE COLLAPSED FORM IS THE DEFAULT here too, for the reason recorded on
+     * `.starci-core-primary-rail-layout`: every multi-track form lives INSIDE a container query, so
+     * the stacked one cannot be outranked by an attribute selector written outside it. Before this,
+     * the two-track rule for `[navigation="present"][rail="present"]` (0,3,0) in the 72rem query
+     * beat the collapse group's bare class (0,1,0), and the leading four-track rule (0,4,0) beat
+     * every collapse rule there is, so a shell carrying a navigation and a rail never stacked.
+     *
+     * The tiers are mutually exclusive ranges, narrowest first:
+     *   default        one column, one row per region
+     *   > 56rem        the regions take their own tracks
+     *   > 72rem        a navigation AND a rail stand beside the primary at the same time
+     */
+    .starci-core-workspace-shell-layout {
+        --starci-core-workspace-navigation-track: minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem));
+        --starci-core-workspace-rail-track: minmax(16rem, var(--starci-core-rail-standard, 20rem));
+        display: grid;
+        min-width: 0;
+        grid-template-areas: "navigation" "primary" "rail";
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--starci-core-region-gap, 1.5rem);
+    }
+
+    .starci-core-workspace-shell-layout[data-grammar-workspace-navigation-track="intrinsic"] {
+        --starci-core-workspace-navigation-track: max-content;
+    }
+
+    /* Stacked, an absent region leaves no row behind - an empty one would still take a gap. */
+    .starci-core-workspace-shell-layout[data-grammar-workspace-navigation="absent"] {
+        grid-template-areas: "primary" "rail";
+    }
+
+    .starci-core-workspace-shell-layout[data-grammar-workspace-rail="absent"] {
+        grid-template-areas: "navigation" "primary";
+    }
+
+    .starci-core-workspace-shell-layout[data-grammar-workspace-navigation="absent"][data-grammar-workspace-rail="absent"] {
+        grid-template-areas: "primary";
+    }
+
+    /* A leading rail keeps its precedence in the reading order once the tracks are gone. */
+    .starci-core-workspace-shell-layout[data-grammar-workspace-rail-position="leading"][data-grammar-workspace-navigation="absent"][data-grammar-workspace-rail="present"] {
+        grid-template-areas: "rail" "primary";
+    }
+
+    .starci-core-workspace-shell-leading-rule {
+        display: none;
+        grid-area: rule;
+        width: 1px;
+        align-self: stretch;
+        justify-self: stretch;
+        background: var(--separator, var(--starci-core-separator, GrayText));
+    }
+
+    @container starci-core-workspace-shell (min-width: 56.001rem) {
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation="present"][data-grammar-workspace-rail="present"] {
+            grid-template-areas: "navigation primary" "navigation rail";
+            grid-template-columns: var(--starci-core-workspace-navigation-track) minmax(0, 1fr);
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation="absent"][data-grammar-workspace-rail="present"] {
+            grid-template-areas: "primary rail";
+            grid-template-columns: minmax(0, 1fr) var(--starci-core-workspace-rail-track);
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation="present"][data-grammar-workspace-rail="absent"] {
+            grid-template-areas: "navigation primary";
+            grid-template-columns: var(--starci-core-workspace-navigation-track) minmax(0, 1fr);
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation="absent"][data-grammar-workspace-rail="absent"] {
+            grid-template-areas: "primary";
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-rail-position="leading"][data-grammar-workspace-navigation="absent"][data-grammar-workspace-rail="present"] {
+            grid-template-areas: "rail rule primary";
+            grid-template-columns: var(--starci-core-workspace-rail-track) 1px minmax(0, 1fr);
+            column-gap: 0;
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-rail-position="leading"][data-grammar-workspace-navigation="present"][data-grammar-workspace-rail="present"] {
+            grid-template-areas: "navigation rail rule primary";
+            grid-template-columns:
+                var(--starci-core-workspace-navigation-track)
+                var(--starci-core-workspace-rail-track)
+                1px
+                minmax(0, 1fr);
+            column-gap: 0;
+        }
+
+        /* The seam and its rule belong to the side-by-side form, so they arrive with the tracks. */
+        .starci-core-workspace-shell-layout[data-grammar-workspace-rail-position="leading"] .starci-core-workspace-shell-leading-rule {
+            display: block;
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-rail-position="leading"] .starci-core-workspace-shell-primary {
+            padding-inline-start: var(--starci-core-workspace-leading-seam, 2rem);
+        }
+    }
+
+    @container starci-core-workspace-shell (min-width: 72.001rem) {
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation="present"][data-grammar-workspace-rail="present"] {
+            grid-template-areas: "navigation primary rail";
+            grid-template-columns:
+                var(--starci-core-workspace-navigation-track)
+                minmax(0, 1fr)
+                var(--starci-core-workspace-rail-track);
+        }
+    }
+
+    .starci-core-workspace-shell-layout[data-grammar-workspace-rail-width="compact"] {
+        --starci-core-workspace-rail-track: minmax(14rem, var(--starci-core-rail-compact, 16rem));
+    }
+
+    .starci-core-workspace-shell-layout[data-grammar-workspace-rail-width="wide"] {
+        --starci-core-workspace-rail-track: minmax(20rem, var(--starci-core-rail-wide, 24rem));
+    }
+
+    .starci-core-workspace-shell-layout[data-grammar-workspace-align="start"] { align-items: start; }
+    .starci-core-workspace-shell-layout[data-grammar-workspace-align="stretch"] { align-items: stretch; }
+    .starci-core-workspace-shell-navigation { grid-area: navigation; }
+    .starci-core-workspace-shell-primary { grid-area: primary; }
+    .starci-core-workspace-shell-rail { grid-area: rail; }
+
+    .starci-core-workspace-shell-navigation,
+    .starci-core-workspace-shell-primary,
+    .starci-core-workspace-shell-rail {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .starci-core-workspace-shell-primary {
+        display: flex;
+        flex-direction: column;
+        gap: var(--starci-core-region-gap, 1.5rem);
+        outline: none;
+    }
+
+    .starci-core-workspace-shell-floating-layer {
+        position: fixed;
+        z-index: var(--starci-core-workspace-floating-z, 40);
+        inset-inline-end: var(--starci-core-workspace-floating-inset, 1rem);
+        inset-block-end: max(var(--starci-core-workspace-floating-inset, 1rem), env(safe-area-inset-bottom));
+        max-inline-size: min(var(--starci-core-workspace-floating-max, 22rem), calc(100vw - 2 * var(--starci-core-workspace-floating-inset, 1rem)));
+        max-block-size: calc(100dvh - 2 * var(--starci-core-workspace-floating-inset, 1rem));
+        overflow: auto;
+        overscroll-behavior: contain;
+    }
+
+    /*
+     * Sidebar geometry is SHIPPED, not generated.
+     *
+     * Every rule below used to be a Tailwind utility string in the component's JSX, which means a
+     * consumer only saw a sidebar if its own Tailwind build happened to scan
+     * `node_modules/@starci/grammar`. One that scans only its own source got no separator, no rail
+     * width and square items - and `rounded-large` emitted nothing anywhere, because the theme's
+     * radius ramp is `--radius-*`, not a HeroUI v2 name. A composition object owns its layout in
+     * this stylesheet; the JSX carries class names and state attributes only.
+     *
+     * `!important` appears exactly where HeroUI's own `.list-box`, `.list-box-item`,
+     * `.list-box-section` and `.header` rules set the same property. Those live in the vendor's
+     * `components` layer, which is declared after `starci-grammar-common` and therefore wins every
+     * normal declaration regardless of specificity; an important declaration in the earlier layer
+     * is the only thing that keeps the geometry the utilities used to produce.
+     */
+    .starci-core-sidebar {
+        display: flex;
+        min-height: 0;
+        min-width: 0;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--background, var(--starci-core-canvas, Canvas));
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+    }
+
+    .starci-core-sidebar[data-presentation="drawer"] {
+        width: 100%;
+    }
+
+    .starci-core-sidebar[data-presentation="rail"] {
+        width: var(--starci-core-sidebar-width, 16rem);
+        height: 100%;
+        border-inline-end: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+        transition: width var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-sidebar[data-presentation="rail"][data-collapsed="true"] {
+        width: var(--starci-core-sidebar-collapsed-width, 4rem);
+    }
+
+    .starci-core-sidebar-toggle {
+        display: flex;
+        justify-content: flex-end;
+        padding: 0.5rem;
+    }
+
+    .starci-core-sidebar[data-collapsed="true"] .starci-core-sidebar-toggle {
+        justify-content: center;
+    }
+
+    .starci-core-sidebar-header {
+        min-width: 0;
+        padding-inline: 0.75rem;
+        padding-block-end: 0.75rem;
+    }
+
+    .starci-core-sidebar-list {
+        display: flex;
+        min-height: 0;
+        min-width: 0;
+        flex: 1 1 0%;
+        flex-direction: column;
+        gap: 0.25rem;
+        overflow-y: auto !important;
+        padding: 0.75rem !important;
+    }
+
+    .starci-core-sidebar[data-collapsed="true"] .starci-core-sidebar-list {
+        align-items: center;
+        padding: 0.5rem !important;
+    }
+
+    .starci-core-sidebar-section {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.25rem !important;
+    }
+
+    .starci-core-sidebar[data-collapsed="true"] .starci-core-sidebar-section {
+        align-items: center !important;
+    }
+
+    .starci-core-sidebar-section-label {
+        padding-inline: 0.5rem;
+        padding-block: 0.75rem 0.25rem !important;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--muted, var(--starci-core-muted, GrayText));
+    }
+
+    /* A collapsed rail keeps the group name for assistive technology and drops it from the paint. */
+    .starci-core-sidebar[data-collapsed="true"] .starci-core-sidebar-section-label {
+        position: absolute;
+        width: 1px !important;
+        height: 1px;
+        overflow: hidden;
+        margin: -1px;
+        padding: 0 !important;
+        border: 0;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+    }
+
+    .starci-core-sidebar-item {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.75rem;
+        border-radius: var(--radius-xl, calc(var(--radius, 0.5rem) * 1.5)) !important;
+        padding: 0.5rem 0.75rem !important;
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+        cursor: pointer;
+        outline: none;
+    }
+
+    .starci-core-sidebar[data-collapsed="true"] .starci-core-sidebar-item {
+        width: 2.75rem !important;
+        height: 2.75rem;
+        justify-content: center !important;
+        gap: 0 !important;
+        border-radius: var(--starci-core-pill-radius, 999px) !important;
+        padding: 0 !important;
+    }
+
+    .starci-core-sidebar-item[data-hovered="true"] {
+        background: var(--default, var(--starci-core-surface-secondary, Canvas));
+    }
+
+    .starci-core-sidebar-item[data-selected="true"] {
+        background: var(--accent-soft, var(--starci-core-accent, Highlight)) !important;
+        color: var(--accent-soft-foreground, var(--starci-core-accent, HighlightText));
+    }
+
+    .starci-core-sidebar-item[data-focus-visible="true"] {
+        box-shadow: 0 0 0 2px var(--accent, var(--starci-core-accent, Highlight));
+    }
+
+    .starci-core-sidebar-item[data-disabled="true"] {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .starci-core-sidebar-item-label {
+        min-width: 0;
+        flex: 1 1 0%;
+        overflow: hidden;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-sidebar-item-trailing {
+        flex-shrink: 0;
+    }
+
+    .starci-core-sidebar-footer {
+        min-width: 0;
+        padding: 0.75rem;
+        padding-block-start: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-sidebar[data-presentation="rail"] {
+            transition: none;
+        }
+    }
+
+    .starci-core-chat-workspace {
+        display: flex;
+        height: 100%;
+        min-height: 0;
+        min-width: 0;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--background, var(--starci-core-canvas, Canvas));
+    }
+
+    .starci-core-chat-workspace-header,
+    .starci-core-chat-workspace-composer,
+    .starci-core-chat-workspace-rail-trigger-boundary {
+        min-width: 0;
+        flex: none;
+    }
+
+    .starci-core-chat-workspace-rail-trigger-boundary {
+        display: flex;
+        justify-content: flex-end;
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+    }
+
+    .starci-core-chat-workspace-rail-trigger {
+        display: inline-flex;
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        align-items: center;
+        justify-content: center;
+        padding-inline: 0.75rem;
+        border: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+        border-radius: var(--starci-core-control-radius, 0.75rem);
+        background: var(--surface, var(--starci-core-surface, Canvas));
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .starci-core-chat-workspace-rail-trigger:focus-visible,
+    .starci-core-chat-workspace-conversation:focus-visible,
+    .starci-core-chat-workspace-overlay-rail:focus-visible {
+        outline: 2px solid var(--focus, var(--starci-core-focus, Highlight));
+        outline-offset: -2px;
+    }
+
+    .starci-core-chat-workspace-layout {
+        display: grid;
+        min-height: 0;
+        min-width: 0;
+        flex: 1;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--starci-core-region-gap, 1.5rem);
+    }
+
+    .starci-core-chat-workspace-layout-without-rail {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .starci-core-chat-workspace-primary {
+        display: flex;
+        min-height: 0;
+        min-width: 0;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .starci-core-chat-workspace-conversation {
+        min-height: 0;
+        min-width: 0;
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scroll-behavior: smooth;
+    }
+
+    .starci-core-chat-workspace-composer {
+        border-top: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+        background: var(--background, var(--starci-core-canvas, Canvas));
+    }
+
+    .starci-core-chat-workspace-inline-rail { display: none; }
+
+    .starci-core-chat-workspace-drawer-content {
+        right: 0 !important;
+        left: auto !important;
+        width: min(24rem, calc(100dvw - 1rem)) !important;
+        max-width: calc(100dvw - 1rem) !important;
+    }
+
+    .starci-core-chat-workspace-drawer-dialog {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        max-width: none !important;
+    }
+
+    .starci-core-chat-workspace-drawer-body {
+        min-height: 0;
+        min-width: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .starci-core-chat-workspace-overlay-rail {
+        height: 100%;
+        min-height: 0;
+        min-width: 0;
+        padding: 1rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .starci-core-chat-workspace-drawer-close {
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+        border: 1px solid var(--separator, var(--starci-core-separator, GrayText)) !important;
+        border-radius: 999px !important;
+        background: var(--surface, var(--starci-core-surface, Canvas)) !important;
+        color: var(--foreground, var(--starci-core-foreground, CanvasText)) !important;
+    }
+
+    @container starci-core-workspace-shell (max-width: 72rem) {
+        .starci-core-workspace-shell-rail .starci-core-rail {
+            max-width: none;
+        }
+    }
+
+    /*
+     * Every grid template this shell can take now lives in the two `min-width` tiers above. What
+     * stays here is the behaviour of a STACKED rail, which no rule outside the query contradicts.
+     */
+    @container starci-core-workspace-shell (max-width: 56rem) {
+        .starci-core-workspace-shell-rail .starci-core-rail-frame {
+            position: static;
+            max-height: none;
+        }
+
+        .starci-core-workspace-shell-rail .starci-core-rail-body {
+            overflow-y: visible;
+        }
+    }
+
+    @media (max-width: 69.999rem) {
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation-visibility="wide"] .starci-core-workspace-shell-navigation {
+            display: none;
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation-visibility="wide"][data-grammar-workspace-rail="absent"] {
+            grid-template-areas: "primary";
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation-visibility="wide"][data-grammar-workspace-rail="present"] {
+            grid-template-areas: "primary" "rail";
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation-visibility="wide"][data-grammar-workspace-rail-position="leading"][data-grammar-workspace-rail="present"] {
+            grid-template-areas: "rail" "primary";
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation-visibility="wide"] .starci-core-workspace-shell-leading-rule {
+            display: none;
+        }
+
+        .starci-core-workspace-shell-layout[data-grammar-workspace-navigation-visibility="wide"] .starci-core-workspace-shell-primary {
+            padding-inline-start: 0;
+        }
+
+        .starci-core-workspace-shell-compact-header {
+            display: block;
+        }
+
+        .starci-core-workspace-shell-compact-navigation {
+            position: sticky;
+            z-index: 40;
+            inset-block-end: 0;
+            display: flex;
+            min-width: 0;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--starci-core-inline-gap, 0.5rem);
+            border-block-start: 1px solid var(--separator, var(--starci-core-separator, GrayText));
+            background: var(--background, var(--starci-core-canvas, Canvas));
+            padding: 0.75rem 1rem;
+        }
+    }
+
+    @media (min-width: 48rem) {
+        .starci-core-chat-workspace-layout[data-grammar-chat-workspace-rail-width="compact"] {
+            grid-template-columns: minmax(0, 1fr) minmax(14rem, var(--starci-core-rail-compact, 16rem));
+        }
+
+        .starci-core-chat-workspace-layout[data-grammar-chat-workspace-rail-width="standard"] {
+            grid-template-columns: minmax(0, 1fr) minmax(16rem, var(--starci-core-rail-standard, 20rem));
+        }
+
+        .starci-core-chat-workspace-layout[data-grammar-chat-workspace-rail-width="wide"] {
+            grid-template-columns: minmax(0, 1fr) minmax(20rem, var(--starci-core-rail-wide, 24rem));
+        }
+
+        .starci-core-chat-workspace-inline-rail {
+            display: block;
+            min-height: 0;
+            min-width: 0;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [data-grammar-motion="animated"] {
+            scroll-behavior: auto;
+        }
+    }
+
+    /*
+     * ============================================================================================
+     * SHIPPED OBJECT GEOMETRY (0.4.4)
+     * ============================================================================================
+     *
+     * Everything below used to be a Tailwind utility string inside a Grammar component or its
+     * `classNames.ts`. A class only exists if the CONSUMER's Tailwind build scanned the file that
+     * spells it, and almost nobody scans `node_modules/@starci/grammar` - so those objects arrived
+     * in a consuming app with no box at all. The utilities are gone; the box lives here, selected
+     * by the data attributes each component already emits.
+     *
+     * `!important` appears ONLY where the class lands on a HeroUI part - `Card`, `Accordion`,
+     * `Button`, `TextField`, `Input`, `Skeleton`, `ProgressBar`, `ScrollShadow` - whose own rules
+     * live in the vendor's `components` layer. That layer is declared AFTER `starci-grammar-common`
+     * and therefore wins every normal declaration regardless of specificity; an important
+     * declaration in the earlier layer is the only thing that reproduces what the utilities did.
+     * Corners come from the theme radius ramp (`--radius-*`), never from a HeroUI v2 radius name
+     * such as `rounded-large`, which emits nothing anywhere.
+     */
+
+    /* --- Surface card: the card, its label row and its content shell are HeroUI `Card` parts. --- */
+    /*
+     * THE CARD'S OUTER BOX IS ITS BOUNDARY, exactly as the list's and the accordion's are.
+     *
+     * `SurfaceCard` is the only one of the three whose root is a HeroUI `Card`, and the vendor's
+     * `.card` carries a 1rem padding of its own. That inset moved the card's visible surface AND
+     * its label a further 16px inward, so a padded `SurfaceCard` and an unpadded
+     * `SurfaceAccordionCard` standing in one column disagreed by 16px at both edges - two members
+     * of one family drawing the same boundary in two places. The label row and the content shell
+     * were already given `padding: 0 !important` here for the same reason; the root was missed.
+     *
+     * The card keeps its inset where the contract puts it: `PADDING-4` is claimed by the CONTENT
+     * REGION inside the surface, which is where the reader's copy is held off the boundary.
+     */
+    .starci-core-surface-card {
+        display: flex !important;
+        width: 100% !important;
+        min-width: 0;
+        flex-direction: column !important;
+        gap: var(--starci-core-section-gap, 0.75rem) !important;
+        padding: 0 !important;
+    }
+
+    .starci-core-surface-label {
+        padding: 0 !important;
+    }
+
+    .starci-core-surface {
+        padding: 0 !important;
+    }
+
+    .starci-core-surface-highlight {
+        position: relative;
+        height: 100%;
+    }
+
+    /* --- Surface list --- */
+    .starci-core-surface-fact {
+        color: var(--muted, var(--starci-core-muted, GrayText));
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .starci-core-surface-fact[data-grammar-surface-depth="nested"] {
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    /* --- Empty notice --- */
+    .starci-core-empty-notice {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    /* --- Divider --- */
+    .starci-core-divider {
+        display: flex;
+        min-width: 0;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .starci-core-divider-rule {
+        height: 1px;
+        flex: 1 1 0%;
+        background: var(--border, var(--separator, var(--starci-core-separator, GrayText)));
+    }
+
+    /* --- Icon: an app-owned SVG has no intrinsic box, so usage sizing must ship. --- */
+    .starci-core-icon {
+        flex: none;
+    }
+
+    .starci-core-icon[data-usage="heading"] {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .starci-core-icon[data-usage="leading"] {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .starci-core-icon[data-usage="chip"] {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .starci-core-icon-skeleton {
+        display: inline-block;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        flex: none;
+        border-radius: var(--starci-core-pill-radius, 999px) !important;
+    }
+
+    /* --- Icon button: a HeroUI `Button` worn as a circle. --- */
+    .starci-core-icon-button {
+        border-radius: var(--starci-core-pill-radius, 999px) !important;
+    }
+
+    /* --- Icon tile --- */
+    .starci-core-icon-tile {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .starci-core-icon-tile[data-size="sm"] {
+        width: 2rem;
+        height: 2rem;
+        border-radius: var(--radius-lg, var(--radius, 0.5rem));
+    }
+
+    .starci-core-icon-tile[data-size="md"] {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: var(--radius-xl, calc(var(--radius, 0.5rem) * 1.5));
+    }
+
+    /* A tone pair is painted only when the plate draws its own glyph. */
+    .starci-core-icon-tile[data-tone="neutral"][data-artwork="false"][data-loading="false"] {
+        background: var(--default, var(--starci-core-surface-secondary, Canvas));
+        color: var(--muted, var(--starci-core-muted, GrayText));
+    }
+
+    .starci-core-icon-tile[data-tone="accent"][data-artwork="false"][data-loading="false"] {
+        background: var(--accent-soft, var(--starci-core-accent, Highlight));
+        color: var(--accent-soft-foreground, var(--starci-core-accent, HighlightText));
+    }
+
+    .starci-core-icon-tile[data-tone="success"][data-artwork="false"][data-loading="false"] {
+        background: var(--success-soft, var(--success, Canvas));
+        color: var(--success-soft-foreground, var(--success-foreground, CanvasText));
+    }
+
+    .starci-core-icon-tile[data-tone="warning"][data-artwork="false"][data-loading="false"] {
+        background: var(--warning-soft, var(--warning, Canvas));
+        color: var(--warning-soft-foreground, var(--warning-foreground, CanvasText));
+    }
+
+    .starci-core-icon-tile[data-tone="danger"][data-artwork="false"][data-loading="false"] {
+        background: var(--danger-soft, var(--danger, Canvas));
+        color: var(--danger-soft-foreground, var(--danger-foreground, CanvasText));
+    }
+
+    /* --- Progress: a HeroUI `ProgressBar`, and a resting bar of the same measure. --- */
+    .starci-core-progress {
+        width: 100% !important;
+    }
+
+    .starci-core-progress[data-loading="true"] {
+        display: block;
+        height: 0.5rem !important;
+    }
+
+    /*
+     * --- Input ---
+     *
+     * The reveal toggle sits on top of the control, so the field RESERVES room for it rather than
+     * letting the value slide underneath. That inset used to be spelled `pr-9`, a utility no app in
+     * this repository writes, so it was generated nowhere and the toggle overlapped the text at
+     * every width.
+     */
+    .starci-core-input {
+        display: grid !important;
+        min-width: 0;
+        gap: 0.5rem !important;
+    }
+
+    .starci-core-input-control {
+        position: relative;
+        display: flex;
+        min-width: 0;
+        align-items: center;
+    }
+
+    .starci-core-input-control[data-reveal="true"] .starci-core-input-field {
+        padding-inline-end: 2.75rem !important;
+    }
+
+    .starci-core-input-reveal {
+        position: absolute;
+        inset-inline-end: 0.5rem;
+        top: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: var(--muted, var(--starci-core-muted, GrayText));
+        cursor: pointer;
+    }
+
+    .starci-core-input-reveal:disabled {
+        cursor: default;
+    }
+
+    .starci-core-input-reveal :where(svg),
+    .starci-core-input-reveal-icon {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .starci-core-input-reveal-label {
+        font-size: 0.75rem;
+    }
+
+    .starci-core-input-resting-label {
+        width: 33.333333% !important;
+        height: 1rem !important;
+        border-radius: var(--radius-md, calc(var(--radius, 0.5rem) * 0.75)) !important;
+    }
+
+    .starci-core-input-resting-control {
+        width: 100% !important;
+        height: 2.5rem !important;
+        border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5)) !important;
+    }
+
+    /* --- Heading: the FONT rank each level stamps, drawn from the family's own sheet. --- */
+    /*
+     * `Heading` renders through the vendor's `Typography.Heading`, which sizes `.typography--h1`
+     * through `--h4` from the vendor's own sheet. Until 0.4.12 the family answered that with the
+     * Tailwind utility classes on the component alone - and a utility class exists only where the
+     * CONSUMER's Tailwind build scanned this package's dist, which is the same debt
+     * `shipped-geometry.spec.ts` already refuses for layout. A consumer whose scan stopped finding
+     * the package measured 36px under a `FONT-4` stamp and 30px under `FONT-3`: the vendor's sizes,
+     * under the family's promise. The scale is the family's, so the family's sheet draws it, the way
+     * `.starci-core-text` above already draws its own.
+     *
+     * `!important` because the vendor rule has to lose in either import order - consumers import
+     * this sheet both before and after `@heroui/styles`, so layer rank alone cannot decide it. The
+     * values re-state what the utilities carry, so nothing moves where a scan still finds them.
+     *
+     * `display` is the one row a family may re-cut: `offset-pop` gives it its own weight, tracking
+     * and 0.96 line height. So only FONT-6's SIZE is important here; its rhythm stays a normal
+     * declaration that a later family layer can still own.
+     */
+    .grammar-common-root [data-component="Heading"][data-scale="standard"][data-level="1"] {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.025em !important;
+        line-height: 1.75rem !important;
+    }
+
+    .grammar-common-root [data-component="Heading"][data-scale="standard"][data-level="2"] {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        line-height: 1.5rem !important;
+    }
+
+    .grammar-common-root [data-component="Heading"][data-scale="standard"][data-level="3"] {
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        line-height: 1.25rem !important;
+    }
+
+    .grammar-common-root [data-component="Heading"][data-scale="standard"][data-level="4"] {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        line-height: 1rem !important;
+    }
+
+    .grammar-common-root [data-component="Heading"][data-scale="display"] {
+        font-size: 2.25rem !important;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+        line-height: 1.25;
+    }
+
+    /* --- Text: one resolved line of copy, drawn from the attributes it already emits. --- */
+    .starci-core-text {
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5rem;
+    }
+
+    .starci-core-text[data-size="xs"] {
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    .starci-core-text[data-size="sm"] {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .starci-core-text[data-size="metric-lead"] {
+        font-size: 1.875rem;
+        line-height: 2.25rem;
+    }
+
+    .starci-core-text[data-tone="muted"] {
+        color: var(--muted, var(--starci-core-muted, GrayText));
+    }
+
+    .starci-core-text[data-tone="accent"] {
+        color: var(--accent-soft-foreground, var(--starci-core-accent, HighlightText));
+    }
+
+    .starci-core-text[data-weight="medium"] { font-weight: 500; }
+    .starci-core-text[data-weight="semibold"] { font-weight: 600; }
+
+    .starci-core-text[data-start-content="true"] {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .starci-core-text[data-superseded="true"] {
+        text-decoration-line: line-through;
+    }
+
+    :where(.group)[data-selected="true"] .starci-core-text[data-parent-emphasis="accent-soft"] {
+        color: var(--accent-soft-foreground, var(--starci-core-accent, HighlightText));
+    }
+
+    /* Authored overflow behaviour: wrap is the resting answer, the other two are opted into. */
+    .starci-core-text[data-overflow="wrap"] {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .starci-core-text[data-overflow="truncate"] {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-text[data-overflow="clamp-2"] {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
+    /* The resting line keeps its size geometry and hides its copy; no tone is visible to claim. */
+    .starci-core-text[data-loading="true"] {
+        display: inline-block;
+        max-width: 100%;
+        border-radius: var(--radius, 0.25rem);
+        color: transparent;
+        user-select: none;
+    }
+
+    .starci-core-text[data-loading="true"][data-size="xs"] { width: 2.5rem; }
+    .starci-core-text[data-loading="true"][data-size="sm"] { width: 3rem; }
+    .starci-core-text[data-loading="true"][data-size="md"] { width: 10rem; }
+    .starci-core-text[data-loading="true"][data-size="metric-lead"] { width: 10rem; }
+
+    /* --- Text action: one recipe, eight appearances, selected by data attributes. --- */
+    /*
+     * A TextAction is a BUTTON however text-shaped it looks, so the family's pressable floor belongs
+     * to the recipe rather than to one appearance. `route` carried it alone until 0.4.10, which left
+     * the padding-less appearances - inline, muted, disclosure, plain - collapsing to their line box:
+     * a rail action measured 86 x 20 CSS px against a 44px floor. The floor moves up to the recipe
+     * here and `route` keeps its own row, now redundant but harmless, so no appearance can lose it
+     * again. `min-block-size` rather than `padding-block` for the reason `route` already states:
+     * these appearances draw no background at rest, so the extra block size is invisible chrome
+     * around unchanged FONT-2/PADDING-2 typography and never a bigger pill. `align-items: center`
+     * above keeps the glyph and label centred inside the taller box.
+     */
+    .starci-core-text-action {
+        display: inline-flex;
+        width: fit-content;
+        min-width: 0;
+        min-block-size: var(--starci-core-control-min-size, 2.75rem);
+        flex: none;
+        align-items: center;
+        gap: 0.5rem;
+        outline: none;
+        text-underline-offset: 4px;
+    }
+
+    .starci-core-text-action:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .starci-core-text-action[data-size="xs"] { font-size: 0.75rem; line-height: 1rem; }
+    .starci-core-text-action[data-size="sm"] { font-size: 0.875rem; line-height: 1.25rem; }
+    .starci-core-text-action[data-size="md"] { font-size: 1rem; line-height: 1.5rem; }
+
+    .starci-core-text-action[data-appearance="inline"] {
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+        font-weight: 500;
+    }
+
+    .starci-core-text-action[data-appearance="muted"] {
+        color: var(--muted, var(--starci-core-muted, GrayText));
+        font-weight: 500;
+    }
+
+    .starci-core-text-action[data-appearance="inline"]:hover,
+    .starci-core-text-action[data-appearance="inline"]:focus-visible,
+    .starci-core-text-action[data-appearance="muted"]:hover,
+    .starci-core-text-action[data-appearance="muted"]:focus-visible,
+    .starci-core-text-action[data-appearance="disclosure"]:hover,
+    .starci-core-text-action[data-appearance="disclosure"]:focus-visible {
+        text-decoration-line: underline;
+    }
+
+    .starci-core-text-action[data-appearance="choice"] {
+        border-radius: var(--starci-core-pill-radius, 999px);
+        padding: 0.25rem 0.5rem;
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+        font-weight: 500;
+    }
+
+    /*
+     * A `route` TextAction is always a destination, so its 44px floor is unconditional rather than
+     * scoped to one composition: this is the SAME family law the band's action slots carry, applied
+     * to a text-shaped pressable. `min-block-size` is used instead of a taller `padding-block`
+     * because `route` draws no background at rest - only `data-current="true"` paints one - so the
+     * extra block size is invisible chrome around unchanged FONT-2/PADDING-2 typography, not a
+     * bigger pill. The band row still has 3rem (48px) to give a control after its own block inset,
+     * so 44px fits with headroom and `--starci-core-band-height` is untouched.
+     */
+    .starci-core-text-action[data-appearance="route"] {
+        border-radius: var(--starci-core-pill-radius, 999px);
+        padding: 0.5rem 0.75rem;
+        min-block-size: var(--starci-core-control-min-size, 2.75rem);
+        color: var(--muted, var(--starci-core-muted, GrayText));
+    }
+
+    .starci-core-text-action[data-appearance="section"] {
+        border-radius: var(--radius-xl, calc(var(--radius, 0.5rem) * 1.5));
+        padding: 0.5rem 0.75rem;
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+    }
+
+    .starci-core-text-action[data-appearance="section"]:hover,
+    .starci-core-text-action[data-appearance="section"]:focus-visible {
+        background: var(--default, var(--starci-core-surface-secondary, Canvas));
+    }
+
+    .starci-core-text-action[data-appearance="tab"] {
+        border-block-end: 2px solid transparent;
+        padding-block: 0.75rem;
+        color: var(--muted, var(--starci-core-muted, GrayText));
+    }
+
+    .starci-core-text-action[data-appearance="tab"][data-current="true"] {
+        border-block-end-color: var(--accent, var(--starci-core-accent, Highlight));
+        color: var(--accent, var(--starci-core-accent, Highlight));
+        font-weight: 600;
+    }
+
+    .starci-core-text-action[data-appearance="choice"][data-current="true"],
+    .starci-core-text-action[data-appearance="route"][data-current="true"],
+    .starci-core-text-action[data-appearance="section"][data-current="true"] {
+        background: var(--accent-soft, var(--starci-core-accent, Highlight));
+        color: var(--accent-soft-foreground, var(--starci-core-accent, HighlightText));
+    }
+
+    .starci-core-text-action[data-appearance="route"][data-current="true"],
+    .starci-core-text-action[data-appearance="section"][data-current="true"] {
+        font-weight: 600;
+    }
+
+    .starci-core-text-action[data-appearance="disclosure"] {
+        color: var(--accent-soft-foreground, var(--starci-core-accent, HighlightText));
+        font-weight: 600;
+    }
+
+    .starci-core-text-action[data-appearance="plain"] {
+        color: var(--foreground, var(--starci-core-foreground, CanvasText));
+        text-decoration-line: none;
+    }
+
+    .starci-core-text-action-resting {
+        display: inline-flex;
+        width: 4rem;
+        flex: none;
+        color: transparent;
+        user-select: none;
+    }
+
+    /*
+     * --- Button: full width ---
+     *
+     * A full-width action stretches to its parent and lets its label wrap onto a second line rather
+     * than overflow, so the vendor's fixed control height is released to the content.
+     */
+    .starci-core-button[data-width="fill"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: var(--starci-core-control-min-size, 2.75rem);
+        white-space: normal !important;
+    }
+
+    /* --- Chat workspace: the compact rail trigger's resting paint. --- */
+    .starci-core-chat-workspace-rail-trigger {
+        box-shadow: 0 1px 2px 0 color-mix(in srgb, CanvasText 8%, transparent);
+        outline: none;
+        transition: background-color var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-chat-workspace-rail-trigger:hover {
+        background: var(--default, var(--starci-core-surface-secondary, Canvas));
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-chat-workspace-rail-trigger {
+            transition: none;
+        }
+    }
+
+}
+

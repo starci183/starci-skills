@@ -1,0 +1,31 @@
+$ node ../todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/assets/render-check.mjs
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend)
+exit 0
+
+PASS list-empty-desktop-1280.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-empty-desktop-1280.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2d6bfd, 95% of its saturated pixels.
+PASS list-empty-desktop-1280.png entity-list-in-card: Every list of repeated entities in the kept markup (2) sits outside a card surface.
+PASS list-empty-mobile-390.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-empty-mobile-390.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2d6bfd, 95% of its saturated pixels.
+PASS list-empty-mobile-390.png entity-list-in-card: Every list of repeated entities in the kept markup (2) sits outside a card surface.
+PASS list-many-tasks-desktop-1280.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-many-tasks-desktop-1280.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 69% of its saturated pixels.
+PASS list-many-tasks-desktop-1280.png entity-list-in-card: Every list of repeated entities in the kept markup (3) sits outside a card surface.
+PASS list-many-tasks-mobile-390.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-many-tasks-mobile-390.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 70% of its saturated pixels.
+PASS list-many-tasks-mobile-390.png entity-list-in-card: Every list of repeated entities in the kept markup (3) sits outside a card surface.
+PASS list-one-task-desktop-1280.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-one-task-desktop-1280.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 85% of its saturated pixels.
+PASS list-one-task-desktop-1280.png entity-list-in-card: Every list of repeated entities in the kept markup (2) sits outside a card surface.
+PASS list-one-task-mobile-390.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-one-task-mobile-390.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 86% of its saturated pixels.
+PASS list-one-task-mobile-390.png entity-list-in-card: Every list of repeated entities in the kept markup (2) sits outside a card surface.
+PASS list-refused-desktop-1280.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-refused-desktop-1280.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 100% of its saturated pixels.
+PASS list-refused-desktop-1280.png entity-list-in-card: Every list of repeated entities in the kept markup (2) sits outside a card surface.
+PASS list-refused-mobile-390.png palette-off-brand: Every colour the capture is largely made of is a brand token or scale step within deltaE 6.
+PASS list-refused-mobile-390.png primary-absent: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 100% of its saturated pixels.
+PASS list-refused-mobile-390.png entity-list-in-card: Every list of repeated entities in the kept markup (2) sits outside a card surface.
+render-check: 8 captures, no failing check
+
+

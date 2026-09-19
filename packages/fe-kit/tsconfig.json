@@ -1,0 +1,23 @@
+{
+  // Standalone check for the kit sources. Peer imports (react, next-intl, @starci/grammar)
+  // resolve through the junctions that `npm run link-peers` creates in ./node_modules -
+  // the kit is consumed as source via the consumers' @fe-kit/* path alias, so those peers
+  // always end up being the CONSUMER's own copies in the app build.
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules"]
+}

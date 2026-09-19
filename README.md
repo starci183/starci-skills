@@ -157,7 +157,7 @@ The runtime is laid out by concept, one folder per concern:
 | `kernel/` | the control loop, split by the reason each file exists |
 | `hosts/` | the host model as data, and the two adapters behind one call surface |
 | `models/` | the model functions and their headless providers |
-| `checks/` | machine checks over bytes — the brand record, a drawing's capture and markup, a proof bundle |
+| `scripts/checks/` | machine checks over bytes — the brand record, a drawing's capture and markup, a proof bundle |
 | `ops/` | one operator contract per operation kind |
 
 **One command line.** Everything is `node <host>/.claude/bin/starci.mjs <command>`; no instruction ever names a module path inside the runtime.
@@ -198,7 +198,7 @@ For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp
 | Problem | Next step |
 | --- | --- |
 | The agent does not find StarCi from a frontend task | Supply the absolute host, `.claude/SKILL.md` path and selected project binding. A sibling host is not a parent directory. |
-| An old instruction requests `.claude/INDEX.md` | Read the current bootstrap and run `node .claude/scripts/check-entry.mjs /absolute/host`. Do not recreate the retired file. |
+| An old instruction requests `.claude/INDEX.md` | Read the current bootstrap and run `node .claude/scripts/checks/check-entry.mjs /absolute/host`. Do not recreate the retired file. |
 | Storage reports `migration-required` or `conflict` | Inspect existing trees and coordinate migration; do not create an empty replacement workspace. |
 | Validation rejects a specification or completion | Fix the named metadata/evidence defect. Do not loosen the schema or edit sealed proof just to get a pass. |
 | A task pauses in auto | Check scope, authorization, dependencies, evidence and remaining time; auto does not override those gates. |

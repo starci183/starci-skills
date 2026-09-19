@@ -1,7 +1,7 @@
 import test, {before, after} from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {spawnSync} from 'node:child_process';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 const root=path.resolve(import.meta.dirname,'..');
-const FIXTURE_DIRS=['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','checks','providers','approvals','execution','knowledge','contracts','specifications','examples','scripts','core','schemas'];
+const FIXTURE_DIRS=['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','providers','approvals','execution','knowledge','contracts','specifications','examples','scripts','core','schemas'];
 function mktemp(){return fs.mkdtempSync(path.join(os.tmpdir(),'starci-build-'));}
 function assertOwnTemp(dir){assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-build-'));}
 function fixture(t){const dir=mktemp();t.after(()=>{assertOwnTemp(dir);fs.rmSync(dir,{recursive:true,force:true});});for(const p of FIXTURE_DIRS)fs.cpSync(path.join(root,p),path.join(dir,p),{recursive:true});return dir;}

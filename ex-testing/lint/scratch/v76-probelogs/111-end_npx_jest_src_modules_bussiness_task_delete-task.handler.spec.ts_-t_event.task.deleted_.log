@@ -1,0 +1,17 @@
+$ npx jest src/modules/bussiness/task/delete-task.handler.spec.ts -t "event.task.deleted"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/task/delete-task.handler.spec.ts
+  DeleteTaskHandler
+    √ event.task.deleted: publishes on the PlatformEventBus after the row is gone (15 ms)
+    ○ skipped ac.task.delete.final.stays-gone: the identifier resolves to nothing after deletion
+    ○ skipped ac.task.single-owner.refuses-stranger: a stranger cannot delete somebody else's task
+
+Test Suites: 1 passed, 1 total
+Tests:       2 skipped, 1 passed, 3 total
+Snapshots:   0 total
+Time:        3.413 s
+Ran all test suites matching /src\\modules\\bussiness\\task\\delete-task.handler.spec.ts/i with tests matching "event.task.deleted".
+

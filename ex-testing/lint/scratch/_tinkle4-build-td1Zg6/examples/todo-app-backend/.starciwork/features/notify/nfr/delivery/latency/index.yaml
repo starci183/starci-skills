@@ -1,0 +1,18 @@
+schema: work/non-functional-requirement
+id: nfr.notify.delivery.latency
+title: A digested message goes out promptly after its window closes
+quality: latency
+state: todo
+observableCriterion: For a message with at least one admitted event, the delay between the window's
+  closesAt and the first t-dispatch attempt is under 5 seconds at the 95th percentile.
+measurement:
+  how: A load harness enqueues events at a steady rate and measures wall-clock time between each
+    group's closesAt and its first dispatch attempt, once the pipeline exists.
+  threshold: p95 < 5s
+  environment: dev
+refs: [br.notify.digest.window]
+requiresProof:
+  measurement:
+    required: true
+
+change: {rev: 1, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "Dropped the blockedBy on gap.notify.unbuilt-module: it is resolved. NotifyScheduler (src/modules/bussiness/notify/notify.scheduler.ts) is a real setInterval-driven timer that closes a window on a wall clock, not on the next admit() call - scripts/live-proof-notify.sh observed a real digest window flush (flushed_at set, its flush job dequeued from the real Redis queue) without any further admission after the window opened. What has not been built is the dedicated load harness this record's own `measurement.how` describes (a steady-rate enqueue with p95 wall-clock measurement across many samples), so this nfr stays todo for that narrower reason - the mechanism this measurement needs (a real clock closing windows) now exists to measure against."}

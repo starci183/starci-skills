@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.notify.failure.classified.suppresses-unsubscribed
-rule: br.notify.failure.classified
-given: A recipient who unsubscribed from the channel
-when: An event for them is enqueued
-then:
-  - The delivery reaches suppressed with failureClass unsubscribed before any dispatch attempt.
-  - No delivery attempt is ever made against the transport.

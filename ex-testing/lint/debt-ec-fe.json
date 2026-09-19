@@ -1,0 +1,129 @@
+{
+  "app": "ecommerce-app-fe",
+  "lane": "v3-3-ec-fe-lint",
+  "date": "2026-09-19",
+  "layout": {
+    "chosen": "monorepo",
+    "why": "The repo is an npm-workspaces monorepo (apps/landing + apps/shop); component trees live at apps/<app>/src/**. Verified against the installed package, not guessed: node_modules/@starci/eslint-canon-fe exports LAYOUTS = ['monorepo','single-app'], and lint-adoption.mjs LAYOUT_GLOBS maps 'monorepo' to [packages/ui/src/**, apps/*/src/**, **/candidate/src/**] - the apps/*/src branch matches this repo exactly. 'single-app' (src/** only) would govern nothing here.",
+    "source": "@starci/eslint-canon-fe@3.0.2 installed dist: lint-adoption.mjs LAYOUT_GLOBS + README ('monorepo governs shared package and app source trees')"
+  },
+  "config": "eslint.config.mjs mirrors starci-academy-fe/eslint.config.mjs: ignores (.next/node_modules/dist/out/coverage/next-env.d.ts + captures/** + .scannerwork/**), js/recommended + globals.browser, tseslint.configs.recommended, react flat recommended, react-hooks, stylistic block (indent 4 / double quotes / no semi / array-type generic / prop-types off), starciFeConfig({layout:\"monorepo\"}), jsx-a11y rule list verbatim, lang-file exemption (**/messages/**, **/locale*/**, **/lang/**, **/*.lang.* -> starci-fe/no-second-language-in-source + no-emoji-in-source off), scripts/** + apps/*/*.config.mjs get globals.node. All blocks scoped to APP_GLOBS apps/**/*.{ts,tsx} + types/**/*.{ts,tsx} (ec-be pattern). No storybook block - no stories exist.",
+  "devDependencies": {
+    "added": {
+      "@eslint/js": "^9.39.5",
+      "@starci/eslint-canon-fe": "file:../../packages/fe",
+      "eslint": "^9.39.5",
+      "eslint-plugin-jsx-a11y": "^6.10.2",
+      "eslint-plugin-react": "^7.37.5",
+      "eslint-plugin-react-hooks": "^7.1.1",
+      "globals": "^17.12.0",
+      "typescript-eslint": "^8.70.0"
+    },
+    "notes": [
+      "eslint pinned to ^9 per brief; @eslint/js pinned to ^9 to match (v10 peerOptional eslint ^10 conflict).",
+      "canon-fe installed from LOCAL source (file:../../packages/fe -> .claude/packages/fe v3.1.0, symlinked) per supervisor update - carries the new route-slot-fixed-name rule at error level (49 rules total); react/-hooks/jsx-a11y added because the mirrored config uses them."
+    ]
+  },
+  "lintBefore": {
+    "command": "npx eslint . --format json (pre-i18n tree)",
+    "total": 1021,
+    "perRule": {
+      "indent": 520,
+      "semi": 231,
+      "quotes": 202,
+      "starci-fe/no-inline-class-name": 31,
+      "starci-fe/public-component-signature": 11,
+      "starci-fe/require-export-jsdoc": 8,
+      "starci-fe/no-internal-starci-href": 7,
+      "starci-fe/no-emoji-in-source": 6,
+      "starci-fe/no-public-classname-prop": 2,
+      "starci-fe/no-public-frame-css-props": 2,
+      "starci-fe/no-inline-lint-config": 1,
+      "fatal(noInlineConfig)": 1
+    }
+  },
+  "afterAutofix": {
+    "command": "npx eslint . --fix",
+    "total": 68,
+    "note": "953 mechanical fixes (indent/quotes/semi) auto-fixed across the pre-i18n tree"
+  },
+  "lintAfter": {
+    "command": "npx eslint <lane-scope files>",
+    "total": 0,
+    "perRule": {},
+    "starciFeRulesActive": 49,
+    "noInlineConfig": true
+  },
+  "handFixes": {
+    "starci-fe/public-component-signature": "11x destructured/zero-param exported components -> `(props: XProps)`; AppNav gained `type AppNavProps = Record<string, never>` + `void props` (starci-academy-fe convention for prop-less components)",
+    "starci-fe/no-inline-class-name": "31x inline className -> named exports in new colocated `src/components/classNames.ts` per app (plain string exports; cn() cannot be imported there - vendor-primitive-has-named-owner only exempts <folder>/classNames.ts paths with an intermediate dir, and these flat components share one module)",
+    "starci-fe/no-internal-starci-href": "7x literal `href=\"/...\"` -> expressions over new `src/modules/routes.ts` ROUTES tables (one per app); raw wordmark <a> tags became next/link <Link> - the routed navigation owner",
+    "starci-fe/no-public-classname-prop + no-public-frame-css-props": "2x DuckMascot `className` prop removed (className is banned on non-leaf component props, and monorepo-tier-belongs-to-its-side forbids a leaves/ folder inside apps/*); replaced with semantic `size?: number`; call site now `<DuckMascot size={96}>`",
+    "starci-fe/no-emoji-in-source": "6x emoji `glyph` values dropped from landing catalog.ts (field removed); ProductCard renders the product initial letter, same neutral tile the shop uses",
+    "starci-fe/require-export-jsdoc": "8x docblocks added: metadata x2, dynamic x1, DuckMascot x2, CurrentUser, OrderLine, Order",
+    "starci-fe/no-inline-lint-config + fatal": "1x `/* eslint-disable-next-line @next/next/no-img-element */` removed from ProductTile.tsx (the rule it suppressed is not even in this config); rationale kept as a plain comment",
+    "starci-fe/route-slot-fixed-name": "8x slot default-export renames in v3-5's new route tree per supervisor instruction ('fix the files, not the rule'): LocaleLayout->Layout (x2), LandingPage/ShopIndexPage/AccountPage/BrowsePage/CartPage/CheckoutPage->Page (x6). Only the identifiers were touched; the files remain v3-5's."
+  },
+  "outOfLaneRemaining": {
+    "owner": "v3-5-ec-fe-i18n",
+    "state": "in-flight - ex-testing/lint/i18n-ec-fe.done not yet written",
+    "total": 40,
+    "perRule": {
+      "starci-fe/no-inline-class-name": 27,
+      "starci-fe/public-component-signature": 8,
+      "starci-fe/require-export-jsdoc": 5
+    },
+    "files": [
+      "apps/landing/src/app/providers.tsx",
+      "apps/landing/src/components/LandingView.tsx",
+      "apps/landing/src/components/SiteShell.tsx",
+      "apps/landing/src/middleware.ts",
+      "apps/shop/src/app/[lang]/account/page.tsx",
+      "apps/shop/src/app/providers.tsx",
+      "apps/shop/src/components/AccountView.tsx",
+      "apps/shop/src/components/AppNav.tsx",
+      "apps/shop/src/components/BrowseView.tsx",
+      "apps/shop/src/components/CartView.tsx",
+      "apps/shop/src/components/CheckoutView.tsx",
+      "apps/shop/src/components/ShopShell.tsx",
+      "apps/shop/src/middleware.ts"
+    ],
+    "note": "v3-5 is actively rewriting this tree mid-flight (route tree moved to app/[lang]/, all view components re-authored with next-intl, types/{i18n,messages,theme} created). Three of this lane's early hand-fixes (LandingView, SiteShell, AccountView) were overwritten by their rewrites and are counted here rather than re-fought. Exception per supervisor instruction: the 8 route-slot-fixed-name violations in their [lang]/ slot files were fixed in place (identifier renames only) - that count stays 0. v3-5 has since reformatted their files to canon style (the mechanical 944 are gone); the remaining 40 are structural: inline classNames, destructure-style signatures, missing jsdoc. Lint types/{i18n,messages,theme}/** and their other new files only after they write i18n-ec-fe.done."
+  },
+  "filesTouched": {
+    "config": ["eslint.config.mjs", "package.json", "package-lock.json"],
+    "created": [
+      "apps/landing/src/components/classNames.ts",
+      "apps/landing/src/modules/routes.ts",
+      "apps/shop/src/components/classNames.ts",
+      "apps/shop/src/modules/routes.ts"
+    ],
+    "handEdited": [
+      "apps/landing/src/components/DuckMascot.tsx",
+      "apps/landing/src/components/ProductCard.tsx",
+      "apps/landing/src/data/catalog.ts",
+      "apps/shop/src/components/DuckMascot.tsx",
+      "apps/shop/src/components/ProductTile.tsx",
+      "apps/shop/src/components/StateBlock.tsx",
+      "apps/shop/src/modules/api/identity.ts",
+      "apps/shop/src/modules/api/orders.ts"
+    ],
+    "routeSlotRenames (v3-5 files, supervisor instruction)": [
+      "apps/landing/src/app/[lang]/layout.tsx",
+      "apps/landing/src/app/[lang]/page.tsx",
+      "apps/shop/src/app/[lang]/layout.tsx",
+      "apps/shop/src/app/[lang]/page.tsx",
+      "apps/shop/src/app/[lang]/account/page.tsx",
+      "apps/shop/src/app/[lang]/browse/page.tsx",
+      "apps/shop/src/app/[lang]/cart/page.tsx",
+      "apps/shop/src/app/[lang]/checkout/page.tsx"
+    ],
+    "autofixedByEslintFix": "953 mechanical fixes across the pre-i18n tree (later partially overwritten by v3-5 rewrites, counted in outOfLaneRemaining)"
+  },
+  "verification": {
+    "lint": "npx eslint <lane-scope files> -> 0 errors (v3-5 in-flight files excluded; they carry the 984 above)",
+    "typecheck": "npx tsc --noEmit -> clean (whole workspace incl. v3-5's files)",
+    "tests": "none - the app has no test script and no spec files"
+  },
+  "blockers": []
+}

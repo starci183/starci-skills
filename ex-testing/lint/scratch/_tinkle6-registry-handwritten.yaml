@@ -1,0 +1,389 @@
+# =============================================================================
+# modules/ops/registry.yaml — TINKLE-1 pure-yaml catalog of the .claude/ops
+# operator library (30 ops).
+#
+# Sources (every claim traces here):
+#   .claude/ops/registry.yaml        starci/operator-registry@1 — canonical op list + consolidation
+#   .claude/ops/common.yaml          shared contract: lifecycle gates, path/field rules, evidence,
+#                                  commit and bounded-finish policy every op inherits
+#   .claude/ops/<id>/operator.yaml   per-op contract (ported verbatim to ./ops/<id>.yaml)
+#   .claude/ops/*.mjs                engines — roles described below, code not ported
+#
+# Analysis fields (kindInferred, lifecyclePosition, stage, whenNeeded) are
+# TINKLE-1 inference derived from each contract's goal/reads/writes — marked as
+# such; nodeKinds/completionProfile/sideEffects/reads/writes are source facts.
+# =============================================================================
+schema: starci/module-ops-registry@1   # TINKLE-local doc kind; upstream schema is starci/operator-registry@1
+
+origin:
+  canonicalRegistry: .claude/ops/registry.yaml
+  commonDocument: .claude/ops/common.yaml
+  note: >-
+    modules/ is a parallel read-model for agents. .claude/ops/ stays authoritative
+    and untouched; nothing here moves, deletes or re-implements it.
+
+# Lifecycle stages this catalog infers (order is reading order, not a runtime DAG;
+# actual dispatch is the workflow runner's job — no op self-dispatches).
+stages:
+  - id: intake        # classify request → typed intake/scope facts; zero effects
+  - id: scope         # bound the work: scope record, workspace bootstrap
+  - id: decide        # settle authority: SRS, SDS, brand, owner decisions, provisions
+  - id: direct        # image-first UI direction + artwork slots
+  - id: implement     # write product/test/content/knowledge source inside ceilings
+  - id: verify        # independent evidence-bound proof; never repairs
+  - id: release       # publish/deploy/migrate — terminal external effect
+  - id: operate       # runtime/service lifecycle + end-of-life retirement
+
+ops:
+  - id: architecture.decide
+    kindInferred: decide          # authors canonical SDS records; zero product effects
+    goal: Design a flow-led, source-independent architecture with logical components, contracts, state and decisions precise enough to build from.
+    nodeKinds: [architecture]
+    completionProfile: architecture
+    sideEffects: none
+    reads: [design-patterns, application-stacks, target, business, constraints, specification, feasibility, matrix, profile]
+    writes: [node, matrixHandoff]     # SDS leaves ride the node's extensions.work3.sds payload
+    lifecyclePosition: decide — after accepted SRS, before any implement op; also runs mid-implementation as the implementation.architecture secondary when an SDS gap is proven.
+    whenNeeded: A selected scope needs technical design, or a builder reports a design gap.
+
+  - id: backend.implement
+    kindInferred: implement
+    goal: Implement one selected backend outcome and prove its declared contract on actual code.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: owned source edits; scoped local commits when authorized; tests in declared sandbox; only selected owned dev-runtime setup/probes needed to verify — never production deploy.
+    reads: [application-stacks, target, business, architecture, repo, matrix, profile]
+    writes: [node, source, evidence, matrixHandoff, apiDelivery]
+    lifecyclePosition: implement — consumes frozen SRS+SDS; may delegate a design gap to architecture.decide and serves as interface.implement's interface.backend secondary.
+    whenNeeded: An accepted backend slice needs code + its own declared unit/E2E/quality proof.
+
+  - id: brand.decide
+    kindInferred: decide
+    goal: Settle one product's visual identity in the single brand record — colour tokens traced to real source files, typography, mascot, logo, voice, motion.
+    nodeKinds: [brand]
+    completionProfile: brand
+    sideEffects: generated placeholder mascot/logo asset bytes under the brand record's own assets.
+    reads: [target, owner, grammar, sources, assets, knowledge, profile]
+    writes: [node, brandAssets, evidence]
+    lifecyclePosition: decide — once per product, before interface.draw/interface.asset need identity.
+    whenNeeded: A UI workflow needs a settled identity grounded in the installed grammar and real token files.
+
+  - id: business.decide
+    kindInferred: decide
+    goal: Specify the selected business behavior precisely enough to implement and independently accept it.
+    nodeKinds: [business, business-overview]
+    completionProfile: business
+    sideEffects: none
+    reads: [target, repo, intent, specification, matrix, profile]
+    writes: [node, review, matrixHandoff]   # SRS leaves via extensions.work3.srs payload (specification.yaml)
+    lifecyclePosition: decide — authors SRS after scope exists, before architecture.decide; repair mode business.revise answers downstream ambiguity.
+    whenNeeded: A selected scope needs authored/revised requirements, rules, journeys and acceptance.
+
+  - id: code.refactor
+    kindInferred: implement          # restructure-only; behavior invariant is the contract
+    goal: Restructure one selected slice of code under a proven behavior invariant — the same regression check passes identically before and after.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: restructuring source edits; scoped commits when authorized; declared regression + architecture checks before/after in declared sandbox.
+    reads: [target, business, architecture, repo, coverage, conventions, machines, matrix, profile]
+    writes: [node, source, evidence, matrixHandoff]
+    lifecyclePosition: implement — maintenance pass on delivered code; gated on existing regression coverage.
+    whenNeeded: A slice needs restructuring and a covering regression check exists to prove parity.
+
+  - id: content.generate
+    kindInferred: implement          # content/curriculum authoring, not product behavior
+    goal: Create or revise one selected content unit with grounded claims and actual requested media/code checks.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: selected local content/assets/code edits; scoped commits when authorized — no publication implied.
+    reads: [target, business, repo, brief, matrix, profile]
+    writes: [node, source, evidence, matrixHandoff]
+    lifecyclePosition: implement — parallel to code implementation; deliverable is the content unit itself.
+    whenNeeded: A bounded content/curriculum/media unit needs authoring with checked companions.
+
+  - id: decision.prepare
+    kindInferred: decide             # provisional owner-decision drafting; does not wait
+    goal: Prepare the one decidable owner question with analysed options and a single recommendation.
+    nodeKinds: [business]
+    completionProfile: business
+    sideEffects: none
+    reads: [question, decided, environment]
+    writes: [decision]
+    lifecyclePosition: decide — cross-cutting mid-flight support whenever another op raises a decidable question.
+    whenNeeded: An op hits a business/design/authority question; already-settled questions return answered-from instead.
+
+  - id: docs.author
+    kindInferred: implement          # documentation authoring under .starciwork docs dirs
+    goal: Author or update the documentation one selected scope needs, derived from decided records and observed code.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: none                  # writes docs files inside .starciwork only; no product/source effects
+    reads: [target, records, repo, conventions, matrix, profile]
+    writes: [node, docs, evidence, matrixHandoff]
+    lifecyclePosition: implement — after decided records/behavior exist to restate; open questions stay open.
+    whenNeeded: A scope owns documentation deliverables that must trace to records, not transcripts.
+
+  - id: e2e.verify
+    kindInferred: verify
+    goal: Prove one selected delivered slice through its public API on a real stack the suite starts itself.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: scenario-spec authoring inside allowlist; start+disposal of run-owned ephemeral stack; scenario-owned data inside that stack; exactly the declared check commands.
+    reads: [target, business, architecture, repo, suite, stack, checks, effects, profile, workflow, matrix]
+    writes: [node, source, evidence, handoff, matrixHandoff]
+    lifecyclePosition: verify — post-implementation API proof; never edits product code or expectations.
+    whenNeeded: A delivered backend slice needs assertion-by-assertion public-API proof on a real stack.
+
+  - id: goal.revise
+    kindInferred: operate            # goal-lifecycle bookkeeping; revises the frozen goal document
+    goal: Revise an approved workflow goal into v(n+1) with an explicit diff — rev+1, authority never silently widened.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: none                  # goal document + diff evidence only
+    reads: [goal, revision, derivations, profile]
+    writes: [node, goal, evidence]
+    lifecyclePosition: decide-adjacent — mid-workflow goal maintenance driven by critique/owner/revision request.
+    whenNeeded: An approved goal must change and downstream derivations need invalidation hooks.
+
+  - id: grammar.update
+    kindInferred: implement          # design-system package work on the bound grammar repo
+    goal: Grow the installed design grammar by one semantic unit the product needs and no composition of existing contracts renders.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: exact authorized edits in bound grammar repo + canon paths; scoped commits; one published package version when every gate is green; stories/tests in grammar sandbox.
+    reads: [target, gap, canon, repo, consumer, profile]
+    writes: [node, source, evidence]
+    lifecyclePosition: implement — on-demand grammar extension triggered by a recorded failed composition.
+    whenNeeded: A draw/build reports a grammar gap provable by a failed composition attempt.
+
+  - id: integration.verify
+    kindInferred: verify
+    goal: Prove one declared external integration against the real provider's sandbox through the product's own client.
+    nodeKinds: [integration]
+    completionProfile: integration
+    sideEffects: one live sandbox exchange in scenario scope; scenario-owned data created+disposed by the run; sops credential read inside the checking process only — value never written.
+    reads: [application-stacks, official-docs, target, integration, architecture, repo, credential, effects, profile, workflow]
+    writes: [node, evidence, handoff]
+    lifecyclePosition: verify — post-implementation live-provider proof; no mocks/cassettes/stand-ins.
+    whenNeeded: A declared integration needs live sandbox proof with the owner-supplied credential.
+
+  - id: interface.asset
+    kindInferred: implement          # generated artwork production inside owned asset paths
+    goal: Generate every artwork the approved interface candidate embeds as a real repository asset at the declared size/format.
+    nodeKinds: [ui]
+    completionProfile: ui
+    sideEffects: generated artwork files inside the owned asset paths of the bound repository.
+    reads: [target, design, brand, repo, profile]
+    writes: [source, node, evidence]
+    lifecyclePosition: implement — after interface.draw declares artworkSlots, feeding interface.implement.
+    whenNeeded: The design record declares artwork slots that must exist as real generated files.
+
+  - id: interface.draw
+    kindInferred: direct             # image-first direction-setting, not acceptance
+    goal: Produce the image-first interface direction — the smallest representative set of critical screens plus an explicit coverage map.
+    nodeKinds: [ui]
+    completionProfile: ui
+    sideEffects: generated representative direction images and exact prompt files under the owning UI node assets.
+    reads: [target, business, architecture, brand, knowledge, grammar, repo, profile, generatedDirection, workflow, matrix]
+    writes: [node, designSource, evidence, handoff, draws, matrixHandoff]
+    lifecyclePosition: direct — pre-implementation direction after SRS/SDS+brand, before interface.implement.
+    whenNeeded: A new visual direction must be settled before frontend code commits to it.
+
+  - id: interface.implement
+    kindInferred: implement
+    goal: Implement one selected frontend creation, refinement or defect repair reconciling the full draws/design/SRS/SDS input set.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: owned source edits; scoped commits; authorized local preview/test actions; asset reuse/creation inside owned frontend asset paths.
+    reads: [application-stacks, target, business, architecture, repo, knowledge, finding, draws, design, environment, workflow, matrix, profile, assetSources]
+    writes: [node, source, evidence, handoff, flows, matrixHandoff, assetManifest]
+    lifecyclePosition: implement — consumes draws + contracts; emits E/flows.json for uat.verify; owns two declared secondaries (architecture.decide, backend.implement).
+    whenNeeded: A selected frontend slice needs code verified by real captures against accepted draws.
+
+  - id: knowledge.repair
+    kindInferred: implement          # canonical knowledge/rule repair
+    goal: Repair one challenged canonical instruction/rule and affected references from concrete applicability evidence.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: exact authorized knowledge source/reference edits; scoped commits when authorized.
+    reads: [target, repo, rule, matrix, profile]
+    writes: [node, source, evidence, matrixHandoff]
+    lifecyclePosition: implement — runtime/knowledge maintenance whenever evidence challenges a rule.
+    whenNeeded: A canonical rule or skill instruction is proven wrong/incomplete for an applicable case.
+
+  - id: perf.verify
+    kindInferred: verify
+    goal: Run or observe the declared performance measurements against the running product.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: declared measurement/benchmark runs on the authorized running product; run-owned measurement data/load disposed by the same run.
+    reads: [target, business, architecture, repo, environment, metrics, effects, matrix, profile]
+    writes: [node, evidence, matrixHandoff]
+    lifecyclePosition: verify — post-implementation measurement; observed values only, never estimates.
+    whenNeeded: A goal declares performance metrics with thresholds and an authorized environment runs the product.
+
+  - id: provision.ask
+    kindInferred: provision          # the only op that waits for the owner
+    goal: Obtain the one owner-only provision — credential, account, dataset, authority or irreversible go-ahead — and confirm presence.
+    nodeKinds: [business]
+    completionProfile: business
+    sideEffects: none                  # writes a presence report only; secrets never transit here
+    reads: [question, environment]
+    writes: [report]
+    lifecyclePosition: decide — cross-cutting mid-flight wait point whenever an effect needs owner-only input.
+    whenNeeded: A run is blocked on something only the owner can provide; presence check precedes the effect.
+
+  - id: release.deliver
+    kindInferred: operate            # terminal external effect; mode-selected
+    goal: Deliver one explicitly selected publication, deployment or database migration and verify its remote outcome.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: only the selected mode's effects — never a union of mode permissions.
+    reads: [application-stacks, target, selection, matrix, profile]
+    writes: [node, evidence, matrixHandoff]
+    modes: [publish, deploy, migrate]
+    lifecyclePosition: release — terminal stage after implementation+verification evidence exists.
+    whenNeeded: A verified deliverable must be published, deployed or migrated under explicit scoped authority.
+
+  - id: request.analyze
+    kindInferred: intake             # read-only request → workflow classification
+    goal: Analyze one request into a typed intake record — the selected workflow and the scope statement scope.define receives.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: none
+    reads: [request, catalog, repo, profile]
+    writes: [intake, evidence]
+    lifecyclePosition: intake — entry point of every request, in the calling chat before any kernel effect.
+    whenNeeded: Every incoming request, to name exactly one owning catalog workflow + intake record.
+
+  - id: review.verify
+    kindInferred: verify             # independent reviewer; mode-selected; never repairs
+    goal: Independently verify a selected delivery, business, workflow, rendered visual or API result against its own evidence.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: only the selected mode's effects — never a union of mode permissions.
+    reads: [application-stacks, target, selection, matrix, profile]
+    writes: [node, evidence, matrixHandoff]
+    modes: [delivery, business, workflow, visual, api, stales, lint]
+    lifecyclePosition: verify — post-delivery independent review; findings route to owning ops.
+    whenNeeded: Acceptance needs a reviewer who is not the producer — one mode per run.
+
+  - id: runtime.operate
+    kindInferred: operate            # runtime/service lifecycle; mode-selected
+    goal: Deliver the requested runtime or service state with readiness, owned effects and real probes.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: only the selected mode's effects — never a union of mode permissions.
+    reads: [application-stacks, target, selection, matrix, profile]
+    writes: [node, evidence, matrixHandoff]
+    modes: [inspect, serve, service]
+    lifecyclePosition: operate — environment lifecycle around implementation/verification; inspect precedes effects.
+    whenNeeded: A dev runtime or declared auxiliary service must reach an authorized, probed state.
+
+  - id: scope.define
+    kindInferred: scope              # authors the boundary record; performs none of it
+    goal: Turn one request into a bounded scope record — the nodes, dependencies and exclusions the workflow may touch.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: none
+    reads: [request, intake, records, repo, profile]
+    writes: [node, scope, evidence]
+    lifecyclePosition: scope — after intake, before any effect-bearing op; exclusions guard decided authority.
+    whenNeeded: A workflow needs a typed, grounded boundary before effects may run.
+
+  - id: scope.retire
+    kindInferred: operate            # end-of-life; deletion only via separate exact authorization
+    goal: Retire exactly the selected business/resource scope while preserving required evidence and live consumers.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: explicit retirement metadata and separately authorized exact destructive actions only.
+    reads: [target, repo, inventory, authority, matrix, profile]
+    writes: [node, evidence, matrixHandoff]
+    lifecyclePosition: operate — end-of-life; default act is metadata retirement, removal is a gated exception.
+    whenNeeded: A selected scope must leave service without orphaning consumers, evidence or custody.
+
+  - id: security.verify
+    kindInferred: verify             # read-only inspection; findings route to owners
+    goal: Inspect one selected slice of code and configuration for vulnerabilities read-only and leave typed findings.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: exactly the declared read-only scan/analysis commands in the declared sandbox.
+    reads: [target, business, architecture, repo, rules, machines, checks, effects, matrix, profile]
+    writes: [node, evidence, matrixHandoff]
+    lifecyclePosition: verify — may run on any delivered slice; never repairs what it finds.
+    whenNeeded: A code/config slice needs typed, commit-bound vulnerability findings.
+
+  - id: task.execute
+    kindInferred: intake             # ad-hoc routing analysis; the name notwithstanding, zero effects
+    goal: Analyze one request into a bounded, evidence-grounded workflow selection without performing effects.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: none
+    reads: [request, repo, targetSystem, profile]
+    writes: [evidence]
+    lifecyclePosition: intake — direct-task route when no preset workflow matched; hands a typed selection to the host.
+    whenNeeded: An unmatched/ad-hoc task needs its single workflow+op+mode contract chosen explicitly.
+
+  - id: test.author
+    kindInferred: implement          # test-paths-only authoring; collection is the proof
+    goal: Author the test files one bounded slice needs inside a test-paths-only allowlist and prove the runner collects them.
+    nodeKinds: [implementation]
+    completionProfile: implementation
+    sideEffects: test file authoring inside the declared allowlist; scoped commits when authorized; runner collection/listing checks in declared sandbox.
+    reads: [target, architecture, repo, suite, conventions, matrix, profile]
+    writes: [node, source, evidence, matrixHandoff]
+    lifecyclePosition: implement — fills test-gap blockers so verify ops have something to run.
+    whenNeeded: A slice needs authored tests; never claims a product verdict.
+
+  - id: uat.verify
+    kindInferred: verify
+    goal: Execute the requested sequential UX flows with scoped account/seed setup, real screenshot/video recording and verified cleanup.
+    nodeKinds: [uat.ux]
+    completionProfile: uat.ux
+    sideEffects: scoped test account reuse/creation; owned prerequisite SQL seed+cleanup; test-automation script authoring; declared product UI actions + explicitly authorized paid AI calls; direct cleanup of exact run-owned IDs.
+    reads: [target, business, repo, environment, flows, accounts, fixtures, scripts, effects, workflow, matrix, profile]
+    writes: [node, source, resources, evidence, handoff, matrixHandoff]
+    lifecyclePosition: verify — terminal product acceptance on real browser + verified served build.
+    whenNeeded: Ordered UX flows from the FE handoff need genuine yes/no/observed proof with clean resource ledger.
+
+  - id: work.author
+    kindInferred: implement          # launchability authoring + seam-first node cutting
+    goal: Author the canonical Work records one node needs before it can be launched — write scope, testable assertions, runnable checks; or split a too-big node seam-first.
+    nodeKinds: [implementation, uat, ui, operations]
+    completionProfile: operations
+    sideEffects: none                  # Work-record authoring only; no product effects
+    reads: [application-stacks, target, neighbours, specification, source, scripts, profile]
+    writes: [node, integration, parts, evidence]
+    lifecyclePosition: scope/implement boundary — makes nodes launchable; cut mode decomposes oversized nodes before implementation.
+    whenNeeded: A node lacks launch metadata, an integration node must be authored, or a node is too big for one operation.
+
+  - id: workspace.manage
+    kindInferred: operate            # workspace bootstrap/reconstruction; mode-selected
+    goal: Create or reconstruct one canonical .starciwork workspace from a new purpose or selected source import.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects: only the selected mode's effects — never a union of mode permissions.
+    reads: [application-stacks, target, selection, matrix, profile]
+    writes: [node, evidence, matrixHandoff]
+    modes: [prepare, import]
+    lifecyclePosition: scope — earliest stage; prepares the Work tree + bindings or reconstructs them from inspected source (imported leaves stay uninvestigate).
+    whenNeeded: A new purpose needs canonical Work structure, or an existing codebase must be reconstructed into it.
+
+# -----------------------------------------------------------------------------
+# Engines — .claude/ops/*.mjs are execution machinery, NOT context to port.
+# Roles described for routing understanding only; the code stays in .claude/ops/.
+engines:
+  - path: .claude/ops/contracts.mjs
+    role: loader — reads registry.yaml + every <id>/operator.yaml; enforces contract.id === directory name; attaches specification.yaml for business.decide/architecture.decide. Fail-closed identity check.
+  - path: .claude/ops/select.mjs
+    role: mode selector — given a contract + operation name, returns exactly one executionModes contract (or the whole contract when the op has no modes); throws on unknown/absent mode. Selection only — executes no agent, command or effect.
+  - path: .claude/ops/role-authority.mjs
+    role: authority generator — derives starci/op-authority@1 per op (owns, reads, writes, allowedEffects, canAdvanceWorkflow:false, maxSecondary:3); encodes the two declared secondary call tables (interface.implement → architecture.decide + backend.implement; backend.implement → architecture.decide) and mode-selection rules.
+  - path: .claude/ops/basic-ops.mjs
+    role: view generator — emits starci/basic-ops@1 (the six basic ops' contracts plus handoff invariants and gates, business→architecture→implement→uat chains). A generated view of the source contracts, never a second dispatcher.
+  - path: .claude/ops/generate.mjs
+    role: catalogue emitter — builds the .dist outputs (catalog.json with sorted ops + supportingReferences wiring to knowledge INDEX topics, basic-ops.json, consolidation.json, per-op authority.json). generate() itself is retired in favour of npm run build / build:check.
+  - path: .claude/ops/validate.mjs
+    role: operator-contract validator — authoring-time checks over operator.yaml covering op-id shape, SRS/SDS authoring policies (contract/aggregate/section schemas, preserved-English sets), E/ attempt-bundle vs kind-owned write separation, and kernel-owned destinations. Runs during bootstrap before .dist exists; deliberately avoids .dist imports to keep the build acyclic.
+
+consolidation: see .claude/ops/registry.yaml consolidation — source of truth for shared cross-op policy; not duplicated here.

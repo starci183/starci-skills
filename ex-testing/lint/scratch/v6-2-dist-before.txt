@@ -1,0 +1,7 @@
+D:\Repositories\starci-academy-backend\.claude\.dist\knowledge\grammars\INDEX.json
+D:\Repositories\starci-academy-backend\.claude\.dist\knowledge\grammars\starci
+D:\Repositories\starci-academy-backend\.claude\.dist\knowledge\grammars\starci\DNA.json
+D:\Repositories\starci-academy-backend\.claude\.dist\knowledge\grammars\starci\family.json
+D:\Repositories\starci-academy-backend\.claude\.dist\knowledge\grammars\starci\idioms.json
+D:\Repositories\starci-academy-backend\.claude\.dist\knowledge\grammars\starci\INDEX.json
+D:\Repositories\starci-academy-backend\.claude\.dist\knowledge\grammars\starci\playbook.json

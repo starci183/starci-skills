@@ -1,0 +1,20 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: nfr.login.sign-in-timing
+recordDigest: 09de9b7caccb077b38dbe7b1eda1a0d072fd063fa1d4efb907c4e3add189913d
+outcome: pass
+assertions:
+  - id: identical-refusal-parity
+    command: npx jest src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
+      unknown email identically"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
+      unknown email identically" exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T07:51:47.873Z

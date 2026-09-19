@@ -1,0 +1,108 @@
+{
+  "app": "ecommerce-app-be",
+  "lane": "v3-1-ec-be-fix",
+  "scope": [
+    "examples/ecommerce-app-be/src/**/*.ts",
+    "examples/ecommerce-app-be/apps/**/*.ts",
+    "ex-testing/lint/**"
+  ],
+  "date": "2026-09-19",
+  "gate": {
+    "marker": ".claude/ex-testing/lint/setup-ec-be.done",
+    "status": "ABSENT at lane close - v3-0 setup lane for ec-be produced no .done marker (same as todo-be: config/plugin/aliases were wired but the lane never closed).",
+    "proceededOn": "eslint.config.mjs present and stable (starciBeCanon + vendored local rules), @modules/@features/@tests aliases in tsconfig + jest mappers, deps installed, toolchain verified end-to-end on this scope before first hand-fix."
+  },
+  "lintBaseline": {
+    "command": "npx eslint \"src/**/*.ts\" \"apps/**/*.ts\"",
+    "briefFigure": "251 errors (ec-lint.json, 2026-09-19)",
+    "freshMeasure": "260 errors at lane start - the brief figure was stale; the fresh run is the operative baseline."
+  },
+  "lintFinal": {
+    "command": "npx eslint \"src/**/*.ts\" \"apps/**/*.ts\"",
+    "total": "4 errors, 0 warnings",
+    "perRule": {
+      "starci-be/rest-door-needs-a-reason": 4
+    }
+  },
+  "fixesApplied": {
+    "require-export-jsdoc": "Real doc comments written on every flagged export (~101 sites after config/spec fixes): controllers, services, entities, modules, DTO/result interfaces, infra services, e2e helpers. Docs sit between decorator and export keyword where the rule reads them.",
+    "throw-abstract-exception": "Minimal exception hierarchy created under src/modules/platform/exceptions/errors/<domain>/ extending AbstractException (HttpException-based, object-arg constructor, class-derived *_EXCEPTION codes); 31 throw sites migrated across transport, clients, config, redis.",
+    "exception-code-vocabulary": "All wire codes moved to class-derived *_EXCEPTION literals (EMAIL_TAKEN_EXCEPTION, INVALID_CREDENTIALS_EXCEPTION, SESSION_INVALID_EXCEPTION, REQUEST_INVALID_EXCEPTION, PERSON_UNKNOWN_EXCEPTION, CHECKOUT_REFUSAL_EXCEPTION, contract/service-unavailable codes); spec and e2e assertions updated.",
+    "must-deep-module-import": "Every import reaches the deep file (e.g. @modules/integrations/order/order.client); no folder specifiers remain.",
+    "no-folder-reexport": "16 index.ts barrels deleted after all consumers were migrated to deep imports.",
+    "no-non-global-module-import": "Feature modules import nothing - all platform/capability/integration modules registered globally at the two app roots (apps/identity, apps/order) via ConfigurableModuleBuilder register({isGlobal:true}).",
+    "no-self-global-module": "@Global() removed from capability modules; globality declared only at composition roots through the isGlobal extra on each module-definition.",
+    "no-injected-repository": "@InjectRepository/forFeature removed; services take InjectPrimaryEntityManager and reach repositories through the (transaction-scoped) EntityManager.",
+    "unit-test-colocated": "3 specs moved beside owners: app-module.boot.spec.ts -> apps/identity|order/src/, session-guard.wiring.spec.ts -> src/features/checkout/transport/http/, checkout-refusal.spec.ts -> src/modules/platform/exceptions/errors/checkout/.",
+    "no-wiring-in-flow-spec": "src/tests/infra/e2e-world.ts created (bootE2eWorld); all e2e specs boot through it - no Test.createTestingModule in *.e2e-spec.ts.",
+    "e2e-asserts-persisted-state": "Specs assert through dataSource/E2EDbService queries (identifier vocabulary the rule reads), not just response envelopes.",
+    "no-branch-in-flow-step": "if/ternary branches removed from it() bodies in teardown/resilience specs.",
+    "no-restricted-syntax": "process.env reads routed through config services via `import { env } from \"node:process\"` (typed, single chokepoint); no scattered reads remain.",
+    "no-unguarded-unknown-cast": "Env-derived config values guarded before cast in both AppConfigService files.",
+    "require-exception-object-arg": "All exception constructions take a single object literal.",
+    "@typescript-eslint/no-require-imports": "e2e-infra-contract.ts rewritten to static typed imports against the shared e2e world.",
+    "rest-door-needs-a-reason": "2 of 6 resolved honestly: sessions + buyers contract doors moved under internal/ (machine door) since only services call them; the remaining 4 are false-positive candidates (see remainingDebt).",
+    "misc": "unused vars removed (_label params, dead auth var), Function types replaced in entity specs, enum member docs added, inline object types extracted (health controllers), indent fixed in e2e-stack.service.ts, no-console removed from e2e specs."
+  },
+  "remainingDebt": [
+    {
+      "rule": "starci-be/rest-door-needs-a-reason",
+      "file": "src/features/checkout/transport/http/cart.controller.ts:29",
+      "detail": "Public user-facing JSON REST door (@Controller(\"cart\")). FALSE-POSITIVE CANDIDATE: the example app exposes no GraphQL surface at all, so 'a plain JSON read belongs in the GraphQL schema' has no referent here; none of the four sanctioned reasons (probe, external webhook, bytes, machine/operator identity) can honestly apply. Documented in-file as intentional REST-only design.",
+      "blockedBy": "Rule fix or schema-level config exemption needed - out of lane scope (eslint.config.mjs is settled, not owned by this lane)."
+    },
+    {
+      "rule": "starci-be/rest-door-needs-a-reason",
+      "file": "src/features/checkout/transport/http/order.controller.ts:17",
+      "detail": "Public order placement door (@Controller(\"orders\")). Same false-positive candidacy as cart.",
+      "blockedBy": "Same as above."
+    },
+    {
+      "rule": "starci-be/rest-door-needs-a-reason",
+      "file": "src/features/identity/transport/http/account.controller.ts:19",
+      "detail": "Public account view door (@Controller(\"accounts\")). Same false-positive candidacy.",
+      "blockedBy": "Same as above."
+    },
+    {
+      "rule": "starci-be/rest-door-needs-a-reason",
+      "file": "src/features/identity/transport/http/sign-in.controller.ts:26",
+      "detail": "Public auth door (@Controller(\"auth\")). Same false-positive candidacy.",
+      "blockedBy": "Same as above."
+    }
+  ],
+  "outOfScopeObservations": [
+    "eslint.config.mjs is untracked setup-lane output; an out-of-scope override block (rest-door-needs-a-reason: off) found added mid-lane was reverted - the 4 findings stand as honest debt instead of a suppressed rule.",
+    "dist/ staleness is a runtime footgun: E2EStackService.ensureBuilt() only builds when main.js is missing, so a stale dist silently serves old code (old wire codes, old routes). npm run build before test:e2e is required after source changes.",
+    "Emulated dist keeps @modules/@features specifiers verbatim (tsc does not rewrite paths, no tsc-alias in build); spawned api children resolve them via TS_NODE_BASEURL=dist set in spawnApi env - without it the children crash on MODULE_NOT_FOUND. If package.json ever gains tsc-alias (out of scope today), that env becomes redundant but harmless.",
+    "setup lane merge pending: no setup-ec-be.done, no modules-scope debt file observed for this app."
+  ],
+  "verification": {
+    "eslint": "260 errors -> 4 errors (all rest-door-needs-a-reason false-positive candidates). Per-rule: every other rule at 0.",
+    "tsc": "npx tsc --noEmit -> clean, 0 errors",
+    "jest": "36/36 suites, 216/216 tests green (baseline preserved)",
+    "e2e": "npm run test:e2e -> 7/7 suites, 10/10 tests green against real docker compose stack (postgres+redis containers, spawned api children from rebuilt dist, teardown verified clean)"
+  },
+  "filesTouched": {
+    "created": [
+      "src/modules/platform/exceptions/errors/abstract.ts",
+      "src/modules/platform/exceptions/errors/accounts/{email-taken,invalid-credentials,person-unknown}.ts",
+      "src/modules/platform/exceptions/errors/checkout/{checkout-refusal.ts,checkout-refusal.spec.ts}",
+      "src/modules/platform/exceptions/errors/integrations/{identity-contract-mismatch,identity-service-unavailable,order-contract-mismatch,order-service-unavailable}.ts",
+      "src/modules/platform/exceptions/errors/platform/{metadata-file-missing,metadata-ports-missing,metadata-unreadable,redis-connection,redis-unexpected-reply}.ts",
+      "src/modules/platform/exceptions/errors/requests/request-invalid.ts",
+      "src/modules/platform/exceptions/errors/sessions/session-invalid.ts",
+      "src/tests/infra/e2e-world.ts",
+      "13 x *.module-definition.ts (config x2, postgresql primary x2, redis, account, cart, catalog, order, payment, session, identity-client, order-client)",
+      "src/modules/platform/databases/postgresql/{identity,order}/primary/primary.decorators.ts (InjectPrimaryEntityManager)",
+      "apps/identity/src/app-module.boot.spec.ts",
+      "apps/order/src/app-module.boot.spec.ts",
+      "src/features/checkout/transport/http/session-guard.wiring.spec.ts"
+    ],
+    "deleted": [
+      "16 x index.ts barrels under src/modules/** and src/tests/infra/",
+      "src/modules/bussiness/order/checkout-refusal.exception.ts (moved to errors/checkout/)",
+      "src/tests/identity/, src/tests/order/ bucketed spec dirs (specs colocated beside owners)"
+    ],
+    "modified": "~80 files across src/features/**, src/modules/**, src/tests/**, apps/*/src/ (throw migrations, deep imports, EM switch, module rewiring, JSDoc, e2e world migration, spec assertion updates)"
+  }
+}

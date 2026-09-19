@@ -1,0 +1,4010 @@
+{
+  "workRoot": "examples/todo-app-backend/.starciwork",
+  "total": 97,
+  "records": 265,
+  "ws": [
+    {
+      "role": "be",
+      "name": "todo-app"
+    },
+    {
+      "role": "fe",
+      "name": "todo-app-frontend"
+    }
+  ],
+  "files": [
+    {
+      "node": "features/audit/br/append-only",
+      "id": "br.audit.append-only",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "f5f7e253d9371c2c8ca953d05b74d91396fbd6fc6fc0b7a05d96601b120917be",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "ac.audit.append-only.chain-detects-tamper",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"ac.audit.append-only.chain-detects-tamper\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:27:04.233Z"
+      }
+    },
+    {
+      "node": "features/audit/br/erasure/logged",
+      "id": "br.audit.erasure.logged",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "2ec8735186f84030612352a24709595de9bed31ee8be3a4621854e0c3997fe1d",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "ac.audit.erasure.logged.request-and-completion-are-lines",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"ac.audit.erasure.logged.request-and-completion-are-lines\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:27:28.399Z"
+      }
+    },
+    {
+      "node": "features/audit/br/erasure/right",
+      "id": "br.audit.erasure.right",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "262b91f2444d4480e1c6f4b6d6c9a7c155461a7f29efa8bf10e4a43fce053ca2",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "ac.audit.erasure.right.identifying-fields-unreadable",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"ac.audit.erasure.right.identifying-fields-unreadable\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:27:20.516Z"
+      }
+    },
+    {
+      "node": "features/audit/br/retention",
+      "id": "br.audit.retention",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "2c46d8a879b590388e0336b1a7ebdf723c8e5efed0d160f0850c8102bac0d7db",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "ac.audit.retention.available-through-window",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"nfr.audit.retention\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:27:12.424Z"
+      }
+    },
+    {
+      "node": "features/audit/data/log-line",
+      "id": "data.audit.log-line",
+      "schema": "work/data",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "f87d7f3f9cecd8eb7d74fec6dc123cf349772a641c0ef0e06f217ff0dc994a30",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "data.audit.log-line",
+          "command": "npx jest src/modules/bussiness/audit/audit-log.service.spec.ts src/modules/bussiness/audit/audit-keystore.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:00:23.786Z"
+      }
+    },
+    {
+      "node": "features/audit/decision/erasure-method",
+      "id": "decision.audit.erasure-method",
+      "schema": "work/policy-decision",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "8dd6b2b61c86cfac8b608b3c0a71006b6210b07cdcdafccb100e74665e4a297a",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "crypto-shred-built",
+          "command": "npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts src/modules/bussiness/audit/audit-keystore.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:56:28.204Z"
+      }
+    },
+    {
+      "node": "features/audit/fr/erasure/complete",
+      "id": "fr.audit.erasure.complete",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "a0a77ae67d2bb1c16366e08d33128aaca30a0982e1aea83b1348de51a84d3eca",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "br.audit.erasure.right",
+          "command": "npx jest -t ac.audit.erasure.right.identifying-fields-unreadable",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.audit.erasure.logged",
+          "command": "npx jest -t ac.audit.erasure.logged.request-and-completion-are-lines",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "handler",
+          "command": "npx jest src/modules/bussiness/audit/complete-erasure.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:52:35.623Z"
+      }
+    },
+    {
+      "node": "features/audit/fr/erasure/request",
+      "id": "fr.audit.erasure.request",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "86cf9050feac74382e735dfa7ba5161924b3c9a9fa30078b49e4c437ae09863b",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "br.audit.erasure.right",
+          "command": "npx jest -t ac.audit.erasure.right.identifying-fields-unreadable",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.audit.erasure.logged",
+          "command": "npx jest -t ac.audit.erasure.logged.request-and-completion-are-lines",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "handler",
+          "command": "npx jest src/modules/bussiness/audit/request-erasure.handler.spec.ts src/modules/bussiness/audit/audit-erasure.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:51:52.969Z"
+      }
+    },
+    {
+      "node": "features/audit/fr/export",
+      "id": "fr.audit.export",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "eb58436b6c6f3ba08a6d8d50e134a0c62d01df5b5d62814d37dd96b3b1715c21",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "br.audit.append-only",
+          "command": "npx jest src/modules/bussiness/audit/export-my-data.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:52:40.141Z"
+      }
+    },
+    {
+      "node": "features/audit/fr/log/append",
+      "id": "fr.audit.log.append",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "1ed6662288f937eab7875a30622e7c9ee64a6579bd21a03d20ffee1c86e8d285",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "fr.audit.log.append",
+          "command": "npx jest src/modules/bussiness/audit/audit-event.subscriber.spec.ts src/modules/bussiness/audit/append-log-line.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:51:08.295Z"
+      }
+    },
+    {
+      "node": "features/audit/fr/log/read",
+      "id": "fr.audit.log.read",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "7692e4ca2d08703a3e3249fad6888a25ebc1aa385e44ea29457604b4e152904b",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "fr.audit.log.read",
+          "command": "npx jest src/modules/bussiness/audit/audit-log.handler.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "operator-check-and-refusal",
+          "command": "npx jest src/modules/bussiness/audit/audit-operator.guard.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:29:32.940Z"
+      }
+    },
+    {
+      "node": "features/audit/gap/operator-role",
+      "id": "gap.audit.operator-role",
+      "schema": "work/gap",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "d2847109d7294f3d9065172fc2e040daf6c4445f16a31cd36f06a18876234b9f",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "gap.audit.operator-role",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"gap.audit.operator-role\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "audit-operator.service",
+          "command": "npx jest src/modules/bussiness/audit/audit-operator.service.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:29:22.595Z"
+      }
+    },
+    {
+      "node": "features/audit/gap/unbuilt-module",
+      "id": "gap.audit.unbuilt-module",
+      "schema": "work/gap",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "0d2a6cadd34407c0f930140e1f4c2538188194922beb6d03d966489409bbf21c",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "audit-module-exists-and-registers",
+          "command": "npx jest src/modules/bussiness/audit src/app.boot.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:07:51.540Z"
+      }
+    },
+    {
+      "node": "features/audit/impl/todo-app-backend/erasure",
+      "id": "impl.audit.todo-app-backend.erasure",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "7ef02c4cb213c2e0cbdd1317ea4d0366a7d224d22900d19d1b9e7991c76a5e15",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "br.audit.erasure.right",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"ac.audit.erasure.right.identifying-fields-unreadable\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.audit.erasure.logged",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"ac.audit.erasure.logged.request-and-completion-are-lines\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.audit.erasure-request",
+          "command": "npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts src/modules/bussiness/audit/request-erasure.handler.spec.ts src/modules/bussiness/audit/complete-erasure.handler.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "fr.audit.erasure.request",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"fr.audit.erasure.request\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "fr.audit.erasure.complete",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"fr.audit.erasure.complete\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:29:10.202Z"
+      }
+    },
+    {
+      "node": "features/audit/impl/todo-app-backend/log",
+      "id": "impl.audit.todo-app-backend.log",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "34cdede62d08dac04808c0ed591b6aec6cd9e1bca8e529fbabd221edaab344b6",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "br.audit.append-only",
+          "command": "npx jest src/modules/bussiness/audit/audit-log.service.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.audit.retention",
+          "command": "npx jest src/modules/bussiness/audit/audit-log.service.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.audit.log-chain",
+          "command": "npx jest src/modules/bussiness/audit/audit-log.service.spec.ts src/modules/bussiness/audit/audit-event.subscriber.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "ac.audit.append-only.chain-detects-tamper",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"ac.audit.append-only.chain-detects-tamper\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:28:33.799Z"
+      }
+    },
+    {
+      "node": "features/audit/impl/todo-app-backend/operator-read",
+      "id": "impl.audit.todo-app-backend.operator-read",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "4a5d8c7b838bf64c6380ebc16dab37ce0006ee98e92378987db572a05367d352",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "filtered-whole-chain-read",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"fr.audit.log.read\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "fail-closed-refusal",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"refusal\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "operator-check",
+          "command": "npx jest src/modules/bussiness/audit/audit-operator.guard.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "operator-claim-source",
+          "command": "npx jest src/modules/bussiness/audit/audit-operator.service.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "gap.audit.operator-role",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"gap.audit.operator-role\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:30:06.238Z"
+      }
+    },
+    {
+      "node": "features/audit/impl/todo-app-frontend/privacy",
+      "id": "impl.audit.todo-app-frontend.privacy",
+      "schema": "work/implementation",
+      "state": "todo",
+      "repository": "todo-app-frontend",
+      "staleFlag": false,
+      "outcome": "fail",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "d7f56bc1ecf0f17bf710db6b2366decf311bbc4ba44b14bacfca45a820e08056",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "70f2b3450379a425051a3708d78b798d8401be2585477b1b8795995ca04d2080",
+      "capturedCodeDigest": "8792590c4657352592a1a415b04735887059083949868c6b7363f453993b7019",
+      "ownedDirs": [
+        "src/app/audit [MISSING]",
+        "src/components/audit"
+      ],
+      "assertions": [
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "unit-tests",
+          "command": "npx vitest run",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "lint",
+          "command": "npx eslint src/",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "build",
+          "command": "npm run build",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "architecture",
+          "command": "node ../../cli/main.mjs architecture check . --config architecture.json",
+          "exit": 1,
+          "outcome": "fail"
+        },
+        {
+          "id": "rendered-captures",
+          "command": "node -e \"const fs=require('fs'),p='../todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/assets/';const states=['idle','exporting','requesting-erasure','erasure-pending','erasure-complete','erasure-refused'];const vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of vps){for(const ext of ['png','html']){const f=p+'privacy-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const refused=fs.readFileSync(p+'privacy-erasure-refused-desktop-1280.html','utf8');if(!refused.includes('data-state=\\\"erasure-refused\\\"')){ok=false;console.log('refused markup lacks data-state');}for(const v of vps){const j=p+'todo-app-export-'+v+'.json';if(!fs.existsSync(j)){ok=false;console.log('missing export',j);}}if(!ok)process.exit(1);console.log('12 state captures + 2 real export downloads verified');\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "render-proof",
+          "command": "node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork --record impl.audit.todo-app-frontend.privacy",
+          "exit": 1,
+          "outcome": "fail"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T15:20:38.077Z"
+      }
+    },
+    {
+      "node": "features/audit/nfr/retention",
+      "id": "nfr.audit.retention",
+      "schema": "work/non-functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "b5fb5639446e80d618d04377a23c399398e3eb48c60a1df8d3c7f1885bb74693",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "measurement",
+          "command": "npx jest -t \"nfr.audit.retention\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:56:01.850Z"
+      }
+    },
+    {
+      "node": "features/audit/nfr/tamper-evidence",
+      "id": "nfr.audit.tamper-evidence",
+      "schema": "work/non-functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "3fff2f359ac3d2732b85648e880eb56db067926f365645c9acae0c1c0fb42bea",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "measurement",
+          "command": "npx jest -t \"ac.audit.append-only.chain-detects-tamper\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:56:22.530Z"
+      }
+    },
+    {
+      "node": "features/audit/sds/erasure-request",
+      "id": "sds.audit.erasure-request",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "ade73cc12ecbd2a8f19f0a24d97229178507b46bde2c5976df6d9e74de9fe75c",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "t-request",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"sds.audit.erasure-request t-request\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-verify",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"sds.audit.erasure-request t-verify\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-refuse",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"t-refuse\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-execute",
+          "command": "npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-complete",
+          "command": "npx jest src/modules/bussiness/audit --runInBand -t \"personId is dropped\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:28:10.564Z"
+      }
+    },
+    {
+      "node": "features/audit/sds/log-chain",
+      "id": "sds.audit.log-chain",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "3511e1bff90ca3b4bb34dba84610e6111f5ef17a63d42bb0ed74c9b52644e74e",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "9659efeb11b80746ed4a3ccfbf734fb8cbb84a2ce9097e315b4bbedcb307e414",
+      "capturedCodeDigest": "ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e",
+      "ownedDirs": [
+        "src/modules/bussiness/audit"
+      ],
+      "assertions": [
+        {
+          "id": "t-append",
+          "command": "npx jest src/modules/bussiness/audit/audit-log.service.spec.ts src/modules/bussiness/audit/audit-event.subscriber.spec.ts --runInBand",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T18:27:34.053Z"
+      }
+    },
+    {
+      "node": "features/login/br/password/sign-in",
+      "id": "br.login.password.sign-in",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "14bf9d77064ef3961193c54857e5baec30c744661cbd9648f6a0aadb37c6b28e",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "da0cd4992e6ab100529dfa848d1b4b153857e6cf3598f5625231cc20618483ee",
+      "capturedCodeDigest": "45d431b75ca1a4c0f2fbf87883804424de7a07ceb50c971fdd24a2bc1acff49a",
+      "ownedDirs": [
+        "src/modules/bussiness/session",
+        "src/modules/integrations/keycloak"
+      ],
+      "assertions": [
+        {
+          "id": "ac.login.password.sign-in.wrong-pair-is-refused",
+          "command": "npx jest -t \"ac.login.password.sign-in.wrong-pair-is-refused\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "ac.login.password.sign-in.refusal-does-not-name-the-half",
+          "command": "npx jest -t \"ac.login.password.sign-in.refusal-does-not-name-the-half\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T08:37:54.850Z"
+      }
+    },
+    {
+      "node": "features/login/br/session/restores",
+      "id": "br.login.session.restores",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "9c9a80579234df378ac7732dbf3dc1f601d4fe1c92ea2cb179623b194e99ccce",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "c9d9fdddb8d7c5496a6512d4dbb95c76a6f0307f85fbcf5767f27918a559a050",
+      "capturedCodeDigest": "93bb96740706c484e9a6ff6ae0a94f43ecad7fa4173362725ee6dbb737766205",
+      "ownedDirs": [
+        "src/modules/bussiness/session"
+      ],
+      "assertions": [
+        {
+          "id": "ac.login.session.restores.returning-within-the-window-stays-signed-in",
+          "command": "npx jest src/modules/bussiness/session -t \"ac.login.session.restores.returning-within-the-window-stays-signed-in\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T08:38:06.074Z"
+      }
+    },
+    {
+      "node": "features/login/fr/sign-in",
+      "id": "fr.login.sign-in",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "816e6e9a72d5f6dd93e689bc371320c98f61cc477becc5c0db737234a0139ee8",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit-composed-rules",
+          "command": "npx jest src/modules/bussiness/session",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "boot-drives-real-sign-in-route",
+          "command": "npx jest src/app.boot.spec.ts -t \"drives sign-in\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "boot-refuses-unauthenticated-tasks",
+          "command": "npx jest src/app.boot.spec.ts -t \"refuses an unauthenticated tasks query\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "frontend-lands-on-tasks-after-sign-in",
+          "command": "cd ../todo-app-frontend && npx vitest run src/hooks/auth/useSignIn.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T08:39:58.795Z"
+      }
+    },
+    {
+      "node": "features/login/impl/todo-app-backend/auth",
+      "id": "impl.login.todo-app-backend.auth",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "53fda9a27fa2c6d5ec19a145ac56f72be1a54c3fb650ad9119e5fc5c525b384b",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "f5b04c3c22dca0a8d2a7d4ecd467abce06606546e8270a1c269bf2c35278bf32",
+      "capturedCodeDigest": "c0b8f8a1e61bb2934445e95ac052e039b3c6e2e977cb4da90fa8e50778a0cc84",
+      "ownedDirs": [
+        "src/modules/bussiness/session",
+        "src/modules/integrations/keycloak",
+        "src/features/todo/graphql/mutations/session"
+      ],
+      "assertions": [
+        {
+          "id": "unit-suite-green",
+          "command": "npx jest src/modules/bussiness/session src/modules/integrations/keycloak",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "contract.login.identity-for-task",
+          "command": "npx jest src/app.boot.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:19:41.249Z"
+      }
+    },
+    {
+      "node": "features/login/impl/todo-app-frontend/sign-in",
+      "id": "impl.login.todo-app-frontend.sign-in",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app-frontend",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "b4296c1aea8e231ec249cc9450fff3745f2e5f5696628a5858749c6adfd9202b",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "e885d9d5d7aba75ea28bfd97e90ecb3175f5379e017e1e44e6d0355a2c5877c0",
+      "capturedCodeDigest": "3b4caf175eb47fd672f73b385b97f61cc05c5b2520c2391c61cf56adf5d362fb",
+      "ownedDirs": [
+        "src/app/sign-in",
+        "src/components/login/sign-in"
+      ],
+      "assertions": [
+        {
+          "id": "vitest-suite-green",
+          "command": "npx vitest run src/components/blocks/sign-in-form src/hooks/auth src/modules/api/auth.spec.ts src/modules/api/graphql.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:18:06.020Z"
+      }
+    },
+    {
+      "node": "features/login/integration/keycloak",
+      "id": "integration.login.keycloak",
+      "schema": "work/integration",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "c447617cb9a21d064ff49c94cc7d205a12db4dfb07e60bed6979a12ebb169926",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "real-keycloak-token-exchange",
+          "command": "bash scripts/live-proof.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/live-proof.sh (run by hand, not scripts/example-evidence.mjs)",
+        "environment": "local",
+        "capturedAt": "2026-09-18T08:52:00.000Z"
+      }
+    },
+    {
+      "node": "features/login/integration/postgres",
+      "id": "integration.login.postgres",
+      "schema": "work/integration",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "95aa6d8767e390a23287306f71b184f9b1bca82add1be7998a8455c34284ae97",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "real-postgres-round-trip",
+          "command": "bash scripts/live-proof.sh",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "migrations-applied",
+          "command": "docker exec todo-app-dev-postgres-1 psql -U postgres -d todo -c \"select * from migrations;\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/live-proof.sh plus a direct psql check (both run by hand, not scripts/example-evidence.mjs)",
+        "environment": "local",
+        "capturedAt": "2026-09-18T08:52:00.000Z"
+      }
+    },
+    {
+      "node": "features/login/journey/first-sign-in",
+      "id": "journey.login.first-sign-in",
+      "schema": "work/customer-journey",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "fc52787e2c46c1cb5e53100320af30e85bf4254149a5d18d8bd3ec25d22fc5ae",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "uat-login-sign-in-run",
+          "command": "cat ../../uat/sign-in/runs/20260918T090054Z-240aa95e/result.md",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "cat (run by hand, not scripts/example-evidence.mjs - the proof is another record's own run, not a fresh command)",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:01:30.000Z"
+      }
+    },
+    {
+      "node": "features/login/nfr/sign-in-timing",
+      "id": "nfr.login.sign-in-timing",
+      "schema": "work/non-functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "09de9b7caccb077b38dbe7b1eda1a0d072fd063fa1d4efb907c4e3add189913d",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "identical-refusal-parity",
+          "command": "npx jest src/app.boot.spec.ts -t \"refuses sign-in with the wrong password and with an unknown email identically\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T07:51:47.873Z"
+      }
+    },
+    {
+      "node": "features/login/sds/session-store",
+      "id": "sds.login.session-store",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "f36314797203fcb30e7a12912c8dd6d1c1db820ed26f0c7dad890027a3ca7a31",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "c9d9fdddb8d7c5496a6512d4dbb95c76a6f0307f85fbcf5767f27918a559a050",
+      "capturedCodeDigest": "93bb96740706c484e9a6ff6ae0a94f43ecad7fa4173362725ee6dbb737766205",
+      "ownedDirs": [
+        "src/modules/bussiness/session"
+      ],
+      "assertions": [
+        {
+          "id": "t-accept",
+          "command": "npx jest src/modules/bussiness/session -t \"sds.login.session-store t-accept\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-refuse",
+          "command": "npx jest src/modules/bussiness/session -t \"ac.login.password.sign-in.wrong-pair-is-refused\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-expire",
+          "command": "npx jest src/modules/bussiness/session -t \"sds.login.session-store: expiry is enforced on read\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-revoke",
+          "command": "npx jest src/modules/bussiness/session -t \"t-revoke\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-begin",
+          "command": "npx jest src/modules/bussiness/session -t \"t-begin\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T08:48:58.639Z"
+      }
+    },
+    {
+      "node": "features/notify/br/delivery/once",
+      "id": "br.notify.delivery.once",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "094a3191f20df854a6807e3b84f2a32d5659f69030f9ad0577bc37be45efb7d6",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "aad957fa6a8471cf978babe7843c9c610995842fc3a801258b0c5966c1fac0fa",
+      "capturedCodeDigest": "7955d7993ae7756c5b8010d9c05a6133bd9e545ab9685073341bc8ca35e9aed7",
+      "ownedDirs": [
+        "src/modules/bussiness/notify"
+      ],
+      "assertions": [
+        {
+          "id": "dedupe-collapses-retry",
+          "command": "npx jest dedupe.service.spec.ts -t dedupe-collapses-retry",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:06.597Z"
+      }
+    },
+    {
+      "node": "features/notify/br/digest/window",
+      "id": "br.notify.digest.window",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "83a54ad7cbf3b734b013322581490bdddccff64acb54739001a6cefd5ab9a630",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "aad957fa6a8471cf978babe7843c9c610995842fc3a801258b0c5966c1fac0fa",
+      "capturedCodeDigest": "7955d7993ae7756c5b8010d9c05a6133bd9e545ab9685073341bc8ca35e9aed7",
+      "ownedDirs": [
+        "src/modules/bussiness/notify"
+      ],
+      "assertions": [
+        {
+          "id": "collapses-into-one-message",
+          "command": "npx jest digest.service.spec.ts -t collapses-into-one-message",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:14.760Z"
+      }
+    },
+    {
+      "node": "features/notify/br/failure/classified",
+      "id": "br.notify.failure.classified",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "fcf3d41f7b9fee0ca6bad8f6a6f0476d966d5312d0b4861710201887741ffdea",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "aad957fa6a8471cf978babe7843c9c610995842fc3a801258b0c5966c1fac0fa",
+      "capturedCodeDigest": "7955d7993ae7756c5b8010d9c05a6133bd9e545ab9685073341bc8ca35e9aed7",
+      "ownedDirs": [
+        "src/modules/bussiness/notify"
+      ],
+      "assertions": [
+        {
+          "id": "retries-transient",
+          "command": "npx jest delivery.service.spec.ts -t \"a transient failure returns to queued\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "suppresses-bounced-address",
+          "command": "npx jest delivery.service.spec.ts -t suppresses-bounced-address",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "suppresses-unsubscribed",
+          "command": "npx jest delivery.service.spec.ts -t \"reaches suppressed before any dispatch attempt\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:44.154Z"
+      }
+    },
+    {
+      "node": "features/notify/br/unsubscribe/honored",
+      "id": "br.notify.unsubscribe.honored",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "8bd397e13b1caaf84fe6ef52f75e5a60377f147a8264dc99af9aa322e3a25977",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "aad957fa6a8471cf978babe7843c9c610995842fc3a801258b0c5966c1fac0fa",
+      "capturedCodeDigest": "7955d7993ae7756c5b8010d9c05a6133bd9e545ab9685073341bc8ca35e9aed7",
+      "ownedDirs": [
+        "src/modules/bussiness/notify"
+      ],
+      "assertions": [
+        {
+          "id": "suppresses-future-sends",
+          "command": "npx jest preferences.service.spec.ts notify.service.spec.ts -t \"unsubscribe\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:49.747Z"
+      }
+    },
+    {
+      "node": "features/notify/fr/digest",
+      "id": "fr.notify.digest",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "8fc6a5a9ba1f0a95db1b71b5f306ee84776db18687ca4b3f8e20fdf951c8fbfb",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest digest.service.spec.ts notify.service.spec.ts -t digest",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "e2e",
+          "command": "bash scripts/live-proof-notify.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:19:09.140Z"
+      }
+    },
+    {
+      "node": "features/notify/fr/on-completion",
+      "id": "fr.notify.on-completion",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "e21471ec6b7f6fe8cb9b689923fd3299a9117e5d33b438d987f4c2bd592985f9",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest notify-event.subscriber.spec.ts notify.service.spec.ts -t on-completion",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "e2e",
+          "command": "bash scripts/live-proof-notify.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:17:45.073Z"
+      }
+    },
+    {
+      "node": "features/notify/fr/unsubscribe",
+      "id": "fr.notify.unsubscribe",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "11c918ca29fa8e0b647dda53590f76d514dad6c6b840ba833436b346b6725d6a",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest unsubscribe.handler.spec.ts preferences.service.spec.ts notify.service.spec.ts -t unsubscribe",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "e2e",
+          "command": "bash scripts/live-proof-notify.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:20:36.696Z"
+      }
+    },
+    {
+      "node": "features/notify/impl/todo-app-backend/pipeline",
+      "id": "impl.notify.todo-app-backend.pipeline",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "2b03638b00eeaf6d98db7bbe9cf6406df59a13d98ad4bbb998934eaafeabdeb7",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "a2f185943d774fb4289f123a910c46ece3bf411133a0cb13b3ae8aca1680f6d8",
+      "capturedCodeDigest": "6e0dc18502165587cb6453657985767adfcea74f3c64fdaf9ae0b99d80c5472b",
+      "ownedDirs": [
+        "src/modules/bussiness/notify",
+        "src/modules/integrations/notify-smtp",
+        "src/modules/integrations/notify-queue",
+        "src/modules/shared/exceptions/errors/notify",
+        "src/features/todo/graphql/mutations/notify",
+        "src/features/todo/graphql/queries/notify"
+      ],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/notify src/modules/integrations/notify-smtp src/modules/integrations/notify-queue",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live",
+          "command": "bash scripts/live-proof-notify.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:23:48.147Z"
+      }
+    },
+    {
+      "node": "features/notify/impl/todo-app-frontend/preferences",
+      "id": "impl.notify.todo-app-frontend.preferences",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app-frontend",
+      "staleFlag": false,
+      "outcome": "fail",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "a8f65058ae94892c5a222e1803cad44e0c05250f659bec211f04ce4d79539984",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "880792f880ae6e06a40485c1f11f05a5f4a10ce3e565cf89f07db22a5c9280ca",
+      "capturedCodeDigest": "d5d4f367e8ab407b349bacad96010ac3bee215076904ce815a4e10c876483f7d",
+      "ownedDirs": [
+        "src/app/notify [MISSING]",
+        "src/components/notify"
+      ],
+      "assertions": [
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "unit-tests",
+          "command": "npx vitest run",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "lint",
+          "command": "npx eslint src/",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "build",
+          "command": "npm run build",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "architecture",
+          "command": "node ../../cli/main.mjs architecture check . --config architecture.json",
+          "exit": 1,
+          "outcome": "fail"
+        },
+        {
+          "id": "rendered-captures",
+          "command": "node -e \"const fs=require('fs'),p='../todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/assets/';const states=['subscribed','loading','unsubscribed','refused','saving'];const vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of vps){for(const ext of ['png','html']){const f=p+'preferences-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}for(const v of vps){for(const ext of ['png','html']){const f=p+'unsubscribe-link-unsubscribed-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const refused=fs.readFileSync(p+'preferences-refused-desktop-1280.html','utf8');if(!refused.includes('We could')){ok=false;console.log('refused markup lacks refusal sentence');}if(!ok)process.exit(1);console.log('12 state captures verified');\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T14:37:54.102Z"
+      }
+    },
+    {
+      "node": "features/notify/integration/queue",
+      "id": "integration.notify.queue",
+      "schema": "work/integration",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "7a077708446dd09cd109599095b952c91069a006cd5b7a233e94287726f19d96",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "1143929dc9b7859270d7b66fed9aa67f400541ffd82e76e0d714797f4de84662",
+      "capturedCodeDigest": "8f23e4df386e720521321e948f31f03dcd1ed8cfbf3a5279b85f6fcb62d40a06",
+      "ownedDirs": [
+        "src/modules/integrations/notify-queue"
+      ],
+      "assertions": [
+        {
+          "id": "live-redis-roundtrip",
+          "command": "node -r ts-node/register/transpile-only -r tsconfig-paths/register scripts/notify-queue-live-check.cjs",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:21:54.282Z"
+      }
+    },
+    {
+      "node": "features/notify/sds/delivery-lifecycle",
+      "id": "sds.notify.delivery-lifecycle",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "77866e831c5947d0b05b36c3725fc0cd640afa91f8a99d3c340fb3de95766f92",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "aad957fa6a8471cf978babe7843c9c610995842fc3a801258b0c5966c1fac0fa",
+      "capturedCodeDigest": "7955d7993ae7756c5b8010d9c05a6133bd9e545ab9685073341bc8ca35e9aed7",
+      "ownedDirs": [
+        "src/modules/bussiness/notify"
+      ],
+      "assertions": [
+        {
+          "id": "t-suppress",
+          "command": "npx jest delivery.service.spec.ts -t \"reaches suppressed before any dispatch attempt\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-dispatch",
+          "command": "npx jest delivery.service.spec.ts -t \"t-dispatch/t-deliver\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-deliver",
+          "command": "npx jest delivery.service.spec.ts -t \"t-dispatch/t-deliver\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-bounce",
+          "command": "npx jest delivery.service.spec.ts -t suppresses-bounced-address",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-retry",
+          "command": "npx jest delivery.service.spec.ts -t \"a transient failure returns to queued\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-give-up",
+          "command": "npx jest delivery.service.spec.ts -t \"exhausting the retry budget\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:21:44.886Z"
+      }
+    },
+    {
+      "node": "features/plan/br/active-scope",
+      "id": "br.plan.active-scope",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "a38a521b4c3193cd21f97e47f9cf304b6364c181176f8dd1495bf6cd05553f6a",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae",
+      "capturedCodeDigest": "c1467d809c45f32ec261c08b178f1955454a3de0011b4cc2940f2f3c472e7fcf",
+      "ownedDirs": [
+        "src/modules/bussiness/plan"
+      ],
+      "assertions": [
+        {
+          "id": "ac.plan.active-scope.excludes-complete",
+          "command": "npx jest -t \"ac.plan.active-scope.excludes-complete\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:19:54.654Z"
+      }
+    },
+    {
+      "node": "features/plan/br/caps/limit",
+      "id": "br.plan.caps.limit",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "d76fb7122a6c59bd5a802376d719850f41980978e00420a96f2b5b732204aee3",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae",
+      "capturedCodeDigest": "c1467d809c45f32ec261c08b178f1955454a3de0011b4cc2940f2f3c472e7fcf",
+      "ownedDirs": [
+        "src/modules/bussiness/plan"
+      ],
+      "assertions": [
+        {
+          "id": "ac.plan.caps.limit.refuses-over-cap",
+          "command": "npx jest -t \"ac.plan.caps.limit.refuses-over-cap\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:20:15.765Z"
+      }
+    },
+    {
+      "node": "features/plan/br/downgrade/freeze",
+      "id": "br.plan.downgrade.freeze",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "57b5b17ce9164a7c2de8fdaa25af9c99215daeda8e0e4f54a8e4586ae3e33b96",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae",
+      "capturedCodeDigest": "c1467d809c45f32ec261c08b178f1955454a3de0011b4cc2940f2f3c472e7fcf",
+      "ownedDirs": [
+        "src/modules/bussiness/plan"
+      ],
+      "assertions": [
+        {
+          "id": "ac.plan.downgrade.freeze.over-cap-blocks-create",
+          "command": "npx jest -t \"ac.plan.downgrade.freeze.over-cap-blocks-create\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "ac.plan.downgrade.freeze.existing-tasks-untouched",
+          "command": "npx jest -t \"ac.plan.downgrade.freeze.existing-tasks-untouched\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:20:50.723Z"
+      }
+    },
+    {
+      "node": "features/plan/br/lapse/reverts-on-read",
+      "id": "br.plan.lapse.reverts-on-read",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "014cc41f358ad99c60f664e7f52547466466b7caf1b2a161b5bf60a2eb7b9958",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae",
+      "capturedCodeDigest": "c1467d809c45f32ec261c08b178f1955454a3de0011b4cc2940f2f3c472e7fcf",
+      "ownedDirs": [
+        "src/modules/bussiness/plan"
+      ],
+      "assertions": [
+        {
+          "id": "ac.plan.lapse.reverts-on-read.read-after-grace-is-free",
+          "command": "npx jest -t \"ac.plan.lapse.reverts-on-read.read-after-grace-is-free\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:21:20.257Z"
+      }
+    },
+    {
+      "node": "features/plan/br/payment/idempotent",
+      "id": "br.plan.payment.idempotent",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "ef623f07264b5f022a742f9b8cbad2db1de0f8314302ad87aa3e5f62b6d28837",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae",
+      "capturedCodeDigest": "c1467d809c45f32ec261c08b178f1955454a3de0011b4cc2940f2f3c472e7fcf",
+      "ownedDirs": [
+        "src/modules/bussiness/plan"
+      ],
+      "assertions": [
+        {
+          "id": "ac.plan.payment.idempotent.replay-is-noop",
+          "command": "npx jest -t \"ac.plan.payment.idempotent.replay-is-noop\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:21:40.386Z"
+      }
+    },
+    {
+      "node": "features/plan/contract/create-precondition",
+      "id": "contract.plan.create-precondition",
+      "schema": "work/contract",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "07644f53d5e4a2587cc86ee0ff5d86f499f6e6d08b2ff5340fc3e37864b0e686",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "e363eea9fc2c2e134f173bb97d5bac4fad4c9b66d0429af339844db0a7a8ec77",
+      "capturedCodeDigest": "5e5c12b73e053ba761d91ba4e9eecfc363030f7466c98e71e5f83998ea640f9c",
+      "ownedDirs": [
+        "src/modules/bussiness/plan",
+        "src/modules/integrations/sepay",
+        "src/features/todo/http/webhooks/sepay"
+      ],
+      "assertions": [
+        {
+          "id": "provider",
+          "command": "npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "consumer",
+          "command": "npx jest src/modules/bussiness/plan/create-precondition.contract.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:39:42.131Z"
+      }
+    },
+    {
+      "node": "features/plan/impl/todo-app-backend/plan",
+      "id": "impl.plan.todo-app-backend.plan",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "287a9afa79819ac1022cf32e944a300adddd97d5330bdd8d8ebcf3ff2a8441a1",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "e363eea9fc2c2e134f173bb97d5bac4fad4c9b66d0429af339844db0a7a8ec77",
+      "capturedCodeDigest": "5e5c12b73e053ba761d91ba4e9eecfc363030f7466c98e71e5f83998ea640f9c",
+      "ownedDirs": [
+        "src/modules/bussiness/plan",
+        "src/modules/integrations/sepay",
+        "src/features/todo/http/webhooks/sepay"
+      ],
+      "assertions": [
+        {
+          "id": "br.plan.caps.limit",
+          "command": "npx jest src/modules/bussiness/plan",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.plan.active-scope",
+          "command": "npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.plan.downgrade.freeze",
+          "command": "npx jest src/modules/bussiness/plan/downgrade-plan.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.plan.payment.idempotent",
+          "command": "npx jest src/modules/bussiness/plan/payment.service.spec.ts src/modules/bussiness/plan/confirm-payment.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.plan.lapse.reverts-on-read",
+          "command": "npx jest src/modules/bussiness/plan/subscription.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.plan.subscription-lifecycle",
+          "command": "npx jest src/modules/bussiness/plan/subscription.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.plan.cap-guard",
+          "command": "npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "contract.plan.create-precondition",
+          "command": "npx jest src/modules/bussiness/plan/create-precondition.contract.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:40:22.290Z"
+      }
+    },
+    {
+      "node": "features/plan/impl/todo-app-frontend/usage",
+      "id": "impl.plan.todo-app-frontend.usage",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app-frontend",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "8b5478d9f57704731be077a8c2dae71aff87e0ec1be2c81f097bfb00282a7940",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "83282dc9032da4f216b0c84572a83a3d55b6bbe683cf1442643b345e951a3a0a",
+      "capturedCodeDigest": "8710571cabff1e557a9ff8ec7f64ac83768c1948b4545f7f6c7abe5a0765ab4a",
+      "ownedDirs": [
+        "src/app/plan [MISSING]",
+        "src/components/plan"
+      ],
+      "assertions": [
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "unit",
+          "command": "npx vitest run",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "lint",
+          "command": "npx eslint .",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "build",
+          "command": "npx next build",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T14:41:03.729Z"
+      }
+    },
+    {
+      "node": "features/plan/integration/sepay",
+      "id": "integration.plan.sepay",
+      "schema": "work/integration",
+      "state": "todo",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "fail",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "b4c7d97bdd0b340d52c8a088fa718d6e8be0316e765e3cda9344bc7fe24e54b2",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "integration.plan.sepay",
+          "command": "curl.exe -s -o NUL -w %{http_code} -X POST https://my.sepay.vn/userapi/transactions/qr | findstr 200",
+          "exit": 1,
+          "outcome": "fail"
+        },
+        {
+          "id": "probe.create-intent-route",
+          "command": "curl.exe -s -o NUL -w %{http_code} -X POST https://my.sepay.vn/userapi/transactions/qr | findstr 404",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "probe.get-transaction-route",
+          "command": "curl.exe -s -o NUL -w %{http_code} https://my.sepay.vn/userapi/transactions/details/1 | findstr 401",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "probe.invented-route-control",
+          "command": "curl.exe -s -o NUL -w %{http_code} -X POST https://my.sepay.vn/userapi/transactions/definitely-not-a-route | findstr 404",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "probe.v2-sandbox-host",
+          "command": "curl.exe -s -o NUL -w %{http_code} https://userapi-sandbox.sepay.vn/v2/transactions | findstr 401",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "client-makes-the-real-call",
+          "command": "npx jest src/modules/integrations/sepay",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:40:42.747Z"
+      }
+    },
+    {
+      "node": "features/plan/sds/cap-guard",
+      "id": "sds.plan.cap-guard",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "e7485a0dbb4deba83d70dccdf6ae8e25c09886e1b57fec3ee4a7775c2300f989",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae",
+      "capturedCodeDigest": "c1467d809c45f32ec261c08b178f1955454a3de0011b4cc2940f2f3c472e7fcf",
+      "ownedDirs": [
+        "src/modules/bussiness/plan"
+      ],
+      "assertions": [
+        {
+          "id": "implementation",
+          "command": "npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-under-cap",
+          "command": "npx jest -t \"t-under-cap\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-at-cap",
+          "command": "npx jest -t \"t-at-cap\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:22:11.138Z"
+      }
+    },
+    {
+      "node": "features/plan/sds/subscription-lifecycle",
+      "id": "sds.plan.subscription-lifecycle",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "ae36c894e419eed32e2d5764fcc6326bb00193ece8e8088501aa8732b32156da",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae",
+      "capturedCodeDigest": "c1467d809c45f32ec261c08b178f1955454a3de0011b4cc2940f2f3c472e7fcf",
+      "ownedDirs": [
+        "src/modules/bussiness/plan"
+      ],
+      "assertions": [
+        {
+          "id": "implementation",
+          "command": "npx jest src/modules/bussiness/plan/subscription.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-checkout-started",
+          "command": "npx jest -t \"t-checkout-started\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-gateway-confirmed",
+          "command": "npx jest -t \"t-gateway-confirmed\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-gateway-abandoned",
+          "command": "npx jest -t \"t-gateway-abandoned\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-renewal-due",
+          "command": "npx jest -t \"t-renewal-due\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-renewal-confirmed",
+          "command": "npx jest -t \"t-renewal-confirmed\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-lapse",
+          "command": "npx jest -t \"t-lapse\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-downgrade",
+          "command": "npx jest -t \"t-downgrade\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:23:56.938Z"
+      }
+    },
+    {
+      "node": "features/recur/br/ending/preserves-history",
+      "id": "br.recur.ending.preserves-history",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "1d3869d18a1963b4b5b4e4111cc466d47e1ac7acd7f4cdcee9dd42051e4a1991",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "422f2bd071ab412f0437bda3a06d4a8c92383d8da3603523175f17e14d840293",
+      "capturedCodeDigest": "ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34",
+      "ownedDirs": [
+        "src/modules/bussiness/recur"
+      ],
+      "assertions": [
+        {
+          "id": "ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences",
+          "command": "npx jest -t \"ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:09:37.341Z"
+      }
+    },
+    {
+      "node": "features/recur/br/generation/once",
+      "id": "br.recur.generation.once",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "272c8e93fb27aaa9e45ccf6725205870150d68631a92a9c241bbc10c1cce0564",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "422f2bd071ab412f0437bda3a06d4a8c92383d8da3603523175f17e14d840293",
+      "capturedCodeDigest": "ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34",
+      "ownedDirs": [
+        "src/modules/bussiness/recur"
+      ],
+      "assertions": [
+        {
+          "id": "ac.recur.generation.once.is-idempotent-on-rerun",
+          "command": "npx jest -t \"ac.recur.generation.once.is-idempotent-on-rerun\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:08:46.044Z"
+      }
+    },
+    {
+      "node": "features/recur/br/impossible-date/skips",
+      "id": "br.recur.impossible-date.skips",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "e0d88693aabc665e2f152093a61f7d5bc4aa2dc2e47f4dee40fc1b6f543de269",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "422f2bd071ab412f0437bda3a06d4a8c92383d8da3603523175f17e14d840293",
+      "capturedCodeDigest": "ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34",
+      "ownedDirs": [
+        "src/modules/bussiness/recur"
+      ],
+      "assertions": [
+        {
+          "id": "ac.recur.impossible-date.skips.skips-nonexistent-day",
+          "command": "npx jest -t \"ac.recur.impossible-date.skips.skips-nonexistent-day\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:09:09.568Z"
+      }
+    },
+    {
+      "node": "features/recur/br/occurrence/owned-by-rule-owner",
+      "id": "br.recur.occurrence.owned-by-rule-owner",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "b14339e27613aae3bb709599acef43499148fc0deb527151b3338d3da3eda64e",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "422f2bd071ab412f0437bda3a06d4a8c92383d8da3603523175f17e14d840293",
+      "capturedCodeDigest": "ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34",
+      "ownedDirs": [
+        "src/modules/bussiness/recur"
+      ],
+      "assertions": [
+        {
+          "id": "ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner",
+          "command": "npx jest -t \"ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:09:23.214Z"
+      }
+    },
+    {
+      "node": "features/recur/br/timezone/owner-local-time",
+      "id": "br.recur.timezone.owner-local-time",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "ac54083e5f3c3f3ecff78cc19be8be2c5e65132c97e888ad1151976444969bcd",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "422f2bd071ab412f0437bda3a06d4a8c92383d8da3603523175f17e14d840293",
+      "capturedCodeDigest": "ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34",
+      "ownedDirs": [
+        "src/modules/bussiness/recur"
+      ],
+      "assertions": [
+        {
+          "id": "ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap",
+          "command": "npx jest -t \"ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest",
+          "command": "npx jest -t \"ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "ac.recur.timezone.owner-local-time.distinct-zones-differ",
+          "command": "npx jest -t \"ac.recur.timezone.owner-local-time.distinct-zones-differ\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:10:25.277Z"
+      }
+    },
+    {
+      "node": "features/recur/impl/todo-app-backend/engine",
+      "id": "impl.recur.todo-app-backend.engine",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "37f51039d4e2c036ffd212a475e1aa0fb247c6f6e2b399854a24ba012d028796",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "68e69fc81172cd3f0c5281061e493eeb5ccf2fd31a73b2a63c450d8e0e0c4812",
+      "capturedCodeDigest": "6e44df19ea4fc358d35bcb3293b7ace4ba213a5338f5279a52c7ddbb328ce5ed",
+      "ownedDirs": [
+        "src/modules/bussiness/recur",
+        "src/features/todo/graphql/mutations/recur",
+        "src/features/todo/graphql/queries/recur"
+      ],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/recur",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-e2e",
+          "command": "bash scripts/live-proof-recur.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:14.864Z"
+      }
+    },
+    {
+      "node": "features/recur/impl/todo-app-frontend/schedule",
+      "id": "impl.recur.todo-app-frontend.schedule",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app-frontend",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "5b0b74900e600fbf41a3ca7fda21d7106f495f70bc8f57d6c80aa67a18a9879e",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "931ba0bdd8df23fb9efeca89f3855302d9f7267e1dd1f071aff9ea28f746827b",
+      "capturedCodeDigest": "cacd3592a2f9ffcc2fd65d512f8a7eb648997dc470ea7dac47e272ba9c445a9f",
+      "ownedDirs": [
+        "src/app/recur [MISSING]",
+        "src/components/recur"
+      ],
+      "assertions": [
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "vitest-suite-green",
+          "command": "npx vitest run",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "build",
+          "command": "npm run build",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T14:47:02.312Z"
+      }
+    },
+    {
+      "node": "features/recur/integration/scheduler",
+      "id": "integration.recur.scheduler",
+      "schema": "work/integration",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "6b680bccd17f6de864c392bdb3ab594faa78395ea1f14930299f6a3e890c1f4e",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "live-tick",
+          "command": "bash scripts/live-proof-recur.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:12:44.205Z"
+      }
+    },
+    {
+      "node": "features/recur/sds/generation-engine",
+      "id": "sds.recur.generation-engine",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "49d4680bec94e65d264b04ea710a0c26cd921d5448b4ac5b69653fb38703105a",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "422f2bd071ab412f0437bda3a06d4a8c92383d8da3603523175f17e14d840293",
+      "capturedCodeDigest": "ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34",
+      "ownedDirs": [
+        "src/modules/bussiness/recur"
+      ],
+      "assertions": [
+        {
+          "id": "implementation",
+          "command": "npx jest src/modules/bussiness/recur/zone.util.spec.ts src/modules/bussiness/recur/calendar.util.spec.ts src/modules/bussiness/recur/generator.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:10:39.962Z"
+      }
+    },
+    {
+      "node": "features/recur/sds/occurrence-lifecycle",
+      "id": "sds.recur.occurrence-lifecycle",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "2c769a647d3220573df7f260a412acdd34a275fcff287508362371cf05208bb7",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "422f2bd071ab412f0437bda3a06d4a8c92383d8da3603523175f17e14d840293",
+      "capturedCodeDigest": "ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34",
+      "ownedDirs": [
+        "src/modules/bussiness/recur"
+      ],
+      "assertions": [
+        {
+          "id": "t-materialise",
+          "command": "npx jest -t \"t-materialise\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-complete",
+          "command": "npx jest -t \"t-complete\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-skip",
+          "command": "npx jest -t \"t-skip\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-orphan",
+          "command": "npx jest -t \"t-orphan\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "implementation",
+          "command": "npx jest src/modules/bussiness/recur",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:11:57.844Z"
+      }
+    },
+    {
+      "node": "features/share/br/editor/no-delete",
+      "id": "br.share.editor.no-delete",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "3f9375b66f9c8e82c8902c8573273d507979efc4010f4aa604a4050ecdb757ee",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a",
+      "capturedCodeDigest": "a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf",
+      "ownedDirs": [
+        "src/modules/bussiness/share"
+      ],
+      "assertions": [
+        {
+          "id": "delete-refused-for-editor",
+          "command": "npx jest src/modules/bussiness/share/completion-authority.spec.ts -t delete-refused-for-editor",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:10:28.173Z"
+      }
+    },
+    {
+      "node": "features/share/br/invite/expiry",
+      "id": "br.share.invite.expiry",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "205de79daa4112c26d086ce212c1103eb08eea4e9a531655c9f2bb5c80e8f77b",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a",
+      "capturedCodeDigest": "a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf",
+      "ownedDirs": [
+        "src/modules/bussiness/share"
+      ],
+      "assertions": [
+        {
+          "id": "expires-after-14-days",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts -t expires-after-14-days",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "accept-before-expiry-succeeds",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts -t accept-before-expiry-succeeds",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:10:57.690Z"
+      }
+    },
+    {
+      "node": "features/share/br/revoke/on-read",
+      "id": "br.share.revoke.on-read",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "79687d3c7d1a20fb0e09964b87e62af4c5f12e93d379507d93dffca69e19bdf7",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a",
+      "capturedCodeDigest": "a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf",
+      "ownedDirs": [
+        "src/modules/bussiness/share"
+      ],
+      "assertions": [
+        {
+          "id": "removed-loses-access-next-read",
+          "command": "npx jest src/modules/bussiness/share -t removed-loses-access-next-read",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:11:32.712Z"
+      }
+    },
+    {
+      "node": "features/share/br/role/permissions",
+      "id": "br.share.role.permissions",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "a2614c866f9d3fc46f03da0de364154fc19f21c3c0d7ae21090d9e9acc40308f",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a",
+      "capturedCodeDigest": "a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf",
+      "ownedDirs": [
+        "src/modules/bussiness/share"
+      ],
+      "assertions": [
+        {
+          "id": "viewer-read-only",
+          "command": "npx jest src/modules/bussiness/share/completion-authority.spec.ts -t viewer-read-only",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "editor-can-complete",
+          "command": "npx jest src/modules/bussiness/share/completion-authority.spec.ts -t editor-can-complete",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:12:03.749Z"
+      }
+    },
+    {
+      "node": "features/share/fr/accept",
+      "id": "fr.share.accept",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "2f6bbd36d5d2d6e0d82ba1cb64a832a91b295a1a010a6033ae5f5b6bb8a6fc8d",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/share/accept-invitation.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:15:31.497Z"
+      }
+    },
+    {
+      "node": "features/share/fr/invite",
+      "id": "fr.share.invite",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "da3c27bb7205ca1eeccfe1be18cf1b70501aff279f0ba751bf7fd50048c3d97d",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/share/invite.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:15:13.780Z"
+      }
+    },
+    {
+      "node": "features/share/fr/list",
+      "id": "fr.share.list",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "b0b1f88ef934a068203bb1cf6947ea72c29e1055730438bc70a7a4c14a8a04e9",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/share/list-collaborators.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:15:58.371Z"
+      }
+    },
+    {
+      "node": "features/share/fr/revoke",
+      "id": "fr.share.revoke",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "164c4f48d169ffd0fcbe6a8060557febaa295a3b808727b924fee208396e2a6d",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/share/revoke-collaborator.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:15:43.464Z"
+      }
+    },
+    {
+      "node": "features/share/impl/todo-app-backend/access",
+      "id": "impl.share.todo-app-backend.access",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "5d64548a640ec04514548136e387294af241a6c89bef00bad8901aa7a8f6954d",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a",
+      "capturedCodeDigest": "a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf",
+      "ownedDirs": [
+        "src/modules/bussiness/share"
+      ],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/share/completion-authority.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:35.152Z"
+      }
+    },
+    {
+      "node": "features/share/impl/todo-app-backend/invitations",
+      "id": "impl.share.todo-app-backend.invitations",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "ed7375dfd036d132a822e6f7a446782cefd48ebfec91ca9b3d893a44c5368914",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a",
+      "capturedCodeDigest": "a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf",
+      "ownedDirs": [
+        "src/modules/bussiness/share"
+      ],
+      "assertions": [
+        {
+          "id": "unit",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts src/modules/bussiness/share/invite.handler.spec.ts src/modules/bussiness/share/accept-invitation.handler.spec.ts src/modules/bussiness/share/revoke-collaborator.handler.spec.ts src/modules/bussiness/share/list-collaborators.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:55.042Z"
+      }
+    },
+    {
+      "node": "features/share/impl/todo-app-frontend/invite-screen",
+      "id": "impl.share.todo-app-frontend.invite-screen",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app-frontend",
+      "staleFlag": false,
+      "outcome": "fail",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "4a16706133c4cbadb02a2d5f07ca81cbd74b0fe26ef42829896ee09255bcf624",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "b215c7df7585ad193cd0dc23de7ada60340bd31c3a8e3cca54574f0d8a7d3b1c",
+      "capturedCodeDigest": "2c3e6d8eb05966557da8ac5e3c782e63f90ddd41e9894cd531c5087fcb168ddd",
+      "ownedDirs": [
+        "src/app/tasks/[taskId]/share [MISSING]",
+        "src/features/pages/share",
+        "src/components/blocks/share-invite",
+        "src/hooks/share",
+        "src/modules/api",
+        "src/components/leaves/Link",
+        "src/hooks/auth"
+      ],
+      "assertions": [
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "unit-tests",
+          "command": "npx vitest run",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "lint",
+          "command": "npx eslint .",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "architecture",
+          "command": "node ../../cli/main.mjs architecture check . --config architecture.json",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "scoped-lint",
+          "command": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && node ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config architecture.json --all",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "captures",
+          "command": "node verify-captures.mjs assets",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "render-entity-list-in-card",
+          "command": "node verify-captures.mjs entity-list",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "render-primary-absent",
+          "command": "node verify-captures.mjs primary",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "render-palette-off-brand",
+          "command": "node verify-captures.mjs palette",
+          "exit": 1,
+          "outcome": "fail"
+        },
+        {
+          "id": "build",
+          "command": "npx next build",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T15:23:54.370Z"
+      }
+    },
+    {
+      "node": "features/share/sds/invitation-lifecycle",
+      "id": "sds.share.invitation-lifecycle",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "31473a0d1220044d684af7d14ee3f4aa1b7a660ae5a1de8f212c8050058ce98a",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a",
+      "capturedCodeDigest": "a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf",
+      "ownedDirs": [
+        "src/modules/bussiness/share"
+      ],
+      "assertions": [
+        {
+          "id": "t-invite",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts -t \"creates a pending invitation bound\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-accept",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts -t accept-before-expiry-succeeds",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-expire",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts -t expires-after-14-days",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-revoke-pending",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts -t \"revoking an already revoked invitation is refused\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "t-revoke-accepted",
+          "command": "npx jest src/modules/bussiness/share/invitation.service.spec.ts -t \"removed-loses-access-next-read\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "implementation",
+          "command": "npx jest src/modules/bussiness/share",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "live-proof",
+          "command": "bash scripts/live-proof-share.sh",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:13:00.898Z"
+      }
+    },
+    {
+      "node": "features/task/br/complete/once",
+      "id": "br.task.complete.once",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "188f8baf97ab8676c6d4db1ae52de42210f9e78e0d51ce085c2c2bb232910936",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "ac.task.complete.once.is-idempotent",
+          "command": "npx jest src/modules/bussiness/task/complete-task.handler.spec.ts -t \"ac.task.complete.once.is-idempotent\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "ac.task.complete.once.is-reversible",
+          "command": "npx jest src/modules/bussiness/task/reopen-task.handler.spec.ts -t \"ac.task.complete.once.is-reversible\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.completion-state.t-complete",
+          "command": "npx jest src/modules/bussiness/task/task.service.spec.ts -t \"sds.task.completion-state.t-complete:\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.task.complete.once.live-proof",
+          "command": "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"API_URL=http://localhost:3005 scripts/live-proof.sh\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:55:51.952Z"
+      }
+    },
+    {
+      "node": "features/task/br/delete/final",
+      "id": "br.task.delete.final",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "6869de81a64bc76e06cf0dd4bd7b0d8b00e5436492053b3527e9f3f0b4048b00",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "ac.task.delete.final.stays-gone",
+          "command": "npx jest src/modules/bussiness/task/delete-task.handler.spec.ts -t \"ac.task.delete.final.stays-gone\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.task.delete.final.live-proof",
+          "command": "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"API_URL=http://localhost:3005 scripts/live-proof.sh\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:56:33.350Z"
+      }
+    },
+    {
+      "node": "features/task/br/list/owned",
+      "id": "br.task.list.owned",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "57ba1918de6aa444adab85d48c4c083eb156e987ebfcd4a600b0752fede81b48",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "ac.task.list.owned.excludes-others",
+          "command": "npx jest src/modules/bussiness/task/list-tasks.handler.spec.ts -t \"ac.task.list.owned.excludes-others\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "br.task.list.owned.live-proof",
+          "command": "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"API_URL=http://localhost:3005 scripts/live-proof.sh\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:56:17.380Z"
+      }
+    },
+    {
+      "node": "features/task/br/single-owner",
+      "id": "br.task.single-owner",
+      "schema": "work/business-rule",
+      "state": "todo",
+      "repository": null,
+      "staleFlag": true,
+      "outcome": "pass",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "33950fe7bfb99b745017c3ace0d5bae9712c540ee50990f0713188dd7a34ba97",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "e316c2dd01ff768a908cde2c9005f4d2bd80dcf1a81e7c0eeb8737066ee91ea8",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "ac.task.single-owner.refuses-stranger",
+          "command": "npx jest -t \"ac.task.single-owner.refuses-stranger\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T09:06:39.024Z"
+      }
+    },
+    {
+      "node": "features/task/br/title/required",
+      "id": "br.task.title.required",
+      "schema": "work/business-rule",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "4cfc203f0b8ff266f39539b0c1a82bd0bba643f3112c972e47ef4c86b4d6eb92",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "ac.task.title.required.refuses-empty",
+          "command": "npx jest -t \"ac.task.title.required.refuses-empty\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:02:36.177Z"
+      }
+    },
+    {
+      "node": "features/task/event/completed",
+      "id": "event.task.completed",
+      "schema": "work/event",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "12834f7d15f0ef3d91341fca14413cc409172dcf0a50370b0df933f3a9787b32",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "86268daf77c0e1e1b451f40661eeb56489e3f7027219c3f008b30ace95bfb991",
+      "capturedCodeDigest": "e202d683483bc9b522521f6868084f99716f06b5ffbe858706c295882e469704",
+      "ownedDirs": [
+        "src/modules/bussiness/task",
+        "src/modules/platform/events"
+      ],
+      "assertions": [
+        {
+          "id": "event.task.completed",
+          "command": "npx jest src/modules/bussiness/task/complete-task.handler.spec.ts -t \"event.task.completed\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:58:38.665Z"
+      }
+    },
+    {
+      "node": "features/task/event/created",
+      "id": "event.task.created",
+      "schema": "work/event",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "6318e689f0f1fce0e75355d81b007ededf0aa7c0621dc1a62d3bc13717d349ab",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "00343b2944370c0fa94064b7acb3694121234911890e7c805d39c9250b6b1e7b",
+      "capturedCodeDigest": "7d593d12bafa669eaac558f7815d24a40f477e381efddad6fa4378057ffc9bb7",
+      "ownedDirs": [
+        "src/modules/platform/events"
+      ],
+      "assertions": [
+        {
+          "id": "event.task.created",
+          "command": "npx jest src/modules/bussiness/task/create-task.handler.spec.ts -t \"event.task.created\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:58:34.241Z"
+      }
+    },
+    {
+      "node": "features/task/event/deleted",
+      "id": "event.task.deleted",
+      "schema": "work/event",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "8545aad6f0e16b59ae4f0b591555280cd9eb135378dabf6a8055018bfbfa03ef",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "86268daf77c0e1e1b451f40661eeb56489e3f7027219c3f008b30ace95bfb991",
+      "capturedCodeDigest": "e202d683483bc9b522521f6868084f99716f06b5ffbe858706c295882e469704",
+      "ownedDirs": [
+        "src/modules/bussiness/task",
+        "src/modules/platform/events"
+      ],
+      "assertions": [
+        {
+          "id": "event.task.deleted",
+          "command": "npx jest src/modules/bussiness/task/delete-task.handler.spec.ts -t \"event.task.deleted\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:58:42.703Z"
+      }
+    },
+    {
+      "node": "features/task/fr/complete",
+      "id": "fr.task.complete",
+      "schema": "work/functional-requirement",
+      "state": "todo",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "a3f2220dc80f4e8427afa8447a4fdc74a26f7acb00ea1470185ac4b682b7cb08",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "e2e",
+          "command": "npm run test:e2e -- tasks/complete",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T19:18:54.086Z"
+      }
+    },
+    {
+      "node": "features/task/fr/create",
+      "id": "fr.task.create",
+      "schema": "work/functional-requirement",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "45818e4d4d72c387739eaa8e551509671ea00ad26be3a58e5cb15b8865cd08b6",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "unit-composed-rules",
+          "command": "npx jest src/modules/bussiness/task",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "boot-drives-real-create-route",
+          "command": "npx jest src/app.boot.spec.ts -t \"drives sign-in, the full task lifecycle\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:03:06.537Z"
+      }
+    },
+    {
+      "node": "features/task/fr/reopen",
+      "id": "fr.task.reopen",
+      "schema": "work/functional-requirement",
+      "state": "todo",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": true,
+      "currentRecordDigest": "5cf040d66588b1f85129b483d5e9731e21672172b42e2b3c6ff4fe4dce8f52f1",
+      "codeDigestMismatch": false,
+      "freshCodeDigest": null,
+      "capturedCodeDigest": null,
+      "ownedDirs": [],
+      "assertions": [
+        {
+          "id": "e2e",
+          "command": "npm run test:e2e -- tasks/reopen",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T19:11:40.040Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/complete-task",
+      "id": "impl.task.todo-app-backend.complete-task",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "80aaa3a82a6e93f05954c8629d2518495358b13be4163dfae3338a5033368ccf",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "br.task.complete.once",
+          "command": "npx jest src/modules/bussiness/task/complete-task.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.completion-state",
+          "command": "npx jest src/modules/bussiness/task/task.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "event.task.completed",
+          "command": "npx jest src/modules/bussiness/task/complete-task.handler.spec.ts -t \"event.task.completed\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "boot-task-lifecycle",
+          "command": "npx jest src/app.boot.spec.ts -t \"drives sign-in, the full task lifecycle\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:59:01.438Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/create-task",
+      "id": "impl.task.todo-app-backend.create-task",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "1d8f75baaf1786b2c3ca2c7d9184e9c2b90e66863e06a454879255001847c957",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "fr.task.create",
+          "command": "npx jest src/modules/bussiness/task/create-task.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "ac.task.title.required.refuses-empty",
+          "command": "npx jest -t \"ac.task.title.required.refuses-empty\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:01:41.955Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/delete-task",
+      "id": "impl.task.todo-app-backend.delete-task",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "dd81d7bf8a1204aa3d560cab270731446ee804156339e6dcbd1e205edab02b57",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "br.task.delete.final",
+          "command": "npx jest src/modules/bussiness/task/delete-task.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "event.task.deleted",
+          "command": "npx jest src/modules/bussiness/task/delete-task.handler.spec.ts -t \"event.task.deleted\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "boot-task-lifecycle",
+          "command": "npx jest src/app.boot.spec.ts -t \"drives sign-in, the full task lifecycle\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:00:07.161Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/list",
+      "id": "impl.task.todo-app-backend.list",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "eb1f35993d3f08de358703a38d3d1b19f3f36bae6c9e5c4dd4c333f48d21bfe9",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "br.task.list.owned",
+          "command": "npx jest src/modules/bussiness/task/list-tasks.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "contract.task.list-for-dashboard.provider",
+          "command": "npx jest src/modules/bussiness/task/task-counts.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "boot-task-lifecycle",
+          "command": "npx jest src/app.boot.spec.ts -t \"drives sign-in, the full task lifecycle\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:00:29.543Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/ownership",
+      "id": "impl.task.todo-app-backend.ownership",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "8d08b644ed924894f1d400f7a1b7e3321af11616227f4c2fbef07522bb4597d2",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "sds.task.ownership-guard",
+          "command": "npx jest src/modules/bussiness/task/completion-authority.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.ownership-guard.real-share-authority",
+          "command": "npx jest src/modules/bussiness/share/completion-authority.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:00:39.358Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/platform-database",
+      "id": "impl.task.todo-app-backend.platform-database",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "e1d1b624f2ce9e7552d4446de36430a4b4adb2409da86415a01cded1edcf6d8b",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "b86592f95f4f15119f4a93703999fdff70db6450880286c1d12996aedb21365b",
+      "capturedCodeDigest": "e3b2b48499da8fbe77fb136bdd890bfb743340f984f51520c65e7481d5451aa9",
+      "ownedDirs": [
+        "src/modules/platform/databases/postgresql/primary"
+      ],
+      "assertions": [
+        {
+          "id": "data.task.task",
+          "command": "npx jest src/modules/bussiness/task",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "session-store",
+          "command": "npx jest src/modules/bussiness/session",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:18:14.041Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/platform-events",
+      "id": "impl.task.todo-app-backend.platform-events",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "78cfe599997d4027b15f6536047b75a4c507bb67d6989a0753b5ead7f29bc065",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "00343b2944370c0fa94064b7acb3694121234911890e7c805d39c9250b6b1e7b",
+      "capturedCodeDigest": "7d593d12bafa669eaac558f7815d24a40f477e381efddad6fa4378057ffc9bb7",
+      "ownedDirs": [
+        "src/modules/platform/events"
+      ],
+      "assertions": [
+        {
+          "id": "event.task.created",
+          "command": "npx jest src/modules/bussiness/task/create-task.handler.spec.ts -t \"event.task.created\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "event.task.completed",
+          "command": "npx jest src/modules/bussiness/task/complete-task.handler.spec.ts -t \"event.task.completed\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "event.task.deleted",
+          "command": "npx jest src/modules/bussiness/task/delete-task.handler.spec.ts -t \"event.task.deleted\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T12:01:03.704Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-backend/reopen-task",
+      "id": "impl.task.todo-app-backend.reopen-task",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "d2545ee4f92f205957cae9c0d5180b93c4779584dc59f82e0251be165b0b3b5c",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "br.task.complete.once",
+          "command": "npx jest src/modules/bussiness/task/reopen-task.handler.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.completion-state",
+          "command": "npx jest src/modules/bussiness/task/task.service.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "boot-task-lifecycle",
+          "command": "npx jest src/app.boot.spec.ts -t \"drives sign-in, the full task lifecycle\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:59:26.778Z"
+      }
+    },
+    {
+      "node": "features/task/impl/todo-app-frontend/task-list",
+      "id": "impl.task.todo-app-frontend.task-list",
+      "schema": "work/implementation",
+      "state": "done",
+      "repository": "todo-app-frontend",
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "b7ba7d761ea17200b93354d384a32b7e56767130a2619a7b938c4a1e0524d7a4",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "369b1353227b1e022062a014ccd1d649ee0ab96f89f8a5a8ae9597c1125e41fe",
+      "capturedCodeDigest": "8053fe7f9c8850714aac183acb321d9f5f4a1e55b02a8ca40a6ee1d197e02648",
+      "ownedDirs": [
+        "src/components/blocks/task-list",
+        "src/features/pages/tasks",
+        "src/app/tasks [MISSING]"
+      ],
+      "assertions": [
+        {
+          "id": "focused-vitest",
+          "command": "npx vitest run src/components/blocks/task-list src/features/pages/tasks",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "typecheck",
+          "command": "npx tsc --noEmit",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "production-build",
+          "command": "npm run build",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "uat-typecheck",
+          "command": "npm run uat:typecheck",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "render-capture",
+          "command": "node ../todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/assets/capture.mjs",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "render-check",
+          "command": "node ../todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/assets/render-check.mjs",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T15:28:30.977Z"
+      }
+    },
+    {
+      "node": "features/task/sds/completion-state",
+      "id": "sds.task.completion-state",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "f1a7cedd51a4981d93b074e213827feedb1d797a9de48c1a5af5f104b5399bd5",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "sds.task.completion-state.implementation",
+          "command": "npx jest src/modules/bussiness/task",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.completion-state.t-complete",
+          "command": "npx jest src/modules/bussiness/task/task.service.spec.ts -t \"sds.task.completion-state.t-complete:\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.completion-state.t-complete-again",
+          "command": "npx jest src/modules/bussiness/task/task.service.spec.ts -t \"sds.task.completion-state.t-complete-again:\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.completion-state.t-reopen",
+          "command": "npx jest src/modules/bussiness/task/task.service.spec.ts -t \"sds.task.completion-state.t-reopen:\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:57:54.569Z"
+      }
+    },
+    {
+      "node": "features/task/sds/ownership-guard",
+      "id": "sds.task.ownership-guard",
+      "schema": "work/sds-component",
+      "state": "done",
+      "repository": null,
+      "staleFlag": false,
+      "outcome": "pass",
+      "recordDigestMismatch": false,
+      "currentRecordDigest": "5a185d8554fec8828e3272a40ade313110d7b336097e016b93d91e54a368c581",
+      "codeDigestMismatch": true,
+      "freshCodeDigest": "962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49",
+      "capturedCodeDigest": "20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea",
+      "ownedDirs": [
+        "src/modules/bussiness/task"
+      ],
+      "assertions": [
+        {
+          "id": "sds.task.ownership-guard.implementation",
+          "command": "npx jest src/modules/bussiness/task",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.ownership-guard.t-owner",
+          "command": "npx jest src/modules/bussiness/task/completion-authority.spec.ts -t \"sds.task.ownership-guard.t-owner:\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.ownership-guard.t-collaborator",
+          "command": "npx jest src/modules/bussiness/task/completion-authority.spec.ts -t \"sds.task.ownership-guard.t-collaborator:\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.ownership-guard.t-stranger",
+          "command": "npx jest src/modules/bussiness/task/completion-authority.spec.ts -t \"sds.task.ownership-guard.t-stranger:\"",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.ownership-guard.real-share-authority",
+          "command": "npx jest src/modules/bussiness/share/completion-authority.spec.ts",
+          "exit": 0,
+          "outcome": "pass"
+        },
+        {
+          "id": "sds.task.ownership-guard.boot-transport",
+          "command": "npx jest src/app.boot.spec.ts -t \"drives sign-in, the full task lifecycle\"",
+          "exit": 0,
+          "outcome": "pass"
+        }
+      ],
+      "hasRun": null,
+      "provenance": {
+        "actor": "example-evidence",
+        "tool": "scripts/example-evidence.mjs",
+        "environment": "local",
+        "capturedAt": "2026-09-18T11:58:29.245Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"ok":true,"files":77,"stale":[],"counts":{"stems":77,"yaml":76,"jsonFallback":1,"rules":323,"examples":4}}

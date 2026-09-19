@@ -1,0 +1,47 @@
+# Written by hand, same as the settled sign-in evidence beside it: this file names the run this
+# record settled on. The outcome is pass - the run walked all seven authored steps of the record's
+# rev-6 wording and every check observed its expected value. The earlier run folders beside it
+# (runs/20260919T142835Z-5c10a673 through runs/20260919T152927Z-5c10a673) are rig-and-spec history -
+# append-only, untouched, and they settle nothing; the last of them remains the honest record of the
+# pre-repair step-7 absence this record's rev-5 change describes.
+schema: work/evidence
+record: uat.checkout.place-order
+recordDigest: 0d35216202eea80d168283cc870d05ac909bf8a05bf83d0c5e810484d42d4363
+run: runs/20260919T155312Z-5c10a673
+outcome: pass
+assets:
+  - path: runs/20260919T155312Z-5c10a673/videos/place-order.webm
+    sha256: 29b07d962ce41df5ee7e91abfe5ed858f613910b382e2097196a5cc2fd21aaa2
+provenance:
+  actor: playwright-harness
+  tool: 'npx playwright test -c uat/playwright.config.ts uat.checkout.place-order, run in examples/ecommerce-app-fe with UAT_LIVE_LOGIN_AUTHORIZED=true (reporter uat/lib/run-writer.ts)'
+  environment: local
+  capturedAt: '2026-09-19T15:53:21.000Z'
+  stack: >-
+    The ecommerce example's own topology per examples/ecommerce-app-be/metadata.json: identity
+    GraphQL API on 5070 and order API on 6070 (both already running, /health ok), ecommerce
+    Postgres on 5501 and Redis on 6448. The shop under test is a fresh production build
+    (next build + next start) served on the projected port 4069 via
+    `node scripts/serve.mjs shop start` - the stale wedged listener that held the port from an
+    earlier lane was terminated first. Session carrier is the product's settled handoff:
+    POST /api/session calls identity's register/signIn GraphQL mutations server-side and sets the
+    httpOnly northwind-session + northwind-person cookies.
+  authorization: >-
+    UAT_LIVE_LOGIN_AUTHORIZED=true. The run registered a fresh disposable person namespaced by the
+    run id (uat-buyer-20260919t155312z-5c10a673@ecommerce.dev, from the accounts.yaml throwaway row)
+    through the identity register door, then signed in through the product form; no credential value
+    is stored in this record, and session bearer values are withheld from the run folder entirely.
+  observed_effect: >-
+    Matches the flow record's declared effects and cleanup: one order
+    (3eeedc00-a96b-4bb4-8337-e27bfae42981) was written with its captured payment for the
+    run-registered person (d301ed91-8683-48cf-acab-40e8ff6a35fa) and that person's cart was cleared
+    by the service on confirmation; the replay press re-sent the same idempotency key from the same
+    rendered checkout and returned the same order marked already-sent, writing no second order;
+    the empty-cart and beyond-stock refusals answered with their named reasons (the latter naming
+    the product, the requested quantity 3 and the stock that exists, 2). The account page rendered
+    the buyer confirmation for this run's person, and the provider's own machine door
+    (GET /internal/buyers/<personId>) read back hasOrders=true. The person row and the order remain
+    in the demo store exactly as the record's cleanup note states - the product exposes no deletion
+    for either - and the run's session was revoked through the product sign-out and verified absent
+    (SESSION_INVALID) at the identity verify door. cleanup.json in the run folder carries the same
+    accounting.

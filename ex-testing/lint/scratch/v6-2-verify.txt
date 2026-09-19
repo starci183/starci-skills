@@ -1,0 +1,24 @@
+schema starci/knowledge-source@1: valid
+id=grammar.common.dna family=common schema=starci/knowledge-source@1
+tokens=108 renderers=42 gaps=10 observations=6
+
+[authored] root=knowledge/grammars
+  grammarTokenNames: error=null names=108 file=knowledge/grammars/common/DNA.yaml
+  cardClassesOf:     error=null classes=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/knowledge/grammars/common/DNA.yaml
+  PASS both return error:null with non-empty results
+
+[built (.dist)] root=.dist/knowledge/grammars
+  grammarTokenNames: error=null names=108 file=.dist/knowledge/grammars/common/DNA.json
+  cardClassesOf:     error=null classes=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  PASS both return error:null with non-empty results
+
+[default] root=.dist/knowledge/grammars
+  grammarTokenNames: error=null names=108 file=.dist/knowledge/grammars/common/DNA.json
+  cardClassesOf:     error=null classes=["starci-core-form-surface","starci-core-frameless-surface","starci-core-surface","starci-core-surface-card"] source=D:/Repositories/starci-academy-backend/.claude/.dist/knowledge/grammars/common/DNA.json
+  PASS both return error:null with non-empty results
+
+kept markup: 65 files under examples/todo-app-backend/.starciwork/features
+  snapshot card class starci-core-form-surface: on 8 capture(s)
+  snapshot card class starci-core-frameless-surface: on 20 capture(s)
+  snapshot card class starci-core-surface: on 55 capture(s)
+  snapshot card class starci-core-surface-card: on 55 capture(s)

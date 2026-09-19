@@ -1,0 +1,26 @@
+head lines 67 new lines 67
+--- line 10
+HEAD: | Landing home · `:3069/` | [Image](features/checkout/ui/landing-home/assets/landing-home.png) | [Prompt](features/checkout/ui/landing-home/assets/landing-home.prompt.txt) | [Record](features/checkout/ui/landing-home/index.yaml) |
+NOW : | Landing home · `:3069/` | [Image](./landing-home.png) | [Prompt](./landing-home.prompt.txt) | [Record](../index.yaml) |
+--- line 11
+HEAD: | Shop browse · `:4069/browse` | [Image](features/checkout/ui/shop-browse/assets/shop-browse.png) | [Prompt](features/checkout/ui/shop-browse/assets/shop-browse.prompt.txt) | [Record](features/checkout/ui/shop-browse/index.yaml) |
+NOW : | Shop browse · `:4069/browse` | [Image](../../shop-browse/assets/shop-browse.png) | [Prompt](../../shop-browse/assets/shop-browse.prompt.txt) | [Record](../../shop-browse/index.yaml) |
+--- line 12
+HEAD: | Populated cart · `:4069/cart` | [Image](features/checkout/ui/cart/assets/cart.png) | [Prompt](features/checkout/ui/cart/assets/cart.prompt.txt) | [Record](features/checkout/ui/cart/index.yaml) |
+NOW : | Populated cart · `:4069/cart` | [Image](../../cart/assets/cart.png) | [Prompt](../../cart/assets/cart.prompt.txt) | [Record](../../cart/index.yaml) |
+--- line 13
+HEAD: | Account / sign-in · `:4069/account` | [Image](features/identity/ui/sign-in/assets/sign-in.png) | [Prompt](features/identity/ui/sign-in/assets/sign-in.prompt.txt) | [Record](features/identity/ui/sign-in/index.yaml) |
+NOW : | Account / sign-in · `:4069/account` | [Image](../../../../identity/ui/sign-in/assets/sign-in.png) | [Prompt](../../../../identity/ui/sign-in/assets/sign-in.prompt.txt) | [Record](../../../../identity/ui/sign-in/index.yaml) |
+--- line 14
+HEAD: | Stock refusal · `:4069/checkout` | [Image](features/checkout/ui/stock-refused/assets/stock-refused.png) | [Prompt](features/checkout/ui/stock-refused/assets/stock-refused.prompt.txt) | [Record](features/checkout/ui/stock-refused/index.yaml) |
+NOW : | Stock refusal · `:4069/checkout` | [Image](../../stock-refused/assets/stock-refused.png) | [Prompt](../../stock-refused/assets/stock-refused.prompt.txt) | [Record](../../stock-refused/index.yaml) |
+--- line 25
+HEAD: The [retained B3 source](features/checkout/ui/landing-home/assets/B3-source.txt) was found
+NOW : The [retained B3 source](./B3-source.txt) was found
+--- line 29
+HEAD: [Brand rev 1](brand/index.yaml) is unchanged. The actual Todo grammar renders were
+NOW : [Brand rev 1](../../../../../brand/index.yaml) is unchanged. The actual Todo grammar renders were
+--- line 64
+HEAD: [Artifact verification](features/checkout/ui/landing-home/assets/direction-check.yaml)
+NOW : [Artifact verification](./direction-check.yaml)
+differing lines: 8

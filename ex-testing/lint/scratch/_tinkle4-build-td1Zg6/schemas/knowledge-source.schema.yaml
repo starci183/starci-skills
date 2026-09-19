@@ -1,0 +1,180 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci/knowledge-source@1
+title: StarCi authored knowledge topic
+type: object
+additionalProperties: false
+required:
+  - schema
+  - id
+  - title
+  - purpose
+  - appliesTo
+properties:
+  related:
+    type: array
+  families:
+    type: array
+  observations:
+    type: array
+  identity:
+    type: object
+  tokens:
+    type: array
+  renderers:
+    type: array
+  cssDependency:
+    type: object
+  dna:
+    type: object
+  themeAndAccessibility:
+    type: object
+  sourceBackedBehavior:
+    type: array
+  promotion:
+    type: object
+  idioms:
+    type: array
+  seenOnce:
+    type: object
+  shapes:
+    type: array
+  readingSteps:
+    type: array
+  authoritySplit:
+    type: object
+  imageryClarification:
+    type: object
+  openQuestions:
+    type: array
+  doesNotDecide:
+    type: string
+  catalogNotes:
+    type: string
+  ownerVocabulary:
+    type: object
+  componentOwnership:
+    type: object
+  scale:
+    type: object
+  sourceMaintenance:
+    type: string
+  authority:
+    type: object
+  gaps:
+    oneOf:
+      - type: array
+      - type: object
+  schema:
+    const: starci/knowledge-source@1
+  id:
+    type: string
+    minLength: 1
+    pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+  title:
+    type: string
+    minLength: 1
+  purpose:
+    type: string
+    minLength: 1
+  appliesTo:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - backend
+        - frontend
+        - ui
+        - grammar
+        - runtime
+        - knowledge
+  family:
+    type: string
+    minLength: 1
+  provenance:
+    type: object
+    additionalProperties: true
+    properties:
+      extractionCommit:
+        type: string
+        pattern: ^[a-f0-9]{40}$
+      sources:
+        type: array
+        items: true
+      limitations:
+        type: string
+  rules:
+    type: array
+    items:
+      $ref: starci/knowledge-rule@1
+  topics:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          minLength: 1
+        path:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+        summary:
+          type: string
+        decides:
+          type: string
+        rules:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        ruleIds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+  branches:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - path
+        - title
+      properties:
+        id:
+          type: string
+          minLength: 1
+        path:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+        use:
+          type: string
+  guidance:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - requirement
+      properties:
+        id:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        requirement:
+          type: string
+          minLength: 1
+        rationale:
+          type: string

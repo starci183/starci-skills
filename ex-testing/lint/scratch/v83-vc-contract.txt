@@ -1,0 +1,5 @@
+revisions: 8
+
+WITHDRAWN CLAUSE: "The session token travels as a custom \"x-session-token\" request header (implicit, never named as part of this surface)."
+  exact verbatim elsewhere: (none)
+  whitespace-folded/contained: (none)

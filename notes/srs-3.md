@@ -1,6 +1,6 @@
 # srs-3: the Work layout and its checker
 
-Branch `srs/3` owns `schemas/work-layout.yaml` and `checks/work-layout.mjs`. The per-record schemas
+Branch `srs/3` owns `schemas/work-layout.yaml` and `scripts/checks/work-layout.mjs`. The per-record schemas
 (`srs/1`) and the record checker (`srs/2`) are not written here. What follows is what this branch decided,
 what it repaired, where the brief and the disk disagreed, and the questions the record schemas still owe.
 
@@ -47,7 +47,7 @@ and untracked runtime custody.
 
 - **Which keys count as authored state.** `WORK_PARENT_AUTHORS_STATE` fires on `state`, `proven`,
   `provenBy`, `requiresProof`, `evidence`, `completion` and `activity` on a parent. If srs/1 adds another
-  leaf-only field, add it to `STATE_KEYS` in `checks/work-layout.mjs` rather than to a second list.
+  leaf-only field, add it to `STATE_KEYS` in `scripts/checks/work-layout.mjs` rather than to a second list.
 
 - **Whether `recordDigest` is checkable from the layout.** It is not: recomputing the normative digest of
   a record means knowing which fields are normative, which is a record-schema fact. The layout check reads

@@ -1,0 +1,143 @@
+ M .gitignore
+ M .stacks/dev/runtime/files/keycloak-admin-password.txt.enc
+ M .stacks/dev/runtime/files/keycloak-admin.json.enc
+ M .stacks/dev/runtime/files/sonarqube-admin-token.key.enc
+ D .workspaces/projects/miamia/be.json
+ D .workspaces/projects/miamia/fe.json
+ M .workspaces/projects/nivo/be.json
+ M .workspaces/projects/nivo/chart.json
+ D .workspaces/projects/starci-academy/be.json
+ D .workspaces/projects/starci-academy/fe.json
+ D .workspaces/projects/tayson/be.json
+ D .workspaces/projects/tayson/fe.json
+ D .workspaces/projects/tedo/be.json
+ D .workspaces/projects/tedo/fe.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/accounts.dev.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/flow.md
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/history.md
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/latest.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260903-uat-1/result.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260903-uat-1/run.md
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260903-uat-1/snapshot.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260903-uat-1/verdicts.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/result.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/run.md
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/snapshot.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/01-sign-in/capture-signed-in-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/01-sign-in/capture-signed-in-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/01-sign-in/capture-wrong-password-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/01-sign-in/capture-wrong-password-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/01-sign-in/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/02-open-workspace/capture-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/02-open-workspace/capture-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/02-open-workspace/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/03-installed-list/capture-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/03-installed-list/capture-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/03-installed-list/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/04-installed-root/capture-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/04-installed-root/capture-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/04-installed-root/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/05-diagnostics/capture-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/05-diagnostics/capture-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/05-diagnostics/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/06-collection/capture-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/06-collection/capture-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/06-collection/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/07-studio/capture-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/07-studio/capture-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/07-studio/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/08-refused-recovery/capture-recovered-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/08-refused-recovery/capture-recovered-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/08-refused-recovery/capture-refused-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/08-refused-recovery/capture-refused-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/08-refused-recovery/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/09-not-owned/capture-narrow-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/09-not-owned/capture-wide-light.png
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/steps/09-not-owned/step.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/runs/20260904-uat-2/verdicts.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/seed/README.md
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/seed/expected.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/seed/records.json
+ D .worktrees/uat/agentos-modules/collection-to-module-workspace/snapshot.json
+ M AGENTS.md
+ M CLAUDE.md
+ M plugins/eslint/index.mjs
+ M tamsu.md
+?? .claude-pinned/
+?? .stacks/dev/runtime/files/keycloak-admin-password.rotation-pending.enc
+?? .stacks/dev/runtime/files/keycloak-admin.rotation-pending.enc
+?? .stacks/dev/runtime/files/sonarqube-ecommerce-app-be-token.key.enc
+?? .stacks/dev/runtime/files/sonarqube-ecommerce-app-fe-token.key.enc
+?? .stacks/dev/runtime/files/sonarqube-todo-app-backend-token.key.enc
+?? .stacks/dev/runtime/files/sonarqube-todo-app-frontend-token.key.enc
+?? .starci/
+?? .starciwork/
+?? .work/maintenance/starci-work-authority/
+?? .workspaces/ports/form-copilot.json
+?? .workspaces/projects/nivo/landing.json
+?? .workspaces/projects/nivo/work.json
+?? .workspaces/projects/nivo/workflow.json
+?? .worktrees/backups/
+?? .worktrees/banked/
+?? .worktrees/chatbot-contract-repair-method.md
+?? .worktrees/chatbot-contract-retry-flags.json
+?? .worktrees/chatbot-contract-schema-check.cjs
+?? .worktrees/e2e/
+?? .worktrees/form-copilot-response-sync-mission.json
+?? .worktrees/nivo-accounting-autonomous-session-draft.json
+?? .worktrees/routed/
+?? .worktrees/runtime/
+?? .worktrees/session-confirm-form-copilot-response-sync.json
+?? .worktrees/session-confirm-form-copilot-screenout.json
+?? .worktrees/session-confirm-form-copilot-valid519-csv.json
+?? .worktrees/session-draft-01a07250.json
+?? .worktrees/session-open-form-copilot-import-screenout.json
+?? .worktrees/session-open-form-copilot-response-sync.json
+?? .worktrees/session-open-form-copilot-screenout.json
+?? .worktrees/session-open-form-copilot-valid519-csv.json
+?? .worktrees/uat/agentos-modules/module-setup/
+?? .worktrees/uat/module-setup/
+?? .worktrees/uat/nivo-agentic-os-landing/
+?? .worktrees/uat/nivo-identity-repair-20260904/
+?? .worktrees/uat/workspace-recovery/
+?? .worktrees/unchecked/
+?? .worktrees/v23/
+?? .worktrees/v24-bind-admission/
+?? .worktrees/v24-budget-patch/
+?? .worktrees/v24-correction-busy/
+?? .worktrees/v24-integration-recovery/
+?? .worktrees/v24-parallel-resume/
+?? .worktrees/v24-plan-revisions/
+?? .worktrees/v24-recovery-patch/
+?? .worktrees/v24-repair-routing/
+?? .worktrees/v24-route-patch/
+?? .worktrees/v25-dynamic-coordination/
+?? .worktrees/v25-goal-architecture/
+?? .worktrees/v25-goal-partitions/
+?? .worktrees/v25-nested-admission/
+?? .worktrees/v25-nested-return/
+?? .worktrees/v25-output-templates/
+?? .worktrees/v25-prior-waits-lifecycle/
+?? .worktrees/v25-prior-waits/
+?? .worktrees/v25-proof-review-reentry/
+?? .worktrees/v25-rc11-release/
+?? .worktrees/v25-rc12-release/
+?? .worktrees/v25-rc13-release/
+?? .worktrees/v25-rc14-release/
+?? .worktrees/v25-rc15-release/
+?? .worktrees/v25-rc16-release/
+?? .worktrees/v25-retry-order/
+?? .worktrees/v25-return-chain/
+?? .worktrees/v25-settled-wait/
+?? .worktrees/v25-shared-repair-resolution/
+?? .worktrees/v25-source-review/
+?? .worktrees/v25-unit-migration/
+?? .worktrees/v25-unit-successors/
+?? .worktrees/v25-workflow-reentry/
+?? exports/
+?? nul
+?? output/visualizations/
+?? outputs/
+?? scratch-spreadsheet-repair/
+?? starci-full-yaml-runtime.cursor-prompt.md
+?? starci-yaml-migration.cursor-prompt.md

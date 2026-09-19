@@ -1,0 +1,251 @@
+schema: starci/orchestration-supervision@1
+purpose: |-
+  Define the one control loop of StarCi 5.0: a workflow kernel, a pool of operation agents, and nothing
+  between them. The kernel owns the loop as code; an operation receives its whole contract at launch and
+  answers with exactly one report file; the kernel waits on the boundary tick and speaks to a live agent only
+  through notify. This is an execution protocol, not a product workflow and not an operation.
+ownership:
+  kernel:
+    - goal-assessment-and-one-user-approval
+    - operation-scheduling
+    - runtime-allocation
+    - machine-verified-acceptance
+    - commit-and-ledger-write
+    - bounded-retry
+    - gate-execution
+    - final-reporting
+  operationAgent:
+    - implementation-and-repair
+    - test-and-verification-execution
+    - operation-output-production
+routing:
+  operationToKernel:
+    recipient: workflow-kernel
+    transport: one-report-file-per-dispatch
+    authority: report-file-then-signal
+    events:
+      - question
+      - escalation
+      - heartbeat
+      - worker_done
+  kernelToOperation:
+    recipient: own-operation-terminal
+    transport: launcher-notify
+    statusEvent: forbidden-for-control-instruction
+    reason: an-operation-receives-its-whole-contract-at-launch-so-no-second-control-channel-exists
+    when:
+      - answer-a-question
+      - nudge-a-stalled-idle-operation
+  kernelLocal:
+    execution: operation-agent-only
+    userNotification: none
+    resolveWithoutUser:
+      - operation-dependency
+      - runtime-allocation-and-overflow
+      - no-effect-provider-failure
+      - bounded-retry
+      - review-finding-repair
+      - reported-design-gap
+  kernelToUser:
+    envelope: final-report-need-user
+    onlyWhen:
+      - goal-approval
+      - exhausted-retry-or-review-bound
+      - ledger-incomplete-or-refused-ledger-write
+      - no-runtime-accepted-an-operation
+      - human-product-decision
+      - gate-still-failing
+  operationToOperation:
+    direct: forbidden
+    reason: operations-are-parallel-by-disjoint-allowlist-never-by-conversation
+waitHierarchy:
+  kernel:
+    waitsFor: operation-boundary
+    accepts:
+      - question
+      - escalation
+      - heartbeat
+      - worker_done
+    actsBy: verify-accept-commit-retry-or-reallocate
+    directExecution: forbidden
+    loopOwner: code-never-a-model
+    modelCalls:
+      - assessGoal
+      - planOp
+      - decide
+workerLifecycle:
+  displayNames:
+    workflowWorktree: "[Workflow] <Workflow>"
+    workflowKernel: "[Kernel] <Workflow>"
+    operationAgent: "[Op] <operation> - <scope>"
+    applyAgentNameWith: task-display-name-then-provider-attestation-then-terminal-canonicalization
+  kernel:
+    lifetime: one-workflow
+    host: workflow-worktree
+    launch: local-process-never-an-orca-worker
+    state: one-workflow-directory-with-an-append-only-event-log
+    authority: owns-the-loop-after-one-user-approval
+    release: after-the-final-report
+  operationAgent:
+    lifetime: operation-attempt
+    launch: supervised-native-agent
+    isolation: one-operation-one-agent
+    release: after-accepted-worker_done
+    reuse: forbidden
+    parallelism: disjoint-allowlist-under-one-worktree
+    dispatchAdmission:
+      required:
+        - expected-operation-from-the-approved-goal
+        - exact-operation-contract
+        - allocated-runtime-selection
+        - canonical-display-name
+      providerProof: worker-show-exact-effective-agent-model
+      effectAcceptance: only-after-provider-proof
+      onOperationMismatch: fence-reconcile-release-and-dispatch-expected-operation
+      onProviderMismatch: fence-reconcile-release-and-retry-allocated-runtime
+    acceptance:
+      authority: kernel-re-runs-every-declared-check-itself
+      changedFiles: computed-from-git-never-from-the-report
+      allowlist: every-changed-file-inside-the-operation-allowlist
+      commit: one-operation-one-commit
+      selfDeclaredDone: never-sufficient
+    displayNameStability:
+      identityAuthority: task-display-name-plus-worker-provider-receipt
+      terminalTitle: mutable-native-ui-metadata
+      launch: provider-attest-then-rename-and-verify
+      runtimeDrift: recanonicalize-without-fencing-when-immutable-identity-is-exact
+      settlement: recanonicalize-before-release
+      effectDecision: never-reject-solely-for-runtime-terminal-title-drift
+    architectureSidearm:
+      onlyTrigger: active-implementation-secondary_request
+      requiredReason: sds-technical-gap
+      requiredSecondaryOp: architecture.decide
+      requiredAuthority: explicit-bounded-sds-allowlist
+      forbiddenTriggers:
+        - review-finding
+        - review-suggestion
+        - unanswered-design-question
+        - inferred-sds-gap
+    qwenLaunch:
+      agent: qwen
+      model: qwen3.8-flash
+      modelAuthority: rendered-terminal-footer
+      create: command-terminal-per-attempt
+      readiness: rendered-input-prompt
+      supervise: dispatch-return-preamble
+      promptDelivery: terminal-send-with-submit-verification
+      credentialRefresh: unset-stale-process-env-then-qwen-env-file
+      terminalCommand: declared-target-command-only
+      nestedAgents: forbidden
+    nativeLaunchFailure:
+      recognizedFailures:
+        - agent_prompt_stalled
+        - session_not_reported
+      action: fence-and-reconcile-exact-attempt
+      nextCandidate: only-after-verified-no-effects
+      fallthroughOwner: canonical-launcher-within-one-start-op-invocation
+      classification: typed-call-result-outcome-and-effect-state
+      unsupervisedFallback: forbidden
+      release: release-or-retain-from-worker-receipt
+      duplicateSubmit: forbidden
+      onExhaustedRuntimes: release-the-slot-cool-the-pool-and-allocate-another-runtime
+    deadTerminals:
+      owner: workflow-kernel
+      when: after-every-settlement-and-before-workflow-completion
+      command: sweep
+      closes: settled-dispatch-terminals-and-residual-agent-terminals-in-the-workflow-worktree
+      never: live-worker-kernel-or-user-terminal
+reports:
+  schema: starci/op-report@1
+  workflowSchema: starci/workflow-report@1
+  outcomes: [done, partial, failed, ask, blocked]
+  signals: {done: worker_done, partial: worker_done, failed: worker_done, ask: question, blocked: escalation}
+  authority: report-file-then-signal
+  command: report
+  onceOnly: true
+wait:
+  mode: blocking-event-wait
+  owner: launcher-wait-tick
+  subscribe:
+    - question
+    - escalation
+    - worker_done
+  tickMs: 120000
+  heartbeatGraceMs: 600000
+  ping: operation-heartbeat-every-5-minutes-peeked-per-tick
+  tick:
+    - check-wait-with-previous-batch-acknowledged
+    - scan-report-files
+    - classify-every-live-worker
+    - sweep-dead-terminals
+    - recanonicalize-titles
+  events: [report, stalled-idle, stalled-silent, stalled-prompt, dead, timeout]
+  onTimeout:
+    action: wait-again
+    inspectWorker: true
+    notifyUser: false
+  endsTurnOnlyOn: [workflow-goal, blocked-need-user]
+  onHealthyHeartbeat:
+    action: none
+    inspectWorker: false
+    notifyUser: false
+liveness:
+  checkWhen:
+    - heartbeat-grace-expired
+    - workflow-deadline-expired
+    - terminal-closed
+    - terminal-crashed
+  inspectionOrder:
+    - workflow-state
+    - task-and-dispatch-state
+    - latest-heartbeat
+    - bounded-terminal-tail
+  maxTerminalTailReads: 1
+messages:
+  identity:
+    required:
+      - messageId
+      - deliveryId
+      - runId
+      - workflowTaskId
+      - dispatchId
+      - attempt
+      - eventType
+      - emittedAt
+  deduplicateBy: messageId
+  acknowledgeAfter: successful-processing
+  changedRedelivery: reject
+transitions:
+  question:
+    action: reply
+    next: wait
+  escalation:
+    action: resolve-boundary
+    next: wait
+  worker_done:
+    action: validate-review-release
+    next: unlock-dependent-operations
+  worker_failed:
+    action: reconcile-effects
+    next: recover-or-escalate
+forbidden:
+  - model-owned-control-loop
+  - supervisor-layer-between-kernel-and-operation
+  - operation-agent-acts-as-the-kernel
+  - operation-agent-creates-nested-agent
+  - operation-agent-controls-another-operation
+  - kernel-implements-operation-scope
+  - kernel-runs-operation-work-instead-of-re-running-its-checks
+  - accept-self-declared-done-without-machine-verification
+  - commit-outside-the-operation-allowlist
+  - periodic-terminal-poll
+  - periodic-log-read
+  - periodic-diff-read
+  - progress-prompt
+  - duplicate-test-run
+  - restart-healthy-operation
+  - user-report-on-unchanged-state
+  - dispatch-operation-not-selected-by-the-approved-goal
+  - accept-effect-before-provider-attestation
+  - dispatch-operation-to-existing-terminal
+  - infer-architecture-sidearm-from-review

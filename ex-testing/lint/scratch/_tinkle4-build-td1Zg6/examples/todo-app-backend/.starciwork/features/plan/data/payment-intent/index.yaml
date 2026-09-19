@@ -1,0 +1,19 @@
+schema: work/data
+id: data.plan.payment-intent
+title: Payment intent
+state: done
+fields:
+  - {name: id, type: text, required: true, note: Opaque, assigned at creation; this is the idempotency key.}
+  - {name: subscriptionId, type: text, required: true}
+  - {name: gateway, type: text, required: true, default: sepay, note: "References integration.plan.sepay."}
+  - {name: gatewayIntentId, type: text, required: true, note: The gateway's own id for the same transaction.}
+  - {name: amount, type: integer, required: true, note: Minor units of currency.}
+  - {name: currency, type: text, required: true, default: VND}
+  - {name: status, type: text, required: true, default: pending, note: "pending, paid, or failed."}
+  - {name: appliedAt, type: timestamp, required: false, note: Set the one time this intent is applied.}
+invariants:
+  - appliedAt is set at most once per id; a second application attempt for the same id never changes it -
+    this is the idempotency guard of br.plan.payment.idempotent.
+  - A payment intent is never deleted; it is the audit trail for a subscription's activations.
+
+refs: [data.plan.subscription, integration.plan.sepay, br.plan.payment.idempotent]

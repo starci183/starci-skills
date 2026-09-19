@@ -1,0 +1,18 @@
+$ npm run test:e2e -- tasks/reopen
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 1
+
+
+> todo-app-backend@1.0.0 test:e2e
+> jest --config src/tests/e2e/jest.config.ts tasks/reopen
+
+No tests found, exiting with code 1
+Run with `--passWithNoTests` to exit with code 0
+In D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend
+  15 files checked.
+  testMatch: **/*.e2e-spec.ts - 13 matches
+  testPathIgnorePatterns: \\node_modules\\ - 15 matches
+  testRegex:  - 0 matches
+Pattern: tasks\\reopen - 0 matches
+
+

@@ -1,0 +1,55 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.plan.todo-app-frontend.usage
+recordDigest: 8b5478d9f57704731be077a8c2dae71aff87e0ec1be2c81f097bfb00282a7940
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/app/plan/page.tsx
+      sha256: 05d02b9f7259b58a930b864a1c16abd219c6ccf6872ff7e9e903ca6343d6738b
+    - path: src/app/plan/usage/page.tsx
+      sha256: 823463f0efefd26c41b3a59d643ce58471b6101c793c991280269d3564b0ccb5
+    - path: src/components/plan/api.spec.ts
+      sha256: c98a1590e2046f9b14aace06434a820a2bbeede24c09b291df9c832a92c1af88
+    - path: src/components/plan/api.ts
+      sha256: f160d7f80154a54bb94f1c2a10ff1e366ebd6eade973b2820c15a8fdf77bd916
+    - path: src/components/plan/routed-action/index.tsx
+      sha256: 2f5690dd9ddbd4f66e85ab76a9ab649c8ec62681dff76813f785497dd44e41bb
+    - path: src/components/plan/usage-screen/classNames.ts
+      sha256: 88caba8befc8d5e74e0b6868b8d54e31fe1b59cc20cae342f6c54414add63339
+    - path: src/components/plan/usage-screen/component.spec.tsx
+      sha256: 90f7467e51742f9ec8bc82f842b7fda06c07d3f6fe94fb5b2d54b249881de213
+    - path: src/components/plan/usage-screen/component.tsx
+      sha256: 7945528c8fb89e01cf99a341d5c0295d0a9008d354e46841489f074102093de1
+    - path: src/components/plan/usage-screen/index.tsx
+      sha256: 68f741a6415ce4e90ffba29c56c320d197a84ef87ce0923d3122d209065e7ab5
+  digest: 8710571cabff1e557a9ff8ec7f64ac83768c1948b4545f7f6c7abe5a0765ab4a
+outcome: pass
+assertions:
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
+  - id: unit
+    command: npx vitest run
+    exit: 0
+    outcome: pass
+    observation: npx vitest run exited 0
+  - id: lint
+    command: npx eslint .
+    exit: 0
+    outcome: pass
+    observation: npx eslint . exited 0
+  - id: build
+    command: npx next build
+    exit: 0
+    outcome: pass
+    observation: npx next build exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T14:41:03.729Z

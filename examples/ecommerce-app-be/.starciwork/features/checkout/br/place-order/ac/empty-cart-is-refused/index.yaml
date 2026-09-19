@@ -1,7 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.checkout.place-order.empty-cart-is-refused
-rule: br.checkout.place-order
-given: A live session whose cart holds no lines
-when: The person confirms the order
-then:
-  - The confirmation is refused by the reason cart-empty, and no order or payment is written.

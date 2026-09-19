@@ -1,0 +1,30 @@
+schema: work/policy-decision
+id: decision.recur.impossible-date
+title: Skip, clamp, or refuse a monthly rule's day that a month does not have
+state: done
+outcome: decided
+chosen: skip
+question: A rule says "the 31st". February never has one, and April, June, September and November do not
+  either. What happens to the rule, and what happens to that month?
+options:
+  - id: refuse-at-creation
+    summary: The rule is refused when it names a day above 28, or above the day count of any month the
+      owner might reasonably mean.
+    consequence: Protects nobody from anything real; "the 31st" is a common, well-understood request and
+      refusing to create it is worse than the ambiguity it avoids.
+  - id: clamp-to-last-day
+    summary: A month without the named day fires on its last day instead (the 31st becomes the 28th or
+      30th).
+    consequence: Silently changes what the rule means every few months; a person who asked for "the 31st"
+      did not ask for "the 28th, except when there's a 31st", and a bill due the 31st is not due the 28th.
+  - id: skip
+    summary: A month without the named day produces no occurrence for that month; no other date is
+      substituted.
+    consequence: Honest about what was actually asked - "the 31st, when it exists" - at the cost of an
+      owner who wants "the last banking day of the month" needing a different rule this feature does not
+      offer.
+recommendation: skip
+recommendationReason: Skip is the only option that never invents a date the rule did not name. It is
+  proven directly by walking real calendar dates one by one (a month with no 31st never produces one to
+  check against), which also means br.recur.impossible-date.skips needs no special February case - the
+  skip is a consequence of the walk, not a rule layered on top of it.

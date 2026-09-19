@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.audit.erasure.right.identifying-fields-unreadable
-rule: br.audit.erasure.right
-given: A person who has produced several log lines, and a completed erasure request against them
-when: Any reader, including export, tries to resolve those lines back to the person
-then:
-  - No reader recovers the person's identity from any line they produced.
-  - "The lines themselves are unchanged: same bytes, same position, same hash chain."

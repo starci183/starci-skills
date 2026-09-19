@@ -1,0 +1,401 @@
+# ============================================================================
+# TINKLE-8 — modules/goal/legality.yaml
+# Brief: ex-testing/briefs/tinkle/tinkle-8.md.
+#
+# The legality rules a proposed op chain must satisfy and the kernel enforces.
+# FIVE families: forward edges (ordering), backward edges (the cấn cấn
+# mid-flight-discovery mechanism), split rules (fan-out legality),
+# existing-surface rules (the survey leg / extend-vs-add), and ambiguity rules
+# (the ORDER/SCOPE/INTENT ladder). Declarative only — these are the business
+# rules the analyzer checks a chain against and the kernel routes on; nothing
+# here executes.
+#
+# Sources:
+#   model/kinds.yaml                — lanes (step order), routes (outcome/blocker routing), kind catalog
+#   .dist/kernel/sync.mjs           — designGate, cutOpFor, disjoint child ops
+#   .dist/kernel/ledger.mjs         — disjoint(allowlists), inScope, candidates — path-prefix coverage + ownership
+#   .dist/kernel/common.mjs         — allowlistsOverlap
+#   .dist/kernel/intake.mjs         — extensions.work3.reconciliation (reference/conflict/new)
+#   .dist/kernel/goal.mjs           — reviseGoal, validateGoalRevision, propagateInvalidation, applyWorkflowAmendment
+#   .dist/kernel/owner.mjs          — STOP_KINDS, PROVISION_KINDS, openOwnerAsk (pause vs provisional)
+#   .dist/kernel/owner-requests.mjs — owner request kinds; credential verified only after integration.verify done+pass
+#   .dist/kernel/graph.mjs          — validateGraph: "a lane that builds without proving, a design step after a build step" is refused
+#   .dist/docs/work-ledger.md       — .starciwork ownership: one index.yaml per scope folder, only leaves author state
+#   .dist/docs/op-granularity.md    — seam-first cut, one observable behaviour per child, serial fallback
+#   .dist/docs/work-verification.md — verify is read-only; source drift vs evidence invalidation vs unavailable input
+#   scripts/checks/check-work-deep.mjs     — DEP_STALE / NORM_UNRECORDED baseline semantics
+#   modules/goal/existing.yaml      — the survey leg + extend-vs-add decision
+#   CLAUDE.md                       — work-correction policy
+# ============================================================================
+
+schema: starci/module-goal-legality@1
+
+about:
+  kind: chain-legality
+  businessQuestion: >-
+    "Is this proposed op chain a legal way to reach this goal — right order,
+    right authority, right ownership — and what does the workflow do when the
+    goal itself turns out to be wrong mid-flight?"
+  enforcement: >-
+    The analyzer proposes; these rules are what the proposal is checked
+    against. The kernel enforces them at three seams — lane derivation
+    (sync.mjs/kinds.yaml), outcome routing (graph.mjs routes), and revision
+    validation (goal.mjs) — so a chain that violates them is refused or
+    rerouted, never silently run.
+
+# ============================================================================
+# PRODUCES VOCABULARY — the postcondition vocabulary backward chaining needs.
+# KNOWN GAP (per brief): modules/ops/*.yaml route: blocks carry `prerequisites:`
+# (the needs) but no `produces:` — step 4 (backward CHAIN) cannot run against
+# the route index today; this table IS the required vocabulary, derived from
+# kinds.yaml writes/lanes + the ops' completion profiles. tinkle-1 files need
+# this backfilled as a `produces:` key on each route block, and a future
+# scripts/route/route-plan.mjs (chain builder; route-op.mjs only picks one op)
+# would consume it. (inferred vocabulary — source: kind.writes + lane step
+# purposes, not a declared field)
+# ============================================================================
+producesVocabulary:
+  stateVariables:  # the variables a goal's S* is written in
+    - "business.X: decided"      # SRS requirement settled
+    - "sds.X: decided"           # SDS contract settled
+    - "brand: settled"           # brand record exists
+    - "ui.X: drawn"              # interface design record (artworkSlots declared)
+    - "ui.X: assets"             # generated artwork real
+    - "impl.X: done"             # code built, behavior delivered
+    - "records.X: authored"      # Work records written/remapped
+    - "tests.X: authored"        # regression coverage exists
+    - "ui.X: verified"           # walked end-to-end on served build
+    - "api.X: verified"          # proven through public API on real stack
+    - "integration.X: verified"  # live-provider proof w/ owner credential
+    - "perf.X: verified"         # measured against declared budget
+    - "security.X: verified"     # security proof on delivered slice
+    - "slice.X: reviewed"        # read-only findings delivered
+    - "provision.X: provided"    # owner custody landed
+    - "decision.X: prepared"     # options + recommendation drafted
+    - "goal: revised"            # rev+1, derivations stale-marked
+    - "scope.X: defined"         # bounded scope statement exists
+    - "scope.X: retired"         # end-of-life completed
+    - "grammar: grown"           # semantic unit added
+    - "runtime: operated"        # environment/infra effect applied
+    - "release: delivered"       # external/terminal effect done
+    - "docs.X: authored"         # documentation written
+    - "content.X: generated"     # content artifact produced
+  opProduces:  # which op establishes which variable(s) — the CHAIN lookup table
+    request.analyze:      ["request: analyzed"]
+    scope.define:         ["scope.X: defined"]
+    business.decide:      ["business.X: decided"]
+    architecture.decide:  ["sds.X: decided"]
+    brand.decide:         ["brand: settled"]
+    interface.draw:       ["ui.X: drawn"]
+    interface.asset:      ["ui.X: assets"]
+    interface.implement:  ["impl.X: done (frontend)"]
+    backend.implement:    ["impl.X: done (backend)"]
+    code.refactor:        ["impl.X: done (restructured, behavior-invariant)"]
+    work.author:          ["records.X: authored"]
+    implementation.plan:  ["node.X: cut into disjoint children"]
+    test.author:          ["tests.X: authored"]
+    uat.verify:           ["ui.X: verified"]
+    e2e.verify:           ["api.X: verified"]
+    integration.verify:   ["integration.X: verified"]
+    perf.verify:          ["perf.X: verified"]
+    security.verify:      ["security.X: verified"]
+    review.verify:        ["slice.X: reviewed"]
+    provision.ask:        ["provision.X: provided"]
+    decision.prepare:     ["decision.X: prepared"]
+    goal.revise:          ["goal: revised"]
+    scope.retire:         ["scope.X: retired"]
+    grammar.update:       ["grammar: grown"]
+    runtime.operate:      ["runtime: operated"]
+    release.deliver:      ["release: delivered"]
+    docs.author:          ["docs.X: authored"]
+    content.generate:     ["content.X: generated"]
+    knowledge.repair:     ["knowledge: repaired"]
+    workspace.manage:     ["workspace: managed"]
+    task.execute:         ["task: executed"]
+  stalenessNote: >-
+    A produced variable is only as good as its evidence binding: DEP_STALE /
+    evidence-invalidation flips it back to unsettled (check-work-deep.mjs,
+    work-verification.md). Backward chaining must treat a stale variable as
+    missing — it produces a re-verification leg, not a skip.
+
+# ============================================================================
+# 1 — FORWARD EDGES. Ordering constraints as {if, then-required/before} rules.
+#    "X is illegal without/before Y" — the chain must satisfy every one.
+# ============================================================================
+forwardEdges:
+
+  - id: draw-before-ui-build
+    if: "any frontend/UI build leg is proposed (interface.implement / frontend.implement)"
+    thenRequired: "interface.draw done for that feature's ui node"
+    enforcement: designGate — the kernel holds a frontend build until the feature's ui node is done and asks the user when the feature has none (.dist/kernel/sync.mjs)
+    why: "interface code is built against the drawing of its feature (model/kinds.yaml implementation/frontend lane purpose)"
+    illegal: "UI work without interface.draw first is ILLEGAL"
+
+  - id: verify-after-implement
+    if: "any proof leg is proposed (uat.verify / e2e.verify / review.verify / perf.verify / security.verify)"
+    thenBefore: "the implementation it proves must be done first"
+    enforcement: lane order — proofs are steps after the build in every lane; a proof that finds nothing built reports 'no delivery to inspect', not a pass
+    why: "verification reads a delivered slice; it is not the builder (.dist/docs/work-verification.md)"
+    illegal: "uat.verify before implementation is complete is ILLEGAL"
+
+  - id: remap-after-refactor
+    if: "code.refactor is proposed"
+    thenRequired: "a work.author leg to remap the implementation record's source mapping to the moved code"
+    why: >-
+      Evidence pins source identity (sourceIdentity / currentCodeMap,
+      .dist/docs/work-verification.md). A refactor that moves code without
+      remapping the record leaves evidence certifying a tree that no longer
+      exists — the stale-evidence rule. The regression-coverage prerequisite
+      is enforced by the test-gap route (blocker test-gap -> test.author).
+    illegal: "refactor without the work.author remap is ILLEGAL"
+
+  - id: architecture-after-business
+    if: "architecture.decide is proposed"
+    thenRequired: "business.decide done (accepted SRS)"
+    enforcement: route block prerequisite (modules/ops/ops/architecture.decide.yaml)
+    why: "the SDS realises the SRS — design may not invent the product rule it is supposed to realise (model/kinds.yaml srs-gap route purpose)"
+    illegal: "architecture.decide before an accepted business scope is ILLEGAL"
+
+  - id: backend-after-decisions
+    if: "backend.implement is proposed"
+    thenRequired: "business.decide done AND architecture.decide done"
+    enforcement: route block prerequisites (modules/ops/ops/backend.implement.yaml)
+    illegal: "backend implementation without both decision legs is ILLEGAL"
+
+  - id: frontend-after-direction-and-design
+    if: "interface.implement / frontend.implement is proposed"
+    thenRequired: "interface.draw done AND architecture.decide done"
+    enforcement: route block prerequisites + designGate
+    illegal: "frontend implementation without direction and architecture is ILLEGAL"
+
+  - id: integration-after-custody
+    if: "integration.verify is proposed"
+    thenRequired: "implementation done AND the owner custody the integration needs (credential/account provision) is in progress or landed"
+    enforcement: >-
+      A missing credential blocks the proof as environment -> needUser
+      (model/kinds.yaml environment-needs-the-user); the credential ask only
+      settles 'verified' after integration.verify reports done+pass
+      (.dist/kernel/owner-requests.mjs). The chain therefore carries a
+      provision.ask leg for the custody BEFORE the verify leg needs it.
+    illegal: "integration verification without custody/provision readiness is ILLEGAL"
+
+  - id: decide-before-build-general
+    if: "any implement leg is proposed"
+    thenBefore: "every decide/direct leg its route prerequisites name"
+    enforcement: >-
+      validateGraph refuses "a lane that builds without proving, a design
+      step after a build step" (.dist/kernel/graph.mjs). The registry stage
+      order (intake > scope > decide > direct > implement > verify > release >
+      operate) is the coarse ordering every chain obeys.
+    illegal: "a build leg before a design/decision leg it depends on is ILLEGAL; a build leg with no proof leg after it is ILLEGAL"
+
+  - id: revise-needs-approved-goal
+    if: "goal.revise is proposed"
+    thenRequired: "an approved goal exists (route prerequisite)"
+    enforcement: reviseGoal requires an approved goal; a goal that was never approved is replaced upstream, not revised
+    illegal: "goal.revise on an unapproved goal is ILLEGAL"
+
+# ============================================================================
+# 2 — BACKWARD EDGES. The cấn cấn mechanism: mid-flight discovery that the
+#    goal, a record, or the scope is wrong. The discovery NEVER gets fixed in
+#    place — it travels BACK to the owning boundary and re-runs forward.
+#    CLAUDE.md: "return to the owning workflow, re-run it from the affected
+#    Business/SRS or Architecture/SDS boundary, and produce fresh evidence.
+#    Never relabel an incorrect flow as debt or refresh stale evidence by
+#    assertion."
+# ============================================================================
+backwardEdges:
+  mechanism: >-
+    An operation that discovers a contradiction raises it as a blocker or a
+    revision request — it never patches the product to match a guess. The
+    kernel routes the blocker to the revision/repair kind that owns it
+    (model/kinds.yaml routes), or the goal itself is revised (goal.revise).
+    propagateInvalidation marks every derivation that depended on the changed
+    section stale; the work re-runs from the affected boundary and produces
+    FRESH evidence; old reports stay bound to the rev that produced them —
+    adoptReportRev adopts a report into the new rev only when the digests are
+    identical (.dist/kernel/goal.mjs).
+  neverQuietly: >-
+    The finding is never "fixed quietly" inside the op that found it. The op's
+    allowlist does not cover the requirement/design record, so it could not —
+    and may not — edit it; it reports the gap and the route reopens the
+    boundary that owns it.
+  suspicionLevels:
+
+    - level: spec-conflict-in-scope
+      when: "the op finds the SRS/SDS/record it was given contradicts the work in scope — e.g. an implementation discovers the SRS contradicts the UI it must build"
+      mayResolve: "the AGENT may resolve it — by raising/recommending the revision, not by picking a reading in code"
+      route: >-
+        The typed gap blocker routes to the owning revision:
+        srs-gap -> business.revise (reopen), sds-gap -> architecture.revise
+        (reopen), interface-gap -> interface.draw (reopen), brand-gap ->
+        brand.decide, grammar-gap -> grammar.update, test-gap -> test.author —
+        each limit 2, then the workflow asks the user (model/kinds.yaml routes).
+        A goal-level conflict goes through goal.revise.
+      staleness: "downstream evidence derived from the changed section is marked stale (propagateInvalidation) and re-proven — never asserted fresh"
+      ownerAsk: "only if the conflict is AUTHORITY_WIDENING — a scope/authority widening is the owner's call, not a record edit"
+      citation: "model/kinds.yaml routes (srs/sds/interface/brand/grammar/test-gap); .dist/kernel/goal.mjs propagateInvalidation; CLAUDE.md work-correction policy"
+
+    - level: scope-expansion
+      when: "the work the goal actually needs reaches beyond the scope the owner approved — a path, a feature, an integration the scope did not declare"
+      mayResolve: "the agent may NOT expand scope itself — scope is the owner's contract"
+      route: >-
+        re-run scope.define against the expanded understanding, then
+        provision.ask/decision.prepare if the expansion needs owner consent —
+        a scope or authority widening is AUTHORITY_WIDENING, a declared blocker
+        that becomes an owner decision (goal.revise contract; effectCeiling
+        containment means a request can never outgrow its grant,
+        applyWorkflowAmendment).
+      staleness: "the goal's scope/criteria derivations stale until the re-scoped goal is approved"
+      citation: "modules/ops/ops/scope.define.yaml + goal.revise.yaml; .dist/kernel/goal.mjs applyWorkflowAmendment/effectPathCovered"
+
+    - level: identity-wrong
+      when: "the discovery is that the goal itself is the wrong goal — wrong workflow, wrong feature, wrong product boundary"
+      mayResolve: "NEVER. An agent must never self-decide a goal-identity change."
+      route: >-
+        provision.ask — always. validateGoalRevision rejects any revision that
+        changes the workflow identity (.dist/kernel/goal.mjs), and an
+        amendment binds baseGoalIdentity — so identity cannot move under the
+        goal's feet. The only legal move is to put the question to the owner
+        and let the workflow be stopped or re-aimed by them.
+      staleness: "a wrong identity voids ALL downstream evidence — every report bound to the wrong rev certifies the wrong contract"
+      citation: ".dist/kernel/goal.mjs validateGoalRevision + stateGoalIdentity; owner.mjs provision stops"
+
+  # The closed route table this mechanism resolves through — cited, not restated.
+  routeTable: >-
+    model/kinds.yaml routes: uat-red/e2e-red/perf-red/review-findings ->
+    lane.build repair (limit 3, reopen/settle); rejected-report -> same (2,
+    retry); red-gate -> lane.build gate (3, settle); srs-gap ->
+    business.revise, sds-gap -> architecture.revise, interface-gap ->
+    interface.draw, brand-gap -> brand.decide, grammar-gap -> grammar.update,
+    test-gap -> test.author (each 2, reopen); shared-change from e2e ->
+    backend.implement, from uat -> frontend.implement, else same (3, pause);
+    environment -> needUser (1); authority -> needUser (1); ask -> needUser
+    (1); partial -> same (5, retry); failed -> same (3, retry). First match
+    wins; a route with an explicit `from` stands before the `any` one.
+  citation: "model/kinds.yaml routes:; CLAUDE.md work-correction policy; .dist/kernel/goal.mjs"
+
+# ============================================================================
+# 3 — SPLIT RULES. When may a goal fan out into sibling chains.
+# ============================================================================
+splitRules:
+  ownershipModel: >-
+    .starciwork is a tree of OWNED scopes: every scope folder owns one
+    index.yaml, parents aggregate required descendants, only leaves author
+    state (.dist/docs/work-ledger.md). No two nodes own the same path — the
+    tree itself forbids two children asserting over overlapping scope.
+  disjointnessIsTheTest: >-
+    A split is legal ONLY when the siblings' write scopes are disjoint —
+    disjoint()/.allowlistsOverlap use path-prefix coverage: `src/**` and
+    `src/x.ts` overlap, `src/a/**` and `src/b/**` do not
+    (.dist/kernel/ledger.mjs disjoint, .dist/kernel/common.mjs
+    allowlistsOverlap). On a plan ledger the same rule is a schema constraint:
+    independent ops must have disjoint path-prefix allowlists (goal-plan.json).
+  noSharedPath: >-
+    No two sibling nodes may own the same path. A path every sibling must
+    touch — module wiring, DI registration, migrations, shared contracts and
+    types — is the SEAM: it is cut as its own child, runs ALONE and FIRST,
+    and every sibling is disjoint from it (cutOpFor seam instructions,
+    .dist/kernel/sync.mjs; allocation.fanOut seamFirst).
+  serialFallback: >-
+    If the scope cannot be split cleanly — no disjoint cut exists, the seam is
+    the whole job — the goal runs SERIAL, one op at a time in dependency
+    order. Forcing parallel ops onto overlapping allowlists is illegal: two
+    writers on one path is two sources of truth for one scope
+    (.dist/docs/op-granularity.md).
+  siblingAnatomy: >-
+    Each sibling gets its own op chain, its own agent, and its own worktree —
+    two workflows never share a worktree (.dist/kernel/lanes.mjs). The parent
+    retains the join operations — integration.verify and review.verify prove
+    the group once, at the parent, after every sibling is done
+    (.dist/docs/op-granularity.md groupAssertions; model/kinds.yaml
+    implementation.plan purpose).
+  limits: >-
+    allocation.fanOut: seamFirst true, maxPerGroup 9 against maxParallelOps 10
+    — eight or nine builds of one parent at once while the seam runs alone
+    (.dist/docs/op-granularity.md).
+  rule: "split only where scopes are disjoint; where they are not, serial — never force a fan-out the tree cannot own"
+
+# ============================================================================
+# 4 — EXISTING-SURFACE RULES. The survey leg — input x current-state, never
+#    raw input alone. Full mechanics in modules/goal/existing.yaml.
+# ============================================================================
+existingSurfaceRules:
+
+  - id: survey-before-chain
+    if: "any feature/refactor/integration input is being decomposed"
+    thenRequired: "the SURVEY leg runs BEFORE the chain is proposed — S₀ unmeasured is Δ uncomputable"
+    mechanism: ".starciwork ownership lookup (ledger.mjs inScope/executableCandidates/decisionCandidates) + source scan + intake reconciliation rows (intake.mjs)"
+    citation: "modules/goal/existing.yaml rules.existing-surface-detection"
+    illegal: "a chain proposed against an unsurveyed tree is ILLEGAL"
+
+  - id: extends-must-record-and-reprove
+    if: "SURVEY found an existing extendable surface X the request touches"
+    thenRequired: "goal records `extends: <record-id-of-X>` AND the chain carries a regression/verification leg on X itself"
+    why: "touching X can break X — X's verified variable goes DEP_STALE on the change; the regression leg is the re-proof, generated BY the extends link not remembered by the agent"
+    citation: "existing.yaml extend-vs-add + ownership-check; scripts/checks/check-work-deep.mjs DEP_STALE"
+    illegal: "EXTEND without the regression leg on the extended surface is ILLEGAL"
+
+  - id: zero-build-is-legal
+    if: "SURVEY found an existing impl already provides the capability"
+    thenRequired: "the chain may be ZERO build legs + one wiring/integration leg"
+    why: "Δ is what is missing, not what was asked for by name — routing a wire to existing capability is the honest chain; inventing a build leg is invented scope"
+    citation: "existing.yaml reuse-over-rebuild"
+    note: "a legal outcome, not a decomposition failure"
+
+  - id: done-record-reverify
+    if: "the touched surface is owned by a record in `done` state"
+    thenRequired: "the chain includes re-verification of that record"
+    why: "DEP_STALE: a done record whose referenced deps moved since baseline refuses — 'its proof was captured against older premises' (check-work-deep.mjs)"
+    citation: "existing.yaml ownership-check; scripts/checks/check-work-deep.mjs"
+    illegal: "touching a done-owned surface without re-verifying it is ILLEGAL"
+
+# ============================================================================
+# 5 — AMBIGUITY RULES. The ladder for an under-specified prompt.
+#    Cost asymmetry: a wrong ORDER costs reruns; a wrong IDENTITY voids every
+#    piece of downstream evidence. The ladder escalates with the cost of
+#    being wrong.
+# ============================================================================
+ambiguityRules:
+  framing: >-
+    Ambiguity is missing information, tiered by WHERE in the planning pipeline
+    it is missing (anatomy.yaml decomposition): intent ambiguous = S* cannot be
+    formed (PARSE fails); scope ambiguous = S* exists but Δ is unmeasurable
+    (SURVEY/GAP stalls); order ambiguous = S* and Δ both known, only the
+    topological sort is undetermined (CHAIN).
+  ladder:
+    - kind: INTENT
+      whereMissing: "PARSE — S* cannot be formed at all"
+      when: "WHAT the owner wants is ambiguous — build vs verify, this feature vs another, this product boundary vs none"
+      resolve: "MUST use provision.ask — the agent never guesses intent"
+      neverGuess: >-
+        A wrong identity is not a rerun cost: it voids every downstream
+        derivation, because every op, question, decision and report is bound to
+        the goalRev that produced it (goalRevOf). The kernel structurally
+        forbids the quiet fix — validateGoalRevision rejects an identity change
+        and the amendment binds baseGoalIdentity — so the only honest move is
+        the owner question.
+      cost: "wrong identity invalidates ALL downstream evidence; wrong order costs reruns only"
+      citation: ".dist/kernel/goal.mjs validateGoalRevision + applyWorkflowAmendment; .dist/kernel/owner.mjs provision stops"
+
+    - kind: SCOPE
+      whereMissing: "SURVEY/GAP — S* formed but Δ unmeasurable (what is IN scope is unknown)"
+      when: "what is IN the goal is ambiguous — which feature, which boundary, whether an existing node is reused or re-authored"
+      resolve: "scope.define proposes the scope — bounding is exactly its job (prerequisite 'request analyzed'); it is the leg that makes Δ measurable"
+      then: "if the proposed scope needs owner consent — it widens authority, touches undeclared paths, adds an integration — provision.ask carries it to the owner"
+      citation: "modules/ops/ops/scope.define.yaml; .dist/kernel/goal.mjs AUTHORITY_WIDENING"
+
+    - kind: ORDER
+      whereMissing: "CHAIN — S* and Δ both known, only the topological sort undetermined"
+      when: "the legs are known but their order is ambiguous — which verify, whether draw precedes decide, whether scope runs before or after a diagnostic"
+      resolve: "the AGENT chooses, using route prerequisites (`needs`) and lane order as the oracle — a leg whose prerequisite names another's output goes after it"
+      record: "the assumption is recorded on the goal (`assumed:` / a questions entry) so a later revision can see it was a guess"
+      cost: "wrong order costs reruns — the chain re-sorts and the affected evidence re-runs; nothing is voided"
+      citation: "modules/ops/ops/*.yaml route prerequisites; model/kinds.yaml lanes order; goal-plan.json dependsOn"
+
+  escalation: >-
+    The ladder is ordered by WHERE the information is missing and by the cost
+    of being wrong. Resolve the HIGHEST rung first — intent before scope
+    before order — because a settled higher rung may dissolve the lower
+    ambiguity entirely, and because the lower rungs are uncomputable while a
+    higher one is open (no S* means no Δ; no Δ means nothing to order).

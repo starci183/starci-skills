@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calibration anchor — low</title>
+<style>
+  /* Anchor: low. The same overview surface as the other two anchors, composed so that the first
+     glance lands nowhere, a band pays no rent, the edges drift, the colour is spent everywhere and
+     the words name modules instead of things. Plain HTML and CSS; nothing loads from outside. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f4f4f6; color: #222; }
+  .top { display: flex; align-items: center; gap: 18px; padding: 14px 22px; background: #ffffff; border-bottom: 1px solid #ddd; }
+  .top h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  .top a { font-size: 13px; color: #1a56db; }
+  .band { height: 180px; background: #e6ecf7; display: flex; align-items: center; justify-content: center; }
+  .band .blob { width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(#c7d4f0, #e6ecf7 70%); }
+  .wrap { padding: 20px 28px 20px 19px; }
+  h2 { font-size: 16px; font-weight: 600; margin: 24px 0 10px 6px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 22px; }
+  .card { background: #fff; border: 1px solid #ddd; padding: 12px 16px 18px 9px; border-radius: 2px; }
+  .card.soft { border-radius: 18px; box-shadow: 0 6px 18px rgba(0,0,0,.14); }
+  .card.pill { border-radius: 999px; padding-left: 20px; }
+  .card .k { font-size: 11px; color: #777; text-transform: uppercase; }
+  .card .v { font-size: 30px; font-weight: 700; margin-top: 3px; }
+  .card .v.small { font-size: 22px; font-weight: 500; }
+  .card .note { font-size: 13.5px; margin-top: 6px; color: #444; }
+  .actions { display: flex; gap: 10px; margin: 18px 0 0 3px; }
+  .btn { padding: 8px 14px; border: 0; border-radius: 6px; font-size: 14px; color: #fff; }
+  .btn.a { background: #1a56db; }
+  .btn.b { background: #16a34a; }
+  .btn.c { background: #db2777; }
+  .btn.d { background: #f59e0b; border-radius: 999px; }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 22px; margin-top: 31px; }
+  .row .card { border-radius: 10px; }
+  .empty { margin: 27px 0 0 2px; padding: 44px 0; text-align: center; color: #888; font-size: 13px; }
+  .list { margin: 13px 0 0 11px; padding: 0; list-style: none; }
+  .list li { padding: 9px 0; border-bottom: 1px solid #e5e5e5; font-size: 14px; display: flex; justify-content: space-between; }
+  .list li.warn { }
+  .tag { font-size: 12px; color: #16a34a; }
+</style>
+</head>
+<body>
+  <header class="top">
+    <h1>Manage</h1>
+    <a href="#svc_orders">svc_orders</a>
+    <a href="#tbl_customers">tbl_customers</a>
+    <a href="#rel_2026_09">rel_2026_09</a>
+    <a href="#information">Information</a>
+  </header>
+
+  <div class="band"><div class="blob"></div></div>
+
+  <main class="wrap">
+    <h2>Overview</h2>
+    <section class="grid">
+      <div class="card"><div class="k">Orders</div><div class="v">1284</div><div class="note">Lorem ipsum dolor sit amet, consectetur</div></div>
+      <div class="card soft"><div class="k">Revenue</div><div class="v small">98213</div><div class="note tag">good</div></div>
+      <div class="card pill"><div class="k">Latency</div><div class="v">342</div></div>
+      <div class="card"><div class="k">Errors</div><div class="v">17</div><div class="note">Since 03:14</div></div>
+    </section>
+
+    <div class="actions">
+      <button class="btn a">Save</button>
+      <button class="btn b">Update</button>
+      <button class="btn c">Delete</button>
+      <button class="btn d">Information</button>
+    </div>
+
+    <h2>Recent</h2>
+    <section class="row">
+      <div class="card"><div class="k">Job</div><div class="note">build_7781 finished</div></div>
+      <div class="card"><div class="k">Job</div><div class="note">build_7780 finished</div></div>
+    </section>
+
+    <section class="empty">No data.</section>
+
+    <ul class="list">
+      <li><span>Payment provider timeout</span><span>2</span></li>
+      <li class="warn"><span>Disk at 91</span><span>1</span></li>
+      <li><span>Queue depth</span><span>0.42</span></li>
+      <li class="warn"><span>Certificate expires</span><span>3</span></li>
+    </ul>
+  </main>
+</body>
+</html>

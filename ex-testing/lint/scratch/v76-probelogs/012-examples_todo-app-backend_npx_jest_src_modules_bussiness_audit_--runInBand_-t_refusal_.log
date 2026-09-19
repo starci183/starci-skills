@@ -1,0 +1,14 @@
+$ npx jest src/modules/bussiness/audit --runInBand -t "refusal"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/audit/audit-log.handler.spec.ts
+PASS src/modules/bussiness/audit/audit-operator.guard.spec.ts
+
+Test Suites: 9 skipped, 2 passed, 2 of 11 total
+Tests:       57 skipped, 2 passed, 59 total
+Snapshots:   0 total
+Time:        4.03 s, estimated 20 s
+Ran all test suites matching /src\\modules\\bussiness\\audit/i with tests matching "refusal".
+

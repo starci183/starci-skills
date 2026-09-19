@@ -1,0 +1,102 @@
+✔ concept 1: a rule naming a criterion that no ac/ directory answers is refused when the rule owns criteria (105.3023ms)
+✖ concept 1: the reverse direction - a criterion its rule does not list, and a criterion whose id lost touch with its directory (119.879ms)
+✔ concept 2: a forEach demand naming a field the record does not carry is refused, and a dotted path resolves (125.7256ms)
+✖ concept 2: proof coverage of a done flow - thin where nothing is demanded, gap where the bar does not grow (30.355ms)
+✔ concept 2: a done journey whose own route list contains an unfinished requirement is refused (99.9891ms)
+✔ concept 3: two done records that declare each other impossible need a decided policy-decision naming both (145.5721ms)
+✔ concept 4: a todo prover of a done record is suspected; the done-prover direction belongs to the base gate (48.4227ms)
+✔ concept 5: a gap closed by nothing, and a gap still open though every closer is done (188.692ms)
+✖ concept 6: a catalog entry without its feature node is refused; a title that no longer says the same thing is suspected (25.4053ms)
+✔ concept 7: a state outside the family schema is refused where the schema is readable and unclaimed where it is not (120.9393ms)
+✔ concept 8: parity reports one line per record family whose authored fields differ between trees (148.3007ms)
+✖ a tree whose records agree with each other produces no finding at all (245.6906ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 8
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1665.2318
+
+✖ failing tests:
+
+test at tests\work-consistency.spec.mjs:77:1
+✖ concept 1: the reverse direction - a criterion its rule does not list, and a criterion whose id lost touch with its directory (119.879ms)
+  AssertionError [ERR_ASSERTION]: ../../../starci-tmp/consistency-fixture-29872-5/.starciwork/features/f/br/complete/once/index.yaml: acceptanceCriteria names "is-idempotent" and ../../../starci-tmp/consistency-fixture-29872-5/.starciwork/features/f/br/complete/once/ac/is-idempotent exists, but no record inside it carries the id ac.f.complete.once.is-idempotent its place requires [AC_NAMING_ASYMMETRY]
+  ../../../starci-tmp/consistency-fixture-29872-5/.starciwork/features/f/br/complete/once/ac/is-idempotent/index.yaml: criterion proves br.f.complete.twice but br.f.complete.twice's acceptanceCriteria is [] - it does not list is-idempotent, so no reader reaches this criterion from the rule [AC_NAMING_ASYMMETRY]
+  ../../../starci-tmp/consistency-fixture-29872-5/.starciwork/features/f/br/complete/once/ac/is-idempotent/index.yaml: criterion proves br.f.complete.twice but does not live under its rule's ac/ directory (../../../starci-tmp/consistency-fixture-29872-5/.starciwork/features/f/br/complete/once/ac/is-idempotent/index.yaml vs ../../../starci-tmp/consistency-fixture-29872-5/.starciwork/features/f/br/complete/twice/index.yaml) [AC_NAMING_ASYMMETRY]
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/work-consistency.spec.mjs:91:10)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests\work-consistency.spec.mjs:115:1
+✖ concept 2: proof coverage of a done flow - thin where nothing is demanded, gap where the bar does not grow (30.355ms)
+  AssertionError [ERR_ASSERTION]: ../../../starci-tmp/consistency-fixture-29872-10/.starciwork/features/f/uat/create/index.yaml: uat.f.create is todo but its proves names 1 record(s) already done (fr.f.create) - their provenance now rests on a prover that is not itself proven [PROVES_ASYMMETRY]
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/work-consistency.spec.mjs:134:10)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\work-consistency.spec.mjs:229:1
+✖ concept 6: a catalog entry without its feature node is refused; a title that no longer says the same thing is suspected (25.4053ms)
+  AssertionError [ERR_ASSERTION]: ../../../starci-tmp/consistency-fixture-29872-23/.starciwork/index.yaml: no readable work/catalog features list at the tree root, so nothing here can be reconciled with it [CATALOG_DIRTY]
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/work-consistency.spec.mjs:234:10)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests\work-consistency.spec.mjs:310:1
+✖ a tree whose records agree with each other produces no finding at all (245.6906ms)
+  AssertionError [ERR_ASSERTION]: ../../../starci-tmp/consistency-fixture-29872-28/.starciwork/index.yaml: no readable work/catalog features list at the tree root, so nothing here can be reconciled with it [CATALOG_DIRTY]
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/work-consistency.spec.mjs:319:10)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

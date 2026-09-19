@@ -78,7 +78,6 @@ function copySkillForBuild(t) {
     'kernel',
     'hosts',
     'models',
-    'checks',
     'providers',
     'approvals',
     'execution',

@@ -1,0 +1,40 @@
+# Deterministic source staleness check
+
+`scripts/check-stales.mjs` is the read-only source/Work/stack freshness gate. It reads an existing canonical Work tree, runs the canonical validator, selects the declared inspection closure, and compares current `inputDigest`, completion evidence, `sourceRefs`, and `starci/source-identity@1` coverage with explicitly mapped Git repositories.
+
+```text
+node scripts/check-stales.mjs --work <work-root> \
+  --repo <repository-id>=<git-root> [--repo ...] \
+  [--target <exact-work-node-id> ...]
+```
+
+Every repository named by a selected source binding must have an explicit `--repo` mapping. A mapping is an observation boundary, not permission to edit it. Omit `--target` to inspect all canonical nodes. With targets, the scanner includes aggregate descendants, ancestor context, `dependsOn`, `refs`, split SRS/SDS semantic inputs and applicable brand context. Ancestors do not by themselves select unrelated siblings. Unrelated Git changes do not invalidate unchanged scoped source coverage.
+
+The command prints `starci/source-staleness-report@1` JSON. Output has no clock value, and stable inputs produce byte-identical output and finding IDs. It exits:
+
+- `0` only when every selected subject is `verified-conforming` within its declared coverage;
+- `1` for `revalidation-needed`, `known-drift`, `missing`, or `unverifiable` findings;
+- `2` for invalid arguments, unsafe/protected paths, missing roots, unknown targets, or unresolved repository inputs;
+- `3` for an unexpected internal failure.
+
+## Meaning of a result
+
+The scanner derives status; input files cannot author it.
+
+- `verified-conforming` means the canonical validator accepts the selected record and current bytes match its declared source coverage. It is bounded structural freshness, not a new product acceptance claim.
+- `revalidation-needed` means semantic inputs, tested source coverage, or evidence bindings changed. A hash difference alone does not prove code wrong.
+- `known-drift` means a declared Work/specification constraint is currently contradicted.
+- `missing` means a required declared source path or completion proof is absent. `IMPLEMENTATION_PROOF_MISSING` does not assert that implementation code is absent.
+- `unverifiable` means a repository, revision, snapshot comparison, path, or canonical input cannot be resolved safely. Unknown is never treated as fresh.
+
+Findings keep `source-drift`, `stack-drift`, `contract-drift`, `evidence-invalid`, and `input-unavailable` separate. Each finding names the exact subject, references one deduplicated `impactGraph.impactSets` closure, gives its existing operator route, and returns bounded candidate paths with `authorized:false`. The graph keeps typed reasons once instead of repeating transitive edge paths in every finding, so a large Work tree remains machine-readable. The report's `coverage` and `limitations` state the exact selected closure, stored binding types, and static-only proof boundary. The report never grants writes, changes Work, reopens nodes, rewrites SRS/SDS from current source, or replaces historical receipts.
+
+Committed `source-identity@1` coverage is compared to its stored revision and normalized credential-free Git origin. A newer HEAD is still conforming when the declared scoped paths have identical bytes; unrelated Git commits and unrelated dirty paths do not invalidate scoped proof. Changed covered bytes require revalidation. Dirty identities remain `unverifiable` because the canonical identity preserves an evidence asset and digest but does not define a reversible checkout format for every snapshot. Legacy `codeRefs` identify a commit but not covered paths, so they remain explicitly unverifiable rather than receiving a full-tree assumption.
+
+SRS and SDS remain source-independent. Their current Work input digests may invalidate dependent completion or evidence, while source paths and symbols stay in implementation mappings. `.starciwork/_local`, `.git`, and `.stacks/staging` are never scanning targets.
+
+## Operation use
+
+A source-staleness audit runs this command before repair and stores its exact report as evidence. The selected closure includes exact targets, aggregate descendants, ancestor context, ordinary `dependsOn`/`refs`, split SRS/SDS semantic inputs and implicit brand input where applicable. Existing operators own any later bounded repair: `business.decide`, `architecture.decide`, `backend.implement`, `interface.implement`, or `runtime.operate`. The repair operation must compare accepted SRS/SDS with source and preserve prior completion/evidence history; it cannot promote current code into a requirement. A separate `review.verify` reruns this command after the repair and rejects any remaining or newly introduced finding. An implementation leaf with no completion reports missing proof; it does not claim source code is absent. A stored but stale completion reports revalidation instead of being relabeled as missing implementation.
+
+The stale subject itself may be the audit target; it is not scheduled as a completed prerequisite merely to inspect it. Real upstream authorization and declared dependencies still apply. `baselineDigest` binds the canonical Work inputs and stored source identities scanned by this report. It is not an acceptance receipt and cannot bless current bytes automatically.

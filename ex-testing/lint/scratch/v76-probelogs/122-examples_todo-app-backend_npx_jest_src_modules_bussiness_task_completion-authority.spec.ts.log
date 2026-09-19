@@ -1,0 +1,20 @@
+$ npx jest src/modules/bussiness/task/completion-authority.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/task/completion-authority.spec.ts
+  CompletionAuthorityRegistry
+    √ br.task.single-owner (default): only the owner may complete or reopen; a stranger is refused (18 ms)
+    √ a registered widened authority lets a non-owner complete/reopen once registered (3 ms)
+    √ delete stays owner-only through OwnershipGuard even after a widened CompletionAuthority is registered (3 ms)
+    √ sds.task.ownership-guard.t-owner: with the default authority the owner passes the completion authority and the delete guard (3 ms)
+    √ sds.task.ownership-guard.t-collaborator: a widened authority proceeds with complete and reopen, while delete is still refused (2 ms)
+    √ sds.task.ownership-guard.t-stranger: a stranger is refused on both paths before anything is written (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        3.74 s, estimated 7 s
+Ran all test suites matching /src\\modules\\bussiness\\task\\completion-authority.spec.ts/i.
+

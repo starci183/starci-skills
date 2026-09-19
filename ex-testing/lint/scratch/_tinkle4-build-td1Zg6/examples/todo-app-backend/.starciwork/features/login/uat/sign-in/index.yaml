@@ -1,0 +1,19 @@
+schema: work/uat-flow
+id: uat.login.sign-in
+title: Sign in, close the browser, come back
+state: done
+entry: /login
+actor: person
+accounts: accounts.yaml
+environment: environment.todo-app.dev
+fixtures: [fixture.todo-app.seed]
+steps:
+    - {order: 1, actor: person, action: "Sign in with the seeded person.", expected: "the task list loads for that person", checks: [{id: loading, expected: yes}, {id: completion, expected: yes}]}
+    - {order: 2, actor: person, action: "See the empty task list.", expected: "no tasks are listed and no error shows", checks: [{id: errorFeedback, expected: no}]}
+    - {order: 3, actor: person, action: "Close the browser tab and come back (the session token persists in localStorage, read back as an Authorization: Bearer header - never a cookie).", expected: "still signed in, same list renders with no re-authentication", checks: [{id: completion, expected: yes}]}
+    - {order: 4, actor: person, action: "Submit a wrong password.", expected: "a single uniform refusal message shows; no account-existence hint", checks: [{id: errorFeedback, expected: yes}, {id: validation, expected: yes}]}
+effects:
+  - "read-only sign-in against the seeded identity; no row created"
+cleanup:
+  - "none - no disposable row created"
+proves: [fr.login.sign-in, br.login.password.sign-in, br.login.session.restores]

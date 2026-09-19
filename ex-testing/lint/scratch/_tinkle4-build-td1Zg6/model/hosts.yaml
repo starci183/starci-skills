@@ -1,0 +1,36 @@
+schema: starci/hosts@1
+purpose: |-
+  A host is three facts and no more: a name, what it offers beyond a worktree and a runtime, and whether it
+  runs operations in parallel. The kernel reads nothing else about the machine it is on (`hostDescriptorOf`),
+  so the two adapters belong here as data rather than as a frozen object in each adapter's source: a host that
+  gains a capability or loses its parallelism is then one reviewable diff in this file instead of two constants
+  in two modules that can drift apart, and a reader who wants to know what a host is reads one page.
+  `hosts/index.mjs` is the only code that loads this profile; `hosts/orca/calls.mjs` and
+  `hosts/headless/host.mjs` ask it for their own descriptor and carry the built-in values only as the fallback
+  for a tree that has not been built yet.
+  `capabilities` are values of the `capabilities` vocabulary of `model/kinds.yaml` and nothing else: a kind
+  declares what it `needs` from that same vocabulary, and an operation whose kind needs what its host does not
+  offer is refused at schedule time as `host-unsupported` rather than launched into a process that has no tool
+  to do the work with. A capability is therefore a fact about tooling, never about a model or a budget.
+hosts:
+  # The multi-agent IDE the runtime was built against: it supplies worktrees, attested agent terminals, a
+  # dispatch mailbox and a run coordinator. It is the only host that carries built-in ImageGen for
+  # `interface.draw` directions and `interface.asset` artwork, which is why it declares `design-tool`,
+  # and it runs up to `maxParallelOps` operations at once in one worktree - so `sequential` is false.
+  orca:
+    capabilities: [design-tool]
+    sequential: false
+    purpose: >-
+      The Orca IDE. Parallel attested agent terminals in one worktree, plus built-in ImageGen for representative
+      interface directions and declared artwork.
+  # The chat host: the same kernel without Orca, where an operation is a `claude -p` / `codex exec` / `qwen`
+  # child process and a report arrives through a file mailbox. It offers nothing beyond the worktree the
+  # command was started in, so its capability list is deliberately empty - the emptiness is the contract that
+  # makes `host-unsupported` mechanical instead of a judgement. It is sequential because one chat drives one
+  # workflow and there is no second terminal from which a second process could be supervised.
+  headless:
+    capabilities: []
+    sequential: true
+    purpose: >-
+      A plain Claude Code or Codex chat driving the kernel. One operation at a time as a headless model
+      process, reports through a file mailbox, no design tooling.

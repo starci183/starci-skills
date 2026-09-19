@@ -1,0 +1,66 @@
+schema: starci/flash-policy@1
+mode: FLASH
+purpose: |-
+  Execute one small, clear, cohesive and reversible local repair without the full Plan, workflow or Work ceremony.
+activation: |-
+  Automatically select this direct route for an authorized small change when all structured eligibility checks pass; no flash keyword is required. Explicit flash remains supported but never bypasses eligibility. mode null means no explicit mode, not a requirement to create a Plan. Respect an explicit user request for planning instead of execution.
+routes:
+  - flash
+  - workflow
+  - plan
+  - inspect
+limits:
+  effectCeiling: local-source-and-focused-local-checks
+  paths: |-
+    Multiple repository-relative files are allowed when they form one bounded cohesive repair.
+requiredFacts:
+  - mode
+  - operation
+  - repository
+  - scope
+  - impact
+  - checks
+eligible:
+  - |-
+    Mode is FLASH or null; actual requested effects authorize this edit
+  - Repository root and binding are known
+  - |-
+    Outcome and repository-relative paths are explicit, clear and cohesive
+  - |-
+    The edit is local, reversible and low risk
+  - At least one focused check is named
+  - |-
+    No business, authorization, schema, architecture, external or destructive effect is present
+examples:
+  flash:
+    - A typo in existing copy or code
+    - |-
+      A cohesive local CSS repair, including several directly related CSS files
+    - |-
+      A retry handler repair where existing safe retry semantics, authorization and contracts remain unchanged
+  workflow:
+    - |-
+      A business, authorization, schema, persistence, public contract or architecture change
+    - |-
+      A bounded explicitly authorized deploy, publish, runtime operation or data mutation
+  plan:
+    - |-
+      A redesign, new interaction flow, destructive operation, broad refactor or scope expansion
+authority:
+  execution: |-
+    The user's change request authorizes the eligible bounded local edit and focused checks; no separate Plan or duplicate approval is needed. Questions, diagnoses and planning-only requests do not authorize edits. Classification is not an authority grant.
+  truth: |-
+    Structured facts and reporting cannot authenticate behavior. Compare them with the actual request, diff and check output; do not manufacture approval, acceptance, impact facts, check results or completion evidence.
+  ceiling: |-
+    FLASH grants no publish, deployment, runtime, production, data mutation or destructive authority.
+  promotion: |-
+    An ineligible but clear cohesive request selects workflow classification; unclear or expanded multi-workflow scope selects Plan. Neither fallback authorizes effects. Use selectExecutionRoute for the complete scope decision; no one-job Plan wrapper is required.
+validation:
+  - |-
+    Recheck repository binding and path scope before reporting the result
+  - |-
+    Every requested focused check has an actual status and observation
+  - |-
+    Report failed or unavailable checks honestly
+  - |-
+    Do not claim product completion when applicable checks did not pass

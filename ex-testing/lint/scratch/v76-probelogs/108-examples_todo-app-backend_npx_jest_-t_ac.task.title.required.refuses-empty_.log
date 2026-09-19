@@ -1,0 +1,15 @@
+$ npx jest -t "ac.task.title.required.refuses-empty"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/task/task.service.spec.ts
+PASS src/modules/bussiness/task/create-task.handler.spec.ts
+PASS src/features/todo/graphql/mutations/task/create-task/create-task.resolver.spec.ts (19.399 s)
+
+Test Suites: 114 skipped, 3 passed, 3 of 117 total
+Tests:       698 skipped, 3 passed, 701 total
+Snapshots:   0 total
+Time:        25.142 s
+Ran all test suites with tests matching "ac.task.title.required.refuses-empty".
+

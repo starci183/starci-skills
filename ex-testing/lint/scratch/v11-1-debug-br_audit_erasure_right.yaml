@@ -1,0 +1,34 @@
+schema: work/business-rule
+id: br.audit.erasure.right
+title: A person may have what identifies them erased
+state: done
+statements:
+  - A verified erasure request makes every existing log line the person produced permanently
+    unreadable to any reader, without deleting the line, rewriting its content or breaking the chain.
+  - Erasure removes only what identifies the person. The line's action, target and position stay.
+authorityRefs:
+  - "owner-intent: the log is a record of events, not a permanent record of the people in them."
+acceptance:
+  - id: ac.audit.erasure.right.identifying-fields-unreadable
+    given: A person who has produced several log lines, and a completed erasure request against them
+    when: Any reader, including export, tries to resolve those lines back to the person
+    then:
+      - No reader recovers the person's identity from any line they produced.
+      - "The lines themselves are unchanged: same bytes, same position, same hash chain."
+module: src/modules/bussiness/audit
+refs: [decision.audit.erasure-method, br.audit.retention]
+
+change:
+change:
+  rev: 4
+  kind: editorial
+  at: 2026-09-19T15:44:01.435Z
+  reason: "Dropped the conflictsWith edge on br.audit.retention rev 2: the tension it described was
+    real under retention's pre-decision wording, but decision.audit.erasure-method (chosen:
+    crypto-shred) narrowed retention to the line's existence and chain position - br.audit.retention
+    rev 2 already says 'readable-or-tombstoned ... never dropped early' - so the two statements no
+    longer contradict. The decision stays linked through refs; keeping a conflictsWith whose because
+    quotes a statement the target no longer makes would record a resolved conflict as live. Rev 2's
+    reason stands on the record: crypto-shred is settled and built in AuditErasureService, module
+    corrected to src/modules/bussiness/audit, proven by audit-erasure.service.spec.ts. rev 4 (v11 ac-collapse): acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.audit.erasure.right#<former-ac-id>. Encoding change only, no semantic change."
+

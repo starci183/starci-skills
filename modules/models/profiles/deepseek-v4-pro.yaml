@@ -1,0 +1,51 @@
+# Profile: deepseek-v4-pro — installed DeepSeek-on-QwenCloud exception target.
+# Business frame: like qwen3.8-max — installed, launchable, but deliberately off
+# every automatic chain. Its profiles carry the "preferred cost-aware" labels,
+# yet the routing policy still requires explicit selection.
+
+target: deepseek-v4-pro       # registry.json targets
+provider: qwen                # QwenCloud-compatible route — runs through the qwen CLI
+runtime: qwen                 # registry.json targets.deepseek-v4-pro.runtime
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: deepseek-v4-pro
+  profiles:
+    working: deepseek-v4-pro-worker     # qwen.json — "the PREFERRED cost-aware
+                                        # backend implementation and repair work"
+    reasoning: deepseek-v4-pro-reviewer # qwen.json — "the PREFERRED deep
+                                        # independent review"
+  tension: >-
+    OBSERVED: the profile descriptions say "preferred" while registry.json
+    costPolicy excludes the target from all automatic chains. Resolution: the
+    profiles describe intent within the QwenCloud family; the registry's chain
+    exclusion is the operative routing rule — preference is realized only through
+    explicit/user-approved selection, never by default.
+
+launch:
+  orca:
+    kind: command-terminal
+    command: "qwen --model deepseek-v4-pro --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
+    dispatch: return-preamble-and-send
+    adapter: qwen
+    nestedAgents: forbidden
+  imageGeneration: false      # both profiles false in qwen.json
+
+position:
+  automaticChains: excluded   # costPolicy, verbatim
+  tiers: absent
+
+business:
+  question: >-
+    "Which target do I name when cost-aware depth on the QwenCloud window is the
+    explicit requirement?" — deepseek-v4-pro.
+  whenNeeded:
+    - User-approved exception dispatch or benchmark, exactly like qwen3.8-max.
+    - Deep independent review where the owner has chosen it over the flash reviewer.
+  whenNot:
+    - Automatic routing of any kind — no chain lists it.
+    - As a way to get "preferred" status without an explicit grant — the preferred label is descriptive, not routing authority.
+  pickedBy: Explicit owner/benchmark selection only.
+  failureModes:
+    - Same command-terminal ceilings as all Qwen routes; a ceiling stop is failure.
+    - "INFERRED: do not read \"preferred\" in the profile text as permission to lead a chain — the registry overrides."

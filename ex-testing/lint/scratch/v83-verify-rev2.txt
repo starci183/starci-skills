@@ -1,0 +1,55 @@
+schema: work/contract
+id: contract.login.identity-for-task
+title: How task learns who the actor is
+state: todo
+between:
+  provider: login
+  consumer: task
+owner: login
+surface:
+  - name: actorOf
+    shape: (request) -> {personId}, or throws a stable AbstractException subclass
+    guarantee: Resolves to the person of a live session. An absent or expired session throws
+      SessionNotFoundException/SessionExpiredException (both AbstractException, both carrying a stable
+      `code`) rather than returning a sentinel value; it never returns a partial person.
+    stability: A change to the shape, or to which exception subclass is thrown for which cause, is
+      breaking for task.
+guarantees:
+  - A returned personId belongs to a session that was live at the moment of the call.
+  - An absent/expired session is a thrown, typed refusal, never "unknown" and never a null the caller
+    could mistake for success; task must not retry on it.
+consumerObligations:
+  - task lets the thrown exception propagate as its own refusal (unauthenticated) and never invents an
+    actor to keep going.
+  - task does not cache the personId beyond one request.
+refs: [br.login.session.restores, br.task.single-owner]
+
+requiresProof:
+  provider:
+    required: true
+    note: The provider proves it honours the surface.
+  consumer:
+    required: true
+    note: The consumer proves it honours its obligations.
+
+change:
+  rev: 2
+  kind: breaking
+  at: 2026-09-18T14:20:00.000Z
+  withdraws: ["Returns the person of a live session, or null. Never throws, never a partial person.",
+    "null means unauthenticated, never \"unknown\"; task must not retry on it.",
+    "task treats null as a refusal and never invents an actor."]
+  reason: The withdrawn shape ("or null") never matched either the pre-refactor REST controllers or the
+    current session-actor.adapter.ts - both always throw SessionNotFoundException/SessionExpiredException
+    for an absent or expired session, and the consumer has always relied on that throw propagating as the
+    transport's own refusal, never on reading a null. This rev makes the contract describe the real,
+    already-tested mechanism instead of one the code never implemented.
+
+# gap.task.collaborator-completion closed (lane be-share): share's provider half is real and tested.
+# The consumer side (impl.task.todo-app-backend.ownership) re-proving this contract's own consumer
+# obligations against br.task.single-owner rev 2 is lane login-impl/task's call, not this lane's, so
+# this record stays todo with no blockedBy of its own rather than citing a resolved gap.
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+provenBy:
+  provider: [impl.login.todo-app-backend.auth]

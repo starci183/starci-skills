@@ -1,0 +1,28 @@
+schema: work/policy-decision
+id: decision.notify.dedupe-key
+title: What the dedupe key is derived from
+state: done
+outcome: decided
+question: A delivery may be attempted more than once for the same real-world event. What identifies "the
+  same real-world event" so a retry collapses onto it instead of creating a second notification?
+options:
+  - id: producer-event-id
+    summary: sha256 of kind + the producer's own event id + the recipient.
+    consequence: Correct as long as the producer hands notify a stable id per real event. If the
+      producer has no such id (see contract.notify.task-completion-feed), notify has nothing honest to
+      hash and cannot dedupe at all - it would have to invent an id, which defeats the point.
+  - id: payload-hash
+    summary: sha256 of kind + the recipient + a hash of the payload.
+    consequence: Works with no cooperation from the producer, but two distinct real events with the
+      same payload (two different tasks both titled "reply to Sam") collapse into one notification,
+      which is a worse bug than an occasional duplicate.
+  - id: receipt-time-bucket
+    summary: sha256 of kind + recipient + the minute the pipeline received it.
+    consequence: Guarantees nothing; a retry that lands in the next minute is treated as new, which is
+      exactly the failure this decision exists to prevent.
+recommendation: producer-event-id
+recommendationReason: A payload collision that silently drops a real event is worse than a duplicate that
+  at-least-once already risks. This makes the dedupe key's correctness a property the producer must
+  uphold - a stable per-event id - and not something notify can manufacture on its own; that obligation
+  is recorded on the two contract records this feature is missing.
+chosen: producer-event-id

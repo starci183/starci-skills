@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {PROOF_POLICY,isSpecPath,policyFor,proofApplies,proofFinding,proofPlan,runAtBase,planProtectedProof,runProtectedProof,protectedProofFinding} from '../checks/proof.mjs';
+import {PROOF_POLICY,isSpecPath,policyFor,proofApplies,proofFinding,proofPlan,runAtBase,planProtectedProof,runProtectedProof,protectedProofFinding} from '../scripts/checks/proof.mjs';
 
 test('the protected proof is a gate only for a code-writing kind with a sealed oracle; everything else is skipped, not judged',()=>{
   const manifest={schema:'starci/oracle-manifest@1',digest:'a'.repeat(64),oracles:[{id:'oracle-1',path:'protected/double.spec.mjs',sha256:'b'.repeat(64),assertionIds:['doubles'],ownerAttemptId:'kernel:wf:1',kinds:['backend.implement'],command:'node --test protected/double.spec.mjs'}]};
@@ -245,5 +245,5 @@ test('an empty plan is checks-only and runs nothing',()=>{
 
 test('the module is listed as a runtime module',()=>{
   const listed=fs.readFileSync(new URL('../scripts/runtime-modules.txt',import.meta.url),'utf8');
-  assert.match(listed,/^checks\/proof\.mjs$/m);
+  assert.match(listed,/^scripts\/checks\/proof\.mjs$/m);
 });

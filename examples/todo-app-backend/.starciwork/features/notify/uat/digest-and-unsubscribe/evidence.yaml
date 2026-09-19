@@ -1,0 +1,53 @@
+# Written by hand, same convention as uat.plan.upgrade-after-cap/uat.share.invite-and-collaborate
+# (scripts/example-evidence.mjs cannot emit the `run:` field a uat-flow needs). IMPORTANT DIFFERENCE:
+# the named run settled partial-pass, not pass - this file records which run exists and what it proved,
+# it does NOT settle the record as done. The record stays inprogress on gap.notify.live-proof, which
+# names the unproven inbox-arrival leg: the product has no in-app inbox and this stack has no reachable
+# SMTP host (integration.notify.smtp / gap.notify.smtp-host-unreachable), so the record's steps 3 and 6
+# have no honest surface to read and the owner directive forbids faking the provider leg.
+schema: work/evidence
+record: uat.notify.digest-and-unsubscribe
+recordDigest: 5213e2384e355f91ebab34511023bb54f69f012b29422a8c5651ae7584acd408
+run: runs/20260919T144517Z-5c10a673
+outcome: partial-pass
+assets:
+  - path: runs/20260919T144517Z-5c10a673/videos/digest-and-unsubscribe.webm
+    sha256: 4b42ffc06f448ae8cc9b345becc95b611367a7ec46910b68ad24acc3d04610e8
+provenance:
+  actor: playwright-harness
+  tool: 'npx playwright test -c uat/playwright.config.ts uat.notify.digest-and-unsubscribe.spec.ts (reporter uat/lib/run-writer.ts)'
+  environment: local
+  capturedAt: '2026-09-19T14:45:17.000Z'
+  stack: >-
+    The shared stack already running on this machine (not booted by this lane): postgres:16 on
+    127.0.0.1:5432 (database todo) in container compose-postgres-1, keycloak 26.0 on 8089 (realm todo,
+    the two DEMO-ONLY committed users demo@todo.dev / demo2@todo.dev), redis on 6379 carrying the real
+    notify dispatch queue, minio on 9000, this worktree's backend on 3001 and frontend on 3000 - the
+    bytes proven are the manifest's frontendCommit/backendCommit (5c10a673 for both).
+  authorization: >-
+    UAT_LIVE_LOGIN_AUTHORIZED=true, UAT_DEMO_PASSWORD set to the DEMO-ONLY plaintext password already
+    committed in .starcistacks/dev/infra/compose/realm-todo.json; docker-executed psql against
+    compose-postgres-1 for the read-only read-backs (notification preferences, notify_notifications /
+    notify_delivery_attempts / notify_digest_windows grouping and flush state) that
+    environment.todo-app.dev's allowedEffects authorize - the product exposes no notifications query,
+    so the database is the only honest read surface. No credential value is stored in this record or
+    the run folder.
+  observed_effect: >-
+    One real sign-in wrote a session row (not counted as a run-owned resource, same caveat as the
+    sibling flows). Three run-owned task rows were created and completed through the app's own UI - the
+    record's declared "trigger three notify-worthy product events" effect, written through the real
+    door - and the real notify pipeline reacted: the first two completions landed as
+    notify_notifications rows sharing one digest_group_id inside one rolling window (armed to the
+    preference's own digestWindowMinutes=1 through the real updateNotificationPreferences mutation),
+    the NotifyScheduler flushed that window once and DeliveryService dispatched both members as ONE
+    rendered batch; after the preferences screen's real "Unsubscribe from email" action persisted
+    unsubscribed:true, the third completion's delivery attempt was born suppressed
+    (failure_class=unsubscribed, attempt=0, no dispatch). The dispatched batch was refused transiently
+    by the transport - no dev SMTP host exists - so inbox arrival is not-run, never faked. All three
+    task rows were deleted through the UI's own two-step confirm, the notify pipeline rows were removed
+    by scoped delete, the pre-run preference (unsubscribed:false, digestWindowMinutes:1) was restored,
+    and every deletion was verified absent by read-back - cleanup.json's triplets close out.
+  recording: >-
+    videos/digest-and-unsubscribe.webm, 1,470,781 bytes, WebM, captured by Playwright with video: 'on'.
+    Password fields render as the browser's own bullets and page.screenshot masks them whenever
+    present; no credential is in the committed bytes.

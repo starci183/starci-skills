@@ -1,0 +1,64 @@
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\audit\privacy\component.tsx
+  138:1   error  Expected indentation of 12 spaces but found 6       indent
+  174:1   error  Expected indentation of 32 spaces but found 16      indent
+  198:1   error  Expected indentation of 32 spaces but found 16      indent
+  229:1   error  Expected indentation of 36 spaces but found 18      indent
+  236:1   error  Expected indentation of 40 spaces but found 20      indent
+  241:1   error  Expected indentation of 44 spaces but found 22      indent
+  244:1   error  Expected indentation of 44 spaces but found 22      indent
+  251:1   error  Expected indentation of 48 spaces but found 24      indent
+  260:1   error  Expected indentation of 48 spaces but found 24      indent
+  262:77  error  Use the routed navigation owner for internal links  starci-fe/no-internal-starci-href
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\blocks\share-invite\component.tsx
+  228:1  error  Expected indentation of 40 spaces but found 14  indent
+  263:1  error  Expected indentation of 52 spaces but found 20  indent
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\blocks\task-list\component.tsx
+  120:1  error  Expected indentation of 28 spaces but found 14  indent
+  129:1  error  Expected indentation of 36 spaces but found 18  indent
+  173:1  error  Expected indentation of 64 spaces but found 32  indent
+  182:1  error  Expected indentation of 68 spaces but found 34  indent
+  186:1  error  Expected indentation of 64 spaces but found 32  indent
+  192:1  error  Expected indentation of 64 spaces but found 32  indent
+  195:1  error  Expected indentation of 64 spaces but found 32  indent
+  199:1  error  Expected indentation of 68 spaces but found 34  indent
+  210:1  error  Expected indentation of 36 spaces but found 18  indent
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\notify\preferences\component.tsx
+  131:1   error  Expected indentation of 12 spaces but found 6       indent
+  190:1   error  Expected indentation of 40 spaces but found 20      indent
+  227:69  error  Use the routed navigation owner for internal links  starci-fe/no-internal-starci-href
+  239:1   error  Expected indentation of 40 spaces but found 20      indent
+  242:1   error  Expected indentation of 40 spaces but found 20      indent
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\plan\usage-screen\component.tsx
+  185:1  error  Expected indentation of 52 spaces but found 24  indent
+  189:1  error  Expected indentation of 56 spaces but found 26  indent
+  197:1  error  Expected indentation of 52 spaces but found 24  indent
+  203:1  error  Expected indentation of 56 spaces but found 26  indent
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\recur\end-rule-confirm.tsx
+  29:1  error  Expected indentation of 20 spaces but found 10  indent
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\recur\schedule-screen.tsx
+  225:1  error  Expected indentation of 24 spaces but found 12  indent
+  266:1  error  Expected indentation of 32 spaces but found 16  indent
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\components\recur\workspace.tsx
+   80:1  error  Expected indentation of 20 spaces but found 8   indent
+  128:1  error  Expected indentation of 24 spaces but found 12  indent
+  149:1  error  Expected indentation of 24 spaces but found 12  indent
+  157:1  error  Expected indentation of 24 spaces but found 12  indent
+  162:1  error  Expected indentation of 24 spaces but found 12  indent
+
+D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend\src\features\pages\tasks\index.tsx
+   83:1  error  Expected indentation of 16 spaces but found 8   indent
+  117:1  error  Expected indentation of 28 spaces but found 14  indent
+  128:1  error  Expected indentation of 28 spaces but found 14  indent
+  140:1  error  Expected indentation of 36 spaces but found 18  indent
+
+✖ 42 problems (42 errors, 0 warnings)
+  40 errors and 0 warnings potentially fixable with the `--fix` option.
+

@@ -1,0 +1,24 @@
+
+# token sonarqube-todo-app-backend-token.key (len 44, prefix sqp_***)
+users/search -> HTTP 200
+  projectKeys=starci-todo-app-backend -> total=58
+  projectKeys=starci-ecommerce-app-be -> total=58
+  id=starci-todo-app-backend -> total=58
+  projectKeys=starci-todo-app-nope -> total=58
+  (no selector) -> total=58
+
+# token sonarqube-ecommerce-app-be-token.key (len 44, prefix sqp_***)
+users/search -> HTTP 200
+  projectKeys=starci-todo-app-backend -> total=58
+  projectKeys=starci-ecommerce-app-be -> total=58
+  id=starci-todo-app-backend -> total=58
+  projectKeys=starci-todo-app-nope -> total=58
+  (no selector) -> total=58
+
+# token sonarqube-admin-token.key (len 44, prefix squ_***)
+users/search -> HTTP 200
+  projectKeys=starci-todo-app-backend -> total=58
+  projectKeys=starci-ecommerce-app-be -> total=58
+  id=starci-todo-app-backend -> total=58
+  projectKeys=starci-todo-app-nope -> total=58
+  (no selector) -> total=58

@@ -1,0 +1,19 @@
+$ npx jest src/modules/bussiness/share/completion-authority.spec.ts -t delete-refused-for-editor
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/share/completion-authority.spec.ts
+  ShareCompletionAuthority (contract.share.completion-guard-for-task)
+    √ ac.share.editor.no-delete.delete-refused-for-editor: an accepted editor may never delete the task (9 ms)
+    ○ skipped ac.share.role.permissions.editor-can-complete: an accepted editor collaborator may complete the task
+    ○ skipped ac.share.role.permissions.viewer-read-only: an accepted viewer collaborator may not complete the task
+    ○ skipped ac.share.revoke.on-read.removed-loses-access-next-read: a revoked editor is refused on the very next completion attempt
+    ○ skipped the owner may still complete and delete after an editor is registered
+
+Test Suites: 1 passed, 1 total
+Tests:       4 skipped, 1 passed, 5 total
+Snapshots:   0 total
+Time:        2.508 s
+Ran all test suites matching /src\\modules\\bussiness\\share\\completion-authority.spec.ts/i with tests matching "delete-refused-for-editor".
+

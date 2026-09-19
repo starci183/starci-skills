@@ -1,0 +1,124 @@
+===== candidate buckets =====
+
+-- ecommerce-app-be/ecommerce-app-be/CATALOG: 2
+   examples/ecommerce-app-be/.starciwork/index.yaml: entry checkout: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+   examples/ecommerce-app-be/.starciwork/index.yaml: entry identity: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+
+-- ecommerce-app-be/ecommerce-app-be/FR_DONE_UNIT_FOREACH: 2
+   features/checkout/fr/place-order/index.yaml: composes=1 unit={"forEach":"composes"} e2e=true uat=false
+   features/identity/fr/sign-in/index.yaml: composes=2 unit={"forEach":"composes"} e2e=true uat=false
+
+-- ecommerce-app-be/ecommerce-app-be/GAP: 3
+   features/checkout/gap/live-proof/index.yaml: state=todo closedBy=["uat.checkout.place-order"] allDone=false
+   features/checkout/gap/second-example-gates/index.yaml: state=todo closedBy=null allDone=n/a
+   features/identity/gap/live-proof/index.yaml: state=todo closedBy=["uat.identity.sign-in"] allDone=false
+
+-- ecommerce-app-be/ecommerce-app-be/NO_REQUIRES_PROOF: 5
+   brand/index.yaml: work/brand done with no requiresProof
+   features/checkout/br/place-order/index.yaml: work/business-rule done with no requiresProof
+   features/checkout/impl/ecommerce-app-be/order-checkout/index.yaml: work/implementation done with no requiresProof
+   features/identity/br/sign-in/index.yaml: work/business-rule done with no requiresProof
+   features/identity/impl/ecommerce-app-be/identity-account/index.yaml: work/implementation done with no requiresProof
+
+-- ecommerce-app-be/ecommerce-app-be/PROOF_FOREACH: 7
+   features/checkout/fr/cart/add/index.yaml: unit.forEach=composes fieldPresent=true len=1
+   features/checkout/fr/cart/clear/index.yaml: unit.forEach=composes fieldPresent=true len=1
+   features/checkout/fr/cart/list/index.yaml: unit.forEach=composes fieldPresent=true len=1
+   features/checkout/fr/place-order/index.yaml: unit.forEach=composes fieldPresent=true len=1
+   features/checkout/sds/order-flow/index.yaml: transitions.forEach=stateMachine.transitions fieldPresent=false len=n/a
+   features/identity/fr/account/index.yaml: unit.forEach=composes fieldPresent=true len=2
+
+-- ecommerce-app-be/ecommerce-app-be/PROOF_FOREACH_DANGLING: 1
+   features/checkout/sds/order-flow/index.yaml: transitions.forEach names "stateMachine.transitions", which the record does not carry
+
+-- ecommerce-app-be/ecommerce-app-be/PROOF_KIND_UNKNOWN: 5
+   features/checkout/contract/order-for-identity/index.yaml: kind "provider"
+   features/checkout/contract/order-for-identity/index.yaml: kind "consumer"
+   features/checkout/integration/postgres/index.yaml: kind "live"
+   features/checkout/integration/redis/index.yaml: kind "live"
+   features/checkout/sds/order-flow/index.yaml: kind "transitions"
+
+-- ecommerce-app-be/ecommerce-app-be/PROVES_EDGE: 10
+   features/checkout/impl/ecommerce-app-be/order-checkout/index.yaml: impl.checkout.ecommerce-app-be.order-checkout(done) proves br.checkout.place-order(done, work/business-rule)
+   features/checkout/impl/ecommerce-app-be/order-checkout/index.yaml: impl.checkout.ecommerce-app-be.order-checkout(done) proves fr.checkout.place-order(done, work/functional-requirement)
+   features/checkout/impl/ecommerce-app-be/order-checkout/index.yaml: impl.checkout.ecommerce-app-be.order-checkout(done) proves sds.checkout.order-flow(done, work/sds-component)
+   features/checkout/impl/ecommerce-app-be/order-checkout/index.yaml: impl.checkout.ecommerce-app-be.order-checkout(done) proves contract.checkout.order-for-identity(done, work/contract)
+   features/checkout/uat/place-order/index.yaml: uat.checkout.place-order(todo) proves fr.checkout.place-order(done, work/functional-requirement)
+   features/checkout/uat/place-order/index.yaml: uat.checkout.place-order(todo) proves br.checkout.place-order(done, work/business-rule)
+
+-- todo-app-backend/todo-app-backend/CATALOG: 7
+   examples/todo-app-backend/.starciwork/index.yaml: entry login: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+   examples/todo-app-backend/.starciwork/index.yaml: entry task: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+   examples/todo-app-backend/.starciwork/index.yaml: entry share: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+   examples/todo-app-backend/.starciwork/index.yaml: entry notify: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+   examples/todo-app-backend/.starciwork/index.yaml: entry plan: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+   examples/todo-app-backend/.starciwork/index.yaml: entry audit: recordExists=true idAgrees=true titleAgreesWithDescription=false descAgrees=false entryKeys=[id,directory,description]
+
+-- todo-app-backend/todo-app-backend/CONFLICT_EDGE: 6
+   features/audit/br/erasure/right/index.yaml: br.audit.erasure.right + br.audit.retention: src=done other=done resolvers=[decision.audit.erasure-method/decided/done]
+   features/audit/data/log-line/index.yaml: br.task.delete.final + data.audit.log-line: src=done other=done resolvers=[none]
+   features/notify/contract/new-device-signal/index.yaml: br.login.session.single-device + contract.notify.new-device-signal: src=todo other=todo resolvers=[none]
+   features/notify/fr/on-new-device/index.yaml: br.login.session.single-device + fr.notify.on-new-device: src=todo other=todo resolvers=[none]
+   features/plan/contract/create-precondition/index.yaml: contract.plan.create-precondition + fr.task.create: src=done other=done resolvers=[none]
+   features/recur/data/occurrence/index.yaml: data.recur.occurrence + sds.task.completion-state: src=done other=done resolvers=[none]
+
+-- todo-app-backend/todo-app-backend/FR_DONE_UNIT_FOREACH: 13
+   features/audit/fr/erasure/complete/index.yaml: composes=2 unit={"forEach":"composes"} e2e=true uat=true
+   features/audit/fr/erasure/request/index.yaml: composes=2 unit={"forEach":"composes"} e2e=true uat=true
+   features/audit/fr/export/index.yaml: composes=1 unit={"forEach":"composes"} e2e=true uat=true
+   features/audit/fr/log/append/index.yaml: composes=2 unit={"forEach":"composes"} e2e=true uat=true
+   features/audit/fr/log/read/index.yaml: composes=1 unit={"forEach":"composes"} e2e=true uat=true
+   features/login/fr/sign-in/index.yaml: composes=2 unit={"forEach":"composes"} e2e=true uat=true
+
+-- todo-app-backend/todo-app-backend/GAP: 35
+   features/audit/gap/direction-not-drawn/index.yaml: state=done closedBy=["ui.audit.privacy"] allDone=true
+   features/audit/gap/emitted-events/index.yaml: state=todo closedBy=["impl.task.todo-app-backend.platform-events"] allDone=true
+   features/audit/gap/live-proof/index.yaml: state=todo closedBy=["uat.audit.right-to-be-forgotten"] allDone=false
+   features/audit/gap/operator-role/index.yaml: state=done closedBy=["decision.audit.operator-role"] allDone=true
+   features/audit/gap/render-proof/index.yaml: state=todo closedBy=["impl.audit.todo-app-frontend.privacy"] allDone=false
+   features/audit/gap/unbuilt-module/index.yaml: state=done closedBy=["impl.audit.todo-app-backend.log","impl.audit.todo-app-backend.erasure"] allDone=true
+
+-- todo-app-backend/todo-app-backend/NO_REQUIRES_PROOF: 114
+   brand/index.yaml: work/brand done with no requiresProof
+   features/audit/br/append-only/index.yaml: work/business-rule done with no requiresProof
+   features/audit/br/erasure/logged/index.yaml: work/business-rule done with no requiresProof
+   features/audit/br/erasure/right/index.yaml: work/business-rule done with no requiresProof
+   features/audit/br/retention/index.yaml: work/business-rule done with no requiresProof
+   features/audit/data/erasure-request/index.yaml: work/data done with no requiresProof
+
+-- todo-app-backend/todo-app-backend/PROOF_FOREACH: 41
+   features/audit/fr/erasure/complete/index.yaml: unit.forEach=composes fieldPresent=true len=2
+   features/audit/fr/erasure/request/index.yaml: unit.forEach=composes fieldPresent=true len=2
+   features/audit/fr/export/index.yaml: unit.forEach=composes fieldPresent=true len=1
+   features/audit/fr/log/append/index.yaml: unit.forEach=composes fieldPresent=true len=2
+   features/audit/fr/log/read/index.yaml: unit.forEach=composes fieldPresent=true len=1
+   features/audit/journey/right-to-be-forgotten/index.yaml: requirements.forEach=requirements fieldPresent=true len=3
+
+-- todo-app-backend/todo-app-backend/PROOF_FOREACH_DANGLING: 10
+   features/audit/sds/erasure-request/index.yaml: transitions.forEach names "stateMachine.transitions", which the record does not carry
+   features/audit/sds/log-chain/index.yaml: transitions.forEach names "stateMachine.transitions", which the record does not carry
+   features/login/sds/session-store/index.yaml: transitions.forEach names "stateMachine.transitions", which the record does not carry
+   features/notify/sds/delivery-lifecycle/index.yaml: transitions.forEach names "stateMachine.transitions", which the record does not carry
+   features/plan/sds/cap-guard/index.yaml: transitions.forEach names "stateMachine.transitions", which the record does not carry
+   features/plan/sds/subscription-lifecycle/index.yaml: transitions.forEach names "stateMachine.transitions", which the record does not carry
+
+-- todo-app-backend/todo-app-backend/PROOF_KIND_UNKNOWN: 30
+   features/audit/contract/emitted-events/index.yaml: kind "provider"
+   features/audit/contract/emitted-events/index.yaml: kind "consumer"
+   features/audit/sds/erasure-request/index.yaml: kind "transitions"
+   features/audit/sds/log-chain/index.yaml: kind "transitions"
+   features/login/contract/identity-for-task/index.yaml: kind "provider"
+   features/login/contract/identity-for-task/index.yaml: kind "consumer"
+
+-- todo-app-backend/todo-app-backend/PROVES_EDGE: 79
+   features/audit/impl/todo-app-backend/erasure/index.yaml: impl.audit.todo-app-backend.erasure(done) proves br.audit.erasure.right(done, work/business-rule)
+   features/audit/impl/todo-app-backend/erasure/index.yaml: impl.audit.todo-app-backend.erasure(done) proves br.audit.erasure.logged(done, work/business-rule)
+   features/audit/impl/todo-app-backend/erasure/index.yaml: impl.audit.todo-app-backend.erasure(done) proves sds.audit.erasure-request(done, work/sds-component)
+   features/audit/impl/todo-app-backend/log/index.yaml: impl.audit.todo-app-backend.log(done) proves br.audit.append-only(done, work/business-rule)
+   features/audit/impl/todo-app-backend/log/index.yaml: impl.audit.todo-app-backend.log(done) proves br.audit.retention(done, work/business-rule)
+   features/audit/impl/todo-app-backend/log/index.yaml: impl.audit.todo-app-backend.log(done) proves sds.audit.log-chain(done, work/sds-component)
+
+===== DUAL_TREE_PARITY vocabulary =====
+todo-be only: schema:work/catalog, schema:work/customer-journey, schema:work/data, schema:work/event, schema:work/non-functional-requirement, schema:work/policy-decision, schema:work/resource, work/brand.assets, work/brand.brand, work/brand.change, work/brand.completion, work/brand.kind, work/business-rule.blockedBy, work/business-rule.conflictsWith, work/business-rule.refs, work/catalog.description, work/catalog.features, work/catalog.id, work/catalog.schema, work/contract.blockedBy, work/contract.conflictsWith, work/customer-journey.blockedBy, work/customer-journey.change, work/customer-journey.crossesFeatures, work/customer-journey.id, work/customer-journey.requirements, work/customer-journey.requiresProof, work/customer-journey.schema, work/customer-journey.state, work/customer-journey.steps, work/customer-journey.title, work/data.adds, work/data.because, work/data.change, work/data.conflictsWith, work/data.extends, work/data.fields, work/data.id, work/data.invariants, work/data.module, work/data.refs, work/data.schema, work/data.state, work/data.title, work/data.verificationSource, work/event.blockedBy, work/event.change, work/event.delivery, work/event.id, work/event.payload, work/event.producer, work/event.refs, work/event.schema, work/event.state, work/event.title, work/functional-requirement.blockedBy, work/functional-requirement.conflictsWith, work/functional-requirement.refs, work/functional-requirement.subscribes, work/gap.because, work/gap.verificationSource, work/implementation.assets, work/implementation.blockedBy, work/implementation.change, work/implementation.observations, work/implementation.revision, work/implementation.verification, work/implementation.verificationSource, work/integration.blockedBy, work/integration.change, work/integration.module, work/non-functional-requirement.blockedBy, work/non-functional-requirement.change, work/non-functional-requirement.id, work/non-functional-requirement.measurement, work/non-functional-requirement.observableCriterion, work/non-functional-requirement.quality, work/non-functional-requirement.refs, work/non-functional-requirement.requiresProof, work/non-functional-requirement.schema, work/non-functional-requirement.state, work/non-functional-requirement.title, work/policy-decision.blocks, work/policy-decision.change, work/policy-decision.chosen, work/policy-decision.defaultWindow, work/policy-decision.id, work/policy-decision.options, work/policy-decision.outcome, work/policy-decision.question, work/policy-decision.reason, work/policy-decision.recommendation, work/policy-decision.recommendationReason, work/policy-decision.schema, work/policy-decision.state, work/policy-decision.tension, work/policy-decision.title, work/resource.allowedEffects, work/resource.configuration, work/resource.custody, work/resource.details, work/resource.disposable, work/resource.id, work/resource.kind, work/resource.namespace, work/resource.owner, work/resource.preconditions, work/resource.probes, work/resource.revision, work/resource.roles, work/resource.schema, work/resource.schemaFiles, work/resource.seedFiles, work/resource.target, work/sds-component.appliesTo, work/sds-component.blockedBy, work/sds-component.subscribes, work/uat-flow.environment, work/uat-flow.fixtures, work/ui-screen.assets, work/ui-screen.change
+
+ec-be only: work/brand.colour, work/brand.donts, work/brand.imagery, work/brand.mascot, work/brand.review, work/brand.typography, work/sds-component.extensions

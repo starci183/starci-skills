@@ -1,0 +1,52 @@
+# Written by hand, same as the todo app's settled uat evidence files: a uat-flow's evidence is the run
+# itself - schemas/work-layout.yaml's uatRun note is what check-example-work.mjs's concept 12 actually
+# checks (a `run` field naming runs/<runId>, that run having screens/, videos/ and a result.md whose
+# outcome is pass). Every byte named below was produced by the Playwright harness at
+# examples/ecommerce-app-fe/uat, which wrote runs/<runId>/ itself; this file only settles which run.
+# Two earlier run folders beside it (runs/20260919T151633Z-5c10a673 and runs/20260919T151937Z-5c10a673)
+# are failed spec-repair history - append-only, untouched, and they settle nothing.
+schema: work/evidence
+record: uat.identity.sign-in
+recordDigest: 617314a75f0cf5fa89ae6b1d64b4369439019939c0d0a90756af2b9d3afd5a02
+run: runs/20260919T152145Z-5c10a673
+outcome: pass
+# The run's own manifest.yaml carries the full asset list with a sha256 per file; this entry repeats only
+# the recording concept 12 refuses a done record for lacking, so the video is named by the record that
+# settles on it and not only by a file inside the run it points at.
+assets:
+  - path: runs/20260919T152145Z-5c10a673/videos/sign-in.webm
+    sha256: e2bdb6565f16f49afab54bea01cf6e85272050a498c57858301c58588826a85b
+provenance:
+  # Same note as the todo evidence files: the layout's provenance.actor vocabulary has only starci-kernel
+  # and example-evidence, and neither wrote this - no kernel workflow settled it and example-evidence.mjs
+  # cannot emit a `run:` field. The value names the mechanism that actually produced the proof.
+  actor: playwright-harness
+  tool: 'npx playwright test -c uat/playwright.config.ts uat/flows/uat.identity.sign-in.spec.ts (reporter uat/lib/run-writer.ts), run in examples/ecommerce-app-fe with UAT_LIVE_LOGIN_AUTHORIZED=true'
+  environment: local
+  capturedAt: '2026-09-19T15:21:53.502Z'
+  stack: >-
+    The ecommerce example's own topology per examples/ecommerce-app-be/metadata.json: identity GraphQL
+    API on 5070 (built with npm run build, started with npm run start:identity), order API on 6070, and
+    the shop served by npm run dev:shop on 4069 (Next dev, not a production build). The browser served
+    and the browser proved are the same bytes as the frontendCommit/backendCommit recorded in the run
+    manifest (5c10a673 for both). Session carrier is the product's settled handoff: the shop's
+    /api/session door calls identity's register/signIn GraphQL mutations server-side and sets the
+    httpOnly northwind-session cookie; sign-out is the product's own DELETE /api/session ->
+    internal/sessions/revoke.
+  authorization: >-
+    UAT_LIVE_LOGIN_AUTHORIZED=true. The run registered a fresh disposable address
+    (uat-person-20260919t152145z-5c10a673@ecommerce.dev) with the accounts.yaml throwaway password
+    pattern; no credential value is stored in this record, and session bearer values are withheld from
+    the run folder entirely (cleanup.json notes why).
+  observed_effect: >-
+    Matches the flow record's declared effects and cleanup: one disposable person row was registered in
+    the identity store and three sessions were issued across the walk. Sessions 1 and 2 were revoked by
+    the product's own sign-out (verify door read-back: SESSION_INVALID / 401 for both); session-3 stays
+    live until the identity TTL and the person row remains, exactly as the record's cleanup note states -
+    the product exposes no account deletion. cleanup.json's "unresolved owned resources" note names the
+    same two rows.
+  recording: >-
+    videos/sign-in.webm, 349,624 bytes, VP8 800x450 at 25 fps, 8.28s; verified by full remux and by
+    decoding frames with Playwright's bundled ffmpeg (ms-playwright/ffmpeg-1011/ffmpeg-win64.exe -v
+    error -i sign-in.webm -vsync 0 -frames:v 5) - zero decode errors. Password fields are masked at
+    capture time on every screenshot and video frame, so nothing secret is in the committed bytes.

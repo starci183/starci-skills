@@ -1,0 +1,19 @@
+=== todo-be
+  records with a lifecycle state: 210
+  tally.total as written: 209
+  -> would be tallied: 209
+  dropped, state outside derive's vocabulary (bucketOf => null): 0
+  dropped, no feature (outside features/**): 1
+      brand [suspended]
+=== ec-be
+  records with a lifecycle state: 27
+  tally.total as written: 21
+  -> would be tallied: 21
+  dropped, state outside derive's vocabulary (bucketOf => null): 5
+      ui.checkout.cart [uninvestigate] feature=checkout
+      ui.checkout.landing-home [uninvestigate] feature=checkout
+      ui.checkout.shop-browse [uninvestigate] feature=checkout
+      ui.checkout.stock-refused [uninvestigate] feature=checkout
+      ui.identity.sign-in [uninvestigate] feature=identity
+  dropped, no feature (outside features/**): 1
+      brand [done]

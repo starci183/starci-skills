@@ -1,0 +1,13 @@
+/*
+ * The dark answer to `brand/tokens.css`.
+ *
+ * The brand file states the light tokens once and is owned by another lane, so the dark overrides
+ * live beside the theme module that paints the `.dark` class - the same `.dark` / `[data-theme]`
+ * hooks starci-academy-fe's token layer answers to. Only the app-level tokens that were stated
+ * light-only are restated; Grammar's own surfaces carry their own dark values behind
+ * `data-grammar-theme` and need nothing here.
+ */
+.dark,
+[data-theme='dark'] {
+  --brand-surface: oklch(21% 0.003 354.13);
+}

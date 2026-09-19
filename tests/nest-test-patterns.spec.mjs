@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { checkNestTests, NEST_TEST_RULES } from '../checks/code-patterns/nest-tests.mjs';
+import { checkNestTests, NEST_TEST_RULES } from '../scripts/checks/code-patterns/nest-tests.mjs';
 const require = createRequire(import.meta.url);
 
 function fixture(t, subject, spec, name = 'store.handler') {

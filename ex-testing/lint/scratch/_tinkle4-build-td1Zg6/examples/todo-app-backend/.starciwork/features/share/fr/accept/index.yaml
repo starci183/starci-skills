@@ -1,0 +1,35 @@
+schema: work/functional-requirement
+id: fr.share.accept
+title: Accept an invitation
+state: done
+actors: [collaborator]
+trigger: The invited person accepts a pending invitation addressed to them.
+mainFlow:
+  - The invited person accepts within the fourteen-day window.
+  - The invitation becomes accepted and the role becomes active immediately.
+exceptionFlows:
+  - Accepting past the fourteen-day window is refused; the invitation reads expired.
+  - Accepting with an email other than the invited one is refused.
+  - Accepting a revoked invitation is refused.
+postconditions:
+  - Exactly one collaborator with the invited role exists on the task.
+composes:
+  - {rule: br.share.invite.expiry, module: src/modules/bussiness/share}
+  - {rule: br.share.role.permissions, module: src/modules/bussiness/share}
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: br.share.invite.expiry and br.share.role.permissions are both done; AcceptInvitationHandler
+    dispatches to InvitationService.accept, proven by accept-invitation.handler.spec.ts,
+    invitation.service.spec.ts (all three exceptionFlows, including the fourteen-day boundary by
+    backdating sentAt) and scripts/live-proof-share.sh's accept steps against the real GraphQL endpoint.
+    requiresProof.uat.required is not yet satisfied by a recorded uat.verify walk - see the same
+    gap.share.live-proof note on fr.share.invite's own change entry.

@@ -1,0 +1,159 @@
+components/audit/privacy/component.tsx:57: string:Back to tasks
+components/audit/privacy/component.tsx:60: string:Privacy policy
+components/audit/privacy/component.tsx:69: attr:Primary
+components/audit/privacy/component.tsx:109: jsx:Todo app
+components/audit/privacy/component.tsx:118: jsx:Todo app
+components/audit/privacy/component.tsx:144: attr:Primary
+components/audit/privacy/component.tsx:146: attr:The privacy screen - request erasure, export data | string:The privacy screen - request erasure, export data
+components/audit/privacy/component.tsx:147: attr:Breadcrumb
+components/audit/privacy/component.tsx:153: jsx:Privacy and your data
+components/audit/privacy/component.tsx:154: jsx:Manage the data linked to your account.
+components/audit/privacy/component.tsx:157: attr:Export your data | string:Export your data
+components/audit/privacy/component.tsx:158: jsx:Export your data
+components/audit/privacy/component.tsx:159: jsx:Get a copy of your personal activity records.
+components/audit/privacy/component.tsx:168: string:Export my data
+components/audit/privacy/component.tsx:177: attr:Request erasure | string:Request erasure
+components/audit/privacy/component.tsx:178: jsx:Request erasure
+components/audit/privacy/index.tsx:13: string:You need to sign in again before your erasure request can be submitted.
+components/audit/privacy/index.tsx:14: string:We couldn't submit your erasure request. Try again.
+components/audit/privacy/index.tsx:15: string:We couldn't prepare your export. Try again.
+components/audit/privacy/index.tsx:24: string:Get a copy of your personal activity records.
+components/audit/privacy/index.tsx:53: string:You need to sign in again before your data can be exported.
+components/blocks/share-invite/component.tsx:25: string:Primary destinations
+components/blocks/share-invite/component.tsx:26: string:The invitation screen and the collaborator list
+components/blocks/share-invite/component.tsx:84: jsx:Sign out
+components/blocks/share-invite/component.tsx:93: jsx:Todo app
+components/blocks/share-invite/component.tsx:100: jsx:Todo app
+components/blocks/share-invite/component.tsx:109: attr:Breadcrumb
+components/blocks/share-invite/component.tsx:122: jsx:Share this task
+components/blocks/share-invite/component.tsx:126: jsx:Back to task
+components/blocks/share-invite/component.tsx:128: string:Invite collaborators
+components/blocks/share-invite/component.tsx:129: jsx:Invite a collaborator
+components/blocks/share-invite/component.tsx:130: jsx:Choose who can view or edit this task.
+components/blocks/share-invite/component.tsx:135: attr:Email address | string:Email address
+components/blocks/share-invite/component.tsx:173: jsx:Viewers can read. Editors can complete the task.
+components/blocks/share-invite/component.tsx:189: attr:Collaborators
+components/blocks/share-invite/component.tsx:190: jsx:Pending invitations expire after 14 days.
+components/blocks/share-invite/component.tsx:222: jsx:Privacy policy
+components/blocks/share-invite/index.tsx:9: string:Your session has ended. Sign in again to see this task's collaborators.
+components/blocks/share-invite/index.tsx:10: string:Enter a valid email address.
+components/blocks/sign-in-form/component.tsx:37: string:Sign in
+components/blocks/sign-in-form/component.tsx:42: attr:Email
+components/blocks/sign-in-form/component.tsx:51: attr:Password
+components/blocks/sign-in-form/component.tsx:59: string:Signing in... | string:Sign in
+components/blocks/task-list/classNames.ts:24: string:All tasks
+components/blocks/task-list/classNames.ts:56: template:ButtonVariant
+components/blocks/task-list/component.tsx:23: template:StaticImageData
+components/blocks/task-list/component.tsx:93: attr:New task | string:New task
+components/blocks/task-list/component.tsx:94: attr:What needs doing? | string:What needs doing?
+components/blocks/task-list/component.tsx:103: attr:all-tasks-heading
+components/blocks/task-list/component.tsx:123: jsx:No tasks yet. Add the first one.
+components/blocks/task-list/component.tsx:153: jsxTextLine:Delete “{task.title}”?
+components/blocks/task-list/component.tsx:190: jsxTextLine:Completed tasks stay here until you delete them.
+components/blocks/task-list/index.tsx:7: string:Your session has ended. Sign in again to see your tasks.
+components/login/sign-in/component.tsx:68: string:Enter your email and password to continue.
+components/login/sign-in/component.tsx:70: string:Enter your password to continue.
+components/login/sign-in/component.tsx:72: string:Enter your email to continue.
+components/login/sign-in/component.tsx:87: jsx:Todo app
+components/login/sign-in/component.tsx:93: jsxTextLine:One task at a time.
+components/login/sign-in/component.tsx:111: jsxTextLine:Sign in to keep your tasks moving.
+components/login/sign-in/component.tsx:114: string:Sign in
+components/login/sign-in/component.tsx:119: attr:Email
+components/login/sign-in/component.tsx:129: attr:Password
+components/login/sign-in/component.tsx:137: jsxTextLine:Forgot password?
+components/login/sign-in/component.tsx:150: string:Signing in... | string:Sign in
+components/login/sign-in/component.tsx:160: jsx:New here?
+components/notify/preferences/component.tsx:52: string:Back to tasks
+components/notify/preferences/component.tsx:55: string:Privacy policy
+components/notify/preferences/component.tsx:60: attr:Primary
+components/notify/preferences/component.tsx:108: jsx:Todo app
+components/notify/preferences/component.tsx:118: jsx:Todo app
+components/notify/preferences/component.tsx:136: attr:Primary
+components/notify/preferences/component.tsx:138: attr:The notification preferences screen | string:The notification preferences screen
+components/notify/preferences/component.tsx:141: attr:Breadcrumb
+components/notify/preferences/component.tsx:147: jsx:Notification preferences
+components/notify/preferences/component.tsx:148: jsx:Choose whether to receive task updates by email.
+components/notify/preferences/component.tsx:150: string:Notification preferences
+components/notify/preferences/component.tsx:151: jsx:Email digest
+components/notify/preferences/component.tsx:152: jsx:Receive grouped task updates in your inbox.
+components/notify/preferences/component.tsx:164: string:Turn on | string:Turn off
+components/notify/preferences/component.tsx:168: jsx:You are unsubscribed from the email digest.
+components/notify/preferences/component.tsx:178: string:Save preferences
+components/notify/preferences/component.tsx:195: jsxTextLine:You can also unsubscribe using the link in any email.
+components/notify/preferences/index.tsx:14: string:We couldn't save your preference. Try again.
+components/notify/preferences/index.tsx:15: string:We couldn't load your preferences. Try again.
+components/notify/preferences/index.tsx:16: string:You need to sign in again before your notification preferences can load.
+components/notify/unsubscribe/component.tsx:25: string:Privacy policy
+components/notify/unsubscribe/component.tsx:39: attr:The email unsubscribe screen | string:The email unsubscribe screen
+components/notify/unsubscribe/component.tsx:42: jsx:Todo app
+components/notify/unsubscribe/component.tsx:44: jsx:Unsubscribe from email
+components/notify/unsubscribe/component.tsx:45: jsx:Stop the task digest for this address.
+components/notify/unsubscribe/component.tsx:48: jsx:This unsubscribe link is missing its token.
+components/notify/unsubscribe/component.tsx:50: jsx:You are unsubscribed from email.
+components/notify/unsubscribe/component.tsx:52: jsx:We could not unsubscribe you. This link may have expired.
+components/notify/unsubscribe/component.tsx:61: string:Unsubscribe from email
+components/notify/unsubscribe/index.tsx:15: template:SessionService.findActive
+components/plan/usage-screen/component.tsx:43: string:Privacy policy
+components/plan/usage-screen/component.tsx:78: jsx:Todo app
+components/plan/usage-screen/component.tsx:79: attr:Primary destinations | string:Primary destinations
+components/plan/usage-screen/component.tsx:85: jsx:Sign out
+components/plan/usage-screen/component.tsx:92: jsx:Todo app
+components/plan/usage-screen/component.tsx:95: jsx:Sign out
+components/plan/usage-screen/component.tsx:109: string:The usage screen and its upgrade action
+components/plan/usage-screen/component.tsx:113: attr:Primary destinations | string:Primary destinations
+components/plan/usage-screen/component.tsx:116: jsx:Settings / Plan
+components/plan/usage-screen/component.tsx:117: jsx:Plan and usage
+components/plan/usage-screen/component.tsx:122: jsx:Free plan
+components/plan/usage-screen/component.tsx:124: attr:Tasks used against your free plan cap | string:Tasks used against your free plan cap
+components/plan/usage-screen/component.tsx:132: string:Paid plan | string:Free plan
+components/plan/usage-screen/component.tsx:139: attr:Tasks used against your free plan cap | string:Tasks used against your free plan cap
+components/plan/usage-screen/component.tsx:148: jsxTextLine:You have used all {props.cap} active tasks on your free plan — the next task you try to create will be refused.
+components/plan/usage-screen/component.tsx:160: jsxTextLine:You have {props.activeCount} active tasks, which exceeds your free plan limit of {props.cap}.
+components/plan/usage-screen/component.tsx:163: jsx:Your existing tasks are safe. Complete or delete tasks to make room, or upgrade for no task cap.
+components/plan/usage-screen/component.tsx:168: jsx:Manage tasks
+components/plan/usage-screen/component.tsx:170: jsx:Completing tasks frees up space.
+components/plan/usage-screen/index.tsx:11: string:Your session has ended. Sign in again to see your plan usage.
+components/plan/usage-screen/index.tsx:12: string:Checkout could not be started. Try again from this page.
+components/recur/end-rule-confirm.tsx:21: jsx:End this rule? No new occurrences are created; the occurrences already materialised are kept.
+components/recur/end-rule-confirm.tsx:24: string:End rule
+components/recur/schedule-screen.tsx:73: string:Every weekday
+components/recur/schedule-screen.tsx:74: string:Every N days
+components/recur/schedule-screen.tsx:75: string:Day of the month
+components/recur/schedule-screen.tsx:142: template:Input (id: recur-rule, label: Repeat)
+components/recur/schedule-screen.tsx:143: attr:Repeat
+components/recur/schedule-screen.tsx:145: attr:recur-frequency-label
+components/recur/schedule-screen.tsx:171: attr:Every (days) | string:Every (days)
+components/recur/schedule-screen.tsx:184: attr:Day of the month | string:Day of the month
+components/recur/schedule-screen.tsx:196: attr:Time of day | string:Time of day
+components/recur/schedule-screen.tsx:197: string:Use 24-hour format (e.g. 14:30).
+components/recur/schedule-screen.tsx:208: attr:Time zone | string:Time zone
+components/recur/schedule-screen.tsx:209: string:Uses your selected local time zone.
+components/recur/schedule-screen.tsx:220: attr:Start date | string:Start date
+components/recur/schedule-screen.tsx:221: string:The first time this task should occur.
+components/recur/schedule-screen.tsx:231: string:Save schedule
+components/recur/schedule.tsx:45: template:RecurFrequency
+components/recur/schedule.tsx:80: string:Enter a number of days greater than zero.
+components/recur/schedule.tsx:83: string:Enter a day of the month from 1 to 31.
+components/recur/schedule.tsx:85: string:Enter a time of day as HH:MM.
+components/recur/schedule.tsx:86: string:Enter an IANA time zone, like Europe/Berlin.
+components/recur/schedule.tsx:87: string:Enter a start date as YYYY-MM-DD.
+components/recur/schedule.tsx:128: string:Open a task\u2019s schedule before saving a rule.
+components/recur/upcoming-list.tsx:28: attr:Upcoming occurrences | string:Upcoming occurrences
+components/recur/upcoming-list.tsx:33: string:Preview - not yet materialised
+components/recur/upcoming-list.tsx:38: string:Nothing upcoming
+components/recur/upcoming-list.tsx:39: string:This rule has ended, so it will not create new occurrences; the rows above are kept.
+components/recur/workspace.tsx:94: jsx:Todo app
+components/recur/workspace.tsx:95: attr:Destinations
+components/recur/workspace.tsx:106: jsx:Todo app
+components/recur/workspace.tsx:116: attr:Breadcrumb
+components/recur/workspace.tsx:136: jsx:Repeat this task
+components/recur/workspace.tsx:137: jsx:No task selected.
+components/recur/workspace.tsx:166: attr:Destinations
+components/recur/workspace.tsx:168: string:A recurring task's schedule
+features/pages/sign-in/index.tsx:18: jsx:Sign in
+features/pages/tasks/index.tsx:37: string:Privacy policy
+features/pages/tasks/index.tsx:103: attr:Primary
+features/pages/tasks/index.tsx:118: attr:Primary
+features/pages/tasks/index.tsx:120: attr:The task list and its create form | string:The task list and its create form
+features/pages/tasks/index.tsx:126: jsx:A little progress, every day.
+features/pages/tasks/index.tsx:130: attr:Legal

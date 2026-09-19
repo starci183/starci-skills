@@ -1,0 +1,105 @@
+ D examples/ecommerce-app-be/.starciwork/DIRECTIONS.md
+ M examples/ecommerce-app-be/.starciwork/_derived/critique.md
+ M examples/ecommerce-app-be/.starciwork/_derived/critique.yaml
+ M examples/ecommerce-app-be/.starciwork/_derived/frontier.md
+ M examples/ecommerce-app-be/.starciwork/_derived/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/br/place-order/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/br/place-order/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/contract/order-for-identity/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/contract/order-for-identity/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/impl/ecommerce-app-be/order-checkout/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/impl/ecommerce-app-be/order-checkout/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/sds/order-flow/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/sds/order-flow/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/direction-check.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/generation-receipts.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/generation-receipts.yaml
+ M examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/generation-receipts.yaml
+ M examples/ecommerce-app-be/.starciwork/features/identity/br/sign-in/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/identity/br/sign-in/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/identity/fr/sign-in/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/identity/fr/sign-in/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/identity/impl/ecommerce-app-be/identity-account/evidence.yaml
+ M examples/ecommerce-app-be/.starciwork/features/identity/impl/ecommerce-app-be/identity-account/index.yaml
+ M examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/assets/generation-receipts.yaml
+ M examples/ecommerce-app-fe/.gitignore
+ M examples/ecommerce-app-fe/apps/landing/next.config.mjs
+ M examples/ecommerce-app-fe/apps/landing/package.json
+ M examples/ecommerce-app-fe/apps/landing/src/app/globals.css
+ D examples/ecommerce-app-fe/apps/landing/src/app/layout.tsx
+ D examples/ecommerce-app-fe/apps/landing/src/app/page.tsx
+ D examples/ecommerce-app-fe/apps/landing/src/components/DuckMascot.tsx
+ D examples/ecommerce-app-fe/apps/landing/src/components/LandingView.tsx
+ D examples/ecommerce-app-fe/apps/landing/src/components/ProductCard.tsx
+ D examples/ecommerce-app-fe/apps/landing/src/components/SiteShell.tsx
+ M examples/ecommerce-app-fe/apps/landing/src/data/catalog.ts
+ M examples/ecommerce-app-fe/apps/landing/src/modules/config/index.ts
+ M examples/ecommerce-app-fe/apps/landing/src/modules/config/projection.ts
+ M examples/ecommerce-app-fe/apps/landing/tsconfig.json
+ M examples/ecommerce-app-fe/apps/shop/next.config.mjs
+ M examples/ecommerce-app-fe/apps/shop/package.json
+ D examples/ecommerce-app-fe/apps/shop/src/app/account/page.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/app/browse/page.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/app/cart/page.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/app/checkout/page.tsx
+ M examples/ecommerce-app-fe/apps/shop/src/app/globals.css
+ D examples/ecommerce-app-fe/apps/shop/src/app/layout.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/app/page.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/AccountView.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/AppNav.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/BrowseView.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/CartView.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/CheckoutView.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/DuckMascot.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/ProductTile.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/ShopShell.tsx
+ D examples/ecommerce-app-fe/apps/shop/src/components/StateBlock.tsx
+ M examples/ecommerce-app-fe/apps/shop/src/modules/api/catalog.ts
+ M examples/ecommerce-app-fe/apps/shop/src/modules/api/http.ts
+ M examples/ecommerce-app-fe/apps/shop/src/modules/api/identity.ts
+ M examples/ecommerce-app-fe/apps/shop/src/modules/api/orders.ts
+ M examples/ecommerce-app-fe/apps/shop/src/modules/config/index.ts
+ M examples/ecommerce-app-fe/apps/shop/src/modules/config/projection.ts
+ M examples/ecommerce-app-fe/apps/shop/src/modules/money.ts
+ M examples/ecommerce-app-fe/apps/shop/tsconfig.json
+ M examples/ecommerce-app-fe/brand/duck.prompt.txt
+ M examples/ecommerce-app-fe/package-lock.json
+ M examples/ecommerce-app-fe/package.json
+ M examples/ecommerce-app-fe/tsconfig.json
+ D examples/ecommerce-app-fe/types/global.d.ts
+?? examples/ecommerce-app-be/.starciwork/features/checkout/br/cart/
+?? examples/ecommerce-app-be/.starciwork/features/checkout/fr/cart/
+?? examples/ecommerce-app-be/.starciwork/features/checkout/gap/live-proof/
+?? examples/ecommerce-app-be/.starciwork/features/checkout/uat/
+?? examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/directions.md
+?? examples/ecommerce-app-be/.starciwork/features/identity/br/account/
+?? examples/ecommerce-app-be/.starciwork/features/identity/fr/account/
+?? examples/ecommerce-app-be/.starciwork/features/identity/gap/
+?? examples/ecommerce-app-be/.starciwork/features/identity/uat/
+?? examples/ecommerce-app-fe/.scannerwork/
+?? examples/ecommerce-app-fe/apps/landing/src/app/[lang]/
+?? examples/ecommerce-app-fe/apps/landing/src/app/providers.tsx
+?? examples/ecommerce-app-fe/apps/landing/src/components/layouts/
+?? examples/ecommerce-app-fe/apps/landing/src/components/pages/
+?? examples/ecommerce-app-fe/apps/landing/src/middleware.ts
+?? examples/ecommerce-app-fe/apps/landing/src/modules/routes.ts
+?? examples/ecommerce-app-fe/apps/landing/src/modules/shop-url.spec.tsx
+?? examples/ecommerce-app-fe/apps/landing/src/modules/shop-url.tsx
+?? examples/ecommerce-app-fe/apps/shop/src/app/[lang]/
+?? examples/ecommerce-app-fe/apps/shop/src/app/providers.tsx
+?? examples/ecommerce-app-fe/apps/shop/src/components/layouts/
+?? examples/ecommerce-app-fe/apps/shop/src/components/pages/
+?? examples/ecommerce-app-fe/apps/shop/src/middleware.ts
+?? examples/ecommerce-app-fe/apps/shop/src/modules/money.spec.ts
+?? examples/ecommerce-app-fe/apps/shop/src/modules/routes.ts
+?? examples/ecommerce-app-fe/captures/verify-render.mjs
+?? examples/ecommerce-app-fe/eslint.config.mjs
+?? examples/ecommerce-app-fe/nul
+?? examples/ecommerce-app-fe/packages/
+?? examples/ecommerce-app-fe/sonar-project.properties
+?? examples/ecommerce-app-fe/vitest.config.ts
+?? examples/ecommerce-app-fe/vitest.setup.ts
+?? packages/fe-kit/

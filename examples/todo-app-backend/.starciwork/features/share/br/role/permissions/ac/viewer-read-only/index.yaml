@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.share.role.permissions.viewer-read-only
-rule: br.share.role.permissions
-given: A task has an accepted viewer collaborator
-when: That collaborator attempts to complete the task
-then:
-  - The attempt is refused.
-  - The task is unchanged.

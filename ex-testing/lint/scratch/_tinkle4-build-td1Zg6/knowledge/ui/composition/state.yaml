@@ -1,0 +1,170 @@
+schema: starci/knowledge-source@1
+id: ui.composition.state
+title: State composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: which distinct conditions can this feature be in, and which
+  published carrier holds each one?
+  State is compiled before anything renders. The direction lists the business facts and the
+  transitions between them first, then binds each to a real carrier. Two facts that share a carrier
+  become one fact, and a fact with no carrier becomes a guess, so the compiling step is the rule.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+guidance:
+  - id: the-five-kinds
+    title: The five kinds
+    requirement: |-
+      | Kind | Examples | Nature |
+      | --- | --- | --- |
+      | Transient cue | hover, focus, pressed | Lasts only while the input lasts |
+      | Persistent value | selected, expanded | Survives blur, rerender, and reflow |
+      | Lifecycle fact | unavailable, pending, initially unresolved | Follows the work, not the pointer |
+      | Settled outcome | success, error, cancellation | Requires a real result from authority |
+      | Absence | the branch does not exist | Contributes nothing at all |
+      `PresentationState` publishes `neutral`, `informative`, `affirmative`, `cautionary`, `negative`,
+      `pending`, and `unavailable` for owners such as surfaces, rails, and static rows. Those values are
+      render-neutral: they paint a fact that authority already established, and they never create one.
+rules:
+  - id: STATE-1
+    title: Name the meanings before choosing carriers
+    governs: Governs the order in which state decisions are made.
+    cases:
+      - id: case-1
+        when: A feature has more than one reachable condition
+        assert: |-
+          Every business fact and every transition between them is named in the `.starciwork` specification before any carrier prop appears against it
+      - id: case-2
+        when: The named facts are ready to bind
+        assert: |-
+          Each named fact resolves to its own carrier: `isDisabled`, `isPending`, or `isSkeleton` where the owner publishes them, `Tabs.selectedKey`, `SurfaceAccordionCard.isOpen`, or a `PresentationState` on its owner
+      - id: case-3
+        when: A single generic flag would cover several of them
+        assert: |-
+          No carrier appears against more than one named fact, so disabled, pending, and unresolved never share one flag
+      - id: case-4
+        when: A transient cue is available and looks convenient
+        assert: No hover or focus cue carries a selected or expanded value
+      - id: case-5
+        when: |-
+          A presentation value is available before authority has spoken
+        assert: |-
+          Every `PresentationState` value in the tree traces to a fact authority already settled; none precedes it
+  - id: STATE-2
+    title: Accepted work and unresolved content have separate owners
+    governs: Governs the boundary between progress and loading.
+    cases:
+      - id: case-1
+        when: A command accepted work
+        assert: |-
+          `isPending` sits on the initiating command, or on the published forwarding prop such as `EmptyNotice.isActionPending`
+      - id: case-2
+        when: Content has not resolved for the first time
+        assert: |-
+          `isSkeleton` sits on the content owner, and that owner renders inert geometry with no announced value
+      - id: case-3
+        when: A measurement is unknown
+        assert: |-
+          No node states a value for it; a rendered zero appears nowhere in place of an unknown measurement
+      - id: case-4
+        when: A peer control did not start the work
+        assert: That control carries no progress cue of its own
+    notThisRule: what the reader is told once the work settles is FEEDBACK-3.
+  - id: STATE-3
+    title: Absence is complete
+    governs: Governs what a branch leaves behind when it does not exist.
+    cases:
+      - id: case-1
+        when: |-
+          Authority says an optional branch, control, region, or slot does not exist now
+        assert: |-
+          The branch is unmounted through the published optional contract, such as an omitted `ChatWorkspace` rail or an omitted `EmptyNotice.actionLabel`
+      - id: case-2
+        when: Hiding it visually would be easier
+        assert: |-
+          No node for that branch remains in the tree, visible or not, and nothing invisible still responds to input
+      - id: case-3
+        when: The branch sat inside a grid or a flex row
+        assert: |-
+          Its wrapper, track, spacer, divider, and reserved scroll range are absent with it
+      - id: case-4
+        when: The branch contained anything focusable
+        assert: |-
+          Nothing from that branch is focusable and nothing from it appears in the accessibility tree
+    retired: |-
+      STATE-4 is retired into COVERAGE-1 and is not reused; the address stays spent.
+  - id: STATE-5
+    title: Whole-surface action or static surface
+    governs: Governs whether a surface is itself one interactive thing.
+    cases:
+      - id: case-1
+        when: The entire surface leads to one destination
+        assert: |-
+          `SurfaceCard.wholeAction` is `{ kind: "link", href, label }`, giving exactly one semantic target with one accessible name
+      - id: case-2
+        when: The entire surface runs one command
+        assert: |-
+          `SurfaceCard.wholeAction` is `{ kind: "button", press, label }`
+      - id: case-3
+        when: The surface is not interactive
+        assert: |-
+          `wholeAction` is absent, and the surface carries no click handler and no hover response that implies interaction
+      - id: case-4
+        when: |-
+          The surface needs a smaller independent action inside it, such as a row menu
+        assert: |-
+          The whole-surface target and the smaller action occupy disjoint boundaries; neither encloses the other
+    notThisRule: how many effects one activation may reach is ACTION-1.
+  - id: STATE-6
+    title: Persistent peer choice
+    governs: Governs a selected value shared by peer views.
+    cases:
+      - id: case-1
+        when: |-
+          Peer views share one selection that must outlive hover, press, and focus
+        assert: |-
+          `Tabs` carries an application-owned `selectedKey` with ordered `items` and `onSelect`
+      - id: case-2
+        when: Each peer controls a panel
+        assert: |-
+          `panelId` associates each tab with its panel, so the relationship is published rather than implied
+      - id: case-3
+        when: |-
+          The direction is tempted to keep a second selected value locally
+        assert: |-
+          Exactly one controlled value drives the rendering; no local copy of that selection exists
+      - id: case-4
+        when: |-
+          The direction is tempted to wrap the published tabs in its own tab roles
+        assert: |-
+          No node outside `Tabs` carries composite tab semantics for the same choice
+  - id: STATE-7
+    title: Controlled disclosure
+    governs: Governs a summary that reveals a region.
+    cases:
+      - id: case-1
+        when: One summary reveals or hides one associated region
+        assert: |-
+          `SurfaceAccordionCard` carries `isOpen`, `summaryRender`, `bodyRender`, and `onOpenChange`
+      - id: case-2
+        when: A list has several independently controlled disclosures
+        assert: |-
+          Controlled `items` with `onItemOpenChange` bind each open value to its own item
+      - id: case-3
+        when: |-
+          Hover would open it, or a second trigger would sit beside the published one
+        assert: |-
+          Disclosure changes only through the controlled value, from exactly one trigger; no hover path and no second trigger reaches it
+      - id: case-4
+        when: The closed body contains links or controls
+        assert: |-
+          While closed, nothing inside the body is focusable or announced
+doesNotDecide: |-
+  Which regions exist to hold these states is [Layout](layout.yaml), and which branch survives a reflow
+  is [Responsive](responsive.yaml). Which control carries a decision, and who owns pending among several
+  controls, is [CTA](cta.yaml) and [Action](action.yaml). What the reader is told at each outcome is
+  [Feedback](feedback.yaml). What the `.starciwork` specification must enumerate about these states is
+  [Coverage](coverage.yaml). Whether the rendered state is announced, reachable, and truthful is
+  [Accessibility](../proof/accessibility.yaml), [Focus](../proof/focus.yaml), and
+  [Render truth](../proof/render-truth.yaml).

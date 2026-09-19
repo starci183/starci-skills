@@ -1,0 +1,15 @@
+$ npx jest src/modules/bussiness/session
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/session/session.service.spec.ts
+PASS src/modules/bussiness/session/sign-out.handler.spec.ts
+PASS src/modules/bussiness/session/sign-in.handler.spec.ts
+
+Test Suites: 3 passed, 3 total
+Tests:       14 passed, 14 total
+Snapshots:   0 total
+Time:        4.592 s
+Ran all test suites matching /src\\modules\\bussiness\\session/i.
+

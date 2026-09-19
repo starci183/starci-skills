@@ -1,0 +1,175 @@
+schema: starci/uat-run-manifest@1
+id: uat.login.sign-in.runs.20260919T112508Z-5c10a673
+nodeId: uat.login.sign-in
+inputDigest: dc1ef715c18fe44e72704eb5751b459a0739bccddaa9cd1507371ddd5e1bfd7b
+outcome: pass
+assertions:
+  - id: ux.sign-in.validation-feedback
+    expected: yes
+    observed: yes
+    note: The submit button stays disabled while either field is empty (SignInFormView disabled logic).
+  - id: ux.sign-in.lands-on-task-list
+    expected: yes
+    observed: yes
+    note: Signing in navigates to /tasks on its own (useSignIn calls router.push after setToken); no
+      manual navigation was needed.
+  - id: fr.login.sign-in
+    expected: yes
+    observed: yes
+    note: After landing on /tasks, the browser rendered data-state="empty", matching a correctly-headed
+      API read-back of demo@todo.dev's own 0 task(s).
+  - id: br.login.session.restores
+    expected: yes
+    observed: yes
+    note: "The session token lives in localStorage, read back as an Authorization: Bearer header - never
+      a cookie (the record's own step 3 wording now says this) - so reloading /tasks re-read it
+      without re-authenticating; the list rendered data-state=\"empty\" after reload. This matches a
+      correctly-headed API read-back of demo@todo.dev's own 0 task(s)."
+  - id: ux.sign-in.error-feedback
+    expected: yes
+    observed: yes
+    note: form[data-state="refused"] renders a role="alert" message after the wrong-password submit.
+  - id: br.login.password.sign-in
+    expected: yes
+    observed: yes
+    note: The refusal text is the one normalized SIGN_IN_REFUSAL_MESSAGE regardless of which half of the
+      pair was wrong (src/modules/api/auth.ts) - the same text an unknown email would produce.
+assets:
+  - path: screens/empty.png
+    sha256: 2141dfd8bab74a64cf4e009d39b460580b582d6e5c833c9705f777483e592d06
+    size: 137585
+  - path: screens/signed-in.png
+    sha256: d1adf85182ef3b530125c51e31490252be4129564cfe8c46a84eb64483a0850a
+    size: 138369
+  - path: screens/task-list-after-sign-in.png
+    sha256: 4fc84318865a53c0f1b5073ce5dffb3836201fbc3a880466f5840bdd4b720d01
+    size: 53599
+  - path: screens/session-restores-on-reload.png
+    sha256: 4fc84318865a53c0f1b5073ce5dffb3836201fbc3a880466f5840bdd4b720d01
+    size: 53599
+  - path: screens/filled.png
+    sha256: f7ce256edc27733db8112b5785c3e38dce0d8856f61895ff395c70f6b22ab4bc
+    size: 136323
+  - path: screens/working-and-refused.png
+    sha256: 6a1bfc88f018a013cd6827cd1154ba4c48e3406ff201bb43a80640bcb69d6112
+    size: 140426
+  - path: screens/screenshot.png
+    sha256: be52339511a3e2db0a1e6ca84b80f4809901d286ad4658af14bd94d134c55b57
+    size: 140792
+  - path: videos/sign-in.webm
+    sha256: 55fa9685629fcf274e991c4144815642676bd4df1813eb2c993103e1a09913af
+    size: 126543
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:3000
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.login.sign-in
+    ownedResourcesCreated: []
+    ownedResourcesDeleted: []
+    verifiedAbsent: []
+    note: This run created no run-owned fixture rows against a database this lane owns; nothing to clean
+      up.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.login.sign-in
+      title: Sign in, close the browser, come back
+      steps:
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+      proves:
+        - fr.login.sign-in
+        - br.login.password.sign-in
+        - br.login.session.restores
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.login.sign-in
+    checked:
+      - ux.sign-in.validation-feedback
+      - ux.sign-in.lands-on-task-list
+      - fr.login.sign-in
+      - br.login.session.restores
+      - ux.sign-in.error-feedback
+      - br.login.password.sign-in
+    notRun: []
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T112508Z-5c10a673
+    flow: uat.login.sign-in
+    started: 2026-09-19T11:25:09.248Z
+    finished: 2026-09-19T11:25:11.562Z
+    accountsDeclared:
+      - role: person
+        username: demo@todo.dev
+    reused: []
+    created: []
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.login.sign-in
+    checks:
+      - id: ux.sign-in.validation-feedback
+        expected: yes
+        observed: yes
+        note: The submit button stays disabled while either field is empty (SignInFormView disabled logic).
+      - id: ux.sign-in.lands-on-task-list
+        expected: yes
+        observed: yes
+        note: Signing in navigates to /tasks on its own (useSignIn calls router.push after setToken); no
+          manual navigation was needed.
+      - id: fr.login.sign-in
+        expected: yes
+        observed: yes
+        note: After landing on /tasks, the browser rendered data-state="empty", matching a correctly-headed
+          API read-back of demo@todo.dev's own 0 task(s).
+      - id: br.login.session.restores
+        expected: yes
+        observed: yes
+        note: "The session token lives in localStorage, read back as an Authorization: Bearer header - never
+          a cookie (the record's own step 3 wording now says this) - so reloading /tasks re-read it
+          without re-authenticating; the list rendered data-state=\"empty\" after reload. This
+          matches a correctly-headed API read-back of demo@todo.dev's own 0 task(s)."
+      - id: ux.sign-in.error-feedback
+        expected: yes
+        observed: yes
+        note: form[data-state="refused"] renders a role="alert" message after the wrong-password submit.
+      - id: br.login.password.sign-in
+        expected: yes
+        observed: yes
+        note: The refusal text is the one normalized SIGN_IN_REFUSAL_MESSAGE regardless of which half of the
+          pair was wrong (src/modules/api/auth.ts) - the same text an unknown email would produce.
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.login.sign-in
+    steps:
+      - step: empty
+        startedAt: 2026-09-19T11:25:10.346Z
+        endedAt: 2026-09-19T11:25:10.416Z
+        screenshot: empty
+      - step: signed-in
+        startedAt: 2026-09-19T11:25:10.509Z
+        endedAt: 2026-09-19T11:25:11.197Z
+        screenshot: signed-in
+      - step: task-list-after-sign-in
+        startedAt: 2026-09-19T11:25:11.311Z
+        endedAt: 2026-09-19T11:25:11.320Z
+        screenshot: task-list-after-sign-in
+      - step: session-restores-on-reload
+        startedAt: 2026-09-19T11:25:11.361Z
+        endedAt: 2026-09-19T11:25:11.457Z
+        screenshot: session-restores-on-reload
+      - step: filled
+        startedAt: 2026-09-19T11:25:11.546Z
+        endedAt: 2026-09-19T11:25:11.622Z
+        screenshot: filled
+      - step: working-and-refused
+        startedAt: 2026-09-19T11:25:11.702Z
+        endedAt: 2026-09-19T11:25:11.829Z
+        screenshot: working-and-refused

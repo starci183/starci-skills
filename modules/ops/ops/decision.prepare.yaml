@@ -1,0 +1,164 @@
+# modules/ops/ops/decision.prepare.yaml - TINKLE-1 pure-yaml port of .claude/ops/decision.prepare/operator.yaml
+# The operator contract below is verbatim; the trailing 'business:' block is the added
+# analysis (inference marked where the contract does not state it literally).
+
+id: decision.prepare
+goal:
+  en: >-
+    Prepare one decision the runtime takes provisionally - the question, why it matters, the options analysed
+    per side, one recommendation - or answer the question from the records the product already decided. The
+    runtime never decides for the owner: it carries the recommendation into the work and the owner overturns it
+    later with workflow-answer. A provision (a credential, an account, a dataset, an authority) is not prepared
+    here; that is provision.ask, the one operation that waits for the owner.
+nodeKinds:
+  - business
+completionProfile: business
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: question
+    path: "the operation goal (section 'Question for the owner') and the operation that asked it"
+    purpose:
+      en: Read the question exactly as it was raised - by which operation, of which kind (business, design,
+        authority, credential), what it blocks - before anything is written. A question of business, design,
+        authority, security, money or customer data is the owner's to answer; only a mechanical one is not.
+  - id: decided
+    path: ".starciwork/features/<feature>/business/**/index.yaml + .starciwork/features/<feature>/architecture/**/index.yaml (done)"
+    purpose:
+      en: Read every decided business (SRS) and architecture (SDS) record the question touches. A decided
+        record that already settles the question is the answer, named by id; the owner is not asked twice.
+  - id: environment
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: For a credential or configuration question, read where the code reads the value - the exact
+        variable name - and which identity custody of this tree
+        (.starciwork/_resources/identity/<slug>/) holds it. Never the value itself.
+writes:
+  - id: decision
+    path: .starciwork/features/<feature>/business/srs/business-rules/policy-decisions/<slug>/index.yaml
+    fields:
+      - schema
+      - description
+      - extensions.work3.srs
+      - refs
+    content:
+      en: One policy-decision record draft (work/node@2, kind business, an srs-policy-decision section with decisionStatus
+        open, the shape of the existing policy decisions of the tree), state todo, carrying in order the question in one sentence; why it
+        matters and what changes until it is answered; the options, numbered, each with what it means
+        for the architecture, the user stories, the security and authority, the business rules and the
+        quality limits, and what it costs; the decided records each option agrees or conflicts with, by id;
+        and exactly one recommendation with its reason. Real product-shaped content, no placeholder, no
+        secret value. The srs.requiredDecisions array lists unresolved topics, never selectable answers.
+        Before owner presentation, srs.options contains at least two distinct concrete mutually exclusive
+        policy outcomes in the exact presentation order. Questions beginning with Whether are agenda topics,
+        not yes/no decisions. Repair an unprepared options array in this operation before requesting an answer.
+steps:
+  - reads:
+      - question
+      - decided
+    writes: []
+    action:
+      en: >-
+        Try the decided records first. When one settles the question, report done with the first line of
+        the summary exactly "answered-from: <record id>" followed by the answer in one paragraph, and write
+        nothing.
+  - reads:
+      - question
+      - decided
+      - environment
+    writes:
+      - decision
+    action:
+      en: Otherwise write the one policy-decision record draft with the question, why it matters, the numbered
+        options analysed per side, the decided records each touches by id in the text (never as a graph edge)
+        and one recommendation. A provision is not prepared here; that is provision.ask.
+  - reads:
+      - question
+    writes: []
+    action:
+      en: >-
+        Print the question and its numbered options in this terminal and say that the owner may answer here
+        with the number, or later with workflow-answer; do not wait - a decision is taken provisionally on the
+        recommendation and the owner overturns it later.
+  - reads:
+      - question
+    writes: []
+    action:
+      en: >-
+        Run `starci validate` and report done exactly once: first line "decision: <record id>", then
+        "recommended: <n>", then the options numbered as the owner will answer them. If the owner happened to
+        answer here already, the first line is "answered-by-owner: <n>" instead.
+
+proofs:
+  - id: decided-first
+    requirement:
+      en: A question a decided record settles is answered from that record, by id, and no record is written.
+  - id: one-record
+    requirement:
+      en: Otherwise exactly one policy-decision record draft exists with the question, the numbered options
+        analysed per side, the touched records by id and one recommendation, and the workspace validates.
+        The explicit srs.options array contains outcomes separate from the requiredDecisions agenda.
+  - id: asked-in-the-terminal
+    requirement:
+      en: The question and its numbered options were printed in this operation's own terminal, with both ways
+        to answer them, before any report was sent.
+  - id: no-secret
+    requirement:
+      en: No value of any credential or secret appears in the record, the report, the terminal or anywhere
+        else; a credential is put into the tree's encrypted identity custody by the owner's own command and
+        this operation verifies only that it is present.
+blockers:
+  - code: QUESTION_UNCLEAR
+    condition:
+      en: The question names no decidable choice and no record it touches; the operation that asked it is
+        sent back to state it.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: The feature the question belongs to has no records to draft the decision under.
+placeholders:
+  feature: Selected feature slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  slug: Stable decision slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+# ---------------------------------------------------------------------------
+# TINKLE-1 business analysis (not part of the source contract; inference marked).
+business:
+  question: >-
+    "What is the decidable question, its options analysed per side, and the one
+    recommendation the runtime carries provisionally until the owner overturns
+    it?"
+  whenNeeded:
+    - When another operation raises an owner question (business/design/authority) that needs a decidable record.
+    - When the question is already settled by a decided record - then answered-from: <id> is returned and nothing is written.
+  whenNot:
+    - Not for provisions - a credential/account/dataset is provision.ask, which actually waits for the owner.
+    - Not for mechanical questions the runtime can answer itself; never decides money/authority/customer-data silently.
+  consumes:
+    - The question as raised; decided SRS/SDS records; environment facts (a credential question cites the variable name + custody, never the value).
+  produces:
+    - One policy-decision record draft (decisionStatus open, state todo) with numbered options and exactly one recommendation.
+    - Terminal print of the question for the owner; provisional recommendation the runtime may carry until overturned.
+  failureModes:
+    - QUESTION_UNCLEAR, DECLARED_DEPENDENCY_UNMET (declared blockers).
+    - Missing srs.options is repaired in-op before requesting an answer - the record must be decidable, not just stored.
+# ---------------------------------------------------------------------------
+# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
+# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
+# block alone — an agent never reads the whole contract to route.
+route:
+  nodeKinds: [business]
+  phase: [decide, cross-cutting]
+  intent: [decision, prepare, owner-question]
+  prerequisites: ["a decidable question raised by another op"]

@@ -1,0 +1,11 @@
+schema: work/gap
+id: gap.notify.unbuilt-module
+title: No notify module exists under the NestJS/Next.js layout yet
+state: done
+statement: The example backend is moving to a NestJS/TypeORM backend and the frontend to Next.js. No
+  code exists yet at src/notify/{dedupe,digest,delivery,preferences} or app/notify, so no acceptance
+  criterion, load test or UAT walk in this feature has anything to run against.
+closedBy: impl.notify.todo-app-backend.pipeline
+verificationSource: authored-claim
+because: "closedBy names impl.notify.todo-app-backend.pipeline, itself done with a fresh evidence.yaml proving every owned module directory exists and every br/sds it proves is done with its own evidence. The backend module now exists at src/modules/bussiness/notify (house shape, not the src/notify/{dedupe,digest,delivery,preferences} path this statement was authored against - the target layout changed from a flat src/notify/* guess to nivo's real modules/{platform,integrations,bussiness} shape once the shared scaffold existed to build against). The frontend half of this statement (app/notify) is out of scope for this backend lane and is not claimed closed here."
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "impl.notify.todo-app-backend.pipeline reached done; this gap's closer is satisfied."}

@@ -1,0 +1,1111 @@
+PASS src/modules/bussiness/notify/preferences.service.spec.ts (13.852 s)
+  PreferencesService
+    √ data.notify.preference: no row reads as the default (not unsubscribed, no override) (21 ms)
+    √ ac.notify.unsubscribe.honored.suppresses-future-sends: unsubscribing is per person and per channel (4 ms)
+    √ re-subscribing (unsubscribed: false) reverses the suppression (3 ms)
+    √ data.notify.preference invariant: at most one row per (personId, channel) - setting unsubscribed preserves an existing digestWindowMinutes (4 ms)
+
+PASS src/modules/bussiness/recur/occurrence.service.spec.ts (13.992 s)
+  OccurrenceService (sds.recur.occurrence-lifecycle)
+    √ t-materialise: writes one row keyed by windowKey, joined with the task row it was created alongside (18 ms)
+    √ br.recur.generation.once / ac.is-idempotent-on-rerun: a second materialise for the same windowKey changes nothing (2 ms)
+    √ t-complete: the owner can complete a materialised occurrence, which also completes the underlying task (2 ms)
+    √ completing an already-completed occurrence again is a no-op, not a second write (5 ms)
+    √ t-skip: the owner can skip a materialised occurrence without marking the task complete (3 ms)
+    √ ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner: a stranger's complete/skip attempt is refused and nothing changes (4 ms)
+    √ t-orphan / br.recur.ending.preserves-history: orphanEndedOccurrences flips only materialised occurrences dated on/after endedAt, and never deletes any row (2 ms)
+
+PASS src/modules/bussiness/notify/digest.service.spec.ts (13.913 s)
+  DigestService
+    √ ac.notify.digest.window.collapses-into-one-message: a second event before close joins the same group (19 ms)
+    √ ac.notify.digest.window.collapses-into-one-message: flushing before close returns nothing (3 ms)
+    √ ac.notify.digest.window.collapses-into-one-message: flushing at close returns the group once, in order (3 ms)
+    √ fr.notify.digest's exception flow: a window that has already closed is not joined by a later admission (3 ms)
+    √ a preference override changes the window length (2 ms)
+
+PASS src/modules/bussiness/audit/audit-keystore.service.spec.ts (13.833 s)
+  AuditKeystoreService
+    √ getOrCreateKey mints a key on first use and returns the same key on later calls (20 ms)
+    √ seal/unseal round-trips a plaintext under the same key (3 ms)
+    √ unseal returns null, never throws, for a tampered or wrongly-keyed blob (2 ms)
+    √ br.audit.erasure.right / decision.audit.erasure-method: destroyKey removes the key and the personId-to-keyId mapping together (2 ms)
+    √ getKeyIdForPerson never creates a key as a side effect of a read (3 ms)
+
+PASS src/modules/bussiness/audit/audit-log.service.spec.ts (14.022 s)
+  AuditLogService
+    √ fr.audit.log.append: appending increases the line count by exactly one and the chain stays valid (20 ms)
+    √ sds.audit.log-chain's t-append: the acting person's id is sealed, never stored in the clear (3 ms)
+    ac.audit.append-only.chain-detects-tamper
+      √ an untouched log of several lines recomputes as fully valid (4 ms)
+      √ mutating one stored field on an already-appended line surfaces a content mismatch at that line's index (4 ms)
+      √ removing a line from the middle of the store surfaces a broken prevHash link at the line that followed it (4 ms)
+      √ fuzzes every line and every mutable field: each single out-of-band mutation is detected, and each is undone before the next (61 ms)
+      √ a fuzz over every middle line-removal index is detected, with zero false positives on the untouched baseline (5 ms)
+    nfr.audit.retention
+      √ a line survives its full 400-day retention window untouched, proven with a fake clock, never real elapsed time (2 ms)
+      √ retention and erasure are independent axes: past the window, an erased line still exists but no longer decrypts (3 ms)
+    findLinesForPerson / exportForPerson
+      √ returns only the lines that person produced, oldest first, never another person's lines (3 ms)
+      √ returns an empty list for a person who never produced a line (2 ms)
+
+PASS src/modules/bussiness/plan/cap-guard.policy.spec.ts
+  PlanCapGuardPolicy (sds.plan.cap-guard)
+    √ t-under-cap: a free person under 20 active tasks may create (7 ms)
+    √ ac.plan.caps.limit.refuses-over-cap / t-at-cap: a free person at 20 active tasks is refused, naming the cap and the upgrade path (6 ms)
+    √ ac.plan.active-scope.excludes-complete: a completed task does not count toward the cap (3 ms)
+    √ a paid person is never refused, however many active tasks they hold (3 ms)
+    √ br.plan.downgrade.freeze / ac.plan.downgrade.freeze.over-cap-blocks-create: a downgraded-to-free person over the cap is refused the same way an at-cap create is (5 ms)
+    √ contract.plan.create-precondition / gap.plan.cap-guard-not-wired: registered into TaskCreationPolicyRegistry, the registry itself refuses the over-cap create (3 ms)
+
+PASS src/features/todo/graphql/mutations/session/sign-out/sign-out.resolver.spec.ts (14.415 s)
+  SignOutResolver
+    √ fr.login.sign-out: dispatches SignOutCommand with the token from the input and reports the result (21 ms)
+    √ propagates the refusal when the token does not name an active session (3 ms)
+
+PASS src/features/todo/graphql/mutations/session/sign-in/sign-in.resolver.spec.ts (14.423 s)
+  SignInResolver
+    √ br.login.password.sign-in: dispatches SignInCommand with the input mapped to params and returns the issued session (25 ms)
+    √ ac.login.password.sign-in.wrong-pair-is-refused: the handler refusal propagates to the caller unchanged (5 ms)
+
+PASS src/modules/bussiness/task/complete-task.handler.spec.ts
+  CompleteTaskHandler
+    √ ac.task.complete.once.is-idempotent: completing an already-complete task is unchanged and succeeds again (7 ms)
+    √ ac.task.single-owner.refuses-stranger: a stranger cannot complete somebody else's task (3 ms)
+    √ event.task.completed: publishes on the PlatformEventBus after the write succeeds (5 ms)
+
+PASS src/features/todo/graphql/mutations/task/delete-task/delete-task.resolver.spec.ts (15.26 s)
+  DeleteTaskResolver
+    √ br.task.delete.final: resolves the caller, maps the id arg onto the command and reports the deletion (21 ms)
+    √ refuses before dispatching any command when the session cannot be resolved (4 ms)
+    √ propagates TASK_NOT_FOUND from the handler unchanged (3 ms)
+    √ propagates TASK_FORBIDDEN when the task belongs to somebody else (3 ms)
+
+PASS src/modules/bussiness/recur/scheduler.service.spec.ts
+  SchedulerService (integration.recur.scheduler)
+    √ onModuleInit registers a started CronJob named recur-generation-tick under the configured cron (13 ms)
+    √ each tick delegates to GeneratorService.runOnce (4 ms)
+
+PASS src/features/todo/graphql/queries/audit/audit-log/audit-log.resolver.spec.ts (15.406 s)
+  AuditLogResolver
+    √ maps every line onto an AuditLogLineResponse, keeping a null target null (20 ms)
+    √ dispatches an AuditLogQuery with the session actor as personId and no caller-controlled filters (3 ms)
+    √ returns an empty list when the person has no audit lines (2 ms)
+    √ refuses a request with no Authorization header before any query runs (7 ms)
+    √ propagates SessionExpiredException unchanged (5 ms)
+    √ propagates AuditOperatorRoleNotAuthorizedException raised inside the query bus unchanged (2 ms)
+
+PASS src/features/todo/graphql/mutations/plan/downgrade-plan/downgrade-plan.resolver.spec.ts (15.546 s)
+  DowngradePlanResolver (fr.plan.downgrade)
+    √ resolves the actor and dispatches DowngradePlanCommand, returning the new plan state (23 ms)
+    √ refuses before dispatch when the session cannot be resolved (6 ms)
+    √ refuses before dispatch when the session is expired (3 ms)
+    √ propagates PlanSubscriptionNotFoundException when the owner has no subscription row (3 ms)
+
+PASS src/features/todo/graphql/queries/audit/export-my-data/export-my-data.resolver.spec.ts (15.525 s)
+  ExportMyDataResolver
+    √ maps every decrypted line onto an ExportedLineResponse (23 ms)
+    √ dispatches an ExportMyDataQuery with the session actor as personId (5 ms)
+    √ returns an empty list once a completed erasure has destroyed the caller key (2 ms)
+    √ refuses a request with no Authorization header before any query runs (11 ms)
+    √ propagates SessionExpiredException unchanged (7 ms)
+
+PASS src/features/todo/graphql/queries/task/task-counts/task-counts.resolver.spec.ts (15.435 s)
+  TaskCountsResolver
+    √ maps the counts result onto a TaskCountsResponse (30 ms)
+    √ counts the session actor only - the query shape leaves no room for a caller-supplied person (5 ms)
+    √ returns zero counts for an owner with no tasks (2 ms)
+    √ refuses a request with no Authorization header before any query runs (7 ms)
+    √ propagates SessionExpiredException unchanged (3 ms)
+
+PASS src/features/todo/graphql/mutations/plan/upgrade-plan/upgrade-plan.resolver.spec.ts (15.494 s)
+  UpgradePlanResolver (fr.plan.upgrade)
+    √ resolves the actor from the Bearer token and dispatches UpgradePlanCommand for that owner (24 ms)
+    √ refuses before dispatch when the Authorization header is absent (10 ms)
+    √ refuses before dispatch when the session is expired (4 ms)
+    √ propagates a plan-domain refusal from the command bus untouched (4 ms)
+
+PASS src/features/todo/graphql/mutations/audit/request-erasure/request-erasure.resolver.spec.ts (15.5 s)
+  RequestErasureResolver (fr.audit.erasure.request)
+    √ requests erasure only for the caller: the session personId is the command subject (27 ms)
+    √ propagates a command-bus failure untouched (4 ms)
+    √ refuses before dispatch when the session is missing or expired (6 ms)
+
+PASS src/features/todo/graphql/queries/task/list-tasks/list-tasks.resolver.spec.ts (15.519 s)
+  ListTasksResolver
+    √ maps every result row onto a TaskSummaryResponse (31 ms)
+    √ dispatches a ListTasksQuery whose ownerId is the session actor - never a caller-supplied person (13 ms)
+    √ uses the first value of a multi-valued Authorization header (11 ms)
+    √ returns an empty list when the owner has no tasks (3 ms)
+    √ refuses a request with no Authorization header before any query runs (12 ms)
+    √ refuses a malformed Authorization header (no Bearer prefix) the same way (3 ms)
+    √ propagates SessionExpiredException unchanged (3 ms)
+    √ propagates a domain error raised inside the query bus unchanged (2 ms)
+
+PASS src/features/todo/graphql/queries/recur/upcoming-occurrences/upcoming-occurrences.resolver.spec.ts (15.663 s)
+  UpcomingOccurrencesResolver
+    √ maps materialised rows and preview dates onto an UpcomingOccurrencesResponse (19 ms)
+    √ threads the ruleId argument and the session actor into the query params (4 ms)
+    √ shows an ended rule as history only: materialised rows stay, previewDates is empty (3 ms)
+    √ refuses a request with no Authorization header before any query runs (7 ms)
+    √ propagates SessionExpiredException unchanged (6 ms)
+    √ propagates RecurRuleNotFoundException raised inside the query bus unchanged (3 ms)
+    √ propagates RecurRuleForbiddenException for a rule the actor does not own (2 ms)
+
+PASS src/modules/bussiness/share/invite.handler.spec.ts
+  InviteHandler
+    √ fr.share.invite: dispatches to InvitationService and returns the pending invitation (9 ms)
+
+PASS src/modules/bussiness/share/invitation.service.spec.ts
+  InvitationService
+    √ fr.share.invite: creates a pending invitation bound to the task, email and role (6 ms)
+    √ fr.share.invite exceptionFlows: an invalid email is refused and nothing is created (2 ms)
+    √ fr.share.invite exceptionFlows: a role other than viewer or editor is refused (15 ms)
+    √ data.share.invitation invariant: a second invite to the same pending pair is refused (3 ms)
+    √ ac.share.invite.expiry.accept-before-expiry-succeeds: accepting thirteen days in still succeeds (2 ms)
+    √ ac.share.invite.expiry.expires-after-14-days: reading fifteen days later reports expired and refuses acceptance (3 ms)
+    √ fr.share.accept exceptionFlows: accepting with a different email is refused (2 ms)
+    √ fr.share.accept exceptionFlows: accepting a revoked invitation is refused (3 ms)
+    √ ac.share.revoke.on-read.removed-loses-access-next-read: revoke clears the collaborator cache immediately (2 ms)
+    √ fr.share.revoke exceptionFlows: revoking an already revoked invitation is refused (2 ms)
+    √ fr.share.revoke: only the owner may revoke (2 ms)
+    √ fr.share.list exceptionFlows: a stranger sees nothing (2 ms)
+    √ fr.share.list: the owner sees every row with a live status (1 ms)
+    √ fr.share.list: a bound collaborator sees the list too (1 ms)
+    √ fr.share.list postconditions: an expired row reads expired at read time, never cached (1 ms)
+    √ re-inviting an expired address re-opens a fresh pending row instead of a second one (2 ms)
+
+PASS src/modules/bussiness/recur/upcoming-occurrences.handler.spec.ts
+  UpcomingOccurrencesHandler (fr.recur.see-upcoming)
+    √ preview dates never land on a weekend for an every-weekday rule (9 ms)
+    √ exceptionFlows: an ended rule shows no upcoming preview, only its history (3 ms)
+    √ only the rule's own owner may query its upcoming occurrences (2 ms)
+
+PASS src/modules/bussiness/recur/generator.service.spec.ts
+  GeneratorService (sds.recur.generation-engine)
+    √ materialises one occurrence per weekday date between startDate and now, skipping weekends (12 ms)
+    √ br.recur.generation.once / ac.is-idempotent-on-rerun: running twice for an overlapping window creates no second occurrence (5 ms)
+    √ decision.recur.generation.backfill: a generator that has never run walks and materialises every missed date, one occurrence per date (4 ms)
+    √ ac.recur.impossible-date.skips.skips-nonexistent-day: a monthly-day-31 rule materialises January and March 2026 but nothing for February (6 ms)
+    √ br.recur.ending.preserves-history: an ended rule never has a generated occurrence dated after the day it ended (4 ms)
+    √ br.recur.timezone.owner-local-time: the materialised occurrence's dueAtUtc is resolved from the rule's own zone, not the host clock (4 ms)
+
+PASS src/modules/bussiness/notify/notify-event.subscriber.spec.ts
+  NotifyEventSubscriber
+    √ event.task.completed: admits a task-complete notification with the producer-supplied sourceEventId, never an invented one (7 ms)
+    √ event.login.signed-in: gap.notify.new-device-event - subscribing does not fabricate a new-device notification (2 ms)
+    √ unsubscribes on destroy: a later publish reaches nothing (2 ms)
+
+PASS src/features/todo/graphql/queries/plan/plan-usage/plan-usage.resolver.spec.ts
+  PlanUsageResolver
+    √ maps the usage result onto a PlanUsageResponse (6 ms)
+    √ keeps a null cap null on the paid plan ("no cap") (5 ms)
+    √ dispatches a PlanUsageQuery whose ownerId is the session actor (3 ms)
+    √ refuses a request with no Authorization header before any query runs (5 ms)
+    √ propagates SessionExpiredException unchanged (2 ms)
+    √ propagates a domain error raised inside the query bus unchanged (3 ms)
+
+PASS src/features/todo/graphql/queries/share/collaborators/collaborators.resolver.spec.ts
+  CollaboratorsResolver
+    √ maps every collaborator onto a CollaboratorResponse (5 ms)
+    √ threads the taskId argument and the session actor into the query params (4 ms)
+    √ returns an empty list for a task with no collaborators (2 ms)
+    √ refuses a request with no Authorization header before any query runs (7 ms)
+    √ propagates SessionExpiredException unchanged (7 ms)
+    √ propagates TaskNotFoundException raised inside the query bus unchanged (5 ms)
+    √ propagates ShareForbiddenException for an actor who is neither owner nor collaborator (3 ms)
+
+PASS src/modules/bussiness/audit/audit-log.handler.spec.ts
+  AuditLogHandler (fr.audit.log.read)
+    √ a person with no lines gets an empty list, not an error (10 ms)
+    √ refusal (fr.audit.log.read exceptionFlows): an empty actor is refused before any line is touched (3 ms)
+    √ gap.audit.operator-role closed - fail-closed default: with no operator configured, a read returns only the caller's own lines and never the wider chain (6 ms)
+    √ verifiable claim (decision.audit.operator-role): a subject outside the roster is no operator, so an action filter cannot escalate to the whole chain (2 ms)
+    √ fr.audit.log.read mainFlow: a verified operator on the roster reads the whole chain, filtered by an action the contract emits (5 ms)
+    √ fr.audit.log.read: an operator's unfiltered read returns every line in the chain, oldest first (5 ms)
+    √ fr.audit.log.read: an operator filtering by an action the contract never emits gets nothing (5 ms)
+
+PASS src/modules/bussiness/plan/plan-usage.handler.spec.ts
+  PlanUsageHandler (fr.plan.usage.view)
+    √ a free person under the cap sees their count against 20 (9 ms)
+    √ ac.plan.active-scope.excludes-complete: the shown count excludes completed tasks (4 ms)
+    √ fr.plan.usage.view mainFlow: a paid person sees no cap (4 ms)
+
+PASS src/modules/bussiness/recur/end-recurrence.handler.spec.ts
+  EndRecurrenceHandler (fr.recur.end-rule, br.recur.ending.preserves-history)
+    √ ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences (10 ms)
+    √ exceptionFlows-equivalent: a stranger may not end someone else's rule (3 ms)
+
+PASS src/modules/bussiness/share/accept-invitation.handler.spec.ts
+  AcceptInvitationHandler
+    √ fr.share.accept: accepting a pending invitation activates the role immediately (7 ms)
+    √ fr.share.accept exceptionFlows: a mismatched email is refused (2 ms)
+
+PASS src/modules/platform/databases/postgresql/primary/primary.module.spec.ts
+  PostgresqlPrimaryModule
+    √ register() returns the module itself, provides and exports PostgresPrimaryClient, and is non-global by default (4 ms)
+    √ threads the POSTGRESQL_PRIMARY name into the data-source and entity-manager provider tokens (1 ms)
+    √ injects AppConfigService into the options factory and imports ConfigModule for it (1 ms)
+    √ builds TypeORM options from the configured database URL with migrations on and synchronize off (2 ms)
+
+PASS src/modules/bussiness/recur/edit-recurrence.handler.spec.ts
+  EditRecurrenceHandler (fr.recur.edit-rule)
+    √ fr.recur.edit-rule: the owner can change the schedule (5 ms)
+    √ exceptionFlows: someone who is not the rule's owner may not edit it (4 ms)
+
+PASS src/modules/bussiness/task/reopen-task.handler.spec.ts
+  ReopenTaskHandler
+    √ ac.task.complete.once.is-reversible: the task reads incomplete and its completion timestamp is cleared (5 ms)
+    √ ac.task.single-owner.refuses-stranger: a stranger cannot reopen somebody else's task (2 ms)
+
+PASS src/modules/bussiness/notify/update-notification-preferences.handler.spec.ts
+  UpdateNotificationPreferencesHandler
+    √ sets the digest window without touching unsubscribed (6 ms)
+    √ a later call that only sets unsubscribed keeps the earlier digestWindowMinutes (2 ms)
+
+PASS src/modules/bussiness/share/list-collaborators.handler.spec.ts
+  ListCollaboratorsHandler
+    √ fr.share.list: the owner sees every collaborator with a live status (11 ms)
+    √ fr.share.list exceptionFlows: a stranger sees nothing (3 ms)
+
+PASS src/features/todo/graphql/mutations/recur/make-recurring/make-recurring.resolver.spec.ts (16.91 s)
+  MakeRecurringResolver (fr.recur.make-recurring)
+    √ dispatches MakeRecurringCommand owned by the caller, with absent frequency fields mapped to null (24 ms)
+    √ forwards n for an every-n-days rule and dayOfMonth for a monthly-day rule (15 ms)
+    √ propagates RecurRuleInvalidException when the rule shape breaks data.recur.rule (6 ms)
+    √ refuses before dispatch when the session is missing or expired (5 ms)
+  MakeRecurringInput validation
+    √ accepts a well-formed every-weekday submission (3 ms)
+    √ rejects an empty title and an empty timeZone (2 ms)
+    √ rejects a frequency outside the RecurFrequency enum (1 ms)
+    √ rejects a malformed HH:MM time and a non-YYYY-MM-DD startDate (1 ms)
+    √ rejects n or dayOfMonth below 1 (1 ms)
+
+PASS src/modules/bussiness/task/task-counts.handler.spec.ts
+  TaskCountsHandler
+    √ contract.task.list-for-dashboard.counts-obey-owned-list: the two counts cover exactly the reader's own tasks (6 ms)
+    √ contract.task.list-for-dashboard.counts-track-completion: completing and reopening move a task between the two counters (2 ms)
+
+PASS src/modules/bussiness/plan/reconcile-payment.handler.spec.ts
+  ReconcilePaymentHandler (fr.plan.reconcile / sds.plan.reconciliation)
+    √ exceptionFlow "still pending": nothing changes and it is checked again later (14 ms)
+    √ mainFlow "gateway shows paid": the same activation a webhook would have caused is applied, once (3 ms)
+    √ mainFlow "gateway shows failed": t-gateway-abandoned returns the subscription to free (7 ms)
+    √ br.plan.payment.idempotent: a webhook that already applied the intent leaves reconcile a no-op without a gateway call (9 ms)
+    √ PLAN_FORBIDDEN: a person may not reconcile a payment intent on somebody else's subscription (5 ms)
+
+PASS src/modules/bussiness/audit/request-erasure.handler.spec.ts
+  RequestErasureHandler
+    √ fr.audit.erasure.request: exactly one erasure-request row exists per submission, in state requested (then verified, since the caller is the subject) (14 ms)
+
+PASS src/modules/bussiness/recur/skip-occurrence.handler.spec.ts
+  SkipOccurrenceHandler (sds.recur.occurrence-lifecycle t-skip)
+    √ skips a materialised occurrence for its owner without completing the task (5 ms)
+    √ ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner (2 ms)
+
+PASS src/features/todo/graphql/mutations/task/create-task/create-task.resolver.spec.ts (17.044 s)
+  CreateTaskResolver
+    √ fr.task.create: resolves the caller from the bearer token, dispatches CreateTaskCommand and returns the created task (19 ms)
+    √ refuses before dispatching any command when the session cannot be resolved (4 ms)
+    √ passes an empty token to the session boundary when the Authorization header is missing (2 ms)
+    √ ac.task.title.required.refuses-empty: the handler refusal propagates to the caller unchanged (3 ms)
+
+PASS src/modules/platform/databases/postgresql/primary/entities/entities.spec.ts
+  primary entities
+    √ every entity class instantiates through the Nest container (3 ms)
+    √ sessions: @Entity name matches the migration-owned table (1 ms)
+    √ tasks: @Entity name matches the migration-owned table
+    √ invitations: @Entity name matches the migration-owned table
+    √ recurrence_rules: @Entity name matches the migration-owned table (1 ms)
+    √ occurrences: @Entity name matches the migration-owned table
+    √ notify_notifications: @Entity name matches the migration-owned table
+    √ notify_delivery_attempts: @Entity name matches the migration-owned table
+    √ notify_preferences: @Entity name matches the migration-owned table
+    √ notify_digest_windows: @Entity name matches the migration-owned table
+    √ audit_log_lines: @Entity name matches the migration-owned table
+    √ audit_keys: @Entity name matches the migration-owned table
+    √ audit_erasure_requests: @Entity name matches the migration-owned table
+    √ subscriptions: @Entity name matches the migration-owned table
+    √ payment_intents: @Entity name matches the migration-owned table
+    √ sessions: columns are declared in order with their SQL types
+    √ tasks: columns are declared in order with their SQL types
+    √ invitations: columns are declared in order with their SQL types
+    √ recurrence_rules: columns are declared in order with their SQL types
+    √ occurrences: columns are declared in order with their SQL types
+    √ notify_notifications: columns are declared in order with their SQL types (1 ms)
+    √ notify_delivery_attempts: columns are declared in order with their SQL types
+    √ notify_preferences: columns are declared in order with their SQL types
+    √ notify_digest_windows: columns are declared in order with their SQL types
+    √ audit_log_lines: columns are declared in order with their SQL types (1 ms)
+    √ audit_keys: columns are declared in order with their SQL types
+    √ audit_erasure_requests: columns are declared in order with their SQL types
+    √ subscriptions: columns are declared in order with their SQL types
+    √ payment_intents: columns are declared in order with their SQL types (1 ms)
+    √ sessions: primary key columns match the migration primary key
+    √ tasks: primary key columns match the migration primary key
+    √ invitations: primary key columns match the migration primary key
+    √ recurrence_rules: primary key columns match the migration primary key
+    √ occurrences: primary key columns match the migration primary key
+    √ notify_notifications: primary key columns match the migration primary key
+    √ notify_delivery_attempts: primary key columns match the migration primary key
+    √ notify_preferences: primary key columns match the migration primary key
+    √ notify_digest_windows: primary key columns match the migration primary key
+    √ audit_log_lines: primary key columns match the migration primary key
+    √ audit_keys: primary key columns match the migration primary key (1 ms)
+    √ audit_erasure_requests: primary key columns match the migration primary key
+    √ subscriptions: primary key columns match the migration primary key
+    √ payment_intents: primary key columns match the migration primary key
+    √ sessions: exactly the declared columns are nullable
+    √ tasks: exactly the declared columns are nullable
+    √ invitations: exactly the declared columns are nullable
+    √ recurrence_rules: exactly the declared columns are nullable (1 ms)
+    √ occurrences: exactly the declared columns are nullable
+    √ notify_notifications: exactly the declared columns are nullable
+    √ notify_delivery_attempts: exactly the declared columns are nullable (14 ms)
+    √ notify_preferences: exactly the declared columns are nullable
+    √ notify_digest_windows: exactly the declared columns are nullable (1 ms)
+    √ audit_log_lines: exactly the declared columns are nullable
+    √ audit_keys: exactly the declared columns are nullable
+    √ audit_erasure_requests: exactly the declared columns are nullable
+    √ subscriptions: exactly the declared columns are nullable
+    √ payment_intents: exactly the declared columns are nullable
+    √ sessions: exactly the declared columns are unique
+    √ tasks: exactly the declared columns are unique
+    √ invitations: exactly the declared columns are unique
+    √ recurrence_rules: exactly the declared columns are unique
+    √ occurrences: exactly the declared columns are unique
+    √ notify_notifications: exactly the declared columns are unique
+    √ notify_delivery_attempts: exactly the declared columns are unique (1 ms)
+    √ notify_preferences: exactly the declared columns are unique
+    √ notify_digest_windows: exactly the declared columns are unique
+    √ audit_log_lines: exactly the declared columns are unique
+    √ audit_keys: exactly the declared columns are unique
+    √ audit_erasure_requests: exactly the declared columns are unique (1 ms)
+    √ subscriptions: exactly the declared columns are unique
+    √ payment_intents: exactly the declared columns are unique
+    √ sessions: column defaults back the declared free-tier/gateway values
+    √ tasks: column defaults back the declared free-tier/gateway values (2 ms)
+    √ invitations: column defaults back the declared free-tier/gateway values
+    √ recurrence_rules: column defaults back the declared free-tier/gateway values
+    √ occurrences: column defaults back the declared free-tier/gateway values
+    √ notify_notifications: column defaults back the declared free-tier/gateway values (1 ms)
+    √ notify_delivery_attempts: column defaults back the declared free-tier/gateway values
+    √ notify_preferences: column defaults back the declared free-tier/gateway values
+    √ notify_digest_windows: column defaults back the declared free-tier/gateway values
+    √ audit_log_lines: column defaults back the declared free-tier/gateway values
+    √ audit_keys: column defaults back the declared free-tier/gateway values
+    √ audit_erasure_requests: column defaults back the declared free-tier/gateway values (1 ms)
+    √ subscriptions: column defaults back the declared free-tier/gateway values
+    √ payment_intents: column defaults back the declared free-tier/gateway values
+    √ audit_log_lines.id is the only generated column, an incrementing bigint - the hash chain ordering key
+
+PASS src/features/todo/graphql/mutations/share/invite/invite.resolver.spec.ts (17.108 s)
+  InviteResolver
+    √ fr.share.invite: resolves the owner, maps the input onto the command and returns the invitation (33 ms)
+    √ refuses before dispatching any command when the session cannot be resolved (5 ms)
+    √ br.share.role.permissions: the role refusal stays at the business boundary and propagates unchanged (4 ms)
+    √ propagates SHARE_FORBIDDEN when the task belongs to somebody else (3 ms)
+
+PASS src/features/todo/graphql/mutations/plan/reconcile-payment/reconcile-payment.resolver.spec.ts (17.084 s)
+  ReconcilePaymentResolver (fr.plan.reconcile)
+    √ dispatches ReconcilePaymentCommand with the caller as actor and the input intent id (36 ms)
+    √ returns the no-op outcome when the intent was already applied or is still pending (2 ms)
+    √ propagates PlanPaymentIntentNotFoundException for an intent id this product never created (5 ms)
+    √ propagates PlanForbiddenException when the intent belongs to somebody else (4 ms)
+    √ refuses before dispatch when the session is missing or expired (5 ms)
+
+PASS src/modules/bussiness/recur/make-recurring.handler.spec.ts
+  MakeRecurringHandler (fr.recur.make-recurring)
+    √ fr.recur.make-recurring: exactly one rule is created, owned by the submitter (8 ms)
+    √ decision.recur.impossible-date: a monthly-day rule naming the 31st is accepted, not refused at creation (5 ms)
+
+PASS src/features/todo/graphql/mutations/share/accept-invitation/accept-invitation.resolver.spec.ts (17.277 s)
+  AcceptInvitationResolver
+    √ fr.share.accept: resolves the caller, maps the input onto the command and returns the accepted invitation (28 ms)
+    √ refuses before dispatching any command when the session cannot be resolved (4 ms)
+    √ propagates SHARE_INVITATION_NOT_FOUND from the handler unchanged (4 ms)
+    √ propagates SHARE_EMAIL_MISMATCH when the invitation was addressed to another email (3 ms)
+
+PASS src/features/todo/graphql/queries/notify/notification-preferences/notification-preferences.resolver.spec.ts
+  NotificationPreferencesResolver
+    √ maps the preferences result onto a NotificationPreferencesResponse (9 ms)
+    √ threads the caller-supplied channel and the session actor into the query params (5 ms)
+    √ reads back the default (not unsubscribed, no digest window) when no row exists (4 ms)
+    √ refuses a request with no Authorization header before any query runs (15 ms)
+    √ propagates SessionExpiredException unchanged (9 ms)
+    √ propagates an infrastructure failure raised inside the query bus unchanged (4 ms)
+
+PASS src/modules/bussiness/audit/audit-erasure.service.spec.ts
+  AuditErasureService
+    √ sds.audit.erasure-request t-request/t-verify: request() creates the row directly verified, since the caller is always the subject (15 ms)
+    √ sds.audit.erasure-request t-verify as its own second round: confirm() on the still-pending request verifies it for its subject (11 ms)
+    √ sds.audit.erasure-request t-verify: confirm() by a stranger of a still-pending request refuses it (t-refuse), and nothing about the subject's keys is touched (8 ms)
+    √ ac.audit.erasure.logged.request-and-completion-are-lines: an erasure-requested line and an erasure-completed line both exist, in that order, and neither names the erased person (9 ms)
+    √ t-refuse: a mismatched requester at verification time is refused, and nothing about the subject's keys is touched (14 ms)
+    br.audit.erasure.right / fr.audit.erasure.complete
+      √ ac.audit.erasure.right.identifying-fields-unreadable: after completion, no reader (including export) resolves the subject's identity from any line they produced, and every line's bytes, position and hash stay unchanged (7 ms)
+      √ data.audit.erasure-request invariant: personId is dropped from the request row once state reaches complete (5 ms)
+      √ a caller who is not the request's own subject is forbidden from completing it (3 ms)
+      √ completing an unknown requestId is refused as not found (4 ms)
+      √ a request already complete cannot be completed again (9 ms)
+
+PASS src/modules/bussiness/plan/payment.service.spec.ts
+  PaymentService
+    √ data.plan.payment-intent: create writes a pending row with no appliedAt (13 ms)
+    √ ac.plan.payment.idempotent.replay-is-noop: the first apply activates, a replay changes nothing (3 ms)
+    √ br.plan.payment.idempotent: applying twice never records a second ledger entry for the same intent (3 ms)
+    √ fr.plan.reconcile: markFailed never overturns an already-applied intent (2 ms)
+    √ markFailed on a never-applied intent sets it failed (3 ms)
+    √ findByGatewayIntentId resolves the intent SePay named in a webhook (3 ms)
+
+PASS src/modules/bussiness/audit/append-log-line.handler.spec.ts
+  AppendLogLineHandler
+    √ fr.audit.log.append: appends a line and reports the count increasing by exactly one (13 ms)
+
+PASS src/modules/bussiness/task/completion-authority.spec.ts
+  CompletionAuthorityRegistry
+    √ br.task.single-owner (default): only the owner may complete or reopen; a stranger is refused (7 ms)
+    √ a registered widened authority lets a non-owner complete/reopen once registered (3 ms)
+    √ delete stays owner-only through OwnershipGuard even after a widened CompletionAuthority is registered (2 ms)
+    √ sds.task.ownership-guard.t-owner: with the default authority the owner passes the completion authority and the delete guard (3 ms)
+    √ sds.task.ownership-guard.t-collaborator: a widened authority proceeds with complete and reopen, while delete is still refused (3 ms)
+    √ sds.task.ownership-guard.t-stranger: a stranger is refused on both paths before anything is written (2 ms)
+
+PASS src/modules/bussiness/session/sign-out.handler.spec.ts
+  SignOutHandler
+    √ br.login.session.restores: the session ends and the next request against that token is unauthenticated (9 ms)
+    √ event.login.signed-out: publishes on the PlatformEventBus after the session is revoked (3 ms)
+
+PASS src/modules/bussiness/recur/complete-occurrence.handler.spec.ts
+  CompleteOccurrenceHandler (sds.recur.occurrence-lifecycle t-complete)
+    √ completes a materialised occurrence for its owner (5 ms)
+    √ ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner (3 ms)
+
+PASS src/modules/bussiness/task/task.service.spec.ts
+  TaskService
+    √ br.task.single-owner rev 2, default seam: with no authority registered the owner may complete and delete, and a stranger is refused on both (7 ms)
+    √ br.task.delete.final: deleting a task removes it; there is no recovery path (2 ms)
+    √ ac.task.title.required.refuses-empty: a creation request with an empty or whitespace title is refused (1 ms)
+    √ sds.task.completion-state.t-complete: completing an open task sets complete and a completedAt (2 ms)
+    √ sds.task.completion-state.t-complete-again: completing a complete task writes nothing and leaves completedAt (1 ms)
+    √ sds.task.completion-state.t-reopen: reopening a completed task clears complete and completedAt (1 ms)
+
+PASS src/modules/bussiness/plan/confirm-payment.handler.spec.ts
+  ConfirmPaymentHandler
+    √ sds.plan.subscription-lifecycle t-gateway-confirmed: a paid webhook activates a pending subscription (9 ms)
+    √ ac.plan.payment.idempotent.replay-is-noop: the same webhook applied twice activates only once (3 ms)
+    √ br.plan.payment.idempotent: a late webhook after fr.plan.reconcile already applied the same intent is a no-op (3 ms)
+    √ sds.plan.subscription-lifecycle t-gateway-abandoned: a failed outcome on a still-pending intent returns the subscription to free (3 ms)
+    √ a failed outcome arriving after the intent was already applied paid never unwinds the activation (3 ms)
+    √ sds.plan.subscription-lifecycle t-renewal-confirmed: a paid webhook on a past-due subscription returns it to active (2 ms)
+    √ PLAN_PAYMENT_INTENT_NOT_FOUND: an unknown gatewayIntentId is refused rather than silently ignored (4 ms)
+
+PASS src/modules/bussiness/audit/audit-operator.guard.spec.ts
+  assertOperatorRead (gap.audit.operator-role)
+    √ refuses every actor without an operator claim - which is every actor this example can resolve today (6 ms)
+    √ honors operator and operator:* claims if sds.login.session-store ever grows a role field
+    √ carries a stable refusal code, per contract.login.identity-for-task's typed-refusal rule
+    √ asks and asserts the same one rule
+  AuditOperatorGuard
+    √ denies the session-only actor this example resolves today (SessionRecord carries no role) (5 ms)
+    √ admits an operator claim (1 ms)
+  operator filter/summary pair (fr.audit.log.read)
+    √ filters by action and by target, and passes everything when unfiltered (2 ms)
+    √ the summary carries exactly at/action/target - never actor, never keyId (1 ms)
+    √ readAllLines resolves a real tombstoned line into the same summary shape, unreadable but present (7 ms)
+  AUDIT_SEALED_ACTIONS (contract.audit.emitted-events)
+    √ names exactly the five events this lane declares (1 ms)
+
+PASS src/features/todo/graphql/mutations/task/complete-task/complete-task.resolver.spec.ts
+  CompleteTaskResolver
+    √ fr.task.complete: resolves the caller, maps the id arg onto the command and returns the completion state (4 ms)
+    √ refuses before dispatching any command when the session cannot be resolved (2 ms)
+    √ propagates TASK_NOT_FOUND from the handler unchanged (1 ms)
+    √ propagates TASK_FORBIDDEN when the task belongs to somebody else (1 ms)
+
+PASS src/features/todo/graphql/mutations/share/revoke-collaborator/revoke-collaborator.resolver.spec.ts (17.675 s)
+  RevokeCollaboratorResolver
+    √ fr.share.revoke: resolves the owner, maps the input onto the command and returns the revoked invitation (27 ms)
+    √ refuses before dispatching any command when the session cannot be resolved (3 ms)
+    √ propagates SHARE_INVITATION_NOT_FOUND from the handler unchanged (4 ms)
+    √ propagates SHARE_FORBIDDEN when the invitation belongs to somebody else’s task (3 ms)
+
+PASS src/features/todo/graphql/mutations/recur/edit-recurrence/edit-recurrence.resolver.spec.ts (17.69 s)
+  EditRecurrenceResolver (fr.recur.edit-rule)
+    √ dispatches EditRecurrenceCommand with the caller as actor and only the fields the input carries (22 ms)
+    √ propagates RecurRuleNotFoundException for a rule id that does not resolve (9 ms)
+    √ propagates RecurRuleForbiddenException when the caller does not own the rule (8 ms)
+    √ propagates RecurRuleInvalidException when the edit breaks the rule shape (5 ms)
+    √ refuses before dispatch when the session is missing or expired (3 ms)
+  EditRecurrenceInput validation
+    √ accepts a sparse edit that only names the rule (1 ms)
+    √ rejects a malformed time, a non-positive n, and a frequency outside the enum (1 ms)
+
+PASS src/features/todo/graphql/mutations/audit/complete-erasure/complete-erasure.resolver.spec.ts
+  CompleteErasureResolver (fr.audit.erasure.complete)
+    √ dispatches CompleteErasureCommand with the request id and the caller as callerId (6 ms)
+    √ propagates ErasureRequestNotFoundException for a request id that does not resolve (8 ms)
+    √ propagates ErasureRequestForbiddenException when the request's subject is somebody else (3 ms)
+    √ propagates ErasureRequestInvalidStateException when the request is not yet verified (4 ms)
+    √ refuses before dispatch when the session is missing or expired (3 ms)
+
+PASS src/features/todo/graphql/mutations/recur/end-recurrence/end-recurrence.resolver.spec.ts (17.761 s)
+  EndRecurrenceResolver (fr.recur.end-rule)
+    √ dispatches EndRecurrenceCommand with the caller as actor and returns the orphan count (26 ms)
+    √ propagates RecurRuleNotFoundException for a rule id that does not resolve (10 ms)
+    √ propagates RecurRuleForbiddenException when the caller does not own the rule (5 ms)
+    √ refuses before dispatch when the session is missing or expired (3 ms)
+  EndRecurrenceInput validation
+    √ accepts a YYYY-MM-DD endedAt (5 ms)
+    √ rejects an endedAt that is not a YYYY-MM-DD calendar date (1 ms)
+
+PASS src/modules/bussiness/task/create-task.handler.spec.ts
+  CreateTaskHandler
+    √ fr.task.create: the task is created, owned by the submitter, not complete (6 ms)
+    √ ac.task.title.required.refuses-empty: an empty or whitespace-only title is refused and nothing is written (6 ms)
+    √ event.task.created: publishes on the PlatformEventBus after the write succeeds (4 ms)
+  TaskCreationPolicyRegistry (sds.plan.cap-guard seam)
+    √ sds.plan.cap-guard: a registered policy can refuse creation before the write, and nothing is written (2 ms)
+    √ an empty registry (the default) blocks nothing (2 ms)
+
+PASS src/modules/bussiness/notify/unsubscribe.handler.spec.ts
+  UnsubscribeHandler
+    √ ac.notify.unsubscribe.honored.suppresses-future-sends: sets unsubscribed for the actor and channel (5 ms)
+
+PASS src/features/todo/graphql/mutations/task/reopen-task/reopen-task.resolver.spec.ts
+  ReopenTaskResolver
+    √ br.task.complete.once: resolves the caller, maps the id arg onto the command and returns the reopened state (7 ms)
+    √ refuses before dispatching any command when the session cannot be resolved (3 ms)
+    √ propagates TASK_NOT_FOUND from the handler unchanged (2 ms)
+    √ propagates TASK_FORBIDDEN when the task belongs to somebody else (3 ms)
+
+PASS src/modules/bussiness/notify/notification-preferences.handler.spec.ts
+  NotificationPreferencesHandler
+    √ data.notify.preference: reads back the default when no preference has ever been written (12 ms)
+    √ reads back a written preference (3 ms)
+
+PASS src/modules/bussiness/recur/rule.service.spec.ts
+  RuleService (data.recur.rule)
+    √ creates an every-weekday rule owned by the submitter (9 ms)
+    √ data.recur.rule invariant: every-n-days requires a positive integer n (2 ms)
+    √ data.recur.rule invariant: monthly-day requires dayOfMonth between 1 and 31 (2 ms)
+    √ decision.recur.impossible-date: monthly-day 31 is accepted at creation even though most months lack a 31st (2 ms)
+    √ ac.recur.occurrence.owned-by-rule-owner (rule half): a stranger cannot edit or end the rule (2 ms)
+    √ fr.recur.edit-rule: the owner can change frequency, time and time zone (1 ms)
+    √ br.recur.ending.preserves-history: ending sets endedAt and never clears it back (2 ms)
+    √ findById refuses an unknown rule id (5 ms)
+
+PASS src/modules/bussiness/task/delete-task.handler.spec.ts
+  DeleteTaskHandler
+    √ ac.task.delete.final.stays-gone: the identifier resolves to nothing after deletion (12 ms)
+    √ ac.task.single-owner.refuses-stranger: a stranger cannot delete somebody else's task (2 ms)
+    √ event.task.deleted: publishes on the PlatformEventBus after the row is gone (8 ms)
+
+PASS src/modules/bussiness/audit/export-my-data.handler.spec.ts
+  ExportMyDataHandler
+    √ fr.audit.export: the export contains no other person's lines (15 ms)
+    √ exceptionFlow: once the person's key has been destroyed by a completed erasure, export returns nothing (5 ms)
+
+PASS src/modules/bussiness/audit/complete-erasure.handler.spec.ts
+  CompleteErasureHandler
+    √ fr.audit.erasure.complete: moves the request to complete, and export subsequently returns nothing for the subject (12 ms)
+    √ refuses when the caller is not the request's own subject (5 ms)
+
+PASS src/modules/bussiness/share/completion-authority.spec.ts
+  ShareCompletionAuthority (contract.share.completion-guard-for-task)
+    √ ac.share.role.permissions.editor-can-complete: an accepted editor collaborator may complete the task (16 ms)
+    √ ac.share.role.permissions.viewer-read-only: an accepted viewer collaborator may not complete the task (5 ms)
+    √ ac.share.editor.no-delete.delete-refused-for-editor: an accepted editor may never delete the task (6 ms)
+    √ ac.share.revoke.on-read.removed-loses-access-next-read: a revoked editor is refused on the very next completion attempt (4 ms)
+    √ the owner may still complete and delete after an editor is registered (4 ms)
+
+PASS src/modules/bussiness/session/sign-in.handler.spec.ts
+  SignInHandler
+    √ ac.login.password.sign-in.wrong-pair-is-refused: a known email with a wrong password is refused and no session is created (7 ms)
+    √ br.login.password.sign-in: a sign-in succeeds only when Keycloak accepts the pair (8 ms)
+    √ ac.login.password.sign-in.refusal-does-not-name-the-half: an unknown email and a wrong password carry the same refusal (16 ms)
+    √ sds.login.session-store t-accept: a successful sign-in writes one active session (2 ms)
+    √ event.login.signed-in: publishes on the PlatformEventBus after a successful sign-in (2 ms)
+    √ a refused sign-in publishes nothing (2 ms)
+
+PASS src/modules/integrations/integrations.modules-edge.spec.ts
+  integrations module wiring edge cases
+    √ SepayModule.register() binds the client its consumers inject (25 ms)
+    √ register({ isGlobal: true }) marks the dynamic module global; the default does not (1 ms)
+    √ a globally-registered integration module satisfies a consumer that never imports it (2 ms)
+    √ the same consumer fails to compile when the module is registered non-global (4 ms)
+
+PASS src/modules/bussiness/plan/subscription.service.spec.ts
+  SubscriptionService
+    √ data.plan.subscription: a person with no row yet is lazily given exactly one, starting free (32 ms)
+    √ sds.plan.subscription-lifecycle t-checkout-started: free -> pending (2 ms)
+    √ sds.plan.subscription-lifecycle t-gateway-confirmed: pending -> active, periodEnd set, plan paid (2 ms)
+    √ sds.plan.subscription-lifecycle t-gateway-abandoned: pending -> free, periodEnd cleared (1 ms)
+    √ sds.plan.subscription-lifecycle t-renewal-due then t-lapse: active -> past-due -> lapsed (1 ms)
+    √ sds.plan.subscription-lifecycle t-renewal-confirmed: past-due -> active, periodEnd extended (1 ms)
+    √ br.plan.lapse.reverts-on-read / ac.plan.lapse.reverts-on-read.read-after-grace-is-free: a lapsed row reads as free without writing to it (1 ms)
+    √ t-revert-on-read: active and past-due both read as the paid plan (2 ms)
+    √ br.plan.downgrade.freeze / decision.plan.downgrade.policy t-downgrade: active -> free immediately, never refused (3 ms)
+    √ t-downgrade from past-due also lands on free (3 ms)
+    √ t-downgrade on an already-free person is a no-op, not an error (2 ms)
+
+PASS src/modules/bussiness/task/list-tasks.handler.spec.ts
+  ListTasksHandler
+    √ ac.task.list.owned.excludes-others: every row belongs to the reader, no row of the other person appears (6 ms)
+
+PASS src/features/todo/graphql/mutations/notify/unsubscribe/unsubscribe.resolver.spec.ts
+  UnsubscribeResolver (fr.notify.unsubscribe)
+    √ dispatches UnsubscribeCommand for the caller on the requested channel (5 ms)
+    √ propagates a command-bus refusal untouched (3 ms)
+    √ refuses before dispatch when the session is missing or expired (12 ms)
+  UnsubscribeInput validation
+    √ rejects an empty channel (4 ms)
+
+PASS src/features/todo/graphql/mutations/notify/update-notification-preferences/update-notification-preferences.resolver.spec.ts
+  UpdateNotificationPreferencesResolver (fr.notify.unsubscribe / data.notify.preference)
+    √ dispatches the command with caller actorId and every preference field the input carries (5 ms)
+    √ forwards a partial patch with omitted fields left undefined for the handler to keep (1 ms)
+    √ refuses before dispatch when the session is missing or expired (5 ms)
+  UpdateNotificationPreferencesInput validation
+    √ accepts a channel-only patch (4 ms)
+    √ rejects an empty channel and a non-positive digest window (1 ms)
+
+PASS src/modules/bussiness/plan/create-precondition.contract.spec.ts
+  contract.plan.create-precondition
+    √ the task create path calls the guard before writing and honors a refusal, naming the cap and the upgrade path (33 ms)
+    √ nothing is written when the create is refused (17 ms)
+    √ a paid person is never refused by the same real create path (5 ms)
+
+PASS src/modules/integrations/notify-smtp/notify-smtp.client.spec.ts
+  NotifySmtpClient.send (integration.notify.smtp)
+    √ speaks the full submission dialogue and delivers the rendered message (19 ms)
+    √ maps an unreachable host to a transient failure (6 ms)
+    √ maps a non-220 greeting to a transient failure (32 ms)
+    √ maps a refused EHLO to a transient failure (3 ms)
+    √ maps a 5xx at RCPT TO to a permanent rejection of the address (7 ms)
+    √ maps a 4xx at RCPT TO to a transient failure, not a permanent one (8 ms)
+
+PASS src/modules/bussiness/plan/downgrade-plan.handler.spec.ts
+  DowngradePlanHandler
+    √ fr.plan.downgrade / decision.plan.downgrade.policy: the downgrade is accepted immediately, never refused (6 ms)
+    √ ac.plan.downgrade.freeze.existing-tasks-untouched: the downgrade only changes the subscription row (3 ms)
+
+PASS src/modules/bussiness/task/creation-policy.providers.spec.ts
+  TaskCreationPolicyRegistry
+    √ with nothing registered, creation is never refused (4 ms)
+    √ a registered policy that has nothing to say still resolves (2 ms)
+    √ a refusing policy propagates its own typed refusal (2 ms)
+    √ policies run in registration order and the first refusal wins: later policies are never consulted (2 ms)
+
+PASS src/modules/bussiness/notify/dedupe.service.spec.ts
+  DedupeService
+    √ ac.notify.delivery.once.dedupe-collapses-retry: a second admission for the same triple returns the same notification, not a new one (6 ms)
+    √ a different sourceEventId, kind or recipient produces a distinct notification (4 ms)
+    √ assignDigestGroup sets digestGroupId exactly once and a second call is a no-op (3 ms)
+
+PASS src/modules/bussiness/session/session.service.spec.ts
+  SessionService
+    √ t-begin: a malformed email is refused before any write, and a well-formed one passes through (11 ms)
+    √ sds.login.session-store: expiry is enforced on read, and the row is deleted on the way out (3 ms)
+    √ ac.login.session.restores.returning-within-the-window-stays-signed-in: a session within the window is still active (2 ms)
+    √ t-revoke: the row is deleted so the next read of that token finds nothing (2 ms)
+    √ sds.login.session-store t-accept: a successful sign-in writes one session row with a thirty-day expiry (2 ms)
+    √ an operation without a session token is refused before any database read (3 ms)
+
+PASS src/modules/integrations/notify-queue/notify-queue.client.spec.ts
+  NotifyQueueClient (integration.notify.queue)
+    √ enqueues a job as a ZADD on the dispatch sorted set, scored by its due time (50 ms)
+    √ dequeues due jobs through the atomic EVAL script and returns their ids (8 ms)
+    √ treats a non-array reply to dequeueDue as an empty batch (5 ms)
+    √ rejects when redis answers the command with an error (12 ms)
+    √ rejects when the configured redis is unreachable (44 ms)
+    √ closes the socket after each command rather than leaking connections (24 ms)
+
+PASS src/modules/bussiness/share/revoke-collaborator.handler.spec.ts
+  RevokeCollaboratorHandler
+    √ fr.share.revoke: the owner revokes a collaborator (6 ms)
+    √ fr.share.revoke: a non-owner is refused (2 ms)
+
+PASS src/modules/integrations/keycloak/keycloak.client-edge.spec.ts
+  KeycloakClient.signIn edge cases
+    √ rejects when the token endpoint answers 200 with a body that is not JSON (25 ms)
+    √ refuses an access token whose subject is empty (41 ms)
+    √ refuses an access token whose payload decodes to JSON null (13 ms)
+    √ refuses an access token whose payload is a JSON array (5 ms)
+
+PASS src/modules/bussiness/notify/delivery.service.spec.ts
+  DeliveryService
+    √ ac.notify.failure.classified.suppresses-unsubscribed: reaches suppressed before any dispatch attempt, and no attempt is ever made (6 ms)
+    √ sds.notify.delivery-lifecycle t-dispatch/t-deliver: a queued attempt that the transport accepts reaches delivered (3 ms)
+    √ ac.notify.failure.classified.suppresses-bounced-address: a permanent rejection reaches bounced and does not retry (880 ms)
+    √ ac.notify.failure.classified.retries-transient: a transient failure returns to queued with failureClass transient, and a later dispatch can still reach delivered (12 ms)
+    √ ac.notify.failure.classified.retries-transient: exhausting the retry budget lands on bounced with failureClass retries-exhausted, distinct from a real bounce (2 ms)
+    √ dispatching a batch renders one message covering every member (br.notify.digest.window) (17 ms)
+
+PASS src/modules/platform/databases/postgresql/primary/primary.decorators.spec.ts
+  InjectPrimaryEntityManager
+    √ declares the named-connection entity-manager token in the injection metadata (3 ms)
+    √ resolves the primary entity manager from the container at the decorated parameter (17 ms)
+
+PASS src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+  AuditEventSubscriber
+    √ fr.audit.log.append: task.created is appended for its published event (16 ms)
+    √ fr.audit.log.append: task.completed is appended for its published event (3 ms)
+    √ fr.audit.log.append: task.deleted is appended for its published event (30 ms)
+    √ fr.audit.log.append: login.signed-in is appended for its published event (8 ms)
+    √ fr.audit.log.append: login.signed-out is appended for its published event (6 ms)
+    √ unsubscribes on module destroy: a later publish dispatches nothing (2 ms)
+
+PASS src/modules/bussiness/plan/upgrade-plan.handler.spec.ts
+  UpgradePlanHandler
+    √ fr.plan.upgrade mainFlow t-checkout-started: the subscription becomes pending and a payment intent is created (16 ms)
+    √ data.plan.payment-intent: the created intent carries the catalog price and currency (12 ms)
+
+PASS src/modules/bussiness/audit/audit-operator.service.spec.ts
+  AuditOperatorService (decision.audit.operator-role)
+    √ is fail-closed with no roster: nobody resolves to an operator (26 ms)
+    √ grants the operator claim only to a subject the roster names (8 ms)
+    √ reads the deployment roster from the environment, trimming and dropping blanks (6 ms)
+    √ resolves through Nest dependency injection, falling back to the environment roster (fail-closed when unset) (14 ms)
+
+PASS src/modules/platform/config/app-config.service.spec.ts
+  AppConfigService
+    √ returns the declared defaults when no environment variable is set (30 ms)
+    √ reads string settings from the environment verbatim (6 ms)
+    √ parses numeric settings from the environment (6 ms)
+    √ treats an empty-string environment value as unset for the truthy-checked getters (3 ms)
+    √ passes an empty-string environment value through verbatim for the nullish-checked getters (3 ms)
+    √ returns an empty secret when the *_FILE variable is unset, without touching the filesystem (4 ms)
+    √ reads a secret from the file the *_FILE variable names, trimmed (5 ms)
+    √ returns an empty secret instead of throwing when the secret file cannot be read (3 ms)
+    √ treats an empty-string *_FILE variable as unset without touching the filesystem (3 ms)
+    √ returns an empty secret when the file holds only whitespace (4 ms)
+    √ parses a numeric '0' verbatim rather than falling back to the default (3 ms)
+    √ does no validation: a non-numeric value reaches the caller as NaN (5 ms)
+
+PASS src/modules/platform/config/config.module.spec.ts
+  ConfigModule
+    √ register() provides and exports AppConfigService through the dynamic module (1 ms)
+    √ register() defaults to non-global and honors the isGlobal extra
+    √ resolves AppConfigService from the Nest container when imported (11 ms)
+
+PASS src/modules/integrations/notify-smtp/testing/fake-notify-smtp.client.spec.ts
+  FakeNotifySmtpClient
+    √ is the instance the port token resolves to (24 ms)
+    √ records every accepted message (7 ms)
+    √ rejects an address marked transient with NOTIFY_SMTP_TRANSIENT_FAILURE and records nothing (14 ms)
+    √ rejects an address marked permanent with NOTIFY_SMTP_PERMANENT_REJECTION (22 ms)
+    √ treats a permanent mark as stronger than a transient one on the same address (7 ms)
+    √ clearFailuresFor lets a later send to the same address through (2 ms)
+
+PASS src/modules/integrations/sepay/sepay.client.spec.ts
+  SepayClient.assertWebhookAuthorized
+    √ fr.plan.upgrade's invalid-signature exception flow: a missing or wrong Authorization header is refused (14 ms)
+    √ a matching Authorization header is accepted (2 ms)
+  SepayClient.createIntent (integration.plan.sepay)
+    √ reports the gateway status of a failed call instead of a JSON parse error (3 ms)
+    √ names whether a credential went out at all, never its value (4 ms)
+    √ carries the gateway's own transaction id and checkout url through unchanged (3 ms)
+    √ refuses a success response that names no transaction (3 ms)
+    √ refuses a gateway answer that is not JSON at all (2 ms)
+  SepayClient.getTransaction (sds.plan.reconciliation)
+    √ refuses a status outside the closed vocabulary rather than casting it into one (5 ms)
+    √ reads the gateway's paid status and its period end (4 ms)
+    √ refuses a period end it cannot read as a date (3 ms)
+    √ keeps a gateway intent id inside its own path segment (2 ms)
+    √ reports a gateway that never answers as a timeout (2 ms)
+    √ reports the real cause of a request that could not be made (3 ms)
+
+PASS src/modules/platform/events/events.types.spec.ts
+  platform event payloads
+    √ TaskCreatedEvent stamps event.task.created and stores its declared fields (2 ms)
+    √ TaskCompletedEvent stamps event.task.completed and stores its declared fields (1 ms)
+    √ TaskDeletedEvent stamps event.task.deleted and stores its declared fields
+    √ SignedInEvent stamps event.login.signed-in and stores its declared fields (1 ms)
+    √ SignedOutEvent stamps event.login.signed-out and stores its declared fields
+    √ NewDeviceSigninEvent stamps event.login.new-device-signin and stores its declared fields
+    √ every event class exposes a distinct kind discriminant (1 ms)
+
+PASS src/modules/integrations/notify-queue/resp.spec.ts
+  encodeCommand
+    √ writes a RESP array of bulk strings with byte lengths (2 ms)
+    √ counts bytes, not characters, for multibyte arguments
+  tryParse
+    √ parses a simple string reply (1 ms)
+    √ parses an error reply into an Error value
+    √ parses an integer reply
+    √ parses a bulk string reply (8 ms)
+    √ parses a null bulk string
+    √ parses an array reply recursively
+    √ parses a null array
+    √ returns null while a reply is incomplete, at every level (1 ms)
+    √ parses from the given offset so a buffered reply can resume mid-stream
+    √ throws on an unknown type byte rather than guessing (4 ms)
+
+PASS src/modules/integrations/keycloak/keycloak.client.spec.ts
+  KeycloakClient.signIn (integration.login.keycloak)
+    √ posts the direct access grant to the realm token endpoint with the configured client id (16 ms)
+    √ maps any refusal of the token endpoint to the same invalid-credentials exception (14 ms)
+    √ refuses a 200 answer that carries no access token (8 ms)
+    √ refuses an access token whose payload segment cannot be read (7 ms)
+    √ refuses an access token whose payload is not JSON (2 ms)
+    √ refuses an access token that carries no subject (2 ms)
+    √ reports an unreachable provider as unavailable rather than as bad credentials (3 ms)
+  KeycloakClient.notifySignOut
+    √ posts the sign-out notice for the revoked session’s person (5 ms)
+    √ is best-effort: a provider-side error answer does not block the local revoke (3 ms)
+    √ still surfaces a transport failure as KEYCLOAK_UNAVAILABLE (1 ms)
+
+PASS src/modules/bussiness/recur/calendar.util.spec.ts
+  calendar.util (br.recur.impossible-date.skips, sds.recur.generation-engine)
+    √ ac.recur.impossible-date.skips.skips-nonexistent-day: a monthly-day-31 rule produces r3:2026-01-31 and r3:2026-03-31 but nothing for February 2026 (7 ms)
+    √ every-weekday never includes a Saturday or Sunday (1 ms)
+    √ every-n-days fires every n days starting from the rule's own startDate (9 ms)
+    √ never produces a date before the rule's own startDate even when asked for an earlier range
+    √ monthly-day-31 never substitutes the last day of a shorter month (clamp is rejected, per decision.recur.impossible-date)
+
+PASS src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.spec.ts
+  createFakeEntityManager
+    √ round-trips rows saved by their single-column key (7 ms)
+    √ findOneBy falls back to criteria matching when the where clause is not the key (1 ms)
+    √ findBy returns every row matching all criteria and nothing else (1 ms)
+    √ treats an IsNull()-shaped find operator as matching null or undefined fields
+    √ supports a composite key function for multi-column primary keys
+    √ save throws when the entity does not carry enough fields to derive a key (1 ms)
+    √ delete removes by scalar key or by composite-key criteria
+
+PASS src/modules/bussiness/recur/zone.util.spec.ts
+  zone.util (sds.recur.generation-engine, br.recur.timezone.owner-local-time)
+    √ ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap: Europe/Berlin 02:30 on 2026-03-29 resolves to 2026-03-29T01:30:00.000Z, not the transition instant and not any instant formatting to the nonexistent 02:30 local (3 ms)
+    √ ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest: America/New_York 01:30 on 2024-11-03 resolves to the earlier real instant, 2024-11-03T05:30:00.000Z, not the later 06:30:00.000Z (7 ms)
+    √ exactly one instant is produced for the fold window - no second, later candidate is silently generated (8 ms)
+    √ ac.recur.timezone.owner-local-time.distinct-zones-differ: Asia/Ho_Chi_Minh 09:00 keeps the same +07:00 offset across a DST-observing date change (6 ms)
+    √ ac.recur.timezone.owner-local-time.distinct-zones-differ: Europe/Berlin 09:00 shifts offset between CET and CEST (2 ms)
+    √ ac.recur.timezone.owner-local-time.distinct-zones-differ: the same nominal 09:00 differs between Ho_Chi_Minh and Berlin on both dates (3 ms)
+    √ a nominal time safely before a gap-day transition resolves normally, using the pre-transition offset (3 ms)
+    √ a nominal time safely after a gap-day transition resolves normally, using the post-transition offset (6 ms)
+    √ localDateInZone reads "today" from the rule's own zone, not the host clock (4 ms)
+
+PASS src/modules/platform/databases/postgresql/primary/migrations/migrations.spec.ts
+  primary migrations
+    √ every migration names itself after its class, timestamp suffix included (27 ms)
+    √ every statement is written idempotently - each guarded by IF (NOT) EXISTS (28 ms)
+    √ CreateSessionsTable: up creates sessions + person index, down drops the table (9 ms)
+    √ CreateTasksTable: up creates tasks + completed_at column + owner index, down removes only the added column (6 ms)
+    √ CreateInvitationsTable: up creates invitations + the unique (task_id, email) index backing one-row-per-pair (8 ms)
+    √ CreatePlanTables: up creates subscriptions + payment_intents, down drops the dependent table first (2 ms)
+    √ CreateNotifyTables: up creates all four tables with the partial open-window index, down drops in reverse (8 ms)
+    √ CreateAuditTables: up creates log_lines/keys/erasure_requests, down drops them in reverse order (3 ms)
+    √ CreateRecurTables: up creates recurrence_rules + occurrences with the unique window_key index that makes generation idempotent (2 ms)
+
+PASS src/modules/shared/exceptions/exceptions.edge.spec.ts
+  AbstractException edge cases
+    √ toJSON carries an empty metadata object when none was attached (1 ms)
+    √ toJSON round-trips extra metadata fields a subclass did not name (1 ms)
+    √ keeps code identical to name for transport matching, on every subclass path (1 ms)
+    √ a subclass constructor with no arguments still yields a metadata-shaped object
+
+PASS src/modules/bussiness/notify/notify.scheduler.spec.ts
+  NotifyScheduler
+    √ ticks NotifyService.runDueJobs on an interval once started, and stops on destroy (10 ms)
+    √ contains a rejecting tick inside the interval instead of letting it escape unhandled (4 ms)
+
+PASS src/modules/bussiness/share/collaborator-cache.spec.ts
+  CollaboratorCache (br.share.revoke.on-read)
+    √ a pair never written reads as no role (9 ms)
+    √ a written pair reads back its role, scoped to exactly that (taskId, personId) (6 ms)
+    √ a re-written pair reads its latest role (2 ms)
+    √ a deleted pair reads as no role on the very next lookup - revocation takes effect immediately (1 ms)
+
+PASS src/modules/platform/events/event-bus.providers.spec.ts
+  PlatformEventBus
+    √ event.task.created: a subscriber receives exactly what is published (5 ms)
+    √ a subscriber registered after publish does not retroactively see the earlier event (2 ms)
+    √ event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out all carry their declared fields (2 ms)
+    √ event.login.new-device-signin delivers the declared payload fields even though nothing publishes it yet (2 ms)
+    √ delivers each published event to every registered subscriber (3 ms)
+    √ stops delivering to a handler once its subscription is unsubscribed, without affecting others (4 ms)
+    √ publish is a no-op when nobody is subscribed (3 ms)
+    √ invokes the same handler once per subscription when it is subscribed twice (3 ms)
+    √ a handler that throws does not break publish, stays subscribed, and is reported as an unhandled error (11 ms)
+    √ a publish nested inside a handler is delivered to the remaining subscribers before the outer event continues (4 ms)
+    √ a subscriber unsubscribed during delivery does not receive the event in flight (2 ms)
+    √ a handler that unsubscribes itself stops receiving later events (2 ms)
+
+PASS src/modules/integrations/integrations.modules.spec.ts
+  integrations module wiring
+    √ register() binds each client to the token its consumers inject (9 ms)
+
+PASS src/modules/bussiness/task/ownership.guard.spec.ts
+  OwnershipGuard (sds.task.ownership-guard)
+    √ t-owner: the owner passes the assertion (4 ms)
+    √ t-stranger: a non-owner is refused with the stable TASK_FORBIDDEN code (7 ms)
+    √ no widened role exists on this seam: even a collaborator-shaped actor id is refused (3 ms)
+
+PASS src/modules/platform/events/events.module.spec.ts
+  PlatformEventsModule
+    √ register() provides and exports PlatformEventBus through the dynamic module (2 ms)
+    √ register() defaults to non-global and honors the isGlobal extra
+    √ resolves a working bus from the Nest container when imported (4 ms)
+
+PASS src/modules/shared/exceptions/exceptions.spec.ts
+  shared exception vocabulary
+    √ AUDIT_OPERATOR_ROLE_NOT_AUTHORIZED_EXCEPTION is an AbstractException carrying its code, name and metadata (3 ms)
+    √ NOTIFY_QUEUE_PROTOCOL_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ SEPAY_REQUEST_FAILED_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ INVALID_CREDENTIALS_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ SESSION_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ SESSION_EXPIRED_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ TASK_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ TASK_FORBIDDEN_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ TASK_TITLE_REQUIRED_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ KEYCLOAK_INVALID_CREDENTIALS_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ KEYCLOAK_UNAVAILABLE_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ POSTGRES_PRIMARY_UNAVAILABLE_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ SHARE_INVITATION_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ SHARE_INVALID_EMAIL_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ SHARE_INVALID_ROLE_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ SHARE_INVITATION_ALREADY_EXISTS_EXCEPTION is an AbstractException carrying its code, name and metadata (2 ms)
+    √ SHARE_EMAIL_MISMATCH_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ SHARE_INVITATION_EXPIRED_EXCEPTION is an AbstractException carrying its code, name and metadata (2 ms)
+    √ SHARE_INVITATION_REVOKED_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ SHARE_INVITATION_ALREADY_CLOSED_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ SHARE_FORBIDDEN_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ RECUR_RULE_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ RECUR_RULE_FORBIDDEN_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ RECUR_RULE_INVALID_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ RECUR_OCCURRENCE_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ RECUR_OCCURRENCE_FORBIDDEN_EXCEPTION is an AbstractException carrying its code, name and metadata (9 ms)
+    √ NOTIFY_SMTP_TRANSIENT_FAILURE_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ NOTIFY_SMTP_PERMANENT_REJECTION_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ ERASURE_REQUEST_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ ERASURE_REQUEST_FORBIDDEN_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ ERASURE_REQUEST_INVALID_STATE_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ ERASURE_NOT_CONFIRMED_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ PLAN_CAP_EXCEEDED_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ PLAN_SUBSCRIPTION_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata (1 ms)
+    √ PLAN_PAYMENT_INTENT_NOT_FOUND_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ PLAN_FORBIDDEN_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ PLAN_WEBHOOK_UNAUTHORIZED_EXCEPTION is an AbstractException carrying its code, name and metadata
+    √ covers every AbstractException subclass file under errors/ (2 ms)
+  AbstractException
+    √ toJSON serializes message, code and metadata for transport
+    √ getOriginalError returns the wrapped error when one was attached
+    √ getOriginalError returns undefined when no original error was attached
+    √ PlanCapExceededException names the cap and upgrade path in its message, with defaults
+
+PASS src/modules/bussiness/notify/notify.service.spec.ts
+  NotifyService
+    √ fr.notify.on-completion: admitting a task-complete event queues a delivery inside the digest window (12 ms)
+    √ br.notify.delivery.once: admitting the same (kind, sourceEventId, recipientId) twice never creates a second delivery attempt (4 ms)
+    √ fr.notify.digest / ac.notify.digest.window.collapses-into-one-message: two events for the same person and channel become one message when the window closes (7 ms)
+    √ fr.notify.unsubscribe / ac.notify.unsubscribe.honored.suppresses-future-sends: an unsubscribed recipient never joins a window and never receives a message (3 ms)
+    √ re-subscribing lets a later event reach the digest window again (2 ms)
+    √ nfr.notify.delivery.guarantee: a transient failure retries and eventually delivers exactly once (2 ms)
+
+PASS src/modules/integrations/notify-queue/testing/fake-notify-queue.client.spec.ts
+  FakeNotifyQueueClient
+    √ is the instance the port token resolves to (4 ms)
+    √ returns only the jobs due at or before now, and removes each job it returns (2 ms)
+    √ re-enqueueing a job id replaces its due time instead of duplicating the member (2 ms)
+    √ has() reports a job as queued until it is dequeued (2 ms)
+
+PASS src/modules/bussiness/share/access.service.spec.ts
+  AccessService (contract.share.completion-guard-for-task)
+    √ the owner may complete and may delete (4 ms)
+    √ an accepted editor may complete but may never delete (3 ms)
+    √ an accepted viewer may neither complete nor delete (2 ms)
+    √ a stranger with no accepted invitation may neither complete nor delete (3 ms)
+    √ a collaborator on a different task holds no role on this one (6 ms)
+
+PASS src/modules/integrations/sepay/sepay.client-edge.spec.ts
+  SepayClient.assertWebhookAuthorized edge cases
+    √ refuses an absent header even when a secret is configured (7 ms)
+    √ compares the whole Bearer header: wrong scheme, wrong case or padding all fail (3 ms)
+  SepayClient.createIntent edge cases
+    √ refuses a JSON answer that parses but is not an object (4 ms)
+    √ refuses a transaction id that is present but empty (3 ms)
+  SepayClient.getTransaction edge cases
+    √ refuses a periodEnd that is an object rather than a date (5 ms)
+    √ refuses a non-string status rather than coercing it into the vocabulary (2 ms)
+    √ carries the failed status through unchanged (3 ms)
+    √ accepts an epoch-milliseconds periodEnd (2 ms)
+    √ refuses a gateway answer that is not JSON at all (3 ms)
+
+PASS src/modules/platform/databases/postgresql/primary/primary.client.spec.ts
+  PostgresPrimaryClient
+    √ constructs the pg Pool with the configured connection string (5 ms)
+    √ ping resolves when SELECT 1 returns exactly one row (2 ms)
+    √ ping wraps a driver failure in PostgresPrimaryUnavailableException (4 ms)
+    √ ping refuses when the probe returns an unexpected row count (2 ms)
+    √ registers a pool 'error' listener so an idle client's death cannot crash the process (2 ms)
+    √ registers a pool 'connect' listener that arms a per-client 'error' guard for the checked-out window (2 ms)
+    √ routes a pool 'error' event onto the winston surface instead of throwing (3 ms)
+    √ ends the pool when the Nest module is destroyed (3 ms)
+    √ ping stringifies a non-Error driver rejection into the exception reason (2 ms)
+    √ ping refuses when the driver reports a null row count (2 ms)
+    √ onModuleDestroy propagates a pool.end() rejection to the lifecycle caller (4 ms)
+    √ fails module boot rather than the first ping when the Pool cannot be constructed (3 ms)
+
+[31m[Nest] 65936  - [39m09/19/2026, 6:34:15 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe email or password is incorrect.[39m
+INVALID_CREDENTIALS_EXCEPTION: The email or password is incorrect.
+    at SignInHandler.process (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\modules\bussiness\session\sign-in.handler.ts:54:23)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[Nest] 65936  - [39m09/19/2026, 6:34:15 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe email or password is incorrect.[39m
+INVALID_CREDENTIALS_EXCEPTION: The email or password is incorrect.
+    at SignInHandler.process (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\modules\bussiness\session\sign-in.handler.ts:54:23)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[Nest] 65936  - [39m09/19/2026, 6:34:15 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe session is not active.[39m
+SESSION_NOT_FOUND_EXCEPTION: The session is not active.
+    at FakeSessionService.findActive (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\app.boot.spec.ts:87:19)
+    at actorIdFromRequest (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\session-actor.adapter.ts:15:42)
+    at ListTasksResolver.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\queries\task\list-tasks\list-tasks.resolver.ts:30:78)
+    at D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:67:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at target (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:74:28)
+    at Object.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-proxy.js:9:24)
+[31m[Nest] 65936  - [39m09/19/2026, 6:34:15 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe session is not active.[39m
+SESSION_NOT_FOUND_EXCEPTION: The session is not active.
+    at FakeSessionService.findActive (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\app.boot.spec.ts:83:19)
+    at actorIdFromRequest (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\session-actor.adapter.ts:15:42)
+    at ListTasksResolver.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\queries\task\list-tasks\list-tasks.resolver.ts:30:78)
+    at D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:67:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at target (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:74:28)
+    at Object.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-proxy.js:9:24)
+[31m[Nest] 65936  - [39m09/19/2026, 6:34:15 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe session is not active.[39m
+SESSION_NOT_FOUND_EXCEPTION: The session is not active.
+    at FakeSessionService.findActive (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\app.boot.spec.ts:83:19)
+    at actorIdFromRequest (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\session-actor.adapter.ts:15:42)
+    at CreateTaskResolver.createTask (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\mutations\task\create-task\create-task.resolver.ts:29:78)
+    at D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:67:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at target (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:74:28)
+    at Object.createTask (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-proxy.js:9:24)
+PASS src/app.boot.spec.ts (22.217 s)
+  todo-app-backend boot
+    √ refuses sign-in with the wrong password and with an unknown email identically (161 ms)
+    √ drives sign-in, the full task lifecycle, and sign-out through the real GraphQL operations (62 ms)
+    √ refuses an unauthenticated tasks query before any data is returned, with no Authorization header at all (4 ms)
+    √ refuses a task mutation carrying a malformed Authorization header (no "Bearer " prefix) the same way (6 ms)
+    √ answers a cross-origin preflight with Access-Control-Allow-Origin for http://localhost:3000 (5 ms)
+
+PASS src/modules/integrations/notify-smtp/notify-smtp.client-edge.spec.ts (22.308 s)
+  NotifySmtpClient.send edge cases
+    √ maps a 5xx at MAIL FROM to transient - only RCPT TO carries the permanent classification (49 ms)
+    √ maps a refusal of the DATA verb to transient (8 ms)
+    √ maps a rejection after the terminating dot to transient (7 ms)
+    √ maps a non-250, non-5xx answer at RCPT TO to transient, not permanent (6 ms)
+    √ maps a server that never greets to transient once the response timer fires (10009 ms)
+    √ maps an unreachable host to transient whichever refusal wins the race (6 ms)
+
+PASS src/modules/integrations/notify-queue/notify-queue.client-edge.spec.ts (22.778 s)
+  NotifyQueueClient edge cases
+    √ rejects with "redis reply timed out" when the server answers a command with silence (5056 ms)
+    √ reassembles a reply split across TCP packets before resolving (54 ms)
+    √ rejects a malformed redis url instead of failing silently (6 ms)
+    √ rejects rather than hanging when the host cannot be connected (5009 ms)
+
+Test Suites: 117 passed, 117 total
+Tests:       701 passed, 701 total
+Snapshots:   0 total
+Time:        24.037 s

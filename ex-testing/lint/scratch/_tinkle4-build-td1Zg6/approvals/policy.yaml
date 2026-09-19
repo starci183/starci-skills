@@ -1,0 +1,79 @@
+schema: starci/approval-policy@1
+entry:
+  decision: need-user
+  checkpoint: workflow-brief
+  description: Before the first workflow effect, present one complete brief and bind the user's
+    acceptance to its digest.
+  requiredBriefFields:
+    - goal
+    - scope
+    - repositories
+    - worktrees
+    - operators
+    - allowedActions
+    - exclusions
+    - completionCriteria
+preBriefAutoActions:
+  - inspect.read-only
+  - validate.read-only
+  - brief.prepare
+withinAcceptedBrief:
+  decision: auto
+  actions:
+    - inspect.read-only
+    - validate.read-only
+    - worktree.create
+    - worker.dispatch
+    - source.edit
+    - sds.edit-via-architecture-sidearm
+    - test.run
+    - lint.run
+    - typecheck.run
+    - build.run
+    - retry.bounded
+    - fallback.no-effects
+    - conflict-owner.dispatch
+    - review.technical
+    - integration.local
+    - commit.local
+    - push.remote
+    - deploy.remote
+    - migration.remote
+    - delete.remote
+  rule: An action is automatic only when its repository, scope and action are inside the accepted
+    brief, its effects are known, and no reserved checkpoint or material-change trigger applies.
+needUser:
+  decision: need-user
+  triggers:
+    - missing-or-unaccepted-brief
+    - material-goal-change
+    - business-or-srs-change
+    - scope-expansion
+    - repository-expansion
+    - ownership-expansion
+    - action-outside-effect-ceiling
+    - reserved-user-checkpoint
+    - missing-secret-or-credential
+    - unresolved-business-alternatives
+    - safety-block
+    - partial-or-unknown-effects
+    - fallback-after-effects
+completion:
+  withinAcceptedBrief: auto-report
+  rule: Technical completion does not require another formal approval unless the accepted brief
+    reserved an exit checkpoint or completion would perform an undeclared external effect.
+fallback:
+  autoReasons:
+    - unavailable
+    - quota-exhausted
+    - rate-limited
+    - startup-failure
+    - unsupported
+  requiredEffectState: none
+invariants:
+  - A brief acceptance never authorizes an action, repository, scope or effect omitted from that brief.
+  - Technical observations and validator success never manufacture business approval.
+  - Implementation workers never edit SDS; architecture.decide owns SDS corrections in a separate worktree.
+  - A secondary operation inside the accepted brief is procedure, not a new human checkpoint.
+  - Push, deploy, migration and delete are automatic only when named explicitly in allowedActions.
+  - Partial or unknown effects are reconciled before retry and never use provider fallback.

@@ -1,0 +1,22 @@
+schema: work/sds-component
+id: sds.recur.generation-engine
+title: How a rule's due dates are computed and resolved to instants
+state: done
+owners:
+  - {role: module, path: src/modules/bussiness/recur}
+responsibility: "Walks a rule's real calendar dates one by one between its last-generated date and now,
+  selecting the ones the rule fires on, and resolves each to a UTC instant from the rule's declared time
+  zone. Owns every decision this feature made about time: decision.recur.timezone.anchor,
+  decision.recur.timezone.dst, decision.recur.impossible-date and decision.recur.generation.backfill are
+  all implemented here, not distributed across callers."
+interfaces:
+  - sds.recur.occurrence-lifecycle's t-materialise is the only consumer of the dates this component
+    produces; it does not call the store itself.
+refs: [br.recur.impossible-date.skips, br.recur.timezone.owner-local-time]
+dependsOn: [integration.recur.scheduler]
+
+requiresProof:
+  implementation:
+    required: true
+
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now implements this component (calendar.util.ts's datesForRule walk, zone.util.ts's resolveLocalTimeToUtc, generator.service.ts's per-rule run) - the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed, and owners is added naming the real module root. Proven at src/modules/bussiness/recur/{zone.util,calendar.util,generator.service}.spec.ts, including the pinned decision.recur.timezone.dst instants and the decision.recur.impossible-date skip."}

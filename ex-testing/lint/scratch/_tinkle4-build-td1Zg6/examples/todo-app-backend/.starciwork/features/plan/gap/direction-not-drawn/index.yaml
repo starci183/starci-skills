@@ -1,0 +1,13 @@
+schema: work/gap
+id: gap.plan.direction-not-drawn
+title: No interface.draw run has produced a direction for plan.usage
+state: done
+statement: ui.plan.usage named its representative state (over-cap-frozen) and an exact
+  prompt at plan/ui/usage/assets/usage-over-cap-frozen.prompt.txt; interface.draw has since run and
+  invoked built-in image_gen.imagegen against it, producing the over-cap-frozen direction image and its
+  generation provenance, and the ui-screen record's own evidence.yaml verified it. The screen now has a
+  direction image, not only a designed prompt and a coverage map.
+closedBy: ui.plan.usage
+verificationSource: authored-claim
+because: "closedBy names ui.plan.usage, itself done with a fresh evidence.yaml whose assertions verified the drawn direction; the gap's closure is a derived fact about that record reaching done, not something with a separate command of its own to run."
+change: {rev: 2, kind: editorial, at: 2026-09-18T10:00:00.000Z}

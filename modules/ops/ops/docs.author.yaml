@@ -1,0 +1,258 @@
+# modules/ops/ops/docs.author.yaml - TINKLE-1 pure-yaml port of .claude/ops/docs.author/operator.yaml
+# The operator contract below is verbatim; the trailing 'business:' block is the added
+# analysis (inference marked where the contract does not state it literally).
+
+id: docs.author
+goal:
+  en: Author or update the documentation one selected scope needs, derived from the decided records
+    and the actual code - a reader's document, never a restated transcript.
+nodeKinds:
+  - operations
+completionProfile: operations
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
+        and validator freshness - which document this node owns, its audience and its declared
+        coverage. This consumer op requires its target node to exist. An absent target is a
+        scope/graph gap: report it and propose a separately selected scope op; do not create a
+        target or invent its acceptance/graph here."
+  - id: records
+    path: .starciwork/<business>/**/index.yaml
+    purpose:
+      en: Read the decided requirement, design, decision and goal records the document describes -
+        the settled intent. Documentation restates what records decided; it never decides anything
+        itself, and an undecided question stays a documented open item, not a filled blank.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the code,
+        manifests, public entry points and existing docs the document describes. Every behavior,
+        command, path and symbol the document names is read in the source - a documented fact that
+        was not observed is a defect, not a draft.
+  - id: conventions
+    path: existing documentation files and docs conventions in the bound tree and repository
+    purpose:
+      en: Read the documentation that already exists - its structure, voice, format and audience -
+        so an update extends it instead of forking it. A missing convention is reported, not
+        replaced by a private style.
+  - id: matrix
+    path: selected complete-job matrix request + workflows/jobs.json
+    purpose:
+      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
+        input bindings, requested output JSON shapes and required criteria. Standalone execution
+        needs no fabricated matrix request. A template is not authority for extra effects.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles. Use current host model configuration; historical model names are not availability
+        proof. Capabilities are the intersection of actual tools, selected profile policy, op
+        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
+        or extra-agent permissions.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - schema
+      - state
+      - blocker
+      - completion.inputDigest
+      - completion.evidence
+      - description
+      - extensions.work3.docs
+    content:
+      en: Write the document's own declaration on the selected node (schema work/node@2 preserved) -
+        which documents it owns under
+        extensions.work3.docs - plus state/blocker/completion. The document content itself belongs
+        to the docs write and observations to evidence; do not widen refs/dependencies/acceptance to
+        obtain pass.
+  - id: docs
+    path: .starciwork/<docs-dir>/<doc>.md
+    fields:
+      - document title
+      - audience and purpose
+      - body
+      - source references
+    content:
+      en: Author or update the selected document in place at the catalog-declared docs path and name
+        (prose carries no schema const) - real prose grounded in the records and
+        code actually read, with every command, path, symbol and behavior named as observed and
+        every source cited. Documentation that must live beside product code is proposed as
+        separately selected scope, never written into the repository from this op. Preserve stable
+        document identity, existing correct sections and declared exclusions; record open questions
+        honestly instead of filling them.
+  - id: evidence
+    path: E/manifest.yaml + E/docs-map.json + E/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - extensions
+    content:
+      en: "Map every documented claim to the record id or source path/line it was read from, list
+        the documents authored or updated with their before/after, and record what stayed
+        undocumented with its reason. Operator-specific observed result in E/result.md: coverage of
+        the declared documentation scope and the open questions that remain."
+  - id: matrixHandoff
+    path: E/job-result.json
+    fields:
+      - requestId
+      - requestDigest
+      - op
+      - operation when selected
+      - status
+      - criteria
+      - outputs
+      - artifacts
+    content:
+      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
+        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
+        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
+        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
+        The selected request freezes output field schemas before execution.
+steps:
+  - reads:
+      - target
+      - records
+      - conventions
+      - profile
+    writes:
+      - evidence
+    action:
+      en: "Bind the documentation scope - the documents this node owns, their audience and the
+        coverage the assertions declare. Read the decided records first so the document restates
+        settled intent. Resolve the execution profile and actual tool availability before selecting
+        instruments; this does not switch the model/runtime or spawn workers."
+  - reads:
+      - records
+      - repo
+      - conventions
+    writes:
+      - docs
+      - evidence
+    action:
+      en: Author or update the selected documents inside the existing conventions - each section
+        grounded in a record id or an inspected source path, each command and symbol as observed.
+        Preserve stable identity and correct existing material; where a fact is undecided or
+        unverifiable, write the open question, never a guess.
+  - reads:
+      - repo
+      - records
+    writes:
+      - evidence
+    action:
+      en: "Read the authored documents back against the source and records - every named command,
+        path, symbol and behavior verified where it was claimed, every stale statement corrected or
+        removed. A claim that cannot be traced is cut, not kept."
+  - reads:
+      - target
+      - records
+      - matrix
+    writes:
+      - node
+      - docs
+      - evidence
+      - matrixHandoff
+    action:
+      en: Declare the authored documents on the node, run the record-class validator `starci validate` over the edited tree
+        and report done once with the docs map and open questions. When selected in a job matrix,
+        produce E/job-result.json bound to the exact request, its output schema and every required
+        criterion. Never dispatch a successor.
+proofs:
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+        done.
+  - id: grounded
+    requirement:
+      en: Every documented claim traces to a decided record id or an inspected source path - the
+        docs-map lists the citation per claim, and an untraceable statement is absent, not present.
+  - id: coverage
+    requirement:
+      en: The declared documentation scope is covered - every owned document authored or updated,
+        every required section present - and whatever stayed undocumented is named with its reason.
+  - id: records-preserved
+    requirement:
+      en: The operation authored documents only - no decided record was restated into something
+        else, no repository source was written, and no scope, dependency or acceptance was touched
+        to obtain pass.
+blockers:
+  - code: RECORD_UNSETTLED
+    condition:
+      en: "The records the document must describe are missing, not decided or self-contradictory -
+        report the exact record ids as the applicable record gap; documentation cannot settle a
+        question the records left open."
+  - code: SOURCE_OF_TRUTH_MISSING
+    condition:
+      en: The code or existing documentation the document must describe cannot be resolved, so
+        grounding is impossible; report the exact missing input.
+  - code: AUTHORITY_REQUIRED
+    condition:
+      en: "Covering the declared scope needs an authority the goal does not grant, such as
+        publishing or writing beside product code - report blocked with blocker kind authority, an
+        owner decision."
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never
+        run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  docs-dir: Tree directory that owns the selected documents
+  doc: Stable document slug inside that directory
+docsPolicy:
+  sourceOfTruth: records-and-inspected-code
+  repoWrite: never
+  untraceableClaim: cut-not-kept
+  openQuestions: recorded-honestly
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+# ---------------------------------------------------------------------------
+# TINKLE-1 business analysis (not part of the source contract; inference marked).
+business:
+  question: >-
+    "What does a reader need documented about this scope - restated from decided
+    records and observed code, never from a transcript?"
+  whenNeeded:
+    - When a selected scope owns documents that must be authored or updated under .starciwork documentation directories.
+    - After decided records/implemented behavior exist to document - docs restate authority, they do not create it.
+  whenNot:
+    - Never writes into the product repository - that needs separately selected scope.
+    - Never settles undecided questions - open items are recorded as open, not resolved by prose.
+    - Never invents facts not traced to a record id or an inspected source path.
+  consumes:
+    - Target node, decided records (SRS/SDS/decisions), repo source for observed facts, existing docs conventions.
+  produces:
+    - Documents at .starciwork/<docs-dir>/<doc>.md; node extensions.work3.docs declaration; docs-map evidence.
+  failureModes:
+    - RECORD_UNSETTLED, SOURCE_OF_TRUTH_MISSING, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
+# ---------------------------------------------------------------------------
+# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
+# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
+# block alone — an agent never reads the whole contract to route.
+route:
+  nodeKinds: [operations]
+  phase: [implement, implementation]
+  intent: [docs, documentation, write]
+  prerequisites: ["decided records/behavior exist"]

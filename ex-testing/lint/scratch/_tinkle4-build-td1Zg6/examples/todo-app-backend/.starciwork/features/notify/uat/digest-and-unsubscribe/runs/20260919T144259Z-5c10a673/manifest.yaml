@@ -1,0 +1,244 @@
+schema: starci/uat-run-manifest@1
+id: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
+nodeId: uat.notify.digest-and-unsubscribe
+inputDigest: 7c0608bc723fdd99735972e9274fc0907d0c4cd21c0e8325dc45a6561a3efa8c
+outcome: fail
+assertions:
+  - id: ux.notify.preferences.reachable
+    expected: yes
+    observed: yes
+    note: The signed-in owner reached /notify/preferences and the screen settled into a real state (not
+      loading, not refused) - the record's step-1 expectation.
+  - id: br.notify.digest.window
+    expected: yes
+    observed: yes
+    note: Both task completions landed as notify_notifications rows sharing one digest_group_id
+      (15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64) - the second event joined the still-open window the
+      first one opened. Read back from the stack's own Postgres because the product exposes no
+      notifications query.
+  - id: fr.notify.digest
+    expected: yes
+    observed: yes
+    note: 'The shared window (15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64) flushed once after its 1-minute
+      close and the real scheduler dispatched both members as ONE batch
+      (DeliveryService.dispatchBatch renders a single message per flushed group - "2 updates" naming
+      both tasks). Read back from Postgres: one window, one flush, one batch.'
+  - id: ux.notify.inbox-arrival
+    expected: yes
+    observed: not-run
+    note: "The record's step 3 asks to read the owner's inbox and see the one message. The product's
+      only inbox is the person's external email mailbox: no in-app inbox UI exists and this stack
+      has no reachable SMTP host (integration.notify.smtp / gap.notify.smtp-host-unreachable), so
+      the rendered message was dispatched, refused transiently by the transport, and never arrived
+      anywhere a walk could read. Per the owner directive, external-provider legs are never faked;
+      this leg stays unproven."
+  - id: fr.notify.unsubscribe
+    expected: yes
+    observed: yes
+    note: "The preferences screen's \"Unsubscribe from email\" action settled the screen on
+      unsubscribed, and a correctly-headed notificationPreferences read-back returns unsubscribed:
+      true - the preference is saved, not merely displayed."
+  - id: br.notify.unsubscribe.honored
+    expected: yes
+    observed: yes
+    note: The third event was recorded (its notify_notifications row exists) but its delivery attempt
+      was created already suppressed with failure_class=unsubscribed and attempt=0 - no dispatch was
+      ever made, so no message could have arrived. That is the provable form of the record's step 6
+      ("no new message arrives") given that no reachable inbox exists.
+assets:
+  - path: screens/digest-flushes-one-message.png
+    sha256: 91455c41458662bc77fefa92080f5d98898fe6471ab3f991c8f7aeed1a503dbd
+    size: 48888
+  - path: screens/unsubscribed-in-preferences.png
+    sha256: 9d8ec0ef112e7c4c7a75a455a6457eaf8d8ea2acb57658e263a3a7583b15a212
+    size: 38906
+  - path: screens/third-event-suppressed.png
+    sha256: 309d02469fe5d639af46a5c290ccd25fd972e8151ad24a9845dc641e63706288
+    size: 61530
+  - path: screens/cleaned-up.png
+    sha256: cd6aa0fa79188c49c74a354417758b59cc1efabd12c044fc316626210c90a64c
+    size: 46230
+  - path: screens/screenshot.png
+    sha256: 86a8c69d0395cfd264b7a91052e787630946b6f6ae5173ffb50f4248e90d77ae
+    size: 46228
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:3000
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.notify.digest-and-unsubscribe
+    ownedResourcesCreated:
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-a
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-b
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: notify-pipeline-rows
+        id: 15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64
+        note: Notification, delivery-attempt and digest-window rows this run's task completions wrote into
+          the stack's Postgres - internal rows no UI surface ever shows.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-post-unsubscribe
+        note: Run-owned task created and completed through the UI after the unsubscribe.
+    ownedResourcesDeleted:
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-a
+        note: Deleted through the UI two-step confirm.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-b
+        note: Deleted through the UI two-step confirm.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-post-unsubscribe
+        note: Deleted through the UI two-step confirm.
+      - kind: notify-pipeline-rows
+        id: 15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64
+        note: Deleted from notify_notifications, notify_delivery_attempts and notify_digest_windows.
+    verifiedAbsent:
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-a
+        note: The title resolves to zero rows in the re-read owner list.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-b
+        note: The title resolves to zero rows in the re-read owner list.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-post-unsubscribe
+        note: The title resolves to zero rows in the re-read owner list.
+      - kind: notify-pipeline-rows
+        id: 15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64
+        note: Zero notify_notifications rows remain for the run's taskIds on read-back.
+    note: Every run-owned resource this run created was deleted and its absence verified by read-back.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.notify.digest-and-unsubscribe
+      title: Two events settle into one digest, then an unsubscribe silences the next one
+      steps:
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+      proves:
+        - fr.notify.digest
+        - fr.notify.unsubscribe
+        - br.notify.digest.window
+        - br.notify.unsubscribe.honored
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.notify.digest-and-unsubscribe
+    checked:
+      - ux.notify.preferences.reachable
+      - br.notify.digest.window
+      - fr.notify.digest
+      - fr.notify.unsubscribe
+      - br.notify.unsubscribe.honored
+    notRun:
+      - ux.notify.inbox-arrival
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T144259Z-5c10a673
+    flow: uat.notify.digest-and-unsubscribe
+    started: 2026-09-19T14:42:59.667Z
+    finished: 2026-09-19T14:44:05.122Z
+    accountsDeclared:
+      - role: owner
+        username: demo@todo.dev
+    reused: []
+    created:
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-a
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-digest-b
+        note: Run-owned task created and completed through the UI; the completion is the notify trigger.
+      - kind: notify-pipeline-rows
+        id: 15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64
+        note: Notification, delivery-attempt and digest-window rows this run's task completions wrote into
+          the stack's Postgres - internal rows no UI surface ever shows.
+      - kind: task
+        id: uat-20260919T144259Z-5c10a673-post-unsubscribe
+        note: Run-owned task created and completed through the UI after the unsubscribe.
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.notify.digest-and-unsubscribe
+    checks:
+      - id: ux.notify.preferences.reachable
+        expected: yes
+        observed: yes
+        note: The signed-in owner reached /notify/preferences and the screen settled into a real state (not
+          loading, not refused) - the record's step-1 expectation.
+      - id: br.notify.digest.window
+        expected: yes
+        observed: yes
+        note: Both task completions landed as notify_notifications rows sharing one digest_group_id
+          (15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64) - the second event joined the still-open window the
+          first one opened. Read back from the stack's own Postgres because the product exposes no
+          notifications query.
+      - id: fr.notify.digest
+        expected: yes
+        observed: yes
+        note: 'The shared window (15e19eb5-b7d5-4b2c-89cd-30eb29a4bc64) flushed once after its 1-minute
+          close and the real scheduler dispatched both members as ONE batch
+          (DeliveryService.dispatchBatch renders a single message per flushed group - "2 updates"
+          naming both tasks). Read back from Postgres: one window, one flush, one batch.'
+      - id: ux.notify.inbox-arrival
+        expected: yes
+        observed: not-run
+        note: "The record's step 3 asks to read the owner's inbox and see the one message. The product's
+          only inbox is the person's external email mailbox: no in-app inbox UI exists and this
+          stack has no reachable SMTP host (integration.notify.smtp /
+          gap.notify.smtp-host-unreachable), so the rendered message was dispatched, refused
+          transiently by the transport, and never arrived anywhere a walk could read. Per the owner
+          directive, external-provider legs are never faked; this leg stays unproven."
+      - id: fr.notify.unsubscribe
+        expected: yes
+        observed: yes
+        note: "The preferences screen's \"Unsubscribe from email\" action settled the screen on
+          unsubscribed, and a correctly-headed notificationPreferences read-back returns
+          unsubscribed: true - the preference is saved, not merely displayed."
+      - id: br.notify.unsubscribe.honored
+        expected: yes
+        observed: yes
+        note: The third event was recorded (its notify_notifications row exists) but its delivery attempt
+          was created already suppressed with failure_class=unsubscribed and attempt=0 - no dispatch
+          was ever made, so no message could have arrived. That is the provable form of the record's
+          step 6 ("no new message arrives") given that no reachable inbox exists.
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.notify.digest-and-unsubscribe
+    steps:
+      - step: owner-signed-in
+        startedAt: 2026-09-19T14:42:59.870Z
+        endedAt: 2026-09-19T14:43:00.233Z
+        screenshot: owner-signed-in
+      - step: preferences-reachable
+        startedAt: 2026-09-19T14:43:00.286Z
+        endedAt: 2026-09-19T14:43:00.599Z
+        screenshot: preferences-reachable
+      - step: two-events-one-window
+        startedAt: 2026-09-19T14:43:00.631Z
+        endedAt: 2026-09-19T14:43:01.289Z
+        screenshot: two-events-one-window
+      - step: digest-flushes-one-message
+        startedAt: 2026-09-19T14:43:01.333Z
+        endedAt: 2026-09-19T14:44:02.362Z
+        screenshot: digest-flushes-one-message
+      - step: unsubscribed-in-preferences
+        startedAt: 2026-09-19T14:44:02.397Z
+        endedAt: 2026-09-19T14:44:02.531Z
+        screenshot: unsubscribed-in-preferences
+      - step: third-event-suppressed
+        startedAt: 2026-09-19T14:44:02.582Z
+        endedAt: 2026-09-19T14:44:03.029Z
+        screenshot: third-event-suppressed
+      - step: cleaned-up
+        startedAt: 2026-09-19T14:44:03.068Z
+        endedAt: 2026-09-19T14:44:04.362Z
+        screenshot: cleaned-up

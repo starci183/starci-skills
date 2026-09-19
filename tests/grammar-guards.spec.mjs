@@ -6,7 +6,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { checkGrammarGuards, GRAMMAR_GUARD_RULES } from '../checks/code-patterns/grammar-guards.mjs';
+import { checkGrammarGuards, GRAMMAR_GUARD_RULES } from '../scripts/checks/code-patterns/grammar-guards.mjs';
 
 const require = createRequire(import.meta.url);
 const typescriptRoot = path.dirname(require.resolve('typescript/package.json'));

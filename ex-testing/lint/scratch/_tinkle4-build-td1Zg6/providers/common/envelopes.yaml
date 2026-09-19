@@ -1,0 +1,50 @@
+schema: starci/provider-envelopes@1
+operationInput:
+  required:
+    - operationId
+    - attempt
+    - goal
+    - scope
+    - ownership
+    - dependencies
+    - capabilities
+    - selectedProvider
+    - selectedProfile
+    - selectedModel
+    - outputContract
+  forbidden:
+    - hidden-chat-history-as-dependency
+    - shared-secret-value
+    - unstated-authority
+operationOutput:
+  required:
+    - operationId
+    - attempt
+    - outcome
+    - summary
+    - filesModified
+    - tests
+    - evidence
+    - unresolved
+  outcome:
+    - succeeded
+    - failed
+  rules:
+    - Provider-specific output must be normalized before a dependent operation receives it.
+    - A failed or unknown-effect attempt cannot be silently rebound to another provider.
+workflowBoundary:
+  required:
+    - workflowId
+    - attempt
+    - eventType
+    - summary
+    - acceptedOperationOutputs
+    - crossWorkflowNeeds
+  eventTypes:
+    - cross-workflow-dependency
+    - shared-owner-change
+    - cross-workflow-conflict
+    - accepted-scope-or-authority-change
+    - human-product-decision
+    - workflow-manager-terminal-failure
+    - normalized-workflow-done

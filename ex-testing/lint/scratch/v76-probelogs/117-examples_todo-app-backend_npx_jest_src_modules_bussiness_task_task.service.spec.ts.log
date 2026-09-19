@@ -1,0 +1,20 @@
+$ npx jest src/modules/bussiness/task/task.service.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/task/task.service.spec.ts
+  TaskService
+    √ br.task.single-owner rev 2, default seam: with no authority registered the owner may complete and delete, and a stranger is refused on both (16 ms)
+    √ br.task.delete.final: deleting a task removes it; there is no recovery path (3 ms)
+    √ ac.task.title.required.refuses-empty: a creation request with an empty or whitespace title is refused (3 ms)
+    √ sds.task.completion-state.t-complete: completing an open task sets complete and a completedAt (2 ms)
+    √ sds.task.completion-state.t-complete-again: completing a complete task writes nothing and leaves completedAt (2 ms)
+    √ sds.task.completion-state.t-reopen: reopening a completed task clears complete and completedAt (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        3.226 s, estimated 7 s
+Ran all test suites matching /src\\modules\\bussiness\\task\\task.service.spec.ts/i.
+

@@ -1,0 +1,31 @@
+schema: starci/knowledge-source@1
+id: code-pattern-enforcement
+title: Executable Nest and Next code-pattern coverage
+purpose: Read docs/code-pattern-enforcement.md and model/code-patterns.yaml before claiming code-pattern conformance. The authored manifest maps mechanical obligations to exact machines and keeps semantic design review separate.
+appliesTo: [backend, frontend]
+family: cross-cutting
+provenance:
+  reviewedAt: 2026-09-16
+  sources:
+    - model/code-patterns.yaml
+    - docs/code-pattern-enforcement.md
+    - starci-eslint@5d529de0821083903f3924fbde10bdff88c38a57
+    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/eslint.config.mjs
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/eslint.config.mjs
+  limitations: A clean mechanical result does not prove semantic ownership, DI identity, behavior, live effects or rendered quality. Missing and conflicting manifest obligations block conformance.
+rules:
+  - id: CODE-PATTERN-1
+    title: Authored obligations are authority
+    kind: mandatory
+    requirement: Use model/code-patterns.yaml as the exact Nest/Next mechanical inventory. Installed package exports are a toolbox and cannot silently add, remove or weaken an obligation.
+    rationale: Package recommendations contain legacy, disabled and profile-conflicting rules; adoption must remain explicit and reviewable.
+  - id: CODE-PATTERN-2
+    title: Complete applicable machine coverage
+    kind: mandatory
+    requirement: Every applicable mechanical obligation must have a current clean result from its exact rule IDs over every expected file with the declared config, package and source identities. Missing, ignored, suppressed, disabled, stale, unavailable or conflicting coverage fails.
+    rationale: Generic lint success and agent review cannot establish an unexecuted code rule.
+  - id: CODE-PATTERN-3
+    title: Semantic review remains separate
+    kind: mandatory
+    requirement: Use the manifest's semantic companions and Markdown guidance for responsibility, cohesion and edge cases, with applicable behavior evidence. Never move a mechanically decidable clause to semanticOnly to manufacture coverage.
+    rationale: Static checks and design review answer different questions and neither substitutes for the other.

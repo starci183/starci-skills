@@ -3,12 +3,17 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/*": ["../../packages/shared/src/*"],
+      "@fe-kit/*": ["../../../../packages/fe-kit/src/*"]
     }
   },
   "include": [
     "next-env.d.ts",
-    "../../types/**/*.d.ts",
+    "../../vitest.setup.ts",
+    "../../packages/shared/src/**/*.d.ts",
+    "../../packages/shared/src/**/*.ts",
+    "../../packages/shared/src/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
     ".next/types/**/*.ts"

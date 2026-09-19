@@ -1,9 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.task.complete.once.is-reversible
-rule: br.task.complete.once
-given: A task the owner completed
-when: The owner reopens it
-then:
-  - The task reads incomplete.
-  - Its completion timestamp is cleared.
-

@@ -1,0 +1,268 @@
+schema: starci/json-exceptions@1
+description: >
+  Exact relative paths (from this skill root) allowed to remain authored JSON
+  after declarative sources migrate to YAML. No directory wildcards.
+exceptions:
+  - path: core/yaml-license.json
+    reason: >
+      License metadata for the bundled yaml runtime in core/yaml.mjs;
+      scripts/compile-declarative.mjs keeps it source-side and excludes it from
+      YAML→.dist projection.
+  - path: docs/examples/v4-live-proof/settle-chatbot-monitor.json
+    reason: Verbatim Orca 1.4.188 settlement receipt captured as runtime 4.0 live proof.
+  - path: docs/examples/v4-live-proof/settle-core-monitor.json
+    reason: Verbatim Orca 1.4.188 settlement receipt captured as runtime 4.0 live proof.
+  - path: docs/examples/v4-live-proof/settle-sales-monitor.json
+    reason: Verbatim Orca 1.4.188 settlement receipt captured as runtime 4.0 live proof.
+  - path: docs/examples/v4-live-proof/verify.json
+    reason: Verbatim Orca 1.4.188 receipt captured as runtime 4.0 live proof; JSON is the receipt format.
+  - path: examples/todo-app-backend/.starcistacks/dev/environment.json
+    reason: >
+      Rendered dev environment for the todo-app-backend application stack;
+      starci/rendered-environment output of application-stacks.yaml, JSON by
+      the rendering contract.
+  - path: examples/todo-app-backend/.starcistacks/dev/infra/compose/realm-todo.json
+    reason: >
+      Keycloak realm import for the dev todo-app-backend Compose stack; the
+      Keycloak container's realm-import feature requires a JSON realm file.
+  - path: examples/todo-app-backend/.starcistacks/vps/environment.json
+    reason: >
+      Rendered vps environment for the todo-app-backend application stack;
+      starci/rendered-environment output of application-stacks.yaml, JSON by
+      the rendering contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness
+      (examples/todo-app-frontend/uat/lib/run-writer.ts) for the real
+      uat.login.sign-in run; a captured run receipt, JSON by the harness's
+      own writer contract, the same shape as the docs/examples/v4-live-proof
+      receipts above.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for the
+      real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness for
+      the real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness for
+      the real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T070052Z-b037b5fe/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness
+      (examples/todo-app-frontend/uat/lib/run-writer.ts) for the second real
+      uat.login.sign-in run, against the rebuilt real-grammar frontend; a
+      captured run receipt, JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T070052Z-b037b5fe/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for the
+      second real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T070052Z-b037b5fe/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the second real uat.login.sign-in run; a captured run receipt, JSON by
+      the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T070052Z-b037b5fe/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness
+      for the second real uat.login.sign-in run; a captured run receipt,
+      JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T070052Z-b037b5fe/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness for
+      the second real uat.login.sign-in run; a captured run receipt, JSON by
+      the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T070052Z-b037b5fe/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      second real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T080854Z-f7ab26f0/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness
+      (examples/todo-app-frontend/uat/lib/run-writer.ts) for the third real
+      uat.login.sign-in run, against the running examples/todo-app-backend
+      api and a production examples/todo-app-frontend build on the todo-app-dev
+      dev stack; a captured run receipt, JSON by the harness's own writer
+      contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T080854Z-f7ab26f0/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for the
+      third real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T080854Z-f7ab26f0/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the third real uat.login.sign-in run; a captured run receipt, JSON by
+      the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T080854Z-f7ab26f0/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness
+      for the third real uat.login.sign-in run; a captured run receipt, JSON
+      by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T080854Z-f7ab26f0/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness for
+      the third real uat.login.sign-in run; a captured run receipt, JSON by
+      the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T080854Z-f7ab26f0/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      third real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T080854Z-f7ab26f0/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness
+      (examples/todo-app-frontend/uat/lib/run-writer.ts) for the first real
+      uat.task.create run, against the running examples/todo-app-backend api
+      and a production examples/todo-app-frontend build on the todo-app-dev
+      dev stack; a captured run receipt, JSON by the harness's own writer
+      contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T080854Z-f7ab26f0/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for the
+      first real uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T080854Z-f7ab26f0/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the first real uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T080854Z-f7ab26f0/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness
+      for the first real uat.task.create run; a captured run receipt, JSON by
+      the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T080854Z-f7ab26f0/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness for
+      the first real uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T080854Z-f7ab26f0/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      first real uat.task.create run; a captured run receipt, JSON by the
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness for
+      the third real uat.login.sign-in run (ex-login-impl, against the
+      GraphQL/Authorization-Bearer rewrite with UAT_LIVE_LOGIN_AUTHORIZED=true);
+      a captured run receipt, JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for
+      the same ex-login-impl uat.login.sign-in run; a captured run receipt,
+      JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the same ex-login-impl uat.login.sign-in run; a captured run receipt,
+      JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness
+      for the same ex-login-impl uat.login.sign-in run; a captured run
+      receipt, JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness
+      for the same ex-login-impl uat.login.sign-in run; a captured run
+      receipt, JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      same ex-login-impl uat.login.sign-in run; a captured run receipt, JSON
+      by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness for
+      the real uat.task.create run captured alongside the login lane's own
+      run (ex-login-impl, same live stack, same UAT_LIVE_LOGIN_AUTHORIZED=true
+      invocation); a captured run receipt, JSON by the harness's own writer
+      contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for
+      the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness
+      for the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness
+      for the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/ledger-anchor.json
+    reason: >
+      Illustrative runtime ledger anchor for the example Work tree; the real
+      file is kernel-owned runtime custody (core/index.mjs ROOT_LOCAL_DIRS),
+      committed here only as example output, and JSON is its own format.
+  - path: examples/todo-app-backend/architecture.json
+    reason: NestJS architecture config for the real todo-app-backend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-backend/package-lock.json
+    reason: npm lockfile for the real todo-app-backend example; package managers require JSON filename and syntax.
+  - path: examples/todo-app-backend/package.json
+    reason: npm package manifest for the real todo-app-backend example; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-backend/tsconfig.build.json
+    reason: TypeScript build project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
+  - path: examples/todo-app-backend/tsconfig.json
+    reason: TypeScript project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
+  - path: examples/todo-app-frontend/architecture.json
+    reason: Next.js architecture config for the real todo-app-frontend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-frontend/package-lock.json
+    reason: npm lockfile for the real todo-app-frontend example; package managers require JSON filename and syntax.
+  - path: examples/todo-app-frontend/package.json
+    reason: npm package manifest for the real todo-app-frontend example; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-frontend/tsconfig.json
+    reason: TypeScript project config for the real todo-app-frontend example; tsc expects a JSON tsconfig file.
+  - path: examples/todo-app-frontend/uat/tsconfig.json
+    reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
+  - path: knowledge/ui/proof/calibration/calibration.json
+    reason: >
+      Explicit calibration dataset exception enforced by
+      scripts/compile-knowledge.mjs; all other authored knowledge JSON is rejected.
+  - path: package-lock.json
+    reason: npm lockfile; package managers require JSON filename and syntax.
+  - path: package.json
+    reason: npm package manifest; Node/npm require JSON filename and syntax.
+  - path: sites/docs/package.json
+    reason: npm package manifest for the docs site; npm requires JSON.
+  - path: sites/skills/package-lock.json
+    reason: npm lockfile for the skills site; package managers require JSON.
+  - path: sites/skills/package.json
+    reason: npm package manifest for the skills site; npm requires JSON.
+  - path: sites/skills/tsconfig.app.json
+    reason: TypeScript project config; tsc/Vite expect JSON tsconfig files.
+  - path: sites/skills/tsconfig.json
+    reason: TypeScript project config; tsc/Vite expect JSON tsconfig files.
+  - path: sites/skills/tsconfig.node.json
+    reason: TypeScript project config; tsc/Vite expect JSON tsconfig files.

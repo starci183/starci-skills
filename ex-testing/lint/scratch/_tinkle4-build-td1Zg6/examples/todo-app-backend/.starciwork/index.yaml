@@ -1,0 +1,26 @@
+schema: work/catalog
+id: todo
+description: Product catalog. One entry per feature; every record of a feature lives under its directory.
+features:
+  - id: login
+    directory: features/login
+    description: Getting into the product and staying in.
+  - id: task
+    directory: features/task
+    description: A task a person creates, completes and deletes.
+  - id: share
+    directory: features/share
+    description: A task shared with other people through role-bounded, expiring invitations.
+  - id: notify
+    directory: features/notify
+    description: Telling a person something happened, outside the product - email now, other channels later.
+  - id: plan
+    directory: features/plan
+    description: A paid plan that caps what the product will do.
+  - id: audit
+    directory: features/audit
+    description: An append-only record of what happened, and the right to have it erased.
+  - id: recur
+    directory: features/recur
+    description: A task that comes back on a schedule the owner set.
+

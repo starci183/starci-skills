@@ -1,0 +1,157 @@
+PASS src/modules/bussiness/audit/audit-keystore.service.spec.ts (10.44 s)
+PASS src/modules/bussiness/notify/preferences.service.spec.ts (10.497 s)
+PASS src/modules/bussiness/notify/digest.service.spec.ts (10.481 s)
+PASS src/modules/bussiness/audit/audit-log.service.spec.ts (10.595 s)
+PASS src/modules/bussiness/recur/occurrence.service.spec.ts (10.681 s)
+PASS src/modules/bussiness/notify/notify.service.spec.ts
+PASS src/modules/bussiness/share/accept-invitation.handler.spec.ts
+PASS src/features/todo/graphql/mutations/session/sign-out/sign-out.resolver.spec.ts (11.23 s)
+PASS src/features/todo/graphql/mutations/session/sign-in/sign-in.resolver.spec.ts (11.315 s)
+PASS src/features/todo/graphql/queries/task/list-tasks/list-tasks.resolver.spec.ts (11.481 s)
+PASS src/features/todo/graphql/mutations/audit/request-erasure/request-erasure.resolver.spec.ts (11.66 s)
+PASS src/features/todo/graphql/queries/task/task-counts/task-counts.resolver.spec.ts (11.79 s)
+PASS src/features/todo/graphql/mutations/task/delete-task/delete-task.resolver.spec.ts (11.827 s)
+PASS src/features/todo/graphql/queries/recur/upcoming-occurrences/upcoming-occurrences.resolver.spec.ts (11.787 s)
+PASS src/features/todo/graphql/mutations/plan/downgrade-plan/downgrade-plan.resolver.spec.ts (11.792 s)
+PASS src/features/todo/graphql/queries/audit/export-my-data/export-my-data.resolver.spec.ts (11.929 s)
+PASS src/features/todo/graphql/queries/audit/audit-log/audit-log.resolver.spec.ts (11.862 s)
+PASS src/features/todo/graphql/mutations/plan/upgrade-plan/upgrade-plan.resolver.spec.ts (11.898 s)
+PASS src/modules/platform/databases/postgresql/primary/primary.module.spec.ts
+PASS src/features/todo/graphql/mutations/share/invite/invite.resolver.spec.ts (12.115 s)
+PASS src/modules/bussiness/plan/downgrade-plan.handler.spec.ts
+PASS src/features/todo/graphql/mutations/recur/end-recurrence/end-recurrence.resolver.spec.ts (12.196 s)
+PASS src/features/todo/graphql/mutations/task/create-task/create-task.resolver.spec.ts (12.234 s)
+PASS src/modules/bussiness/notify/notify.scheduler.spec.ts
+PASS src/features/todo/graphql/mutations/share/revoke-collaborator/revoke-collaborator.resolver.spec.ts (12.311 s)
+PASS src/modules/bussiness/plan/create-precondition.contract.spec.ts
+PASS src/modules/bussiness/audit/export-my-data.handler.spec.ts
+PASS src/features/todo/graphql/mutations/audit/complete-erasure/complete-erasure.resolver.spec.ts
+PASS src/features/todo/graphql/queries/share/collaborators/collaborators.resolver.spec.ts
+PASS src/modules/bussiness/task/create-task.handler.spec.ts
+PASS src/modules/bussiness/audit/complete-erasure.handler.spec.ts
+PASS src/features/todo/graphql/mutations/recur/make-recurring/make-recurring.resolver.spec.ts (12.452 s)
+PASS src/features/todo/graphql/mutations/plan/reconcile-payment/reconcile-payment.resolver.spec.ts (12.457 s)
+PASS src/modules/bussiness/plan/reconcile-payment.handler.spec.ts
+PASS src/features/todo/graphql/mutations/recur/edit-recurrence/edit-recurrence.resolver.spec.ts (12.479 s)
+PASS src/modules/bussiness/share/revoke-collaborator.handler.spec.ts
+PASS src/features/todo/graphql/mutations/share/accept-invitation/accept-invitation.resolver.spec.ts (12.507 s)
+PASS src/modules/bussiness/notify/delivery.service.spec.ts
+PASS src/features/todo/graphql/queries/plan/plan-usage/plan-usage.resolver.spec.ts
+PASS src/modules/bussiness/share/completion-authority.spec.ts
+PASS src/modules/bussiness/plan/cap-guard.policy.spec.ts
+PASS src/features/todo/graphql/mutations/task/complete-task/complete-task.resolver.spec.ts
+PASS src/features/todo/graphql/mutations/notify/unsubscribe/unsubscribe.resolver.spec.ts
+PASS src/features/todo/graphql/mutations/task/reopen-task/reopen-task.resolver.spec.ts
+PASS src/modules/bussiness/task/completion-authority.spec.ts
+PASS src/modules/bussiness/recur/complete-occurrence.handler.spec.ts
+PASS src/features/todo/graphql/mutations/notify/update-notification-preferences/update-notification-preferences.resolver.spec.ts
+PASS src/modules/bussiness/share/list-collaborators.handler.spec.ts
+PASS src/modules/bussiness/session/sign-in.handler.spec.ts
+PASS src/modules/bussiness/share/invite.handler.spec.ts
+PASS src/modules/bussiness/recur/scheduler.service.spec.ts
+PASS src/modules/bussiness/audit/request-erasure.handler.spec.ts
+PASS src/modules/bussiness/plan/upgrade-plan.handler.spec.ts
+PASS src/modules/bussiness/plan/plan-usage.handler.spec.ts
+PASS src/modules/bussiness/task/complete-task.handler.spec.ts
+PASS src/modules/bussiness/recur/rule.service.spec.ts
+PASS src/modules/bussiness/recur/make-recurring.handler.spec.ts
+PASS src/modules/bussiness/recur/edit-recurrence.handler.spec.ts
+PASS src/features/todo/graphql/queries/notify/notification-preferences/notification-preferences.resolver.spec.ts
+PASS src/modules/bussiness/recur/end-recurrence.handler.spec.ts
+PASS src/modules/bussiness/audit/append-log-line.handler.spec.ts
+PASS src/modules/bussiness/audit/audit-erasure.service.spec.ts
+PASS src/modules/bussiness/plan/confirm-payment.handler.spec.ts
+PASS src/modules/bussiness/notify/notification-preferences.handler.spec.ts
+PASS src/modules/bussiness/notify/unsubscribe.handler.spec.ts
+PASS src/modules/bussiness/notify/notify-event.subscriber.spec.ts
+PASS src/modules/bussiness/audit/audit-log.handler.spec.ts
+PASS src/modules/integrations/integrations.modules-edge.spec.ts
+PASS src/modules/bussiness/task/list-tasks.handler.spec.ts
+PASS src/modules/integrations/integrations.modules.spec.ts
+PASS src/modules/bussiness/notify/update-notification-preferences.handler.spec.ts
+PASS src/modules/bussiness/notify/dedupe.service.spec.ts
+PASS src/modules/bussiness/plan/subscription.service.spec.ts
+PASS src/modules/integrations/notify-queue/notify-queue.client.spec.ts
+PASS src/modules/bussiness/session/sign-out.handler.spec.ts
+PASS src/modules/bussiness/recur/upcoming-occurrences.handler.spec.ts
+PASS src/modules/bussiness/session/session.service.spec.ts
+PASS src/modules/bussiness/task/delete-task.handler.spec.ts
+PASS src/modules/platform/databases/postgresql/primary/entities/entities.spec.ts
+PASS src/modules/bussiness/recur/skip-occurrence.handler.spec.ts
+PASS src/modules/bussiness/recur/generator.service.spec.ts
+PASS src/modules/bussiness/task/task-counts.handler.spec.ts
+PASS src/modules/platform/databases/postgresql/primary/migrations/migrations.spec.ts
+PASS src/modules/platform/events/events.module.spec.ts
+PASS src/modules/bussiness/task/reopen-task.handler.spec.ts
+PASS src/modules/bussiness/plan/payment.service.spec.ts
+PASS src/modules/platform/databases/postgresql/primary/primary.decorators.spec.ts
+PASS src/modules/integrations/keycloak/keycloak.client.spec.ts
+PASS src/modules/bussiness/audit/audit-operator.guard.spec.ts
+PASS src/modules/platform/config/app-config.service.spec.ts
+PASS src/modules/integrations/notify-smtp/testing/fake-notify-smtp.client.spec.ts
+PASS src/modules/integrations/notify-smtp/notify-smtp.client.spec.ts
+PASS src/modules/integrations/sepay/sepay.client.spec.ts
+PASS src/modules/integrations/keycloak/keycloak.client-edge.spec.ts
+PASS src/modules/integrations/sepay/sepay.client-edge.spec.ts
+PASS src/modules/bussiness/recur/calendar.util.spec.ts
+PASS src/modules/bussiness/share/access.service.spec.ts
+PASS src/modules/integrations/notify-queue/resp.spec.ts
+PASS src/modules/bussiness/share/collaborator-cache.spec.ts
+PASS src/modules/bussiness/recur/zone.util.spec.ts
+PASS src/modules/bussiness/audit/audit-operator.service.spec.ts
+PASS src/modules/platform/events/events.types.spec.ts
+PASS src/modules/shared/exceptions/exceptions.edge.spec.ts
+PASS src/modules/bussiness/task/ownership.guard.spec.ts
+PASS src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.spec.ts
+PASS src/modules/bussiness/share/invitation.service.spec.ts
+PASS src/modules/bussiness/task/creation-policy.providers.spec.ts
+PASS src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+PASS src/modules/shared/exceptions/exceptions.spec.ts
+PASS src/modules/platform/databases/postgresql/primary/primary.client.spec.ts
+PASS src/modules/bussiness/task/task.service.spec.ts
+PASS src/modules/platform/config/config.module.spec.ts
+PASS src/modules/integrations/notify-queue/testing/fake-notify-queue.client.spec.ts
+PASS src/modules/platform/events/event-bus.providers.spec.ts
+[31m[Nest] 91532  - [39m09/19/2026, 5:12:39 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe email or password is incorrect.[39m
+INVALID_CREDENTIALS_EXCEPTION: The email or password is incorrect.
+    at SignInHandler.process (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\modules\bussiness\session\sign-in.handler.ts:54:23)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[Nest] 91532  - [39m09/19/2026, 5:12:39 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe email or password is incorrect.[39m
+INVALID_CREDENTIALS_EXCEPTION: The email or password is incorrect.
+    at SignInHandler.process (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\modules\bussiness\session\sign-in.handler.ts:54:23)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[Nest] 91532  - [39m09/19/2026, 5:12:40 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe session is not active.[39m
+SESSION_NOT_FOUND_EXCEPTION: The session is not active.
+    at FakeSessionService.findActive (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\app.boot.spec.ts:87:19)
+    at actorIdFromRequest (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\session-actor.adapter.ts:15:42)
+    at ListTasksResolver.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\queries\task\list-tasks\list-tasks.resolver.ts:30:78)
+    at D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:67:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at target (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:74:28)
+    at Object.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-proxy.js:9:24)
+[31m[Nest] 91532  - [39m09/19/2026, 5:12:40 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe session is not active.[39m
+SESSION_NOT_FOUND_EXCEPTION: The session is not active.
+    at FakeSessionService.findActive (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\app.boot.spec.ts:83:19)
+    at actorIdFromRequest (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\session-actor.adapter.ts:15:42)
+    at ListTasksResolver.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\queries\task\list-tasks\list-tasks.resolver.ts:30:78)
+    at D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:67:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at target (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:74:28)
+    at Object.tasks (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-proxy.js:9:24)
+[31m[Nest] 91532  - [39m09/19/2026, 5:12:40 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31mThe session is not active.[39m
+SESSION_NOT_FOUND_EXCEPTION: The session is not active.
+    at FakeSessionService.findActive (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\app.boot.spec.ts:83:19)
+    at actorIdFromRequest (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\session-actor.adapter.ts:15:42)
+    at CreateTaskResolver.createTask (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\src\features\todo\graphql\mutations\task\create-task\create-task.resolver.ts:29:78)
+    at D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:67:33
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at target (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-context-creator.js:74:28)
+    at Object.createTask (D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\node_modules\@nestjs\core\helpers\external-proxy.js:9:24)
+PASS src/app.boot.spec.ts (14.363 s)
+PASS src/modules/integrations/notify-queue/notify-queue.client-edge.spec.ts (19.109 s)
+PASS src/modules/integrations/notify-smtp/notify-smtp.client-edge.spec.ts (19.107 s)
+
+Test Suites: 117 passed, 117 total
+Tests:       701 passed, 701 total
+Snapshots:   0 total
+Time:        20.2 s, estimated 24 s

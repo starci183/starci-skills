@@ -1,0 +1,31 @@
+﻿✖ failing tests:
+
+test at tests\grammar-guards.spec.mjs:1:1
+✖ tests\grammar-guards.spec.mjs (149.3869ms)
+  'test failed'
+
+test at tests\pattern-coverage.spec.mjs:261:1
+✖ every _local/workflows/<id>/ run-state artifact binds a schema and a live writer/validator at a declared path (728.1132ms)
+  Error: store-paths-removed:reports
+      at removed (file:///D:/Repositories/starci-academy-backend/.claude/kernel/store.mjs:62:28)
+      at Object.get (file:///D:/Repositories/starci-academy-backend/.claude/kernel/store.mjs:132:14)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/pattern-coverage.spec.mjs:279:38)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests\pattern-coverage.spec.mjs:314:1
+✖ undeclared writes under _local quarantine the candidate; declared run-state files are housekeeping (702.7995ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(frozen.reasons.includes('outside-allowlist:.starciwork/_local/workflows/wfc/rogue.json'))
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/pattern-coverage.spec.mjs:335:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

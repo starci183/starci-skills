@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {sameDriveTmp} from './_ledger-fixture.mjs';
-import {checkWorkChange,classifyChange,normativeDigest,normative,readWorkTree,CHANGE_KINDS,WorkChangeInputError} from '../checks/work-change.mjs';
+import {checkWorkChange,classifyChange,normativeDigest,normative,readWorkTree,CHANGE_KINDS,WorkChangeInputError} from '../scripts/checks/work-change.mjs';
 
 /**
  * The change record decides how far an edit travels, so every fixture here is a pair of trees: the

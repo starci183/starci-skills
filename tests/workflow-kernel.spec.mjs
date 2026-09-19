@@ -8,7 +8,7 @@ import {canonicalJSON,sha256} from '../core/index.mjs';
 import {EventEmitter} from 'node:events';
 import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
-import {brandColours} from '../checks/render.mjs';
+import {brandColours} from '../scripts/checks/render.mjs';
 import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease,stageAnsweredDecisionLateReport,lateReportReplayMatches,restoreDeferredReportOperation,persistLaunchAttempts} from '../kernel/kernel.mjs';
 import {inputScratchDir,reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';

@@ -1,0 +1,16 @@
+$ npx jest src/modules/bussiness/plan/downgrade-plan.handler.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/plan/downgrade-plan.handler.spec.ts
+  DowngradePlanHandler
+    √ fr.plan.downgrade / decision.plan.downgrade.policy: the downgrade is accepted immediately, never refused (6 ms)
+    √ ac.plan.downgrade.freeze.existing-tasks-untouched: the downgrade only changes the subscription row (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        2.141 s, estimated 4 s
+Ran all test suites matching /src\\modules\\bussiness\\plan\\downgrade-plan.handler.spec.ts/i.
+

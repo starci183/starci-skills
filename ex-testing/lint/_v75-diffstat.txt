@@ -1,0 +1,8 @@
+ .../ecommerce-app-be/.starciwork/DIRECTIONS.md     | 66 ----------------------
+ .../ui/cart/assets/generation-receipts.yaml        |  1 +
+ .../ui/landing-home/assets/direction-check.yaml    |  5 +-
+ .../landing-home/assets/generation-receipts.yaml   |  1 +
+ .../ui/shop-browse/assets/generation-receipts.yaml |  1 +
+ .../stock-refused/assets/generation-receipts.yaml  |  1 +
+ .../ui/sign-in/assets/generation-receipts.yaml     |  1 +
+ 7 files changed, 8 insertions(+), 68 deletions(-)

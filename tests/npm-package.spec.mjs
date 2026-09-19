@@ -33,7 +33,7 @@ test('actual npm tarball installs a runnable compiled command without developmen
   assert.equal(packed.status,0,packed.stderr??String(packed.error));
   const receipt=JSON.parse(packed.stdout)[0];
   assert.ok(receipt.files.some(file=>file.path==='.dist/cli/main.mjs'));
-  assert.ok(receipt.files.some(file=>file.path==='.dist/checks/stacks.mjs'));
+  assert.ok(receipt.files.some(file=>file.path==='.dist/scripts/checks/stacks.mjs'));
   fs.writeFileSync(path.join(target,'package.json'),'{}\n');
   const installed=npm(['install','--ignore-scripts','--omit=dev','--no-audit','--no-fund','--package-lock=false',path.join(temporary,receipt.filename)],target);
   assert.equal(installed.status,0,installed.stderr??String(installed.error));

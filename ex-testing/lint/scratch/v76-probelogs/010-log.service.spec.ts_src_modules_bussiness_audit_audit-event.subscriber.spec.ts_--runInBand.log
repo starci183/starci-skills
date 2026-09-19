@@ -1,0 +1,14 @@
+$ npx jest src/modules/bussiness/audit/audit-log.service.spec.ts src/modules/bussiness/audit/audit-event.subscriber.spec.ts --runInBand
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/audit/audit-log.service.spec.ts
+PASS src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+
+Test Suites: 2 passed, 2 total
+Tests:       17 passed, 17 total
+Snapshots:   0 total
+Time:        2.209 s, estimated 4 s
+Ran all test suites matching /src\\modules\\bussiness\\audit\\audit-log.service.spec.ts|src\\modules\\bussiness\\audit\\audit-event.subscriber.spec.ts/i.
+

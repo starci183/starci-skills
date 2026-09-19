@@ -1,0 +1,4 @@
+INFO    examples/ecommerce-app-be/.starciwork: 17 evidence file(s) carry no cwd/repository/commit stamp - a stale verdict cannot say which input moved [EVIDENCE_CONTEXT_MISSING]
+INFO    examples/ecommerce-app-be/.starciwork: 6 asset payload(s) carry non-work schemas - they are artifacts of their parent record, not records; the base gate should not walk them as such [PAYLOAD_AS_RECORD]
+
+0 refused, 0 suspect, 2 info

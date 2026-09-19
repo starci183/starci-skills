@@ -10,14 +10,14 @@ import {parseYaml} from '../core/yaml.mjs';
  * Coverage matrices, kept honest by discovery rather than by hand.
  *
  * A. knowledge/patterns/{fe,be}/ records: every authored rule maps to an executable check
- *    (a script obligation routed into checks/code-patterns/, an ESLint obligation or an
+ *    (a script obligation routed into scripts/checks/code-patterns/, an ESLint obligation or an
  *    architecture obligation of model/code-patterns.yaml) or carries an explicit manual
  *    marker with a reason (an authored `check: manual`, a nonempty verification.manual
  *    list, or a profile semanticOnly entry with rationale+guidance).
  * B. .starciwork record classes (model/records.yaml): every class maps to a schema file
  *    plus a runnable validator, or is marked external/embedded with the reason.
  * C. .stacks env/service files: every file under a repository .stacks/ is the manifest,
- *    referenced by the manifest (checks/stacks.mjs bounds-checks each reference), or a
+ *    referenced by the manifest (scripts/checks/stacks.mjs bounds-checks each reference), or a
  *    documented artifact. An env/service file nothing references is uncovered.
  * D. run-state layout (.starciwork/_local/workflows/<id>/): every persisted artifact class
  *    binds a schema const (or a declared internal format), an owning writer/validator, and
@@ -36,9 +36,9 @@ const read=relpath=>fs.readFileSync(path.join(root,relpath),'utf8');
 const yaml=relpath=>parseYaml(read(relpath));
 
 const catalog=yaml('model/code-patterns.yaml');
-const scriptSource=read('scripts/check-scoped-lint.mjs');
+const scriptSource=read('scripts/checks/check-scoped-lint.mjs');
 
-// The adapter table of check-scoped-lint.mjs routes script ruleIds into checks/code-patterns/.
+// The adapter table of check-scoped-lint.mjs routes script ruleIds into scripts/checks/code-patterns/.
 const adapters=[...scriptSource.matchAll(/\{profile:'(\w+)',module:'([\w-]+)',entry:'(\w+)',rules:\[([^\]]*)\]\}/g)]
   .map(match=>({profile:match[1],module:match[2],entry:match[3],rules:[...match[4].matchAll(/[A-Z][A-Z0-9_]+/g)].map(item=>item[0])}));
 const scriptModuleFor=(profile,ruleIds)=>{
@@ -78,7 +78,7 @@ for(const family of ['fe','be']){
         const kind=obligation.mechanical?.check?.kind;
         if(kind==='script'){
           const module=scriptModuleFor(profileName,obligation.mechanical.check.ruleIds??[]);
-          coverage='script';detail=`${obligation.id} -> checks/code-patterns/${module}.mjs`;
+          coverage='script';detail=`${obligation.id} -> scripts/checks/code-patterns/${module}.mjs`;
         }else{coverage=kind??'unbound';detail=obligation.id;}
       }else if(semantic){
         assert.ok(semantic.rationale&&semantic.guidance,`${rule.id}: semanticOnly entry ${semantic.id} must carry rationale and guidance`);
@@ -122,9 +122,9 @@ test('the script-coverage gap is exactly the known set - comment/folder/function
     'BE-IMPORTS-1:no-self-module-alias','BE-IMPORTS-6:no-nest-logger']);
   // Every script obligation routes to a checker module that exists and exports its adapter.
   for(const adapter of adapters){
-    const file=path.join(root,'checks/code-patterns',`${adapter.module}.mjs`);
-    assert.ok(fs.existsSync(file),`checks/code-patterns/${adapter.module}.mjs is missing`);
-    const loaded=await import(`${new URL(`../checks/code-patterns/${adapter.module}.mjs`,import.meta.url)}`);
+    const file=path.join(root,'scripts/checks/code-patterns',`${adapter.module}.mjs`);
+    assert.ok(fs.existsSync(file),`scripts/checks/code-patterns/${adapter.module}.mjs is missing`);
+    const loaded=await import(`${new URL(`../scripts/checks/code-patterns/${adapter.module}.mjs`,import.meta.url)}`);
     assert.equal(typeof loaded[adapter.entry],'function',`${adapter.module}.mjs must export ${adapter.entry}`);
   }
 });
@@ -194,8 +194,8 @@ const findStacks=dir=>{
 findStacks(root);
 
 test('every .stacks env/service file is manifest-referenced or an accounted artifact',async t=>{
-  const {checkApplicationStacks}=await import('../checks/stacks.mjs');
-  assert.equal(typeof checkApplicationStacks,'function','checks/stacks.mjs must export checkApplicationStacks');
+  const {checkApplicationStacks}=await import('../scripts/checks/stacks.mjs');
+  assert.equal(typeof checkApplicationStacks,'function','scripts/checks/stacks.mjs must export checkApplicationStacks');
   const uncoveredFiles=[],referencedAbsent=[],rows=[];
   for(const dir of stackDirs){
     const manifestFile=path.join(dir,'application-stacks.yaml');
@@ -225,7 +225,7 @@ test('every .stacks env/service file is manifest-referenced or an accounted arti
   }
   for(const row of rows)t.diagnostic(row);
   for(const ref of referencedAbsent)t.diagnostic(`referenced-but-absent\t${ref}`);
-  assert.deepEqual(uncoveredFiles,[],'every env/service file under .stacks/ must be referenced by the manifest (checks/stacks.mjs bounds-checks it) or be a non-service artifact');
+  assert.deepEqual(uncoveredFiles,[],'every env/service file under .stacks/ must be referenced by the manifest (scripts/checks/stacks.mjs bounds-checks it) or be a non-service artifact');
 });
 
 // ---------------------------------------------------------------- D. run-state layout (.starciwork/_local/workflows/<id>/)

@@ -1,0 +1,286 @@
+# modules/ops/ops/perf.verify.yaml - TINKLE-1 pure-yaml port of .claude/ops/perf.verify/operator.yaml
+# The operator contract below is verbatim; the trailing 'business:' block is the added
+# analysis (inference marked where the contract does not state it literally).
+
+id: perf.verify
+goal:
+  en: Run or observe the declared performance measurements against the running product the
+    environment provides, and leave the measured numbers as evidence - never an estimate, never a
+    repaired product.
+nodeKinds:
+  - implementation
+completionProfile: implementation
+sideEffects:
+  - declared measurement/benchmark runs against the authorized running product
+  - run-owned measurement data and load, disposed by the same run
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
+        and validator freshness. This consumer op requires its target node to exist. An absent
+        target is a scope/graph gap: report it and propose a separately selected scope op; do not
+        create a target or invent its acceptance/graph here."
+  - id: business
+    path: .starciwork/<business>/business/**/index.yaml
+    purpose:
+      en: Read the accepted non-functional requirements and the journeys the measurements are taken
+        on, declared as relevant inputs in the selected .starciwork graph. Intent declares the
+        threshold; observed behavior is not a replacement for it.
+  - id: architecture
+    path: .starciwork/<business>/architecture/**/index.yaml
+    purpose:
+      en: Read the declared quality targets - latency, throughput, resource ceilings and the
+        operations they apply to - so each measurement has a stated expectation. Where the design is
+        silent about a required metric, report the gap instead of inventing a threshold.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the delivered
+        slice, its declared benchmark/load tooling and existing measurement scripts. The evidence
+        binds the exact served tree, so a spec-only claim without a resolved repository is not a
+        measurement.
+  - id: environment
+    path: .starciwork/_resources/environments/<environment>/resource.yaml
+    purpose:
+      en: Read exact target/origins, owner, configuration revision, declared probes and allowed
+        effects; validate the running product's identity by observation - expected origin, observed
+        served versions - never inferred from a hostname alone.
+  - id: metrics
+    path: selected request metrics[] + declared goal thresholds
+    purpose:
+      en: Read the exact metrics, thresholds and measurement methods the request and the goal's done
+        block declare. A metric nobody declared is reported as undefined, never measured against an
+        invented bar.
+  - id: effects
+    path: current request authorization + selected environment resource declared allowed effects
+    purpose:
+      en: Bind measurement runs, generated load and run-owned data to the selected metrics and the
+        authorized environment. Shared-target stress, unbounded load and production traffic are
+        outside this op; discover an unknown external effect by read-only correlation before
+        repeating a run.
+  - id: matrix
+    path: selected complete-job matrix request + workflows/jobs.json
+    purpose:
+      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
+        input bindings, requested output JSON shapes and required criteria. Standalone execution
+        needs no fabricated matrix request. A template is not authority for extra effects.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles. Use current host model configuration; historical model names are not availability
+        proof. Capabilities are the intersection of actual tools, selected profile policy, op
+        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
+        or extra-agent permissions.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - blocker
+      - completion.inputDigest
+      - completion.evidence
+      - completion.codeRefs
+    content:
+      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
+        only state/blocker/completion here; measurements and run conditions belong to the evidence
+        result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap
+        or separately selected scope update; never add/remove them to obtain pass.
+  - id: evidence
+    path: E/manifest.yaml + E/measurements.json + E/run-output.txt + E/runtime.json + E/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - codeRefs
+      - extensions
+    content:
+      en: "Keep each declared metric with its observed value, unit, method, run parameters and the
+        served identity it was measured against - environment, served versions, configuration
+        revision. Record exact commands, cwd, exit codes, counts, durations and sanitized output,
+        every attempt visible. A metric that could not be measured stays not-run or inconclusive
+        with the reason; an estimate, an interpolated number or a copied figure is never a
+        measurement. Redact credentials and personal data before assets are hashed.
+        Operator-specific observed result in E/result.md: per-metric observed value versus declared
+        threshold, run conditions and unmeasured items."
+  - id: matrixHandoff
+    path: E/job-result.json
+    fields:
+      - requestId
+      - requestDigest
+      - op
+      - operation when selected
+      - status
+      - criteria
+      - outputs
+      - artifacts
+    content:
+      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
+        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
+        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
+        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
+        The selected request freezes output field schemas before execution.
+steps:
+  - reads:
+      - target
+      - business
+      - architecture
+      - metrics
+      - environment
+      - profile
+    writes:
+      - evidence
+    action:
+      en: "Freeze the metric set before any run - each declared metric with its threshold, method and
+        the journey or operation it applies to. Verify the running product's identity and the
+        measurement tooling before measuring. Resolve the execution profile and actual tool
+        availability before selecting instruments; this does not switch the model/runtime or spawn
+        workers."
+  - reads:
+      - repo
+      - environment
+      - effects
+    writes:
+      - evidence
+    action:
+      en: Prepare the declared measurement inside the authorized environment - existing benchmark or
+        load tooling the repository already owns, run-owned data only. Verify the product serves and
+        its observed versions match the bound delivery before the first measurement; a different
+        served build is reconciled first, never measured and labelled as this one.
+  - reads:
+      - metrics
+      - environment
+      - effects
+    writes:
+      - evidence
+    action:
+      en: Execute the declared measurements against the running product, keeping run parameters,
+        warmup, counts and durations, and capture the observed values verbatim. Re-run only inside
+        the declared method; every attempt is recorded, including discarded ones, and the load this
+        run generated stays inside the authorized ceiling.
+  - reads:
+      - metrics
+      - environment
+    writes:
+      - evidence
+    action:
+      en: Read the measurements back against the declared thresholds, metric by metric, and record
+        pass/fail/not-run for each with its observed value. Then confirm the run-owned load and data
+        are disposed and no authorized effect is left open; a leftover is recorded with its identity
+        and a resumable disposal command.
+  - reads:
+      - target
+      - metrics
+      - repo
+      - environment
+      - matrix
+    writes:
+      - node
+      - evidence
+      - matrixHandoff
+    action:
+      en: Report done once with every declared metric measured and bound to the served identity; a
+        metric under threshold is reported failed with the observed value, and an unmeasurable
+        metric is not-run with the reason - never interpolated into a pass. When selected in a job
+        matrix, produce E/job-result.json bound to the exact request, its output schema and every
+        required criterion. Never self-advance.
+proofs:
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+        done.
+  - id: measured
+    requirement:
+      en: Every declared metric has an observed value taken this run against the bound served
+        identity - method, unit, run parameters and thresholds recorded. An estimated, copied or
+        interpolated figure is not a measurement, and an unmeasured metric stays not-run.
+  - id: environment
+    requirement:
+      en: The product measured is the authorized running one - expected origin, observed served
+        versions and configuration revision recorded and consistent with the bound delivery. A
+        measurement on a different or unverified target is a defect, not evidence.
+  - id: scope
+    requirement:
+      en: The run changed no product source, no shared target and no expectation; run-owned load and
+        data are disposed, and anything left is recorded with a resumable command.
+blockers:
+  - code: METRIC_UNDEFINED
+    condition:
+      en: A required measurement has no declared metric, threshold or method; report the exact gap
+        instead of measuring against an invented bar.
+  - code: RUNTIME_UNAVAILABLE
+    condition:
+      en: "The authorized running product or the measurement tooling cannot be observed or started
+        here and the cause is provably unfixable from the allowlist - report blocked with blocker
+        kind environment naming the exact missing piece."
+  - code: OUTSIDE_ALLOWLIST
+    condition:
+      en: "Producing a required measurement needs a path, target or effect outside the selected
+        authority - report the exact need as blocker kind shared-change rather than widening it."
+  - code: AUTHORITY_REQUIRED
+    condition:
+      en: "A measurement needs an authority the goal does not grant - report blocked with blocker
+        kind authority, an owner decision."
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never
+        run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  environment: Resolved environment label
+perfPolicy:
+  surface: running-product
+  measurement: observed-only
+  thresholds: declared-metrics-only
+  productCode: unchanged
+  loadCeiling: authorized-environment-only
+  teardown: run-owned-disposed
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+# ---------------------------------------------------------------------------
+# TINKLE-1 business analysis (not part of the source contract; inference marked).
+business:
+  question: >-
+    "What are the measured values of the declared metrics against the running
+    product - observed, never estimated?"
+  whenNeeded:
+    - When a goal/request declares performance metrics with thresholds and the product runs in an authorized environment.
+    - Post-implementation measurement of the declared metric set only.
+  whenNot:
+    - A metric without a declared threshold/method is reported undefined - never an invented bar.
+    - Never repairs the product; an unmeasurable metric is not-run, not interpolated; a different served build is reconciled first.
+  consumes:
+    - Target, NFRs/journeys, architecture quality targets; repo tooling; the environment resource; the declared metrics; effects authorization.
+  produces:
+    - measurements.json evidence: one measured value per metric vs its threshold; node completion.
+  failureModes:
+    - METRIC_UNDEFINED, RUNTIME_UNAVAILABLE, OUTSIDE_ALLOWLIST, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
+# ---------------------------------------------------------------------------
+# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
+# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
+# block alone — an agent never reads the whole contract to route.
+route:
+  nodeKinds: [implementation]
+  phase: [verify, post-implementation]
+  intent: [perf, performance, measure, verify]
+  prerequisites: ["implementation done"]

@@ -1,0 +1,13 @@
+$ npx jest -t "ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/recur/zone.util.spec.ts
+
+Test Suites: 116 skipped, 1 passed, 1 of 117 total
+Tests:       700 skipped, 1 passed, 701 total
+Snapshots:   0 total
+Time:        17.619 s, estimated 20 s
+Ran all test suites with tests matching "ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap".
+

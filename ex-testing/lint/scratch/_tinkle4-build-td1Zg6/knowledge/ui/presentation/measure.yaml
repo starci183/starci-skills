@@ -1,0 +1,233 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.measure
+title: Measure presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: how much room does an application-owned content region take?
+  Composition has already chosen the DOM tree and the Grammar objects. Measure resolves width and
+  height constraints on regions the application owns. The internal dimensions of a card, input, control,
+  or shell belong to Grammar.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The region belongs to the application
+      applicationWrites: The class
+    - name: A component name
+      meaning: Common already constrains this dimension
+      applicationWrites: Nothing. Pass the prop
+    - name: —
+      meaning: Common exposes no public path
+      applicationWrites: The class, recorded as a workaround
+  notes: |-
+    Every region that can receive long content also carries `min-w-0`. Without it a flex or grid child
+    refuses to shrink below its content and pushes its neighbours out of the viewport. Common applies it
+    throughout its own renderers; an application region that wraps text must do the same.
+componentOwnership:
+  title: Measure Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: Button
+      element: root, width="fill"
+      rule: MEASURE-2
+    - component: HorizontalScrollRegion
+      element: root
+      rule: MEASURE-3
+    - component: NavigationFeatureNav
+      element: root
+      rule: MEASURE-2
+    - component: PageContainer
+      element: root
+      rule: MEASURE-1
+    - component: PressableField
+      element: root
+      rule: MEASURE-2
+    - component: Progress
+      element: root
+      rule: MEASURE-2
+    - component: Rail
+      element: body, height="fill"
+      rule: MEASURE-6
+    - component: Sidebar
+      element: root, presentation!="drawer"
+      rule: MEASURE-6
+    - component: Sidebar
+      element: root, presentation="drawer"
+      rule: MEASURE-2
+    - component: TextAction
+      element: root
+      rule: MEASURE-3
+    - component: VerticalScrollRegion
+      element: root, isScrollable
+      rule: MEASURE-7
+    - component: WorkspaceShell
+      element: layout
+      rule: MEASURE-1
+topics:
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+catalogNotes: |-
+  Height has no closed value scale, and width has one only for caps (see Width scale), so the rule
+  ID is an address over constraint kinds rather than a position on a ramp. Prefer the earliest rule that works: fluid before fitted, fitted
+  before capped, capped before fixed.
+
+  A fixed width or height is absent from this catalog on purpose. A region whose size cannot respond to
+  its content or its viewport is a layout decision made before presentation, and it is reported rather
+  than written here.
+guidance:
+  - id: width-scale
+    title: Width scale
+    requirement: |-
+      A capped width takes one step of this closed scale and nothing else; an arbitrary width such as
+      `max-w-[720px]` is outside the selected family scale. Report or replace it only within an authorized
+      implementation scope. The prose cap `max-w-[65ch]` is the one character-based step, because line
+      length follows the text. The retained owner ruling of 2026-09-03 fixes the scale for applications
+      adopting this family; it does not override a different approved design system.
+      | Step | Class | Width |
+      | --- | --- | --- |
+      | W-sm | `max-w-sm` | 24rem |
+      | W-md | `max-w-md` | 28rem |
+      | W-lg | `max-w-lg` | 32rem |
+      | W-xl | `max-w-xl` | 36rem |
+      | W-2xl | `max-w-2xl` | 42rem |
+      | W-3xl | `max-w-3xl` | 48rem |
+      | W-4xl | `max-w-4xl` | 56rem |
+      | W-5xl | `max-w-5xl` | 64rem |
+      | W-6xl | `max-w-6xl` | 72rem |
+      | W-7xl | `max-w-7xl` | 80rem |
+      | W-prose | `max-w-[65ch]` | 65 characters |
+rules:
+  - id: MEASURE-1
+    title: Page measure
+    governs: |-
+      A routed page adopts one packaged width instead of inventing its own.
+    cases:
+      - id: case-1
+        when: A page of continuous prose that must stay readable
+        owner: "`PageContainer`"
+        render: '`<PageContainer measure="reading">`'
+      - id: case-2
+        when: An ordinary product page of cards, tables, and controls
+        owner: "`PageContainer`"
+        render: "`<PageContainer>`, the product default"
+      - id: case-3
+        when: |-
+          A page whose content genuinely spans the viewport, such as a board or canvas
+        owner: "`PageContainer`"
+        render: '`<PageContainer measure="full">`'
+    notThisRule: |-
+      recreating the page width with a cap and a centring margin. That reproduces a component the page already has.
+  - id: MEASURE-2
+    title: Fluid width
+    governs: The region takes the width it is given and stays responsive.
+    cases:
+      - id: case-1
+        when: |-
+          A region that should follow the width supplied by its layout host
+        owner: "`App`"
+        render: '`<section className="w-full">`'
+      - id: case-2
+        when: A control or field that must span its column
+        owner: "`App`"
+        render: "`w-full` on the app-owned wrapper, never inside the control"
+    notThisRule: forcing a child past its parent's intended measure.
+  - id: MEASURE-3
+    title: Content width
+    governs: The region grows only as far as its content needs.
+    cases:
+      - id: case-1
+        when: A compact region whose width should follow its own content
+        owner: "`App`"
+        render: '`<aside className="w-fit max-w-full">`'
+      - id: case-2
+        when: Row content inside a horizontal scroll region
+        owner: "`HorizontalScrollRegion`"
+        render: Compose the region; children already take `max-content`
+    notThisRule: long prose, or a region that must fill its host.
+    remark: |-
+      Always pair `w-fit` with `max-w-full`. Without the cap, content longer than expected widens the
+      region past its container and creates page-level horizontal scrolling.
+  - id: MEASURE-4
+    title: Capped width
+    governs: |-
+      A fluid region stops widening once further width stops helping the reader.
+    cases:
+      - id: case-1
+        when: |-
+          A prose region whose line length needs a readable upper bound
+        owner: "`App`"
+        render: '`<article className="max-w-[65ch]">`'
+      - id: case-2
+        when: A content region that loses its grouping past a known width
+        owner: "`App`"
+        render: |-
+          `<main className="w-full max-w-6xl">`, the cap one step of the Width scale
+      - id: case-3
+        when: |-
+          A capped region whose content is narrower than the column it sits in, so the free space would otherwise gather on one side (a game table, a form, a media frame)
+        owner: "`App`"
+        render: |-
+          `<section className="w-full max-w-4xl mx-auto">`: the cap plus `mx-auto`, never a left-aligned cap
+    notThisRule: adding a cap because a screenshot looks sparse.
+    remark: |-
+      Character-based caps follow the text itself and belong to prose. Length-based caps belong to mixed
+      content. Neither applies to tables, media, or code, which have their own intrinsic width.
+  - id: MEASURE-5
+    title: Minimum height
+    governs: |-
+      The region reserves a floor and still grows with its content.
+    cases:
+      - id: case-1
+        when: |-
+          A region needing a stable canvas before its content height is known
+        owner: "`App`"
+        render: '`<section className="min-h-[24rem]">`'
+      - id: case-2
+        when: |-
+          A region whose empty and populated states must not shift the page
+        owner: "`App`"
+        render: The same floor on both states
+    notThisRule: |-
+      reserving space for content that is absent by design. An empty state occupies its own region rather than a held-open gap.
+  - id: MEASURE-6
+    title: Inherited height
+    governs: The region fills a height its host already defines.
+    cases:
+      - id: case-1
+        when: A region inside a host that supplies a definite height
+        owner: "`App`"
+        render: '`<section className="h-full">` inside a sized parent'
+      - id: case-2
+        when: A rail that must run the full height of its shell
+        owner: "`Rail`"
+        render: '`height="fill"` on the rail'
+    notThisRule: stretching ordinary document content.
+    remark: |-
+      `h-full` resolves against a definite parent height and does nothing without one. In an indefinite
+      chain it silently has no effect, which reads as a styling bug rather than a missing height.
+  - id: MEASURE-7
+    title: Capped height
+    governs: The region stops growing, and something inside it scrolls.
+    cases:
+      - id: case-1
+        when: |-
+          A list or panel that must not push the page beyond the viewport
+        owner: "`VerticalScrollRegion`"
+        render: Compose the region; it owns the boundary
+      - id: case-2
+        when: An app-owned region with a bounded height and its own scroll
+        owner: "`App`"
+        render: "`max-h-*` together with the matching overflow rule"
+    notThisRule: capping a region to hide content the reader still needs.
+    remark: |-
+      A capped height without a scroll owner clips content silently. The two decisions travel together.
+doesNotDecide: |-
+  Which boundary scrolls or clips is [Overflow](overflow.yaml). How text behaves inside the region is
+  [Text flow](text-flow.yaml). Space around and inside the region is [Gap](gap.yaml) and [Padding](padding.yaml).

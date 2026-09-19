@@ -1,0 +1,23 @@
+schema: work/gap
+id: gap.plan.render-proof
+title: The usage captures fail the canonical render checks - impl.plan.todo-app-frontend.usage cannot claim done
+state: todo
+statement: "impl.plan.todo-app-frontend.usage keeps real captures - the running page across
+  under-cap, at-cap and upgrade states at desktop and mobile, produced from the served build.
+  The artifacts are real; the proof is not. Run through checks/render.mjs, entity-list-in-card
+  fails on running-page-desktop, running-page-mobile and running-page-under-cap: 3-7 repeated
+  `starci-core-text` items sit in a `div` inside `starci-core-surface` - a list of entities is a
+  page section with a heading; a card is one item. running-page-at-cap additionally fails
+  palette-off-brand on #2a52b4 (6% of saturated pixels, nearest --starci-core-accent at deltaE
+  12.92). Both findings are properties of the shipped markup and paint in todo-app-frontend,
+  outside the .starciwork record scope, so the done claim is unproven and the record is held at
+  todo, blockedBy this gap. Repro: node scripts/example-render-proof.mjs --work
+  examples/todo-app-backend/.starciwork --record impl.plan.todo-app-frontend.usage"
+closedBy: impl.plan.todo-app-frontend.usage
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-19T21:30:00.000Z
+  reason: "Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
+    palette failures above on real markup and bytes. Neither editing checks/*.mjs nor staging
+    captures can close this - the rendered page itself violates the design system's laws."

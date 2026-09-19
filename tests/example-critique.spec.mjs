@@ -7,7 +7,7 @@ import {computeCritique, runCritique} from '../scripts/example-critique.mjs';
 /**
  * One fixture tree per section this lane was asked to compute, plus its freshness gate. Fixtures live on
  * the same drive as the repo for the same reason tests/example-derive.spec.mjs's own fixtures do: a
- * different-drive os.tmpdir() breaks the relative-path handling scripts/check-example-work.mjs relies on.
+ * different-drive os.tmpdir() breaks the relative-path handling scripts/checks/check-example-work.mjs relies on.
  *
  * Each fixture's own `.starciwork` sits directly under a throwaway repo directory (`root`), mirroring the
  * real example's shape (`examples/todo-app-backend/.starciwork`) closely enough for path resolution (a

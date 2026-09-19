@@ -4,8 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { checkNestErrors, NEST_ERROR_RULES } from '../checks/code-patterns/nest-errors.mjs';
-import { defaultScriptChecker } from '../scripts/check-scoped-lint.mjs';
+import { checkNestErrors, NEST_ERROR_RULES } from '../scripts/checks/code-patterns/nest-errors.mjs';
+import { defaultScriptChecker } from '../scripts/checks/check-scoped-lint.mjs';
 
 const require = createRequire(import.meta.url);
 const typescriptRoot = path.dirname(require.resolve('typescript/package.json'));

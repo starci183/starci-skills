@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.share.revoke.on-read.removed-loses-access-next-read
-rule: br.share.revoke.on-read
-given: An accepted editor collaborator who was just revoked, with no sweep or scheduled job run in between
-when: That collaborator's own next read is checked
-then:
-  - The invitation reads revoked.
-  - A completion attempt made in that same instant is refused.

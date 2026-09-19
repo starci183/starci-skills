@@ -1,0 +1,16 @@
+✔ invalid YAML is rejected by the knowledge compiler (38.9474ms)
+✔ duplicate YAML keys are rejected by the knowledge compiler (5.6094ms)
+✔ duplicate rule IDs across topics are rejected (18.5928ms)
+✔ missing example file referenced by manifest is rejected (13.0726ms)
+✔ path escape via ../ is rejected (8.9602ms)
+✔ two compiles produce identical bytes (24.259ms)
+✔ check mode detects stale output without writing (44.4867ms)
+✔ compatibility projection includes schema starci/knowledge@1 title and sections (21.3202ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 245.8243

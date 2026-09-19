@@ -1,0 +1,12 @@
+--follow lineage entries: 10
+WORKTREE: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]
+0 2aba05ab M: rev=2 kind=breaking withdraws=1 statements=2 dup=true clauseAt=change.withdraws[0]
+1 dfb7c74e M: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]
+2 a6044fe4 M: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]
+3 10e3a072 M: rev=2 kind=breaking withdraws=1 statements=2 dup=true clauseAt=change.withdraws[0]
+4 ebcdbe2c M: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]
+5 c5d09f03 M: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]
+6 c2a504d7 R: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]
+7 8982b8c8 M: rev=2 kind=breaking withdraws=1 statements=2 dup=true clauseAt=change.withdraws[0]
+8 4b64eea7 M: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]
+9 acd7e45e A: rev=2 kind=breaking withdraws=1 statements=2 dup=false clauseAt=change.withdraws[0]

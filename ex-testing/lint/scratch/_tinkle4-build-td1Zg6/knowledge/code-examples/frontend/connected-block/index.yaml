@@ -1,0 +1,94 @@
+schema: starci/code-example@1
+id: connected-block
+title: Connected block and pure renderer pair
+purpose: |
+  Show one feature block unit: connected index.tsx owns data, localization,
+  navigation and state resolution; pure component.tsx receives only resolved
+  state, labels, data and actions. Grammar imports come from the verified
+  @starci/grammar/common entry. Domain names are synthetic Example*; do not
+  copy Academy product copy from provenance sources.
+appliesTo: [frontend]
+relatedRules:
+  - FE-FUNCTION-1
+  - FE-FUNCTION-2
+  - FE-FUNCTION-3
+  - FE-FUNCTION-4
+  - FE-FUNCTION-5
+  - FE-FOLDER-1
+  - FE-FOLDER-2
+  - FE-FOLDER-6
+files:
+  - path: index.tsx
+    role: Connected owner; "use client"; resolves query/i18n/router into Base props.
+  - path: component.tsx
+    role: Pure renderer; state/props/on contract only; no fetch, router or i18n hooks.
+  - path: classNames.ts
+    role: Owns unit class strings; component.tsx never inlines className literals.
+  - path: index.spec.tsx
+    role: Maps connected owner states and actions with Base and hooks mocked.
+  - path: component.spec.tsx
+    role: Renders Base states; asserts command onPress versus destination href.
+entrypoint: index.tsx
+adapt:
+  - Replace Example* names with the target block name and folder under blocks/<domain>/.
+  - Remap next-intl, @/i18n/navigation and @/hooks imports to the host's approved entries.
+  - Replace useQueryExampleStatusSwr with the target's real SWR/query hook.
+  - Resolve every label in the connected half; never pass translation keys into Base.
+  - Keep Button commands on onPress and destinations on href; never combine them.
+  - Keep router.push (or equivalent) in the connected half; pass openHelp as an action.
+dependencies:
+  packages:
+    - "@starci/grammar"
+    - react
+    - next-intl
+    - vitest
+    - "@testing-library/react"
+  assumptions: |
+    Illustrative Next.js client-block shape. Grammar symbols Button, Heading, Text
+    and SurfaceCard were verified against starci-academy-fe packages/grammar
+    (package name @starci/grammar, public entry ./common, version 0.4.13) source
+    renderers.ts and the built dist/common/index.js. App hooks and i18n are
+    adapter seams, not Grammar APIs.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests:
+    - index.spec.tsx
+    - component.spec.tsx
+  limitations: |
+    No shared example harness in this knowledge tree yet; typecheck and lint are
+    not claimed. Specs illustrate ownership and Button contracts when run in a
+    host Vitest + Testing Library setup with the listed packages. Pending state
+    is rendered explicitly; empty is omitted to keep the brief focused. Mock-only
+    connected mapping is not browser UAT.
+provenance:
+  sources:
+    - starci-academy-fe/src/components/blocks/commerce/CartBlock/index.tsx
+    - starci-academy-fe/src/components/blocks/commerce/CartBlock/component.tsx
+    - starci-academy-fe/src/components/blocks/commerce/CartBlock/classNames.ts
+    - starci-academy-fe/src/components/blocks/commerce/CartBlock/index.spec.tsx
+    - starci-academy-fe/src/components/blocks/auth/AccountMenu/component.tsx
+    - starci-academy-fe/src/components/blocks/auth/AccountMenu/component.spec.tsx
+    - starci-academy-fe/packages/grammar/src/common/renderers.ts
+    - starci-academy-fe/packages/grammar/src/core/primitive/Button/index.tsx
+    - starci-academy-fe/packages/grammar/package.json
+  simplifications: |
+    Replaced cart/account business flows with a synthetic status summary.
+    Kept the three-part pure contract (state/props/on), connected ownership of
+    hooks, colocated classNames ownership, and Grammar Button onPress-versus-href
+    discrimination. Omitted Academy leaves, overlays and payment surfaces.
+grammarExportsVerified:
+  package: "@starci/grammar"
+  entry: "@starci/grammar/common"
+  versionObserved: "0.4.13"
+  exports:
+    - Button
+    - Heading
+    - Text
+    - SurfaceCard
+  notes: |
+    Verified as functions from packages/grammar/dist/common/index.js and as named
+    re-exports in packages/grammar/src/common/renderers.ts. ButtonProps is a
+    discriminated union: DestinationButton (href, onPress?: never) |
+    CommandButton (onPress, href?: never).

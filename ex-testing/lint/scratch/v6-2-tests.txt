@@ -1,0 +1,310 @@
+✔ the colour mathematics round trips and reproduces the known contrast pairs (1.6081ms)
+✔ custom properties are read per scope, and token files by key (0.6276ms)
+✔ tokens-match-source binds every brand colour to the shipped stylesheet across notations (47.8636ms)
+✔ tokens-match-source skips rather than passing when it cannot read the source (1.3919ms)
+✔ contrast-aa measures declared text pairs and the primary on its surface (0.8144ms)
+✔ primary-danger-distinct fails a danger that reads as primary and passes with a note when the owner allows it (0.3349ms)
+✔ mascot-assets-present verifies the bytes under the tree (9.2941ms)
+✔ icon-set-only lists imports outside the declared glyph set and ignores vendored trees (20.6024ms)
+✔ tokens-in-grammar refuses token names the grammar canon does not declare (6.5657ms)
+✔ runBrandChecks reports every check, resolves the record from a repository root, and refuses a broken input (58.7026ms)
+✔ a record with no declared rev is identified by the digest of its own bytes (12.0494ms)
+✔ the CLI prints one line per check and exits 1 when a check fails (891.3369ms)
+✔ safe YAML rejects duplicate keys and aliases during knowledge compile (114.4962ms)
+✔ unknown root fields and retired JSON knowledge fail closed (122.8636ms)
+✔ duplicate rule ids are rejected (72.4015ms)
+✔ missing rule refs are rejected (50.4719ms)
+✔ path escapes in example manifests are rejected (48.8403ms)
+✔ identical input yields identical bytes (69.0506ms)
+✔ build:check / compile --check detects stale generated knowledge without writing (59.0911ms)
+✔ index.yaml maps to INDEX.json and bundles example file text without executing it (60.0905ms)
+✔ npm build:knowledge:check is read-only via CLI (290.4016ms)
+✔ concept 1: blocker edges - prose blockedBy is refused, dangling target is refused, a stale (done) blocker is refused (45.7537ms)
+✔ concept 2: gap records need a valid state, a statement, and a resolving closedBy (11.4493ms)
+✔ trust concept 8: a done implementation is refused when its ui direction is not done yet (IMPL_BEFORE_DIRECTION) (31.1969ms)
+✔ trust concept 5: a blockedBy cycle is refused (BLOCKER_CYCLE), and a chain rooted in a gap or an open decision is accepted (17.5049ms)
+✔ trust concept 5: a blockedBy chain that dead-ends at an ordinary record (neither cyclic nor gap/open-decision rooted) is warned, not refused (BLOCKER_UNROOTED) (10.6382ms)
+✔ trust concept 1: a stale codeDigest is refused unless the evidence carries stale: true (CODE_DIGEST_STALE) (14.8244ms)
+✔ trust concept 2: an evidence assertion without a command is refused as not replayable (PROOF_NOT_REPLAYABLE) (11.8681ms)
+✔ trust concept 3: a done record's proves target must itself be done (PROVES_TARGET_NOT_DONE) (18.1073ms)
+✔ trust concept 3: owners[]/module paths that do not exist on disk are refused for done records and warned for todo ones (OWNER_PATH_MISSING) (9.9356ms)
+✔ trust concept 4: a done sds-component needs owners naming an existing module directory; a todo one without owners is only warned (9.6817ms)
+✔ concept 7: gap.closedBy accepts a bare id (normalised to one entry) or a list, every entry must resolve, and a done gap needs every closer done (23.7302ms)
+✔ concept 3: conflictsWith rev must match; tension is refused off policy-decision and needs 2+ ids (14.1717ms)
+✔ concept 4: decision outcome is closed, chosen must resolve to an option, targetModule is refused (12.0508ms)
+✔ concept 5: change.kind is a closed enum; a stale recordDigest must carry stale: true (21.0213ms)
+✔ concept 6: a done record needs evidence or an authored-claim declaration; data/brand/policy-decision are exempt by default (10.4676ms)
+✔ concept 7: appliesTo is refused off business-rule/sds-component (work/data in particular) and its targets must resolve (13.9817ms)
+✔ concept 8: event needs a resolving producer, non-empty payload and a closed delivery vocabulary; subscribes must target a work/event; extends must target a work/data; a non-timer object on transitions.on is refused (25.9431ms)
+✔ concept 9: work/implementation refuses legacy directory/files/targetFiles and needs role+path on every owner; business-rule.module accepts a string or a list (18.0056ms)
+✔ concept 10: a done ui-screen needs an asset carrying image_gen.imagegen generation, and coverage.map must name every listed state (11.9493ms)
+✔ concept 11: a generation-carrying asset is refused outside work/ui-screen, with a dedicated message for work/implementation (7.6581ms)
+✔ concept 12: a done uat-flow needs a sibling evidence.yaml naming a run with screens, videos and a passing result.md (18.9714ms)
+✔ concept 6: schemas/work-layout.yaml's shape.families must equal check-example-work.mjs's own FAMILIES set (FAMILIES_DRIFT) (5.1997ms)
+✔ concept 13: _resources custody is the plain work/resource schema (no @N), and a uat-flow's environment/fixtures/accounts refs resolve to the right kind (25.0095ms)
+node:internal/modules/cjs/loader:1420
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module 'typescript/package.json'
+Require stack:
+- D:\Repositories\starci-academy-backend\.claude\tests\grammar-guards.spec.mjs
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1420:15)
+    at require.resolve (node:internal/modules/helpers:163:19)
+    at file:///D:/Repositories/starci-academy-backend/.claude/tests/grammar-guards.spec.mjs:12:45
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'D:\\Repositories\\starci-academy-backend\\.claude\\tests\\grammar-guards.spec.mjs'
+  ]
+}
+
+Node.js v25.2.1
+✖ tests\grammar-guards.spec.mjs (149.3869ms)
+✔ invalid YAML is rejected by the knowledge compiler (49.0911ms)
+✔ duplicate YAML keys are rejected by the knowledge compiler (11.3303ms)
+✔ duplicate rule IDs across topics are rejected (36.1927ms)
+✔ missing example file referenced by manifest is rejected (16.4313ms)
+✔ path escape via ../ is rejected (13.374ms)
+✔ two compiles produce identical bytes (44.8775ms)
+✔ check mode detects stale output without writing (69.9653ms)
+✔ compatibility projection includes schema starci/knowledge@1 title and sections (18.5814ms)
+(node:93980) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ every authored pattern rule maps to an executable check or a named manual marker (1.0351ms)
+ℹ fe/architecture-check.yaml	FE-ARCHITECTURE-1	architecture	NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
+ℹ fe/architecture-check.yaml	FE-ARCHITECTURE-2	architecture	NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
+ℹ fe/architecture-check.yaml	FE-ARCHITECTURE-3	eslint	NEXT-LEGACY-BLOCK-TWIN-GUARD
+ℹ fe/architecture-check.yaml	FE-ARCHITECTURE-4	architecture	NEXT-OWNER-PUBLIC-ENTRY
+ℹ fe/architecture-check.yaml	FE-ARCHITECTURE-5	architecture	NEXT-OWNER-PUBLIC-ENTRY
+ℹ fe/comment.yaml	FE-COMMENT-1	eslint	NEXT-COMMENT-SOURCE-HYGIENE
+ℹ fe/comment.yaml	FE-COMMENT-2	manual	NEXT-COMMENT-QUALITY: Whether prose adds a source-sensitive constraint or consequence is semantic afte
+ℹ fe/comment.yaml	FE-COMMENT-3	manual	NEXT-COMMENT-QUALITY: Whether prose adds a source-sensitive constraint or consequence is semantic afte
+ℹ fe/comment.yaml	FE-COMMENT-4	manual	NEXT-COMMENT-QUALITY: Whether prose adds a source-sensitive constraint or consequence is semantic afte
+ℹ fe/comment.yaml	FE-COMMENT-5	eslint	NEXT-COMMENT-SOURCE-HYGIENE
+ℹ fe/error.yaml	FE-ERROR-1	script	NEXT-ERROR-STATE-MAPPING -> checks/code-patterns/next-errors.mjs
+ℹ fe/error.yaml	FE-ERROR-2	script	NEXT-ERROR-STATE-MAPPING -> checks/code-patterns/next-errors.mjs
+ℹ fe/error.yaml	FE-ERROR-3	script	NEXT-REQUIRED-VALUE-FAILURE -> checks/code-patterns/next-errors.mjs
+ℹ fe/error.yaml	FE-ERROR-4	script	NEXT-ERROR-STATE-MAPPING -> checks/code-patterns/next-errors.mjs
+ℹ fe/error.yaml	FE-ERROR-5	script	NEXT-GRAMMAR-GUARD-BEHAVIOR -> checks/code-patterns/grammar-guards.mjs
+ℹ fe/folder.yaml	FE-FOLDER-1	architecture	NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
+ℹ fe/folder.yaml	FE-FOLDER-2	architecture	NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
+ℹ fe/folder.yaml	FE-FOLDER-3	architecture	NEXT-ROUTE-COMPOSITION
+ℹ fe/folder.yaml	FE-FOLDER-4	architecture	NEXT-OWNER-PUBLIC-ENTRY
+ℹ fe/folder.yaml	FE-FOLDER-5	architecture	NEXT-GRAMMAR-CONTRACT
+ℹ fe/folder.yaml	FE-FOLDER-6	eslint	NEXT-FILE-AND-EXPORT-SHAPE
+ℹ fe/function.yaml	FE-FUNCTION-1	eslint	NEXT-FILE-AND-EXPORT-SHAPE
+ℹ fe/function.yaml	FE-FUNCTION-2	eslint	NEXT-PRESENTATION-API
+ℹ fe/function.yaml	FE-FUNCTION-3	eslint	NEXT-PRESENTATION-API
+ℹ fe/function.yaml	FE-FUNCTION-4	eslint	NEXT-LEGACY-BLOCK-TWIN-GUARD
+ℹ fe/function.yaml	FE-FUNCTION-5	eslint	NEXT-FILE-AND-EXPORT-SHAPE
+ℹ fe/function.yaml	FE-FUNCTION-6	architecture	NEXT-DATA-LIFECYCLE-KEYS
+ℹ fe/function.yaml	FE-FUNCTION-7	architecture	NEXT-ROUTE-COMPOSITION
+ℹ fe/imports.yaml	FE-IMPORTS-1	architecture	NEXT-GRAMMAR-CONTRACT
+ℹ fe/imports.yaml	FE-IMPORTS-2	manual	NEXT-IMPORT-ORDER-OBSERVATION: The source explicitly records import order as observed rather than mandatory.
+ℹ fe/imports.yaml	FE-IMPORTS-3	architecture	NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
+ℹ fe/imports.yaml	FE-IMPORTS-4	architecture	NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
+ℹ fe/imports.yaml	FE-IMPORTS-5	architecture	NEXT-GRAMMAR-CONTRACT
+ℹ fe/imports.yaml	FE-IMPORTS-6	architecture	NEXT-OWNER-PUBLIC-ENTRY
+ℹ fe/imports.yaml	FE-IMPORTS-7	architecture	NEXT-GRAMMAR-CONTRACT
+ℹ fe/naming.yaml	FE-NAMING-1	eslint	NEXT-FILE-AND-EXPORT-SHAPE
+ℹ fe/naming.yaml	FE-NAMING-2	script	NEXT-CONTRACT-NAME-SHAPE -> checks/code-patterns/next.mjs
+ℹ fe/naming.yaml	FE-NAMING-3	eslint	NEXT-FILE-AND-EXPORT-SHAPE
+ℹ fe/naming.yaml	FE-NAMING-4	script	NEXT-SOURCE-NAME-SHAPE -> checks/code-patterns/next.mjs
+ℹ fe/naming.yaml	FE-NAMING-5	script	NEXT-SOURCE-NAME-SHAPE -> checks/code-patterns/next.mjs
+ℹ fe/naming.yaml	FE-NAMING-6	eslint	NEXT-PRESENTATION-API
+ℹ fe/naming.yaml	FE-NAMING-7	script	NEXT-SOURCE-NAME-SHAPE -> checks/code-patterns/next.mjs
+ℹ fe/test.yaml	FE-TEST-1	eslint	NEXT-LEGACY-BLOCK-TWIN-GUARD
+ℹ fe/test.yaml	FE-TEST-2	manual	NEXT-SPEC-BEHAVIOR-SELECTION: Connected and pure responsibilities, copied implementation detail, network subst
+ℹ fe/test.yaml	FE-TEST-3	manual	NEXT-SPEC-BEHAVIOR-SELECTION: Connected and pure responsibilities, copied implementation detail, network subst
+ℹ fe/test.yaml	FE-TEST-4	script	NEXT-SPEC-SUBJECT-AND-DESCRIBE -> checks/code-patterns/next.mjs
+ℹ fe/test.yaml	FE-TEST-5	script	NEXT-SPEC-NO-SNAPSHOT -> checks/code-patterns/next.mjs
+ℹ fe/test.yaml	FE-TEST-6	manual	NEXT-SPEC-BEHAVIOR-SELECTION: Connected and pure responsibilities, copied implementation detail, network subst
+ℹ fe/typing.yaml	FE-TYPING-1	eslint	NEXT-TYPE-SAFETY
+ℹ fe/typing.yaml	FE-TYPING-2	script	NEXT-READONLY-PROPS-CONTRACT -> checks/code-patterns/next.mjs
+ℹ fe/typing.yaml	FE-TYPING-3	script	NEXT-CLOSED-VOCABULARY-SHAPE -> checks/code-patterns/next.mjs
+ℹ fe/typing.yaml	FE-TYPING-4	eslint	NEXT-TYPE-SAFETY
+ℹ fe/typing.yaml	FE-TYPING-5	script	NEXT-RETURN-TYPE-PROFILE -> checks/code-patterns/next.mjs
+ℹ fe/typing.yaml	FE-TYPING-6	eslint	NEXT-TYPE-SAFETY
+ℹ fe/typing.yaml	FE-TYPING-7	script	NEXT-CLOSED-VOCABULARY-SHAPE -> checks/code-patterns/next.mjs
+ℹ fe/typing.yaml	FE-TYPING-8	architecture	NEXT-DATA-LIFECYCLE-KEYS
+ℹ be/architecture-check.yaml	BE-ARCHITECTURE-1	architecture	NEST-DEPENDENCY-DIRECTION
+ℹ be/architecture-check.yaml	BE-ARCHITECTURE-2	architecture	NEST-APP-COMPOSITION
+ℹ be/architecture-check.yaml	BE-ARCHITECTURE-3	architecture	NEST-MODULE-REGISTRATION
+ℹ be/architecture-check.yaml	BE-ARCHITECTURE-4	architecture	NEST-APPLICATION-TRANSPORT-BOUNDARY
+ℹ be/comment.yaml	BE-COMMENT-1	eslint	NEST-DOCUMENTED-EXPORTS
+ℹ be/comment.yaml	BE-COMMENT-2	eslint	NEST-DOCUMENTED-EXPORTS
+ℹ be/comment.yaml	BE-COMMENT-3	script	NEST-COMMENT-MEMBER-SHAPE -> checks/code-patterns/nest.mjs
+ℹ be/comment.yaml	BE-COMMENT-4	eslint	NEST-DOCUMENTED-EXPORTS
+ℹ be/comment.yaml	BE-COMMENT-5	script	NEST-COMMENT-MEMBER-SHAPE -> checks/code-patterns/nest.mjs
+ℹ be/comment.yaml	BE-COMMENT-6	script	NEST-COMMENT-MEMBER-SHAPE -> checks/code-patterns/nest.mjs
+ℹ be/comment.yaml	BE-COMMENT-7	eslint	NEST-DOCUMENTED-EXPORTS
+ℹ be/error.yaml	BE-ERROR-1	eslint	NEST-LEGACY-EXCEPTION-POLICY-GUARD
+ℹ be/error.yaml	BE-ERROR-2	eslint	NEST-LEGACY-EXCEPTION-POLICY-GUARD
+ℹ be/error.yaml	BE-ERROR-3	eslint	NEST-LEGACY-EXCEPTION-POLICY-GUARD
+ℹ be/error.yaml	BE-ERROR-4	script	NEST-TRANSPORT-ERROR-MAPPING -> checks/code-patterns/nest-errors.mjs
+ℹ be/error.yaml	BE-ERROR-5	script	NEST-TRANSPORT-ERROR-MAPPING -> checks/code-patterns/nest-errors.mjs
+ℹ be/error.yaml	BE-ERROR-6	script	NEST-TRANSPORT-ERROR-MAPPING -> checks/code-patterns/nest-errors.mjs
+ℹ be/error.yaml	BE-ERROR-7	eslint	NEST-OBSERVABILITY
+ℹ be/folder.yaml	BE-FOLDER-1	architecture	NEST-APP-COMPOSITION
+ℹ be/folder.yaml	BE-FOLDER-2	architecture	NEST-FEATURE-FILE-SHAPE
+ℹ be/folder.yaml	BE-FOLDER-3	architecture	NEST-MODULE-REGISTRATION
+ℹ be/folder.yaml	BE-FOLDER-4	eslint	NEST-LEGACY-BARREL-GUARD
+ℹ be/folder.yaml	BE-FOLDER-5	architecture	NEST-FEATURE-FILE-SHAPE
+ℹ be/folder.yaml	BE-FOLDER-6	architecture	NEST-FEATURE-FILE-SHAPE
+ℹ be/folder.yaml	BE-FOLDER-7	eslint	NEST-HANDLER-TWIN-COUNT-GUARD
+ℹ be/function.yaml	BE-FUNCTION-1	eslint	NEST-CONDITIONAL-CQRS-SHAPE
+ℹ be/function.yaml	BE-FUNCTION-2	eslint	NEST-CONDITIONAL-CQRS-SHAPE
+ℹ be/function.yaml	BE-FUNCTION-3	eslint	NEST-PERSISTENCE-SHAPE
+ℹ be/function.yaml	BE-FUNCTION-4	eslint	NEST-AUTHORIZATION-DOOR
+ℹ be/function.yaml	BE-FUNCTION-5	eslint	NEST-PERSISTENCE-SHAPE
+ℹ be/function.yaml	BE-FUNCTION-6	eslint	NEST-DELIVERY-CONTRACT-SHAPE
+ℹ be/function.yaml	BE-FUNCTION-7	manual	NEST-COHESIVE-ORCHESTRATION: Whether a wrapper, helper, port or generic owns a meaningful responsibility depe
+ℹ be/function.yaml	BE-FUNCTION-8	architecture	NEST-MODULE-REGISTRATION
+ℹ be/imports.yaml	BE-IMPORTS-1	eslint	NEST-LEGACY-BARREL-GUARD
+ℹ be/imports.yaml	BE-IMPORTS-2	eslint	NEST-TYPE-IMPORT-FORM
+ℹ be/imports.yaml	BE-IMPORTS-3	manual	NEST-IMPORT-ORDER-OBSERVATION: Import order is explicitly observational; selected execution form and ownership 
+ℹ be/imports.yaml	BE-IMPORTS-4	eslint	NEST-LEGACY-BARREL-GUARD
+ℹ be/imports.yaml	BE-IMPORTS-5	manual	NEST-IMPORT-ORDER-OBSERVATION: Import order is explicitly observational; selected execution form and ownership 
+ℹ be/imports.yaml	BE-IMPORTS-6	script	NEST-ENV-CACHE-BOUNDARY -> checks/code-patterns/nest-boundaries.mjs
+ℹ be/imports.yaml	BE-IMPORTS-7	script	NEST-JEST-ALIAS-PARITY -> checks/code-patterns/nest-metadata.mjs
+ℹ be/naming.yaml	BE-NAMING-1	architecture	NEST-FEATURE-FILE-SHAPE
+ℹ be/naming.yaml	BE-NAMING-2	architecture	NEST-FEATURE-FILE-SHAPE
+ℹ be/naming.yaml	BE-NAMING-3	eslint	NEST-LEGACY-EXCEPTION-POLICY-GUARD
+ℹ be/naming.yaml	BE-NAMING-4	architecture	NEST-FEATURE-FILE-SHAPE
+ℹ be/naming.yaml	BE-NAMING-5	eslint	NEST-NAMED-CODE-SHAPE
+ℹ be/naming.yaml	BE-NAMING-6	eslint	NEST-NAMED-CODE-SHAPE
+ℹ be/naming.yaml	BE-NAMING-7	architecture	NEST-CONTRACT-TYPE-FORM
+ℹ be/naming.yaml	BE-NAMING-8	architecture	NEST-FEATURE-FILE-SHAPE
+ℹ be/test.yaml	BE-TEST-1	eslint	NEST-HANDLER-TWIN-COUNT-GUARD
+ℹ be/test.yaml	BE-TEST-2	script	NEST-TEST-CODE-FORM -> checks/code-patterns/nest-tests.mjs
+ℹ be/test.yaml	BE-TEST-3	script	NEST-TEST-CODE-FORM -> checks/code-patterns/nest-tests.mjs
+ℹ be/test.yaml	BE-TEST-4	script	NEST-TEST-CODE-FORM -> checks/code-patterns/nest-tests.mjs
+ℹ be/test.yaml	BE-TEST-5	eslint	NEST-TEST-STATIC-CONTRACT
+ℹ be/test.yaml	BE-TEST-6	script	NEST-TEST-CODE-FORM -> checks/code-patterns/nest-tests.mjs
+ℹ be/test.yaml	BE-TEST-7	eslint	NEST-TEST-STATIC-CONTRACT
+ℹ be/typing.yaml	BE-TYPING-1	architecture	NEST-CONTRACT-TYPE-FORM
+ℹ be/typing.yaml	BE-TYPING-2	architecture	NEST-CONTRACT-TYPE-FORM
+ℹ be/typing.yaml	BE-TYPING-3	architecture	NEST-CONTRACT-TYPE-FORM
+ℹ be/typing.yaml	BE-TYPING-4	architecture	NEST-CONTRACT-TYPE-FORM
+ℹ be/typing.yaml	BE-TYPING-5	eslint	NEST-TYPE-SAFETY
+ℹ be/typing.yaml	BE-TYPING-6	manual	NEST-COHESIVE-ORCHESTRATION: Whether a wrapper, helper, port or generic owns a meaningful responsibility depe
+ℹ be/typing.yaml	BE-TYPING-7	eslint	NEST-PERSISTENCE-SHAPE
+ℹ fe/architecture-check.yaml	rules=5	dedicatedScript=false	manual=false	uncovered=0
+ℹ fe/comment.yaml	rules=5	dedicatedScript=false	manual=true	uncovered=0
+ℹ fe/error.yaml	rules=5	dedicatedScript=true	manual=false	uncovered=0
+ℹ fe/folder.yaml	rules=6	dedicatedScript=false	manual=false	uncovered=0
+ℹ fe/function.yaml	rules=7	dedicatedScript=false	manual=false	uncovered=0
+ℹ fe/imports.yaml	rules=7	dedicatedScript=false	manual=true	uncovered=0
+ℹ fe/index.yaml	rules=0	dedicatedScript=false	manual=index	uncovered=0
+ℹ fe/naming.yaml	rules=7	dedicatedScript=true	manual=false	uncovered=0
+ℹ fe/test.yaml	rules=6	dedicatedScript=true	manual=true	uncovered=0
+ℹ fe/typing.yaml	rules=8	dedicatedScript=true	manual=false	uncovered=0
+ℹ be/architecture-check.yaml	rules=4	dedicatedScript=false	manual=false	uncovered=0
+ℹ be/comment.yaml	rules=7	dedicatedScript=true	manual=false	uncovered=0
+ℹ be/error.yaml	rules=7	dedicatedScript=true	manual=false	uncovered=0
+ℹ be/folder.yaml	rules=7	dedicatedScript=false	manual=false	uncovered=0
+ℹ be/function.yaml	rules=8	dedicatedScript=false	manual=true	uncovered=0
+ℹ be/imports.yaml	rules=7	dedicatedScript=true	manual=true	uncovered=0
+ℹ be/index.yaml	rules=0	dedicatedScript=false	manual=index	uncovered=0
+ℹ be/naming.yaml	rules=8	dedicatedScript=false	manual=false	uncovered=0
+ℹ be/test.yaml	rules=7	dedicatedScript=true	manual=false	uncovered=0
+ℹ be/typing.yaml	rules=7	dedicatedScript=false	manual=true	uncovered=0
+✔ the script-coverage gap is exactly the known set - comment/folder/function/imports/typing records with no dedicated script (15.4231ms)
+✔ every .starciwork record class maps to a schema and a runnable validator (12.7243ms)
+ℹ record	covered	schemas/work.schema.yaml:$defs.node | core/index.mjs:validateWorkspace
+ℹ srs	covered	schemas/work.schema.yaml:$defs.businessSpec, specifications/srs-v3.schema.yaml, specifications/srs-sections.yaml | specifications/validate.mjs:validateSpecification + core/index.mjs:validateWorkspace (SRS_BINDING, SRS_GRAPH)
+ℹ sds	covered	schemas/work.schema.yaml:$defs.architectureSpec, specifications/sds.schema.yaml, specifications/sds-map.yaml | specifications/validate.mjs:validateSpecification + core/index.mjs:validateWorkspace (SDS_BINDING, SDS_MAP)
+ℹ decision	covered	schemas/work.schema.yaml:$defs.businessSpec, specifications/srs-sections.yaml (starci/srs-policy-decision@1) | kernel/decision-inputs.mjs:canonicalDecisionInput + specifications/validate.mjs
+ℹ brand	covered	schemas/work.schema.yaml:$defs.brandSpec | core/index.mjs:validateWorkspace (BRAND_REV)
+ℹ design	covered	schemas/work.schema.yaml:$defs.uiSpec | core/index.mjs:validateWorkspace
+ℹ asset	covered	schemas/work.schema.yaml:$defs.asset, schemas/work.schema.yaml:$defs.nodeAsset | core/index.mjs:validateWorkspace
+ℹ code	external	repository-bound product source (layout repository:**), verified by the operations of its lane, never a .starciwork file
+ℹ grammar	external	grammar:** package files are product-bound; only the authored knowledge side is tree-checked
+ℹ evidence	covered	schemas/work.schema.yaml:$defs.evidence | core/index.mjs:validateWorkspace
+ℹ runtime	embedded	declared, never written as a file: carried inside the operations node record (records.yaml)
+ℹ integration	covered	schemas/work.schema.yaml:$defs.integrationDeclaration | core/index.mjs:validateWorkspace + integration.verify op
+✔ every .stacks env/service file is manifest-referenced or an accounted artifact (8.3254ms)
+✖ every _local/workflows/<id>/ run-state artifact binds a schema and a live writer/validator at a declared path (728.1132ms)
+✖ undeclared writes under _local quarantine the candidate; declared run-state files are housekeeping (702.7995ms)
+✔ every feature record class binds a schema def, a validator and a declared layout path; outside fails with a named code (149.017ms)
+ℹ record	bound	features/<f>/**/index.yaml (work/node@2 canonical) -> $defs.node
+ℹ   outside features/sales/implementation/frontend/rogue/node.yaml	CANONICAL_FORMAT
+ℹ   outside features/sales/implementation/receipt/index.yaml	IMPLEMENTATION_LAYOUT
+ℹ   outside _scratch	RESERVED_DIRECTORY
+ℹ srs	bound	features/<f>/business/srs/** beside business/index.yaml + business/overview/index.yaml -> $defs.businessSpec
+ℹ   outside features/sales/business/srs/rules/index.yaml	SRS_LAYOUT
+ℹ   outside features/sales/business/index.yaml	MODULE_SPEC_OWNER
+ℹ sds	bound	features/<f>/architecture/sds/** beside architecture/index.yaml + overview -> $defs.architectureSpec
+ℹ   outside features/sales/architecture/sds/api/index.yaml	SDS_LAYOUT
+ℹ decision	embedded	no path of its own; rides in SRS records
+ℹ brand	bound	brand/index.yaml at the tree root (product singleton) -> $defs.brandSpec
+ℹ   outside features/sales/brand/index.yaml	LAYOUT
+ℹ design	bound	features/<f>/ui/**/index.yaml -> $defs.uiSpec
+ℹ   outside features/sales/screens/index.yaml	UI_LAYOUT
+ℹ asset	custody	files bound through node assets:; index.yaml under assets/ is not a record and is ignored by design
+ℹ code	external	never a .starciwork file
+ℹ grammar	external	product-bound; the authored knowledge side is tree-checked
+ℹ evidence	bound	<node>/evidence/** node-owned custody -> $defs.evidence
+ℹ   outside features/sales/evidence/index.yaml	LAYOUT
+ℹ runtime	embedded	declared, never written as a file
+ℹ integration	embedded	validated inside the parent node
+ℹ tree	business-overview outside business/overview/	MODULE_SPEC_OWNER
+ℹ tree	uat accounts.yaml without an owning uat node	ACCOUNTS_OWNER
+ℹ tree	node planted inside _resources custody	LAYOUT
+ℹ excluded	node planted inside _local run state	ignored	_local is kernel-owned: Work validation excludes it; op writes there are refused by the candidate freeze above
+ℹ excluded	non-record file at the tree root	ignored	non-index.yaml files are not node records; the validator ignores them rather than failing
+✔ the decoder returns the exact pixels for every filter type, and refuses the formats it cannot read (7.3299ms)
+✔ the dominant colours of a capture are its saturated pixels, bucketed in OKLab (5.4654ms)
+✔ the palette of a capture is the brand tokens, and the primary has to be in it (8.068ms)
+✔ a list of entities inside a card fails, the same list in a section passes, and one item in a card is a card (177.5426ms)
+✔ the tag scanner survives markup a browser survived, and keeps the ancestry the check asks it for (0.3836ms)
+✔ the mascot has a slot exactly where the brand allows it (0.7977ms)
+✔ a run over a ui node reads every candidate, its markup and the mascot slots of every surface (165.4205ms)
+✔ the kernel hook finds the ui node the operation wrote, and answers null when it wrote none (57.8897ms)
+✔ ImageGen directions are not misreported as exact browser render proof (29.1842ms)
+✔ capture classification is structural and cannot be changed by provenance wording (42.6752ms)
+✔ frontend implementation audits real captures from its implementation owner while reading the referenced ui design (25.4979ms)
+✔ the CLI prints one line per check and exits 1 when a check fails or the input is broken (990.7292ms)
+ℹ tests 72
+ℹ suites 0
+ℹ pass 69
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2201.2424
+
+✖ failing tests:
+
+test at tests\grammar-guards.spec.mjs:1:1
+✖ tests\grammar-guards.spec.mjs (149.3869ms)
+  'test failed'
+
+test at tests\pattern-coverage.spec.mjs:261:1
+✖ every _local/workflows/<id>/ run-state artifact binds a schema and a live writer/validator at a declared path (728.1132ms)
+  Error: store-paths-removed:reports
+      at removed (file:///D:/Repositories/starci-academy-backend/.claude/kernel/store.mjs:62:28)
+      at Object.get (file:///D:/Repositories/starci-academy-backend/.claude/kernel/store.mjs:132:14)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/pattern-coverage.spec.mjs:279:38)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests\pattern-coverage.spec.mjs:314:1
+✖ undeclared writes under _local quarantine the candidate; declared run-state files are housekeeping (702.7995ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(frozen.reasons.includes('outside-allowlist:.starciwork/_local/workflows/wfc/rogue.json'))
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/pattern-coverage.spec.mjs:335:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

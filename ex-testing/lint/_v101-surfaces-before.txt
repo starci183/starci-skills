@@ -1,0 +1,37 @@
+SURFACE MAP
+  ecommerce-app-be: 5 http route(s) (1 declared, 4 owned-only); 7 graphql op(s), 7 claimed
+  ecommerce-app-fe: 0 http route(s) (0 declared, 0 owned-only); 6 fe route(s), 4 ui-claimed
+  48 record(s) total; 1 contract http declaration(s), 0 integration endpoint(s), 1 contract graphql declaration(s), 5 ui route claim(s)
+  todo-app-backend: 2 http route(s) (1 declared, 1 owned-only); 27 graphql op(s), 20 claimed; 6 event class(es), 5 emitted, 2 subscriber file(s)
+  todo-app-frontend: 0 http route(s) (0 declared, 0 owned-only); 10 fe route(s), 5 ui-claimed
+  6 work/event record(s) (3 done), 5 emitted, 2 feature(s) declaring subscribes
+  289 record(s) total; 0 contract http declaration(s), 5 integration endpoint(s), 0 contract graphql declaration(s), 7 ui route claim(s)
+
+REFUSE  examples/todo-app-backend/.starciwork/features/audit/ui/privacy/index.yaml: ui.audit.privacy claims route /privacy (as /privacy) but no page.tsx serves it in any bound fe repository - a screen the record says exists that no route reaches [UI_ROUTE_GHOST]
+REFUSE  examples/todo-app-backend/.starciwork/features/recur/ui/schedule/index.yaml: ui.recur.schedule claims route /tasks/:taskId/schedule (as /tasks/:_/schedule) but no page.tsx serves it in any bound fe repository - a screen the record says exists that no route reaches [UI_ROUTE_GHOST]
+SUSPECT examples/ecommerce-app-be/src/features/identity/transport/http/session.controller.ts: POST /internal/sessions/verify served by session.controller.ts is owned by fr.identity.sign-in but declared by no contract or integration endpoint - a wire between features with no record of its shape [UNDECLARED_ROUTE]
+SUSPECT examples/ecommerce-app-be/src/features/identity/transport/http/session.controller.ts: POST /internal/sessions/revoke served by session.controller.ts is owned by fr.identity.sign-in but declared by no contract or integration endpoint - a wire between features with no record of its shape [UNDECLARED_ROUTE]
+SUSPECT examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/index.yaml: ui.identity.sign-in claims route http://localhost:4069/en/account (as /en/account on apps/shop) but no page.tsx serves it in any bound fe repository - a screen the record says exists that no route reaches (record is todo, not done) [UI_ROUTE_GHOST]
+SUSPECT examples/ecommerce-app-fe/apps/shop/src/app/[lang]/account/page.tsx: apps/shop route /account is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/ecommerce-app-fe/apps/shop/src/app/[lang]/page.tsx: apps/shop route / is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/todo-app-backend/src/features/todo/graphql/mutations/plan/downgrade-plan: graphql mutations/plan serves 3 op(s) no record owns or names: downgradePlan, reconcilePayment, upgradePlan - protocol adaptation is thin, but a shipped door should still be explained [UNDECLARED_OPERATION]
+SUSPECT examples/todo-app-backend/src/features/todo/graphql/mutations/share/invite: graphql mutations/share serves 2 op(s) no record owns or names: invite, revokeCollaborator - protocol adaptation is thin, but a shipped door should still be explained [UNDECLARED_OPERATION]
+SUSPECT examples/todo-app-backend/src/features/todo/graphql/queries/plan/plan-usage: graphql queries/plan serves 1 op(s) no record owns or names: planUsage - protocol adaptation is thin, but a shipped door should still be explained [UNDECLARED_OPERATION]
+SUSPECT examples/todo-app-backend/src/features/todo/graphql/queries/share/collaborators: graphql queries/share serves 1 op(s) no record owns or names: collaborators - protocol adaptation is thin, but a shipped door should still be explained [UNDECLARED_OPERATION]
+SUSPECT examples/todo-app-frontend/src/app/[lang]/audit/privacy/page.tsx: route /audit/privacy is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/todo-app-frontend/src/app/[lang]/notify/unsubscribe/page.tsx: route /notify/unsubscribe is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/todo-app-frontend/src/app/[lang]/page.tsx: route / is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/todo-app-frontend/src/app/[lang]/plan/page.tsx: route /plan is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/todo-app-frontend/src/app/[lang]/recur/page.tsx: route /recur is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/todo-app-backend/src/modules/bussiness/notify/notify-event.subscriber.ts: notify's subscribers (notify-event.subscriber.ts) handle event.login.signed-in, but no notify record's subscribes names it [SUBSCRIPTION_UNDECLARED]
+SUSPECT examples/todo-app-backend/src/modules/bussiness/notify/notify-event.subscriber.ts: notify's records subscribe to event.login.new-device-signin, but its subscribers (notify-event.subscriber.ts) never handle it - a declared subscription with no code behind it [SUBSCRIPTION_NOT_WIRED]
+INFO    examples/ecommerce-app-be/src/features/checkout/transport/http/health.controller.ts: GET /health is an ops/probe door - real, but no contract could ever own it [OPS_ROUTE]
+INFO    examples/ecommerce-app-be/src/features/identity/transport/http/health.controller.ts: GET /health is an ops/probe door - real, but no contract could ever own it [OPS_ROUTE]
+INFO    examples/todo-app-backend/.starciwork/features/login/integration/keycloak/index.yaml: integration.login.keycloak endpoint "POST /realms/todo/protocol/openid-connect/token" is not served by any bound repository - expected for the provider's own API; check this entry if the endpoint was meant as an inbound door (webhook/callback) [INTEGRATION_ENDPOINT_REMOTE]
+INFO    examples/todo-app-backend/.starciwork/features/login/integration/keycloak/index.yaml: integration.login.keycloak endpoint "GET /realms/todo/protocol/openid-connect/userinfo" is not served by any bound repository - expected for the provider's own API; check this entry if the endpoint was meant as an inbound door (webhook/callback) [INTEGRATION_ENDPOINT_REMOTE]
+INFO    examples/todo-app-backend/.starciwork/features/plan/integration/sepay/index.yaml: integration.plan.sepay endpoint "POST /userapi/transactions/qr" is not served by any bound repository - expected for the provider's own API; check this entry if the endpoint was meant as an inbound door (webhook/callback) [INTEGRATION_ENDPOINT_REMOTE]
+INFO    examples/todo-app-backend/.starciwork/features/plan/integration/sepay/index.yaml: integration.plan.sepay endpoint "GET /userapi/transactions/details/:id" is not served by any bound repository - expected for the provider's own API; check this entry if the endpoint was meant as an inbound door (webhook/callback) [INTEGRATION_ENDPOINT_REMOTE]
+INFO    examples/todo-app-backend/src/features/todo/http/health/health.controller.ts: GET /health is an ops/probe door - real, but no contract could ever own it [OPS_ROUTE]
+INFO    examples/todo-app-backend/.starciwork/features/login/event/new-device-signin/index.yaml: event.login.new-device-signin maps to event class LoginNewDeviceSigninEvent/NewDeviceSigninEvent, but nothing under src/ publishes it - the record describes an event nothing emits; the record itself says so (todo, blockedBy gap.login.device-field) [EVENT_UNEMITTED]
+
+2 refused, 16 suspect, 8 info

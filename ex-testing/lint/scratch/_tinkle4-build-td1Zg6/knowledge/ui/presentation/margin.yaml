@@ -1,0 +1,223 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.margin
+title: Margin presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: when may an application-owned object push away from its surroundings
+  with an external offset, and how much?
+  Margin is the exception in this system, not the default. A distance between siblings belongs to the
+  parent's gap, and a distance from a boundary to its content belongs to that boundary's padding.
+  Margin is correct only when one object needs an offset that no parent relationship can express, and
+  that reason has a name.
+  Common reflects this: it resets `margin` to `0` on almost every renderer it owns and lets parents own
+  the rhythm. An application that reaches for margin first will produce two owners for one distance,
+  which is `DOUBLE_OWNER`.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The offset is a named application placement exception
+      applicationWrites: The class
+    - name: A component name
+      meaning: Common already sets or resets the margin inside that component
+      applicationWrites: Nothing. Compose it
+    - name: —
+      meaning: Common exposes no public path for this relationship
+      applicationWrites: The class, recorded as a workaround
+  notes: |-
+    Each case names who owns the offset. The owner decides whether the application writes a class at all.
+
+    Writing a class where a component is the owner is `APP_REIMPLEMENTATION`. Adding a child margin next
+    to a parent gap that already expresses the same distance is `DOUBLE_OWNER`.
+scale:
+  steps:
+    - id: MARGIN-0
+      class: m-0
+      value: "0"
+    - id: MARGIN-1
+      class: m-1
+      value: .25rem
+    - id: MARGIN-2
+      class: m-2
+      value: .5rem
+    - id: MARGIN-3
+      class: m-3
+      value: .75rem
+    - id: MARGIN-4
+      class: m-4
+      value: 1rem
+    - id: MARGIN-5
+      class: m-6
+      value: 1.5rem
+    - id: MARGIN-6
+      class: m-8
+      value: 2rem
+  notes: |-
+    `COMMON_SPACING_SCALE` is closed. The rule ID is the ordinal position on that scale. It is not the
+    Tailwind step number, and the two diverge from MARGIN-5 onward.
+
+    Common publishes no margin token. `MARGIN-AUTO` is separate and carries no scale value.
+    The rem values resolve to `0 / 4 / 8 / 12 / 16 / 24 / 32` CSS pixels only at a computed root of
+    `16px`. Runtime checks use `expectedPx = remFactor * observedRootFontPx`.
+componentOwnership:
+  title: Margin Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: Label
+      element: root
+      rule: MARGIN-0
+    - component: MediaFrame
+      element: root
+      rule: MARGIN-0
+    - component: PageContainer
+      element: root
+      rule: MARGIN-AUTO
+    - component: SectionHeader
+      element: title
+      rule: MARGIN-0
+    - component: SurfaceAccordionCard
+      element: accordion trigger wrapper
+      rule: MARGIN-0
+    - component: WorkspaceShell
+      element: header, hasHeader
+      rule: MARGIN-5
+guidance:
+  - id: axis-variants
+    title: Axis variants
+    requirement: |-
+      `mx-*` and `my-*` are not separate rules. They apply an existing rule to one axis when only one axis
+      carries the exception.
+      | Axis | Class | Meaning |
+      | --- | --- | --- |
+      | Inline | `mx-*` | The chosen rule applies to logical start and end only |
+      | Block | `my-*` | The chosen rule applies to block start and end only |
+      On the same element `m-*` and `mx-*` compete for the inline sides rather than adding. Adjacent block
+      margins between siblings collapse, which is a second reason the parent gap is the reliable owner of
+      sibling rhythm.
+rules:
+  - id: MARGIN-0
+    title: "`m-0` / `0`"
+    governs: |-
+      The offset is removed so a parent relationship becomes the single owner of the distance.
+    cases:
+      - id: case-1
+        when: |-
+          A native element brings a default margin that fights the composition
+        owner: "`App`"
+        render: |-
+          `<h2 className="m-0">` inside an app section that owns its gap
+      - id: case-2
+        when: |-
+          Rendered article content whose rhythm is owned by the article
+        owner: "`MarkdownArticle`"
+        render: Compose the article; no margin
+      - id: case-3
+        when: Any Common renderer that already resets its own margin
+        owner: The component
+        render: Compose it; no margin
+    notThisRule: |-
+      erasing a deliberate offset without moving that decision to a real owner leaves the relationship unowned.
+  - id: MARGIN-1
+    title: "`m-1` / `.25rem`"
+    governs: |-
+      The smallest external clearance, for one precisely placed object that must sit just clear of an edge.
+    cases:
+      - id: case-1
+        when: |-
+          An absolutely placed marker that would otherwise touch its containing edge
+        owner: "`App`"
+        render: '`<span className="absolute left-0 top-0 m-1">`'
+    notThisRule: |-
+      repeating it across siblings recreates a gap. Use GAP-1 on the parent.
+  - id: MARGIN-2
+    title: "`m-2` / `.5rem`"
+    governs: A compact offset for one independently placed object.
+    cases:
+      - id: case-1
+        when: |-
+          An overlay caption or control anchored to a corner of an app-owned canvas
+        owner: "`App`"
+        render: '`<aside className="absolute bottom-0 right-0 m-2">`'
+    notThisRule: |-
+      a substitute for container padding or sibling gap. Use PADDING-2 or GAP-2.
+  - id: MARGIN-3
+    title: "`m-3` / `.75rem`"
+    governs: |-
+      A dense but noticeable offset for one named placement exception.
+    cases:
+      - id: case-1
+        when: |-
+          A placed object where `.5rem` reads as cramped against a busy background
+        owner: "`App`"
+        render: '`<aside className="absolute right-0 top-0 m-3">`'
+    notThisRule: repeated items in a list. Use GAP-3 on the parent.
+  - id: MARGIN-4
+    title: "`m-4` / `1rem`"
+    governs: |-
+      The standard external offset for one object with an explicit placement exception.
+    cases:
+      - id: case-1
+        when: |-
+          A standalone object needing equal clearance from an enclosing boundary that cannot own it
+        owner: "`App`"
+        render: '`<aside className="m-4">`'
+      - id: case-2
+        when: The trailing space after a code block inside article content
+        owner: "`FencedCodeBlock`"
+        render: Compose the block; no margin
+      - id: case-3
+        when: The block rhythm around a horizontal rule in article content
+        owner: "`MarkdownArticle`"
+        render: Compose the article; no margin
+    notThisRule: |-
+      combining it with parent padding for the same edge-to-content purpose produces two owners for one distance.
+  - id: MARGIN-5
+    title: "`m-6` / `1.5rem`"
+    governs: |-
+      A large offset that makes one standalone object visibly detached from its containing boundary.
+    cases:
+      - id: case-1
+        when: |-
+          A named exception that must clear a boundary by more than the standard offset
+        owner: "`App`"
+        render: '`<aside className="m-6">`'
+      - id: case-2
+        when: The separation below a workspace header
+        owner: "`WorkspaceShell`"
+        render: Compose the shell; no margin
+    notThisRule: |-
+      separation between substantial siblings. Use GAP-5 on the parent.
+  - id: MARGIN-6
+    title: "`m-8` / `2rem`"
+    governs: |-
+      The largest external clearance, for a deliberately detached object.
+    cases:
+      - id: case-1
+        when: |-
+          One object that must read as separated from everything around it, with a stated reason
+        owner: "`App`"
+        render: '`<aside className="m-8">`'
+    notThisRule: |-
+      general page rhythm, or repetition across siblings. Use GAP-6 on the parent.
+  - id: MARGIN-AUTO
+    title: "`mx-auto`"
+    governs: |-
+      Auto inline margins divide the free inline space and centre a width-constrained container. It carries
+      no scale value and is not an offset decision.
+    cases:
+      - id: case-1
+        when: |-
+          An app-owned container that constrains its own width and must sit centred
+        owner: "`App`"
+        render: '`<main className="mx-auto max-w-3xl">`'
+      - id: case-2
+        when: A page adopting the packaged measure and inset
+        owner: "`PageContainer`"
+        render: Compose the container; it already centres
+    notThisRule: |-
+      a full-width element, or an attempt to distribute space between siblings. Distribution belongs to the parent's layout.
+doesNotDecide: |-
+  Distance between siblings is [Gap](gap.yaml). The distance from a boundary to its content is
+  [Padding](padding.yaml). Width constraints are [Measure](measure.yaml).

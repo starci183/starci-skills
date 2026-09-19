@@ -1,0 +1,164 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.text-flow
+title: Text flow presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: how does text behave inside a region whose size is already decided?
+  Composition has chosen the tree, [Font](font.yaml) has set the rank, and [Measure](measure.yaml) has set
+  the room. Text flow resolves alignment, wrapping, and what happens when the words do not fit.
+  The default is the correct answer far more often than any rule here. Text that starts at the reading
+  edge and wraps naturally needs no class at all.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The text region belongs to the application
+      applicationWrites: The class
+    - name: A component name
+      meaning: Common already resolves this behaviour
+      applicationWrites: Nothing. Compose it
+    - name: —
+      meaning: Common exposes no public path
+      applicationWrites: The class, recorded as a workaround
+  notes: |-
+    Every wrapping region also needs `min-w-0` from [Measure](measure.yaml). Truncation and clamping fail
+    silently without it, because the region never becomes narrower than its longest word.
+componentOwnership:
+  title: Text flow Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: MediaFrame
+      element: caption, caption!=undefined
+      rule: FLOW-3
+    - component: PressableField
+      element: placeholder
+      rule: FLOW-4
+    - component: SectionHeader
+      element: title
+      rule: FLOW-3
+    - component: Sidebar
+      element: item label, not collapsed
+      rule: FLOW-4
+    - component: Subnav
+      element: title
+      rule: FLOW-4
+    - component: Tabs
+      element: hero tabs list container wrapper
+      rule: FLOW-2
+    - component: Tooltip
+      element: content
+      rule: FLOW-2
+topics:
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+catalogNotes: |-
+  Truncation removes information. FLOW-4 and FLOW-5 are valid only when the full text remains reachable
+  somewhere else, and never for a value the reader must act on.
+rules:
+  - id: FLOW-1
+    title: Alignment
+    governs: |-
+      Text starts at the reading edge unless the content itself is a quantity being compared.
+    cases:
+      - id: case-1
+        when: Any prose, label, heading, or explanation
+        owner: "`App`"
+        render: No class. Start alignment is the default
+      - id: case-2
+        when: A numeric column whose values are compared down the column
+        owner: "`App`"
+        render: "`text-end` on the cell, applied to the whole column"
+      - id: case-3
+        when: |-
+          A single short line centred inside a deliberately symmetric region
+        owner: "`App`"
+        render: "`text-center` on the app-owned region only"
+    notThisRule: |-
+      centring paragraphs. A centred block has a ragged start edge, and every line costs the reader a search for where it begins. Justified text is never used, because it opens uneven rivers of space at the widths this system supports.
+  - id: FLOW-2
+    title: Wrapping
+    governs: |-
+      A line wraps by default. Preventing that is a promise the content is short.
+    cases:
+      - id: case-1
+        when: Any content whose length is not fixed
+        owner: "`App`"
+        render: No class. Wrapping is the default
+      - id: case-2
+        when: |-
+          A control label, badge, or tab that must not break mid-phrase
+        owner: The component
+        render: Compose it; Common already keeps it on one line
+      - id: case-3
+        when: Code that must keep its own line breaks
+        owner: "`FencedCodeBlock`"
+        render: Compose the block; it scrolls instead of wrapping
+    notThisRule: |-
+      `whitespace-nowrap` on translated or user-supplied text. A phrase that fits in one language overflows in another, and the overflow appears only after release.
+  - id: FLOW-3
+    title: Breaking inside a word
+    governs: |-
+      A single unbroken string longer than its region breaks rather than escaping it.
+    cases:
+      - id: case-1
+        when: |-
+          Content that can contain a URL, token, identifier, or pasted string
+        owner: "`App`"
+        render: "`break-words` on the app-owned region"
+      - id: case-2
+        when: Section titles, captions, and article prose
+        owner: The component
+        render: Compose it; Common already breaks these
+    notThisRule: |-
+      breaking short labels, which produces a single stranded character on the second line.
+    remark: |-
+      This is the rule that prevents page-level horizontal scrolling. One email address in a narrow column
+      widens every ancestor without it.
+  - id: FLOW-4
+    title: Truncating one line
+    governs: |-
+      One line is cut with an ellipsis because its region has a fixed inline size and the full value is
+      available elsewhere.
+    cases:
+      - id: case-1
+        when: |-
+          A title in a fixed-width strip whose full text is on the destination page
+        owner: "`Subnav`"
+        render: Compose it; Common already truncates
+      - id: case-2
+        when: |-
+          An app-owned row label whose full value is reachable by opening the row
+        owner: "`App`"
+        render: "`truncate` with `min-w-0` on the same element"
+    notThisRule: |-
+      a price, status, error, deadline, or any value the reader acts on. Give the region more room instead.
+    remark: |-
+      The visible text must remain the accessible name in full. A truncated label that also truncates its
+      accessible name removes the value from assistive output entirely.
+  - id: FLOW-5
+    title: Clamping several lines
+    governs: |-
+      A block is cut after a fixed number of lines, and the reader can open the full text.
+    cases:
+      - id: case-1
+        when: |-
+          A card description in a grid whose cards must stay the same height
+        owner: "`—`"
+        render: "`line-clamp-2` with an affordance that reveals the rest"
+      - id: case-2
+        when: A preview whose full body is the destination of the row
+        owner: "`—`"
+        render: Same, with the row as the affordance
+    notThisRule: |-
+      clamping to hide a layout problem. If two cards differ in height because their content differs, that is the content, not a defect.
+    remark: |-
+      A clamp without a way to read the rest is content deletion. The affordance is part of the rule, not a
+      later addition. Common exposes no clamp prop, so both cases stay recorded workarounds.
+doesNotDecide: |-
+  The size and weight of the text is [Font](font.yaml). Its colour is [Tone](tone.yaml). How much room the
+  region gets is [Measure](measure.yaml). Which boundary scrolls is [Overflow](overflow.yaml).

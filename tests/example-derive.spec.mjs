@@ -4,13 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {computeDerived, buildYamlDocument, runDerive} from '../scripts/example-derive.mjs';
-import {checkExampleDerived} from '../scripts/check-example-derived.mjs';
+import {checkExampleDerived} from '../scripts/checks/check-example-derived.mjs';
 import {resolveOwnedDirs, hashOwnedDirs} from '../scripts/example-ownership.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 
 /**
  * One fixture tree per derived field this lane was asked to prove, plus the two refusal gates
- * (scripts/check-example-derived.mjs). Fixtures live on the same drive as the repo, exactly like
+ * (scripts/checks/check-example-derived.mjs). Fixtures live on the same drive as the repo, exactly like
  * tests/example-work-gate.spec.mjs's own fixtures, and for the same reason: os.tmpdir() can be a different
  * drive on this host, which breaks the relative-path handling both scripts rely on.
  */

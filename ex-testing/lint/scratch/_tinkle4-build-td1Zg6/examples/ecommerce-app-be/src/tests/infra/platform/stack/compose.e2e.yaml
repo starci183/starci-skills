@@ -1,0 +1,35 @@
+# Run-owned ephemeral stack for the end-to-end suite (npm run test:e2e).
+#
+# The suite starts and disposes this project itself, on every run, with a project name unique to
+# that run (ec-e2e-<spec-hash>-<run-token>) and host ports allocated from the OS on 127.0.0.1 -
+# a concurrent ecommerce-app-be-dev stack is never touched and never becomes the proof surface.
+#
+# Only postgres + redis live here: the dev stack's identity/order compose entries are placeholder
+# images behind the `app` profile (the canonical dev run drives the APIs on the host), so the suite
+# does the same - E2EStackService spawns both dist/ entrypoints as child processes, identity first,
+# order only after identity's /health answers. The two services share this one database, with
+# disjoint table sets, exactly like the dev topology.
+#
+# Secrets are generated per run and passed through the environment; no plaintext credential sits
+# in this tracked file.
+
+name: ${E2E_COMPOSE_PROJECT}
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${E2E_PG_USER}
+      POSTGRES_PASSWORD: ${E2E_PG_PASSWORD}
+      POSTGRES_DB: ${E2E_PG_DB}
+    ports:
+      - "127.0.0.1:${E2E_PG_PORT}:5432"
+    volumes:
+      - ec-e2e-postgres:/var/lib/postgresql/data
+  redis:
+    image: redis:7
+    ports:
+      - "127.0.0.1:${E2E_REDIS_PORT}:6379"
+
+volumes:
+  ec-e2e-postgres: {}

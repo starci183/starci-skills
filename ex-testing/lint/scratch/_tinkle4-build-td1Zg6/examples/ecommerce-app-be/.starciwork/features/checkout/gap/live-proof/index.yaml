@@ -1,0 +1,31 @@
+schema: work/gap
+id: gap.checkout.live-proof
+title: The order service serves no order-list door, so the place-order walk cannot show the confirmed order listed on the account page
+state: done
+statement: >-
+  Every former absence under this gap is now closed and proven: lane v9-8 ported the run-writer rig
+  to ecommerce-app-fe/uat, lane v9-6 landed the session seam (httpOnly northwind-session via the
+  shop's /api/session door) and fixed the shop-wide SSR 500 (dual next-intl copies -> resolve.modules
+  pin in both next.config.mjs), and lane v9-7 wired browse/cart/checkout/account to the real GraphQL
+  doors (cart, addCartItem, clearCart, placeOrder, account) - the scaffold REST modules are gone.
+  v9-7's runs/20260919T152927Z-5c10a673 then executed the walk end-to-end, passing steps 1-6 outright
+  and failing step 7 on BE_CAPABILITY_MISSING: its wording expected "the confirmed order is listed
+  for this person", and no read door lists a person's orders. v9-10's audit found that wording
+  over-claimed relative to every settled authority: fr.checkout.place-order's own postcondition is
+  "a confirmed person has orders - visible through contract.checkout.order-for-identity", the
+  contract surface is {personId, hasOrders}, fr.identity.account answers personId+email+hasOrders,
+  and no settled record or live door serves a per-order list (the order-history e2e states it
+  outright). The record was repaired at rev 5 to name the claim the product actually carries, the
+  disposable person was namespaced per run so the buyer answer binds this run's own order causally,
+  and the re-run passes step 7 outright. The product still serves no per-order list - that absence
+  remains true and unfabricated - but no accepted record asks for one, so this gap has no claim left
+  to measure. Closed by lane v9-10: uat.checkout.place-order is done on
+  runs/20260919T155312Z-5c10a673 - all seven steps walked, Outcome: pass, every assertion observed at
+  its expected value, screens + video + cleanup verified.
+closedBy: uat.checkout.place-order
+verificationSource: authored-claim
+because: A gap closes through its closer being done, not through its own replayable command;
+  uat.checkout.place-order (this gap's closedBy) carries the real evidence - its evidence.yaml names
+  runs/20260919T155312Z-5c10a673, whose result.md records outcome pass with screens, a playable
+  video and honest cleanup metadata.
+change: {rev: 4, kind: editorial, at: 2026-09-19T15:56:00.000Z, reason: "state flips to done now that the live UAT run this gap gated actually passed the repaired record outright; the statement's history - including the fact that the final absence rested on an over-claimed step wording rather than a promised-but-missing door - is retained rather than deleted."}

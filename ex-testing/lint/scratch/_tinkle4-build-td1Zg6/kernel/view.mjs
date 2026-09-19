@@ -1,0 +1,673 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {listWorkflows,workflowsRoot} from './store.mjs';
+import {integrationProofStatus,readLedgerTree} from './ledger.mjs';
+import {ownerItems,ownerSection} from './owner.mjs';
+import {askFillLine,fillWaitingAsks,inputReadyAsks} from './fill.mjs';
+import {loadRuntimes} from './schedule.mjs';
+import {roleOf} from './graph.mjs';
+
+/**
+ * One truthful status view of a workflow. This is what replaces "go and watch the agents": every number
+ * below is derived from the workflow's own files - `state.json`, `events.jsonl`, `kernel.lock`, `stop.flag`,
+ * `validator/verdicts.jsonl` and the repository's `supervisor.log`. The view never calls Orca, never asks a
+ * model and never writes: it opens no store (the store constructor creates directories), so reading a
+ * workflow can never change one, and a file that does not exist yields an empty or null field instead of an
+ * error - a tree whose kernel has no validator or no lanes still renders a complete page.
+ */
+export const WORKFLOW_VIEW='starci/workflow-view@1';
+export const WORKFLOW_LIST='starci/workflow-list@1';
+/** The rate window. A workflow younger than this is measured over its own life, so a 10 minute old run does not read as idle. */
+export const RATE_WINDOW_MS=3*60*60*1000;
+/** The supervisor has no pid to probe; a round inside this window is the only honest evidence it is polling. */
+export const SUPERVISOR_FRESH_MS=5*60*1000;
+const RECENT_EVENTS=15;
+const MINUTE_MS=60000;
+/** Op statuses that still owe the workflow something; `paused` is live too (it waits for a shared change). */
+const LIVE_OPS=['pending','ready','running','answering','paused'];
+/** Ledger statuses that are finished work: `preexisting` was approved by the user, never verified by a kernel. */
+const DONE_LEDGER=['verified','preexisting'];
+/** Event fields worth one line of a terminal; everything else of an event stays in `events.jsonl`. */
+const LINE_FIELDS=['op','node','runtime','kind','outcome','result','reason','refusal','component','liveness',
+  'iteration','rounds','step','option','signature','restarts','attempt','budget','files','orphans'];
+
+const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+const need=(condition,message)=>{if(!condition)throw Error(message);};
+const required=(value,label)=>{need(typeof value==='string'&&value.trim(),`Missing ${label}`);return value.trim();};
+const readJson=(file,fallback=null)=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}};
+const readLines=file=>{try{return fs.readFileSync(file,'utf8').split('\n').map(line=>line.trim()).filter(Boolean);}catch{return [];}};
+const readJsonLines=file=>readLines(file).map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(plain);
+const minutes=ms=>Number.isFinite(ms)?Math.round(ms/MINUTE_MS):null;
+const at=entry=>Number.isFinite(entry?.at)?entry.at:null;
+const count=(list,key)=>list.reduce((totals,item)=>{const bucket=key(item);if(bucket!==null&&bucket!==undefined)totals[bucket]=(totals[bucket]??0)+1;return totals;},{});
+const unique=list=>[...new Set(list)];
+const per=(total,windowMs)=>windowMs>0?Math.round((total/(windowMs/3600000))*100)/100:null;
+const last=(list,predicate)=>{for(let index=list.length-1;index>=0;index-=1)if(predicate(list[index]))return list[index];return null;};
+
+/** A pid that exists but belongs to another user answers EPERM: the process is alive, we simply may not signal it. */
+function processAlive(pid){
+  if(!Number.isInteger(pid)||pid<=0)return false;
+  try{process.kill(pid,0);return true;}catch(error){return error?.code==='EPERM';}
+}
+
+/**
+ * The lane of a workflow: the worktree it owns alone, its branch, the base both came from and the merge that
+ * took it home. A workflow without a lane (it runs in whatever worktree it was started from) answers null.
+ */
+function readLane(state){
+  const lane=state?.lane;
+  if(!plain(lane))return null;
+  return {name:lane.name??null,worktree:lane.worktree??null,branch:lane.branch??null,
+    base:{worktree:lane.base?.worktree??null,branch:lane.base?.branch??null},
+    merged:plain(lane.merged)?{commit:lane.merged.commit??null,into:lane.merged.into??lane.base?.branch??null}:null,
+    conflict:plain(lane.conflict)?{files:[...(lane.conflict.files??[])]}:null,
+    closed:Boolean(lane.closed)};
+}
+
+export function workflowDir(repoRoot,id){return path.join(workflowsRoot(repoRoot),required(id,'workflow id'));}
+
+/** The feature a ledger item belongs to: a Work node id is `<product>.<feature>.…`, so the first two segments name it. */
+export function featureOf(item){
+  const id=String(item?.nodeId??item?.id??'');
+  const segments=id.split('.').filter(Boolean);
+  if(segments.length>=2)return `${segments[0]}.${segments[1]}`;
+  return item?.module??(segments[0]||'(no feature)');
+}
+
+/** The last supervision round, from the repository's `.starciwork/supervisor.log`, plus what it decided here. */
+function readSupervisor(repoRoot,id,now,dir=null){
+  // The supervisor's log is an audit stream beside the ledger, never state: the record itself is the ledger.
+  const files=[...new Set([path.join(repoRoot,'.starciwork','supervisor.log'),...(dir?[path.join(path.dirname(dir),'supervisor.log')]:[])])];
+  const rounds=files.flatMap(file=>readJsonLines(file)).filter(entry=>entry.event==='supervisor-round').sort((a,b)=>(a.at??0)-(b.at??0));
+  const lastRound=rounds.at(-1)??null;
+  const lastRoundAt=at(lastRound);
+  const mine=last(rounds,entry=>Array.isArray(entry.rounds)&&entry.rounds.some(item=>String(item).startsWith(`${id}:`)));
+  const action=mine?String(mine.rounds.find(item=>String(item).startsWith(`${id}:`))).split(':').slice(1).join(':'):null;
+  const silentMs=lastRoundAt===null?null:now-lastRoundAt;
+  return {lastRoundAt,silentMs,alive:lastRoundAt===null?null:silentMs<SUPERVISOR_FRESH_MS,rounds:rounds.length,lastAction:action};
+}
+
+/**
+ * The verdicts of the Work validator, when the kernel keeps them. The file is the source of truth; without
+ * it the events carry the same story, and without either the section is honestly empty rather than absent.
+ */
+function readValidator(dir,events){
+  const lines=readJsonLines(path.join(dir,'validator','verdicts.jsonl'));
+  const verdict=entry=>String(entry.outcome??entry.verdict??entry.status??'').toLowerCase();
+  if(lines.length){
+    const accepted=lines.filter(entry=>/accept|ok|valid|pass/.test(verdict(entry))).length;
+    const rejected=lines.filter(entry=>/reject|invalid|fail/.test(verdict(entry))).length;
+    const unavailable=lines.filter(entry=>/unavailable|skip|error/.test(verdict(entry))).length;
+    const latest=lines.at(-1);
+    return {source:'verdicts',accepted,rejected,unavailable,
+      lastSummary:String(latest.summary??latest.reason??latest.detail??verdict(latest)??'').slice(0,300)||null,lastAt:at(latest)};
+  }
+  // Only a verdict counts here. `validator-only-block` is a kernel policy event about one operation, not a verdict on the tree.
+  const verdicts=['validated','validator-rejected','validator-unavailable'];
+  const byEvent=count(events,event=>verdicts.includes(event.event)?event.event:null);
+  const latest=last(events,event=>verdicts.includes(event.event));
+  return {source:latest?'events':null,accepted:byEvent.validated??0,rejected:byEvent['validator-rejected']??0,
+    unavailable:byEvent['validator-unavailable']??0,
+    lastSummary:latest?String(latest.summary??latest.note??latest.reason??latest.event).slice(0,300):null,lastAt:at(latest)};
+}
+
+/** The three things a status page may say about an external system, and nothing in between. */
+export const PROOF_WORDS={live:'proven live',fake:'proven against a fake, not live',none:'not proven'};
+
+/**
+ * The integrations the worked tree declares and what each one is actually proven by. The view still opens
+ * no store and runs no validator: `readLedgerTree` is a bounded filesystem read of `state.ledgerRoot`, and
+ * a workflow that names no tree, or a tree that is gone, leaves the section out rather than failing a page
+ * that is otherwise complete.
+ */
+function readIntegrations(state){
+  const root=typeof state?.ledgerRoot==='string'&&state.ledgerRoot.trim()?state.ledgerRoot.trim():null;
+  if(!root)return [];
+  try{
+    const tree=readLedgerTree(root);
+    return tree?integrationProofStatus(tree).map(entry=>({id:entry.id,provider:entry.provider??null,node:entry.node,
+      proven:entry.proven,evidence:entry.evidence.length})):[];
+  }catch{return [];}
+}
+
+/**
+ * The reconciliation of every intake this workflow ran: the last `reconciled` event per op carries the counts of
+ * the three cases, and a `decision` item that names the intake op is a conflict still waiting for the owner. It is
+ * derived from the log and the state alone, so a page can say "one conflict open" without opening the tree.
+ */
+function readReconciliation(state,events){
+  const ops=Array.isArray(state?.ops)?state.ops:[];
+  const last=new Map();
+  for(const event of events)if(event?.event==='reconciled'&&event.op)last.set(event.op,event);
+  const open=Array.isArray(state?.needUser)?state.needUser.filter(item=>item?.kind==='decision'&&item.op):[];
+  return ops.filter(op=>op?.intake?.scope).map(op=>{
+    const event=last.get(op.id);
+    return {op:op.id,scope:op.intake.scope,checked:Boolean(event),reference:event?.reference??0,conflict:event?.conflict??0,new:event?.new??0,
+      open:open.filter(item=>item.op===op.id).map(item=>item.record??'(decision without a record)')};
+  });
+}
+
+/** An owner answer that says the thing is now there: `credential: <X> present`, or `provided: <what>`. */
+const PROVIDED_ANSWER=/(?:^|[\n;.])\s*provided:\s*\S/i;
+const escapeRegExp=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+/**
+ * What only the owner can provide, and how far each one has got. The list itself is the critique's, read once
+ * from the whole product before anything was planned (`state.provisions`); the status is read back off the
+ * `decision.prepare` / `provision.ask` operations the kernel opened - `asked` once one names it, `provided` once its answer says
+ * `credential: <name> present` or `provided: <what>`, `open` until then. Nothing here writes or asks anything:
+ * the operation that needs a provision asks for it in its own tab at the moment it needs it, and nothing else
+ * in the workflow waits for that answer.
+ */
+function readProvisions(state){
+  const provisions=(Array.isArray(state?.provisions)?state.provisions:[]).filter(plain);
+  if(!provisions.length)return [];
+  const asks=(Array.isArray(state?.ops)?state.ops:[]).filter(op=>['decision.prepare','provision.ask','owner.ask'].includes(op?.kind));
+  const answersOf=op=>[typeof op.answer==='string'?op.answer:op.answer?.note??'',
+    ...(Array.isArray(op.reports)?op.reports.map(report=>String(report?.summary??'')):[])].filter(Boolean);
+  const textsOf=op=>[String(op.question?.text??''),String(op.goal??''),...answersOf(op)];
+  return provisions.map(item=>{
+    const name=String(item.name??'');
+    const named=name?asks.filter(op=>textsOf(op).some(text=>text.includes(name))):[];
+    const answers=named.flatMap(answersOf);
+    const present=new RegExp(`credential:\\s*${escapeRegExp(name)}\\s+present`,'i');
+    const provided=answers.some(text=>present.test(text)||PROVIDED_ANSWER.test(text));
+    return {kind:item.kind??null,name,feature:item.feature??null,why:String(item.why??''),
+      status:provided?'provided':named.length?'asked':'open',
+      asks:named.map(op=>op.id),questionKinds:unique(named.map(op=>op.question?.kind).filter(Boolean))};
+  });
+}
+
+/** Lanes are the kernel's optional grouping of nodes; both shapes it may take are read, neither is required. */
+function readLanes(state,statusOf){
+  const lanes=state?.lanes;
+  if(!lanes)return null;
+  const entries=Array.isArray(lanes)
+    ?lanes.map(lane=>[String(lane?.id??lane?.lane??lane?.name??''),lane?.nodes??lane?.ops??lane?.ledgerIds??[]])
+    :Object.entries(lanes).map(([name,lane])=>[name,Array.isArray(lane)?lane:lane?.nodes??lane?.ops??lane?.ledgerIds??[]]);
+  return entries.filter(([name])=>name).map(([name,nodes])=>{
+    const ids=Array.isArray(nodes)?nodes.map(String):[];
+    return {lane:name,done:ids.filter(id=>DONE_LEDGER.includes(statusOf(id))).length,total:ids.length};
+  });
+}
+
+/**
+ * The one view. `now` is injected so a status line is reproducible in a test and so two sections of one
+ * render can never disagree about the time.
+ */
+export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
+  const stamp=typeof now==='function'?now():now;
+  const dir=given?path.resolve(given):workflowDir(repoRoot,id);
+  const state=readJson(path.join(dir,'state.json'));
+  need(plain(state),`No workflow state in ${dir.replaceAll('\\','/')}`);
+  const events=readJsonLines(path.join(dir,'events.jsonl'));
+  const ops=Array.isArray(state.ops)?state.ops:[];
+  const ledger=Array.isArray(state.ledger)?state.ledger:[];
+  const lock=readJson(path.join(dir,'kernel.lock'));
+  const lastEvent=last(events,event=>at(event)!==null);
+  const lastEventAt=at(lastEvent);
+
+  const opStatus=count(ops,op=>op.status??'unknown');
+  const liveness=op=>{
+    const entry=last(events,event=>event.op===op.id
+      ||(Array.isArray(event.liveness)&&op.dispatch&&event.liveness.some(item=>String(item).startsWith(`${op.dispatch}:`))));
+    if(!entry)return null;
+    const word=Array.isArray(entry.liveness)
+      ?String(entry.liveness.find(item=>String(item).startsWith(`${op.dispatch}:`))??'').split(':').slice(1).join(':')||null
+      :typeof entry.liveness==='string'?entry.liveness:entry.event??null;
+    return {at:at(entry),ageMin:minutes(stamp-at(entry)),liveness:word};
+  };
+  const launchedAt=op=>at(last(events,event=>event.event==='launched'&&event.op===op.id));
+  const running=ops.filter(op=>op.status==='running').map(op=>({id:op.id,kind:op.kind??null,runtime:op.runtime??null,
+    ageMin:launchedAt(op)===null?null:minutes(stamp-launchedAt(op)),restarts:op.restarts??0,lastPing:liveness(op)}))
+    .sort((a,b)=>(b.ageMin??-1)-(a.ageMin??-1));
+  const blocked=ops.filter(op=>op.status==='blocked').map(op=>({id:op.id,refusal:op.refusal??op.waitingFor??null}));
+
+  const statusOf=nodeId=>ledger.find(item=>item.id===nodeId||item.nodeId===nodeId)?.status??null;
+  const ledgerStatus=count(ledger,item=>item.status??'unknown');
+  const liveLedgerIds=new Set(ops.filter(op=>LIVE_OPS.includes(op.status)).flatMap(op=>[...(op.ledgerIds??[]),op.nodeId].filter(Boolean)));
+  const features=new Map();
+  for(const item of ledger){
+    const key=featureOf(item);
+    const bucket=features.get(key)??{feature:key,done:0,total:0};
+    bucket.total+=1;
+    if(DONE_LEDGER.includes(item.status))bucket.done+=1;
+    features.set(key,bucket);
+  }
+
+  const firstAt=at(events.find(event=>at(event)!==null));
+  const windowMs=Math.max(Math.min(RATE_WINDOW_MS,firstAt===null?RATE_WINDOW_MS:stamp-firstAt),MINUTE_MS);
+  const inWindow=events.filter(event=>at(event)!==null&&at(event)>=stamp-windowMs);
+  const opsDone=inWindow.filter(event=>event.event==='op-done');
+  const nodesDone=unique(opsDone.map(event=>event.node).filter(Boolean));
+
+  const runtimeIds=unique([...Object.keys(plain(state.quota?.slots)?state.quota.slots:{}),
+    ...Object.keys(plain(state.allocation?.loads)?state.allocation.loads:{}),
+    ...Object.keys(plain(state.allocation?.cooling)?state.allocation.cooling:{}),
+    ...ops.map(op=>op.runtime).filter(Boolean)]);
+  const runtimes=runtimeIds.map(runtime=>{
+    const cool=state.allocation?.cooling?.[runtime];
+    return {id:runtime,running:ops.filter(op=>op.status==='running'&&op.runtime===runtime).length,
+      max:Number.isFinite(state.quota?.slots?.[runtime])?state.quota.slots[runtime]:null,
+      usedToday:state.allocation?.usedToday?.[runtime]??0,
+      cooling:plain(cool)&&Number.isFinite(cool.until)&&cool.until>stamp
+        ?{kind:cool.kind??'other',until:cool.until,minutesLeft:minutes(cool.until-stamp),reason:cool.reason??null}:null};
+  });
+
+  const anomalies=plain(state.anomalies)?state.anomalies:{};
+  const anomalyList=Object.entries(anomalies).map(([signature,entry])=>({signature,count:entry?.count??0,
+    triaged:entry?.triaged?.option??entry?.triaged??null,lastAt:entry?.lastAt??entry?.firstAt??null}))
+    .sort((a,b)=>b.count-a.count);
+  const manager=plain(state.engine?.manager)?state.engine.manager:{};
+  const managerEvent=last(events,event=>['manager-applied','manager-pending','manager-refused','manager-unavailable'].includes(event.event));
+  const meaningful=last(events,event=>['goal','approved','manager-applied','launched','op-relaunched','op-done','accepted-early',
+    'native-attempt-reconciled','failed-launch-stopped-proved','candidate-quarantined','record-blocks-quarantined','op-blocked','stopped','finished'].includes(event.event));
+  const waitEvent=last(events,event=>['candidate-quarantined','record-blocks-quarantined','candidate-reconciliation-required','launch-reconciliation-required',
+    'job-reconciliation-required','op-blocked','shared-change-blocked','preflight-blocked'].includes(event.event))
+    ??last(events,event=>['admission-deferred','allocation-deferred','schedule-deferred'].includes(event.event))
+    ??last(events,event=>['manager-quota-wait','manager-pending','manager-unavailable','manager-refused','manager-no-progress'].includes(event.event));
+  const selected=unique(Object.values(plain(state.engine?.modelSelections)?state.engine.modelSelections:{})
+    .map(entry=>entry?.runtime??entry?.provider).filter(value=>typeof value==='string'));
+  const attested=last(events,event=>['model-attested','worker-attested'].includes(event.event)&&event.role==='decide');
+  const activeWait=waitEvent&&((at(waitEvent)??0)>=(at(meaningful)??0))?waitEvent:null;
+  const coordination={mode:state.engine?.coordination??null,decisionId:manager.lastDecisionId??manager.pendingDecisionId??null,
+    actions:[...(manager.lastActions??managerEvent?.actions??[])].filter(value=>typeof value==='string').slice(0,20),
+    // The accepted manager decision currently persists its bounded action list, but not model prose. Never fill
+    // this field from prompts, terminal previews, or hidden reasoning.
+    rationale:typeof manager.lastRationale==='string'?clip(manager.lastRationale,500):null,
+    wait:activeWait?.reason??activeWait?.detail??activeWait?.code??manager.incident?.reason??(manager.pendingDecisionId?'manager decision is pending':managerEvent?.reason??null),
+    schedulerSelectedModels:selected,attestedActualModel:typeof attested?.runtime==='string'?attested.runtime:typeof attested?.target==='string'?attested.target:null,
+    lastMeaningfulProgress:meaningful?{event:meaningful.event??null,at:at(meaningful),ageMin:at(meaningful)===null?null:minutes(stamp-at(meaningful)),op:meaningful.op??null}:null};
+
+  return {
+    schema:WORKFLOW_VIEW,id:state.id??id,dir,at:stamp,
+    job:state.job??null,branch:state.branch??null,head:state.head??null,worktree:state.worktree??null,
+    lane:readLane(state),
+    ledgerMode:state.ledgerMode??null,iterations:state.iterations??0,approved:Boolean(state.approved),
+    phase:state.phase??null,finished:state.finished??null,stopRequested:fs.existsSync(path.join(dir,'stop.flag')),
+    kernel:{alive:processAlive(lock?.pid),pid:lock?.pid??null,startedAt:lock?.startedAt??null,
+      lastEventAt,lastEvent:lastEvent?.event??null,silentMs:lastEventAt===null?null:stamp-lastEventAt,events:events.length},
+    supervisor:readSupervisor(repoRoot,state.id??id,stamp,dir),
+    coordination,
+    runtimes,
+    ops:{total:ops.length,counts:opStatus,live:ops.filter(op=>LIVE_OPS.includes(op.status)).length,running,blocked},
+    ledger:{total:ledger.length,counts:ledgerStatus,
+      done:DONE_LEDGER.reduce((sum,status)=>sum+(ledgerStatus[status]??0),0),
+      implemented:ledgerStatus.implemented??0,todo:ledgerStatus.planned??0,
+      reviewExhausted:ledgerStatus['review-exhausted']??0,outOfRepository:ledgerStatus['out-of-repository']??0,
+      eligible:ledger.filter(item=>liveLedgerIds.has(item.id)||liveLedgerIds.has(item.nodeId)).length,
+      treeEligible:state.ledgerSummary?.eligible??null,treeTotal:state.ledgerSummary?.total??null,
+      byFeature:[...features.values()].sort((a,b)=>a.feature.localeCompare(b.feature))},
+    lanes:readLanes(state,statusOf),
+    integrations:readIntegrations(state),
+    reconciliation:readReconciliation(state,events),
+    provisions:readProvisions(state),
+    reviews:{rounds:plain(state.verifyRounds)?{...state.verifyRounds}:{},
+      exhausted:unique(events.filter(event=>event.event==='verify-exhausted').map(event=>event.component).filter(Boolean)),
+      findings:Array.isArray(state.reviewFindings)?state.reviewFindings.length:0},
+    validator:readValidator(dir,events),
+    // What the owner has to fill in: one credential per line, each with the exact command that does it. Every
+    // other question is asked in its own tab or taken provisionally, so this list is short by design.
+    ownerInputs:state.ownerInputs??null,
+    inputPreparation:fillWaitingAsks(state).filter(ask=>!ask.credential?.ready).length,
+    ownerFill:inputReadyAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
+      custody:ask.credential?.custody??null,command:ask.fillCommand??null,line:askFillLine(ask)})),
+    needUser:Array.isArray(state.needUser)?state.needUser:[],
+    // The one place the owner looks: every ask tab, every provisional decision and every line that is really
+    // theirs, in one list, each with the command or the tab that settles it. Derived, never stored.
+    owner:ownerItems(state),
+    // Decisions the runtime took on its own recommendation so the work could continue. They are not in "needs
+    // you": nothing is blocked on them, and the workflow may have finished done over them - but the owner is
+    // still owed the question, and a different answer reopens what was built on it.
+    provisional:(Array.isArray(state.provisional)?state.provisional:[]).map(entry=>({decision:entry?.decision??null,
+      op:entry?.op??null,recommended:entry?.recommended??null,options:[...(entry?.options??[])],at:entry?.at??null,
+      answered:entry?.answered??null})),
+    rate:{windowMs,windowHours:Math.round((windowMs/3600000)*100)/100,
+      opsDone:opsDone.length,opsDonePerHour:per(opsDone.length,windowMs),
+      nodesDone:nodesDone.length,nodesDonePerHour:per(nodesDone.length,windowMs)},
+    anomalies:{total:anomalyList.reduce((sum,entry)=>sum+entry.count,0),
+      untriaged:anomalyList.filter(entry=>!entry.triaged).length,signatures:anomalyList},
+    recent:events.slice(-RECENT_EVENTS).map(oneLine)
+  };
+}
+
+const cell=value=>value===null||value===undefined||value===''?'-':String(value).replace(/\s+/g,' ');
+const table=(headers,rows)=>[`| ${headers.join(' | ')} |`,`| ${headers.map(()=>'---').join(' | ')} |`,
+  ...rows.map(row=>`| ${row.map(cell).join(' | ')} |`)].join('\n');
+const short=value=>Array.isArray(value)?`[${value.length}]`:plain(value)?'{...}':String(value).replace(/\s+/g,' ').slice(0,60);
+const clip=(value,max)=>{const text=String(value).replace(/\s+/g,' ');return text.length>max?`${text.slice(0,max)}...`:text;};
+const age=ms=>ms===null||ms===undefined?'-':ms<MINUTE_MS?'<1m':ms<3600000?`${Math.round(ms/MINUTE_MS)}m`:`${Math.round(ms/3600000*10)/10}h`;
+function oneLine(event){
+  const time=Number.isFinite(event.at)?new Date(event.at).toISOString().slice(11,19):'--:--:--';
+  const fields=LINE_FIELDS.filter(key=>event[key]!==undefined&&event[key]!==null).map(key=>`${key}=${short(event[key])}`);
+  return `${time} #${event.seq??'-'} ${event.event??'?'}${fields.length?` ${fields.join(' ')}`:''}`;
+}
+
+/* ------------------------------------------------------------------ event tail */
+
+const ANSI={off:'\x1b[0m',dim:'\x1b[2m',bold:'\x1b[1m',red:'\x1b[31m',green:'\x1b[32m',yellow:'\x1b[33m',magenta:'\x1b[35m',cyan:'\x1b[36m'};
+/** Heartbeat noise a tail hides by default; `--all` asks for it back. */
+export const QUIET_EVENTS=new Set(['tick','owner-list','dependency-alive','wait','stalled-heartbeat','supervisor-round']);
+/**
+ * The colour of an event is the role it plays in the run, read off its name and in this order: red for a
+ * block or failure, magenta for a manager/owner/decision event, yellow for a wait or deferral, green for
+ * accepted and proven work, cyan for a launch, allocation or dispatch. Anything else stays uncoloured.
+ */
+const EVENT_TONE=[
+  [ANSI.red,/blocked|failed|reject|quarantine|error|refus|conflict|drift|exhausted|contradict|missing|inconclusive|dropped/i],
+  [ANSI.magenta,/manager|owner|question|asked|decision|answer|triage|provision|critique|amend/i],
+  [ANSI.yellow,/defer|held|stall|cool|pending|skipped|park|quota|wait|throttle|budget|unavail|reconciliation-required|nudge/i],
+  [ANSI.green,/done|accept|validat|commit|verif|finish|succeed|proved|readmit|adopted|settled|integrat|merged|attest|reconciled|approved|applied/i],
+  [ANSI.cyan,/launch|spawn|op-added|dispatch|start|resum|rebound|admission|allocation|model|task|lease/i]];
+const toneOf=event=>{const name=String(event?.event??'');for(const [tone,re] of EVENT_TONE)if(re.test(name))return tone;return '';};
+/**
+ * One event as one coloured line: the timestamp dimmed, the event name bold in its tone, its fields plain.
+ * `color:false` - or a non-terminal stdout - yields exactly the plain line the status page prints.
+ */
+export function renderEventLine(event,{color=true}={}){
+  const time=Number.isFinite(event.at)?new Date(event.at).toISOString().slice(11,19):'--:--:--';
+  const fields=LINE_FIELDS.filter(key=>event[key]!==undefined&&event[key]!==null).map(key=>`${key}=${short(event[key])}`);
+  const name=String(event.event??'?'),tone=color?toneOf(event):'';
+  const prefix=`${time} #${event.seq??'-'}`;
+  return `${color?ANSI.dim:''}${prefix}${color?ANSI.off:''} ${tone?`${tone}${ANSI.bold}${name}${ANSI.off}`:name}${fields.length?` ${fields.join(' ')}`:''}`;
+}
+/** The workflow's own event log, in order, as parsed objects. */
+export function readWorkflowEvents(dir){return readJsonLines(path.join(dir,'events.jsonl'));}
+/**
+ * The tail: the last `lines` events of the log, heartbeat noise filtered unless `all` asks for it. The colours
+ * make a scan answer "what just happened" at a glance - spawn is cyan, success green, a wait yellow, a block red.
+ */
+export function renderEventTail(events,{color=true,all=false,lines=40}={}){
+  const shown=(all?events:events.filter(event=>!QUIET_EVENTS.has(event?.event))).slice(-lines);
+  return `${shown.map(event=>renderEventLine(event,{color})).join('\n')}\n`;
+}
+
+/* ------------------------------------------------------------------ ops schedule digest */
+
+export const WORKFLOW_OPS='starci/workflow-ops@1';
+/** The allocation events that say why an op sits on its runtime; the last one for the op is the reason printed. */
+const OPS_WHY=['allocation-adaptive','allocation-shared','allocation-budgeted'];
+/** The deferral events that say what holds a waiting op back. */
+const OPS_WAIT=['schedule-deferred','admission-deferred','allocation-deferred','launch-cooling','launch-cap-reached'];
+/** Buckets of the digest: in-flight, queued, fenced and settled. `paused` waits on a shared change, so it queues. */
+const OPS_RUNNING=['running','answering'],OPS_QUEUED=['pending','ready','paused'],OPS_DONE=['done'];
+
+/** The role an operation kind allocates under, resolved the way the allocator resolves it. */
+const opsRole=(kind,profile)=>{try{const role=roleOf(kind);if(typeof role==='string'&&role)return role;}catch{}return profile?.roleOfKind?.[kind]??'implement';};
+/** The model a pool pins for one role (`models[role]`, then its default, then the pool's own), or null when the profile names none. */
+const poolModel=(profile,runtime,role)=>{
+  const pool=plain(profile?.runtimes?.[runtime])?profile.runtimes[runtime]:null;
+  if(!pool)return null;
+  const models=plain(pool.models)?pool.models:{};
+  const named=models[role]??models.default??models['*'];
+  return typeof named==='string'&&named.trim()?named.trim():(typeof pool.model==='string'&&pool.model.trim()?pool.model.trim():null);
+};
+
+/**
+ * The compact schedule digest behind `workflow-ops`: which op runs on which runtime and model and why, what
+ * each waiting op is held by, what each blocked op is blocked on, and how oversized work was split. Every
+ * line is read off the workflow's own `state.json` and `events.jsonl` - a `why`/`waits` text is the last
+ * event that decided it, never a guess - plus the allocator's own runtimes profile for the pinned model.
+ * Like the status page it opens no store and writes nothing; a missing file yields an empty section.
+ */
+export function buildOpsView({dir,now=Date.now(),runtimes=null}={}){
+  const stamp=typeof now==='function'?now():now;
+  const resolved=path.resolve(required(dir,'workflow dir'));
+  const state=readJson(path.join(resolved,'state.json'));
+  need(plain(state),`No workflow state in ${resolved.replaceAll('\\','/')}`);
+  const events=readJsonLines(path.join(resolved,'events.jsonl'));
+  const ops=Array.isArray(state.ops)?state.ops:[];
+  const lock=readJson(path.join(resolved,'kernel.lock'));
+  const profile=runtimes??(()=>{try{return loadRuntimes();}catch{return null;}})();
+  const lastFor=(op,kinds)=>last(events,event=>event.op===op.id&&kinds.includes(event.event));
+
+  // The pool's model for the op's role when the profile resolves it; else the last `model-selected` event's.
+  const modelOf=op=>{
+    if(typeof op.runtime==='string'&&op.runtime){
+      const named=poolModel(profile,op.runtime,opsRole(op.kind,profile));
+      if(named)return named;
+    }
+    const selected=lastFor(op,['model-selected']);
+    const named=selected?.runtime??selected?.model;
+    return typeof named==='string'&&named.trim()?named.trim():null;
+  };
+  // Why the op is where it is: the last allocation event that decided its CURRENT runtime, else the launch itself.
+  const whyOf=op=>{
+    for(let index=events.length-1;index>=0;index-=1){
+      const event=events[index];
+      if(event.op!==op.id||!OPS_WHY.includes(event.event))continue;
+      if(typeof event.runtime==='string'&&event.runtime&&typeof op.runtime==='string'&&op.runtime&&event.runtime!==op.runtime)continue;
+      if(event.event==='allocation-adaptive')return String(event.reason??'').trim()||null;
+      if(event.event==='allocation-shared')return `shared ledger: ${(Array.isArray(event.preferredOver)?event.preferredOver:[]).join(', ')||'the preferred runtime'} carried other work`;
+      return `provider budget: ${(Array.isArray(event.sparedOver)?event.sparedOver:[]).join(', ')||'the other runtimes'} had less window left`;
+    }
+    const launched=lastFor(op,['launched','op-relaunched']);
+    return launched?`launched on ${launched.runtime??op.runtime??'?'}${Number.isFinite(launched.attempt)&&launched.attempt>1?`, attempt ${launched.attempt}`:''}`:null;
+  };
+  // What a queued op waits on: the last deferral event, its resource/holder fields appended when the reason
+  // does not already name them; then the state's own waiting fields; then its bare status word.
+  const waitsOf=op=>{
+    const event=lastFor(op,OPS_WAIT);
+    if(event){
+      const reason=String(event.reason??event.event).trim();
+      const resources=[...(Array.isArray(event.resources)?event.resources:[]),...(typeof event.lease==='string'?[event.lease]:[])].map(String);
+      const holders=[...(Array.isArray(event.clashes)?event.clashes:[]),...(typeof event.holder==='string'?[event.holder]:[])].map(String);
+      const extras=[];
+      if(resources.length&&!resources.some(item=>reason.includes(item)))extras.push(resources.join(', '));
+      if(holders.length&&!holders.some(item=>reason.includes(item)))extras.push(`held by ${holders.join(', ')}`);
+      if(typeof event.parent==='string'&&event.parent&&!reason.includes(event.parent))extras.push(`group ${event.parent}`);
+      return extras.length?`${reason} (${extras.join('; ')})`:reason;
+    }
+    if(typeof op.deferral?.reason==='string'&&op.deferral.reason)return op.deferral.reason;
+    if(typeof op.waitingFor==='string'&&op.waitingFor)return `waiting on ${op.waitingFor}`;
+    if(op.fill)return 'credential custody is not filled yet';
+    return op.status??'waiting';
+  };
+  // What a blocked op is blocked on: the pending reconciliation kind or the refusal, plus its held lease.
+  const blockedOf=op=>{
+    const label=typeof op.pending?.kind==='string'&&op.pending.kind?op.pending.kind
+      :typeof op.refusal==='string'&&op.refusal?op.refusal:'blocked';
+    const qualifiers=[];
+    const detail=typeof op.pending?.detail==='string'?op.pending.detail
+      :Array.isArray(op.pending?.reasons)&&op.pending.reasons.length?String(op.pending.reasons[0])
+      :typeof op.pending?.reason==='string'?op.pending.reason:null;
+    if(detail)qualifiers.push(clip(detail,90));
+    if(plain(op.lease))qualifiers.push('lease held');
+    if(typeof op.waitingFor==='string'&&op.waitingFor)qualifiers.push(`waiting on ${op.waitingFor}`);
+    return `${label}${qualifiers.length?` (${qualifiers.join(', ')})`:''}`;
+  };
+
+  const rowOf=op=>({id:op.id,kind:op.kind??null,runtime:typeof op.runtime==='string'&&op.runtime?op.runtime:null,
+    model:modelOf(op),node:op.nodeId??null});
+  // The op that speaks for a child node: its builder when there is one, else the latest op on the node.
+  const opForNode=nodeId=>{
+    const mine=ops.filter(item=>item.nodeId===nodeId);
+    return mine.find(item=>opsRole(item.kind,profile)==='implement')??mine.at(-1)??null;
+  };
+  // Split groups: node-level cut groups (`state.cuts`, reasoned by the cut op's `cut.reason` or the cut events)
+  // and op-level retry splits (`origin`/`op-created` reason `split of <op>`).
+  const groups=new Map();
+  const note=(parent,label,runtime)=>{const group=groups.get(parent)??{children:[],reason:null};group.children.push({label,runtime:runtime??null});groups.set(parent,group);};
+  for(const [parent,group] of Object.entries(plain(state.cuts)?state.cuts:{}))
+    for(const childId of Array.isArray(group?.children)?group.children:[]){const child=opForNode(childId);note(String(parent),child?.id??String(childId),child?.runtime??null);}
+  for(const op of ops){
+    const fromOrigin=/^split of\s+(\S+)/.exec(String(op.origin??''));
+    const created=lastFor(op,['op-created']);
+    const fromEvent=/^split of\s+(\S+)/.exec(String(created?.reason??''));
+    const parent=fromOrigin?.[1]??fromEvent?.[1];
+    if(parent)note(parent,op.id,op.runtime);
+  }
+  const splits=[...groups.entries()].map(([parent,group])=>{
+    const cutOp=ops.find(item=>plain(item.cut)&&(item.cut.node===parent||item.id===parent));
+    const planned=last(events,event=>['cut-planned','cut-authored'].includes(event.event)&&(event.node===parent||event.op===parent||event.op===cutOp?.id));
+    const decided=last(events,event=>event.event==='decide'&&event.op===parent&&event.option==='split');
+    return {parent,children:group.children,
+      reason:(typeof cutOp?.cut?.reason==='string'&&cutOp.cut.reason)||(typeof planned?.reason==='string'&&planned.reason)
+        ||(typeof decided?.rationale==='string'&&decided.rationale)||null};
+  });
+
+  return {schema:WORKFLOW_OPS,id:state.id??null,dir:resolved,at:stamp,
+    phase:state.phase??null,finished:state.finished??null,
+    generation:Number.isFinite(state.engine?.generation)?state.engine.generation:null,
+    pin:typeof state.engine?.runtimePin?.digest==='string'?state.engine.runtimePin.digest.slice(0,8):null,
+    kernel:{alive:processAlive(lock?.pid),pid:lock?.pid??null},
+    running:ops.filter(op=>OPS_RUNNING.includes(op.status)).map(op=>({...rowOf(op),why:whyOf(op)})),
+    waiting:ops.filter(op=>OPS_QUEUED.includes(op.status)).map(op=>({...rowOf(op),waits:waitsOf(op)})),
+    blocked:ops.filter(op=>![...OPS_RUNNING,...OPS_QUEUED,...OPS_DONE].includes(op.status)).map(op=>({...rowOf(op),blocked:blockedOf(op)})),
+    done:ops.filter(op=>OPS_DONE.includes(op.status)).map(rowOf),
+    splits};
+}
+
+const OPS_TONE={running:ANSI.cyan,waiting:ANSI.yellow,blocked:ANSI.red,done:ANSI.green,split:ANSI.magenta};
+/**
+ * The digest as one terminal page: fixed-width-ish columns, `why`/`waits`/`blocked`/`reason` dimmed, section
+ * names in the same tones the tail uses (cyan running, yellow waiting, red blocked, green done). `color:false`
+ * - or a piped stdout, decided by the caller - yields the plain page.
+ */
+export function renderOpsView(view,{color=true}={}){
+  const paint=(text,tone)=>color&&tone?`${tone}${ANSI.bold}${text}${ANSI.off}`:text;
+  const dim=text=>color?`${ANSI.dim}${text}${ANSI.off}`:text;
+  const fit=(value,width)=>{const text=String(value??'-');return text.length>width?`${text.slice(0,width-1)}…`:text.padEnd(width);};
+  // The model is only printed for the op it currently drives: a queued op's pool is decided at dispatch.
+  const place=(op,withModel)=>op.runtime?`${op.runtime}${withModel&&op.model?` (${op.model})`:''}`:'-';
+  const sections=[['RUNNING',OPS_TONE.running,view.running,op=>op.why?`why: ${op.why}`:null,true],
+    ['WAITING',OPS_TONE.waiting,view.waiting,op=>`waits: ${op.waits}`,false],
+    ['BLOCKED',OPS_TONE.blocked,view.blocked,op=>`blocked: ${op.blocked}`,false],
+    ['DONE',OPS_TONE.done,view.done,()=>null,false]];
+  const all=sections.flatMap(([,,list,,withModel])=>list.map(op=>({op,withModel})));
+  const idW=Math.min(32,Math.max(...all.map(({op})=>String(op.id).length),2))+2;
+  const kindW=Math.min(24,Math.max(...all.map(({op})=>String(op.kind??'-').length),2))+2;
+  const placeW=Math.min(40,Math.max(...all.map(({op,withModel})=>place(op,withModel).length),1))+2;
+  const line=(op,suffix,withModel)=>`  ${fit(op.id,idW)}${fit(op.kind,kindW)}${fit(place(op,withModel),placeW)}${suffix?dim(suffix):''}`.trimEnd();
+  const lines=[paint(`workflow ${view.id??'?'}  phase=${view.phase??'-'}  gen=${view.generation??'-'}  kernel=${view.kernel.alive?'alive':view.kernel.pid?'dead':'none'}  pin=${view.pin??'-'}`,ANSI.bold)];
+  for(const [name,tone,list,suffixOf,withModel] of sections){
+    lines.push(paint(`${name} (${list.length})`,tone));
+    for(const op of list)lines.push(line(op,suffixOf(op),withModel));
+  }
+  if(view.splits.length){
+    lines.push(paint('SPLIT',OPS_TONE.split));
+    for(const split of view.splits)
+      lines.push(`  ${split.parent}  →  ${split.children.map(child=>`${child.label}${child.runtime?` (${child.runtime})`:''}`).join(', ')}${split.reason?`   ${dim(`reason: ${split.reason}`)}`:''}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+/** The terminal page. Plain text with markdown tables: no colour codes, no cursor control, safe in a log. */
+export function renderView(view){
+  const lines=[];
+  const verdict=view.finished?`finished ${view.finished.outcome??'?'}`:view.stopRequested?'stop requested':`phase ${view.phase??'?'}`;
+  lines.push(`# ${view.id} - ${verdict}${view.approved?'':' (not approved)'}`);
+  if(view.job)lines.push(`job        ${clip(view.job,140)}`);
+  lines.push(`kernel     ${view.kernel.alive?`alive pid ${view.kernel.pid}`:view.kernel.pid?`pid ${view.kernel.pid} is gone`:'no kernel process'}, last event ${age(view.kernel.silentMs)} ago${view.kernel.lastEvent?` (${view.kernel.lastEvent})`:''}`);
+  lines.push(`supervisor ${view.supervisor.lastRoundAt===null?'no supervisor log':`last round ${age(view.supervisor.silentMs)} ago${view.supervisor.lastAction?` (${view.supervisor.lastAction})`:''}`}`);
+  lines.push(`ledger     ${view.ledger.done}/${view.ledger.total} done, ${view.ledger.implemented} implemented, ${view.ledger.todo} todo, ${view.ledger.eligible} with a live op${view.ledger.outOfRepository?`, ${view.ledger.outOfRepository} out of repository`:''}`);
+  lines.push(`ops        ${Object.entries(view.ops.counts).map(([status,n])=>`${status} ${n}`).join(', ')||'none'} (${view.ops.total} total)`);
+  lines.push(`rate       ${view.rate.opsDonePerHour??'-'} ops/h, ${view.rate.nodesDonePerHour??'-'} nodes/h over ${view.rate.windowHours}h`);
+  lines.push(`iterations ${view.iterations}${view.head?`, head ${String(view.head).slice(0,12)}`:''}${view.branch?` on ${view.branch}`:''}`);
+  if(view.coordination?.mode){
+    const c=view.coordination;
+    lines.push(`manager    ${c.decisionId??'no decision'}; workflow-selected models ${c.schedulerSelectedModels.join(', ')||'unknown'}; manager attested actual ${c.attestedActualModel??'unknown'}`);
+    if(c.actions.length)lines.push(`actions    ${c.actions.join(', ')}`);
+    lines.push(`rationale  ${c.rationale??'not retained; no hidden reasoning or prompt is exposed'}`);
+    if(c.wait)lines.push(`waiting    ${clip(c.wait,240)}`);
+    if(c.lastMeaningfulProgress)lines.push(`progress   ${c.lastMeaningfulProgress.event??'event'}${c.lastMeaningfulProgress.op?` op ${c.lastMeaningfulProgress.op}`:''}, ${c.lastMeaningfulProgress.ageMin??'?'}m ago`);
+  }
+  if(view.lane)lines.push(`lane       ${view.lane.name} - ${view.lane.worktree??'?'} on ${view.lane.branch??'?'}`
+    +`, base ${view.lane.base.branch??'?'} in ${view.lane.base.worktree??'?'}`
+    +(view.lane.merged?`, merged ${String(view.lane.merged.commit??'').slice(0,12)} into ${view.lane.merged.into}`
+      :view.lane.conflict?`, NOT merged: conflicts in ${view.lane.conflict.files.join(', ')}`:', not merged yet')
+    +(view.lane.closed?', worktree closed':''));
+
+  // First of every section, because it is the answer to "where does it ask me?": what is waiting on the owner
+  // and what to type for each one. The sections below still say more about each kind of item - a `needUser`
+  // line in full, the decision record behind a provisional answer - but a page that had only them is how six
+  // open tabs held a question the owner could not find.
+  lines.push('',...ownerSection(view.owner??[]));
+
+  if(view.runtimes.length){
+    lines.push('','## Runtimes',table(['runtime','running','max','used today','cooling'],
+      view.runtimes.map(runtime=>[runtime.id,runtime.running,runtime.max,runtime.usedToday,
+        runtime.cooling?`${runtime.cooling.kind} ${runtime.cooling.minutesLeft}m left`:null])));
+  }
+  lines.push('',`## Running operations (${view.ops.running.length})`);
+  lines.push(view.ops.running.length?table(['op','kind','runtime','age','restarts','last ping'],
+    view.ops.running.map(op=>[op.id,op.kind,op.runtime,op.ageMin===null?null:`${op.ageMin}m`,op.restarts,
+      op.lastPing?`${op.lastPing.liveness??'seen'} ${op.lastPing.ageMin}m ago`:null])):'nothing is running');
+  if(view.ops.blocked.length)lines.push('',`## Blocked operations (${view.ops.blocked.length})`,
+    ...view.ops.blocked.map(op=>`- ${op.id}: ${op.refusal??'no refusal recorded'}`));
+
+  if(view.ledger.byFeature.length)lines.push('',`## Ledger by feature${view.ledger.treeTotal===null?'':` (tree: ${view.ledger.treeEligible}/${view.ledger.treeTotal} nodes eligible in scope)`}`,
+    table(['feature','done','total'],view.ledger.byFeature.map(entry=>[entry.feature,entry.done,entry.total])));
+  if(view.lanes?.length)lines.push('','## Lanes',table(['lane','done','total'],view.lanes.map(lane=>[lane.lane,lane.done,lane.total])));
+  // One line per declared external system and what the tree may honestly claim about it. An integration
+  // that is only ever faked is printed as such, so a workflow can never read as finished over one.
+  if(view.integrations?.length)lines.push('',`## Integrations (${view.integrations.length})`,
+    ...view.integrations.map(entry=>`- ${entry.id}${entry.provider&&entry.provider!==entry.id?` (${entry.provider})`:''}: `
+      +`${PROOF_WORDS[entry.proven]??entry.proven}${entry.node?'':' - no integration node in the tree'}`));
+
+  // One line per intake: what the kernel counted in its table, and every conflict the owner has not answered.
+  if(view.reconciliation?.length)lines.push('',`## Reconciliation (${view.reconciliation.length})`,
+    ...view.reconciliation.map(entry=>`- ${entry.scope} (${entry.op}): ${entry.checked?`reference ${entry.reference}, conflict ${entry.conflict}, new ${entry.new}`:'not checked yet'}`
+      +(entry.open.length?`; open for the owner: ${entry.open.join(', ')}`:'')));
+
+  // What the owner and nobody else can provide, read once from the whole product and tracked here. Read-only:
+  // the op that needs one asks for it in its own tab when it gets there, and nothing else waits for the answer.
+  if(view.provisions?.length)lines.push('',`## The owner provides (${view.provisions.length})`,
+    table(['kind','name','feature','status','why'],view.provisions.map(entry=>[entry.kind,entry.name,entry.feature,
+      entry.status+(entry.asks.length?` (${entry.asks.join(', ')})`:''),clip(entry.why,80)])));
+
+  const rounds=Object.entries(view.reviews.rounds);
+  if(rounds.length||view.reviews.exhausted.length)lines.push('','## Reviews',
+    table(['group','rounds','exhausted'],rounds.map(([group,n])=>[group,n,view.reviews.exhausted.includes(group)?'yes':'no'])));
+  lines.push('',`## Validator  accepted ${view.validator.accepted}, rejected ${view.validator.rejected}, unavailable ${view.validator.unavailable}${view.validator.source?` (from ${view.validator.source})`:' (no verdicts recorded)'}`);
+  if(view.validator.lastSummary)lines.push(`last: ${view.validator.lastSummary}`);
+
+  // One line, one command. A question for the owner is a prompt they answer, not a command they compose: this
+  // is the exact line to copy, and the kernel settles the ask itself once the custody holds every variable.
+  if(view.ownerFill?.length)lines.push('',`## Owner (${view.ownerFill.length})`,
+    ...view.ownerFill.map(entry=>`- ${entry.line}`));
+  if(view.inputPreparation)lines.push('',`The workflow is researching and preparing ${view.inputPreparation} integration input request(s); no owner input is needed for those yet.`);
+  lines.push('',`## Needs you (${view.needUser.length})`);
+  lines.push(view.needUser.length?view.needUser.map(item=>`- ${item.kind??'item'}${item.node?` ${item.node}`:item.op?` ${item.op}`:''}: ${clip(item.detail??'',200)}`).join('\n'):'nothing is waiting on you');
+  // Separate from "needs you" on purpose: nothing waits on these, and a workflow that finished done may still
+  // owe the owner every one of them.
+  const open=(view.provisional??[]).filter(entry=>!entry.answered);
+  if(open.length)lines.push('',`## Provisional decisions (${open.length})`,
+    ...open.map(entry=>`- ${entry.decision}: the runtime took option ${entry.recommended}`
+      +`${entry.options?.[entry.recommended-1]?` - ${clip(entry.options[entry.recommended-1],120)}`:''}`
+      +` and carried on. Answer with \`starci workflow-answer --id ${view.id} --op ${entry.op} --choice <n> [--note "..."]\`;`
+      +` a different option reopens what was built on it.`));
+  if(view.anomalies.signatures.length)lines.push('',`## Anomalies (${view.anomalies.total} in ${view.anomalies.signatures.length} signatures, ${view.anomalies.untriaged} untriaged)`,
+    table(['signature','count','triaged'],view.anomalies.signatures.map(entry=>[entry.signature,entry.count,entry.triaged])));
+  lines.push('',`## Recent events (${view.recent.length})`,...(view.recent.length?view.recent:['no events']));
+  return `${lines.join('\n')}\n`;
+}
+
+export function renderJson(view){return `${JSON.stringify(view,null,2)}\n`;}
+
+/** One row per workflow of the repository: enough to pick the one to open, never enough to guess at. */
+export function buildList({repoRoot,now=Date.now()}){
+  const stamp=typeof now==='function'?now():now;
+  return listWorkflows(repoRoot).map(entry=>{
+    const state=entry.state;
+    const ops=Array.isArray(state?.ops)?state.ops:[];
+    // §8: the last event, the kernel lock and the stop request are ledger rows the lister already read;
+    // there is no workflow directory left to stat for them.
+    const lastEventAt=at(entry.lastEvent);
+    const lane=readLane(state);
+    return {id:entry.id,phase:state?.finished?'finished':state?.phase??'unknown',
+      approved:Boolean(state?.approved),finished:state?.finished?.outcome??null,
+      lane:lane?{name:lane.name,branch:lane.branch,base:lane.base.branch,merged:lane.merged?.commit??null,closed:lane.closed}:null,
+      opsDone:ops.filter(op=>op.status==='done').length,opsTotal:ops.length,
+      kernelAlive:processAlive(entry.kernelPid),pid:entry.kernelPid??null,
+      stopRequested:entry.stopRequested===true,
+      lastEventAt,lastEventAgeMs:lastEventAt===null?null:stamp-lastEventAt};
+  });
+}
+
+export function renderList(list){
+  if(!list.length)return 'no workflows in this repository\n';
+  return `${table(['workflow','phase','lane','ops','kernel','last event'],list.map(entry=>[entry.id,
+    entry.finished?`finished ${entry.finished}`:entry.stopRequested?`${entry.phase} (stop)`:entry.approved?entry.phase:`${entry.phase} (not approved)`,
+    entry.lane?`${entry.lane.name} -> ${entry.lane.base??'?'}${entry.lane.merged?' merged':''}${entry.lane.closed?' closed':''}`:null,
+    `${entry.opsDone}/${entry.opsTotal}`,entry.kernelAlive?`alive ${entry.pid}`:'-',age(entry.lastEventAgeMs)]))}\n`;
+}

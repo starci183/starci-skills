@@ -1,0 +1,61 @@
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +45ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPlatformEventsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTodoGraphqlModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +13ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mKeycloakModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mSepayModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mNotifySmtpModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mNotifyQueueModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPostgresqlPrimaryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mSignInSingleMutationModule dependencies initialized[39m[38;5;3m +14ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mSignOutSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mSepayWebhookModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHealthModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCqrsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mGraphQLSchemaBuilderModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:54 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mGraphQLModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTypeOrmCoreModule dependencies initialized[39m[38;5;3m +1659ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mSessionModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTaskModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mShareModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mListTasksSingleQueryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTaskCountsSingleQueryModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCollaboratorsSingleQueryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUpcomingOccurrencesSingleQueryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mNotificationPreferencesSingleQueryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuditLogSingleQueryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mExportMyDataSingleQueryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPlanUsageSingleQueryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCreateTaskSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCompleteTaskSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mReopenTaskSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDeleteTaskSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mInviteSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAcceptInvitationSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRevokeCollaboratorSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mMakeRecurringSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mEditRecurrenceSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mEndRecurrenceSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUpdateNotificationPreferencesSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUnsubscribeSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRequestErasureSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mCompleteErasureSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUpgradePlanSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDowngradePlanSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mReconcilePaymentSingleMutationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mNotifyModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRecurModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPlanModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:56 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuditModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:57 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mHealthController {/health}:[39m[38;5;3m +1084ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:57 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/health, GET} route[39m[38;5;3m +19ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:57 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mSepayWebhookController {/webhooks/sepay}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:57 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/webhooks/sepay, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:58 PM [32m    LOG[39m [38;5;3m[GraphQLModule] [39m[32mMapped {/graphql, POST} route[39m[38;5;3m +1378ms[39m
+[32m[Nest] 90004  - [39m09/19/2026, 6:47:59 PM [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +56ms[39m
+^C

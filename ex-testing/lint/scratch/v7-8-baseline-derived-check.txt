@@ -1,0 +1,3 @@
+REFUSED D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\.starciwork/_derived/index.yaml is missing or stale; run `node scripts/example-derive.mjs --work D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\.starciwork --write` to refresh it
+REFUSED D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\.starciwork/_derived/critique.yaml or critique.md is missing or stale; run `node scripts/example-critique.mjs --work D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\.starciwork --write` to refresh them
+2 work tree(s) checked: 2 refused

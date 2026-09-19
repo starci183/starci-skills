@@ -1,0 +1,230 @@
+schema: starci/uat-run-manifest@1
+id: uat.identity.sign-in.runs.20260919T151633Z-5c10a673
+nodeId: uat.identity.sign-in
+inputDigest: 3dae04f43b2b6515fe818d36c280f114fe0ceb767eb07623fbb745a5104d770a
+outcome: pass
+assertions:
+  - id: loading
+    expected: yes
+    observed: yes
+    note: The register submit relabelled to "Registering…" and disabled itself while the request was in
+      flight (SessionForm working state).
+  - id: completion
+    expected: yes
+    observed: yes
+    note: After one POST /api/session (mode=register), the account page re-rendered server-side and
+      shows "Signed in as uat-person-20260919t151633z-5c10a673@ecommerce.dev." with the Sign out
+      action - the registered pair signed the person in.
+  - id: fr.identity.sign-in
+    expected: yes
+    observed: yes
+    note: Register ran the identity register door then signIn behind it; the opaque bearer landed in the
+      httpOnly northwind-session cookie and the server render verified it to this person.
+  - id: errorFeedback
+    expected: yes
+    observed: yes
+    note: 'The wrong pair was refused with HTTP 401 (INVALID_CREDENTIALS) and the form rendered one
+      role="alert" line: "That email and password did not open a session.".'
+  - id: br.identity.sign-in
+    expected: yes
+    observed: yes
+    note: Wrong-password-on-known-email and any-password-on-unknown-email both answered 401
+      INVALID_CREDENTIALS and rendered the identical refusal "That email and password did not open a
+      session." - indistinguishable, naming neither half
+      (ac.identity.sign-in.wrong-pair-is-refused-alike).
+  - id: validation
+    expected: yes
+    observed: yes
+    note: With the password empty the submit stayed disabled; Enter and a forced click produced zero
+      POST /api/session calls - refused before the credential check, exactly as
+      fr.identity.sign-in's exception flow states.
+  - id: errorFeedback
+    expected: yes
+    observed: yes
+    note: Re-registering uat-person-20260919t151633z-5c10a673@ecommerce.dev answered 409 EMAIL_TAKEN and
+      the form rendered the conflict refusal "That email already has an account — sign in instead.".
+assets:
+  - path: screens/register-pair.png
+    sha256: ff54e697a294ae4fd09659e5cb39ffb38f0b7658ca95e7c14f429c42f92aac62
+    size: 34628
+  - path: screens/wrong-pair-uniform-refusal.png
+    sha256: e359c84ef7ba0d4aeadfd6fc89f88494e29ce9b2c7dceb67081f2426a1a5c4b4
+    size: 70226
+  - path: screens/missing-half-refused.png
+    sha256: f3e1c406541070deb6206c7d5f830acfdef4be68fa0e75ed3c4b5b9b7e8898e0
+    size: 69866
+  - path: screens/screenshot.png
+    sha256: 0073fd502c22188ec965f2b56bc3198a7ba4ce6fa5e0daf81ed46ab820840a8f
+    size: 71800
+  - path: videos/sign-in.webm
+    sha256: f91acd45e29500645159f93202a347bc934cb96092cf8748e14f852eddeae9bb
+    size: 387831
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:4069
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.identity.sign-in
+    ownedResourcesCreated:
+      - kind: session
+        id: session-1
+        note: "Session issued by signIn; the bearer value is withheld from evidence (it is a live
+          credential). Cookie northwind-session present: true."
+      - kind: person
+        id: uat-person-20260919t151633z-5c10a673@ecommerce.dev
+        note: "Disposable person row registered through the shop form (mode=register → identity register +
+          signIn). The record declares cleanup: none - the product exposes no account deletion, so
+          this row stays in the demo store."
+    ownedResourcesDeleted:
+      - kind: session
+        id: session-1
+        note: Revoked by the product sign-out (DELETE /api/session → internal/sessions/revoke).
+    verifiedAbsent:
+      - kind: session
+        id: session-1
+        note: Correctly-headed verify-door read-back after sign-out answered SESSION_INVALID (401).
+    note: Unresolved owned resource(s) remain - see ownedResourcesCreated vs
+      ownedResourcesDeleted/verifiedAbsent.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.identity.sign-in
+      title: Register a pair, be refused alike on a wrong one, sign in
+      steps:
+        - order: 1
+          actor: person
+          action: Register a new email and password pair for the disposable person.
+          expected: the account page shows that person signed in
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: person
+          action: Submit the registered email with a wrong password.
+          expected: a single uniform refusal shows; nothing names which half was wrong
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 3
+          actor: person
+          action: Submit the sign-in form with the password left empty.
+          expected: the submit is refused before any credential check runs
+          checks:
+            - id: validation
+              expected: yes
+        - order: 4
+          actor: person
+          action: Register the same email again with a different password.
+          expected: a conflict refusal shows; the first pair still signs in
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 5
+          actor: person
+          action: Sign in with the registered pair a second time.
+          expected: a session issues again and the account page keeps showing the same person
+          checks:
+            - id: completion
+              expected: yes
+      proves:
+        - fr.identity.sign-in
+        - br.identity.sign-in
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.identity.sign-in
+    checked:
+      - loading
+      - completion
+      - fr.identity.sign-in
+      - errorFeedback
+      - br.identity.sign-in
+      - validation
+      - errorFeedback
+    notRun: []
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T151633Z-5c10a673
+    flow: uat.identity.sign-in
+    started: 2026-09-19T15:16:34.456Z
+    finished: 2026-09-19T15:16:44.528Z
+    accountsDeclared:
+      - role: person
+        username: uat-person@ecommerce.dev
+    reused: []
+    created:
+      - kind: session
+        id: session-1
+        note: "Session issued by signIn; the bearer value is withheld from evidence (it is a live
+          credential). Cookie northwind-session present: true."
+      - kind: person
+        id: uat-person-20260919t151633z-5c10a673@ecommerce.dev
+        note: "Disposable person row registered through the shop form (mode=register → identity register +
+          signIn). The record declares cleanup: none - the product exposes no account deletion, so
+          this row stays in the demo store."
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.identity.sign-in
+    checks:
+      - id: loading
+        expected: yes
+        observed: yes
+        note: The register submit relabelled to "Registering…" and disabled itself while the request was in
+          flight (SessionForm working state).
+      - id: completion
+        expected: yes
+        observed: yes
+        note: After one POST /api/session (mode=register), the account page re-rendered server-side and
+          shows "Signed in as uat-person-20260919t151633z-5c10a673@ecommerce.dev." with the Sign out
+          action - the registered pair signed the person in.
+      - id: fr.identity.sign-in
+        expected: yes
+        observed: yes
+        note: Register ran the identity register door then signIn behind it; the opaque bearer landed in the
+          httpOnly northwind-session cookie and the server render verified it to this person.
+      - id: errorFeedback
+        expected: yes
+        observed: yes
+        note: 'The wrong pair was refused with HTTP 401 (INVALID_CREDENTIALS) and the form rendered one
+          role="alert" line: "That email and password did not open a session.".'
+      - id: br.identity.sign-in
+        expected: yes
+        observed: yes
+        note: Wrong-password-on-known-email and any-password-on-unknown-email both answered 401
+          INVALID_CREDENTIALS and rendered the identical refusal "That email and password did not
+          open a session." - indistinguishable, naming neither half
+          (ac.identity.sign-in.wrong-pair-is-refused-alike).
+      - id: validation
+        expected: yes
+        observed: yes
+        note: With the password empty the submit stayed disabled; Enter and a forced click produced zero
+          POST /api/session calls - refused before the credential check, exactly as
+          fr.identity.sign-in's exception flow states.
+      - id: errorFeedback
+        expected: yes
+        observed: yes
+        note: Re-registering uat-person-20260919t151633z-5c10a673@ecommerce.dev answered 409 EMAIL_TAKEN and
+          the form rendered the conflict refusal "That email already has an account — sign in
+          instead.".
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.identity.sign-in
+    steps:
+      - step: register-pair
+        startedAt: 2026-09-19T15:16:35.407Z
+        endedAt: 2026-09-19T15:16:37.494Z
+        screenshot: register-pair
+      - step: wrong-pair-uniform-refusal
+        startedAt: 2026-09-19T15:16:37.539Z
+        endedAt: 2026-09-19T15:16:38.152Z
+        screenshot: wrong-pair-uniform-refusal
+      - step: missing-half-refused
+        startedAt: 2026-09-19T15:16:38.229Z
+        endedAt: 2026-09-19T15:16:38.850Z
+        screenshot: missing-half-refused

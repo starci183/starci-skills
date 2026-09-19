@@ -19,5 +19,22 @@ export default defineConfig({
     include: ['src/**/*.spec.{ts,tsx}'],
     setupFiles: ['./vitest.setup.ts'],
     globals: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'json-summary'],
+      reportsDirectory: 'coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.spec.{ts,tsx}',
+        'src/**/*.test.{ts,tsx}',
+        'src/**/*.d.ts',
+        // The journey specs' own harness: test scaffolding rather than product source, so it must be
+        // read and run without being measured as if a reader could ship it in an app bundle.
+        'src/testing/**',
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/.next/**',
+      ],
+    },
   },
 });

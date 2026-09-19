@@ -1,7 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.checkout.place-order.becomes-a-buyer
-rule: br.checkout.place-order
-given: A person who has just confirmed an order through the checkout
-when: identity is asked, over its own HTTP surface, whether that person has orders
-then:
-  - The answer is yes, read live from the order service - never inferred from anything shared.

@@ -1,0 +1,304 @@
+✖ entry rebuilds absent, corrupt and stale JSON, and reuses a current build (0.914ms)
+✖ invalid source fails instead of claiming the old build is ready (0.0471ms)
+✖ compiled dist is JSON contracts plus mirrored runtime modules; entry requires freshness before selection (0.0284ms)
+✖ fresh compiled architecture CLI contains its complete internal module closure (0.0238ms)
+✖ invalid typed operator policy cannot pass build (0.0352ms)
+✖ ensure-build CLI never reports deferred knowledge success (0.024ms)
+✖ actual npm tarball installs a runnable compiled command without development dependencies (1017.3411ms)
+ℹ real npm pack + npm install on purpose: only a real install can prove no dev dependency or ERR_MODULE_NOT_FOUND leaks through; there is one scenario here, nothing to merge or fake
+✖ public starci CLI installs the host separately from project metadata and refuses overwrites (0.6269ms)
+✖ storage reports legacy and mixed names read-only and init cannot create parallel Work (0.0888ms)
+✖ retired temp destination is refused and split-storage bootstraps upgrade without losing user text (0.0608ms)
+✖ workspace init preserves a Plan saved before metadata exists and refuses other existing content (0.058ms)
+✖ storage does not follow backend or storage symlinks (0.0786ms)
+✖ state follows the explicit root, never the presence of a competing tree or a digest rewrite (0.0548ms)
+✖ update migrates known pre-rename bootstraps and preserves custom instructions and product bytes (0.0532ms)
+✔ no spec builds its fixture inside the runtime tree (27.0242ms)
+✔ the runtime tree carries no fixture leftovers (0.5934ms)
+✔ the runtime directory is refused as a Work root (6.3034ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 3
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 259005.6577
+
+✖ failing tests:
+
+test at tests\build-entry.spec.mjs:26:1
+✖ entry rebuilds absent, corrupt and stale JSON, and reuses a current build (0.914ms)
+  AssertionError [ERR_ASSERTION]: Runtime payload is missing static dependency hosts/headless/host.mjs -> ../../model/index.mjs (model/index.mjs). Add its owned module to the runtime inventory.
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:20:10)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33)
+      at node:internal/test_runner/harness:397:12
+      at file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:16:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\build-entry.spec.mjs:30:1
+✖ invalid source fails instead of claiming the old build is ready (0.0471ms)
+  AssertionError [ERR_ASSERTION]: Runtime payload is missing static dependency hosts/headless/host.mjs -> ../../model/index.mjs (model/index.mjs). Add its owned module to the runtime inventory.
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:20:10)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33)
+      at node:internal/test_runner/harness:397:12
+      at file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:16:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\build-entry.spec.mjs:31:1
+✖ compiled dist is JSON contracts plus mirrored runtime modules; entry requires freshness before selection (0.0284ms)
+  AssertionError [ERR_ASSERTION]: Runtime payload is missing static dependency hosts/headless/host.mjs -> ../../model/index.mjs (model/index.mjs). Add its owned module to the runtime inventory.
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:20:10)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33)
+      at node:internal/test_runner/harness:397:12
+      at file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:16:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\build-entry.spec.mjs:47:1
+✖ fresh compiled architecture CLI contains its complete internal module closure (0.0238ms)
+  AssertionError [ERR_ASSERTION]: Runtime payload is missing static dependency hosts/headless/host.mjs -> ../../model/index.mjs (model/index.mjs). Add its owned module to the runtime inventory.
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:20:10)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33)
+      at node:internal/test_runner/harness:397:12
+      at file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:16:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\build-entry.spec.mjs:59:1
+✖ invalid typed operator policy cannot pass build (0.0352ms)
+  AssertionError [ERR_ASSERTION]: Runtime payload is missing static dependency hosts/headless/host.mjs -> ../../model/index.mjs (model/index.mjs). Add its owned module to the runtime inventory.
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:20:10)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33)
+      at node:internal/test_runner/harness:397:12
+      at file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:16:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\build-entry.spec.mjs:60:1
+✖ ensure-build CLI never reports deferred knowledge success (0.024ms)
+  AssertionError [ERR_ASSERTION]: Runtime payload is missing static dependency hosts/headless/host.mjs -> ../../model/index.mjs (model/index.mjs). Add its owned module to the runtime inventory.
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:20:10)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33)
+      at node:internal/test_runner/harness:397:12
+      at file:///D:/Repositories/starci-academy-backend/.claude/tests/build-entry.spec.mjs:16:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\npm-package.spec.mjs:17:1
+✖ actual npm tarball installs a runnable compiled command without development dependencies (1017.3411ms)
+  Error: Runtime reference cannot be a symlink: D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity
+      at visit (file:///D:/Repositories/starci-academy-backend/.claude/scripts/build-workflows.mjs:162:41)
+      at visit (file:///D:/Repositories/starci-academy-backend/.claude/scripts/build-workflows.mjs:186:32)
+      at visit (file:///D:/Repositories/starci-academy-backend/.claude/scripts/build-workflows.mjs:186:32)
+      at visit (file:///D:/Repositories/starci-academy-backend/.claude/scripts/build-workflows.mjs:186:32)
+      at buildFiles (file:///D:/Repositories/starci-academy-backend/.claude/scripts/build-workflows.mjs:194:5)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/npm-package.spec.mjs:29:31)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+
+test at tests\public-package.spec.mjs:25:1
+✖ public starci CLI installs the host separately from project metadata and refuses overwrites (0.6269ms)
+  Error: Recursive option not enabled, cannot copy a directory: \\?\D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity\
+      at cpSyncFn (node:internal/fs/cp/cp-sync:56:13)
+      at cpSync (node:fs:3123:3)
+      at copyPayload (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:189:5)
+      at init (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:422:3)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/public-package.spec.mjs:18:84)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33) {
+    code: 'ERR_FS_EISDIR'
+  }
+
+test at tests\public-package.spec.mjs:39:1
+✖ storage reports legacy and mixed names read-only and init cannot create parallel Work (0.0888ms)
+  Error: Recursive option not enabled, cannot copy a directory: \\?\D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity\
+      at cpSyncFn (node:internal/fs/cp/cp-sync:56:13)
+      at cpSync (node:fs:3123:3)
+      at copyPayload (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:189:5)
+      at init (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:422:3)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/public-package.spec.mjs:18:84)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33) {
+    code: 'ERR_FS_EISDIR'
+  }
+
+test at tests\public-package.spec.mjs:53:1
+✖ retired temp destination is refused and split-storage bootstraps upgrade without losing user text (0.0608ms)
+  Error: Recursive option not enabled, cannot copy a directory: \\?\D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity\
+      at cpSyncFn (node:internal/fs/cp/cp-sync:56:13)
+      at cpSync (node:fs:3123:3)
+      at copyPayload (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:189:5)
+      at init (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:422:3)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/public-package.spec.mjs:18:84)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33) {
+    code: 'ERR_FS_EISDIR'
+  }
+
+test at tests\public-package.spec.mjs:78:1
+✖ workspace init preserves a Plan saved before metadata exists and refuses other existing content (0.058ms)
+  Error: Recursive option not enabled, cannot copy a directory: \\?\D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity\
+      at cpSyncFn (node:internal/fs/cp/cp-sync:56:13)
+      at cpSync (node:fs:3123:3)
+      at copyPayload (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:189:5)
+      at init (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:422:3)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/public-package.spec.mjs:18:84)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33) {
+    code: 'ERR_FS_EISDIR'
+  }
+
+test at tests\public-package.spec.mjs:90:1
+✖ storage does not follow backend or storage symlinks (0.0786ms)
+  Error: Recursive option not enabled, cannot copy a directory: \\?\D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity\
+      at cpSyncFn (node:internal/fs/cp/cp-sync:56:13)
+      at cpSync (node:fs:3123:3)
+      at copyPayload (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:189:5)
+      at init (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:422:3)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/public-package.spec.mjs:18:84)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33) {
+    code: 'ERR_FS_EISDIR'
+  }
+
+test at tests\public-package.spec.mjs:99:1
+✖ state follows the explicit root, never the presence of a competing tree or a digest rewrite (0.0548ms)
+  Error: Recursive option not enabled, cannot copy a directory: \\?\D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity\
+      at cpSyncFn (node:internal/fs/cp/cp-sync:56:13)
+      at cpSync (node:fs:3123:3)
+      at copyPayload (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:189:5)
+      at init (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:422:3)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/public-package.spec.mjs:18:84)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33) {
+    code: 'ERR_FS_EISDIR'
+  }
+
+test at tests\public-package.spec.mjs:117:1
+✖ update migrates known pre-rename bootstraps and preserves custom instructions and product bytes (0.0532ms)
+  Error: Recursive option not enabled, cannot copy a directory: \\?\D:\Repositories\starci-academy-backend\.claude\examples\ecommerce-app-be\node_modules\@ecommerce-app-be\identity\
+      at cpSyncFn (node:internal/fs/cp/cp-sync:56:13)
+      at cpSync (node:fs:3123:3)
+      at copyPayload (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:189:5)
+      at init (file:///D:/Repositories/starci-academy-backend/.claude/bin/starci-skills.mjs:422:3)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/public-package.spec.mjs:18:84)
+      at TestHook.runInAsyncScope (node:async_hooks:213:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.createHook (node:internal/test_runner/test:930:33) {
+    code: 'ERR_FS_EISDIR'
+  }

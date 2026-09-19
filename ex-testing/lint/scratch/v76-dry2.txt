@@ -1,0 +1,81 @@
+READY features/audit/br/append-only
+READY features/audit/br/erasure/logged
+READY features/audit/br/erasure/right
+READY features/audit/br/retention
+READY features/audit/fr/erasure/complete
+READY features/audit/fr/erasure/request
+READY features/audit/fr/export
+READY features/audit/fr/log/append
+READY features/audit/fr/log/read
+READY features/audit/impl/todo-app-backend/erasure
+READY features/audit/impl/todo-app-backend/log
+READY features/audit/impl/todo-app-backend/operator-read
+SKIP  features/audit/impl/todo-app-frontend/privacy — architecture: exited 1 (+1 more)
+READY features/audit/sds/erasure-request
+READY features/audit/sds/log-chain
+READY features/login/br/password/sign-in
+READY features/login/br/session/restores
+READY features/login/fr/sign-in
+READY features/login/impl/todo-app-backend/auth
+READY features/login/impl/todo-app-frontend/sign-in
+SKIP  features/login/integration/keycloak — real-keycloak-token-exchange: exited 1
+SKIP  features/login/integration/postgres — real-postgres-round-trip: exited 1 (+1 more)
+SKIP  features/login/journey/first-sign-in — uat-login-sign-in-run: exited 1
+READY features/login/sds/session-store
+READY features/notify/br/delivery/once
+READY features/notify/br/digest/window
+READY features/notify/br/failure/classified
+READY features/notify/br/unsubscribe/honored
+SKIP  features/notify/impl/todo-app-backend/pipeline — live: exited 1
+SKIP  features/notify/impl/todo-app-frontend/preferences — architecture: exited 1
+SKIP  features/notify/integration/queue — live-redis-roundtrip: exited 1
+READY features/notify/sds/delivery-lifecycle
+READY features/plan/br/active-scope
+READY features/plan/br/caps/limit
+READY features/plan/br/downgrade/freeze
+READY features/plan/br/lapse/reverts-on-read
+READY features/plan/br/payment/idempotent
+READY features/plan/contract/create-precondition
+READY features/plan/impl/todo-app-backend/plan
+READY features/plan/impl/todo-app-frontend/usage
+READY features/plan/sds/cap-guard
+READY features/plan/sds/subscription-lifecycle
+READY features/recur/br/ending/preserves-history
+SKIP  features/recur/br/generation/once — ac.recur.generation.once.is-idempotent-on-rerun: exited 0 but selected no test (Tests:       701 skipped, 701 total) — a vacuous run is not a proof
+READY features/recur/br/impossible-date/skips
+READY features/recur/br/occurrence/owned-by-rule-owner
+READY features/recur/br/timezone/owner-local-time
+SKIP  features/recur/impl/todo-app-backend/engine — live-e2e: exited 1
+READY features/recur/impl/todo-app-frontend/schedule
+READY features/recur/sds/generation-engine
+READY features/recur/sds/occurrence-lifecycle
+SKIP  features/share/br/editor/no-delete — live-proof: exited 1
+SKIP  features/share/br/invite/expiry — live-proof: exited 1
+SKIP  features/share/br/revoke/on-read — live-proof: exited 1
+SKIP  features/share/br/role/permissions — live-proof: exited 1
+SKIP  features/share/impl/todo-app-backend/access — live-proof: exited 1
+SKIP  features/share/impl/todo-app-backend/invitations — live-proof: exited 1
+SKIP  features/share/impl/todo-app-frontend/invite-screen — architecture: exited 1 (+2 more)
+SKIP  features/share/sds/invitation-lifecycle — live-proof: exited 1
+SKIP  features/task/br/complete/once — br.task.complete.once.live-proof: exited 7
+SKIP  features/task/br/delete/final — br.task.delete.final.live-proof: exited 7
+SKIP  features/task/br/list/owned — br.task.list.owned.live-proof: exited 7
+READY features/task/br/title/required
+READY features/task/event/completed
+READY features/task/event/created
+READY features/task/event/deleted
+READY features/task/fr/complete
+READY features/task/fr/create
+READY features/task/fr/reopen
+READY features/task/impl/todo-app-backend/complete-task
+READY features/task/impl/todo-app-backend/create-task
+READY features/task/impl/todo-app-backend/delete-task
+READY features/task/impl/todo-app-backend/list
+READY features/task/impl/todo-app-backend/ownership
+READY features/task/impl/todo-app-backend/platform-database
+READY features/task/impl/todo-app-backend/platform-events
+READY features/task/impl/todo-app-backend/reopen-task
+READY features/task/impl/todo-app-frontend/task-list
+READY features/task/sds/completion-state
+READY features/task/sds/ownership-guard
+summary {"considered":80,"written":0,"failedRestored":0,"skipped":20,"dryReady":60}

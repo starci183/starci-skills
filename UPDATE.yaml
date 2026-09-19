@@ -73,7 +73,7 @@ sections:
       - The runtime tree is laid out by concept. The declared data the runtime runs on is `model/`
         (it was `profiles/`), and the one `execution/` folder became four - `kernel/` for the control
         loop, one file per concern, `hosts/` for the host adapters and the host model, `models/` for
-        the model functions, `checks/` for the machine checks that read bytes. `execution/` itself
+        the model functions, `scripts/checks/` for the machine checks that read bytes. `execution/` itself
         stays and still carries the 4.x Plan-route execution modes. `.dist` mirrors the source tree,
         so a compiled path moves with its source. Add a new root to `package.json` `files` and to
         `INDEX.yaml` `folders` together; add it to the installer's owned-roots set only when a file

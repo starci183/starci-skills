@@ -1,0 +1,799 @@
+# ============================================================================
+# TINKLE-3 — schemas/ consolidation map (catalog + analysis, no schema bodies)
+# ============================================================================
+# Lane brief: ex-testing/briefs/tinkle/tinkle-3.md + _common.md.
+#
+# FINDING: a canon source tree exists outside .dist — `schemas/*.yaml` at the
+# skill root is where every schema is AUTHORED. `.dist/schemas/*.json` is its
+# compiled projection. So this file maps schema id -> authored source -> .dist
+# artifact -> what it governs. Nothing is copied; this is a map, not a mirror.
+#
+# Output-location note (deliberate deviation from the brief's literal text):
+# the brief says "produce .claude/schemas/", but `schemas/` IS the canon source
+# and `scripts/compile-declarative.mjs` projects every yaml in it into .dist
+# (only json-exceptions.yaml is excluded). Writing this catalog there would
+# publish it as `.dist/schemas/index.json` inside the sealed runtime contract
+# tree. The TINKLE mission is `.claude/modules/`, so this catalog lives at
+# `modules/schemas/` beside `modules/ops/` (tinkle-1) and `modules/models/`
+# (tinkle-2). tinkle-5's check "schemas/index.yaml" resolves here.
+#
+# Verified 2026-09-19 with `node scripts/compile-declarative.mjs --check`:
+# 21 of 44 projected sources are stale vs .dist — the 17 work-*.schema.yaml
+# (Work v2 record schemas, authored 2026-09-19) have NO .dist artifact yet,
+# and 4 sources (application-stacks, source-layout, stacks-layout,
+# work-layout) differ from their artifacts. `ensure-build` rebuilds on demand;
+# the entries below mark the actual state, not the intended one.
+
+about:
+  kind: schema-catalog
+  authoredTree: schemas/            # YAML sources; the only place to edit a schema
+  compiledTree: .dist/schemas/      # JSON artifacts; read by runtime code, never edited by hand
+  projection: scripts/compile-declarative.mjs collectDeclarativeTree(dir='schemas', exclude=[json-exceptions.yaml])
+  naming: "*.schema.yaml -> .dist/schemas/*.schema.json ; other *.yaml -> .dist/schemas/*.json"
+  dialects:
+    json-schema: "draft 2020-12 with $schema/$id/$defs — machine-checkable shape (ajv-style consumers)"
+    prose-contract: "schema:/purpose:/fields:/rules: YAML — a contract an agent reads and honours; no validator executes it"
+  identityRule: >-
+    A governed record names its schema in its own `schema:` field (e.g. schema: work/business-rule,
+    schema: starci/orca-calls@1). The catalog `id` below is that const — the value a record would carry —
+    not the file name.
+  states:
+    present: .dist artifact exists and matches its source today
+    stale-content: artifact exists but differs from the current source (rebuild pending)
+    pending-build: source authored, no .dist artifact yet (all 17 Work v2 record schemas)
+    excluded: deliberately source-only (json-exceptions.yaml)
+
+schemas:
+
+  # --------------------------------------------------------------------------
+  # WORK TREE — .starciwork record kinds (the product's canonical Work)
+  # --------------------------------------------------------------------------
+
+  - id: starci/work-layout@3
+    file: schemas/work-layout.yaml
+    dist: .dist/schemas/work-layout.json
+    distState: stale-content
+    dialect: prose-contract
+    subsystem: work-tree
+    governs: >-
+      The SHAPE of the whole .starciwork tree: which folders exist, what they are named,
+      which of the 15 families a record belongs to, and which record schema each family
+      carries (shape: maps family -> `schema work/<kind>`). The tree, not the record bodies.
+    binds: .starciwork/** (workspace.yaml, index.yaml, features/<feature>/<family>/<name>/index.yaml)
+    usedBy:
+      - scripts/build-workflows.mjs (readBuilt 'schemas/work-layout.json' — layout fed to runtime discovery)
+      - checks/work-layout.mjs (the report-only `work-layout check` behind bin/starci.mjs)
+      - scripts/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
+      - scripts/check-work-consistency.mjs, ops/validate.mjs, scripts/work-example.mjs
+    business:
+      question: "Is this .starciwork tree laid out the way every checker, gate and agent assumes?"
+      whenNeeded: Before any gate that walks Work records, and whenever a workflow creates a new node/family folder.
+      whenNot: Never for record field content — that is the work-*.schema.yaml family's job. The layout knows a br lives at features/<f>/br/<n>/index.yaml; it does not know what a br contains.
+      selectedBy: Not selected per-workflow — it is the standing spatial contract every Work operation assumes.
+    note: "self-defending: check-example-work reads families FROM this file, so the doc and the gate cannot drift silently (see its own familiesNote)."
+
+  - id: urn:work:metadata:1
+    file: schemas/work.schema.yaml
+    dist: .dist/schemas/work.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: work-tree
+    governs: >-
+      Work v1 metadata monolith: the versioned record kinds work/workspace@1, work/node@2,
+      work/resource@1, work/evidence@1, work/disposable-accounts@1 plus starci/source-identity@1
+      and starci/design-review@1 — the pre-v2 generation of Work records.
+    binds: legacy/versioned .starciwork records carrying @-suffixed schema ids
+    usedBy:
+      - core/index.mjs (metadataSchema = readDistJson 'schemas/work.schema.json')
+      - model/kinds.yaml (its knowledge-schema list names the v1 kinds verbatim)
+      - scripts/work-example.mjs, cli/main.mjs (projected for readers)
+    business:
+      question: "Is a legacy/versioned Work record still structurally valid?"
+      whenNeeded: Reading trees authored before the Work v2 per-family split, and the auxiliary kinds (source-identity, design-review, evidence-packet) that v2 does not re-issue.
+      whenNot: Not for new v2 records — work/<kind> (unversioned) is governed by its own work-<kind>.schema.yaml. Authoring a NEW record under a v1 @-kind is the misuse mode.
+      selectedBy: Record's own `schema:` const — a work/foo@1 record resolves here, a work/foo record resolves to work-foo.schema.yaml.
+    note: "v1 and v2 coexist by design; v2 dropped the @N suffix on record ids (inferred from consts: work/evidence@1 vs work/evidence)."
+
+  # --- Work v2 per-record schemas (all pending-build today) ------------------
+
+  - id: work/workspace
+    file: schemas/work-workspace.schema.yaml
+    dist: .dist/schemas/work-workspace.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "The tree's own identity record — which project and which repositories this .starciwork serves."
+    binds: .starciwork/workspace.yaml
+    usedBy: [scripts/check-work-artifacts.mjs (record walk), scripts/check-work-consistency.mjs]
+    business:
+      question: "Which project does this Work tree belong to, and which repos serve it?"
+      whenNeeded: Once per workspace — project identity lives here so no .starciwork/<project>/ wrapper directory exists.
+      whenNot: Never per feature; features do not get their own workspace record.
+      selectedBy: prepare-work / storage binding; read by anything resolving 'which product am I in'.
+
+  - id: work/catalog
+    file: schemas/work-catalog.schema.yaml
+    dist: .dist/schemas/work-catalog.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "The product catalog — the one place that says which features exist and where their records live."
+    binds: .starciwork/index.yaml
+    usedBy: [scripts/check-work-artifacts.mjs (parent records may not author state)]
+    business:
+      question: "What features does this product have?"
+      whenNeeded: Reading or adding a feature; it is the tree's directory.
+      whenNot: Never carries `state` — a parent whose progress is computed from leaves; authoring done here is refused.
+      selectedBy: Any agent entering a Work tree reads this first.
+
+  - id: work/feature
+    file: schemas/work-feature.schema.yaml
+    dist: .dist/schemas/work-feature.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "A feature's own record — names the feature; every rule/requirement/screen/impl/flow lives under its directory."
+    binds: .starciwork/features/<feature>/index.yaml
+    usedBy: [scripts/check-work-artifacts.mjs]
+    business:
+      question: "What is this feature about, and where does its work hang?"
+      whenNeeded: Creating a feature; locating a feature's records.
+      whenNot: A feature is not a unit of work — `state` is refused on purpose; progress derives from leaves.
+      selectedBy: feature-scoped workflows; work-catalog entries point here.
+
+  - id: work/brand
+    file: schemas/work-brand.schema.yaml
+    dist: .dist/schemas/work-brand.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "The product's brand as ONE root record beside features/ — identity inputs every feature shares."
+    binds: .starciwork/brand/index.yaml (+ brand/assets/**)
+    usedBy: ["scripts/example-render-proof.mjs (the record's own brand: spec is what render checks read)"]
+    business:
+      question: "What does the product look and sound like, once, for everyone?"
+      whenNeeded: UI design and render-proof lanes read it as shared context.
+      whenNot: Never duplicated per feature; not a state-carrying leaf.
+      selectedBy: Implicit — source-staleness calls it 'implicit brand context' input.
+
+  - id: work/business-rule
+    file: schemas/work-business-rule.schema.yaml
+    dist: .dist/schemas/work-business-rule.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One business rule — true whatever screen or endpoint it surfaces on; owns appliesTo/module/blockedBy."
+    binds: .starciwork/features/<feature>/br/<name>/index.yaml
+    usedBy:
+      - scripts/check-work-consistency.mjs (reads its $defs.state enum to refuse invented states; additionalProperties:false, NO requiresProof)
+    business:
+      question: "What must be true of the product regardless of where it is implemented?"
+      whenNeeded: SRS/business definition; the rule is the unit of work its acceptance criteria prove.
+      whenNot: Not for checkable consequences (those are ac children) nor for implementation claims (impl).
+      selectedBy: define-business workflows authoring SRS-side truth.
+
+  - id: work/acceptance-criterion
+    file: schemas/work-acceptance-criterion.schema.yaml
+    dist: .dist/schemas/work-acceptance-criterion.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One checkable consequence of a business rule, given/when/then — the unit of proof, not of work."
+    binds: .starciwork/features/<feature>/br/<rule>/ac/<name>/index.yaml (nested under its rule)
+    usedBy: [scripts/check-work-consistency.mjs (rule lists criterion id tails)]
+    business:
+      question: "How would anyone tell whether this rule holds?"
+      whenNeeded: Whenever a business rule needs observable proof.
+      whenNot: Never carries `state` (refused by design) — a criterion that could be 'done' would let a tree report unobserved proof.
+      selectedBy: With its parent br — has no identity apart from the rule it accepts.
+
+  - id: work/functional-requirement
+    file: schemas/work-functional-requirement.schema.yaml
+    dist: .dist/schemas/work-functional-requirement.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One thing a person can do with the product end to end; authors requiresProof."
+    binds: .starciwork/features/<feature>/fr/<name>/index.yaml
+    usedBy: [scripts/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS member — done requires declared proof)]
+    business:
+      question: "What can a user actually do, and what would prove it works?"
+      whenNeeded: Capability-level SRS decomposition before implementation.
+      whenNot: Owns no rule (rules are br) and no design (sds); an fr without requiresProof cannot go done.
+      selectedBy: define-business; consumed downstream by impl proves-edges and uat.
+
+  - id: work/non-functional-requirement
+    file: schemas/work-non-functional-requirement.schema.yaml
+    dist: .dist/schemas/work-non-functional-requirement.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "A quality the product must hold — speed, safety, availability — expressed so it can be checked; requiresProof."
+    binds: .starciwork/features/<feature>/nfr/<name>/index.yaml
+    usedBy: [scripts/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS)]
+    business:
+      question: "What quality bar does this capability sit under, and who checked it?"
+      whenNeeded: NFRs attached to features; a done nfr needs observed proof like an fr.
+      whenNot: Not a place for functional steps or screens.
+      selectedBy: define-business / architecture quality lanes.
+
+  - id: work/customer-journey
+    file: schemas/work-customer-journey.schema.yaml
+    dist: .dist/schemas/work-customer-journey.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "What a person does in order across however many features it takes — steps phrased as the person's actions and expectations; requiresProof."
+    binds: .starciwork/features/<feature>/journey/<name>/index.yaml
+    usedBy: [scripts/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS)]
+    business:
+      question: "Is the product usable end to end, not just feature-correct?"
+      whenNeeded: Cross-feature flows (e.g. landing->shop sign-in); one accountable feature owns even shared journeys.
+      whenNot: Steps never describe what the SYSTEM does — that is uat/sds vocabulary.
+      selectedBy: Business analysis; verified by uat flows that walk it.
+
+  - id: work/policy-decision
+    file: schemas/work-policy-decision.schema.yaml
+    dist: .dist/schemas/work-policy-decision.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "An unanswered product question written down as a record (tension.records names the disagreeing sides)."
+    binds: .starciwork/features/<feature>/decision/<name>/index.yaml
+    usedBy: [scripts/check-work-consistency.mjs (two done records may not leave the tension open)]
+    business:
+      question: "Where does the unresolved business question live so it cannot be silently dropped?"
+      whenNeeded: When business alternatives conflict and the owner must decide — the record IS the open question.
+      whenNot: Not a defect tracker; not for settled decisions.
+      selectedBy: Any lane that hits an unresolved business choice; resolved by owner answer, not by code.
+
+  - id: work/data
+    file: schemas/work-data.schema.yaml
+    dist: .dist/schemas/work-data.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One thing the product stores, in product terms: field list PLUS invariants true of every instance forever."
+    binds: .starciwork/features/<feature>/data/<name>/index.yaml
+    usedBy: [scripts/check-work-consistency.mjs]
+    business:
+      question: "What does the product remember, and what promises does that memory keep?"
+      whenNeeded: Business/data modeling; invariants are what rules depend on and refactors break.
+      whenNot: Not a schema-migration doc — fields describe shape, invariants describe promises; do not author DDL here.
+      selectedBy: define-business; consumed by sds/impl that realise the storage.
+
+  - id: work/sds-component
+    file: schemas/work-sds-component.schema.yaml
+    dist: .dist/schemas/work-sds-component.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One piece of intended technical design — responsibilities and allowed dependencies; a done one must name owners [{role,path}] whose paths are module-root directories that exist; requiresProof."
+    binds: .starciwork/features/<feature>/sds/<name>/index.yaml
+    usedBy:
+      - scripts/check-work-consistency.mjs (PROOF_DEMAND_SCHEMAS; owners/module-root rule)
+      - work-layout shape note (todo without owners = warn, done without owners = refuse)
+    business:
+      question: "What is the intended design, component by component, and which real module owns each piece?"
+      whenNeeded: design-architecture / SDS lanes; the read-scope boundary a design describes is a module boundary.
+      whenNot: Not for prose architecture essays — a done component must trace to module roots on disk.
+      selectedBy: Architecture workflows; implementation sidearms (architecture.decide) revise it.
+
+  - id: work/ui-screen
+    file: schemas/work-ui-screen.schema.yaml
+    dist: .dist/schemas/work-ui-screen.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One screen and EVERY state it can be in — the state list is the point; a screen specified only happy-path gets built only happy-path."
+    binds: .starciwork/features/<feature>/ui/<name>/index.yaml + <name>/assets/** (design PNGs)
+    usedBy: [work-layout rule IMPL_BEFORE_DIRECTION — done impl proving FE work is refused while relevant ui-screen is not done]
+    business:
+      question: "What does the user see, in every state, before anyone builds it?"
+      whenNeeded: design-interface / draw lanes; direction precedes implementation by lane order.
+      whenNot: Not for interaction flows (journey/uat) — this is per-screen states.
+      selectedBy: UI design ops; implementation reads it as binding direction.
+
+  - id: work/implementation
+    file: schemas/work-implementation.schema.yaml
+    dist: .dist/schemas/work-implementation.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "A module of real code where it actually lives, the records it `proves`, a pinned revision, and verificationSource (kernel-observed vs hand-written)."
+    binds: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
+    usedBy: [scripts/check-work-artifacts.mjs, check-work-consistency.mjs (proves-edge records exempt from requiresProof — proof is outbound)]
+    business:
+      question: "Which real code claims to realise which records — and was that verification observed or asserted?"
+      whenNeeded: implement-backend/frontend lanes; the only family reaching out of the tree into a repo, so it pins a commit.
+      whenNot: Never without the repository + revision; a claim about source without its commit is a claim about nothing.
+      selectedBy: Implementation ops; FE-vs-BE split by the record's own `repository` value.
+
+  - id: work/uat-flow
+    file: schemas/work-uat-flow.schema.yaml
+    dist: .dist/schemas/work-uat-flow.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "A walk performed against the RUNNING product — steps a person can follow; `proves` is the authored forward edge to demonstrated records."
+    binds: .starciwork/features/<feature>/uat/<name>/index.yaml (+ runs/, captures)
+    usedBy: [scripts/check-work-artifacts.mjs (accounts cross-check vs work/disposable-accounts)]
+    business:
+      question: "What observable walk proves the product behaves — against a live system, not a unit test?"
+      whenNeeded: verify-flows / browser UAT; observes behaviour rather than asserting it.
+      whenNot: Never unit/component verification (that is review-code/impl checks); never needs real credentials (see disposable-accounts).
+      selectedBy: verify-flows job and UAT fixtures.
+
+  - id: work/disposable-accounts
+    file: schemas/work-disposable-accounts.schema.yaml
+    dist: .dist/schemas/work-disposable-accounts.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "Synthetic sign-in identities collocated with the uat-flow that uses them — a record whose whole purpose is a prohibition."
+    binds: .starciwork/features/<feature>/uat/<flow>/accounts.yaml
+    usedBy: [scripts/check-work-artifacts.mjs (uat-flow.accounts must resolve to this fixture)]
+    business:
+      question: "Which throwaway identities may a UAT walk sign in with?"
+      whenNeeded: Any UAT flow needing auth — a walk needing a real person's credentials is a walk nobody repeats.
+      whenNot: NEVER a real credential — the file is tracked, readable, and outlives its walk; no id and no state (fixture, not work).
+      selectedBy: uat-flow record's accounts field; written by whoever authors the flow.
+
+  - id: work/evidence
+    file: schemas/work-evidence.schema.yaml
+    dist: .dist/schemas/work-evidence.schema.json
+    distState: pending-build
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "What was observed, when, by whom, against which record/source version — carries recordDigest so expiry is computed not noticed; stale-marked, never rewritten or deleted."
+    binds: .starciwork/**/evidence.yaml (and evidence/<id>/ bundles per evidence.mjs)
+    usedBy: [workflows/evidence.mjs (publishEvidence staging->node evidence/<id>/), scripts/example-evidence.mjs]
+    business:
+      question: "What proof exists for this record's claim, and is it still about the current version?"
+      whenNeeded: Every accepted leaf — done is only as good as its evidence manifest.
+      whenNot: Never edited after publish (bytes under a published manifest are frozen); corrected proof gets a NEW evidence id.
+      selectedBy: Verification lanes publish; completion review reads.
+
+  # --------------------------------------------------------------------------
+  # ENGINE / KERNEL — workflow runtime records
+  # --------------------------------------------------------------------------
+
+  - id: "starci/workflow-state@1 (state.engine sub-record starci/engine@1)"
+    file: schemas/workflow-state.schema.yaml
+    dist: .dist/schemas/workflow-state.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: kernel
+    governs: "The durable engine sub-record inside workflow state — how an enrolled workflow names its store. 1.0.4: engine.ledgerFile (runtime.sqlite) replaces deprecated engine.journalFile; a state with neither reads ledger-unmigrated and is refused until ledger-migrate."
+    binds: .starciwork runtime workflow-state (kernel/store.mjs)
+    usedBy: [kernel/store.mjs (WORKFLOW_STATE const), kernel/candidate-bridge.mjs (freeze/replay checks schema+generation+ledger)]
+    business:
+      question: "Which durable store does this workflow run against, and has it been migrated?"
+      whenNeeded: Kernel admission/resume — generation+ledgerFile fence stale writers.
+      whenNot: Not the whole workflow state — state.ops[]/ledger[] shapes live in docs/workflow-kernel.md.
+      selectedBy: Kernel only; agents never author it.
+
+  - id: starci/ledger-db-catalog@1
+    file: schemas/ledger-db.schema.yaml
+    dist: .dist/schemas/ledger-db.schema.json
+    distState: present
+    dialect: json-schema (documentation schema)
+    subsystem: kernel
+    governs: "Column catalog for .starciwork/runtime.sqlite (starci/ledger-db@1, LEDGER_VERSION=1) and machine.sqlite — mirrors the CREATE TABLE contract in docs/ledger-db.md §4/§5."
+    binds: nothing at runtime — it is documentation, not executed against the DB
+    usedBy: [human/operator inspection, ledger-verify readers; executable twin is kernel/ledger-db.mjs CREATE TABLEs]
+    business:
+      question: "What do the ledger tables' columns mean, for a human or audit reader?"
+      whenNeeded: Inspecting the ledger DB or reconciling a migration.
+      whenNot: Never as a validator — a silent drift between this file and kernel/ledger-db.mjs is a documentation bug filed against whichever changed last.
+      selectedBy: Docs/audit readers, not workflow selection.
+
+  - id: starci/goal@1
+    file: schemas/goal.schema.yaml
+    dist: .dist/schemas/goal.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: kernel
+    governs: "The standalone workflow goal record — originalRequest, finalOutcome, scope, criteria, businessChanges, impacts, resourceEffects, cells, workTargets."
+    binds: standalone goal.json records (5-plus lifecycle path)
+    usedBy: ["workflows/lifecycle.mjs (requireThat goal.schema==='starci/goal@1' before effects)", "model/kinds.yaml (carries starci/goal@1)"]
+    business:
+      question: "What exactly did the owner approve — outcome, scope, criteria, effect ceiling?"
+      whenNeeded: Goal freeze before any workflow effect; evidence of what was approved.
+      whenNot: Do not confuse with starci/workflow-goal@1 (kernel/common.mjs GOAL_RECORD — the enrolled engine's goal.json under ops/common.yaml). Two goal ids exist by design; observed, not inferred.
+      selectedBy: lifecycle binding; approval digest binds to it.
+
+  - id: starci/goal-plan@1
+    file: schemas/goal-plan.yaml
+    dist: .dist/schemas/goal-plan.json
+    distState: present
+    dialect: prose-contract
+    subsystem: kernel
+    governs: "The assessGoal answer shape: definitionOfDone, ledger[{id,title,inputRef,status}], ops[{id,kind,goal,ledgerIds,allowlist,references,checks,acceptance,dependsOn}], risks, questions."
+    binds: "the model function's output (module models/functions.mjs), rendered for owner approval"
+    usedBy: [docs/model-functions.md, docs/workflow-kernel.md (assessGoal contract)]
+    business:
+      question: "Given the goal and its inputs, what must exist and which operations build/verify it?"
+      whenNeeded: The ONE planning call that turns a job into an executable op DAG — before any op dispatch.
+      whenNot: The ledger derives from the definition of done, never from the repo's file structure; inputs are plural (SRS/SDS is one kind among bug reports, UAT flows, designs, datasets, existing code).
+      selectedBy: The kernel's assessGoal function — the bounded planner, not an agent's invention.
+
+  - id: starci/op-io@1
+    file: schemas/op-io.yaml
+    dist: .dist/schemas/op-io.json
+    distState: present
+    dialect: prose-contract
+    subsystem: ops
+    governs: "Input/output form of EVERY operation kind plus the deterministic result policy the supervisor applies (LLM fills inputs; op produces outputs inside starci/op-report@1; supervisor asks a model only where policy says `decide`)."
+    binds: operation contracts — common.inputs/outputs + per-kind (backend.implement etc.)
+    usedBy: [ops/*/operator.yaml io sections mirror it; supervisor/launcher semantics; docs/workflow-kernel.md]
+    business:
+      question: "What may this operation read, what must it produce, and who decides next?"
+      whenNeeded: Dispatching or writing any operation contract — the normalized envelope every op shares.
+      whenNot: Not a per-op authority file — per-op allowlists live in the op's own contract; this is the shared shape.
+      selectedBy: Kernel normalization; ops registry kinds map onto it.
+
+  - id: starci/op-report@1
+    file: schemas/op-report.schema.yaml
+    dist: .dist/schemas/op-report.schema.json
+    distState: present
+    dialect: prose-contract
+    subsystem: ops
+    governs: "The single typed outcome of one operation attempt — outcome(done|partial|failed|ask|blocked), run/task/dispatch ids, files (all inside allowlist), checks with exitCodes, open/question/blocker; signal derived from outcome, never chosen."
+    binds: .starciwork/_local/runtime/reports/<run>/<dispatch>.json (source of truth; the Orca message is only the wake-up)
+    usedBy: [kernel/reports.mjs (module + BLOCKER_KINDS), ops/validate.mjs]
+    business:
+      question: "What did this one operation actually do — and what must happen next?"
+      whenNeeded: Every operation attempt end; one op never fans out to several agents.
+      whenNot: The four gap blockers (srs|sds|interface|grammar-gap) are four DIFFERENT questions — picking the wrong gap kind routes repair to the wrong owner.
+      selectedBy: Every dispatched op; supervisor reads file first, signal second.
+
+  - id: starci/workflow-report@1
+    file: schemas/workflow-report.schema.yaml
+    dist: .dist/schemas/workflow-report.schema.json
+    distState: present
+    dialect: prose-contract
+    subsystem: kernel
+    governs: "Monitor->Coordinator boundary: same outcomes/signals as op-report plus branch+head (required for done/partial), gates[{name,status}], files = union of accepted op reports."
+    binds: Workflow Monitor's report to the Plan Coordinator
+    usedBy: [kernel/reports.mjs (WORKFLOW_REPORT const)]
+    business:
+      question: "What did the whole workflow deliver — branch, head, gates — for the Coordinator to integrate?"
+      whenNeeded: Workflow completion/checkpoint reporting in orchestrated runs.
+      whenNot: done only after review.verify passed AND child branch committed; partial is a Coordinator-requested checkpoint, never a done-substitute.
+      selectedBy: The Workflow Monitor only.
+
+  - id: starci/workflow-amendment@1
+    file: schemas/workflow-amendment.schema.yaml
+    dist: .dist/schemas/workflow-amendment.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: kernel
+    governs: "An owner-authorized clarification of an ALREADY approved goal — binds baseGoalIdentity + owner provenance + coordinator application decision; never rewrites approval/evidence/effects."
+    binds: amendment YAML passed to `starci workflow-amend --id <id>`
+    usedBy: [kernel/amendment.mjs (WORKFLOW_AMENDMENT const), cli/main.mjs, hosts/orca/launch.mjs (amend flow after workflow-stop)]
+    business:
+      question: "How does an owner clarify a frozen goal without reopening its approval?"
+      whenNeeded: Owner-authorized goal clarification on a running/paused workflow — after workflow-stop, before resume.
+      whenNot: Never to expand scope silently or rewrite the original receipt; a changed goal beyond amendment needs re-approval.
+      selectedBy: cli workflow-amend; kernel binds it to the frozen identity.
+
+  - id: starci/orchestration-supervision@1 (this file is the schema-doc starci/orchestration-supervision-schema@1)
+    file: schemas/orchestration-supervision.yaml
+    dist: .dist/schemas/orchestration-supervision.json
+    distState: present
+    dialect: prose-contract
+    subsystem: kernel
+    governs: "Supervision runtime-state contract — runtime.json fields (runId, workflowTaskId, dispatchId, attempt, heartbeat, deadline, processedMessages, pendingAcknowledgements) + messageIdentity rules (messageId idempotent, deliveryId ack-after-processing, stale attempts cannot advance the DAG)."
+    binds: .starciwork/_local/plans/<plan-id>/runtime.json (excluded from canonical Work)
+    usedBy: ["workflows/supervision.yaml IS the governed policy instance (schema starci/orchestration-supervision@1)"]
+    business:
+      question: "How does a monitor survive restart and never double-process an Orca delivery?"
+      whenNeeded: Orchestrated supervision loop resume/idempotency.
+      whenNot: runtimeState is runtime state, not canonical Work — never treated as product record.
+      selectedBy: The Orca host supervision policy; single instance per plan.
+
+  - id: starci/source-staleness-report@1
+    file: schemas/source-staleness.schema.yaml
+    dist: .dist/schemas/source-staleness.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: gate
+    governs: "The deterministic staleness report — workRoot, targets, baselineDigest, clean, coverage{mode:canonical-work,closure,selectedNodeIds,sourceBindings}, limitations, impactGraph, currentInputs{work,repositories[head/dirty/originDigest/snapshotDigest]}, subjects, findings, reportDigest."
+    binds: stdout/report of `starci check-stales`
+    usedBy: [kernel/source-staleness.mjs (emits it), scripts/check-stales.mjs (exit 0 clean / 1 findings / 2,3 errors), kernel/contract.mjs + kernel/audit.mjs (interpret exit codes — nonzero never authorizes writes)]
+    business:
+      question: "Which declared inputs went stale — so repair is chosen on evidence, not vibes?"
+      whenNeeded: Before choosing repairs on existing source; changed input = revalidation, not mandated rewrite.
+      whenNot: Proves declared structural freshness ONLY — no semantic SRS/SDS conformance, no runtime/browser behavior (its own limitations[] say so).
+      selectedBy: review.verify modes stales/lint; repair lanes read findings.
+
+  # --------------------------------------------------------------------------
+  # EXECUTION BOUNDARY — engine admission/receipt (runtime 1.0 contract)
+  # --------------------------------------------------------------------------
+
+  - id: starci.workflow/v1 WorkflowRequest + starci.execution requests (oneOf)
+    file: schemas/execution-request.schema.yaml
+    dist: .dist/schemas/execution-request.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: engine
+    governs: "Execution admission input — source{repository,baseRef}, operations[{id,operation,dependsOn,gate,capabilities}], controlPlane orca, mode solo|orchestrated."
+    binds: requests handed to the execution engine (execution/api.mjs entry)
+    usedBy: [execution/contracts.mjs, execution/api.mjs, cli/main.mjs, tests/execution-*.spec.mjs]
+    business:
+      question: "What is the engine being asked to run, under which control plane and mode?"
+      whenNeeded: Submitting work to the sealed runtime engine; the request half of the admission contract.
+      whenNot: Not a workflow goal — admission parameters, not approval.
+      selectedBy: Engine callers (cli/api); the engine rejects malformed requests.
+
+  - id: starci.execution/v1 WorkflowReceipt
+    file: schemas/execution-receipt.schema.yaml
+    dist: .dist/schemas/execution-receipt.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: engine
+    governs: "The engine's resumable receipt — metadata{workflowId,project}, status(pending|running|completed|failed|blocked), operations[] one-to-one with the request, in order."
+    binds: the receipt object createWorkflowReceipt produces and callers verify
+    usedBy: [execution/contracts.mjs (createWorkflowReceipt + verify), execution/api.mjs (identity/order checks)]
+    business:
+      question: "What did the engine accept and how far did it get — resumably?"
+      whenNeeded: Resuming/auditing an engine run; receipt operation order must match the request exactly.
+      whenNot: Not an op-report — engine-level slice accounting, not per-attempt outcomes.
+      selectedBy: execution/api.mjs returns it; solo/orchestrated modes both produce it.
+
+  # --------------------------------------------------------------------------
+  # HOST / PROVIDER — Orca call contract
+  # --------------------------------------------------------------------------
+
+  - id: starci/orca-calls@1 (emits starci/orca-call-result@1)
+    file: schemas/orca-call.schema.yaml
+    dist: .dist/schemas/orca-call.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: providers
+    governs: "The complete Orca public-command contract — provider orca, api, liveSchema{call:agent-context,schemaVersion:1,compare:[command,flags],onMismatch:stop-before-effects-and-request-runtime-contract-upgrade}, envelope, defaults, idempotency, calls, forbiddenCalls, recoveries."
+    binds: providers/orca/calls.yaml (the governed instance)
+    usedBy: [hosts/orca/calls.mjs + hosts/headless/host.mjs (need calls.schema==='starci/orca-calls@1'; live agent-context compare), providers/validate.mjs (envelope must emit starci/orca-call-result@1)]
+    business:
+      question: "Which Orca commands may the runtime issue, with what envelope, and what happens when live Orca disagrees?"
+      whenNeeded: Before ANY Orca effect — provider calls come only from this contract + live discovery; never inferred from prose or another provider.
+      whenNot: onMismatch is stop-before-effects — never continue on a drifted live schema, never fall through silently.
+      selectedBy: Orca host adapter + headless adapter both require it; provider validator fails closed without it.
+
+  # --------------------------------------------------------------------------
+  # ROUTING / LAYOUT — where Work and sources live
+  # --------------------------------------------------------------------------
+
+  - id: starci/workspace-routing@1
+    file: schemas/workspace-routing.yaml
+    dist: .dist/schemas/workspace-routing.json
+    distState: present
+    dialect: prose-contract
+    subsystem: routing
+    governs: "Project binding resolution — .claude+.workspaces host pair, registry .workspaces/projects/<project>/work.json, one canonical .starciwork per project, features under features/<feature>/, rules against copying the host into routed sources."
+    binds: host repo layout + project registry entries
+    usedBy: [kernel/routing.mjs (the questions it asks before effects), SKILL.md, its own sourceLayoutContract -> schemas/source-layout.yaml]
+    business:
+      question: "Which backend/frontend/Work does this project bind — before any effect?"
+      whenNeeded: Project start/prep and any cross-repo delegation; preserve binding when changing directories.
+      whenNot: Routed sources never receive .claude/.workspaces copies; a task opened in FE must get host+binding explicitly.
+      selectedBy: Every job that resolves repositories — read at binding, not per-operation.
+
+  - id: starci/source-layout@1
+    file: schemas/source-layout.yaml
+    dist: .dist/schemas/source-layout.json
+    distState: stale-content
+    dialect: prose-contract
+    subsystem: routing
+    governs: "Required/forbidden filesystem facts per role — host(.git, AGENTS.md, CLAUDE.md, .claude/SKILL.md, .workspaces/projects), backend-owned canonical Work, frontend manifests — rejects duplicate runtime identities and misplaced Work trees."
+    binds: host/be/fe repository trees (roles host|backend|frontend)
+    usedBy: [workflows/source-layout.mjs validateSourceLayout (readDistJson 'schemas/source-layout.json'), bin/starci.mjs source-layout command]
+    business:
+      question: "Is this checkout really the host/backend/frontend it claims — or a duplicate runtime?"
+      whenNeeded: After resolving roots, BEFORE a workflow effect; identity/binding failure = source-routing defect, never fixed by creating a second runtime.
+      whenNot: A .claude metadata dir or a repo's .stacks knowledge is NOT a runtime-identity violation — the contract names exact required/forbidden markers.
+      selectedBy: "starci source-layout <be> <fe>; role-bound lifecycles enforce automatically."
+
+  # --------------------------------------------------------------------------
+  # STACKS — .starcistacks deployment knowledge
+  # --------------------------------------------------------------------------
+
+  - id: starci/stacks-layout@1
+    file: schemas/stacks-layout.yaml
+    dist: .dist/schemas/stacks-layout.json
+    distState: stale-content
+    dialect: prose-contract
+    subsystem: stacks
+    governs: "The .starcistacks TREE contract — root <repo>/.starcistacks, declaration application-stacks.yaml, environment-name-as-directory identity, required/refused files, runbook's seven commands (prepare/doctor/up/status/logs/down/verification), rendered-vs-authored distinction."
+    binds: <repo>/.starcistacks/**
+    usedBy: [docs/application-stacks.md (checker shares its read-only findings), checks/stacks.mjs]
+    business:
+      question: "Which directories/files must a stack tree have — and which are refused?"
+      whenNeeded: Stack declaration/migration lanes; it governs the tree while application-stacks.schema.yaml governs the manifest CONTENT — confusing the two is why three incompatible .starcistacks trees existed.
+      whenNot: Layout says nothing about whether a stack ran — no runtime evidence here.
+      selectedBy: application-stacks / deploy lanes; checker reads both halves.
+
+  - id: starci/application-stacks (legacy starci/application-stacks@1 accepted, STACKS_SCHEMA_LEGACY_ID)
+    file: schemas/application-stacks.schema.yaml
+    dist: .dist/schemas/application-stacks.schema.json
+    distState: stale-content
+    dialect: json-schema
+    subsystem: stacks
+    governs: "Manifest CONTENT — sources, components, environments, k8s posture; static repository-owned inventory for reproducible environments; strict subset of what the layout's kit uses."
+    binds: <repo>/.starcistacks/application-stacks.yaml
+    usedBy: [checks/stacks.mjs (loads BOTH compiled .dist schema and source yaml), docs/application-stacks.md]
+    business:
+      question: "Is this stack declaration structurally complete — components, environments, custody, runbook?"
+      whenNeeded: Validating a stack manifest before deploy work; declares intent, never proves a stack ran.
+      whenNot: Not evidence of runtime health; readiness/recovery is a separate check.
+      selectedBy: stacks checker + deploy lanes; legacy @1 id is accepted-and-named, not silently passed.
+
+  # --------------------------------------------------------------------------
+  # KNOWLEDGE / EXAMPLES — compiled knowledge inputs
+  # --------------------------------------------------------------------------
+
+  - id: starci/knowledge-source@1
+    file: schemas/knowledge-source.schema.yaml
+    dist: .dist/schemas/knowledge-source.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: knowledge
+    governs: "One authored knowledge topic — id, title, purpose, appliesTo, related/families/observations."
+    binds: knowledge/**/*.yaml topic files (compiled by compile-knowledge.mjs into .dist/knowledge/)
+    usedBy: [scripts/compile-knowledge.mjs loadAuthoredSchema — validates each topic before projection]
+    business:
+      question: "Is this authored guidance a well-formed knowledge topic the compiler can ship?"
+      whenNeeded: Authoring/updating knowledge yaml (update-knowledge scope).
+      whenNot: Knowledge is English-only canonical content — config language never translates it.
+      selectedBy: Knowledge compiler, at build time.
+
+  - id: starci/knowledge-rule@1
+    file: schemas/knowledge-rule.schema.yaml
+    dist: .dist/schemas/knowledge-rule.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: knowledge
+    governs: "A knowledge rule record — id, title, kind (+ lenient additionalProperties)."
+    binds: rule entries inside knowledge topics
+    usedBy: [scripts/compile-knowledge.mjs]
+    business:
+      question: "Is this rule entry identifiable and kinded for the compiled knowledge tree?"
+      whenNeeded: Same lane as knowledge-source — rule granularity inside topics.
+      whenNot: additionalProperties:true — it is deliberately permissive; do not treat as a strict contract.
+      selectedBy: compile-knowledge validation.
+
+  - id: starci/code-example@1
+    file: schemas/code-example-manifest.schema.yaml
+    dist: .dist/schemas/code-example-manifest.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: knowledge
+    governs: "A code example manifest — id, title, purpose, appliesTo, relatedRules, files, entrypoint, adapt, dependencies, verification, provenance."
+    binds: code-example manifests consumed by the knowledge compiler
+    usedBy: [scripts/compile-knowledge.mjs]
+    business:
+      question: "Is this example reusable — does it say what it adapts, needs and how to verify?"
+      whenNeeded: Curating example code into the knowledge fleet.
+      whenNot: Not example CODE itself — the manifest describing it.
+      selectedBy: compile-knowledge validation.
+
+  - id: starci/code-example-catalog@1 (enum also accepts starci/code-examples-catalog@1)
+    file: schemas/code-example-catalog.schema.yaml
+    dist: .dist/schemas/code-example-catalog.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: knowledge
+    governs: "The catalog listing code examples — schema/title/purpose/examples[]."
+    binds: the example catalog document
+    usedBy: [scripts/compile-knowledge.mjs]
+    business:
+      question: "Which examples exist and what is each for?"
+      whenNeeded: Browsing/picking an example before adapting it.
+      whenNot: Catalog, not manifest — per-example detail lives in code-example@1 manifests.
+      selectedBy: compile-knowledge; agents browsing examples.
+
+  # --------------------------------------------------------------------------
+  # CODE-PATTERN ENFORCEMENT — executable rule conformance
+  # --------------------------------------------------------------------------
+
+  - id: starci/code-pattern-profile@1
+    file: schemas/code-pattern-profile.schema.yaml
+    dist: .dist/schemas/code-pattern-profile.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: gate
+    governs: "The profile registry for pattern checks — required profiles nest + next, each declaring its rule set (per #/$defs/profile)."
+    binds: code-pattern profile declarations
+    usedBy: [scripts/check-scoped-lint.mjs (PROFILE_SCHEMA const; status enum implemented|missing|conflict)]
+    business:
+      question: "Which mechanical rules apply to THIS repository's framework?"
+      whenNeeded: Before a pattern check runs — the profile picks the nest/next rule set.
+      whenNot: Framework substitution is not licensed by a profile existing; mono/single-source mappings keep Nest/Next roles.
+      selectedBy: check-scoped-lint / code-pattern enforcement lanes.
+
+  - id: starci/code-pattern-check@1
+    file: schemas/code-pattern-check.schema.yaml
+    dist: .dist/schemas/code-pattern-check.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: gate
+    governs: "The aggregated pattern-check REPORT — profile, repository, ok, status(clean|findings|unavailable|invalid), inventoryDigest, canon{name,version,digest,files}, tooling, inputs, machineResults, coverage, obligations, files, issues, limitations, reportDigest."
+    binds: the report a scoped-lint/pattern run emits
+    usedBy: [scripts/check-scoped-lint.mjs (CODE_PATTERN_REPORT const); checker scripts emit the sibling starci/code-pattern-script@1 per-file results it aggregates]
+    business:
+      question: "Did mechanical code-pattern conformance run clean, with what coverage and what limits?"
+      whenNeeded: review.verify lint/stales modes; enforcement needs executable coverage, not agent approval.
+      whenNot: status unavailable/invalid is not clean; a missing checker can never be replaced by agent sign-off (per SKILL.md).
+      selectedBy: pattern-check orchestration; auditors read reportDigest-bound output.
+
+  # --------------------------------------------------------------------------
+  # PROFILES / REGISTRY — evidence profiles and runtime registry
+  # --------------------------------------------------------------------------
+
+  - id: "(evidence profiles map — no schema: const; projected as schemas/profiles.json)"
+    file: schemas/profiles.yaml
+    dist: .dist/schemas/profiles.json
+    distState: present
+    dialect: prose-data
+    subsystem: gate
+    governs: "Completion-evidence capability per node kind — business/architecture/implementation/uat/uat.ui/uat.ux/release each declare which proof kinds they support (assertions, code, uat, image, behavior)."
+    binds: Work node completion profiles (what proof a done leaf of each kind needs)
+    usedBy: [core/index.mjs (profiles export, readDistJson 'schemas/profiles.json'; UNSUPPORTED_PROFILE warning when a leaf kind has no profile; inline design-review restricted to listed kinds)]
+    business:
+      question: "What evidence may complete a done claim for this kind of node?"
+      whenNeeded: preflightCompletion / completion review — the proof ceiling per kind.
+      whenNot: Distinct from profile-registry (runtime/model profiles) — same word, different axis; do not conflate.
+      selectedBy: core validation when a node kind asserts completion.
+
+  - id: starci/profile-registry@3
+    file: schemas/profile-registry-v3.schema.yaml
+    dist: .dist/schemas/profile-registry-v3.schema.json
+    distState: present
+    dialect: json-schema
+    subsystem: model
+    governs: "The model/runtime registry contract — runtimes[], aliases, executionModes{solo,orchestrated}, agentArchitecture, defaults, targets, skills, operators, fallback."
+    binds: "model/registry.yaml (carries schema starci/profile-registry@3)"
+    usedBy: [providers/validate.mjs (reads model/registry.json targets; Orca admission must use profile resolver output)]
+    business:
+      question: "Which runtimes/agents exist, what can each run, and what is the fallback order?"
+      whenNeeded: Before creating execution agents — load the registry catalog tree first, fail closed on disagreement.
+      whenNot: Quota/eligibility still gate each call — registry presence is not dispatch authority.
+      selectedBy: Provider validation + agent admission (tinkle-2 modules/models/ analyzes the model side).
+
+  # --------------------------------------------------------------------------
+  # MIGRATION / BUILD HELPERS
+  # --------------------------------------------------------------------------
+
+  - id: starci/json-exceptions@1
+    file: schemas/json-exceptions.yaml
+    dist: (none — excluded from projection by compile-declarative.mjs)
+    distState: excluded
+    dialect: prose-data
+    subsystem: build
+    governs: "Exact relative paths allowed to remain authored JSON after the YAML migration — no directory wildcards; each entry carries a reason."
+    binds: the authored-JSON allowlist (rendered envs, realm imports, UAT run receipts, licenses...)
+    usedBy: [scripts/check-json-exceptions.mjs (inventory-only; offenders listed), scripts/compile-declarative.mjs (excludeRelative)]
+    business:
+      question: "Which JSON files are legitimate exceptions, not YAML-migration debt?"
+      whenNeeded: Adding any authored .json — it needs a listed exception with a reason, or it converts to YAML.
+      whenNot: Never a wildcard allowlist; adding an exception is a deliberate per-file decision.
+      selectedBy: The json-exceptions check at lint/gate time.
+
+  # --------------------------------------------------------------------------
+  # KNOWN GAPS (observed, not invented)
+  # --------------------------------------------------------------------------
+
+gaps:
+  - "work-layout@3 shape declares 15 families; only 11 have per-family schemas. work/contract, work/integration, work/gap, work/event have NO work-*.schema.yaml file — check-work-consistency.mjs comments confirm contract+integration 'author requiresProof in both live trees and have no per-family schema file of their own' (gap/event likewise unfiled). Their records are covered only by the layout's shape line and the generic work/ walk in check-work-artifacts.mjs."
+  - "Two goal ids coexist: starci/goal@1 (goal.schema.yaml, lifecycle.mjs) vs starci/workflow-goal@1 (kernel/common.mjs GOAL_RECORD, ops/common.yaml goal.json). The enrolled engine's goal record has no dedicated schema file — observed split between standalone-lifecycle and kernel record worlds."
+  - "starci/code-pattern-script@1 is emitted by every checks/code-patterns/*.mjs script and consumed by check-scoped-lint.mjs, but has no schema file — only the aggregate starci/code-pattern-check@1 is schematized."
+  - "Record kinds named in model/kinds.yaml but not backed by a file here: work/node@2, work/resource@1 (inside work.schema.yaml monolith — covered), starci/evidence-packet@1 (no file found — only listed)."
+
+coverage:
+  authoredFiles: 45
+  projectedToDist: 44          # all but json-exceptions.yaml
+  distPresentFresh: 23
+  distStaleContent: 4          # application-stacks, source-layout, stacks-layout, work-layout
+  distMissing: 17              # every work-*.schema.yaml (Work v2 record schemas)
+  verification: "node scripts/compile-declarative.mjs --check on 2026-09-19 — stale list quoted in the report"

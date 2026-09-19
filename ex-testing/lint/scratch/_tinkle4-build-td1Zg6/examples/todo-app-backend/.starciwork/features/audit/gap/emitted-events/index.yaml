@@ -1,0 +1,33 @@
+schema: work/gap
+id: gap.audit.emitted-events
+title: login and task expose no emitted-event contract for audit to subscribe to
+state: todo
+statement: "The contract half of this gap is now declared: contract.audit.emitted-events names the
+  five events audit needs emitted - event.login.signed-in, event.login.signed-out,
+  event.task.created, event.task.completed, event.task.deleted - each with its own work/event record
+  under features/audit/event/**, payloads mirroring the typed classes in
+  src/modules/platform/events/events.types.ts field for field, each already listed in
+  fr.audit.log.append's and sds.audit.log-chain's subscribes. Audit's subscriber is built against
+  PlatformEventBus and routes exactly those five kinds through AUDIT_SEALED_ACTIONS
+  (src/modules/bussiness/audit/audit-event.subscriber.ts). What keeps the gap open is the provider
+  half, named precisely: the five product-event records this lane declares have no provider-side
+  implementation record done for their emissions - event.task.created/completed/deleted need
+  impl.task.todo-app-backend.platform-events done (its own note: every task handler really calls
+  PlatformEventBus.publish and create-task.handler.spec.ts proves the call today), and
+  event.login.signed-in/event.login.signed-out need login's session-side prover done for
+  SignInHandler/SignOutHandler (src/modules/bussiness/session/sign-in.handler.ts, sign-out.handler.ts
+  - their specs assert the publish today) - so PROVES_TARGET_NOT_DONE still refuses every candidate
+  closer, this gap's own closedBy included. An emitter that does not exist yet is named there rather
+  than papered over: the subscriber stands and the gap stays honest todo until the provider lanes
+  seal the emissions."
+closedBy: [impl.task.todo-app-backend.platform-events]
+change:
+  rev: 3
+  kind: clarifying
+  at: 2026-09-18T20:10:00.000Z
+  reason: "The brief's own instruction for this gap - build the subscriber against PlatformEventBus
+    (already done) and declare exactly which event types audit needs emitted - is delivered: five
+    work/event records and contract.audit.emitted-events are now the named vocabulary, resolving every
+    dangling subscribes id in this feature. The gap's state is unchanged and honest: its closable edge
+    is a provider-lane record (lane ex-be-task), which stays todo, and login's two emissions still lack
+    any provider-side prover at all, which is stated precisely here instead of assumed closed."

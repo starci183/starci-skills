@@ -1,0 +1,217 @@
+schema: starci/knowledge-source@1
+id: grammar.starci.family
+title: StarCi Core family and DNA
+purpose: |
+  Family identity, CSS dependency direction, Core DNA ownership, theme/accessibility binding, and
+  source-backed gaps for StarCi Core. Snapshot observations — verify installed source before treating
+  any gap or API as current.
+appliesTo:
+  - grammar
+family: starci
+provenance:
+  package: "@starci/grammar"
+  version: "0.4.13"
+  checkout: 41be722701c439e76910f80a8cbb65261da72e01
+  captured: "2026-09-05"
+  publicEntry: "@starci/grammar/common"
+  limitations: |
+    Historical snapshot only. Before use, inspect the selected repository's manifest/lockfile,
+    exported types, renderers and CSS; record actual source/version in .starciwork. If source is
+    unavailable, report unverified; do not infer current APIs or defects from old tables. Consumer
+    imports should use the verified public entry (@starci/grammar/common where supported), not assumed
+    aliases.
+identity:
+  definedBy: coreGrammar
+  selectedBy: CoreGrammarRoot
+  implements: Common contract
+  notes: |
+    StarCi Core implements the Common contract; it is not the parent of Common or of any other family.
+    CORE_GRAMMAR_COMPONENTS remains only a compatibility alias to COMMON_GRAMMAR_COMPONENTS.
+  applicableUiRules:
+    - TONE-1..3
+    - ACCENT-1..5
+    - BOUNDARY-1..6
+    - FONT-1..6
+    - GAP-0..6
+    - PADDING-0..8
+cssDependency:
+  direction: |
+    core/styles.css imports common/styles.css. Common supplies renderer anatomy, geometry, state
+    structure, responsive composition, and universal --grammar-* spacing. Core supplies only
+    family-scoped values and theme bindings. Common never imports Core; another family never imports Core.
+  commonOwns:
+    - renderer anatomy
+    - geometry
+    - state structure
+    - responsive composition
+    - universal --grammar-* spacing
+  coreOwns:
+    - family-scoped values
+    - theme bindings
+dna:
+  publishedBy: "@starci/grammar/core"
+  publishes:
+    - STARCI_CORE_DNA
+    - token names
+    - light/dark defaults
+    - legacy spacing aliases
+  bindsSemanticVariables:
+    - canvas/background
+    - surface
+    - foreground
+    - muted
+    - border/separator
+    - accent/focus
+    - success/warning/danger/info pairs
+    - fields
+    - radii
+    - shadow
+    - motion
+  universalSpacingSource: Common
+  universalSpacing:
+    - COMMON_SPACING_SCALE
+    - COMMON_SPACING_TOKENS
+  compatibilityAliases:
+    - name: --starci-core-page-inset
+      targets: --grammar-page-inset
+    - name: --starci-core-region-gap
+      targets: --grammar-region-gap
+    - name: --starci-core-section-gap
+      targets: --grammar-section-gap
+    - name: --starci-core-row-gap
+      targets: --grammar-row-gap
+    - name: --starci-core-inline-gap
+      targets: --grammar-inline-gap
+  aliasNote: |
+    These are compatibility aliases to --grammar-*, not a second scale.
+themeAndAccessibility:
+  supports:
+    - light
+    - explicit dark
+    - system dark
+    - forced colors
+    - focus-visible
+    - reduced motion
+  under: Core root
+  preserves: Common semantics
+  constraint: |
+    Cannot use palette or motion to change business truth.
+  applicableUiRules:
+    - A11Y-1..4
+    - FOCUS-1..4
+    - MOTION-1..4
+    - STATE-1..3
+sourceBackedBehavior:
+  - id: surface-card-labelled-material
+    observation: |
+      Core keeps the Common SurfaceCard renderer/props/semantics and uses family-scoped CSS plus the
+      neutral data-grammar-surface-labelled hook to paint the outer labelled card as one material box.
+      The inner bounded frame becomes transparent/no-shadow, so the label is visually inside Core
+      material. Heritage's symmetric test paints only its inner frame, keeping the label outside without
+      creating a second contract.
+  - id: button-no-destructive
+    observation: |
+      ButtonVariant has no destructive/danger variant (CTA-4).
+  - id: no-modal-focus-containment
+    observation: |
+      Common has no general modal focus-containment/restoration owner (FOCUS-3).
+gaps:
+  note: |
+    Capabilities recorded as absent at the snapshot, with historical source locations.
+    Recheck actual installed source before recording a current gap in the .starciwork node; this list
+    is not the sole live gap inventory and does not trigger library edits.
+  entries:
+    - components:
+        - SurfaceCard
+        - SurfaceListCard
+        - SurfaceAccordionCard
+      missing: |
+        no typed heading level and no labelled-by-external-heading capability, so a surface whose
+        correct level is not 3 has no owner
+      evidence:
+        - packages/grammar/src/core/primitive/Label/index.tsx
+        - packages/grammar/src/core/branch/SurfaceCard/index.tsx
+    - components:
+        - Common overlay owner
+      missing: |
+        Common publishes no general overlay or elevation prop
+      evidence:
+        - packages/grammar/src/core/branch/Tooltip/index.tsx
+        - packages/grammar/src/common/styles.css
+    - components:
+        - Badge
+      missing: |
+        Badge accepts absent children and renders a non-breaking space, so a glyph-only chip is
+        representable and word presence is not enforced by the type
+      evidence:
+        - packages/grammar/src/core/primitive/Badge/index.tsx
+    - components:
+        - Tabs
+      missing: |
+        leading is an optional ReactNode, not a typed Icon, so nothing forces a glyph or its usage on
+        each peer
+      evidence:
+        - packages/grammar/src/core/branch/Tabs/index.tsx
+    - components:
+        - Button
+        - TextAction
+      missing: |
+        neither action publishes a motion anchor or attribute for its adornment, so a family has
+        nothing to animate beyond data-component
+      evidence:
+        - packages/grammar/src/core/primitive/Button/index.tsx
+        - packages/grammar/src/core/primitive/TextAction/index.tsx
+    - components:
+        - Icon
+      missing: |
+        Icon has no direction-aware mirroring contract; the app's registry chooses the literal glyph
+      evidence:
+        - packages/grammar/src/core/primitive/Icon/index.tsx
+    - components:
+        - IconButton
+      missing: |
+        isActive emits data-active="true" only, with no aria-pressed, so an active utility is visual-only
+      evidence:
+        - packages/grammar/src/core/primitive/IconButton/index.tsx
+    - components:
+        - Tooltip
+      missing: |
+        aria-describedby is placed on the tooltip's wrapper span, not on the focusable control, so the
+        description is not programmatically attached to the button
+      evidence:
+        - packages/grammar/src/core/branch/Tooltip/index.tsx
+    - components:
+        - Icon
+      missing: |
+        Icon accepts only source; there is no fallback or error contract, so a missing registry mapping
+        must be resolved by the app before render
+      evidence:
+        - packages/grammar/src/core/primitive/Icon/index.tsx
+    - components:
+        - MediaFrame
+      missing: |
+        no object-position or focal prop, and className reaches the figure rather than the viewport
+        child, so a required off-centre crop has no owner
+      evidence:
+        - packages/grammar/src/core/primitive/MediaFrame/index.tsx
+        - packages/grammar/src/common/styles.css
+    - components:
+        - MediaFrame
+      missing: |
+        MediaFrame publishes no loading or error prop and renders no state
+      evidence:
+        - packages/grammar/src/core/primitive/MediaFrame/index.tsx
+    - components:
+        - OtpInput
+      missing: |
+        OtpInput publishes disabled and invalid (not the isDisabled/isError names) and no skeleton
+        input, so its unresolved state has no owner
+      evidence:
+        - packages/grammar/src/core/OtpInput.tsx
+    - components:
+        - OtpInput
+      missing: |
+        OtpInput publishes no label, hint, or errorMessage slot; only describedBy links outside text,
+        so its visible identity has no Common owner
+      evidence:
+        - packages/grammar/src/core/OtpInput.tsx

@@ -1,0 +1,532 @@
+2284 decl, 2284 missing  evidence.yaml<work/evidence>.codeDigest.files[].path
+ 174 decl,    8 missing  index.yaml<work/ui-screen>.ui.assets[].generation.inputRefs[]
+ 115 decl,  115 missing  evidence.yaml<work/evidence>.provenance.tool
+  94 decl,   94 missing  critique.yaml<work/critique@1>.findings[].records[]
+  92 decl,    8 missing  index.yaml<work/ui-screen>.assets[].generation.inputRefs[]
+  71 decl,    0 missing  index.yaml<work/ui-screen>.ui.coverage.map[].directionAsset
+  66 decl,    6 missing  manifest.yaml<starci/uat-run-manifest@1>.assets[].path
+  56 decl,   56 missing  index.yaml<work/derived@1>.unclassifiedEdges[].field
+  53 decl,   53 missing  index.yaml<work/derived@1>.unclassifiedEdges[].target
+  51 decl,   51 missing  index.yaml<work/derived@1>.unclassifiedEdges[].from
+  49 decl,    0 missing  index.yaml<work/ui-screen>.ui.acceptedInputs.knowledge[].path
+  42 decl,    0 missing  index.yaml<work/ui-screen>.ui.assets[].path
+  36 decl,    0 missing  evidence.yaml<work/evidence>.assets[].path
+  31 decl,    0 missing  generation-receipts.yaml<starci/generation-receipts@1>.calls[].referencedImages[].path
+  31 decl,    0 missing  index.yaml<work/ui-screen>.ui.assets[].generation.referencedImages[]
+  28 decl,    0 missing  index.yaml<work/ui-screen>.ui.acceptedInputs.grammarReferences[].path
+  25 decl,    0 missing  index.yaml<work/ui-screen>.ui.acceptedInputs.business[].path
+  25 decl,    0 missing  index.yaml<work/implementation>.assets[].path
+  21 decl,    0 missing  index.yaml<work/ui-screen>.ui.assets[].generation.promptPath
+  20 decl,   20 missing  evidence.yaml<work/evidence>.record
+  20 decl,    0 missing  evidence.yaml<work/evidence>.directionReview.anatomySources[].path
+  20 decl,   16 missing  index.yaml<work/ui-screen>.ui.provenance.frontendContext[].path
+  18 decl,    0 missing  index.yaml<work/ui-screen>.assets[].path
+  16 decl,   16 missing  index.yaml<work/brand>.brand.grammar.inspectedFiles[].path
+  14 decl,   14 missing  index.yaml<work/functional-requirement>.composes[].rule
+  13 decl,   13 missing  index.yaml<work/implementation>.proves[]
+  12 decl,   12 missing  index.yaml<work/acceptance-criterion>.rule
+  12 decl,   12 missing  generation-receipts.yaml<starci/generation-receipts@1>.calls[].toolOutputBasename
+  12 decl,   12 missing  generation-receipts.yaml<starci/generation-receipts@1>.calls[].artifact
+  12 decl,   12 missing  generation-receipts.yaml<starci/generation-receipts@1>.calls[].prompt
+  12 decl,   12 missing  index.yaml<work/ui-screen>.ui.assets[].provenance.toolOutputBasename
+  11 decl,   11 missing  index.yaml<work/brand>.brand.color.tokens[].source.path
+  11 decl,   11 missing  evidence.yaml<work/evidence>.assertions[].id
+  11 decl,   11 missing  accounts.yaml<work/disposable-accounts>.accounts[].identity
+  11 decl,   11 missing  manifest.yaml<starci/uat-run-manifest@1>.provenance.version
+  10 decl,   10 missing  index.yaml<work/data>.refs[]
+  10 decl,    0 missing  index.yaml<work/ui-screen>.ui.provenance.anatomyReferences[].path
+   9 decl,    9 missing  index.yaml<work/business-rule>.id
+   9 decl,    0 missing  index.yaml<work/uat-flow>.accounts
+   9 decl,    0 missing  index.yaml<work/ui-screen>.assets[].generation.promptPath
+   8 decl,    8 missing  index.yaml<work/functional-requirement>.refs[]
+   7 decl,    7 missing  index.yaml<work/functional-requirement>.id
+   7 decl,    7 missing  index.yaml<work/sds-component>.refs[]
+   7 decl,    7 missing  index.yaml<work/uat-flow>.environment
+   7 decl,    7 missing  index.yaml<work/uat-flow>.fixtures[]
+   7 decl,    0 missing  index.yaml<work/ui-screen>.ui.acceptedInputs.brand.path
+   7 decl,    0 missing  index.yaml<work/ui-screen>.ui.acceptedInputs.knowledge[].canonicalPath
+   7 decl,    7 missing  index.yaml<work/ui-screen>.ui.acceptedInputs.grammar.version
+   7 decl,    0 missing  index.yaml<work/ui-screen>.ui.anatomyReview.reviewPath
+   7 decl,    0 missing  index.yaml<work/ui-screen>.ui.supersededDirection.path
+   6 decl,    0 missing  evidence.yaml<work/evidence>.directionReview.reviewPath
+   6 decl,    6 missing  index.yaml<work/ui-screen>.ui.acceptedInputs.business[].id
+   6 decl,    6 missing  index.yaml<work/derived@1>.tally.gaps[].closedBy[]
+   6 decl,    0 missing  index.yaml<work/ui-screen>.ui.provenance.business[].path
+   5 decl,    5 missing  index.yaml<work/implementation>.id
+   5 decl,    0 missing  index.yaml<work/integration>.credential.where
+   5 decl,    5 missing  index.yaml<work/gap>.closedBy
+   5 decl,    0 missing  index.yaml<work/ui-screen>.ui.provenance.brand.path
+   5 decl,    0 missing  index.yaml<work/ui-screen>.ui.provenance.knowledge.path
+   5 decl,    0 missing  index.yaml<work/ui-screen>.ui.provenance.promptExample.path
+   5 decl,    5 missing  index.yaml<work/ui-screen>.ui.provenance.promptExample.originalLocation
+   4 decl,    4 missing  index.yaml<work/brand>.brand.sources[].path
+   4 decl,    4 missing  index.yaml<work/contract>.refs[]
+   4 decl,    4 missing  index.yaml<work/integration>.id
+   4 decl,    4 missing  index.yaml<work/non-functional-requirement>.refs[]
+   4 decl,    4 missing  index.yaml<work/sds-component>.dependsOn[]
+   3 decl,    3 missing  index.yaml<work/data>.module
+   3 decl,    3 missing  index.yaml<work/business-rule>.refs[]
+   3 decl,    3 missing  index.yaml<work/data>.id
+   3 decl,    3 missing  index.yaml<work/ui-screen>.id
+   3 decl,    3 missing  index.yaml<work/policy-decision>.id
+   3 decl,    3 missing  resource.yaml<work/resource>.id
+   2 decl,    2 missing  index.yaml<work/brand>.brand.identity.decisions[].authority
+   2 decl,    0 missing  index.yaml<work/brand>.brand.artworkSlots[].master
+   2 decl,    0 missing  index.yaml<work/brand>.assets[].path
+   2 decl,    2 missing  index.yaml<work/uat-flow>.proves[]
+   2 decl,    2 missing  index.yaml<work/ui-screen>.ui.artworkSlots[].master.path
+   2 decl,    2 missing  index.yaml<work/integration>.refs[]
+   2 decl,    2 missing  index.yaml<work/ui-screen>.refs[]
+   2 decl,    2 missing  index.yaml<work/derived@1>.records.br.notify.delivery.once.usedBy.refs[]
+   2 decl,    2 missing  index.yaml<work/derived@1>.records.sds.plan.subscription-lifecycle.usedBy.refs[]
+   2 decl,    2 missing  index.yaml<work/derived@1>.frontier[].id
+   1 decl,    1 missing  index.yaml<work/brand>.brand.color.primaryAlias.source
+   1 decl,    0 missing  index.yaml<work/brand>.brand.mascot.assets[].path
+   1 decl,    0 missing  index.yaml<work/brand>.brand.mascot.assets[].provenance.promptPath
+   1 decl,    1 missing  index.yaml<work/brand>.brand.grammar.version
+   1 decl,    1 missing  index.yaml<work/data>.conflictsWith[].record
+   1 decl,    1 missing  index.yaml<work/policy-decision>.tension.records[]
+   1 decl,    1 missing  index.yaml<work/gap>.closedBy[]
+   1 decl,    0 missing  index.yaml<work/ui-screen>.ui.appOwnedRegions[].reference
+   1 decl,    1 missing  index.yaml<work/functional-requirement>.blockedBy[].record
+   1 decl,    1 missing  index.yaml<work/customer-journey>.requirements[]
+   1 decl,    1 missing  index.yaml<work/customer-journey>.blockedBy[].record
+   1 decl,    1 missing  index.yaml<work/sds-component>.blockedBy[].record
+   1 decl,    1 missing  index.yaml<work/data>.extends
+   1 decl,    1 missing  index.yaml<work/event>.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.audit.append-only.usedBy.composes[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.audit.retention.usedBy.conflictsWith[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.notify.failure.classified.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.plan.active-scope.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.plan.caps.limit.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.plan.payment.idempotent.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.recur.ending.preserves-history.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.recur.impossible-date.skips.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.recur.timezone.owner-local-time.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.share.invite.expiry.usedBy.composes[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.share.revoke.on-read.usedBy.composes[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.task.complete.once.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.task.list.owned.usedBy.composes[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.task.single-owner.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.contract.task.list-for-dashboard.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.decision.task.list.scope.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.fr.plan.upgrade.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.fr.plan.usage.view.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.fr.task.create.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.gap.notify.smtp-host-unreachable.usedBy.blockedBy[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.gap.plan.live-proof.usedBy.blockedBy[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.gap.plan.sepay-not-reachable.usedBy.blockedBy[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.sds.notify.delivery-lifecycle.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.ui.plan.usage.usedBy.refs[]
+   1 decl,    0 missing  resource.yaml<work/resource>.target.compose
+   1 decl,    0 missing  resource.yaml<work/resource>.configuration.renderedFrom
+   1 decl,    0 missing  resource.yaml<work/resource>.configuration.rendered
+   1 decl,    0 missing  resource.yaml<work/resource>.schemaFiles[]
+   1 decl,    0 missing  resource.yaml<work/resource>.seedFiles[]
+   1 decl,    0 missing  resource.yaml<work/resource>.custody.sealed
+   1 decl,    1 missing  direction-check.yaml<starci/direction-check@1>.checks[].record
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.br.checkout.place-order.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.fr.checkout.place-order.usedBy.refs[]
+   1 decl,    1 missing  index.yaml<work/derived@1>.records.sds.checkout.order-flow.usedBy.refs[]
+
+--- missing samples ---
+evidence.yaml<work/evidence>.provenance.tool: 115/115
+  scripts/example-evidence.mjs
+  scripts/example-evidence.mjs
+  scripts/example-evidence.mjs
+  scripts/example-evidence.mjs
+  scripts/example-evidence.mjs
+  scripts/example-evidence.mjs
+index.yaml<work/brand>.brand.identity.decisions[].authority: 2/2
+  OP-BRIEF.md
+  OP-BRIEF.md
+index.yaml<work/brand>.brand.color.tokens[].source.path: 11/11
+  src/app/globals.css
+  node_modules/tailwindcss/theme.css
+  node_modules/tailwindcss/theme.css
+  node_modules/@starci/grammar/dist/core/styles.css
+  node_modules/@starci/grammar/dist/core/styles.css
+  node_modules/@starci/grammar/dist/core/styles.css
+index.yaml<work/brand>.brand.color.primaryAlias.source: 1/1
+  src/app/globals.css
+index.yaml<work/brand>.brand.sources[].path: 4/4
+  src/app/globals.css
+  node_modules/@starci/grammar/dist/core/styles.css
+  node_modules/@starci/grammar/dist/common/styles.css
+  node_modules/tailwindcss/theme.css
+index.yaml<work/brand>.brand.grammar.version: 1/1
+  0.4.13
+index.yaml<work/brand>.brand.grammar.inspectedFiles[].path: 16/16
+  package.json
+  dist/common/index.d.ts
+  dist/common/renderers.js
+  dist/common/styles.css
+  dist/core/styles.css
+  dist/core/primitive/GrammarRoot/index.js
+evidence.yaml<work/evidence>.codeDigest.files[].path: 2284/2284
+  src/modules/bussiness/audit/append-log-line.command.ts
+  src/modules/bussiness/audit/append-log-line.handler.spec.ts
+  src/modules/bussiness/audit/append-log-line.handler.ts
+  src/modules/bussiness/audit/audit-erasure.service.spec.ts
+  src/modules/bussiness/audit/audit-erasure.service.ts
+  src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+index.yaml<work/acceptance-criterion>.rule: 12/12
+  br.audit.erasure.right
+  br.notify.delivery.once
+  br.plan.caps.limit
+  br.recur.generation.once
+  br.recur.impossible-date.skips
+  br.task.complete.once
+evidence.yaml<work/evidence>.record: 20/20
+  br.audit.erasure.right
+  fr.audit.log.read
+  impl.audit.todo-app-backend.log
+  impl.login.todo-app-backend.auth
+  br.notify.delivery.once
+  integration.notify.queue
+index.yaml<work/business-rule>.id: 9/9
+  br.audit.erasure.right
+  br.notify.delivery.once
+  br.plan.caps.limit
+  br.recur.generation.once
+  br.recur.impossible-date.skips
+  br.task.complete.once
+index.yaml<work/data>.refs[]: 10/10
+  br.audit.erasure.right
+  br.audit.erasure.right
+  br.notify.delivery.once
+  integration.plan.sepay
+  br.plan.caps.limit
+  data.plan.plan
+index.yaml<work/data>.conflictsWith[].record: 1/1
+  br.task.delete.final
+index.yaml<work/policy-decision>.tension.records[]: 1/1
+  br.audit.erasure.right
+evidence.yaml<work/evidence>.assertions[].id: 11/11
+  br.audit.erasure.right
+  br.audit.erasure.right
+  fr.audit.log.read
+  br.audit.erasure.right
+  br.plan.caps.limit
+  integration.plan.sepay
+index.yaml<work/functional-requirement>.composes[].rule: 14/14
+  br.audit.erasure.right
+  br.audit.erasure.right
+  br.notify.delivery.once
+  br.notify.delivery.once
+  br.plan.caps.limit
+  br.recur.impossible-date.skips
+index.yaml<work/functional-requirement>.id: 7/7
+  fr.audit.log.read
+  fr.plan.usage.view
+  fr.share.list
+  fr.task.list
+  fr.checkout.cart.add
+  fr.checkout.cart.clear
+index.yaml<work/gap>.closedBy[]: 1/1
+  impl.audit.todo-app-backend.log
+index.yaml<work/implementation>.proves[]: 13/13
+  br.audit.erasure.right
+  fr.audit.log.read
+  br.notify.delivery.once
+  br.plan.caps.limit
+  ui.plan.usage
+  br.recur.generation.once
+index.yaml<work/implementation>.id: 5/5
+  impl.audit.todo-app-backend.log
+  impl.login.todo-app-backend.auth
+  impl.plan.todo-app-backend.plan
+  impl.plan.todo-app-frontend.usage
+  impl.task.todo-app-backend.list
+index.yaml<work/sds-component>.refs[]: 7/7
+  br.audit.erasure.right
+  br.notify.delivery.once
+  br.plan.caps.limit
+  br.plan.caps.limit
+  br.recur.impossible-date.skips
+  br.recur.generation.once
+accounts.yaml<work/disposable-accounts>.accounts[].identity: 11/11
+  identity.todo-app.demo
+  identity.todo-app.demo
+  identity.todo-app.demo
+  identity.todo-app.demo
+  identity.todo-app.demo
+  identity.todo-app.demo
+index.yaml<work/uat-flow>.environment: 7/7
+  environment.todo-app.dev
+  environment.todo-app.dev
+  environment.todo-app.dev
+  environment.todo-app.dev
+  environment.todo-app.dev
+  environment.todo-app.dev
+index.yaml<work/uat-flow>.fixtures[]: 7/7
+  fixture.todo-app.seed
+  fixture.todo-app.seed
+  fixture.todo-app.seed
+  fixture.todo-app.seed
+  fixture.todo-app.seed
+  fixture.todo-app.seed
+index.yaml<work/uat-flow>.proves[]: 2/2
+  fr.audit.log.read
+  br.recur.generation.once
+index.yaml<work/ui-screen>.ui.assets[].generation.inputRefs[]: 8/174
+  fr.plan.usage.view
+  br.plan.caps.limit
+  data.recur.rule
+  fr.share.list
+  br.task.delete.final
+  br.task.list.owned
+index.yaml<work/ui-screen>.ui.acceptedInputs.grammar.version: 7/7
+  0.4.13
+  0.4.13
+  0.4.13
+  0.4.13
+  0.4.13
+  0.4.13
+index.yaml<work/ui-screen>.assets[].generation.inputRefs[]: 8/92
+  fr.plan.usage.view
+  br.plan.caps.limit
+  data.recur.rule
+  fr.share.list
+  br.task.delete.final
+  br.task.list.owned
+manifest.yaml<starci/uat-run-manifest@1>.assets[].path: 6/66
+  videos/sign-in.webm
+  videos/sign-in.webm
+  videos/sign-in.webm
+  videos/sign-in.webm
+  videos/create.webm
+  videos/create.webm
+manifest.yaml<starci/uat-run-manifest@1>.provenance.version: 11/11
+  1.63.0
+  1.63.0
+  1.63.0
+  1.63.0
+  1.63.0
+  1.63.0
+index.yaml<work/ui-screen>.ui.artworkSlots[].master.path: 2/2
+  assets/turtle-master.png
+  assets/turtle-master.png
+index.yaml<work/contract>.refs[]: 4/4
+  br.notify.delivery.once
+  br.notify.delivery.once
+  br.plan.caps.limit
+  br.task.list.owned
+index.yaml<work/data>.module: 3/3
+  src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts
+  src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts
+  src/modules/platform/databases/postgresql/primary/entities/notify-preference.entity.ts
+index.yaml<work/gap>.closedBy: 5/5
+  integration.notify.smtp
+  ui.plan.usage
+  integration.plan.sepay
+  impl.plan.todo-app-backend.plan
+  ui.task.list
+index.yaml<work/integration>.id: 4/4
+  integration.notify.queue
+  integration.notify.smtp
+  integration.plan.sepay
+  integration.checkout.redis
+index.yaml<work/integration>.refs[]: 2/2
+  br.notify.delivery.once
+  br.notify.delivery.once
+index.yaml<work/non-functional-requirement>.refs[]: 4/4
+  br.notify.delivery.once
+  br.plan.caps.limit
+  br.recur.generation.once
+  br.task.list.owned
+index.yaml<work/sds-component>.dependsOn[]: 4/4
+  integration.notify.smtp
+  integration.notify.queue
+  integration.plan.sepay
+  integration.plan.sepay
+index.yaml<work/business-rule>.refs[]: 3/3
+  br.task.list.owned
+  br.task.delete.final
+  br.plan.caps.limit
+index.yaml<work/data>.id: 3/3
+  data.plan.plan
+  data.recur.rule
+  data.task.task
+index.yaml<work/functional-requirement>.refs[]: 8/8
+  integration.plan.sepay
+  integration.plan.sepay
+  ui.plan.usage
+  data.recur.rule
+  data.recur.rule
+  data.recur.rule
+index.yaml<work/functional-requirement>.blockedBy[].record: 1/1
+  integration.plan.sepay
+index.yaml<work/customer-journey>.requirements[]: 1/1
+  fr.plan.usage.view
+index.yaml<work/customer-journey>.blockedBy[].record: 1/1
+  fr.plan.usage.view
+index.yaml<work/sds-component>.blockedBy[].record: 1/1
+  integration.plan.sepay
+index.yaml<work/ui-screen>.id: 3/3
+  ui.plan.usage
+  ui.task.list
+  ui.checkout.cart
+index.yaml<work/ui-screen>.refs[]: 2/2
+  fr.plan.usage.view
+  fr.share.list
+index.yaml<work/ui-screen>.ui.acceptedInputs.business[].id: 6/6
+  fr.plan.usage.view
+  br.plan.caps.limit
+  data.recur.rule
+  fr.share.list
+  br.task.delete.final
+  br.task.list.owned
+index.yaml<work/data>.extends: 1/1
+  data.task.task
+index.yaml<work/policy-decision>.id: 3/3
+  decision.recur.timezone.dst
+  decision.share.roles.count
+  decision.task.list.scope
+index.yaml<work/event>.refs[]: 1/1
+  br.task.delete.final
+critique.yaml<work/critique@1>.findings[].records[]: 94/94
+  fr.plan.usage.view
+  impl.audit.todo-app-backend.log
+  impl.login.todo-app-backend.auth
+  impl.plan.todo-app-backend.plan
+  impl.plan.todo-app-frontend.usage
+  integration.plan.sepay
+index.yaml<work/derived@1>.records.br.audit.append-only.usedBy.composes[]: 1/1
+  fr.audit.log.read
+index.yaml<work/derived@1>.records.br.audit.retention.usedBy.conflictsWith[]: 1/1
+  br.audit.erasure.right
+index.yaml<work/derived@1>.records.br.notify.delivery.once.usedBy.refs[]: 2/2
+  integration.notify.queue
+  integration.notify.smtp
+index.yaml<work/derived@1>.records.br.notify.failure.classified.usedBy.refs[]: 1/1
+  integration.notify.smtp
+index.yaml<work/derived@1>.records.br.plan.active-scope.usedBy.refs[]: 1/1
+  fr.plan.usage.view
+index.yaml<work/derived@1>.records.br.plan.caps.limit.usedBy.refs[]: 1/1
+  data.plan.plan
+index.yaml<work/derived@1>.records.br.plan.payment.idempotent.usedBy.refs[]: 1/1
+  integration.plan.sepay
+index.yaml<work/derived@1>.records.br.recur.ending.preserves-history.usedBy.refs[]: 1/1
+  data.recur.rule
+index.yaml<work/derived@1>.records.br.recur.impossible-date.skips.usedBy.refs[]: 1/1
+  data.recur.rule
+index.yaml<work/derived@1>.records.br.recur.timezone.owner-local-time.usedBy.refs[]: 1/1
+  data.recur.rule
+index.yaml<work/derived@1>.records.br.share.invite.expiry.usedBy.composes[]: 1/1
+  fr.share.list
+index.yaml<work/derived@1>.records.br.share.revoke.on-read.usedBy.composes[]: 1/1
+  fr.share.list
+index.yaml<work/derived@1>.records.br.task.complete.once.usedBy.refs[]: 1/1
+  data.task.task
+index.yaml<work/derived@1>.records.br.task.list.owned.usedBy.composes[]: 1/1
+  fr.task.list
+index.yaml<work/derived@1>.records.br.task.single-owner.usedBy.refs[]: 1/1
+  data.task.task
+index.yaml<work/derived@1>.records.contract.task.list-for-dashboard.usedBy.refs[]: 1/1
+  fr.task.list
+index.yaml<work/derived@1>.records.decision.task.list.scope.usedBy.refs[]: 1/1
+  fr.task.list
+index.yaml<work/derived@1>.records.fr.plan.upgrade.usedBy.refs[]: 1/1
+  ui.plan.usage
+index.yaml<work/derived@1>.records.fr.plan.usage.view.usedBy.refs[]: 1/1
+  ui.plan.usage
+index.yaml<work/derived@1>.records.fr.task.create.usedBy.refs[]: 1/1
+  ui.task.list
+index.yaml<work/derived@1>.records.gap.notify.smtp-host-unreachable.usedBy.blockedBy[]: 1/1
+  integration.notify.smtp
+index.yaml<work/derived@1>.records.gap.plan.live-proof.usedBy.blockedBy[]: 1/1
+  fr.plan.usage.view
+index.yaml<work/derived@1>.records.gap.plan.sepay-not-reachable.usedBy.blockedBy[]: 1/1
+  integration.plan.sepay
+index.yaml<work/derived@1>.records.sds.notify.delivery-lifecycle.usedBy.refs[]: 1/1
+  integration.notify.queue
+index.yaml<work/derived@1>.records.sds.plan.subscription-lifecycle.usedBy.refs[]: 2/2
+  fr.plan.usage.view
+  integration.plan.sepay
+index.yaml<work/derived@1>.records.ui.plan.usage.usedBy.refs[]: 1/1
+  fr.plan.usage.view
+index.yaml<work/derived@1>.tally.gaps[].closedBy[]: 6/6
+  impl.audit.todo-app-backend.log
+  integration.notify.smtp
+  ui.plan.usage
+  integration.plan.sepay
+  impl.plan.todo-app-backend.plan
+  ui.task.list
+index.yaml<work/derived@1>.frontier[].id: 2/2
+  fr.task.list
+  integration.checkout.redis
+index.yaml<work/derived@1>.unclassifiedEdges[].target: 53/53
+  br.audit.erasure.right
+  br.notify.delivery.once
+  br.plan.caps.limit
+  br.recur.generation.once
+  br.recur.impossible-date.skips
+  br.task.complete.once
+index.yaml<work/derived@1>.unclassifiedEdges[].field: 56/56
+  surface.name
+  surface.name
+  surface.name
+  surface.name
+  surface.name
+  assertions.id
+index.yaml<work/derived@1>.unclassifiedEdges[].from: 51/51
+  impl.audit.todo-app-backend.log
+  impl.audit.todo-app-backend.log
+  impl.audit.todo-app-backend.log
+  impl.login.todo-app-backend.auth
+  impl.login.todo-app-backend.auth
+  impl.login.todo-app-backend.auth
+resource.yaml<work/resource>.id: 3/3
+  environment.todo-app.dev
+  fixture.todo-app.seed
+  identity.todo-app.demo
+generation-receipts.yaml<starci/generation-receipts@1>.calls[].toolOutputBasename: 12/12
+  exec-09762d59-c829-425c-b89f-9e06318be7e2.png
+  exec-3adb9e91-c728-4916-8aa9-14f9de11f784.png
+  exec-4f0ee36a-8021-448d-9f53-53973bf4495f.png
+  exec-cb25a35b-96e7-4fdf-afa5-8205c9fc2ddb.png
+  exec-a9e5f8c3-b47e-4d09-84f3-204de906261c.png
+  exec-d3e4b497-444a-4573-b683-ac564da2e1b6.png
+generation-receipts.yaml<starci/generation-receipts@1>.calls[].artifact: 12/12
+  assets/cart.initial.png
+  assets/cart.png
+  assets/cart.anatomy.png
+  assets/landing-home.initial.png
+  assets/landing-home.png
+  assets/shop-browse.initial.png
+generation-receipts.yaml<starci/generation-receipts@1>.calls[].prompt: 12/12
+  assets/cart.initial.prompt.txt
+  assets/cart.prompt.txt
+  assets/cart.anatomy.prompt.txt
+  assets/landing-home.initial.prompt.txt
+  assets/landing-home.prompt.txt
+  assets/shop-browse.initial.prompt.txt
+index.yaml<work/ui-screen>.ui.assets[].provenance.toolOutputBasename: 12/12
+  exec-4f0ee36a-8021-448d-9f53-53973bf4495f.png
+  exec-09762d59-c829-425c-b89f-9e06318be7e2.png
+  exec-3adb9e91-c728-4916-8aa9-14f9de11f784.png
+  exec-cb25a35b-96e7-4fdf-afa5-8205c9fc2ddb.png
+  exec-a9e5f8c3-b47e-4d09-84f3-204de906261c.png
+  exec-d3e4b497-444a-4573-b683-ac564da2e1b6.png
+index.yaml<work/ui-screen>.ui.provenance.promptExample.originalLocation: 5/5
+  ../ex-draw-v4/gen-lab/out/B3-final.txt
+  ../ex-draw-v4/gen-lab/out/B3-final.txt
+  ../ex-draw-v4/gen-lab/out/B3-final.txt
+  ../ex-draw-v4/gen-lab/out/B3-final.txt
+  ../ex-draw-v4/gen-lab/out/B3-final.txt
+index.yaml<work/ui-screen>.ui.provenance.frontendContext[].path: 16/20
+  examples/ecommerce-app-fe/apps/shop/src/app/cart/page.tsx
+  examples/ecommerce-app-fe/apps/shop/src/app/checkout/page.tsx
+  examples/ecommerce-app-fe/apps/shop/src/components/AppNav.tsx
+  examples/ecommerce-app-fe/apps/shop/src/app/layout.tsx
+  examples/ecommerce-app-fe/apps/landing/src/app/page.tsx
+  examples/ecommerce-app-fe/apps/landing/src/components/SiteHeader.tsx
+direction-check.yaml<starci/direction-check@1>.checks[].record: 1/1
+  ui.checkout.cart
+index.yaml<work/derived@1>.records.br.checkout.place-order.usedBy.refs[]: 1/1
+  integration.checkout.redis
+index.yaml<work/derived@1>.records.fr.checkout.place-order.usedBy.refs[]: 1/1
+  ui.checkout.cart
+index.yaml<work/derived@1>.records.sds.checkout.order-flow.usedBy.refs[]: 1/1
+  integration.checkout.redis

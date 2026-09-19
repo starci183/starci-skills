@@ -1,0 +1,465 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.padding
+title: Padding presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: given a boundary the application owns, how much space separates that
+  boundary from its content?
+  Composition has already chosen the DOM tree and the Grammar objects. Padding presentation resolves
+  the inset of application-owned pages, sections, and containers only. The inset inside a card, input,
+  button, or any other Grammar object belongs to Grammar.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The boundary belongs to the application
+      applicationWrites: The class
+    - name: A component name
+      meaning: Common already applies the inset inside that component
+      applicationWrites: Nothing. Compose it
+    - name: —
+      meaning: Common exposes no public path for this boundary
+      applicationWrites: The class, recorded as a workaround
+  notes: |-
+    Each case names who owns the inset. The owner decides whether the application writes a class at all.
+
+    Writing a class where a component is the owner is `APP_REIMPLEMENTATION`. Reaching into a Grammar
+    component with a selector or a passed class to change its inset is `APP_OVERRIDE`.
+scale:
+  steps:
+    - id: PADDING-0
+      class: p-0
+      value: "0"
+    - id: PADDING-1
+      class: p-1
+      value: .25rem
+    - id: PADDING-2
+      class: p-2
+      value: .5rem
+    - id: PADDING-3
+      class: p-3
+      value: .75rem
+    - id: PADDING-4
+      class: p-4
+      value: 1rem
+    - id: PADDING-5
+      class: p-6
+      value: 1.5rem
+    - id: PADDING-6
+      class: p-8
+      value: 2rem
+  notes: |-
+    `COMMON_SPACING_SCALE` is closed. The rule ID is the ordinal position on that scale. It is not the
+    Tailwind step number, and the two diverge from PADDING-5 onward.
+
+    Common publishes no padding token. The internal insets below are reached through the components that
+    own them, not through a variable the application may set.
+    The page inset is the one exception and is not on this scale: `--grammar-page-inset` resolves to
+    `clamp(1rem, 3vw, 2rem)`, a responsive value owned by `PageContainer`. An application never
+    reproduces it with a fixed class.
+    The rem values resolve to `0 / 4 / 8 / 12 / 16 / 24 / 32` CSS pixels only at a computed root of
+    `16px`. Runtime checks use `expectedPx = remFactor * observedRootFontPx`.
+componentOwnership:
+  title: Padding Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: ChatWorkspace
+      element: drawer body, hasRail, isCompactRail
+      rule: PADDING-0
+    - component: ChatWorkspace
+      element: overlay rail, hasRail, isCompactRail
+      rule: PADDING-4
+    - component: ChatWorkspace
+      element: overlay rail, hasRail, not isCompactRail
+      rule: PADDING-4
+    - component: ChatWorkspace
+      element: rail trigger boundary, hasRail, isCompactRail
+      rule: PADDING-2
+    - component: ChatWorkspace
+      element: rail trigger boundary, hasRail, isCompactRail
+      rule: PADDING-4
+    - component: ChatWorkspace
+      element: rail trigger, hasRail, isCompactRail
+      rule: PADDING-3
+    - component: EmptyNotice
+      element: root
+      rule: PADDING-4
+    - component: HorizontalScrollRegion
+      element: root
+      rule: PADDING-1
+    - component: NavigationFeatureNav
+      element: primary
+      rule: PADDING-3
+    - component: OtpInput
+      element: root
+      rule: PADDING-1
+    - component: PressableField
+      element: root
+      rule: PADDING-3
+    - component: PressableField
+      element: shortcut, shortcut!=undefined
+      rule: PADDING-1
+    - component: Rail
+      element: body, inset="content"
+      rule: PADDING-3
+    - component: Rail
+      element: body, inset="content"
+      rule: PADDING-5
+    - component: Sidebar
+      element: footer, not (collapsed
+    - component: Sidebar
+      element: footer, not (collapsed
+    - component: Sidebar
+      element: header, not (collapsed
+    - component: Sidebar
+      element: item, not collapsed
+      rule: PADDING-2
+    - component: Sidebar
+      element: item, not collapsed
+      rule: PADDING-3
+    - component: Sidebar
+      element: list, collapsed
+      rule: PADDING-2
+    - component: Sidebar
+      element: list, not collapsed
+      rule: PADDING-3
+    - component: Sidebar
+      element: section label, group.label!=undefined, not collapsed
+      rule: PADDING-1
+    - component: Sidebar
+      element: section label, group.label!=undefined, not collapsed
+      rule: PADDING-2
+    - component: Sidebar
+      element: section label, group.label!=undefined, not collapsed
+      rule: PADDING-3
+    - component: Sidebar
+      element: toggle, canToggle
+      rule: PADDING-2
+    - component: StaticStateRow
+      element: root
+      rule: PADDING-4
+    - component: Subnav
+      element: root
+      rule: PADDING-3
+    - component: SurfaceAccordionCard
+      element: accordion panel
+      rule: PADDING-0
+    - component: SurfaceAccordionCard
+      element: accordion trigger
+      rule: PADDING-4
+    - component: SurfaceAccordionCard
+      element: div
+      rule: PADDING-0
+    - component: SurfaceAccordionCard
+      element: div
+      rule: PADDING-3
+    - component: SurfaceAccordionCard
+      element: div
+      rule: PADDING-4
+    - component: SurfaceAccordionCard
+      element: div
+      rule: PADDING-5
+    - component: SurfaceCard
+      element: content, composition!="joined", frame!="frameless"
+      rule: PADDING-4
+    - component: SurfaceCard
+      element: content, composition!="joined", frame="frameless"
+      rule: PADDING-0
+    - component: SurfaceCard
+      element: content, composition="joined"
+      rule: PADDING-0
+    - component: SurfaceListCard
+      element: root
+      rule: PADDING-0
+    - component: Tabs
+      element: hero tabs tab
+      rule: PADDING-3
+    - component: Tabs
+      element: root, inset="page"
+      rule: PADDING-5
+    - component: TextAction
+      element: root, appearance="choice"
+      rule: PADDING-1
+    - component: TextAction
+      element: root, appearance="choice"
+      rule: PADDING-2
+    - component: TextAction
+      element: root, appearance="route"
+      rule: PADDING-2
+    - component: TextAction
+      element: root, appearance="route"
+      rule: PADDING-3
+    - component: TextAction
+      element: root, appearance="section"
+      rule: PADDING-2
+    - component: TextAction
+      element: root, appearance="section"
+      rule: PADDING-3
+    - component: TextAction
+      element: root, appearance="tab"
+      rule: PADDING-3
+    - component: Tooltip
+      element: content
+      rule: PADDING-1
+    - component: Tooltip
+      element: content
+      rule: PADDING-2
+guidance:
+  - id: side-contact
+    title: Side contact
+    requirement: |-
+      A boundary does not always take one value on all four sides. When a surface is flush and its child
+      bands own their own inset, each side takes its value from what that side touches.
+      | What the side touches | Value | Rule |
+      | --- | --- | --- |
+      | The outer edge of the surface | `1rem` | PADDING-4 |
+      | A separator between bands | `.75rem` | PADDING-3 |
+      | Nothing, because a child owns the edge | `0` | PADDING-0 |
+      A separator already draws the boundary, so the side meeting it needs less clearance than a bare outer
+      edge. Inline sides of a band always meet the outer edge, so they stay at `1rem`.
+      For a stack of bands this resolves to `px-4` throughout, `pt-4` on the first band, `pb-4` on the last,
+      and `.75rem` on every side that meets a separator. A band between two separators is `px-4 py-3`.
+      Common owns the flush surface itself through `composition="joined"`, which sets the content inset to
+      `0`. It exposes no path for the band insets, so those remain an application workaround.
+  - id: composite-insets
+    title: Composite insets
+    requirement: |-
+      `PADDING-0` through `PADDING-6` are the scale: one rule, one value. From `PADDING-7` onward the rules
+      are named recipes whose sides deliberately take different values. The number keeps counting, but it
+      stops meaning a position on the scale, so a composite rule never appears in the scale table and never
+      introduces a value of its own. Every side of a composite resolves to a base rule.
+      Append the next number when a genuinely new asymmetric pattern appears. State the reason each side
+      differs; a recipe without one is a product decision, not a rule.
+  - id: axis-variants
+    title: Axis variants
+    requirement: |-
+      `px-*` and `py-*` are not separate rules. They apply an existing rule to one axis when the two axes
+      carry different boundary decisions.
+      | Axis | Class | Meaning |
+      | --- | --- | --- |
+      | Inline | `px-*` | The chosen rule applies to logical start and end only |
+      | Block | `py-*` | The chosen rule applies to block start and end only |
+      | One side | `pt-*`, `pb-*`, `ps-*`, `pe-*` | The chosen rule applies to that side only |
+      Per-side classes are what the side-contact rule needs, because the two block sides of one band often
+      take different values. `px-4 pt-4 pb-3` is PADDING-4 on three sides and PADDING-3 on the side meeting
+      a separator, and every side still names its own case.
+      On the same element the narrower class wins the sides it names rather than adding, so `p-4 pb-3`
+      resolves to `1rem` on three sides and `.75rem` at the bottom. Between nested elements padding does
+      add, which is why a wrapper introduced only to change one side produces an inset nobody intended.
+rules:
+  - id: PADDING-0
+    title: "`p-0` / `0`"
+    governs: |-
+      The boundary contributes no space, because the content or a child already owns its own edge.
+    cases:
+      - id: case-1
+        when: |-
+          A container that only groups children which each carry their own boundary
+        owner: "`App`"
+        render: '`<section className="p-0">`'
+      - id: case-2
+        when: Surface bands that must run flush to the card edge
+        owner: "`SurfaceCard`"
+        render: '`composition="joined"` already sets `0`'
+      - id: case-3
+        when: A list whose rows own their own inset
+        owner: "`SurfaceListCard`"
+        render: Compose the card; no padding
+    notThisRule: |-
+      the one boundary protecting readable content keeps its inset. Use PADDING-4.
+  - id: PADDING-1
+    title: "`p-1` / `.25rem`"
+    governs: |-
+      The smallest equal inset, for a deliberately tiny container whose content nearly fills it.
+    cases:
+      - id: case-1
+        when: A compact marker or key floating over an app-owned canvas
+        owner: "`App`"
+        render: '`<aside className="p-1">` with `<Text size="xs">`'
+      - id: case-2
+        when: |-
+          A scroll region reserving room so focus rings are not clipped
+        owner: "`HorizontalScrollRegion`"
+        render: Compose the region; no padding
+      - id: case-3
+        when: A short hint attached to a control
+        owner: "`Tooltip`"
+        render: Compose the tooltip; no padding
+  - id: PADDING-2
+    title: "`p-2` / `.5rem`"
+    governs: |-
+      A compact app-owned container that needs clear but economical edge space.
+    cases:
+      - id: case-1
+        when: A small auxiliary strip whose four sides share one inset
+        owner: "`App`"
+        render: '`<aside className="p-2">` with `<Text size="sm">`'
+      - id: case-2
+        when: A compact bar of controls above app-owned content
+        owner: "`App`"
+        render: '`<div className="flex items-center gap-2 p-2">`'
+    notThisRule: |-
+      separation between siblings inside the container belongs to the parent gap, not to padding. Use the matching GAP rule.
+  - id: PADDING-3
+    title: "`p-3` / `.75rem`"
+    governs: |-
+      A dense but readable inset for a compact app-owned section or nested container.
+    cases:
+      - id: case-1
+        when: |-
+          A nested app container that owns a boundary distinct from its parent's
+        owner: "`App`"
+        render: '`<aside className="p-3">` inside a `p-4` section'
+      - id: case-2
+        when: The inline inset of a tab strip or secondary navigation
+        owner: "`Tabs`, `Subnav`"
+        render: Compose the component; no padding
+      - id: case-3
+        when: A band side that meets a separator inside a flush surface
+        owner: "`—`"
+        render: '`<div className="px-4 py-3">` between two separators'
+      - id: case-4
+        when: The separator-facing side of a metric cell or list row
+        owner: "`—`"
+        render: |-
+          `<div className="p-4 pb-3">`, or `pt-3` when the separator is above
+    notThisRule: |-
+      nesting the same inset for the same boundary and purpose doubles it. Parent and child padding add along the path from outer border to final content.
+  - id: PADDING-4
+    title: "`p-4` / `1rem`"
+    governs: |-
+      The standard equal inset for readable content inside one app-owned boundary.
+    cases:
+      - id: case-1
+        when: |-
+          An app section that owns the full distance from its border to its content
+        owner: "`App`"
+        render: '`<section className="p-4">` with `<Heading level={2}>`'
+      - id: case-2
+        when: Content inside a card
+        owner: "`SurfaceCard`"
+        render: Compose the card; no padding
+      - id: case-3
+        when: A disclosure trigger and its expanded panel
+        owner: "`SurfaceAccordionCard`"
+        render: Compose the card; no padding
+      - id: case-4
+        when: An empty-state notice
+        owner: "`EmptyNotice`"
+        render: Compose the notice; no padding
+      - id: case-5
+        when: A fenced code block
+        owner: "`FencedCodeBlock`"
+        render: Compose the block; no padding
+      - id: case-6
+        when: A band side that meets the outer edge of a flush surface
+        owner: "`—`"
+        render: "`pt-4` on the first band, `pb-4` on the last"
+      - id: case-7
+        when: The inline sides of any band inside a flush surface
+        owner: "`—`"
+        render: "`px-4` on every band, unchanged by position"
+  - id: PADDING-5
+    title: "`p-6` / `1.5rem`"
+    governs: |-
+      A substantial app-owned section that is intentionally more spacious than the standard inset.
+    cases:
+      - id: case-1
+        when: |-
+          A section whose four sides share one deliberately generous boundary decision
+        owner: "`App`"
+        render: '`<section className="p-6">`'
+      - id: case-2
+        when: A tab frame carrying the page-level inline inset
+        owner: "`Tabs`"
+        render: '`inset="page"` already sets `1.5rem`'
+    notThisRule: |-
+      distance between child sections is a gap, not an inset. Use GAP-5.
+  - id: PADDING-6
+    title: "`p-8` / `2rem`"
+    governs: |-
+      A deliberately generous frame around a large, low-density app region.
+    cases:
+      - id: case-1
+        when: |-
+          A page region that needs strong equal clearance on every side
+        owner: "`App`"
+        render: '`<section className="p-8">`'
+      - id: case-2
+        when: An empty or waiting region occupying most of the viewport
+        owner: "`App`"
+        render: '`<section className="p-8">` with `<EmptyNotice>`'
+    notThisRule: |-
+      as a default for ordinary containers it wastes the viewport. Use PADDING-4.
+  - id: PADDING-7
+    title: Inset step at the wider breakpoint
+    governs: |-
+      One boundary keeps its meaning across widths but takes more room once the width allows it. The
+      compact value and the wide value are adjacent rules, never a jump of two steps, and the block axis
+      follows only where the boundary itself is the owner.
+      Composed from: inline sides of the surface `1rem` → `1.5rem` (PADDING-4 → PADDING-5); a block side
+      meeting the outer edge `1rem` → `1.5rem` (PADDING-4 → PADDING-5); a block side meeting a separator
+      `.75rem` at both widths (PADDING-3).
+    cases:
+      - id: case-1
+        when: |-
+          A decision surface whose inline inset opens up on a wider viewport
+        owner: "`—`"
+        render: '`<div className="px-4 sm:px-6">`'
+      - id: case-2
+        when: The same surface's outer-edge block sides, stepping with it
+        owner: "`—`"
+        render: '`<div className="px-4 pt-4 pb-4 sm:px-6 sm:pt-6 sm:pb-6">`'
+      - id: case-3
+        when: A separator-facing side inside that surface
+        owner: "`—`"
+        render: "`pt-3` stays `.75rem` at both widths"
+    notThisRule: |-
+      a separator side does not step, because the separator draws the same line at every width.
+  - id: PADDING-8
+    title: Subordinate content indented at the inline start
+    governs: |-
+      Content that belongs under the row above it, rather than beside it, indents one step at the inline
+      start. Only the start edge carries the hierarchy. The end edge has no such meaning, so it stays
+      aligned with its parent and the reading measure is not squeezed from both sides.
+      Composed from: inline start one step above the surface inset, `1.5rem` against a `1rem` surface
+      (PADDING-5); inline end the surface inset, unchanged (PADDING-4); block sides whatever each side
+      meets, by the side-contact rule (PADDING-3, PADDING-4).
+    cases:
+      - id: case-1
+        when: |-
+          A disclosure body that reads as the answer belonging to the trigger above it
+        owner: "`—`"
+        render: '`<div className="ps-6 pe-4 py-3">`'
+      - id: case-2
+        when: A nested group whose rows belong to a named parent row
+        owner: "`—`"
+        render: Same recipe, one step per level of nesting
+    notThisRule: |-
+      indenting both sides, which centres the content and reads as a separate inset block rather than as subordinate content. Common's disclosure currently applies `1rem` on both inline sides, so the indented form has no published path. Repairing it belongs to the disclosure component, not to an application override.
+  - id: PADDING-9
+    title: Block inset of a routed block at the wider breakpoint
+    governs: |-
+      A routed block gives its own `main` a vertical inset that steps up once the width allows it, while
+      the inline inset stays with `PageContainer` (`--grammar-page-inset`). The two values are adjacent
+      rules on the scale, never a jump of two steps, and only the block axis is written here.
+      Composed from: block sides of the routed block `1.5rem` → `2rem` (PADDING-5 → PADDING-6); inline sides
+      none, because `PageContainer` owns them (MEASURE-1).
+    cases:
+      - id: case-1
+        when: |-
+          The `main` of a routed block that sits directly under the page shell
+        owner: "`App`"
+        render: '`<main className="py-6 sm:py-8">`'
+    notThisRule: |-
+      an inline inset on the same element, which duplicates the page inset the container already draws. Use MEASURE-1 and leave the inline sides alone.
+    remark: |-
+      Historical source locations recorded in the [knowledge snapshot](index.yaml#source-and-maintenance),
+      not current checkout paths or fresh rendered proof: `blocks/commerce/ProSubscriptionBlock/classNames.ts`
+      (`proPageClassName`), `blocks/learn/CoursePlaygroundCatalog/classNames.ts`,
+      `blocks/learn/PlaygroundSession/classNames.ts`, `blocks/learn/PlaygroundSetup/classNames.ts`.
+doesNotDecide: |-
+  Distance between siblings is [Gap](gap.yaml). External offsets are [Margin](margin.yaml). The page inset
+  belongs to `PageContainer` and is not an application decision.

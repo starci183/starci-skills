@@ -1,0 +1,43 @@
+schema: starci/code-example@1
+id: named-exception
+title: AbstractException declaration shape
+purpose: |
+  Show the mandatory failure shape: metadata interface first, class extends
+  AbstractException, single object constructor argument, stable code string.
+  Distinct from CQRS wiring and transaction propagation.
+appliesTo: [backend]
+relatedRules:
+  - BE-ERROR-1
+  - BE-ERROR-2
+  - BE-ERROR-3
+  - BE-FOLDER-5
+files:
+  - path: abstract.ts
+    role: Base AbstractException with code, metadata, optional httpStatus.
+  - path: example-not-found.ts
+    role: Declared domain exception extending AbstractException.
+entrypoint: example-not-found.ts
+adapt:
+  - Keep exceptions under the host's errors/ folder convention.
+  - Throw named AbstractException subclasses for failed operations; never new Error in production src.
+  - Always pass one metadata object, even when empty: throw new ExampleNotFoundException({}).
+dependencies:
+  packages: []
+  assumptions: |
+    Pure TypeScript shapes with no Nest runtime. Host filters map AbstractException
+    to HTTP/GraphQL; this folder does not demonstrate transport mapping.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Does not include HTTP filter, GraphQL formatError, or Winston logging — see
+    BE-ERROR-5/6/7 in patterns/be/error.json.
+provenance:
+  sources:
+    - starci-academy-backend/src/modules/platform/exceptions/errors/abstract.ts
+    - starci-academy-backend/src/modules/platform/exceptions/errors/courses/challenge-not-found.ts
+  simplifications: |
+    Copied AbstractException API surface without filter/interceptor consumers.
+    Replaced ChallengeNotFound with synthetic ExampleNotFound.

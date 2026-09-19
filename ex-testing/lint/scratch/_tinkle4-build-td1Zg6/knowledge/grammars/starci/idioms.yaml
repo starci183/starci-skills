@@ -1,0 +1,416 @@
+schema: starci/knowledge-source@1
+id: grammar.starci.idioms
+title: StarCi Core — idioms
+purpose: |
+  Recurring compositions StarCi reaches for again: ways of putting published Grammar renderers
+  together that the owner has already chosen more than once. Taste, not law. Universal law lives in
+  knowledge/ui; what each renderer is and owns lives in DNA.yaml. Nothing here re-narrates renderer
+  anatomy. A direction is composed from these idioms plus the business shape, and a reference when
+  the request supplies one.
+appliesTo:
+  - grammar
+family: starci
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  package: "@starci/grammar"
+  publicEntry: "@starci/grammar/common"
+  sources:
+    - starci src/components/blocks/dashboard/*
+    - starci src/components/blocks/commerce/ProSubscriptionBlock
+    - nivo apps/app/src/components/blocks/auth/AuthenticationPanel
+  limitations: |
+    Counts and quotations are historical source observations preserved at the extraction commit; they
+    do not claim current blocks are unchanged. Check selected source before applying; idioms do not
+    replace approved business specifications. DNA.yaml is a package snapshot, not certification of the
+    currently installed API. Verify @starci/grammar/common exports before composing. Every composition
+    cell names only renderers and props the package publishes — do not invent APIs.
+promotion:
+  bar: |
+    At least two occurrences in the evidence blocks listed under provenance.sources. A composition
+    seen once is recorded under seenOnce and never composed from as house style. Where the owner has
+    already written down the intent, that sentence is quoted from the block's own classNames.ts.
+idioms:
+  - id: joined-bands-flush-card
+    title: Joined bands in one flush card
+    summary: |
+      One card, no inner cards: the body is flush, and horizontal rules alone divide it into bands.
+    cases:
+      - id: multi-kind-section
+        when: |
+          A dashboard section holds two or more kinds of content that belong to one heading
+        composition: |
+          SurfaceCard label composition="joined" around one app flex flex-col body whose children are
+          the bands; the card owns the outer boundary and clipping, the app owns border-t
+          border-separator between bands
+        evidence:
+          blocks:
+            - ChangelogList
+            - ContinueLearning
+            - DailyQuest
+            - FeedExplorer
+            - JobReadinessWidget
+            - OverviewContributions
+            - StreakStrip
+            - TrendingContents
+            - WeeklyChallengeCard
+            - WeeklyGoals
+          countNote: 10 dashboard blocks
+          ownerQuotes:
+            - text: Stack full-bleed bands inside one bounded dashboard surface
+              source: blocks/dashboard/classNames.ts
+            - text: Separate stacked dashboard bands without inventing extra vertical space
+              source: blocks/dashboard/classNames.ts
+      - id: peer-list-band
+        when: |
+          A band is a list of peers
+        composition: |
+          An app ul/div with m-0 list-none p-0 divide-y divide-separator; each row px-4 pt-3 pb-3
+          last:pb-4, so the inset is constant and only the outer bottom edge grows
+        evidence:
+          blocks:
+            - ChangelogList
+            - DailyQuest tasks
+            - JobReadinessWidget pillars
+            - WeeklyChallengeCard finishers
+            - MyCoursesProgress
+            - RecommendedCourses
+            - commerce benefit grid
+          ownerQuotes:
+            - text: |
+                One divided row inside a flush dashboard list: px-4 always; pb-4 only on the bottom edge
+              source: blocks/dashboard/classNames.ts
+      - id: explanatory-prose-art-list
+        when: |
+          An explanatory page section carries prose, art, and a list
+        composition: |
+          Same card, the three as successive bands rather than three cards
+        evidence:
+          blocks:
+            - ProSubscriptionBlock benefits card
+          notes: |
+            intro band, journey band, benefit grid inside one SurfaceCard label composition={"joined"}
+
+  - id: neutral-summary-band
+    title: A neutral band opens the card with its summary
+    summary: |
+      The card's one-line answer sits first, on the secondary surface, and is separated from the
+      evidence below it — a summary, never a verdict.
+    cases:
+      - id: measure-before-evidence
+        when: |
+          A card states a measure before it shows the evidence for it
+        composition: |
+          App band bg-surface-secondary text-foreground px-4 pt-4 pb-3 as the first child of the joined
+          card, then border-t border-separator
+        evidence:
+          blocks:
+            - JobReadinessWidget headline
+            - WeeklyGoals summary
+            - WeeklyChallengeCard countdown
+            - ProSubscriptionBlock benefits intro
+      - id: between-separators
+        when: |
+          The band sits between two separators rather than at the top
+        composition: |
+          The same treatment at px-4 py-3
+        evidence:
+          blocks:
+            - DailyQuest reward band
+          ownerQuotes:
+            - text: |
+                Neutral band between separators: px-4 always; p-3 on both separator sides vertically
+              source: blocks/dashboard/classNames.ts
+      - id: proven-outcome-colour
+        when: |
+          The summary is a proven outcome, not a pending promise
+        composition: |
+          Only then does the band take a state colour; an unclaimed promise stays neutral
+        evidence:
+          ownerQuotes:
+            - text: |
+                Keep an unclaimed promise neutral; only a proven claimed outcome receives success
+              source: DailyQuest/classNames.ts
+            - text: |
+                Present weekly progress as a neutral summary rather than a state outcome
+              source: WeeklyGoals/classNames.ts
+          relatedRules:
+            - TRUTH-1..4
+
+  - id: bottom-action-band
+    title: The card's one action closes the bottom band
+    summary: |
+      A card has at most one onward action, and it lives in its own band against the card's bottom
+      edge — never floating inside the content.
+    cases:
+      - id: one-way-onward
+        when: |
+          A card offers one way onward
+        composition: |
+          App band border-t border-separator px-4 pb-4 pt-3 as the last child, holding one Button or
+          TextAction
+        evidence:
+          blocks:
+            - JobReadinessWidget
+            - StreakStrip
+            - WeeklyChallengeCard
+            - WeeklyGoals
+          ownerQuotes:
+            - text: Keep a card's lone action separated at the bottom edge
+              source: blocks/dashboard/classNames.ts
+      - id: purchase-narrow-viewport
+        when: |
+          The action is a purchase and must survive a narrow viewport
+        composition: |
+          The same band with grid grid-cols-1 gap-2, the Button variant="primary" stretched to the band
+          width, and an optional Text size="xs" tone="muted" under it
+        evidence:
+          blocks:
+            - ProSubscriptionBlock
+          ownerQuotes:
+            - text: Full-bleed divider and inset action content for the purchase boundary
+              source: ProSubscriptionBlock/classNames.ts
+
+  - id: generated-art-band
+    title: Generated art is a band, not a card
+    summary: |
+      Generated imagery earns a band inside the surface it belongs to. It never becomes a second card,
+      and it never gets an inset frame that letterboxes it.
+    cases:
+      - id: asset-is-point
+        when: |
+          The asset is the point of the section
+        composition: |
+          Its own full-bleed band inside the joined card: border-t border-separator above, no inset,
+          and an image at block h-auto w-full so the generated ratio survives
+        evidence:
+          blocks:
+            - ProSubscriptionBlock journey band
+          ownerQuotes:
+            - text: |
+                The generated journey is its own edge-to-edge joined band; the SurfaceCard owns outer
+                clipping
+              source: ProSubscriptionBlock/classNames.ts
+            - text: |
+                Preserve the generated asset ratio without an inset frame or letterbox
+              source: ProSubscriptionBlock/classNames.ts
+      - id: decorative-discovery
+        when: |
+          The asset is decorative reward or discovery art
+        composition: |
+          MediaFrame aspect="landscape" fit="contain" treatment="plain" inside an app band on
+          bg-accent-soft, or an accent slab with the art anchored to its trailing edge and alt="" /
+          aria-hidden
+        evidence:
+          blocks:
+            - TrendingContents media panel
+            - DailyQuest hero
+          ownerQuotes:
+            - text: Keep generated discovery media prominent without becoming a separate card
+              source: TrendingContents
+            - text: The generated quest illustration stays decorative on the hero's trailing edge
+              source: DailyQuest
+
+  - id: title-supporting-line
+    title: Title and one supporting line
+    summary: |
+      Two lines, tightly stacked: what the thing is called, then one muted line that qualifies it. It
+      is the most repeated relationship in the whole surface set.
+    cases:
+      - id: row-or-cell
+        when: |
+          Inside a row or cell, where the title is not document structure
+        composition: |
+          Text size="sm" weight="semibold" then Text size="xs" tone="muted", stacked at GAP-1
+        evidence:
+          blocks:
+            - Dashboard rows
+            - commerce benefit rows
+          ownerQuotes:
+            - text: Title and explanation stack for one outcome
+              source: ProSubscriptionBlock/classNames.ts
+      - id: surface-name
+        when: |
+          The title is the surface's own name
+        composition: |
+          Heading then Text size="sm" tone="muted"
+        evidence:
+          blocks:
+            - nivo AuthenticationPanel header and its notice tree
+          ownerQuotes:
+            - text: Title and subtitle stay visually coupled
+              source: AuthenticationPanel/classNames.ts
+      - id: qualifier-above
+        when: |
+          The qualifier belongs above the title
+        composition: |
+          Text size="xs" tone="muted" first, then Text size="md" weight="semibold"
+        evidence:
+          blocks:
+            - ContinueLearning
+          ownerQuotes:
+            - text: Keep the supporting kind close to the destination title it qualifies
+              source: ContinueLearning
+      - id: grammar-owned-pair
+        when: |
+          Grammar should own the pair
+        composition: |
+          SurfaceCopyGroup — the one renderer published for this rhythm
+        evidence:
+          blocks:
+            - ProSubscriptionBlock purchase status
+    notes: |
+      The historical note counted eight pairs in its sample, seven built with an app div. The
+      typed-slot proposal cited by the old document is unavailable and unverified; do not treat that
+      proposal as a published API. If ownership needs changing, inspect current source and record a
+      fresh scoped proposal.
+
+  - id: pending-same-tree
+    title: Pending is the same tree, resting
+    summary: |
+      A loading surface is the finished surface with its content at rest — same card, same bands, same
+      row count. It is never a spinner and never a different tree.
+    cases:
+      - id: waiting-for-data
+        when: |
+          The block is waiting for its data
+        composition: |
+          SurfaceCard state={loading ? "pending" : "neutral"}, a fixed-length array of resting items
+          in place of the real ones, and isSkeleton on every Text and Heading inside
+        evidence:
+          blocks:
+            - ChangelogList
+            - ContinueLearning
+            - DailyQuest
+            - JobReadinessWidget
+            - OverviewContributions
+            - StreakStrip
+            - WeeklyChallengeCard
+            - WeeklyGoals
+            - ProSubscriptionBlock
+      - id: action-must-not-fire
+        when: |
+          An action exists but must not fire yet
+        composition: |
+          The same tree with Button isDisabled rather than a removed button, so the layout does not
+          move when data lands
+        evidence:
+          blocks:
+            - ProSubscriptionBlock purchase action
+      - id: empty-or-failed
+        when: |
+          The block has no data at all, or the read failed
+        composition: |
+          A different tree: SurfaceCard composition="single" around one EmptyNotice with message,
+          optional actionLabel, and iconSource — empty and failed are states, not a resting variant
+        evidence:
+          blocks:
+            - ContinueLearning
+            - DailyQuest
+            - TrendingContents
+          relatedRules:
+            - STATE-1
+
+  - id: one-highlighted-card
+    title: One highlighted card
+    summary: |
+      At most one card in a view wears isHighlight, and it is the one thing the reader is meant to do
+      next. Highlight is a claim about the task, not decoration.
+    cases:
+      - id: peers-one-next-step
+        when: |
+          Peers are shown together but one is the intended next step
+        composition: |
+          SurfaceCard isHighlight={true} on that one card only; peers keep the same props otherwise,
+          so the difference reads as rank rather than as a different component
+        evidence:
+          blocks:
+            - ContinueLearning
+          ownerQuotes:
+            - text: |
+                The first resumable item is the focal task; later items remain useful but quieter
+              source: ContinueLearning
+      - id: close-one-decision
+        when: |
+          The view exists to close one decision
+        composition: |
+          The decision card is the highlighted one and sits in the rail of PrimaryRailLayout;
+          everything explanatory stays unhighlighted in primary
+        evidence:
+          blocks:
+            - ProSubscriptionBlock plan rail
+
+  - id: single-column-form-stack
+    title: Single-column form stack
+    summary: |
+      Fields, then the status sentence, then one primary submit — one column, one submit, in that order.
+    cases:
+      - id: credentials-or-code
+        when: |
+          A step asks for credentials or a code
+        composition: |
+          An app form around flex flex-col gap-4: Input per field with label, placeholder, hint,
+          errorMessage, isError, isDisabled; then the status Text size="sm" tone="muted" live
+          (assertive for a refusal, polite otherwise); then one Button variant="primary" type="submit"
+          isPending
+        evidence:
+          blocks:
+            - nivo AuthenticationPanel details step
+            - nivo AuthenticationPanel code step
+          ownerQuotes:
+            - text: Credentials and their submit controls form one semantic unit
+              source: AuthenticationPanel/classNames.ts
+      - id: secondary-ways-onward
+        when: |
+          Secondary ways onward exist
+        composition: |
+          They follow the form as TextAction size="sm" in a wrapping row, never as a second Button
+          variant="primary"
+        evidence:
+          blocks:
+            - AuthenticationPanel resend/back row and its footer prompt
+          ownerQuotes:
+            - text: Secondary text actions wrap cleanly instead of overflowing
+              source: AuthenticationPanel
+
+seenOnce:
+  note: |
+    Recorded so nobody re-derives them as if they were house style, and so a second occurrence can
+    support later promotion. A direction may use the underlying Common semantics and family anatomy
+    when the product needs the shape, but it must not cite this list as reusable house style.
+  compositions:
+    - id: priced-decision-rail
+      composition: |
+        Priced decision rail: Heading level={2} beside Badge tone="accent", then price and period as
+        one labelled fact, then the bottom action band
+      where: ProSubscriptionBlock plan
+      secondOccurrenceWouldSettle: |
+        Whether the price/period pair is the house way to state a recurring charge
+    - id: accordion-secondary-explanation
+      composition: |
+        SurfaceAccordionCard depth="top" carrying secondary explanation with no card of its own around it
+      where: ProSubscriptionBlock disclosures
+      secondOccurrenceWouldSettle: |
+        Whether disclosure is the house answer for content that must be present but not read
+    - id: orientation-stack
+      composition: |
+        Orientation stack before the first band: breadcrumb, then SectionHeader
+        composition="context-intro" level={1}, inside a max-w-3xl column
+      where: ProSubscriptionBlock
+      secondOccurrenceWouldSettle: |
+        Whether a route opens with orientation rather than with its first surface
+    - id: provider-shortcut-before-form
+      composition: |
+        Provider shortcut above a labelled Divider, before the credential form
+      where: nivo AuthenticationPanel
+      secondOccurrenceWouldSettle: |
+        Whether the shortcut always precedes the form
+    - id: leading-icon-tile
+      composition: |
+        A leading IconTile beside a copy block
+      where: ContinueLearning
+      secondOccurrenceWouldSettle: |
+        Whether identity art belongs beside copy or above it
+  deferredByOwner: |
+    The owner's own proposal records one further shape — a muted supporting line followed by an
+    action — at two instances and declines to promote it ("Two instances are not a pattern yet; it
+    stays app-owned"). It stays out of this file until the owner says otherwise.

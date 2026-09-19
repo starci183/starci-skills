@@ -1,0 +1,56 @@
+PASS brand and owner review bind rev 3
+PASS source hash src/app/globals.css
+PASS source hash node_modules/@starci/grammar/dist/core/styles.css
+PASS source hash node_modules/@starci/grammar/dist/common/styles.css
+PASS source hash node_modules/tailwindcss/theme.css
+PASS exact source line --starci-core-accent
+PASS declared value --starci-core-accent
+PASS unrounded contrast --starci-core-accent = 4.667946:1
+PASS exact source line --color-white
+PASS declared value --color-white
+PASS unrounded contrast --color-white = 17.718861:1
+PASS exact source line --color-black
+PASS declared value --color-black
+PASS exact source line --starci-core-danger
+PASS declared value --starci-core-danger
+PASS unrounded contrast --starci-core-danger = 5.005703:1
+PASS exact source line --starci-core-canvas
+PASS declared value --starci-core-canvas
+PASS exact source line --starci-core-surface
+PASS declared value --starci-core-surface
+PASS exact source line --starci-core-surface-secondary
+PASS declared value --starci-core-surface-secondary
+PASS exact source line --starci-core-foreground
+PASS declared value --starci-core-foreground
+PASS exact source line --starci-core-muted
+PASS declared value --starci-core-muted
+PASS exact source line --starci-core-border
+PASS declared value --starci-core-border
+PASS exact source line --starci-core-separator
+PASS declared value --starci-core-separator
+PASS primary and danger distinct
+PASS actual app accent and alias wired
+PASS danger is not redefined
+PASS inspected Grammar hash package.json
+PASS inspected Grammar hash dist/common/index.d.ts
+PASS inspected Grammar hash dist/common/renderers.js
+PASS inspected Grammar hash dist/common/styles.css
+PASS inspected Grammar hash dist/core/styles.css
+PASS inspected Grammar hash dist/core/primitive/GrammarRoot/index.js
+PASS inspected Grammar hash dist/core/primitive/Button/index.d.ts
+PASS inspected Grammar hash dist/core/primitive/Text/index.d.ts
+PASS inspected Grammar hash dist/core/primitive/Input/index.d.ts
+PASS inspected Grammar hash dist/core/primitive/TextAction/index.d.ts
+PASS inspected Grammar hash dist/core/primitive/PressableField/index.d.ts
+PASS inspected Grammar hash dist/core/primitive/Progress/index.d.ts
+PASS inspected Grammar hash dist/core/composition/WorkspaceShell/index.d.ts
+PASS inspected Grammar hash dist/core/composition/WorkspaceShell/index.js
+PASS inspected Grammar hash dist/core/composition/Sidebar/index.d.ts
+PASS inspected Grammar hash dist/core/composition/PrimaryRailLayout/index.d.ts
+PASS current lock matches inspected installation lock
+PASS All 1 declared mascot assets exist in a supported format and match their declared sha256.
+PASS Every icon import across 48 scanned files comes from the brand's declared glyph set.
+INFO white-on-primary contrast = 4.498767:1; forbidden pair is not used. Black label ink must be wired at implementation.
+INFO Common imports do not activate Core material tokens; this check verifies source declarations, not a served theme or browser render.
+
+exit: 0

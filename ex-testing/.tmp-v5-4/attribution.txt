@@ -1,0 +1,93 @@
+
+########## todo-be (starci-todo-app-backend) ##########
+coverage=72.0
+  reliability_rating=1.0
+  duplicated_lines_density=1.1
+  code_smells=32
+  new_violations=undefined
+  security_rating=2.0
+  ncloc=12851
+  new_coverage=undefined
+  vulnerabilities=3
+  security_hotspots=0
+  new_duplicated_lines_density=undefined
+  new-code open issues total=20
+  by type: CODE_SMELL=17 VULNERABILITY=3
+  new-code issues by file:
+      5  src/tests/e2e/resilience/e2e-infra-contract.ts
+      2  src/modules/bussiness/notify/delivery.service.ts
+      2  src/modules/bussiness/share/invitation.service.ts
+      1  src/features/todo/graphql/graphql.module.ts
+      1  src/features/todo/graphql/session-actor.adapter.ts
+      1  src/modules/bussiness/audit/audit-operator-read.ts
+      1  src/modules/bussiness/audit/audit-operator.guard.spec.ts
+      1  src/modules/bussiness/notify/notify.service.ts
+      1  src/modules/bussiness/recur/occurrence.service.ts
+      1  src/modules/bussiness/session/session.service.ts
+      1  src/modules/integrations/notify-smtp/notify-smtp.client.ts
+      1  src/modules/integrations/sepay/sepay.client.ts
+      1  src/modules/shared/exceptions/exceptions.spec.ts
+      1  src/tests/infra/platform/stack/e2e-stack.service.ts
+  rule/severity detail:
+    CODE_SMELL/INFO typescript:S1135 src/features/todo/graphql/graphql.module.ts:68
+    CODE_SMELL/MAJOR typescript:S8786 src/features/todo/graphql/session-actor.adapter.ts:6
+    CODE_SMELL/MINOR typescript:S7763 src/modules/bussiness/audit/audit-operator-read.ts:90
+    CODE_SMELL/MINOR typescript:S5906 src/modules/bussiness/audit/audit-operator.guard.spec.ts:226
+    CODE_SMELL/CRITICAL typescript:S3776 src/modules/bussiness/notify/delivery.service.ts:104
+    CODE_SMELL/MINOR typescript:S6582 src/modules/bussiness/notify/delivery.service.ts:111
+    CODE_SMELL/MINOR typescript:S6551 src/modules/bussiness/notify/notify.service.ts:173
+    CODE_SMELL/MAJOR typescript:S3358 src/modules/bussiness/recur/occurrence.service.ts:99
+    CODE_SMELL/MAJOR typescript:S8786 src/modules/bussiness/session/session.service.ts:34
+    CODE_SMELL/MAJOR typescript:S8786 src/modules/bussiness/share/invitation.service.ts:51
+    CODE_SMELL/MINOR typescript:S7776 src/modules/bussiness/share/invitation.service.ts:54
+    CODE_SMELL/MAJOR typescript:S6557 src/modules/integrations/notify-smtp/notify-smtp.client.ts:166
+    CODE_SMELL/MINOR typescript:S7776 src/modules/integrations/sepay/sepay.client.ts:43
+    CODE_SMELL/MINOR typescript:S5906 src/modules/shared/exceptions/exceptions.spec.ts:440
+    VULNERABILITY/MINOR typescript:S4036 src/tests/e2e/resilience/e2e-infra-contract.ts:17
+    VULNERABILITY/MINOR typescript:S4036 src/tests/e2e/resilience/e2e-infra-contract.ts:33
+    CODE_SMELL/MAJOR typescript:S8786 src/tests/e2e/resilience/e2e-infra-contract.ts:84
+    CODE_SMELL/MINOR typescript:S6551 src/tests/e2e/resilience/e2e-infra-contract.ts:210
+    CODE_SMELL/MAJOR typescript:S4624 src/tests/e2e/resilience/e2e-infra-contract.ts:210
+    VULNERABILITY/MINOR typescript:S4036 src/tests/infra/platform/stack/e2e-stack.service.ts:297
+
+########## ec-be (starci-ecommerce-app-be) ##########
+coverage=63.3
+  reliability_rating=1.0
+  duplicated_lines_density=3.3
+  code_smells=25
+  new_violations=undefined
+  security_rating=3.0
+  ncloc=4364
+  new_coverage=undefined
+  vulnerabilities=4
+  security_hotspots=0
+  new_duplicated_lines_density=undefined
+  new-code open issues total=14
+  by type: CODE_SMELL=14
+  new-code issues by file:
+      2  src/features/checkout/graphql/graphql.module.ts
+      2  src/features/checkout/graphql/queries/cart/cart/cart.resolver.ts
+      2  src/features/identity/graphql/graphql.module.ts
+      1  src/features/checkout/graphql/mutations/index.ts
+      1  src/features/checkout/graphql/queries/index.ts
+      1  src/features/identity/graphql/mutations/index.ts
+      1  src/features/identity/graphql/queries/index.ts
+      1  src/features/identity/transport/http/health.controller.ts
+      1  src/modules/platform/config/identity/app-config.service.ts
+      1  src/modules/platform/config/order/app-config.service.ts
+      1  src/tests/infra/integrations/graphql/e2e-graphql.service.ts
+  rule/severity detail:
+    CODE_SMELL/INFO typescript:S1135 src/features/checkout/graphql/graphql.module.ts:31
+    CODE_SMELL/MINOR typescript:S7744 src/features/checkout/graphql/graphql.module.ts:58
+    CODE_SMELL/INFO typescript:S1135 src/features/checkout/graphql/mutations/index.ts:15
+    CODE_SMELL/MINOR typescript:S3863 src/features/checkout/graphql/queries/cart/cart/cart.resolver.ts:19
+    CODE_SMELL/MINOR typescript:S3863 src/features/checkout/graphql/queries/cart/cart/cart.resolver.ts:22
+    CODE_SMELL/INFO typescript:S1135 src/features/checkout/graphql/queries/index.ts:9
+    CODE_SMELL/INFO typescript:S1135 src/features/identity/graphql/graphql.module.ts:31
+    CODE_SMELL/MINOR typescript:S7744 src/features/identity/graphql/graphql.module.ts:57
+    CODE_SMELL/INFO typescript:S1135 src/features/identity/graphql/mutations/index.ts:12
+    CODE_SMELL/INFO typescript:S1135 src/features/identity/graphql/queries/index.ts:9
+    CODE_SMELL/INFO typescript:S1135 src/features/identity/transport/http/health.controller.ts:26
+    CODE_SMELL/MINOR typescript:S6551 src/modules/platform/config/identity/app-config.service.ts:71
+    CODE_SMELL/MINOR typescript:S6551 src/modules/platform/config/order/app-config.service.ts:66
+    CODE_SMELL/INFO typescript:S1135 src/tests/infra/integrations/graphql/e2e-graphql.service.ts:45

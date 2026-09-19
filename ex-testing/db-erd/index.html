@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>StarCi Ledger DB — runtime.sqlite</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --ink:#e6e9ef; --mut:#8b93a3; --acc:#6d97ff; --line:#262b36; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 ui-monospace,Consolas,monospace; }
+  header { padding:28px 32px 12px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:20px; } h2 { font-size:15px; color:var(--acc); margin:34px 0 8px; }
+  .sub { color:var(--mut); max-width:900px; }
+  main { padding:0 32px 60px; }
+  .mermaid { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; margin:10px 0 26px; }
+  th,td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--panel); color:var(--acc); }
+  td.k { color:#ffd479; white-space:nowrap; }
+  code { color:#9eceff; }
+  .note { color:var(--mut); font-size:12px; }
+  .tag { display:inline-block; padding:1px 7px; border:1px solid var(--line); border-radius:99px; font-size:11px; color:var(--mut); }
+</style>
+</head>
+<body>
+<header>
+  <h1>StarCi Workflow Ledger — DB design</h1>
+  <div class="sub">
+    <b>runtime.sqlite</b> (per-ledger repo, <code>.starciwork/runtime.sqlite</code>) = toàn bộ truth của workflow:
+    state snapshots + audit events + jobs/leases + contracts/reports + inputs. Một transaction ghi snapshot+event+lease
+    cùng lúc → drift <b>không thể persist</b>, không chỉ detectable.<br>
+    <b>machine.sqlite</b> = arbiter duy nhất cho tài nguyên cross-ledger (ai/* quota, machine budgets).
+    WAL mode · busy_timeout 15s · FK on · archive = copy 1 file (sau wal_checkpoint TRUNCATE).
+  </div>
+</header>
+<main>
+
+<h2>1. ERD — runtime.sqlite</h2>
+<div class="mermaid">
+erDiagram
+  workflows ||--o{ goals : "revisions"
+  workflows ||--o{ state_snapshots : "checkpoints"
+  workflows ||--o{ events : "audit chain"
+  workflows ||--o{ jobs : "dispatches"
+  workflows ||--o{ incidents : "stuck ops"
+  workflows ||--o{ reports : "op reports"
+  workflows ||--o{ contracts : "op contracts"
+  workflows ||--o{ checks : "op checks"
+  workflows ||--o{ inbox : "pending inputs"
+  workflows ||--o{ inputs : "owner files (blob)"
+  jobs ||--o{ leases : "holds (FK+trigger)"
+  jobs ||--o{ budget_reservations : "reserves"
+  resources ||--o{ leases : "capacity"
+  budgets ||--o{ budget_reservations : "limits"
+
+  workflows {
+    text workflow_id PK
+    int generation "monotonic, lease trigger soi"
+    text goal_identity
+    text phase
+    text pin_digest
+    int archived_at
+  }
+  goals {
+    int goal_seq PK
+    text workflow_id FK
+    int revision "UNIQUE(wf,rev)"
+    text goal_identity
+    text markdown
+    text amendment_json
+  }
+  state_snapshots {
+    text checkpoint_id UK
+    int generation
+    text goal_identity
+    text state_json
+    text events_head "digest đỉnh chuỗi"
+  }
+  events {
+    int seq PK
+    text event_id UK
+    text entity_type
+    text kind
+    text prev_digest "→ digest chain trigger"
+    text digest
+  }
+  jobs {
+    text job_id PK
+    text workflow_id FK
+    text op_id
+    int attempt
+    int generation
+    text status "queue index"
+    text lease_token "lease phải khớp token này"
+  }
+  resources {
+    text resource_key PK
+    int capacity
+  }
+  leases {
+    text resource_key PK,FK
+    text job_id PK,FK
+    int generation "trigger: == jobs.generation"
+    text token "trigger: == jobs.lease_token"
+    int expires_at
+  }
+  budgets {
+    text scope_key PK
+    int limit_value
+    int used_value
+    int reserved_value
+  }
+  budget_reservations {
+    text scope_key PK,FK
+    text job_id PK,FK
+    int units
+  }
+  incidents {
+    text incident_id PK
+    text workflow_id FK
+    int attempts
+    int tokens
+    text status
+  }
+  reports {
+    text dispatch_id "UNIQUE(wf,dispatch)"
+    text outcome
+    text report_json
+    int consumed_at
+  }
+  contracts {
+    text op_id PK
+    int attempt PK
+    text dispatch_id
+    text markdown
+  }
+  checks {
+    text op_id PK
+    int attempt PK
+    text checks_json
+  }
+  inbox {
+    text kind
+    text key
+    text status "pending→applied"
+    int applied_at
+  }
+  inputs {
+    text key PK "<idx>-<basename>"
+    int goal_revision "frozen lúc goal"
+    text sha256 "bind by hash, not path"
+    blob bytes
+  }
+  signals {
+    text scope PK
+    text key PK
+    int expires_at
+  }
+  runtime_loads {
+    text runtime PK
+    text loads_json
+  }
+</div>
+
+<h2>2. ERD — machine.sqlite (cross-ledger arbiter)</h2>
+<div class="mermaid">
+erDiagram
+  ledgers ||--o{ leases : "holds (mỗi ledger)"
+  ledgers ||--o{ budget_reservations : "per-ledger quota"
+  resources ||--o{ leases : "ai/* capacity"
+  budgets ||--o{ budget_reservations : "ai/* budgets"
+  ledgers {
+    text ledger_id PK "meta.ledger_id — identity theo bytes, không theo path"
+    text file "last known path, refresh on register"
+    int seen_at
+  }
+  leases {
+    text resource_key PK
+    text token PK
+    text ledger_id FK
+    text job_id "không FK — job sống ở ledger"
+    int expires_at
+  }
+</div>
+
+<h2>3. Từng bảng trả lời câu hỏi gì</h2>
+<table>
+<tr><th>Bảng</th><th>Nghiệp vụ — row này cho kernel quyết định gì</th><th>Invariant / guard</th></tr>
+<tr><td class="k">meta</td><td>Identity của chính ledger — <code>ledger_id</code> theo BYTES không theo path (clone repo ≠ clone ledger)</td><td>seed 1 lần, never rewritten</td></tr>
+<tr><td class="k">workflows</td><td>Một workflow = một goal đang chạy. <code>generation</code> tăng đơn điệu — mọi lease/snapshot phải khớp nó</td><td>pin_digest, archived_at</td></tr>
+<tr><td class="k">goals</td><td>Mỗi lần goal revise/amend → 1 revision mới, không ghi đè — audit trail của intent</td><td>UNIQUE(wf, revision)</td></tr>
+<tr><td class="k">state_snapshots</td><td>Checkpoint để resume sau crash — <code>events_head</code> pin digest đỉnh event chain lúc snapshot</td><td>lookup idx (wf, generation)</td></tr>
+<tr><td class="k">events</td><td>Append-only audit log — mỗi event hash-chain vào prev (prev_digest→digest)</td><td><b>trigger</b> chain digest — sai chain = INSERT abort</td></tr>
+<tr><td class="k">jobs</td><td>Op dispatch đang/chờ chạy — status+kind là queue index; <code>lease_token</code> là chìa mọi lease phải khớp</td><td>jobs_queue, jobs_op idx</td></tr>
+<tr><td class="k">leases</td><td>Resource job đang giữ. <b>Trigger soi identity đầy đủ</b> (job_id+wf+op+attempt+generation+token) → lease-identity-drift không thể ghi</td><td>2 triggers INSERT/UPDATE; ON DELETE CASCADE</td></tr>
+<tr><td class="k">budgets + reservations</td><td>Quota per scope — reserved tách used để biết đang giữ chỗ</td><td>CHECK ≥0, FK cascade</td></tr>
+<tr><td class="k">incidents</td><td>Op kẹt — attempts/tokens/elapsed để quyết retry hay escalate</td><td>—</td></tr>
+<tr><td class="k">reports</td><td>Report op trả về — <code>consumed_at</code> phân biệt "đã giao" vs "đã xử lý"</td><td>UNIQUE(wf, dispatch_id) chống double-report</td></tr>
+<tr><td class="k">contracts / checks</td><td>Contract + checks của mỗi (op,attempt) — chìa composite vì retry = attempt mới</td><td>PK(wf,op,attempt)</td></tr>
+<tr><td class="k">inbox</td><td>Input đến chưa apply — pending→applied disposition</td><td>—</td></tr>
+<tr><td class="k">inputs</td><td><b>Owner files theo BYTES</b> — sha256 bind, blob inline. Sinh ra để fix bug "worktree xóa → input mất"</td><td>PK(wf,key), goal_revision freeze</td></tr>
+<tr><td class="k">signals</td><td>Cross-process signal có TTL (expires_at)</td><td>—</td></tr>
+<tr><td class="k">runtime_loads</td><td>Load hiện tại của từng runtime — feed cho model selection</td><td>—</td></tr>
+<tr><td class="k">migrations</td><td>Journal/record cũ đã import — idempotent marker</td><td>—</td></tr>
+</table>
+
+<h2>4. Ba cơ chế "drift không thể persist"</h2>
+<table>
+<tr><th>Cơ chế</th><th>Nó ngăn gì</th></tr>
+<tr><td><b>events digest chain</b> — trigger tính digest = sha256(prev_digest + payload) mỗi INSERT</td><td>Ghi event lệch chuỗi = transaction abort — audit log không thể bị sửa lén giữa chừng</td></tr>
+<tr><td><b>leases_match_job</b> — lease phải khớp job identity+token+generation đúng lúc ghi</td><td>Lease trỏ job cũ/stale không bao giờ vào DB — lease-drift là impossible-state, không phải lỗi phát hiện sau</td></tr>
+<tr><td><b>1 transaction</b> cho snapshot+event+job+lease</td><td>Crash giữa chừng = rollback hết, không có "state mới mà event cũ" — unreconciled-pending bất khả thi</td></tr>
+</table>
+
+<h2>5. Bản chất thiết kế</h2>
+<table>
+<tr><th>Quyết định</th><th>Lý do</th></tr>
+<tr><td>1 file sqlite per ledger repo, không phải DB server</td><td>Archive = copy file · inspect = SELECT · worktree xóa thì record sống trong repo-owning dir</td></tr>
+<tr><td>File untracked + anchor tracked riêng</td><td>Re-clone → ledger-missing REFUSE thay vì restart âm thầm từ generation 0</td></tr>
+<tr><td>machine.sqlite tách riêng</td><td>Chỉ ai/* quota + machine budgets là cross-ledger — giữ arbiter nhỏ nhất có thể</td></tr>
+<tr><td>WAL + busy_timeout 15s</td><td>Kernel ghi trong khi 10 workers đọc contracts cùng lúc</td></tr>
+<tr><td>inputs lưu BLOB + sha256</td><td>Path chết theo worktree; bytes + hash không</td></tr>
+</table>
+
+<p class="note">Source of truth: <code>.dist/kernel/ledger-db.mjs</code> + <code>.dist/docs/ledger-db.md</code> (keystone contract — lead-only edit). Page generated for review; canon catalog lands in <code>.claude/sqlite/</code> via tinkle-7.</p>
+</main>
+<script>mermaid.initialize({startOnLoad:true, theme:'dark', themeVariables:{fontFamily:'ui-monospace,Consolas,monospace'}})</script>
+</body>
+</html>

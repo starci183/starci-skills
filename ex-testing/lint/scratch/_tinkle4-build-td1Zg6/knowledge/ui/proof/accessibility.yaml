@@ -1,0 +1,137 @@
+schema: starci/knowledge-source@1
+id: ui.proof.accessibility
+title: Accessibility proof
+appliesTo:
+  - ui
+family: proof
+purpose: |-
+  This file answers one question: in the tree that actually rendered, can every reader perceive and
+  operate what the direction intended?
+  Nothing here is settled by reading source. A prop in the source is an intention; the accessible name
+  computed from the rendered node is the evidence. Each rule below states the observation that would
+  falsify it, so a passing claim always names something that was looked at.
+rules:
+  - id: A11Y-1
+    title: Field name and relationships
+    governs: |-
+      Governs whether a field's identity and its current guidance reach assistive output.
+    cases:
+      - id: case-1
+        when: A field renders with a visible label
+        observe: |-
+          The computed accessible name equals the visible label. A name supplied only by a placeholder, or a field with no name at all, falsifies it
+      - id: case-2
+        when: The field has a hint, an error, or both
+        observe: |-
+          The message is programmatically related to that input as its description, and the text is the current one. A visible message with no relation to the control falsifies it
+      - id: case-3
+        when: The field is required, invalid, or disabled
+        observe: |-
+          The rendered semantics match the current business facts. A red border with no invalid semantics falsifies it
+      - id: case-4
+        when: The reader types and validation runs again
+        observe: |-
+          The entered value survives the state change, and the description is the new one rather than a stale message
+    notThisRule: |-
+      whether the failure was placed on the right owner in the first place is decided in composition, under FEEDBACK-1.
+  - id: A11Y-2
+    title: Glyph-only commands still carry a name
+    governs: Governs commands whose visible content is a glyph.
+    cases:
+      - id: case-1
+        when: "`IconButton` renders a glyph-only command"
+        observe: |-
+          The button role carries an accessible name equal to its `label`. A tooltip as the only explanation falsifies it
+      - id: case-2
+        when: The button contains a decorative leading glyph
+        observe: |-
+          The inner glyph is hidden from assistive output. The same name computed twice, once on the button and once on the icon, falsifies it
+      - id: case-3
+        when: A standalone glyph itself carries meaning
+        observe: |-
+          `Icon.ariaLabel` produces an image role with that name. A meaningful glyph left hidden falsifies it
+      - id: case-4
+        when: The command can be disabled
+        observe: |-
+          Keyboard activation reaches it when enabled, and produces nothing when disabled
+  - id: A11Y-3
+    title: Measurements have an accessible identity
+    governs: Governs numbers rendered as bars.
+    cases:
+      - id: case-1
+        when: A resolved measurement renders
+        observe: |-
+          The progressbar exposes an accessible name equal to its label, the current value, a minimum of `0`, and a maximum of `100`, and that value equals the product fact
+      - id: case-2
+        when: The value has not resolved
+        observe: |-
+          The skeleton renders aria-hidden geometry with no progressbar and no label. A named progressbar announcing zero falsifies it
+      - id: case-3
+        when: "`value` was omitted while data was unknown"
+        observe: |-
+          The non-skeleton renderer defaults it, so the rendered output announces `0`, which falsifies the claim that the value is unknown
+      - id: case-4
+        when: A decorative bar sits beside the measurement
+        observe: |-
+          It carries no progressbar role. A second announced measurement for one fact falsifies the region
+  - id: A11Y-4
+    title: Perceivable and operable at every required state
+    governs: Governs the evidence that closes an accessibility claim.
+    cases:
+      - id: case-1
+        when: A target must be operable by touch
+        observe: |-
+          Accordion triggers and controls inside a rail measure at least `44px × 44px` in the current render. Any other target needs its own published contract before a minimum is asserted
+      - id: case-2
+        when: The task is attempted by keyboard alone
+        observe: |-
+          Every required control is reachable and operable. One unreachable required control falsifies the page
+      - id: case-3
+        when: |-
+          The page is viewed in forced colours, at reduced contrast, or with colour removed
+        observe: |-
+          Every state, selection, and focus distinction survives. A distinction carried by fill alone falsifies it
+      - id: case-4
+        when: |-
+          The page is zoomed, the text is scaled, or the viewport narrows
+        observe: No required content and no focus indicator is clipped
+      - id: case-5
+        when: A family or the application styles over the published owner
+        observe: |-
+          The isolated published output, the family delta, and the application delta are compared separately, so the failing layer is named
+    notThisRule: |-
+      which semantic owner should have been chosen is decided in composition, under HIERARCHY-1 and STATE-1.
+  - id: A11Y-5
+    title: The accessibility verdict
+    governs: |-
+      Governs how selected observations are summarized in the current `.starciwork` node's evidence.
+    cases:
+      - id: case-1
+        when: The lens runs
+        observe: |-
+          `A11Y-1` to `A11Y-4` are each judged at every state the coverage declares, in every colour scheme, from the computed accessibility tree and the measured render rather than from source
+      - id: case-2
+        when: The verdict is computed
+        observe: |-
+          The gating set is the whole set: `pass` requires every criterion to pass, because a reader who cannot reach a control is not partially served. There is no mean and no tolerance here, and averaging this topic into another falsifies it
+      - id: case-3
+        when: A criterion has no observation behind it
+        observe: |-
+          The verdict is `blocked`, never `pass` and never `fail`, because a render nobody measured has earned neither
+      - id: case-4
+        when: A failure has been measured
+        observe: |-
+          Record whether the measured defect belongs to a value, a structure/relationship, or an unavailable capability in the verified installed family. This is a finding and owner recommendation, not permission to edit another owner or run another op.
+    notes:
+      - |-
+        The scored set is `A11Y-1` to `A11Y-4`; this rule only summarizes and is not itself scored.
+      - |-
+        Store assertions, observations and artifact references in the selected node's evidence; there is
+    remark: |-
+      no separate receipt table or downstream verdict-copying rule. Missing evidence never earns a pass.
+doesNotDecide: |-
+  Which rank, action, or state the direction chose is [Hierarchy](../composition/hierarchy.yaml),
+  [Action](../composition/action.yaml), and [State](../composition/state.yaml). Where the focus indicator
+  goes and how far focus may travel is [Focus](focus.yaml). Whether animation removes meaning is
+  [Motion](motion.yaml), and whether the rendered claim matches authority is
+  [Render truth](render-truth.yaml).

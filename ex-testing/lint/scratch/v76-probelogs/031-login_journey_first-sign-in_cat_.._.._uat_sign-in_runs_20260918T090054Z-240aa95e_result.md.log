@@ -1,0 +1,8 @@
+$ cat ../../uat/sign-in/runs/20260918T090054Z-240aa95e/result.md
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend\.starciwork\features\login\journey\first-sign-in)
+exit 1
+
+
+'cat' is not recognized as an internal or external command,
+operable program or batch file.
+

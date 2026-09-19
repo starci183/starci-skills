@@ -1,0 +1,46 @@
+✔ REV_NOT_BUMPED: normative text moved with change.rev unchanged is refused, naming the transition (606.3638ms)
+✔ a comment-only edit is not a revision: identical parsed content moves no finding at all (639.7281ms)
+✔ a record that never authored a change block is counted once per tree, not suspected per edit (567.7206ms)
+✔ REV_NOT_MONOTONIC: a revision number that goes backwards across committed history is refused (550.6751ms)
+✔ a withdrawal quoted verbatim from the previous revision is exactly what the check expects (541.0705ms)
+✔ a withdrawal naming a clause no committed revision carried is refused down to the record birth (545.2ms)
+✔ the same claim drops to SUSPECT when --limit hides the birth, so a truncated walk never refuses (523.7739ms)
+✔ a withdrawal quoting a fragment of a longer clause is a suspicion, not a refusal (802.5045ms)
+✔ a withdrawal quoting prose the record only carried in a blocker reason is a suspicion (465.7364ms)
+✔ CHANGE_KIND_SUSPECT: a declared editorial that moved normative content while bumping rev is suspected (1108.1097ms)
+✔ UNTRACKED_RECORD: a record file never committed is counted, never judged (372.1005ms)
+✖ a record that moved directory keeps the lineage its withdrawal claim refers to (279.4148ms)
+✔ NO_GIT: a tree outside a repository is skipped, and the skip names the checks it stands in for (40.5281ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7182.0422
+
+✖ failing tests:
+
+test at tests\work-history-check.spec.mjs:219:1
+✖ a record that moved directory keeps the lineage its withdrawal claim refers to (279.4148ms)
+  AssertionError [ERR_ASSERTION]: git mv .starciwork/features/f/br/a/index.yaml .starciwork/features/f/br/kept/index.yaml failed: fatal: renaming '.starciwork/features/f/br/a/index.yaml' failed: No such file or directory
+  
+  
+  128 !== 0
+  
+      at git (file:///D:/Repositories/starci-academy-backend/.claude/tests/work-history-check.spec.mjs:33:10)
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/work-history-check.spec.mjs:227:3)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 128,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,17 @@
+$ npx vitest run src/components/blocks/task-list src/features/pages/tasks
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend)
+exit 0
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Repositories/starci-academy-backend/.claude/examples/todo-app-frontend[39m
+
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx [2m([22m[2m13 tests[22m[2m)[22m[90m 287[2mms[22m[39m
+ [32m✓[39m src/features/pages/tasks/index.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 203[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m   Start at [22m 18:54:36
+[2m   Duration [22m 19.30s[2m (transform 138ms, setup 6.24s, collect 11.40s, tests 490ms, environment 18.08s, prepare 982ms)[22m
+
+
+

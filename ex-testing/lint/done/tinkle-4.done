@@ -1,0 +1,8 @@
+tinkle-4 complete: scripts/checks consolidation
+40 modules moved; importer, resource, runtime inventory, CI, test and documentation paths updated.
+Owner lifted the v11-5 wait gate.
+Both required gates pass with byte-identical before/after output.
+Work: 261 records, 3138 refs, 127 evidence files, 43 artifact payloads skipped; 0 refused, 0 warned.
+YAML: 856 accepted. Focused tests: 210 passed, 2 skipped, 0 failed.
+Report: .claude/ex-testing/lint/tinkle-4-REPORT.md
+Broader runtime build/dependency limitations are recorded in the report; .dist was not republished.

@@ -1,0 +1,24 @@
+{
+  "name": "@starci-examples/e2e-kit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared e2e kit for the example backends: OS port allocation, readiness polling, run-scoped tokens, the axios door client, the Apollo GraphQL transport and the TestingModule boot wrapper. Source-only TypeScript - consumers compile it through their own ts-jest pipeline.",
+  "scripts": {
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apollo/client": "4.3.1",
+    "axios": "1.20.0",
+    "graphql": "16.14.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@starci/eslint-canon-be": "file:../eslint/be",
+    "@types/node": "^20.14.10",
+    "eslint": "^9.39.5",
+    "globals": "^17.12.0",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.70.0"
+  }
+}

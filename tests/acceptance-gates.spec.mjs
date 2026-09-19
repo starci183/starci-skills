@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {EVIDENCE_PACKET,evaluateAcceptance,kernelVerificationReceipt,requiredGatesFor,resolveEvidencePacket} from '../checks/acceptance.mjs';
+import {EVIDENCE_PACKET,evaluateAcceptance,kernelVerificationReceipt,requiredGatesFor,resolveEvidencePacket} from '../scripts/checks/acceptance.mjs';
 
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 const identity={workflowId:'wf',opId:'op',attempt:1,generation:3,jobId:'job'};

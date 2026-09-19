@@ -1,0 +1,24 @@
+schema: work/functional-requirement
+id: fr.checkout.cart.clear
+title: Clear the cart
+state: todo
+actors: [person]
+trigger: The person with a live session asks to empty their cart, over the clearCart mutation.
+mainFlow:
+  - The session is verified against the identity service over HTTP before the cart is touched.
+  - Every line the person holds is removed and the answer reports the cart cleared.
+exceptionFlows:
+  - A call whose bearer token does not verify is refused before any cart work.
+postconditions:
+  - The person's cart holds no lines; the lines of nobody else were touched.
+composes:
+  - rule: br.checkout.cart
+    module: src/modules/bussiness/cart
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npx jest --config src/tests/e2e/jest.config.js checkout/payment-failure
+
+change: {rev: 1, kind: initial, at: 2026-09-19T14:00:00.000Z}

@@ -1,0 +1,91 @@
+# index.yaml — .claude/sqlite/ overview. Read this first.
+#
+# What this directory is: pure yaml/sql CONTEXT for agents about the workflow
+# ledger DB — `<repo>/.starciwork/runtime.sqlite` (starci/ledger-db@1) and the
+# machine arbiter `machine.sqlite` (starci/machine-db@1). No scripts here;
+# execution engines stay in .mjs (per tinkle/_common.md).
+#
+# The one-sentence business rule (docs/ledger-db.md §1/§13): the ledger holds
+# what a LIVE workflow continues from, and nothing else. One transaction makes
+# drift impossible to persist; the hash chain makes history tamper visible; the
+# anchor file (ledger-anchor.json, git-tracked) proves WHICH history is agreed.
+#
+# source of truth for statements: .dist/kernel/ledger-db.mjs + the kernel files
+# cited per query; contract doc: .dist/docs/ledger-db.md.
+
+schema: starci/module-ledger-db-index@1
+sources:
+  - .dist/kernel/ledger-db.mjs      # DDL + handles + two-phase reserve + verify
+  - .dist/docs/ledger-db.md         # keystone contract (§1-§13)
+  - .dist/kernel/journal.mjs        # retired journal; shared helpers it still exports
+  - .dist/kernel/store.mjs          # the store API whose backing IS this DB
+  - .dist/kernel/admission.mjs      # fences, budgets, expire
+  - .dist/kernel/jobs.mjs           # queue + settlement transaction
+  - .dist/kernel/job-worker.mjs     # durable job wrapper (claim shapes, staged results)
+  - .dist/kernel/job-bridge.mjs     # bridge enqueue/replay
+  - .dist/kernel/engine.mjs         # retry/reconcile/provider-loads/intent-v1 binding
+  - .dist/kernel/continuation.mjs   # continuation boundary reads
+  - .dist/kernel/launch.mjs         # signals (locks as rows)
+  - .dist/kernel/loads.mjs          # runtime_loads
+  - .dist/kernel/candidate-bridge.mjs  # custody receipts via events
+  - .dist/kernel/terminals.mjs / supervisor.mjs / owner.mjs / kernel.mjs
+  - .dist/hosts/orca/launch.mjs     # ledger-verify/anchor/retire verbs
+  - .dist/scripts/ledger-migrate.mjs
+  - .dist/schemas/ledger-db.schema.json  # column-catalog contract (documentation schema)
+  - .dist/kernel/ledger.mjs         # NOT this DB — the Work-tree ledger (yaml nodes); see design.yaml naming trap
+
+files:
+  schema.sql:   "ledger DDL verbatim (19 tables, 6 indexes, 3 triggers); per-table comment = what decision the row lets the kernel make"
+  machine.sql:  "machine.sqlite DDL (5 tables) + why a second file exists (two files can't share a tx; only ai/*+machine:* cross ledgers)"
+  design.yaml:  "the ERD: per-table {purpose, keyFields, fks, invariants, decidesFor} + edges + whySingleTransaction + observed gaps"
+  queries/jobs-queue.sql:      "queue lifecycle: enqueue→lease→claim→heartbeat→settle, all fenced on (job_id,lease_token)"
+  queries/leases.sql:          "repo fences: capacity check, reserve, renew, release, intent-v1 exact-binding proof, expiry sweep"
+  queries/machine-arbiter.sql: "machine.sqlite statements: register, reserve, release, sweep-by-pair-proof, migrate import"
+  queries/events-tail.sql:     "hash-chained log: append (3 write shapes), tail/replay, custody receipts, chain walk"
+  queries/state-snapshots.sql: "recovery state: write kinds by checkpoint_id prefix, resume reads, compactSnapshots retention"
+  queries/reports.sql:         "worker↔kernel IPC: contracts out, reports in (+consumed_at), checks per attempt"
+  queries/inbox-signals.sql:   "owner inbox lifecycle + signals (locks/flags as rows) + runtime_loads provider view"
+  queries/budgets.sql:         "declare/reserve/return-or-consume; per-job reservations"
+  queries/workflows-goals.sql: "registration, bound generation, append-only goals, meta identity"
+  queries/inputs.sql:          "frozen owner inputs as bytes; sha256-bound refs"
+  queries/verify-retire.sql:   "verifyChain walk, anchor boundary, liveRows, pruneRetiredGenerations, retireWorkflow, housekeeping pragmas"
+  queries/migration.sql:       "journal-side reads + ledger/machine writes + migrations provenance rows"
+
+domains:  # question → file
+  "may this worker run the job":            queries/jobs-queue.sql + queries/leases.sql
+  "did the op hold what it was admitted":   queries/leases.sql (intent-v1 exact-binding)
+  "where does the workflow resume":         queries/state-snapshots.sql + queries/verify-retire.sql (anchor)
+  "what did the worker report":             queries/reports.sql
+  "what did the kernel ask the worker":     queries/reports.sql (contracts)
+  "is the recorded history intact":         queries/events-tail.sql + queries/verify-retire.sql
+  "is a kernel alive / stop requested":     queries/inbox-signals.sql
+  "does a provider have headroom":          queries/machine-arbiter.sql + queries/inbox-signals.sql (runtime_loads)
+  "does an op fit its budget":              queries/budgets.sql
+  "what inputs was this goal given":        queries/inputs.sql
+  "where did this row come from (1.0.3)":   queries/migration.sql
+  "which table owns X":                     design.yaml (edges + tables.purpose)
+
+invariantsSummary:
+  - "events: hash chain enforced by TRIGGER events_digest_chain — recompute on insert regardless of supplied values (impossible-to-persist drift)"
+  - "leases: triggers leases_match_job(+_update) refuse rows whose identity diverges from the job's (lease-identity-drift)"
+  - "jobs: every transition fences on (job_id,lease_token[,generation]); SETTLED = succeeded|failed|cancelled"
+  - "budgets: CHECK >=0 on all counters; reserve needs declared row + used+reserved+req<=limit"
+  - "state_snapshots: checkpoint_id UNIQUE (idempotent transitions); retention keeps bound gen's latest body + transition/bind skeletons"
+  - "FKs: every workflow-scoped table → workflows; leases/budget_reservations → jobs ON DELETE CASCADE"
+  - "inputs: sha256 proven on read — tampered bytes refuse input-digest-mismatch"
+  - "machine seam: leases.machine_ref pairs to machine.leases.token; sweep proves pair absence via meta.ledger_id match — path match alone never frees a machine row"
+
+walAndBusy:
+  journalMode: "WAL requested on both DBs; falls back to DELETE when the filesystem can't do it (UNC/network) — recorded in meta.journal_mode, reported by inspectLedger; never silently assumed"
+  busyTimeout: "15s (15000ms) ledger + machine; inspectLedger uses readOnly:true, timeout 5s"
+  whyWal: "the kernel writes while ~10 workers read contracts through `starci op-contract`; under DELETE every reader would block the writer for its whole read (§3)"
+  copyRule: "WAL = 3 files (-wal, -shm). EVERY copy path (archive, workflow-export, backup, supervisor snapshot) runs PRAGMA wal_checkpoint(TRUNCATE) inside the handle first and copies runtime.sqlite alone (§3)"
+  pragmas: "foreign_keys=ON; synchronous=FULL; auto_vacuum=INCREMENTAL (create-time only); user_version=1"
+  transactions: "BEGIN IMMEDIATE … COMMIT with rollback on throw; nested transaction() calls THROW (never silently flattened) — makeTransaction label 'ledger'/'machine'"
+
+notHere:  # what an agent must NOT expect to find
+  - "product/spec truth: that is the Work tree (.starciwork/features/**/index.yaml) via kernel/ledger.mjs — a different module, no SQL"
+  - "_local/**: import source for ledger-migrate and export target only; a kernel reading it as authority fails closed (ledger-unmigrated)"
+  - "journal.sqlite: retired (starci/operational-journal@1); journal.mjs is the migrator's read side + shared helpers, must not grow new writers"
+  - "ledger-anchor.json: tracked file beside the DB, NOT a table (§12)"
+  - "incident writes: retry budgets live in workflow state, not the incidents table (imported-history-only, OBSERVED)"

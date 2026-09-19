@@ -1,0 +1,41 @@
+/* Lane v5-5 codemod plan: ui.plan.usage (components/plan/usage-screen). */
+module.exports = [
+    {
+        file: "src/components/plan/usage-screen/component.tsx",
+        ops: [
+            ["sub", "<Text weight=\"semibold\" size=\"md\">Todo app</Text>", "<Text weight=\"semibold\" size=\"md\">{copy.brand}</Text>", 2, "shell.brand"],
+            ["sub", "<nav aria-label=\"Primary destinations\"", "<nav aria-label={copy.navLabel}", 1, "shell.navPrimaryDestinations"],
+            ["sub", "<Text>Alex</Text>", "<Text>{copy.accountName}</Text>", 2, "shell.accountName"],
+            ["sub", "onFollow={props.onSignOut}>Sign out<", "onFollow={props.onSignOut}>{copy.signOut}<", 2, "shell.signOut"],
+            ["sub", "{destinationActions(\"/plan/usage\")}", "{destinationActions(copy, \"/plan/usage\")}", 2, "destinations"],
+            ["sub", "compactNavigationLabel=\"Primary destinations\"", "compactNavigationLabel={copy.navLabel}", 1, "shell.navPrimaryDestinations"],
+            ["sub", "primaryLabel=\"The usage screen and its upgrade action\"", "primaryLabel={copy.mainLabel}", 1, "plan.mainLabel"],
+            ["sub", "<Text tone=\"muted\" size=\"sm\">Settings / Plan</Text>", "<Text tone=\"muted\" size=\"sm\">{copy.breadcrumb}</Text>", 1, "plan.breadcrumb"],
+            ["sub", "<Heading level={1} scale=\"display\">Plan and usage</Heading>", "<Heading level={1} scale=\"display\">{copy.heading}</Heading>", 1, "plan.heading"],
+            ["sub", "<SurfaceCard ariaLabel=\"Usage\">", "<SurfaceCard ariaLabel={copy.usageCard}>", 1, "plan.usageCard"],
+            ["sub", "<Text isSkeleton>Free plan</Text>", "<Text isSkeleton>{copy.freePlan}</Text>", 1, "plan.freePlan"],
+            ["sub", "<Text size=\"metric-lead\" weight=\"semibold\" isSkeleton>0 active tasks</Text>", "<Text size=\"metric-lead\" weight=\"semibold\" isSkeleton>{activeTasks}</Text>", 1, "plan.activeTasks (skeleton)"],
+            ["sub", "<Progress label=\"Tasks used against your free plan cap\" isSkeleton />", "<Progress label={copy.progressLabel} isSkeleton />", 1, "plan.progressLabel"],
+            ["sub", "{props.plan === \"paid\" ? \"Paid plan\" : \"Free plan\"}", "{props.plan === \"paid\" ? copy.paidPlan : copy.freePlan}", 1, "plan.paidPlan / freePlan"],
+            ["sub", "<Text size=\"metric-lead\" weight=\"semibold\">{props.activeCount} active tasks</Text>", "<Text size=\"metric-lead\" weight=\"semibold\">{activeTasks}</Text>", 1, "plan.activeTasks"],
+            ["sub", "<Text tone=\"muted\">Free plan limit: {props.cap}</Text>", "<Text tone=\"muted\">{copy.formatFreePlanLimit(props.cap)}</Text>", 1, "plan.freePlanLimit"],
+            ["sub", "<Progress label=\"Tasks used against your free plan cap\" value={Math.min(100, percentOfCap)} />", "<Progress label={copy.progressLabel} value={Math.min(100, percentOfCap)} />", 1, "plan.progressLabel"],
+            ["sub", "<Text>{percentOfCap}% of cap</Text>", "<Text>{copy.formatPercentOfCap(percentOfCap)}</Text>", 1, "plan.percentOfCap"],
+            ["line", "You have used all {props.cap} active tasks on your free plan \u2014 the next task you try to create will be refused.", "{copy.formatAtCap(props.cap)}", 1, "plan.atCap"],
+            ["line", "Upgrade plan", "{copy.upgrade}", 2, "plan.upgrade"],
+            ["line", "You have {props.activeCount} active tasks, which exceeds your free plan limit of {props.cap}.", "{copy.formatOverCapCount(props.activeCount, props.cap)}", 1, "plan.overCapCount"],
+            ["sub", "<Text weight=\"semibold\">Task creation is paused. Your free plan allows {props.cap} active tasks.</Text>", "<Text weight=\"semibold\">{copy.formatOverCapPaused(props.cap)}</Text>", 1, "plan.overCapPaused"],
+            ["sub", "<Text>Your existing tasks are safe. Complete or delete tasks to make room, or upgrade for no task cap.</Text>", "<Text>{copy.overCapNote}</Text>", 1, "plan.overCapNote"],
+            ["sub", "route=\"/tasks\">Manage tasks</PlanRoutedAction>", "route=\"/tasks\">{copy.manageTasks}</PlanRoutedAction>", 1, "plan.manageTasks"],
+            ["sub", "<Text tone=\"muted\">Completing tasks frees up space.</Text>", "<Text tone=\"muted\">{copy.completeFreesSpace}</Text>", 1, "plan.completeFreesSpace"],
+            ["sub", "{destination.label}", "{copy.legal[destination.key]}", 1, "shell.legal.*"],
+        ],
+    },
+    {
+        file: "src/components/plan/usage-screen/index.tsx",
+        ops: [
+            ["sub", "? READ_REFUSAL_MESSAGE", "? t(\"sessionEnded\")", 1, "plan.sessionEnded"],
+            ["sub", "? CHECKOUT_REFUSAL_MESSAGE", "? t(\"checkoutRefusal\")", 1, "plan.checkoutRefusal"],
+        ],
+    },
+]

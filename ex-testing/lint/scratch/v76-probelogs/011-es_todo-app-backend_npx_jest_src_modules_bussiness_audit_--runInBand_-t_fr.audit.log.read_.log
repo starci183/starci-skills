@@ -1,0 +1,14 @@
+$ npx jest src/modules/bussiness/audit --runInBand -t "fr.audit.log.read"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/audit/audit-operator.guard.spec.ts
+PASS src/modules/bussiness/audit/audit-log.handler.spec.ts
+
+Test Suites: 9 skipped, 2 passed, 2 of 11 total
+Tests:       49 skipped, 10 passed, 59 total
+Snapshots:   0 total
+Time:        3.856 s, estimated 24 s
+Ran all test suites matching /src\\modules\\bussiness\\audit/i with tests matching "fr.audit.log.read".
+

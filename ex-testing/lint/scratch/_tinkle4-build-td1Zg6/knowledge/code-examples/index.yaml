@@ -1,0 +1,51 @@
+schema: starci/code-examples-catalog@1
+title: Extracted code examples
+purpose: |
+  These focused multi-file excerpts make the pattern rules directly usable. They are examples,
+  not product requirements, standalone applications or permission to copy a database connection.
+  Resolve target imports and business types while preserving the illustrated responsibilities.
+  Examples supplement mandatory pattern topics. A compiling snippet does not prove correct
+  authorization, concurrency or production module registration. Verify those against the
+  accepted SRS/SDS and the actual application.
+examples:
+  - id: graphql-command
+    path: backend/graphql-command
+    lane: backend
+    summary: |
+      Named EntityManager injection with CQRS ownership: thin resolver, thin bus-facing service,
+      command/query envelope, ICQRSHandler.process, and module registration. Follow patterns/be
+      rule IDs; do not copy Academy business behavior or assume Core primary for instance-owned
+      data.
+    relatedRules:
+      - BE-FUNCTION-1
+      - BE-FUNCTION-2
+      - BE-FUNCTION-3
+      - BE-FUNCTION-5
+      - REF-BE-1
+      - REF-BE-2
+
+  - id: transactional-service
+    path: backend/transactional-service
+    lane: backend
+    summary: |
+      Capability-service style persistence with private readonly EntityManager through the correct
+      named connection decorator, and transaction-manager propagation through helpers. Never use
+      the outer manager inside the callback; verify rollback and concurrency with the real
+      database beyond the excerpt.
+    relatedRules:
+      - BE-FUNCTION-5
+      - BE-FUNCTION-7
+      - REF-BE-1
+
+  - id: connected-block
+    path: frontend/connected-block
+    lane: frontend
+    summary: |
+      Connected owner and pure renderer with resolved state, labels and actions; verified
+      @starci/grammar/common entry. Test Base states separately from the connected owner's
+      mapping and callbacks; mock-only mapping tests are not browser UAT.
+    relatedRules:
+      - FE-FUNCTION-1
+      - FE-FUNCTION-2
+      - FE-FUNCTION-4
+      - REF-FE-1

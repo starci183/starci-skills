@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.share.invite.expiry.accept-before-expiry-succeeds
-rule: br.share.invite.expiry
-given: An invitation was sent thirteen days ago
-when: The invited person accepts it
-then:
-  - The acceptance succeeds.
-  - The collaborator's role becomes active immediately.

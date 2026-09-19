@@ -1,0 +1,12 @@
+import { cn } from "@heroui/react"
+
+export const sidebarClassName = cn("starci-core-sidebar") ?? "starci-core-sidebar"
+export const sidebarToggleClassName = cn("starci-core-sidebar-toggle") ?? "starci-core-sidebar-toggle"
+export const sidebarHeaderClassName = cn("starci-core-sidebar-header") ?? "starci-core-sidebar-header"
+export const sidebarListClassName = cn("starci-core-sidebar-list") ?? "starci-core-sidebar-list"
+export const sidebarSectionClassName = cn("starci-core-sidebar-section") ?? "starci-core-sidebar-section"
+export const sidebarSectionLabelClassName = cn("starci-core-sidebar-section-label") ?? "starci-core-sidebar-section-label"
+export const sidebarItemClassName = cn("starci-core-sidebar-item") ?? "starci-core-sidebar-item"
+export const sidebarItemLabelClassName = cn("starci-core-sidebar-item-label") ?? "starci-core-sidebar-item-label"
+export const sidebarItemTrailingClassName = cn("starci-core-sidebar-item-trailing") ?? "starci-core-sidebar-item-trailing"
+export const sidebarFooterClassName = cn("starci-core-sidebar-footer") ?? "starci-core-sidebar-footer"

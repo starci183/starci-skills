@@ -8,9 +8,9 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {sha256,validateWorkspace} from '../core/index.mjs';
 import {scanCanonicalWork,sourceStalenessClosure,SourceStalenessInputError} from '../kernel/source-staleness.mjs';
-import {checkStalesMain} from '../scripts/check-stales.mjs';
+import {checkStalesMain} from '../scripts/checks/check-stales.mjs';
 
-const script=path.resolve(new URL('../scripts/check-stales.mjs',import.meta.url).pathname.replace(/^\/(?:[A-Za-z]:)/,value=>value.slice(1)));
+const script=path.resolve(new URL('../scripts/checks/check-stales.mjs',import.meta.url).pathname.replace(/^\/(?:[A-Za-z]:)/,value=>value.slice(1)));
 const run=(cwd,args)=>{const result=spawnSync(args[0],args.slice(1),{cwd,encoding:'utf8',windowsHide:true});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
 
 function fixture(t,{aggregate=false}={}){

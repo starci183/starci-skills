@@ -1,0 +1,6 @@
+schema: work/disposable-accounts
+disposable: true
+accounts:
+  - {role: owner, identity: identity.todo-app.demo}
+  - {role: editor, identity: identity.todo-app.demo}
+  - {role: viewer, identity: identity.todo-app.demo}

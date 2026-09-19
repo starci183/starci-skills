@@ -1,0 +1,15 @@
+tinkle-8 done (amended brief) — modules/goal/ encodes goal decomposition as state-space planning: op = needs->produces transition; 5 steps PARSE->S*, SURVEY->S0, GAP->delta, backward-CHAIN, VALIDATE. Archetypes are memoized delta->chain plans, not the algorithm.
+
+Artifacts:
+- .claude/modules/goal/anatomy.yaml      (goal identity/rev/amendments + stateModel + the 5-step decomposition; can-can = re-plan not rollback)
+- .claude/modules/goal/archetypes.yaml   (7 priors reframed as memoized plans; BUILD shape, survey may shorten to EXTEND/ADD)
+- .claude/modules/goal/existing.yaml     (NEW: survey leg — input x current-state; extend-vs-add decision; 4 rules: existing-surface-detection, extend-vs-add, reuse-over-rebuild, ownership-check w/ DEP_STALE)
+- .claude/modules/goal/legality.yaml     (5 families: forward/backward/split/existing-surface/ambiguity + producesVocabulary — the missing produces: contract)
+- .claude/ex-testing/lint/tinkle-8-REPORT.md (4 hand-simulations run through the 5 steps + gap report)
+
+Checks (all pass):
+- all four yaml files parse clean (yaml lib)
+- every claim cites a real source path; inferred claims marked
+- pure yaml under modules/goal/ — no scripts
+- read-only boundary respected: nothing under .dist/, ops/, modules/ops/, modules/models/ touched
+- flagged in report (not fixed): modules/ops route blocks lack produces: — tinkle-1 backfill needed + future scripts/route/route-plan.mjs; work-query.mjs cited in brief does not exist (real mechanism: ledger.mjs inScope/candidates + intake.mjs reconciliation); riskHints absent on ~half the ops; nodeKinds vocab != lane match keys; phase mixes stage+coarsePhase

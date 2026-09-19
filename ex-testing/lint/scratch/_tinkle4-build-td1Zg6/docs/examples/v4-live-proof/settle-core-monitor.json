@@ -1,0 +1,25 @@
+{
+  "schema": "starci/orca-supervised-settlement@1",
+  "dispatchId": "ctx_d54000752ea9",
+  "reason": "explicit-settle",
+  "effectState": "none",
+  "residualTerminal": {
+    "state": "retained",
+    "reason": "identity_unproven",
+    "processAction": "none"
+  },
+  "stop": {
+    "outcome": "ok",
+    "effectState": "committed",
+    "state": "failed",
+    "alreadySettled": true,
+    "reason": null
+  },
+  "release": {
+    "outcome": "failed",
+    "effectState": "partial",
+    "state": "retained",
+    "processAction": "none",
+    "reason": "identity_unproven"
+  }
+}

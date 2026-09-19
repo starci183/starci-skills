@@ -1,0 +1,99 @@
+schema: starci/uat-run-manifest@1
+id: uat.identity.sign-in.runs.20260919T151937Z-5c10a673
+nodeId: uat.identity.sign-in
+inputDigest: 3dae04f43b2b6515fe818d36c280f114fe0ceb767eb07623fbb745a5104d770a
+outcome: inconclusive
+assertions: []
+assets:
+  - path: screens/screenshot.png
+    sha256: 26f40b33e667d3cdc987a7644b8178ba9234e192c5b600f3921894ff2c5619f5
+    size: 5079
+  - path: videos/sign-in.webm
+    sha256: 364371c3595986ffb0c260f24e753f0c2d7fc58aa7482d9005870ad552ac31fa
+    size: 43078
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:4069
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.identity.sign-in
+    ownedResourcesCreated: []
+    ownedResourcesDeleted: []
+    verifiedAbsent: []
+    note: This run created no run-owned fixture rows against a database this lane owns; nothing to clean
+      up.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.identity.sign-in
+      title: Register a pair, be refused alike on a wrong one, sign in
+      steps:
+        - order: 1
+          actor: person
+          action: Register a new email and password pair for the disposable person.
+          expected: the account page shows that person signed in
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: person
+          action: Submit the registered email with a wrong password.
+          expected: a single uniform refusal shows; nothing names which half was wrong
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 3
+          actor: person
+          action: Submit the sign-in form with the password left empty.
+          expected: the submit is refused before any credential check runs
+          checks:
+            - id: validation
+              expected: yes
+        - order: 4
+          actor: person
+          action: Register the same email again with a different password.
+          expected: a conflict refusal shows; the first pair still signs in
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 5
+          actor: person
+          action: Sign in with the registered pair a second time.
+          expected: a session issues again and the account page keeps showing the same person
+          checks:
+            - id: completion
+              expected: yes
+      proves:
+        - fr.identity.sign-in
+        - br.identity.sign-in
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.identity.sign-in
+    checked: []
+    notRun: []
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T151937Z-5c10a673
+    flow: uat.identity.sign-in
+    started: 2026-09-19T15:19:37.865Z
+    finished: 2026-09-19T15:19:56.969Z
+    accountsDeclared:
+      - role: person
+        username: uat-person@ecommerce.dev
+    reused: []
+    created: []
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.identity.sign-in
+    checks: []
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.identity.sign-in
+    steps: []

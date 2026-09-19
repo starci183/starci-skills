@@ -1,0 +1,6 @@
+projectKey=starci-ecommerce-app-be
+serverUrl=https://sonar.starci.org
+serverVersion=26.8.0.126808
+dashboardUrl=https://sonar.starci.org/dashboard?id=starci-ecommerce-app-be
+ceTaskId=091a8ef0-3700-42ba-9e03-ef4431792b38
+ceTaskUrl=https://sonar.starci.org/api/ce/task?id=091a8ef0-3700-42ba-9e03-ef4431792b38

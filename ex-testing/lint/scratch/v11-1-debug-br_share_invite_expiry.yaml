@@ -1,0 +1,35 @@
+schema: work/business-rule
+id: br.share.invite.expiry
+title: An invitation expires after fourteen days
+state: done
+statements:
+  - An invitation not accepted within fourteen days of being sent can no longer be accepted.
+  - Expiry is computed the moment an invitation is read, never by a background sweep.
+authorityRefs:
+  - "owner-intent: An open invitation to somebody's task is a standing exposure; bounding it removes the
+    need for the owner to remember and manually close it."
+acceptance:
+  - id: ac.share.invite.expiry.expires-after-14-days
+    given: An invitation was sent and never accepted
+    when: It is read fifteen days later
+    then:
+      - Its status reads expired.
+      - An acceptance attempt against it is refused.
+  - id: ac.share.invite.expiry.accept-before-expiry-succeeds
+    given: An invitation was sent thirteen days ago
+    when: The invited person accepts it
+    then:
+      - The acceptance succeeds.
+      - The collaborator's role becomes active immediately.
+module: src/modules/bussiness/share
+change:
+change:
+  rev: 3
+  kind: editorial
+  at: 2026-09-19T15:44:01.435Z
+  reason: impl.share.todo-app-backend.invitations is built (src/modules/bussiness/share, not the
+    earlier-guessed src/share); invitation.service.spec.ts proves both acceptance criteria by backdating
+    sentAt rather than waiting fourteen real days, and scripts/live-proof-share.sh proves the
+    non-expiry half live against the real stack. gap.share.unbuilt-module's blockedBy is resolved.
+
+    rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.share.invite.expiry#<former-ac-id>. Encoding change only, no semantic change.

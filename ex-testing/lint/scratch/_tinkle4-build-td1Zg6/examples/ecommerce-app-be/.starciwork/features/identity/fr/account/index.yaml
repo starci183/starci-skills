@@ -1,0 +1,29 @@
+schema: work/functional-requirement
+id: fr.identity.account
+title: Read an account
+state: todo
+actors: [person]
+trigger: The account view is asked for a person id, over the account query.
+mainFlow:
+  - The person row is read locally; an id this service does not know never reaches the order call.
+  - The buyer half is asked of the order service once, over its internal door, at the moment of the read.
+  - The view answers the person id, the email and the live hasOrders together.
+exceptionFlows:
+  - An unknown person id refuses PERSON_UNKNOWN before the order service is asked.
+  - An unreachable or non-answering order service propagates as a typed refusal; the view never falls back to a guessed hasOrders.
+  - An order answer that does not echo the asked person id with a boolean hasOrders is refused as a contract mismatch, not rendered.
+postconditions:
+  - Nothing is written; the answer reflects what the order service holds at that moment.
+composes:
+  - rule: br.identity.account
+    module: src/modules/bussiness/account
+  - rule: br.identity.account
+    module: src/modules/integrations/order
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+
+change: {rev: 1, kind: initial, at: 2026-09-19T14:00:00.000Z}

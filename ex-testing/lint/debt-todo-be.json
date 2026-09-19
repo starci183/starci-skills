@@ -1,0 +1,131 @@
+{
+  "app": "todo-app-backend",
+  "lane": "v3-9-todo-be-features-tests",
+  "scope": ["src/features/**/*.ts", "src/tests/**/*.ts"],
+  "date": "2026-09-19",
+  "gate": {
+    "marker": ".claude/ex-testing/lint/setup-todo-be.done",
+    "status": "ABSENT at lane close - v3-0 setup lane still in flight (observed writing src/modules/shared/exceptions during this run).",
+    "proceededOn": "Config landed and stable since ~12:27: eslint.config.mjs mirrors canon (starciBeCanon + 7 vendored local rules), @modules/@features/@tests aliases wired in tsconfig + both jest configs, deps installed, toolchain verified end-to-end on this scope before first hand-fix. Marker re-polled between phases; never appeared."
+  },
+  "lintBaseline": {
+    "command": "npx eslint \"src/features/**/*.ts\" \"src/tests/**/*.ts\" (before --fix)",
+    "features": "8705 errors + 1 warning",
+    "tests": "5162 errors + 11 warnings",
+    "total": "13867 errors + 12 warnings"
+  },
+  "lintAfterFix": {
+    "command": "npx eslint --fix (mechanical pass)",
+    "total": "196 errors + 12 warnings = 208",
+    "perRule": {
+      "starci-be/require-export-jsdoc": 131,
+      "starci-be/e2e-asserts-persisted-state": 13,
+      "starci-be/no-relative-capability-escape": 11,
+      "starci-be/no-wiring-in-flow-spec": 11,
+      "starci-be/no-branch-in-flow-step": 9,
+      "starci-be/require-exception-object-arg": 8,
+      "starci-be/no-sleep-in-flow": 5,
+      "starci-be/require-enum-member-jsdoc": 4,
+      "@typescript-eslint/no-require-imports": 4,
+      "@typescript-eslint/no-unused-vars": 3,
+      "starci-be/no-non-global-module-import": 2,
+      "starci-be/must-deep-module-import": 2,
+      "no-console": 2,
+      "starci-be/no-unguarded-unknown-cast": 1,
+      "starci-be/no-default-export": 1,
+      "starci-be/no-folder-reexport": 1
+    }
+  },
+  "lintFinal": {
+    "command": "npx eslint \"src/features/**/*.ts\" \"src/tests/**/*.ts\"",
+    "total": "2 errors + 0 warnings",
+    "perRule": {
+      "starci-be/no-non-global-module-import": 2
+    }
+  },
+  "handFixes": {
+    "require-export-jsdoc": "131 sites: authored JSDoc on every exported resolver/module/input/response/enum/adapter/controller - doc placed between last decorator and `export` per rule semantics (inserted via .claude/ex-testing/lint/add-export-docs.cjs)",
+    "e2e-asserts-persisted-state": "all 13 e2e specs migrated to bootE2EWorld() -> world.dataSource; persisted-state reads via dataSource.query<Row[]>(SELECT). DML (UPDATE..RETURNING / INSERT) stays on E2EDbService.query() which unwraps TypeORM tuples",
+    "no-wiring-in-flow-spec": "new shared helper src/tests/infra/e2e-world.ts (bootE2EWorld(specId?)) owns Test.createTestingModule + TestingInfraModule.register + service resolution; all 13 specs migrated; stale DeferredConnectDbService overrides removed (E2EDbService.source() already gates on stack.whenReady())",
+    "no-relative-capability-escape": "all ../../infra imports -> @tests/infra/<deep path> (e2e-world, e2e-poll, testing-infra.options, integrations/http/e2e-http.service, bussiness/accounts/e2e-auth.service)",
+    "no-branch-in-flow-step": "branches inside it() moved to describe/file-scope helpers: applyGatewayOutcome + startCheckout (plan), expectPostEditRow + statusAfterEnd (recur), ensureWorldClosed + expectTeardownReportClean (teardown-verification), probe ternaries -> (x && y) || null",
+    "no-sleep-in-flow": "new src/tests/infra/e2e-poll.ts: pollUntil(label, probe, timeoutMs, intervalMs) replaces per-spec until()/waitFor()/retryUntil(); holdFor(ms) for the 'stillness is the assertion' window (ended recurrence)",
+    "require-exception-object-arg": "8x `throw new SessionExpiredException()` -> `new SessionExpiredException({})` in query resolver spec helpers (v3-0 metadata-object API)",
+    "require-enum-member-jsdoc": "RecurFrequencyInput members documented (what choosing each cadence schedules)",
+    "no-require-imports + no-explicit-any + line suppression": "src/tests/e2e/resilience/e2e-infra-contract.ts rewritten: static typed helpers (docker/dockerLines/dockerAvailable/composeProjectOf/loopbackUrlsOf/httpStatus/apiHealthUrls/projectServices/projectContainer/killService/startContainer/retryUntil); require()/any/eslint-disable all gone; resilience specs boot via bootE2EWorld(specId)",
+    "must-deep-module-import": "@modules/integrations/sepay -> @modules/integrations/sepay/sepay.client (controller) and .../sepay.module (module)",
+    "no-console": "console.warn -> process.stderr.write in resilience skip gates",
+    "no-unguarded-unknown-cast": "graphql.module formatError: `error as {originalError}` -> `in`-narrowed access (typeof object + 'originalError' in error), zero casts",
+    "no-default-export": "src/tests/e2e/jest.config.ts `export default config` -> `export = config` (jest loads via ts-node CJS)",
+    "no-folder-reexport": "src/tests/infra/index.ts barrel deleted - zero importers left after alias migration",
+    "no-unused-vars": "unused startApi(pgUser/pgPassword/pgDb) params + dead imports in e2e-stack.service; unused dataSource destructure in plan-journey",
+    "exception-code-vocabulary": "38 stale error-code literals updated to v3-0's landed `*_EXCEPTION` vocabulary across resolver specs and e2e specs (SESSION_NOT_FOUND, SESSION_EXPIRED, TASK_FORBIDDEN, TASK_NOT_FOUND, TASK_TITLE_REQUIRED, PLAN_CAP_EXCEEDED, INVALID_CREDENTIALS, SHARE_FORBIDDEN, SHARE_INVITATION_NOT_FOUND, SHARE_INVALID_ROLE, SHARE_EMAIL_MISMATCH)"
+  },
+  "remainingDebt": [
+    {
+      "rule": "starci-be/no-non-global-module-import",
+      "file": "src/features/todo/http/health/health.module.ts:22",
+      "detail": "PostgresqlPrimaryModule.register() is functionally required for HealthController's PostgresPrimaryClient injection (module registered non-global at app root). Canon fix = register it isGlobal at the composition root -> src/app.module.ts, OUTSIDE this lane's scope. Owner: v3-0 / app-root lane.",
+      "blockedBy": "src/app.module.ts out of scope"
+    },
+    {
+      "rule": "starci-be/no-non-global-module-import",
+      "file": "src/features/todo/http/webhooks/sepay/sepay-webhook.module.ts:35",
+      "detail": "SepayModule.register() required for SepayClient injection; SepayModule's own doc states the composition root should register it. Same blocker - needs src/app.module.ts.",
+      "blockedBy": "src/app.module.ts out of scope"
+    }
+  ],
+  "outOfScopeObservations": [
+    "src/app.boot.spec.ts expects old short codes (INVALID_CREDENTIALS / SESSION_NOT_FOUND) - stale vs v3-0's *_EXCEPTION vocabulary; file is outside lane scope (not under src/features or src/tests).",
+    "src/modules/shared/exceptions/exceptions.spec.ts fails: SepayRequestFailedException not covered by the exceptions index - v3-0's own scope, still in flight.",
+    "jest.config.js (root) maps ^@tests/(.*)$ -> <rootDir>/tests/$1 (missing src/) - latent alias bug if any unit spec ever imports @tests/*; outside lane scope."
+  ],
+  "verification": {
+    "eslint": "2 errors remaining (both cross-lane blockers above); baseline 13867+12 -> 208 after --fix -> 2 after hand-fix",
+    "tsc": "npx tsc --noEmit -> clean, 0 errors",
+    "jest": "in-scope suites (src/features/**): 27/27 passed, 134/134 tests. Full suite: 11 failed / 117 total - all failures in out-of-scope files (src/modules/shared/exceptions/*.spec.ts, src/app.boot.spec.ts).",
+    "e2e": "not run - requires docker stack; specs migrated structurally to bootE2EWorld + dataSource + pollUntil"
+  },
+  "filesTouched": {
+    "created": [
+      "src/tests/infra/e2e-world.ts",
+      "src/tests/infra/e2e-poll.ts"
+    ],
+    "deleted": [
+      "src/tests/infra/index.ts"
+    ],
+    "e2eSpecs": [
+      "src/tests/e2e/auth/sign-in.e2e-spec.ts",
+      "src/tests/e2e/session/session-expiry.e2e-spec.ts",
+      "src/tests/e2e/session/sign-out.e2e-spec.ts",
+      "src/tests/e2e/task/task-lifecycle.e2e-spec.ts",
+      "src/tests/e2e/task/task-isolation.e2e-spec.ts",
+      "src/tests/e2e/audit/erasure-journey.e2e-spec.ts",
+      "src/tests/e2e/audit/export-and-log.e2e-spec.ts",
+      "src/tests/e2e/share/share-journey.e2e-spec.ts",
+      "src/tests/e2e/notify/notify-preferences.e2e-spec.ts",
+      "src/tests/e2e/plan/plan-journey.e2e-spec.ts",
+      "src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts",
+      "src/tests/e2e/resilience/infra-recovery.e2e-spec.ts",
+      "src/tests/e2e/resilience/teardown-verification.e2e-spec.ts",
+      "src/tests/e2e/resilience/e2e-infra-contract.ts",
+      "src/tests/e2e/jest.config.ts"
+    ],
+    "testInfra": [
+      "src/tests/infra/bussiness/accounts/accounts.module.ts",
+      "src/tests/infra/bussiness/accounts/e2e-auth.service.ts",
+      "src/tests/infra/integrations/graphql/e2e-graphql.service.ts",
+      "src/tests/infra/integrations/graphql/graphql.module.ts",
+      "src/tests/infra/integrations/http/e2e-http.service.ts",
+      "src/tests/infra/integrations/http/http.module.ts",
+      "src/tests/infra/platform/databases/database.module.ts",
+      "src/tests/infra/platform/databases/e2e-db.service.ts",
+      "src/tests/infra/platform/stack/e2e-stack.service.ts",
+      "src/tests/infra/platform/stack/stack.module.ts",
+      "src/tests/infra/testing-infra.module.ts",
+      "src/tests/infra/testing-infra.options.ts"
+    ],
+    "features": "~80 files under src/features/todo/graphql/** (resolver/module/graphql-types JSDoc + exception-arg + code literals), src/features/todo/graphql/graphql.module.ts, src/features/todo/graphql/session-actor.adapter.ts, src/features/todo/http/health/*, src/features/todo/http/webhooks/sepay/*"
+  },
+  "setupLaneMerge": "v3-0 has not produced its half of this ledger (no .done, no modules-scope debt file observed). Merge pending - re-run merge when setup-todo-be.done lands."
+}

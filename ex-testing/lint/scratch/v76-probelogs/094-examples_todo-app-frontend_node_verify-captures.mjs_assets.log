@@ -1,0 +1,16 @@
+$ node verify-captures.mjs assets
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend)
+exit 0
+
+pass running-page-empty-desktop-1280: png decodes, markup carries data-state="empty"
+pass running-page-empty-mobile-390: png decodes, markup carries data-state="empty"
+pass running-page-inviting-desktop-1280: png decodes, markup carries data-state="inviting"
+pass running-page-inviting-mobile-390: png decodes, markup carries data-state="inviting"
+pass running-page-pending-list-desktop-1280: png decodes, markup carries data-state="pending-list"
+pass running-page-pending-list-mobile-390: png decodes, markup carries data-state="pending-list"
+pass running-page-accepted-desktop-1280: png decodes, markup carries data-state="accepted"
+pass running-page-accepted-mobile-390: png decodes, markup carries data-state="accepted"
+pass running-page-refused-desktop-1280: png decodes, markup carries data-state="refused"
+pass running-page-refused-mobile-390: png decodes, markup carries data-state="refused"
+
+

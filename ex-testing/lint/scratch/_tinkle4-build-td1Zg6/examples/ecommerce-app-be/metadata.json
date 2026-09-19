@@ -1,0 +1,23 @@
+{
+    "project": "ecommerce-app",
+    "description": "ecommerce-app backend monorepo - service port declarations and the resolved runtime projection for offset 69, shaped like nivo-backend's metadata.json. Source allocation lives in the host registry (.workspaces/ports/, slot step 1000): port = basePort + appSlot*1000 + offset. This file is the resolved projection, not a second allocation: apps and .starcistacks fragments READ their numbers from here so no port literal exists that could drift, and the FE lane's ports are documented beside the BE's the way nivo documents its web apps. The host registry has no ecommerce-app.json entry yet (offset 69 is what the orchestrating plan assigned; writing that file is a host-registry action, outside this repository's boundary).",
+    "ports": {
+        "identityApi": 5070,
+        "orderApi": 6070,
+        "postgres": 5501,
+        "redis": 6448,
+        "landing": 3069,
+        "shop": 4069
+    },
+    "portServices": {
+        "identityApi": {"scope": "application", "application": "identity", "basePort": 3001, "appSlot": 2},
+        "orderApi": {"scope": "application", "application": "order", "basePort": 3001, "appSlot": 3},
+        "postgres": {"scope": "shared", "basePort": 5432},
+        "redis": {"scope": "shared", "basePort": 6379},
+        "landing": {"scope": "application", "application": "landing", "basePort": 3000, "appSlot": 0, "ownedBy": "ecommerce-app-fe (the FE lane's repository; declared here so its apps read the same projection)"},
+        "shop": {"scope": "application", "application": "shop", "basePort": 3000, "appSlot": 1, "ownedBy": "ecommerce-app-fe (the FE lane's repository; declared here so its apps read the same projection)"}
+    },
+    "secrets": {
+        "note": "The dev stack has no secret material: the local Postgres runs with trust authentication and nothing is encrypted here. A real deployment moves to the SOPS+age custody the todo-app example demonstrates (.starci stacks runtime files, encrypted members tracked, plaintext gitignored)."
+    }
+}

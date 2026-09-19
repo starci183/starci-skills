@@ -1,0 +1,10 @@
+SURFACE MAP
+  ecommerce-app-be: 5 http route(s) (5 declared, 0 owned-only); 7 graphql op(s), 7 claimed
+  ecommerce-app-fe: 0 http route(s) (0 declared, 0 owned-only); 6 fe route(s), 4 ui-claimed
+  34 record(s) total; 4 contract http declaration(s), 0 integration endpoint(s), 1 contract graphql declaration(s), 5 ui route claim(s)
+
+SUSPECT examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/index.yaml: ui.identity.sign-in claims route http://localhost:4069/en/account (as /en/account on apps/shop) but no page.tsx serves it in any bound fe repository - a screen the record says exists that no route reaches (record is todo, not done) [UI_ROUTE_GHOST]
+SUSPECT examples/ecommerce-app-fe/apps/shop/src/app/[lang]/account/page.tsx: apps/shop route /account is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+SUSPECT examples/ecommerce-app-fe/apps/shop/src/app/[lang]/page.tsx: apps/shop route / is served but no ui-screen's surfaces[].route claims it [UI_ROUTE_UNDECLARED]
+
+0 refused, 3 suspect, 0 info

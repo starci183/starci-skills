@@ -1,0 +1,289 @@
+# selection.yaml — how the runtime decides WHICH model may take WHICH workload.
+#
+# Declarative port of .dist/kernel/model-policy.mjs. Every rule names the mjs
+# function it comes from; where the mjs is the ONLY source of a rule it is cited
+# as `source: model-policy.mjs::<fn>`. Allocation-order facts that live in
+# .dist/model/runtimes.json and registry.json are in `allocationFacts` and cite
+# those files instead.
+#
+# The one-sentence business rule (capabilities.json): a model NAME is an
+# availability fact, never proof of capability. A model job is eligible only
+# through a measured qualification record or a narrowly scoped probation with
+# strict machine gates and independent review. Budget orders eligible candidates;
+# it never makes one eligible and never lowers a floor.
+
+schema: starci/module-model-selection@1
+sources:
+  - .dist/kernel/model-policy.mjs
+  - .dist/model/runtimes.json
+  - .dist/model/registry.json
+  - .dist/model/capabilities.json
+  - .dist/model/qualifications.json
+  - .dist/docs/model-catalog.md
+  - .dist/docs/model-functions.md
+
+# ---------------------------------------------------------------------------
+# 1. Vocabularies and ladders
+# ---------------------------------------------------------------------------
+ladders:
+  risk:                      # riskRank — model-policy.mjs::top
+    order: [low, medium, high, critical]
+    default: medium          # when neither op nor context supplies one
+  qualityFloor:              # floorRank — model-policy.mjs::top
+    order: [probation, standard, high, critical]
+    default: standard
+  rule: >-
+    Comparisons are ordinal on these lists. Unknown risk/floor strings are not
+    clamped — they are disqualifying reasons ("unknown workload risk/floor").
+
+closedSets:
+  highKinds:                 # HIGH_KINDS — never probation-eligible, force elevation
+    - integration.verify
+    - release.deliver
+    - deployment.operate
+    - data.correct
+    - production.deploy
+  kernelFunctionKinds:       # MODEL_KINDS + 'judge' — the kernel's own model calls,
+    - model.assessGoal       # NOT operation work. They draw per-call scope but never
+    - model.planOp           # consume the workflow's probation budget.
+    - model.decide           # (model-policy.mjs MODEL_KINDS + comment: "a workflow
+    - model.validateOp       #  that spent that budget on twenty-five manager
+    - model.manageWorkflow   #  decisions went blind and headless")
+    - model.critiqueGoal
+    - model.classifyScreen
+    - model.presentOwnerQuestion
+    - judge                  # bare 'judge' kind also counts
+  roles: [decide, plan, implement, verify, write]   # kinds.json vocabularies.roles
+
+# ---------------------------------------------------------------------------
+# 2. Workload normalization — what a "workload" IS
+#    source: model-policy.mjs::normalizeWorkload
+# ---------------------------------------------------------------------------
+workloadNormalization:
+  description: >-
+    Before any eligibility question, an operation plus its context collapse into
+    one normalized workload record. Fields resolve context-first, then op, then
+    default:
+  fields:
+    kind: "clean(op.kind || op.operation)"
+    role: "clean(context.role || op.role)"
+    domain: "clean(context.domain || op.domain || 'general')"
+    risk: "clean(context.risk || op.risk || 'medium')"
+    qualityFloor: "clean(context.qualityFloor || op.qualityFloor || 'standard')"
+    tools: "unique sorted list of clean(context.tools || op.tools) — empty strings dropped"
+    contextTokens: "Number(context.contextTokens ?? op.contextTokens ?? 0)"
+    requiresIndependentReview: "Boolean(context.requiresIndependentReview ?? op.requiresIndependentReview)"
+
+# ---------------------------------------------------------------------------
+# 3. Workload derivation for a real operation — the sharper normalization
+#    source: model-policy.mjs::workloadFor
+# ---------------------------------------------------------------------------
+workloadDerivation:
+  description: >-
+    workloadFor() rewrites the raw op into the workload the gates actually see.
+    These are the rewriting rules:
+  rules:
+    - id: kind-synthesis
+      rule: >-
+        If op.kind === 'model' and a functionName is present, the workload kind
+        becomes `model.<functionName>`; otherwise the declared kind stands.
+        jobType 'model-function' or kind 'judge' also marks it a model function.
+    - id: external-effects
+      rule: >-
+        external = any entry of op.externalEffects||op.resourceEffects that is
+        not the string 'none' and not {external:false}. noExternalEffects = !external.
+    - id: elevation
+      rule: >-
+        elevated = kind ∈ highKinds OR risk ∈ {high,critical} OR
+        qualityFloor ∈ {high,critical}. An elevated workload's risk is forced to
+        'high' and its qualityFloor to 'high' for gating — regardless of what the
+        op declared.
+    - id: model-function-tools
+      rule: "A model-function workload carries tools: [] — kernel calls need no tool qualification."
+    - id: gate-flags
+      rule: >-
+        strictMachineGates = modelFunction OR op.checks is non-empty.
+        freshIndependentReview = modelFunction OR
+        (op.independentReview.required && op.independentReview.freshContext).
+        approved = state.approved === true. scope = 'local' (constant).
+    - id: probation-eligibility
+      rule: >-
+        probationEligible = NOT elevated AND NOT external AND
+        (modelFunction OR (checks non-empty AND fresh independent review planned)).
+        Only this shape may ever run on probation.
+
+# ---------------------------------------------------------------------------
+# 4. The qualification path — mode 'qualified'
+#    source: model-policy.mjs::qualification
+# ---------------------------------------------------------------------------
+qualificationGates:
+  description: >-
+    evaluateModelEligibility tries the QUALIFIED path first. Every gate below
+    that fails appends its reason; zero reasons = eligible. Evidence schema:
+    starci/model-qualification@1 (capabilities.json requiredEvidence).
+  preconditions:
+    - evidence is a plain object with schema 'starci/model-qualification@1',
+      else the single reason 'model eligibility unavailable'.
+    - runtime must be a plain object with provider and model|target, else
+      'model eligibility unavailable'.
+  gates:
+    - {id: identity-complete, rule: "evidence.provider, evidence.model, evidence.version all non-empty", reason: "model identity qualification is incomplete"}
+    - {id: identity-match, rule: "evidence.provider === runtime.provider AND evidence.model === runtime.model|target AND evidence.version === runtime.version (runtime.version itself must exist)", reason: "qualification does not match selected runtime identity"}
+    - {id: measurable, rule: "evidence.suite, evidence.measuredAt and evidence.outcomes object all present", reason: "measurable qualification evidence is incomplete"}
+    - {id: receipt, rule: "evidence.verified === true AND receipt.schema === 'starci/model-evaluation-receipt@1' AND receipt.artifact.sha256 non-empty", reason: "verified evaluator artifact receipt is missing"}
+    - {id: date-sane, rule: "measuredAt parses and is not in the future", reason: "qualification date is invalid"}
+    - {id: not-stale, rule: "expiresAt (if present) parses and is in the future", reason: "qualification is stale"}
+    - {id: provenance, rule: "evidence.source ∈ {independent-eval, verified-runtime-eval} AND attestation ≠ 'self-claimed'", reason: "qualification provenance is not trusted"}
+    - {id: risk-known, rule: "workload.risk ∈ risk ladder", reason: "unknown workload risk"}
+    - {id: floor-known, rule: "workload.qualityFloor ∈ floor ladder", reason: "unknown quality floor"}
+    - {id: workload-covered, rule: "evidence.workloads contains workload.kind or '*'", reason: "workload <kind> is not qualified"}
+    - {id: domain-covered, rule: "evidence.domains contains workload.domain or '*'", reason: "domain <domain> is not qualified"}
+    - {id: tools-covered, rule: "every workload.tools entry ∈ evidence.tools", reason: "required tool <tool> is not qualified"}
+    - {id: context-fits, rule: "workload.contextTokens ≤ evidence.maxContextTokens", reason: "required context exceeds qualified context"}
+    - {id: floor-met, rule: "floorRank(evidence.qualityFloor) ≥ floorRank(workload.qualityFloor)", reason: "quality floor <floor> is not met"}
+    - {id: risk-met, rule: "riskRank(evidence.maxRisk) ≥ riskRank(workload.risk)", reason: "risk <risk> is not qualified"}
+    - {id: outcomes-pass, rule: "outcomes.status === 'pass' AND outcomes.cases ≥ 1 AND outcomes.passRate ≥ thresholds.minPassRate", reason: "qualification outcomes do not pass"}
+  evidenceLoading:
+    # model-policy.mjs::loadModelEligibilityContext — where receipts come from
+    - The policy file must be schema 'starci/model-capability-policy@1' or loading THROWS ('Model capability policy is unavailable').
+    - Each qualification record's receipt.artifact.path must resolve INSIDE the declared qualification root (realpath check, prefix-bound); outside paths are silently skipped.
+    - The artifact bytes are re-hashed; sha256 must equal receipt.artifact.sha256. Records passing both are stored as evidenceByRuntime[runtimeId] with verified:true. Anything else never reaches the gate.
+    - Current store (.dist/model/qualifications.json) is EMPTY — no model is certified by shipping the package; "empty records mean no measured qualification".
+
+# ---------------------------------------------------------------------------
+# 5. The probation path — mode 'probation', scoped never manufactured
+#    source: model-policy.mjs::probationReasons + localProbationAllowed +
+#            probationUnavailableReasons + createWorkflowModelEligibility
+# ---------------------------------------------------------------------------
+probation:
+  principle: >-
+    "Bootstrap is scoped probation, never manufactured qualification. Strict
+    oracle and independent review remain mandatory." (mjs comment).
+    Probation is only ever CONSULTED after the qualified path fails.
+  recordGates:
+    # probationReasons — what a probation record must satisfy
+    - schema 'starci/model-probation@1' AND status 'active', else 'model eligibility unavailable'
+    - provider/model match the selected runtime identity
+    - scopeId non-empty AND probation.workloads contains the workload kind (exact match — no '*' wildcard here, unlike qualifications)
+    - strictMachineGates AND independentReview AND noExternalEffects all true on the record
+    - workload.risk ≤ medium AND workload.qualityFloor ∉ {high, critical} — "probation cannot satisfy elevated quality or risk"
+    - remainingAttempts ≥ 1
+  admission:
+    # localProbationAllowed — when the kernel may CREATE a probation record
+    allRequired: [approved===true, scope==='local', noExternalEffects===true, strictMachineGates===true, freshIndependentReview===true, probationEligible===true, "kind ∉ highKinds"]
+  budgets:
+    # createWorkflowModelEligibility — two nested limits, both finite
+    perScope: >-
+      scopeId = `${workflowId}/${opId|'workflow'}/${kind}/${role}`.
+      Each scope starts with remaining=2 attempts — "every operation may need a
+      planner, one native worker and an independent judge; each workload gets two
+      attempts".
+    workflowCeiling: >-
+      probationBudget.remaining = configured state.engine.probationCeiling else
+      max(6, opsCount*6) — "one finite workflow ceiling still prevents
+      runtime/provider switching from minting budget". Kernel functions
+      (kernelFunctionKinds) are EXEMPT from this ceiling; operation work is not.
+  consumption:
+    # consumeProbation — spending an attempt is a typed, idempotent event
+    - requires job.jobId; repeat consumption of the same jobId returns 'probation-consumed-cached'
+    - decrements scope.remaining, records a consumedReceipt {jobId, runtimeId, workflowId, opId, generation, at}
+    - non-kernel-function consumption also decrements the workflow probationBudget
+    - scope exhaustion marks every probation record on that scopeId 'exhausted'
+  refunds:
+    # refundProbation — an attempt is returned ONLY for kernel-side failure,
+    # proven by an identity-bound receipt. Three valid proof shapes:
+    proofs:
+      - {code: native-execution-never-began, requires: "effectState 'none' AND taskCreated false AND inputAccepted false"}
+      - {code: runtime-perception-settlement, requires: "liveness 'stalled-idle' — the kernel misread a running turn as idle; the model did not fail"}
+      - {code: runtime-restart-settlement, requires: "proof.generation < current engine generation — an owner-directed retry retires a generation; the attempts were the runtime's to end"}
+    identityBinding: >-
+      proof.attestationId + jobId + generation + workflowId + opId + runtimeId
+      must all match the consumed receipt (or a durable-journal cancellation for
+      legacy jobs). Anything else: 'probation-refund-proof-invalid'.
+    effect: "scope.remaining += 1 (capped at initial); workflow budget += 1 for non-kernel functions; exhausted records revive while attempts remain"
+
+# ---------------------------------------------------------------------------
+# 6. Putting it together — the decision flow
+# ---------------------------------------------------------------------------
+decisionFlow:
+  # evaluateModelEligibility (per candidate):
+  - step: normalize
+    do: "job = normalizeWorkload(op, context); reject outright if runtime has no provider+model"
+  - step: qualified-first
+    do: "reasons = qualificationGates(runtime, evidence, job); mode = 'qualified'"
+  - step: probation-fallback
+    do: "if reasons non-empty AND a probation record exists: re-evaluate under recordGates; mode = 'probation'"
+  - step: verdict
+    do: "eligible = reasons empty; on success return qualification {provider, model, evidenceId, scopeId?}"
+  # createWorkflowModelEligibility wraps this per workflow:
+  - "callback(job, runtime): derive workload via workloadFor, lazily CREATE a probation record when none exists and admission+budgets allow, then evaluate. Ineligible with no evidence prepends 'model qualification evidence is missing' plus the probation-unavailable detail."
+  - "providerFilter(job): if ANY runtime is qualified → return exactly those targets. Else walk candidates via callback; collect eligible — but STOP after the first for non-kernel work ('probation admits exactly one target for one durable job so an internal fallback can never execute an unconsumed probation candidate'). Kernel functions keep all eligible members (per-call selection)."
+  # selectEligibleCandidate — ordering among the eligible:
+  - "filter eligibleCandidates → sort by budget[runtime].remaining DESC, then runtime.id ASC → take first. 'Quota can order eligible candidates; it can never make an ineligible model eligible or lower the floor.'"
+  - "No eligible model → {ok:false, reason:'no eligible model'} — a typed exclusion, never a silent model swap (model-catalog.md)."
+
+# ---------------------------------------------------------------------------
+# 7. Independent review — who may judge
+#    source: model-policy.mjs::reviewerPolicy + capabilities.json review
+# ---------------------------------------------------------------------------
+reviewerPolicy:
+  rules:
+    - "Candidate must pass the full qualification path with requiresIndependentReview forced true, role 'verify'."
+    - "authorAttempt.attemptId must exist — 'author attempt identity is missing'."
+    - "candidate.attemptId must exist and ≠ authorAttempt.attemptId — 'review must use a distinct attempt'."
+    - "candidate.freshContext must be true — 'review context is not fresh'."
+    - "candidate.inheritsAuthorConversation must be false — 'review inherits author hidden context'."
+    - "candidate.contextDigest ≠ authorAttempt.hiddenContextDigest — 'review context includes author hidden history'."
+  notes: >-
+    providerDifferent and modelDifferent are REPORTED, not required —
+    capabilities.json: "differentProviderAloneIsInsufficient". runtimes.json adds
+    verifyAvoidsImplementRuntime: true — the allocator keeps the verifier off the
+    runtime that implemented the slice, but eligibility itself is the gates above.
+
+# ---------------------------------------------------------------------------
+# 8. Ordering, fallback and failure — the facts the algorithm consumes
+#    sources: runtimes.json allocation + registry.json fallback/selection
+# ---------------------------------------------------------------------------
+allocationFacts:
+  policy: prefer-then-overflow        # runtimes.json — try the preferred pool,
+                                      # overflow downward; never sideways-invent
+  maxParallelOps: 20                  # global; per-pool maxParallel in profiles/
+  tiers:                              # role-ordered pool preference per tier
+    hard: "claude-agent → devin-agent → codex-agent (verify/decide/plan lead claude-fable)"
+    medium: "codex-agent → claude-agent → qwen-agent → devin-agent"
+    easy: "qwen-agent → devin-agent → codex-agent → claude-agent"
+  preference: "per-role order: implement/write = codex→claude→qwen→devin; verify = codex→fable→claude→qwen→devin; decide/plan = fable→codex→claude"
+  note: >-
+    Tier/preference lists are within-family suitability for direct consumers,
+    NOT a provider fallback chain in a workflow (runtimes.json purpose). In a
+    workflow the kernel's providerFilter + declared operator chains decide.
+  cooldowns:                          # a failed runtime is parked, doubling per repeat
+    rate-limited: 600000
+    quota: 3600000
+    auth: 86400000
+    other: 300000
+    backoffFactor: 2
+    maxCooldownMs: 3600000
+  onLaunchFailure: next-available-runtime
+  tieBreak: round-robin
+fallback:
+  # registry.json fallback — when a chain MAY advance to the next target
+  advanceOnlyWhen:
+    - "failure reason ∈ {unavailable, quota-exhausted, rate-limited, startup-failure, unsupported}"
+    - "effectState === 'none' — typed, identity-bound proof nothing happened"
+  neverAdvanceWhen: [permission-denied, user-checkpoint, business-ambiguity, safety-block, partial-or-unknown-effects]
+  corollary: >-
+    A missing output, unknown effect or guessed terminal identity never permits
+    fallback (SKILL.md lifecycle correction). Fallback is an availability
+    mechanism, not a quality retry.
+
+# ---------------------------------------------------------------------------
+# 9. Misuse modes — what goes wrong when an agent routes by vibes
+# ---------------------------------------------------------------------------
+misuseModes:
+  - "name-as-proof: \"Shipping in the package ≠ qualified. qualifications.json is empty; every admission today is qualification-by-receipt or probation.\""
+  - "budget-as-eligibility: \"Ordering by remaining quota cannot rescue an ineligible candidate (selectEligibleCandidate).\""
+  - "probation-as-qualification: \"Probation never covers high/critical floors or highKinds; elevation strips it before the gates run (workloadFor).\""
+  - "fallback-as-retry: \"Advancing a chain on a partial-effect failure re-executes real effects — forbidden without effectState 'none'.\""
+  - "pool-name-as-model: \"A pool's models map pins the model per role; attestation must match that pin, not the pool name (runtimes.json purpose).\""
+  - "supervisor-budget-burn: \"Kernel function calls skip the workflow probation budget deliberately — do not route them through operation accounting (MODEL_KINDS comment).\""

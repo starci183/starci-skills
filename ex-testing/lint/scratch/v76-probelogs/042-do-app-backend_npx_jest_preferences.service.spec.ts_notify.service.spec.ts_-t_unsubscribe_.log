@@ -1,0 +1,14 @@
+$ npx jest preferences.service.spec.ts notify.service.spec.ts -t "unsubscribe"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/notify/preferences.service.spec.ts
+PASS src/modules/bussiness/notify/notify.service.spec.ts
+
+Test Suites: 2 passed, 2 total
+Tests:       5 skipped, 5 passed, 10 total
+Snapshots:   0 total
+Time:        2.957 s, estimated 14 s
+Ran all test suites matching /preferences.service.spec.ts|notify.service.spec.ts/i with tests matching "unsubscribe".
+

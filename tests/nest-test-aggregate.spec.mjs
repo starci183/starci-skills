@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createRequire} from 'node:module';
-import {checkScopedLint} from '../scripts/check-scoped-lint.mjs';
+import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
 
 const require=createRequire(import.meta.url);
 

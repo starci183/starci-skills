@@ -1,0 +1,28 @@
+schema: work/integration
+id: integration.notify.queue
+title: The queue that holds a delivery between admission and dispatch
+state: done
+provider: redis
+boundary: The queue holds a delivery attempt while it waits to be dispatched or retried; it never holds
+  rendered message content, and it is not the source of the dedupe key or the digest grouping, both of
+  which are notify's own logic regardless of which queue technology carries the attempt between them.
+credential:
+  name: REDIS_URL
+  providedBy: owner
+  where: .starcistacks/dev/runtime/env/app.env.enc
+sandbox: The dev stack already runs a real Redis (component redis, port 6379 in application-stacks.yaml)
+  for cache and session use; reusing it as a queue backend is a design choice this record makes, not
+  infrastructure this lane added.
+refs: [br.notify.delivery.once, sds.notify.delivery-lifecycle]
+
+requiresProof:
+  live:
+    required: true
+    note: A run against the real dev Redis. Evidence must carry proof.boundary live and an empty fakes
+      list.
+
+module: src/modules/integrations/notify-queue
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "NotifyQueueClient (src/modules/integrations/notify-queue/notify-queue.client.ts) speaks RESP directly over a TCP socket to the dev stack's real Redis (todo-app-dev-redis-1, port 6379) - ZADD to enqueue, an atomic EVAL (ZRANGEBYSCORE + ZREM in one script) to dequeue due jobs, so a second worker could not double-dispatch the same job. Endpoints corrected from the originally-guessed 'a per-recipient-channel list or stream key' to what was actually built: one sorted set (notify:dispatch-queue) keyed by due time, holding flush-window and retry-redispatch jobs. Live-proven: scripts/notify-queue-live-check.cjs's enqueue/dequeueDue round trip against the real Redis, and scripts/live-proof-notify.sh observing a real flush:<windowId> job land in and later leave notify:dispatch-queue during an actual digest window. gap.notify.unbuilt-module's blocker is resolved; the earlier connection-refused probe was against a stack that was not up yet at that moment - todo-app-dev-redis-1 is up for this run."}
+endpoints:
+  - {name: enqueue, method: "ZADD", path: "notify:dispatch-queue (sorted set, score = due-at epoch ms)"}
+  - {name: dequeue, method: "EVAL (ZRANGEBYSCORE + ZREM, atomic)", path: "notify:dispatch-queue"}

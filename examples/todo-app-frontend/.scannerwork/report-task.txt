@@ -1,0 +1,6 @@
+projectKey=starci-todo-app-frontend
+serverUrl=https://sonar.starci.org
+serverVersion=26.8.0.126808
+dashboardUrl=https://sonar.starci.org/dashboard?id=starci-todo-app-frontend
+ceTaskId=1c07b251-ef97-4b60-99c7-c943d43f7c6c
+ceTaskUrl=https://sonar.starci.org/api/ce/task?id=1c07b251-ef97-4b60-99c7-c943d43f7c6c

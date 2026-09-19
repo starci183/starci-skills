@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { checkArchitecture } from '../checks/architecture.mjs';
+import { checkArchitecture } from '../scripts/checks/architecture.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');

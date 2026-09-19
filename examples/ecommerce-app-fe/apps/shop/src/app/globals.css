@@ -2,6 +2,7 @@
 @import '@heroui/styles/css';
 @import '@starci/grammar/common.css';
 @import '../../../../brand/tokens.css';
+@import '../../../../packages/shared/src/theme/tokens.css';
 
 /*
  * Grammar's own Common renderers spell their typography and layout in Tailwind utilities and ship
@@ -11,3 +12,8 @@
  */
 @source '../../../../node_modules/@starci/grammar/dist';
 @source '../..';
+/* The shared i18n/theme modules under `packages/shared/` carry utilities too - they are outside the app dir. */
+@source '../../../../packages/shared/src';
+
+/* The theme module paints `.dark` on the document root, so `dark:` answers to the class, not the OS. */
+@custom-variant dark (&:where(.dark, .dark *));

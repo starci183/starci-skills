@@ -1,0 +1,45 @@
+{
+  "name": "@starci/heroicons",
+  "version": "0.3.0",
+  "description": "Custom-only Heroicons-compatible cuts missing from upstream.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/starci183/starci-skills.git",
+    "directory": "packages/heroicons"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./24/outline": {
+      "types": "./dist/24/outline/index.d.ts",
+      "import": "./dist/24/outline/index.js"
+    },
+    "./16/solid": {
+      "types": "./dist/16/solid/index.d.ts",
+      "import": "./dist/16/solid/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test": "node --test src/package-boundary.test.mjs",
+    "prepack": "npm run typecheck && npm run build && npm test"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "typescript": "^5.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

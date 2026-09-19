@@ -1,0 +1,43 @@
+# Written by hand, same convention as uat.login.sign-in/uat.task.create (scripts/example-evidence.mjs
+# cannot emit the `run:` field a uat-flow needs). IMPORTANT DIFFERENCE from those two: the named run
+# settled partial-pass, not pass - this file records which run exists and what it proved, it does NOT
+# settle the record as done. The record stays inprogress on gap.share.live-proof, which names the
+# missing invitee-side capability the run's not-run assertions document.
+schema: work/evidence
+record: uat.share.invite-and-collaborate
+recordDigest: f7f5192c6b5570b55889eb6f5fc7ac85875d2f85f4a0f9f492f33af8d3716f1e
+run: runs/20260919T142709Z-5c10a673
+outcome: partial-pass
+assets:
+  - path: runs/20260919T142709Z-5c10a673/videos/invite-and-collaborate.webm
+    sha256: 13937231eea72d42c1c38578b76a837593993f171e1fa718dca5777641a89241
+provenance:
+  actor: playwright-harness
+  tool: 'npx playwright test -c uat/playwright.config.ts uat.share.invite-and-collaborate.spec.ts (reporter uat/lib/run-writer.ts)'
+  environment: local
+  capturedAt: '2026-09-19T14:27:09.000Z'
+  stack: >-
+    The shared stack already running on this machine (not booted by this lane): postgres:16 on
+    127.0.0.1:5432 (database todo) in container compose-postgres-1, keycloak 26.0 on 8089 (realm todo,
+    the two DEMO-ONLY committed users demo@todo.dev / demo2@todo.dev), redis on 6379, this worktree's
+    backend on 3001 and frontend on 3000 - the bytes proven are the manifest's frontendCommit/
+    backendCommit (5c10a673 for both).
+  authorization: >-
+    UAT_LIVE_LOGIN_AUTHORIZED=true, UAT_DEMO_PASSWORD / UAT_PASSWORD_STRANGER / UAT_PASSWORD_EDITOR
+    set to the DEMO-ONLY plaintext passwords already committed in
+    .starcistacks/dev/infra/compose/realm-todo.json; UAT_PG_CONTAINER=compose-postgres-1 for the
+    cleanup deletes environment.todo-app.dev's allowedEffects authorize ("delete run-owned rows by
+    exact recorded id"). No credential value is stored in this record or the run folder.
+  observed_effect: >-
+    Three real sign-ins wrote session rows (owner, editor, owner again) - not counted as run-owned
+    resources, same caveat as the sibling flows. One run-owned task and two run-owned invitation rows
+    were created through the UI; the task was deleted through the UI and the two invitation rows were
+    deleted by exact id via psql (task delete does not cascade - no FK on invitations), each
+    verified absent by read-back; cleanup.json's triplets close out. The three invitee-side
+    assertions are observed not-run - the product has no acceptance surface - so this run is a
+    partial-pass and proves the owner legs only.
+  recording: >-
+    videos/invite-and-collaborate.webm, 225,538 bytes, VP8 yuv420p 800x450 at 25 fps, 3.84s
+    (Playwright bundled ffmpeg, ms-playwright/ffmpeg-1011). Password fields render as the browser's
+    own bullets and page.screenshot masks them whenever present; no credential is in the committed
+    bytes.

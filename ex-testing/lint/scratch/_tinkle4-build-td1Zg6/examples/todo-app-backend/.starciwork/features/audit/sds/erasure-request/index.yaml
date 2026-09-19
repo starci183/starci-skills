@@ -1,0 +1,84 @@
+schema: work/sds-component
+id: sds.audit.erasure-request
+title: The lifecycle of one request to be forgotten
+state: done
+responsibility: Verifies a request is really the subject (or an authorized operator acting for them),
+  then destroys what makes that person's log lines readable, then confirms and logs the completion.
+interfaces:
+  - No caller can reach executing without a verified request; no caller can reach complete while any
+    of the subject's lines still decrypt.
+refs: [br.audit.erasure.right, br.audit.erasure.logged]
+dependsOn: [sds.audit.log-chain]
+owners:
+  - {role: module, path: src/modules/bussiness/audit}
+
+stateMachine:
+  states: [requested, verified, executing, complete, refused]
+  initial: requested
+  terminal: [complete, refused]
+  transitions:
+    - id: t-request
+      to: requested
+      on: person-requests-erasure
+      guard: The request names an existing person id and gets a fresh requestId.
+      effect: One erasure-request row is created directly in state requested (there is no prior state
+        to transition from - the row and its state machine instance come into existence together),
+        and an erasure-requested line is appended naming the requestId, never the person.
+    - id: t-verify
+      from: requested
+      to: verified
+      on: identity-confirmed
+      guard: The requester is proven to be the subject, or an operator authorized to act for them.
+      effect: verifiedAt is set.
+    - id: t-refuse
+      from: requested
+      to: refused
+      on: identity-not-confirmed
+      effect: refusedAt is set; nothing about the subject's keys is touched.
+    - id: t-execute
+      from: verified
+      to: executing
+      on: worker-picks-up-request
+      effect: The subject's key and the keystore's personId-to-keyId mapping are destroyed. No log
+        line is read, rewritten or deleted.
+    - id: t-complete
+      from: executing
+      to: complete
+      on: subject-confirmed-unreadable
+      guard: Every line the subject produced now fails to decrypt.
+      effect: completedAt is set, and an erasure-completed line is appended naming the requestId.
+
+sequence:
+  participants: [person, api, keystore, log]
+  steps:
+    - {from: person, to: api, message: "POST /privacy/erasure naming their own id, observable: http"}
+    - {from: api, to: log, message: "append the erasure-requested line, observable: write"}
+    - {from: api, to: person, message: "a re-authentication challenge, observable: http"}
+    - {from: person, to: api, message: "the re-authentication response, observable: http"}
+    - {from: api, to: keystore, message: "destroy the subject's key and its personId mapping, observable: write"}
+    - {from: api, to: log, message: "append the erasure-completed line, observable: write"}
+  note: Only interactions an end-to-end run can observe are bound here, matching sds.login.session-store's
+    own note. Implementation note (impl.audit.todo-app-backend.erasure) - this example has no separate
+    re-authentication channel, so steps 3-4's challenge/response is satisfied by the same
+    `x-session-token` that already authenticated the GraphQL call - t-verify runs immediately inside
+    AuditErasureService.request rather than waiting on a second round-trip, since the only caller who
+    can ever reach t-request for a given personId is that person's own signed-in session (see
+    gap.audit.operator-role - there is no operator-initiated erasure yet). The state machine and its
+    transitions are unchanged; only this one sequence step's transport is collapsed.
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "impl.audit.todo-app-backend.erasure names the real module: AuditErasureService
+    (src/modules/bussiness/audit/audit-erasure.service.ts) implements t-request/t-verify/t-refuse/
+    t-execute/t-complete under exactly those method names, each proven in
+    audit-erasure.service.spec.ts. owners added naming the real capability directory; blockedBy removed
+    now that gap.audit.unbuilt-module is closed. sequence.note gained the re-authentication-collapse
+    clarification above."

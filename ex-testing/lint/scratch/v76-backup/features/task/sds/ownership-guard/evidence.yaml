@@ -1,0 +1,113 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: sds.task.ownership-guard
+recordDigest: 5a185d8554fec8828e3272a40ade313110d7b336097e016b93d91e54a368c581
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/task/complete-task.command.ts
+      sha256: 905ccd97b11edf7080657db67d6a2ebf6286d952cef3dcf5153e3830292cbf85
+    - path: src/modules/bussiness/task/complete-task.handler.spec.ts
+      sha256: df1fb684331875a2eb065e7f1dc0da214c551138f2ffa4a3ba6e062d5cf8262b
+    - path: src/modules/bussiness/task/complete-task.handler.ts
+      sha256: 19ce75996a8d7ab44f87918c61fe3426e7df1b950e47a336664b90ab4cbb04e9
+    - path: src/modules/bussiness/task/completion-authority.contracts.ts
+      sha256: b06f2d770122970d4058e88d7c94ce841b848faf23840387b1b322281adccce0
+    - path: src/modules/bussiness/task/completion-authority.providers.ts
+      sha256: fc3433001812710f106200d01d429ea95032cb8d09b3e435cbb645ec38c19497
+    - path: src/modules/bussiness/task/completion-authority.spec.ts
+      sha256: e1299d613bd6f626f5366f46e7a991d36ab5f57e1a127498e84c28f9554e101f
+    - path: src/modules/bussiness/task/create-task.command.ts
+      sha256: 022b9c0ebb8c36a392cc3902b45c4c8f93ab00d85295fac0af76563ae4bb6d60
+    - path: src/modules/bussiness/task/create-task.handler.spec.ts
+      sha256: 4293acbe17ee5dd9ee99671d8a51c672242b4bcffb404b32426f93d70202e509
+    - path: src/modules/bussiness/task/create-task.handler.ts
+      sha256: 5f100ff4187311962761f32b44ca49aa8c719cdb8dd5e194e42782083a1a8307
+    - path: src/modules/bussiness/task/creation-policy.contracts.ts
+      sha256: c779bb17a6cc2b10163047b2e7fa6e5f339c43b55014df5ec8de2fe3e220f749
+    - path: src/modules/bussiness/task/creation-policy.providers.ts
+      sha256: 5d2965fcca9be3a1e2bc4bde62a20470f88034da49dcad3a976ee1fefa03b790
+    - path: src/modules/bussiness/task/delete-task.command.ts
+      sha256: 6b7b17d0d57d78ae47af31a1ac11ca554748da0bd0a23825839413f38e9bf88b
+    - path: src/modules/bussiness/task/delete-task.handler.spec.ts
+      sha256: 321105cb4c549a76824a9888f64c86742cbf4035e9057bac3bd499ac585a25d3
+    - path: src/modules/bussiness/task/delete-task.handler.ts
+      sha256: b88c4fe59b1b054cf433ef64139e33251aba97b0b7858dd4fc51d862cd937eae
+    - path: src/modules/bussiness/task/index.ts
+      sha256: 9e747025a10b43563821e97af0c8cc9cbeee4ab391b33ad7bb48d54f31ea1498
+    - path: src/modules/bussiness/task/list-tasks.handler.spec.ts
+      sha256: 14f3ee8aea88e6fd159861217ee294f9d0dfe1d682fd2b866c73bcf1f935e637
+    - path: src/modules/bussiness/task/list-tasks.handler.ts
+      sha256: 5bbb597121fe3e1d54ad7d4fd141267be0c729263641238a63cb9e285911ef00
+    - path: src/modules/bussiness/task/list-tasks.query.ts
+      sha256: 786c8bd4e9c62f6eb2cf2499034990cf3d28c51cd712f88d6cc27c62b8d85a34
+    - path: src/modules/bussiness/task/ownership.guard.ts
+      sha256: de0ce2b9c4f03f836c56591dce45b4b4e9159064c118c73a4cc627d8253253eb
+    - path: src/modules/bussiness/task/reopen-task.command.ts
+      sha256: f5af4f8e1d5267ad968734b452bab7545f5551ecf3729ca6631cea87e3d0ebe6
+    - path: src/modules/bussiness/task/reopen-task.handler.spec.ts
+      sha256: 0078cc8ae11670c294514fd32373286cc95c68522c9fca9d2c1d4c2e87750f89
+    - path: src/modules/bussiness/task/reopen-task.handler.ts
+      sha256: 6a4fe512aa67d17b68b77fb3714fedc8660a2f6a4a1e22f94c5ada99d091540b
+    - path: src/modules/bussiness/task/task-counts.handler.spec.ts
+      sha256: 6d84ee7f14c2c28c7644b700b36df42946b79dbf7a5a93e049f107a1d9c85004
+    - path: src/modules/bussiness/task/task-counts.handler.ts
+      sha256: efaef5579ac50cbbc86bc50fb065ca3027d08e83ad15f8e69e39cedaa63111a4
+    - path: src/modules/bussiness/task/task-counts.query.ts
+      sha256: 56b9d947359a0444fd8b6b01a8486674e4f3acbd176724f0a5cbe81bb9457163
+    - path: src/modules/bussiness/task/task.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/task/task.module.ts
+      sha256: c40a1c3e1518ce3c868c420a0fcec138b9a96a71f664d66a5b01c9400e5abb51
+    - path: src/modules/bussiness/task/task.service.spec.ts
+      sha256: fd2ba88f06d2e3d99c360b79afa9978023ea2333b041b6eb6ef5da86f0d2a2c2
+    - path: src/modules/bussiness/task/task.service.ts
+      sha256: 1c12d8742e7de339f9a86bde5e40797187070414326b7c9d9ad619470d281d4c
+    - path: src/modules/bussiness/task/types/task-record.ts
+      sha256: 2dd6e270d672bf9d8eed0da0a67de448873e3f0e106f071350d5ff32fb2ea541
+  digest: 20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea
+outcome: pass
+assertions:
+  - id: sds.task.ownership-guard.implementation
+    command: npx jest src/modules/bussiness/task
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task exited 0
+  - id: sds.task.ownership-guard.t-owner
+    command: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-owner:"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-owner:" exited 0
+  - id: sds.task.ownership-guard.t-collaborator
+    command: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-collaborator:"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-collaborator:" exited 0
+  - id: sds.task.ownership-guard.t-stranger
+    command: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-stranger:"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-stranger:" exited 0
+  - id: sds.task.ownership-guard.real-share-authority
+    command: npx jest src/modules/bussiness/share/completion-authority.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/share/completion-authority.spec.ts exited 0
+  - id: sds.task.ownership-guard.boot-transport
+    command: npx jest src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle" exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T11:58:29.245Z

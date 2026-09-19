@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { checkNextPatterns, NEXT_SCRIPT_RULES } from '../checks/code-patterns/next.mjs';
+import { checkNextPatterns, NEXT_SCRIPT_RULES } from '../scripts/checks/code-patterns/next.mjs';
 
 const require = createRequire(import.meta.url);
 function fixture(t, sources, options = {}) {

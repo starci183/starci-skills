@@ -1,0 +1,5 @@
+
+gap evidence with a line anchor: 26, covered by this table: 26
+token rows whose cited line actually carries the name: 108/108
+
+all 26 gap citations and 108 token anchors land

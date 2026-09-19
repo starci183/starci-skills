@@ -1,0 +1,6 @@
+census components: 42
+DIFFER GrammarRoot: snapshot-only=[] census-only=[grammar-common-root]
+
+components whose class table differs or is absent from the starci snapshot: 1
+starci DNA components absent from the Common census: (none)
+starci DNA renderer count: 42

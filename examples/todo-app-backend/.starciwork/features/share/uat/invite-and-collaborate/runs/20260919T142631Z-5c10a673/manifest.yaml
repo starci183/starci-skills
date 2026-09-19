@@ -1,0 +1,226 @@
+schema: starci/uat-run-manifest@1
+id: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
+nodeId: uat.share.invite-and-collaborate
+inputDigest: 7b0cb889b0b936c07b7cb363af621b7dfa671978114b19e194054f316d856b69
+outcome: partial-pass
+assertions:
+  - id: fr.share.invite
+    expected: yes
+    observed: yes
+    note: Two invitations submitted through ui.share.invite - demo2@todo.dev as editor,
+      uat-20260919T142631Z-5c10a673-viewer@todo.dev as viewer - both render as Pending rows in the
+      collaborator list. The realm seeds only two accounts, so the "third person" viewer is a
+      run-namespaced address with no login; the invitation row itself is real.
+  - id: fr.share.accept
+    expected: yes
+    observed: not-run
+    note: "No acceptance surface exists in the product: invite publishes no event and sends no email
+      (src/modules/bussiness/share/invite.handler.ts), there is no notifications inbox, no route
+      under src/app serves acceptInvitation, and no query lets an unbound invitee learn the
+      invitationId - collaborators(taskId) returns [] to them (InvitationService.listFor). The
+      shared task can never appear in the invitee list either (tasks is ownership-only). This step's
+      screenshots are the observed absence. Signed in as the invited editor: the run task is absent
+      from their list and the share route renders an empty state with nothing to accept."
+  - id: br.share.role.permissions
+    expected: yes
+    observed: not-run
+    note: Depends on an accepted invitation (unreachable above); even post-accept no UI affordance would
+      exist, since a collaborator has no task surface to complete on.
+  - id: fr.share.revoke
+    expected: yes
+    observed: yes
+    note: The owner revoked both pending invitations through the UI (Revoke + window.confirm); each row
+      now reads Revoked. This proves t-revoke-pending only - the record's designed leg revokes an
+      accepted editor, which the missing accept surface makes unreachable.
+  - id: br.share.revoke.on-read
+    expected: yes
+    observed: not-run
+    note: Depends on an accepted collaborator whose next read is refused; no invitation could be
+      accepted (missing surface above), so there is no bound access for a read to lose.
+assets:
+  - path: screens/owner-signed-in.png
+    sha256: c6e0daea0156ef4a18222576dd86dadb64ca870874341cb16e633c4ca218cb38
+    size: 47014
+  - path: screens/task-created.png
+    sha256: 941f8294e80c7dd07c2ea752e0bbecc4ffabc50b9e1a92cea7dc93270ce70b88
+    size: 39639
+  - path: screens/editor-and-viewer-invited-pending.png
+    sha256: 18327ac4f4bc2951d6e54b2add29beece34731dd1fd53f197824a83656753359
+    size: 40892
+  - path: screens/editor-sign-in-finds-no-accept-surface.png
+    sha256: 56df68b7a77d842cec8afcd19c9bc44d9a47b2c99741469ec57e39eb1bb7d754
+    size: 33594
+  - path: screens/owner-revokes-both-pending-invitations.png
+    sha256: c0eef5bba8cd67a50782225b3dbeb0ab2b894446a36516d03f8b7661013e5988
+    size: 40711
+  - path: screens/task-deleted-and-invitation-rows-cleaned.png
+    sha256: ed307aabf9952727a6dd7c0cf157277e20e2d32f309e48ff4145ebd425948353
+    size: 47035
+  - path: screens/screenshot.png
+    sha256: 6e9bd70907ae4bc4f349a5da6a5630ad2f9fd35011ff1134fac6b39743f5be9c
+    size: 47034
+  - path: videos/invite-and-collaborate.webm
+    sha256: 586320c5e29977869b7bb91e851f3ef4a176f3caebc852feda8b17836448f988
+    size: 268623
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:3000
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.share.invite-and-collaborate
+    ownedResourcesCreated:
+      - kind: task
+        id: uat-20260919T142631Z-5c10a673-share
+        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+      - kind: invitation
+        id: 07086745-0043-4be7-a626-32900745c6c2
+        note: Run-owned invitation row for demo2@todo.dev, created through the owner's invite form; id read
+          back from collaborators(taskId).
+      - kind: invitation
+        id: uat-20260919T142631Z-5c10a673-viewer@todo.dev
+        note: Run-owned invitation row for uat-20260919T142631Z-5c10a673-viewer@todo.dev, created through
+          the owner's invite form; id read back from collaborators(taskId).
+    ownedResourcesDeleted:
+      - kind: task
+        id: uat-20260919T142631Z-5c10a673-share
+        note: Run-owned task row deleted through the UI two-step confirm.
+      - kind: invitation
+        id: 07086745-0043-4be7-a626-32900745c6c2
+        note: Run-owned invitation row for demo2@todo.dev deleted by exact recorded id (psql in
+          compose-postgres-1); task delete does not cascade to invitations.
+    verifiedAbsent:
+      - kind: task
+        id: uat-20260919T142631Z-5c10a673-share
+        note: The title resolves to zero elements in the re-read owner list after the confirmed delete.
+      - kind: invitation
+        id: 07086745-0043-4be7-a626-32900745c6c2
+        note: SELECT count(*) for the recorded id returns 0 after the delete.
+    note: Unresolved owned resource(s) remain - see ownedResourcesCreated vs
+      ownedResourcesDeleted/verifiedAbsent.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.share.invite-and-collaborate
+      title: Invite an editor, have them complete a task, then revoke them
+      steps:
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+      proves:
+        - fr.share.invite
+        - fr.share.accept
+        - fr.share.revoke
+        - br.share.role.permissions
+        - br.share.revoke.on-read
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.share.invite-and-collaborate
+    checked:
+      - fr.share.invite
+      - fr.share.revoke
+    notRun:
+      - fr.share.accept
+      - br.share.role.permissions
+      - br.share.revoke.on-read
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T142631Z-5c10a673
+    flow: uat.share.invite-and-collaborate
+    started: 2026-09-19T14:26:32.227Z
+    finished: 2026-09-19T14:26:35.144Z
+    accountsDeclared:
+      - role: owner
+        username: demo@todo.dev
+      - role: editor
+        username: demo2@todo.dev
+      - role: viewer
+        username: demo2@todo.dev
+    reused: []
+    created:
+      - kind: task
+        id: uat-20260919T142631Z-5c10a673-share
+        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+      - kind: invitation
+        id: 07086745-0043-4be7-a626-32900745c6c2
+        note: Run-owned invitation row for demo2@todo.dev, created through the owner's invite form; id read
+          back from collaborators(taskId).
+      - kind: invitation
+        id: uat-20260919T142631Z-5c10a673-viewer@todo.dev
+        note: Run-owned invitation row for uat-20260919T142631Z-5c10a673-viewer@todo.dev, created through
+          the owner's invite form; id read back from collaborators(taskId).
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.share.invite-and-collaborate
+    checks:
+      - id: fr.share.invite
+        expected: yes
+        observed: yes
+        note: Two invitations submitted through ui.share.invite - demo2@todo.dev as editor,
+          uat-20260919T142631Z-5c10a673-viewer@todo.dev as viewer - both render as Pending rows in
+          the collaborator list. The realm seeds only two accounts, so the "third person" viewer is
+          a run-namespaced address with no login; the invitation row itself is real.
+      - id: fr.share.accept
+        expected: yes
+        observed: not-run
+        note: "No acceptance surface exists in the product: invite publishes no event and sends no email
+          (src/modules/bussiness/share/invite.handler.ts), there is no notifications inbox, no route
+          under src/app serves acceptInvitation, and no query lets an unbound invitee learn the
+          invitationId - collaborators(taskId) returns [] to them (InvitationService.listFor). The
+          shared task can never appear in the invitee list either (tasks is ownership-only). This
+          step's screenshots are the observed absence. Signed in as the invited editor: the run task
+          is absent from their list and the share route renders an empty state with nothing to
+          accept."
+      - id: br.share.role.permissions
+        expected: yes
+        observed: not-run
+        note: Depends on an accepted invitation (unreachable above); even post-accept no UI affordance would
+          exist, since a collaborator has no task surface to complete on.
+      - id: fr.share.revoke
+        expected: yes
+        observed: yes
+        note: The owner revoked both pending invitations through the UI (Revoke + window.confirm); each row
+          now reads Revoked. This proves t-revoke-pending only - the record's designed leg revokes
+          an accepted editor, which the missing accept surface makes unreachable.
+      - id: br.share.revoke.on-read
+        expected: yes
+        observed: not-run
+        note: Depends on an accepted collaborator whose next read is refused; no invitation could be
+          accepted (missing surface above), so there is no bound access for a read to lose.
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.share.invite-and-collaborate
+    steps:
+      - step: owner-signed-in
+        startedAt: 2026-09-19T14:26:32.654Z
+        endedAt: 2026-09-19T14:26:33.099Z
+        screenshot: owner-signed-in
+      - step: task-created
+        startedAt: 2026-09-19T14:26:33.144Z
+        endedAt: 2026-09-19T14:26:33.391Z
+        screenshot: task-created
+      - step: editor-and-viewer-invited-pending
+        startedAt: 2026-09-19T14:26:33.443Z
+        endedAt: 2026-09-19T14:26:33.731Z
+        screenshot: editor-and-viewer-invited-pending
+      - step: editor-sign-in-finds-no-accept-surface
+        startedAt: 2026-09-19T14:26:33.789Z
+        endedAt: 2026-09-19T14:26:34.096Z
+        screenshot: editor-sign-in-finds-no-accept-surface
+      - step: owner-revokes-both-pending-invitations
+        startedAt: 2026-09-19T14:26:34.138Z
+        endedAt: 2026-09-19T14:26:34.551Z
+        screenshot: owner-revokes-both-pending-invitations
+      - step: task-deleted-and-invitation-rows-cleaned
+        startedAt: 2026-09-19T14:26:34.590Z
+        endedAt: 2026-09-19T14:26:35.210Z
+        screenshot: task-deleted-and-invitation-rows-cleaned

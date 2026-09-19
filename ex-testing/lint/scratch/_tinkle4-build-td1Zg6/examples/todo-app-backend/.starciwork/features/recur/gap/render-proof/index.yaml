@@ -1,0 +1,24 @@
+schema: work/gap
+id: gap.recur.render-proof
+title: The schedule captures fail the canonical render checks - impl.recur.todo-app-frontend.schedule cannot claim done
+state: todo
+statement: "impl.recur.todo-app-frontend.schedule keeps real captures - the no-rule, refused,
+  active and ended states at desktop-1280 and mobile-390, produced by ./assets/capture.mjs
+  driving the served build against the live API (real makeRecurring / upcomingOccurrences /
+  endRecurrence). The artifacts are real; the proof is not. Run through checks/render.mjs,
+  entity-list-in-card fails on running-page-active-desktop and running-page-active-mobile: 6
+  `li` items sit in a `div` inside `starci-core-surface` - a list of entities is a page section
+  with a heading; a card is one item. The no-rule and refused mobile captures additionally fail
+  palette-off-brand on #6d97ff (2% of saturated pixels, nearest --starci-core-accent at deltaE
+  13.3). Both findings are properties of the shipped markup and paint in todo-app-frontend,
+  outside the .starciwork record scope, so the done claim is unproven and the record is held at
+  todo, blockedBy this gap. Repro: node scripts/example-render-proof.mjs --work
+  examples/todo-app-backend/.starciwork --record impl.recur.todo-app-frontend.schedule"
+closedBy: impl.recur.todo-app-frontend.schedule
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-19T21:30:00.000Z
+  reason: "Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
+    palette failures above on real markup and bytes. Neither editing checks/*.mjs nor staging
+    captures can close this - the rendered page itself violates the design system's laws."

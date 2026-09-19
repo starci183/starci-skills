@@ -1,0 +1,347 @@
+# modules/ops/ops/architecture.decide.yaml - TINKLE-1 pure-yaml port of .claude/ops/architecture.decide/operator.yaml
+# The operator contract below is verbatim; the trailing 'business:' block is the added
+# analysis (inference marked where the contract does not state it literally).
+# Related source files (not ported): ops/architecture.decide/specification.yaml 
+
+id: architecture.decide
+goal:
+  en: Design a flow-led, source-independent architecture with logical components, contracts, state
+    paths, recovery and planned verification.
+nodeKinds:
+  - architecture
+completionProfile: architecture
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: Canonical .starciwork SRS/SDS owners and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: design-patterns
+    path: knowledge/architecture-rules.json + knowledge/design-patterns.json + docs/design-pattern-catalog.md
+    purpose:
+      en: Apply the fixed NestJS/Next.js ownership standard and select only patterns triggered by the
+        actual scenario. Review transaction/effect boundaries, state authority, concurrency, failure
+        and recovery using primary sources where needed. Record decisions in the existing design;
+        pattern names and source observations are not behavioral proof or authority for code edits.
+  - id: application-stacks
+    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+    purpose:
+      en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
+        load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
+        credential custody, lifecycle commands and existing consumers. Run the static stacks
+        check when validating a materialized stack; bind its exact inputs and limitations.
+        Acceptance additionally requires the selected real startup, persistence, recovery and
+        application checks. This conditional read grants no extra deployment or source scope.
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
+        For an explicitly new target, absence is expected: inspect the nearest existing
+        ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
+        content."
+  - id: business
+    path: .starciwork/<business>/business/**/index.yaml
+    purpose:
+      en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
+        inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a
+        replacement. Do not invent a mandatory BA predecessor for a scope that does not require one;
+        a needed missing input is a reported graph/scope gap, not a new dependency silently added
+        here.
+  - id: constraints
+    path: canonical Work quality/platform constraints and primary design documentation
+    purpose:
+      en: Read stated deployment, storage, trust and compatibility constraints. Verify technology claims
+        using primary documentation where necessary; do not present a design as deployed-source
+        observation.
+  - id: specification
+    path: architecture.decide/specification.json + specifications/sds-map.json +
+      docs/architecture-sds.md
+    purpose:
+      en: Read the JSON field contract and this operator procedure before authoring the .starciwork
+        payload.
+  - id: feasibility
+    path: Selected repositories, relevant configuration and installed API declarations
+    purpose:
+      en: Inspect only surfaces material to the selected design so targets and migration are feasible.
+        The survey informs but never overrides accepted SRS or supplies completion proof.
+  - id: matrix
+    path: selected complete-job matrix request + workflows/jobs.json
+    purpose:
+      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
+        input bindings, requested output JSON shapes and required criteria. Standalone execution
+        needs no fabricated matrix request. A template is not authority for extra effects.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles. Use current host model configuration; historical model names are not availability
+        proof. Capabilities are the intersection of actual tools, selected profile policy, op
+        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
+        or extra-agent permissions.
+writes:
+  - id: node
+    path: .starciwork/<business>/architecture/{overview,sds/**}/index.yaml
+    fields:
+      - schema
+      - refs
+      - dependsOn
+      - assertions
+      - required
+      - extensions.work3.sds
+    content:
+      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path under
+        features/<feature>/architecture/. Author
+        overview plus typed extensions.work3.sds leaves in flows, components, contracts,
+        data, quality, deployment, decisions and verification - each leaf payload carrying its
+        declared starci/sds-*@1 section const. Parent indexes carry only
+        starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
+        interfaces without repository roles, paths, symbols, signatures, source status or revision
+        evidence. Write all canonical SDS content in English, including natural-language prose,
+        YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
+        types, operation names and source symbols. Preserve Business and shared
+        design through stable IDs and exact owning Work refs.
+  - id: matrixHandoff
+    path: E/job-result.json
+    fields:
+      - requestId
+      - requestDigest
+      - op
+      - operation when selected
+      - status
+      - criteria
+      - outputs
+      - artifacts
+    content:
+      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
+        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
+        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
+        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
+        The selected request freezes output field schemas before execution.
+steps:
+  - reads:
+      - design-patterns
+      - application-stacks
+      - target
+      - business
+      - constraints
+      - specification
+      - feasibility
+      - profile
+    writes:
+      - node
+    action:
+      en: "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read
+        specifications/sds-map.json and docs/architecture-sds.md. Survey relevant source,
+        configuration and installed APIs; then independently record retain, extend, correct, replace
+        or add decisions with rationale, impact and migration. Prescribe logical responsibilities,
+        interfaces, state and failure behavior. Repository/file/symbol/call mappings and actual
+        revisions or proof belong to Implementation. Never write product
+        code or present a design constraint as deployed behavior."
+  - reads:
+      - target
+      - business
+      - constraints
+    writes:
+      - node
+    action:
+      en: Write logical components with responsibilities, exclusions and dependency directions. Contracts
+        have one owner, caller/receiver, sync/async/in-process mode, inputs, outcomes/errors,
+        authority, timeout, retry, idempotency and compatibility. Import shared views by stable
+        Work/item IDs; never copy or redefine another owner contract. A generic inter-module command
+        requires an advertised recipient capability, versioned payload, valid installations,
+        authority and consent, stable intent plus fingerprint, and recipient-owned effect/receipt.
+        Admission is not delivery or business completion; an unknown response reconciles the same
+        intent. Never create an arbitrary-payload effect endpoint.
+  - reads:
+      - target
+      - business
+      - constraints
+    writes:
+      - node
+    action:
+      en: Design runtime scenarios referencing canonical SRS flow IDs. Every step names its component,
+        target repo/path/symbol/signature, callers/callees, contracts, authorization, data,
+        transaction/state decision, return path, failure outcome, recovery and planned verification.
+        Do not attach source status or revision evidence. Cover significant architectural
+        differences, including response loss, concurrency, duplicates, ordering, partial success and
+        cancellation where relevant.
+  - reads:
+      - target
+      - business
+      - constraints
+    writes:
+      - node
+    action:
+      en: Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle,
+        placement, connections and credential custody. For durable customer state, examine database
+        consistency, complete backup set, authoritative/derived state, volumes, config, Secrets/keys,
+        custody outside the relevant failure domain, restore destination/order, reconciliation,
+        old-writer fencing and safe effect resumption. Volume bytes alone do not prove recovery.
+        Select failure domains and recovery depth from actual scope, not a mandatory checklist for
+        every project.
+  - reads:
+      - target
+      - business
+      - constraints
+    writes:
+      - node
+    action:
+      en: Challenge one coherent proposal with a materially simpler alternative, rationale, cost,
+        downsides and revisit conditions. Patterns are optional; specify actual mechanisms rather
+        than names. Use applicable StarCi knowledge, verified installed APIs and primary technical
+        references with an applicability argument. Do not invent business targets or product policy; make technical choices within
+        approved requirements.
+  - reads:
+      - target
+      - business
+      - constraints
+    writes:
+      - node
+    action:
+      en: Write relevant quality/threat/failure scenarios with trigger, impact, response, owner and
+        planned design checks linked to SRS acceptance. Keep residual risk and limitations explicit.
+        Never claim source implementation, security audit, HA verification or a recovery drill ran
+        from a design document.
+  - reads:
+      - target
+      - business
+      - constraints
+      - matrix
+    writes:
+      - node
+      - matrixHandoff
+    action:
+      en: Validate recursive layout and exact canonical SRS/shared-design references. Review full
+        requirement/flow/acceptance coverage across the owning architecture scope. Resolve material
+        design blockers before pass. Confirm that all canonical SDS content is English; schema
+        validity alone is not review.
+        Implementation owns source mapping and test execution. Done means current reviewed design,
+        never an edit lock.
+  - reads:
+      - target
+      - business
+      - constraints
+    writes:
+      - node
+    action:
+      en: "Repair mode (the `architecture.revise` kind this operator also carries) is not a second decision: a
+        design section a builder found silent, confusing or self-contradictory is revised here, never
+        escalated and never left for the build to invent a mechanism around. Read the reported gap, state the
+        two or three readings the recorded design actually admits, and choose the most reasonable one from the
+        accepted requirement it realises, the rest of the design it must stay consistent with, the decided
+        records of the other features and the product's own conventions. Write that reading into the section
+        with the contract and the acceptance an implementer derives code from, bump the record's rev, and
+        append EXACTLY ONE extensions.work3.decisionLog entry {rev, at, gap, chosen, why, alternatives},
+        never rewriting or deleting an earlier one. One exception: when the readings differ in an observable
+        outcome about money, authority or customer data, do not choose silently - report ask with
+        question.kind decision, one numbered option per reading with what each costs and who it affects, and
+        one recommendation; the kernel writes that decision record for the owner and carries the work on the
+        recommendation until they answer. Never ask for anything else. A gap that is really a missing or
+        self-contradictory REQUIREMENT is blocked with srs-gap back to the business record that owns it."
+proofs:
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+        done. Legacy specification@3 remains a readable compatibility input, never new
+        authoring output.
+  - id: implementability
+    requirement:
+      en: Each significant operation resolves logical owner, contract, data/commit boundary,
+        authorization, state/transaction, return/recovery and planned verification for the selected
+        implementation slice. The Implementation handoff names the required source-mapping scope
+        without putting repository paths or symbols into SDS. Proactively walk realistic
+        main, alternative, failure and edge cases and relevant constraints; foreseeable material cases
+        and core choices must not be left for implementers to invent. Explicit unknowns and subsequent
+        empirical refinement do not require theoretical perfection before coding.
+  - id: impact-security-coverage
+    requirement:
+      en: SRS outcomes map to owned contracts, runtime scenarios and design checks. Assess relevant
+        threats/failures and limitations. Structural validation does not establish semantic approval
+        or executed behavior.
+  - id: revision-decision-log
+    requirement:
+      en: "Every revision of an already-decided record leaves three things together or it is a defect: the
+        record changed, its rev higher than it was, and exactly one new extensions.work3.decisionLog entry
+        naming the gap, the chosen reading, why it is the most reasonable one by the records it was read from,
+        and the alternatives that were not taken. A changed record with no entry is a defect. A reading that
+        changes an observable outcome about money, authority or customer data and was taken without a decision
+        record with numbered options and one recommendation is a defect, whatever else the revision gets right."
+blockers:
+  - code: OWNERSHIP_UNKNOWN
+    condition:
+      en: An operation/store has no determined owner or required write crosses another owner without
+        scope.
+  - code: COMPATIBILITY_UNKNOWN
+    condition:
+      en: A required version, contract or migration compatibility claim lacks evidence.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never
+        run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  write-ceiling: Explicit owned source paths
+  environment: Resolved environment label
+  identity: Selected actor label
+  fixture: Selected fixture path
+  resource: Selected owned asset name
+  asset: Actual selected source asset filename/format
+  piece: Stable selected piece slug
+  flow: Selected UAT journey slug
+  screen: Selected surface/state slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+# ---------------------------------------------------------------------------
+# TINKLE-1 business analysis (not part of the source contract; inference marked).
+business:
+  question: >-
+    "What is the source-independent technical design (SDS) that realizes the
+    accepted SRS - flows, components, contracts, data, quality, deployment,
+    decisions, verification - precise enough that a builder needs no invention?"
+  whenNeeded:
+    - >-
+      After accepted business scope (SRS) exists and before backend/frontend
+      implementation of that scope (goal + primary-mode name).
+    - >-
+      Mid-implementation when an implement op proves an SDS gap - repair mode via
+      the declared implementation.architecture secondary calls of
+      backend.implement/interface.implement (role-authority.mjs), or the
+      architecture.revise secondary request contract.
+  whenNot:
+    - Not to write product code or map repository paths/symbols - Implementation resolves source and freezes write ceilings (architecture-to-implement handoff invariant, basic-ops.mjs).
+    - Not to re-decide business intent - an srs-gap blocks back to business.decide, never gets resolved silently.
+    - Not proof a deployment/recovery ran - design records plan verification; drills are a separate operation's proof.
+    - INFERRED: not for invented design - every change must trace to a requested SDS change or reported gap (revision-block protocol).
+  consumes:
+    - Accepted SRS/business node and accepted owner decisions (business:).
+    - Design-pattern catalog (knowledge/patterns INDEX topics), Academy architecture rules (rules:).
+    - Constraints + feasibility survey of relevant source inventory; repair mode consumes the reported gap (repo:).
+    - Optionally: matrix cell request, runtime execution profile.
+  produces:
+    - architecture overview + SDS leaves (sds-flow/component/contract/data-model/quality/deployment/decision/verification records) under features/<feature>/architecture/ - written only by this op's architecture mode.
+    - decisionLog entries on every revision; completion.review on the architecture node; E/ matrix job-result when selected.
+    - Downstream: frozen design authority consumed by interface.implement/backend.implement write ceilings and secondary responses.
+  failureModes:
+    - OWNERSHIP_UNKNOWN / COMPATIBILITY_UNKNOWN / DECLARED_DEPENDENCY_UNMET (declared blockers).
+    - Revision without decisionLog + revision block is a defect; money/authority/customer-data reading changes without an owner decision record is a defect (output checks).
+    - sds-obsolete reported findings are conflicts, not authority to retire records unilaterally.
+# ---------------------------------------------------------------------------
+# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
+# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
+# block alone — an agent never reads the whole contract to route.
+route:
+  nodeKinds: [architecture]
+  phase: [decide, pre-implementation]
+  intent: [architecture, sds, design, contracts, decide]
+  prerequisites: ["business.decide done (accepted SRS)"]

@@ -1,0 +1,19 @@
+$ npx jest src/modules/bussiness/share/completion-authority.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/share/completion-authority.spec.ts
+  ShareCompletionAuthority (contract.share.completion-guard-for-task)
+    √ ac.share.role.permissions.editor-can-complete: an accepted editor collaborator may complete the task (15 ms)
+    √ ac.share.role.permissions.viewer-read-only: an accepted viewer collaborator may not complete the task (4 ms)
+    √ ac.share.editor.no-delete.delete-refused-for-editor: an accepted editor may never delete the task (3 ms)
+    √ ac.share.revoke.on-read.removed-loses-access-next-read: a revoked editor is refused on the very next completion attempt (3 ms)
+    √ the owner may still complete and delete after an editor is registered (3 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        3.531 s
+Ran all test suites matching /src\\modules\\bussiness\\share\\completion-authority.spec.ts/i.
+

@@ -1,0 +1,20 @@
+
+=== todo-be ===
+records in derived index: 270
+records with a non-empty usedBy: 95
+usedBy edge kinds (edges total): {"refs":142,"composes":41,"tension":3,"conflictsWith":6,"blockedBy":37,"dependsOn":19,"extends":1,"subscribes":12,"appliesTo":1}
+unclassifiedEdges: 310 total; by field: {"rule":39,"surface.name":5,"blocks":1,"producer":6,"closedBy":35,"proves":80,"requirements":20,"assertions.id":26,"nodeId":11,"assets.generation.inputRefs":31,"ui.acceptedInputs.business.id":25,"ui.assets.generation.inputRefs":31}
+proves edges filed unclassified: 80, naming 66 distinct targets
+  of those targets, carrying a usedBy.proves bucket: 0
+  of those targets, carrying ANY usedBy bucket: 51 / 66
+classified provenBy-family buckets: []
+
+=== ec-be ===
+records in derived index: 29
+records with a non-empty usedBy: 10
+usedBy edge kinds (edges total): {"refs":15,"composes":2,"blockedBy":2,"dependsOn":1}
+unclassifiedEdges: 17 total; by field: {"rule":5,"closedBy":2,"proves":10}
+proves edges filed unclassified: 10, naming 6 distinct targets
+  of those targets, carrying a usedBy.proves bucket: 0
+  of those targets, carrying ANY usedBy bucket: 6 / 6
+classified provenBy-family buckets: []

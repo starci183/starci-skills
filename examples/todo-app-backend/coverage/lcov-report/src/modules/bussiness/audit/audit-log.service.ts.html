@@ -1,0 +1,550 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for src/modules/bussiness/audit/audit-log.service.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../../prettify.css" />
+    <link rel="stylesheet" href="../../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../../index.html">All files</a> / <a href="index.html">src/modules/bussiness/audit</a> audit-log.service.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">93.24% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>69/74</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">65.3% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>32/49</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>17/17</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">96.77% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>60/62</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">192x</span>
+<span class="cline-any cline-yes">294x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-yes">194x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">108x</span>
+<span class="cline-any cline-yes">108x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">100x</span>
+<span class="cline-any cline-yes">100x</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Injectable, Optional } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import type { EntityManager } from 'typeorm';<span class="branch-1 cbranch-no" title="branch not covered" ></span>
+import { InjectPrimaryEntityManager, AuditLogLineEntity } from '../../platform/databases/postgresql/primary';
+import { <span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>AuditKeystore<span class="cstat-no" title="statement not covered" >Service } from './audi</span>t-keystore.ser<span class="cstat-no" title="statement not covered" >vice';<span class="cstat-no" title="statement not covered" ></span></span></span>
+import { AuditLogLin<span class="branch-1 cbranch-no" title="branch not covered" >eR</span>eco<span class="branch-2 cbranch-no" title="branch not covered" >rd } from './types/audit-log-line-reco</span>rd';
+import type { ResolvedAuditLine } from './types/resolved-audit-line';
+&nbsp;
+cons<span class="missing-if-branch" title="else path not taken" >E</span>t GENESIS = 'GENESIS';
+&nbsp;
+/** Injected so a test can advance time without a real 400-day wait (nfr.audit.retention's measurement). */
+export type Clock = () =&gt; Date;
+const systemClock: Clock = () =&gt; new Date();
+&nbsp;
+interface ChainBreak {
+  index: number;
+  reason: 'broken-prev-hash' | 'content-mismatch';
+}
+&nbsp;
+export interface VerifyChainResult {
+  readonly valid: boolean;
+  readonly totalLines: number;
+  readonly break: ChainBreak | null;
+}
+&nbsp;
+const hashContent = (prevHash: string, at: Date, action: string, target: string | null, keyId: string, actor: string): string =&gt;
+  createHash('sha256').update(`${prevHash}|${at.toISOString()}|${action}|${target ?? ''}|${keyId}|${actor}`).digest('hex');
+&nbsp;
+/**
+ * sds.audit.log-chain: appends one hash-chained, per-person-sealed line per tracked action.
+ * br.audit.append-only: once appended, a line's stored bytes and its position in the chain never change
+ * - this service never issues an UPDATE or DELETE against `audit_log_lines`, only INSERT and read.
+ * br.audit.retention: there is correspondingly no eviction path here at all; `sweepRetention` exists
+ * only as the named hook nfr.audit.retention's fake-clock harness calls, and it never deletes anything -
+ * retention holds by the absence of any code path that could shorten a line's life, not by a flag.
+ */
+@Injectable()
+export class AuditLogService {
+  private readonly clock: Clock;
+&nbsp;
+  constructor(
+    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+    private readonly keystore: AuditKeystoreService,
+    @Optional() clock?: Clock,<span class="branch-0 cbranch-no" title="branch not covered" ></span>
+  ) {
+    // Nest's DI always passes a third argument once the constructor declares one (there is no
+    // provider for the bare `Clock` function type, so `@Optional()` resolves it to `undefined` rather
+    // than throwing) - a JS default parameter never gets the chance to apply in that case, unlike a
+    // plain `new AuditLogService(...)` call in a spec, so the fallback is applied explicitly here.
+    this.clock = clock ?? systemClock;
+  }
+&nbsp;
+  /** fr.audit.log.append / sds.audit.log-chain's t-append. `actorPersonId` may be the real subject or
+   * AuditKeystoreService.SYSTEM_ACTOR_ID for the two lines br.audit.erasure.logged requires. */
+  async append(actorPersonId: string, action: string, target: string | null = null): Promise&lt;AuditLogLineRecord&gt; {
+    const { keyId, key } = await this.keystore.getOrCreateKey(actorPersonId);
+    const at = this.clock();
+    const sealedActor = this.keystore.seal(key, actorPersonId);
+    const prevHash = await this.lastHash();
+    const hash = hashContent(prevHash, at, action, target, keyId, sealedActor);
+    const saved = await this.entityManager.save(AuditLogLineEntity, {
+      at,
+      action,
+      target,
+      keyId,
+      actor: sealedActor,
+      prevHash,
+      hash,
+    });
+    return new AuditLogLineRecord(saved.id, at, action, target, actorPersonId, false);
+  }
+&nbsp;
+  private async lastHash(): Promise&lt;string&gt; {
+    const [last] = await this.entityManager.find(AuditLogLineEntity, { order: { id: 'DESC' }, take: 1 });
+    return last?.hash ?? GENESIS;
+  }
+&nbsp;
+  /**
+   * ac.audit.append-only.chain-detects-tamper: recomputes the chain from the first line forward,
+   * re-deriving `prevHash` from the *previous row's actual stored hash* (never trusting a row's own
+   * stored `prevHash` blindly) so a removed line surfaces as a broken link at the line that followed it,
+   * and a changed field surfaces as a content mismatch at that line - exactly the two failure shapes the
+   * acceptance criterion names. `break.index` is the 0-based position in the chain as currently stored,
+   * which is where a fuzz test finds the row it mutated once a removed line has shifted every later
+   * position down by one.
+   */
+  async verifyChain(): Promise&lt;VerifyChainResult&gt; {
+    const rows = await this.entityManager.find(AuditLogLineEntity, { order: { id: 'ASC' } });
+    let expectedPrev = GENESIS;
+    for (let index = 0; index &lt; rows.length; index++) {
+      const row = rows[index];
+      if (row.prevHash !== expectedPrev) {
+        return { valid: false, totalLines: rows.length, break: { index, reason: 'broken-prev-hash' } };
+      }
+      const expectedHash = hashContent(row.prevHash, row.at, row.action, row.target, row.keyId, row.actor);
+      if (expectedHash !== row.hash) {
+        return { valid: false, totalLines: rows.length, break: { index, reason: 'content-mismatch' } };
+      }
+      expectedPrev = row.hash;
+    }
+    return { valid: true, totalLines: rows.length, break: null };
+  }
+&nbsp;
+  /** nf<span class="missing-if-branch" title="if path not taken" >I</span>r.audit.retention's named hook: a fake-clock test advances `clock`, calls this, and asserts the
+   * count a<span class="cstat-no" title="statement not covered" >nd chain validity are unchanged. It deliberately performs no eviction - see the class comment.</span> */
+  async sweepRetention(): Promise&lt;{ lineCount: number; valid: boolean }&gt; {
+    const result = await this.verifyChain();
+    return { lineCount: result.totalLines, valid: result.valid };
+  }
+&nbsp;
+  /** fr.audit.log.read's per-line resolution: a tombstoned line (destroyed key) reads back as
+   * tombstoned rather than throwing. */
+  async readLine(row: AuditLogLineEntity): Promise&lt;ResolvedAuditLine&gt; {
+    const key = await this.keystore.getKeyMaterial(row.keyId);
+    if (!key) {
+      return { at: row.at, action: row.action, target: row.target, actor: null, tombstoned: true };
+    }
+    const actor = this.keystore.unseal(key, row.actor);
+    if (actor === null) {
+      return { at: row.at, action: row.action, target: row.target, actor: null, tombstoned: true };
+    }
+    return { at: row.at, action: row.action, target: row.target, actor, tombstoned: false };
+  }
+&nbsp;
+  /**
+   * Every line the log holds, oldest first, each resolved through readLine - the whole-chain read
+   * fr.audit.log.read's operator path (audit-operator-read.ts's filter/summary pair) runs over. Like
+   * findLinesForPerson it returns only resolved shapes: the response keeps the record's postcondition
+   * (no sealed actor blob, no keyId) by construction, tombstoned or not.
+   */
+  async readAllLines(): Promise&lt;ResolvedAuditLine[]&gt; {
+    const rows = await this.entityManager.find(AuditLogLineEntity, { order: { id: 'ASC' } });
+    return Promise.all(rows.map(row =&gt; this.readLine(row)));
+  }
+&nbsp;
+  /**
+   * The lines a given person produced, oldest first. Filters by `keyId` (opaque, never the person's own
+   * id) rather than decrypting every row in the table - efficient, and it is exactly the boundary
+   * fr.audit.log.read's postcondition draws: the response this feeds never carries that `keyId` back out,
+   * only the decrypted `actor` (which here always equals `personId`, since the filter already selected
+   * their own key) or a tombstoned line if erasure raced this same read.
+   */
+  async findLinesForPerson(personId: string): Promise&lt;ResolvedAuditLine[]&gt; {
+    const keyId = await this.keystore.getKeyIdForPerson(personId);
+    if (!keyId) return [];
+    const rows = await this.entityManager.find(AuditLogLineEntity, { where: { keyId }, order: { id: 'ASC' } });
+    return Promise.all(rows.map(row =&gt; this.readLine(row)));
+  }
+&nbsp;
+  /** fr.audit.export: identical resolution to findLinesForPerson - once a completed erasure destroys the
+   * subject's key, this and the own-lines read agree by construction, both finding no keyId to filter on. */
+  async exportForPerson(personId: string): Promise&lt;ResolvedAuditLine[]&gt; {
+    return this.findLinesForPerson(personId);
+  }
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-09-19T05:24:43.726Z
+            </div>
+        <script src="../../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../../sorter.js"></script>
+        <script src="../../../../block-navigation.js"></script>
+    </body>
+</html>
+    

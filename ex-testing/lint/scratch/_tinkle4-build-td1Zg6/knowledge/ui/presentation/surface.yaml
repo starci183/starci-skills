@@ -1,0 +1,224 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.surface
+title: Surface presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: given a region the application already decided to render, which
+  semantic surface token does that region take, and which foreground token pairs with it?
+  A surface and its foreground always travel together. The application never picks a background alone,
+  because a background chosen without its paired foreground leaves the copy on top of it unmeasured,
+  which is a contrast defect rather than a preference. Paint inside a Grammar object belongs to
+  Grammar; this file resolves only the faces the application owns.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The region belongs to the application
+      applicationWrites: The class pair
+    - name: A component name
+      meaning: Grammar already paints this face
+      applicationWrites: Nothing. Pass the prop
+    - name: —
+      meaning: Grammar exposes no public path for this face
+      applicationWrites: The class pair, recorded as a workaround
+  notes: |-
+    Each case names who owns the face. The owner decides whether the application writes a class at all.
+
+    Writing a class where a component is the owner is `APP_REIMPLEMENTATION`. Writing one where the owner
+    is `—` stays linked to `COMMON_CAPABILITY_MISSING`. Reaching into a Grammar component with a selector
+    or a passed class to repaint it is `APP_OVERRIDE`.
+componentOwnership:
+  title: Surfaces Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: ChatWorkspace
+      element: drawer close, hasRail, isCompactRail
+      rule: SURFACE-2
+    - component: ChatWorkspace
+      element: rail trigger, hasRail, isCompactRail
+      rule: SURFACE-2
+    - component: IconTile
+      element: root, not (isSkeleton
+    - component: IconTile
+      element: root, not (isSkeleton
+    - component: MediaFrame
+      element: root, treatment!="plain"
+      rule: SURFACE-3
+    - component: MediaFrame
+      element: root, treatment="plain"
+      rule: SURFACE-1
+    - component: PressableField
+      element: root
+      rule: SURFACE-4
+    - component: Sidebar
+      element: item
+      rule: SURFACE-4
+    - component: SurfaceAccordionCard
+      element: accordion shell, bounded
+      rule: SURFACE-2
+    - component: SurfaceAccordionCard
+      element: accordion shell, not bounded
+      rule: SURFACE-1
+    - component: SurfaceCard
+      element: card content, frame!="frameless"
+      rule: SURFACE-2
+    - component: SurfaceCard
+      element: card content, frame="frameless"
+      rule: SURFACE-1
+    - component: SurfaceCard
+      element: root, wholeAction!=undefined
+      rule: SURFACE-4
+    - component: SurfaceListCard
+      element: root
+      rule: SURFACE-2
+    - component: TextAction
+      element: root, isCurrent, appearance="choice"
+      rule: '"route"'
+topics:
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+catalogNotes: |-
+  Surfaces have no value ramp, so the rule ID is an address over semantic faces rather than a position
+  on a scale. Prefer the earliest rule that works: no surface before the card face, the card face
+  before a secondary band, a neutral band before a meaningful one.
+
+  `--surface`, `--surface-secondary` and `--accent` are base theme tokens; `--accent-soft` and
+  `--success-soft` and their `-foreground` partners are derived from `--accent` and `--success` on the
+  same element, so overriding a base moves the whole family. Nothing on this list may be reproduced as
+  a hex value, an `oklch()` literal, or a palette step, even when the literal matches the token.
+rules:
+  - id: SURFACE-1
+    title: no surface / inherited foreground
+    governs: |-
+      The region paints nothing, because the face underneath it is already the right one and the copy
+      inherits the foreground that was measured against it.
+    cases:
+      - id: case-1
+        when: |-
+          Content whose visible boundaries are already drawn by its children
+        owner: "`SurfaceCard`"
+        render: |-
+          `frame="frameless"` already sets transparent and `color: inherit`
+      - id: case-2
+        when: Media that must sit on the page canvas with no inset frame
+        owner: "`MediaFrame`"
+        render: '`treatment="plain"` already clears the fill and the border'
+      - id: case-3
+        when: |-
+          An app-owned grouping container that only stacks children which each own a face
+        owner: "`App`"
+        render: |-
+          `<div className="flex min-w-0 flex-col">` with no background class
+    notThisRule: a region that needs its own readable face uses SURFACE-2.
+  - id: SURFACE-2
+    title: "`bg-surface` / `text-surface-foreground`"
+    governs: |-
+      The face of one bounded object. This is the surface a card presents to the page, and Grammar paints
+      it as a pair so the copy inside never has to state a colour.
+    cases:
+      - id: case-1
+        when: One bounded content object on the page canvas
+        owner: "`SurfaceCard`"
+        render: Compose the card; no background class
+      - id: case-2
+        when: A list or disclosure presenting the same bounded face
+        owner: "`SurfaceListCard`, `SurfaceAccordionCard`"
+        render: Compose the card; no background class
+      - id: case-3
+        when: |-
+          Rows that must show the card face through a joined list at reduced alpha
+        owner: "`—`"
+        render: '`<li className="bg-surface/90">` inside a joined card body'
+    notThisRule: |-
+      a band that must read as recessed against the card face uses SURFACE-3.
+    remark: |-
+      Case 3 composes two layers, so contrast is measured against the resulting pixels rather than against
+      `--surface` alone.
+  - id: SURFACE-3
+    title: "`bg-surface-secondary` / `text-foreground`"
+    governs: |-
+      A neutral band inside a joined surface. It reads as recessed against the card face without claiming
+      any meaning of its own, so the copy on it stays at ordinary reading attention.
+    cases:
+      - id: case-1
+        when: |-
+          A summary or explanatory band running edge to edge inside a joined card
+        owner: "`—`"
+        render: |-
+          `<div className="bg-surface-secondary px-4 py-3 text-foreground">`
+      - id: case-2
+        when: A full-bleed illustration band sharing that neutral face
+        owner: "`—`"
+        render: |-
+          `<div className="min-w-0 bg-surface-secondary">` with the image inside
+      - id: case-3
+        when: The recessed backdrop behind framed media
+        owner: "`MediaFrame`"
+        render: Compose the frame; no background class
+    notThisRule: |-
+      a band the product means to raise uses SURFACE-4, and a band reporting a proven outcome uses SURFACE-5. The theme also publishes `--surface-secondary-foreground`, but the bands above pair the secondary face with `--foreground`. The two resolve to the same value in both themes, so the pair is recorded as it is written rather than corrected here.
+  - id: SURFACE-4
+    title: "`bg-accent-soft` / `text-accent-soft-foreground`"
+    governs: |-
+      A band the product deliberately raises. Accent is scarce: repeated across every peer band it stops
+      marking anything, and the raised band still has to say in words why it is raised.
+    cases:
+      - id: case-1
+        when: |-
+          One summary band inside a joined card that the product ranked above its peers
+        owner: "`—`"
+        render: |-
+          `<div className="bg-accent-soft px-4 py-3 text-accent-soft-foreground">`
+      - id: case-2
+        when: |-
+          A leading marker inside a raised region, taking the paired foreground alone
+        owner: "`—`"
+        render: |-
+          `<Icon className="text-accent-soft-foreground" />` on the raised band
+      - id: case-3
+        when: A card whose whole face responds to hover or keyboard focus
+        owner: "`SurfaceCard`"
+        render: '`interaction="whole-action"` already swaps the face'
+    notThisRule: |-
+      a full-strength accent slab under copy. Use SURFACE-6 only where no copy sits on it. A raised band that omits `text-accent-soft-foreground` leaves its copy on the inherited foreground of whatever face it replaced, which is the defect this rule exists to prevent. `--accent-soft` is a `color-mix` of `--accent` toward transparent, so the band is translucent and the face beneath it shows through. Contrast on this rule is therefore measured against the composed pixels, never against the token.
+  - id: SURFACE-5
+    title: "`bg-success-soft` / the foreground of the band it replaces"
+    governs: |-
+      A band reports a proven outcome by exchanging its neutral face for the status face, and keeps the
+      foreground the neutral band already established.
+    cases:
+      - id: case-1
+        when: |-
+          A band whose outcome is settled and evidenced, not merely promised
+        owner: "`—`"
+        render: The neutral band class followed by `bg-success-soft`
+      - id: case-2
+        when: The same band before the outcome is proven
+        owner: "`—`"
+        render: Stay on SURFACE-3; do not pre-paint the result
+    notThisRule: |-
+      colour as the only carrier of the outcome. The band still states the outcome in words, and status colour is never chosen as a text tone. The status face is exchanged without a matching foreground swap, so the pair is `--success-soft` under `--foreground`. That composition has to be measured, not assumed, in both themes.
+  - id: SURFACE-6
+    title: "`bg-accent` / no paired foreground"
+    governs: |-
+      A decorative slab at full accent strength. It is admissible only because nothing readable sits on it,
+      which is also why it names no foreground.
+    cases:
+      - id: case-1
+        when: A hero band carrying one decorative image and no copy
+        owner: "`—`"
+        render: |-
+          `<div className="relative isolate min-h-32 overflow-hidden bg-accent">` with an `aria-hidden` image
+    notThisRule: |-
+      any slab carrying text, a label, or a control. Put copy on SURFACE-4 instead, where a paired foreground exists.
+doesNotDecide: |-
+  Which foreground a single line of copy takes, once its surface is settled, is [Tone](tone.yaml). The
+  edges that separate two faces are [Boundary](boundary.yaml). The space between a face and its content
+  is [Padding](padding.yaml), and the clipping that keeps a band inside its card is
+  [Overflow](overflow.yaml).

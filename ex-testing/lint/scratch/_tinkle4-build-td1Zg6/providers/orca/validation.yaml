@@ -1,0 +1,99 @@
+schema: starci/orca-provider-validation@1
+liveDiscovery:
+  call: orca agent-context --json
+  expectedSchemaVersion: 1
+  compare:
+    - command-count
+    - command-name
+    - usage
+    - flags
+    - positional-arguments
+  onMismatch: stop-before-effects-and-request-runtime-contract-upgrade
+preflight:
+  - orca status --json
+  - orca agent-context --json
+  - node .dist/hosts/orca/launch.mjs verify
+  - orca skills get orca-cli --json
+  - orca skills get orchestration --json
+callContract:
+  file: calls.json
+  runner: hosts/orca/calls.mjs
+  envelope: starci/orca-call-result@1
+  rules:
+    - Every argv StarCi issues is built from calls.json; prose templates in index.json are documentation of the same calls, never a second construction path.
+    - An Orca exit code 1 is a classified result with outcome and effectState; only a contract violation throws.
+    - A mutation whose result is unknown is replayed once with --retry-request; a still-unknown result blocks fallback until a read-only reconciliation proves state.
+    - Fallback to the next candidate requires effectState none, proven by settlement (worker-stop, worker-release released or already_released) when the failed attempt created a Dispatch.
+receipts:
+  required:
+    - run-id
+    - task-id
+    - dispatch-id
+    - agent-terminal-handle
+    - worktree-id
+    - parent-worktree-id
+  qwenAdditional:
+    - one-terminal-created-per-attempt-with-declared-command
+    - rendered-input-prompt-before-dispatch
+    - dispatch-return-preamble-context
+    - submission-verified-on-screen
+    - dispatch-show-assignee-equals-created-terminal
+    - rendered-model-qwen3.8-flash
+  devinAdditional:
+    - explicit-positive-workflow-slot
+    - stored-cli-auth-proven-by-read-only-model-inventory-before-launch
+    - one-terminal-created-per-attempt-with-declared-command
+    - rendered-input-prompt-before-dispatch
+    - dispatch-return-preamble-context
+    - submission-verified-on-screen
+    - dispatch-show-assignee-equals-created-terminal
+    - rendered-provider-devin
+    - logical-model-devin-agent-without-underlying-model-inference
+  providerAttestation:
+    source: orchestration.worker-show
+    required:
+      - exact-worker
+      - active-task-id
+      - effective-agent
+      - effective-model
+      - agent-terminal-handle
+      - canonical-task-display-name
+    onMismatch: fence-reconcile-release-and-retry-before-effect-acceptance
+  titleCanonicalization:
+    afterProviderAttestation:
+      - terminal-rename-to-canonical-op-name
+      - worker-show-verifies-canonical-title
+    duringRuntime:
+      classification: mutable-native-ui-metadata
+      onDriftWithExactImmutableIdentity: recanonicalize-without-fencing
+      effectDecision: never-reject-solely-for-runtime-title-drift
+    beforeRelease:
+      - terminal-rename-to-canonical-op-name
+      - record-ui-defect-if-terminal-is-no-longer-writable
+dispatchAssertions:
+  - The workflow kernel invokes hosts/orca/launch.mjs start-op; it never composes task-create, worker-start, candidate fallback or terminal naming calls itself.
+  - One start-op invocation owns the whole attempt: it tries the allocated candidate when the kernel supplies one, otherwise it walks the resolved chain, and the kernel never re-invokes start-op for the same attempt to obtain a fallback.
+  - A runtime that cannot launch is released, classified and cooled down by the runtime allocator, which then names another runtime; there is no supervisor to replace and no layer to recover.
+  - The workflow worktree is attested with worktree show to be the exact filesystem path the kernel runs in before any operation Task is created.
+  - A worktree whose resolved path is null, stale or different stops dispatch; orchestration Task membership alone never substitutes for Orca worktree identity.
+  - Operation equals an operation of the approved goal before Task creation.
+  - architecture.decide is admitted only by an active implementation secondary_request with reason sds-technical-gap and an explicit bounded SDS allowlist.
+  - Review findings, suggestions and open questions never create architecture.decide.
+  - Provider selection is resolved before launch and attested from worker-show before any effect is accepted.
+  - Task display_name equals [Op] <operation> - <scope> and is the immutable operation name; worker-task_<id> is never accepted as operation identity.
+  - After provider attestation, terminal title is renamed and verified as [Op] <operation> - <scope> before effects are admitted.
+  - A native activity-title drift during execution is mutable UI metadata; with exact Task, Dispatch, worker, agent and model identity it is recanonicalized rather than used to reject valid effects.
+  - A managed operation is never dispatched to an existing terminal; only worker-start creates its supervised native agent. A command-terminal operation is dispatched only to the terminal the same attempt created.
+  - Devin is never an implicit candidate fallback; only an allocator candidate admitted by an explicit positive workflow slot may reach the launcher.
+  - An operation's `done` is never accepted on its own word: the kernel re-runs every declared check itself, computes the changed files from git and refuses a report whose files fall outside the operation allowlist.
+  - Current-runtime worker-start omits --on; a named --on value is used only after live runtime inventory returns that exact environment id.
+  - Literal or guessed environment labels such as windows are rejected before worker-start.
+uiAssertions:
+  - Workflow worktree display name equals [Workflow] <Workflow>.
+  - The kernel's own terminal title equals [Kernel] <Workflow>.
+  - Operation title is canonicalized to [Op] <operation> - <scope> after native readiness and again before release.
+  - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity; the kernel terminal is a shell by design.
+messageAssertions:
+  - The kernel speaks to a live operation only by typing into that operation's own terminal, and delivery is proven from the screen rather than from the send receipt.
+  - Status messages are informational only and never carry a control instruction.
+  - An operation answers exactly once, in its report file; the Orca signal that follows is a wake-up, not the answer.

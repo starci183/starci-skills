@@ -1,0 +1,12 @@
+{
+  "app": "ecommerce-app-be",
+  "runner": "jest",
+  "command": "npx jest --coverage",
+  "lcov": "examples/ecommerce-app-be/coverage/lcov.info",
+  "suites": { "passed": 36, "total": 36 },
+  "tests": { "passed": 216, "total": 216 },
+  "lines": { "covered": 1223, "total": 1272, "pct": 96.14 },
+  "functions": { "covered": 243, "total": 247, "pct": 98.38 },
+  "branches": { "covered": 834, "total": 1486, "pct": 56.12 },
+  "statements": { "covered": 1406, "total": 1602, "pct": 87.76 }
+}

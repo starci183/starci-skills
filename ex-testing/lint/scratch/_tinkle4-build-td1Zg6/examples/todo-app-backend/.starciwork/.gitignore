@@ -1,0 +1,9 @@
+runtime.sqlite
+runtime.sqlite-wal
+runtime.sqlite-shm
+kernel-evidence/
+kernel-strays/
+kernel-headless/
+kernel-approvals/
+_local/
+

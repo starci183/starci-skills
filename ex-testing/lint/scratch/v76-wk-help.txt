@@ -1,0 +1,12 @@
+file:///D:/Repositories/starci-academy-backend/.claude/scripts/work-example.mjs:10
+ const result=validateWorkspace(root);if(!result.ok)throw Error(JSON.stringify(result.errors));return {ok:true,nodes:result.nodes.length,root,synthetic:true};
+                                                          ^
+
+Error: [{"code":"RESERVED_DIRECTORY","path":"_schema","message":"Canonical Work v2 permits only workspace-root _local runtime state and workspace-root _resources typed custody; collocate all other owned YAML records and assets with their node."}]
+    at makeExample (file:///D:/Repositories/starci-academy-backend/.claude/scripts/work-example.mjs:10:59)
+    at file:///D:/Repositories/starci-academy-backend/.claude/scripts/work-example.mjs:12:115
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:654:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v25.2.1

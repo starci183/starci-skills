@@ -1,0 +1,280 @@
+# design.yaml — the ERD of the workflow ledger DB, in yaml.
+#
+# Business frame first (the nghiệp vụ an agent needs before touching this DB):
+#
+#   WHAT it answers: "what does this workflow still owe, and can I prove the
+#   record wasn't tampered with?" — continue / audit / archive, one file per
+#   Work-root repository (`<repo>/.starciwork/runtime.sqlite`). Cross-ledger
+#   quota is the ONLY thing living elsewhere (machine.sqlite — see machine.sql).
+#
+#   WHO writes: the kernel process (openLedger read-write) and, through the CLI,
+#   workers (`starci report` → reports) and ops reading their contract
+#   (`starci op-contract` → contracts). Nobody else. The file is outside every
+#   worker allowlist (`scope-covers-ledger` refusal, §7).
+#
+#   WHO reads without writing: inspectLedger — read-only, no migration, no
+#   compaction — used by operator inspection, the candidate bridge,
+#   continuation, supervisor views and the machine sweep.
+#
+#   WHEN NOT to look here: product truth lives in the Work tree
+#   (`.starciwork/features/**/index.yaml`, handled by kernel/ledger.mjs — a
+#   DIFFERENT module that shares the name "ledger" and has no SQL). This file
+#   is the runtime's own record, never product spec.
+#
+#   WHY one transaction matters (§2): snapshot + audit event + job/lease change
+#   commit atomically, so lease-identity-drift, orphan-writer-reservation and
+#   unreconciled-pending are impossible to persist — enforced by FKs, CHECKs and
+#   three triggers, not by callers being careful.
+#
+# source: .dist/kernel/ledger-db.mjs (DDL, handles, reserveTwoPhase/releaseTwoPhase,
+#   verifyChain/verifyAnchor, retention), .dist/docs/ledger-db.md (§1-§13),
+#   .dist/schemas/ledger-db.schema.json (column catalog contract)
+
+schema: starci/module-ledger-db-design@1
+sources:
+  - .dist/kernel/ledger-db.mjs
+  - .dist/kernel/store.mjs
+  - .dist/kernel/journal.mjs        # retired journal; shared helpers + retention ported whole
+  - .dist/kernel/admission.mjs
+  - .dist/kernel/jobs.mjs
+  - .dist/kernel/job-worker.mjs
+  - .dist/kernel/job-bridge.mjs
+  - .dist/kernel/engine.mjs
+  - .dist/kernel/continuation.mjs
+  - .dist/kernel/launch.mjs
+  - .dist/kernel/loads.mjs
+  - .dist/kernel/candidate-bridge.mjs
+  - .dist/kernel/terminals.mjs
+  - .dist/kernel/supervisor.mjs
+  - .dist/kernel/owner.mjs
+  - .dist/kernel/kernel.mjs
+  - .dist/hosts/orca/launch.mjs
+  - .dist/scripts/ledger-migrate.mjs
+  - .dist/docs/ledger-db.md
+  - .dist/schemas/ledger-db.schema.json
+
+# ---------------------------------------------------------------------------
+# naming trap, recorded once: kernel/ledger.mjs is the WORK-TREE ledger API
+# (YAML index.yaml nodes under .starciwork/features) — it contains NO SQL.
+# kernel/ledger-db.mjs is THIS database. "ledger" without qualification is
+# ambiguous in this codebase; check which file a doc means.
+# ---------------------------------------------------------------------------
+
+databases:
+  ledger:
+    file: "<ledger repo>/.starciwork/runtime.sqlite"
+    schemaName: starci/ledger-db@1
+    userVersion: 1
+    identity: "meta.ledger_id — randomUUID minted at create, stored inside the file; never derived from path (§5)"
+    role: "the record: everything a workflow needs to continue, be audited, be archived"
+  machine:
+    file: "%LOCALAPPDATA%/StarCi/runtime/machine.sqlite (runtimeRootFor; ~/.local/state fallback)"
+    schemaName: starci/machine-db@1
+    userVersion: 1
+    role: "cross-ledger arbiter ONLY: ai/* provider quota + machine:* budgets; small enough to reconcile by TTL"
+  anchor:
+    file: "<ledger repo>/.starciwork/ledger-anchor.json"
+    schemaName: starci/ledger-anchor@1
+    role: "NOT a table — the tracked, human-readable counter-record naming each workflow's head {generation, checkpointId, eventsHead, seq}. The chain is self-consistent so it cannot prove WHICH history is agreed; the anchor can (§12)."
+
+tables:
+  # ==== identity & registration ============================================
+  meta:
+    purpose: "ledger's own identity + achieved open mode; seeded once, never rewritten except journal_mode"
+    keyFields: [key, value]
+    fks: []
+    invariants: ["PRIMARY KEY(key)", "seeded by INSERT OR IGNORE — create-time values are immutable"]
+    decidesFor: "is THIS file the same ledger machine.sqlite knows? (ledger_id); what journal mode did it get?"
+  workflows:
+    purpose: "one row per workflow the ledger owns — registration, bound generation, phase, archive marker"
+    keyFields: [workflow_id, generation, goal_identity, phase, finished_json, pin_digest, archived_at]
+    fks: []
+    invariants: ["generation DEFAULT 0 = never enrolled", "retireWorkflow deletes it last and only when nothing is live"]
+    decidesFor: "does this ledger own workflow X (unmigrated gate); which generation is bound (retention floor); is it finished (retire candidate)"
+  goals:
+    purpose: "append-only approved goal documents; revision = what goal.revise/workflow-amend moves"
+    keyFields: [goal_seq, workflow_id, revision, goal_identity, markdown, json, amendment_json]
+    fks: ["workflow_id → workflows"]
+    invariants: ["UNIQUE(workflow_id,revision)", "re-render of same revision is UPDATE markdown, never a new row"]
+    decidesFor: "which goal revision a snapshot/input binds to; whether an amendment happened"
+
+  # ==== recovery & audit ===================================================
+  state_snapshots:
+    purpose: "recovery state; checkpoint_id namespaces write kind (save:|bind:|transition:|import:)"
+    keyFields: [snapshot_id, checkpoint_id, workflow_id, generation, goal_identity, state_json, events_head]
+    fks: ["workflow_id → workflows"]
+    invariants: ["checkpoint_id UNIQUE — a replayed transition is recognised, never double-applied",
+                 "retention: bound (wf,gen,goal) keeps ONE body + transition/bind rows + latest save only",
+                 "state_json='' rows are kept skeletons proving a checkpoint ran"]
+    decidesFor: "where a workflow resumes; did this transition already run; does the ledger reach the anchor's generation"
+  events:
+    purpose: "ONE hash-chained log: audit lines (entity_type='workflow'), job custody ('job'), file receipts ('runtime-file')"
+    keyFields: [seq, event_id, workflow_id, generation, entity_type, entity_id, kind, prev_digest, digest]
+    fks: ["workflow_id → workflows"]
+    invariants: ["TRIGGER events_digest_chain recomputes prev_digest/digest on EVERY insert — a writer cannot persist a wrong link (digest DEFAULT '' satisfies NOT NULL, then trigger overwrites)",
+                 "digest = sha256(prev_digest||event_id||kind||payload_json||created_at), seeded '' for first row",
+                 "chain verified by verifyChain per workflow; retention truncation stays VISIBLE (first retained row's prev_digest names a deleted row — seed prev=null, see verifyChain comment)"]
+    decidesFor: "did a spawn/settlement receipt exist (never-launched vs launched-and-died); custody receipts for runtime files; tamper/rollback detection at the continuation boundary"
+
+  # ==== admission ===========================================================
+  jobs:
+    purpose: "the durable job queue — one row per admitted model/operation/judge/check unit"
+    keyFields: [job_id, workflow_id, op_id, attempt, generation, kind, status, lease_token, worker_id, deadline]
+    fks: ["workflow_id → workflows"]
+    invariants: ["statuses: queued|leased|running|effect_unknown|succeeded|failed|cancelled (SETTLED = last 3)",
+                 "every transition fences on (job_id, lease_token) — stale workers settle nothing",
+                 "lease_token NULLed on settle; deadline NULLed on terminal/unknown"]
+    decidesFor: "may a worker claim this; is a result a duplicate (event_id dedupe); what must reconcile after a crash"
+  resources:
+    purpose: "repo-scoped fence capacities (canonical-writer:*, source-root:*, lane:*, maxConcurrentWriters). ai/* lives in machine.sqlite"
+    keyFields: [resource_key, capacity]
+    fks: []
+    invariants: ["CHECK(capacity>=0)", "admission requires the row to exist — undeclared = no capacity"]
+    decidesFor: "whether a reservation request can be admitted"
+  leases:
+    purpose: "live reservations: which capacity is held by which job; machine_ref pairs ai/*/machine:* rows to machine.sqlite tokens"
+    keyFields: [resource_key, job_id, token, units, expires_at, machine_ref, workflow_id, op_id, attempt, generation]
+    fks: ["job_id → jobs ON DELETE CASCADE"]
+    invariants: ["PRIMARY KEY(resource_key,job_id) — one lease per resource per job",
+                 "TRIGGERS leases_match_job(+_update): (workflow_id,op_id,attempt,generation,token) MUST equal the job's (…,lease_token); abort 'lease-identity-drift'. op_id uses IS (not =) so NULLs compare.",
+                 "CHECK(units>0)", "expires_at bounds a dead worker's fence"]
+    decidesFor: "capacity spoken for; is an op's reservation still exactly what was admitted (intent-v1 exact-binding); which machine tokens to release with it"
+  budgets:
+    purpose: "repo-scoped spend limits; reserved=in-flight, used=consumed"
+    keyFields: [scope_key, limit_value, used_value, reserved_value]
+    fks: []
+    invariants: ["CHECK all three >=0", "admission: row must exist AND used+reserved+request<=limit", "MAX(0,reserved-?) floors reserved so double-release cannot go negative"]
+    decidesFor: "whether an op fits a declared budget; what returns to the pool on release/consume"
+  budget_reservations:
+    purpose: "per-job budget holds, so release/settle knows exactly what to return or consume"
+    keyFields: [scope_key, job_id, units]
+    fks: ["scope_key → budgets", "job_id → jobs ON DELETE CASCADE"]
+    invariants: ["PRIMARY KEY(scope_key,job_id)", "CHECK(units>0)"]
+    decidesFor: "the exact units owed back to each scope when a job settles or releases"
+  incidents:
+    purpose: "retry-budget rows — OBSERVED: imported-only in 1.0.4 (migrator writes, retireWorkflow deletes; live retry budgets live in workflow STATE state.engine.incidents, engine.mjs:656)"
+    keyFields: [incident_id, workflow_id, op_id, attempts, model_calls, tokens, status]
+    fks: ["workflow_id → workflows"]
+    invariants: []
+    decidesFor: "nothing current — migration landing zone"
+
+  # ==== IPC =================================================================
+  reports:
+    purpose: "worker→kernel: typed outcome per dispatch (done|partial|failed|ask|blocked)"
+    keyFields: [report_id, workflow_id, dispatch_id, op_id, attempt, generation, outcome, consumed_at, from_terminal]
+    fks: ["workflow_id → workflows"]
+    invariants: ["UNIQUE(workflow_id,dispatch_id) — re-report upserts (idempotent `starci report`)",
+                 "consumed_at marks integrated reports — a paused op's own report is consumed so it can't become its answer"]
+    decidesFor: "the op's typed result; whether the kernel already integrated it"
+  contracts:
+    purpose: "kernel→worker: the dispatch authority (markdown + context) per attempt"
+    keyFields: [workflow_id, op_id, attempt, dispatch_id, markdown, context_json]
+    fks: ["workflow_id → workflows"]
+    invariants: ["PRIMARY KEY(workflow_id,op_id,attempt) — exactly one contract per attempt; INSERT OR REPLACE on rewrite"]
+    decidesFor: "what the op was actually asked to do — the contract, never the terminal prompt"
+  checks:
+    purpose: "kernel's re-run check results per op attempt (was checks/<op>.json)"
+    keyFields: [workflow_id, op_id, attempt, checks_json]
+    fks: ["workflow_id → workflows"]
+    invariants: ["PRIMARY KEY(workflow_id,op_id,attempt)"]
+    decidesFor: "what independent verification an accepted slice passed"
+  inbox:
+    purpose: "owner→kernel: answers, amendments, late inputs; append-only pending, settled applied/rejected"
+    keyFields: [inbox_id, workflow_id, kind, key, status, disposition_json, applied_at]
+    fks: ["workflow_id → workflows"]
+    invariants: ["status DEFAULT 'pending'"]
+    decidesFor: "which owner inputs still need integrating"
+  signals:
+    purpose: "keyed process facts replacing dot-files: kernel-lock, supervisor-lock, stop, inputs-lock, launch, final-report"
+    keyFields: [scope, key, holder_pid, token, value_json, at, expires_at]
+    fks: []
+    invariants: ["PRIMARY KEY(scope,key); scope = workflow_id or '*' ledger-wide",
+                 "expires_at evaluated in JS after read — no SQL-side expiry filter (OBSERVED)"]
+    decidesFor: "is a kernel alive for this workflow; was stop requested; which terminal a launch reserved"
+  runtime_loads:
+    purpose: "supervisor's provider-load view; 'ai/provider:'-prefixed rows are providers, rest are runtimes"
+    keyFields: [runtime, loads_json, at]
+    fks: []
+    invariants: ["writeRuntimes deletes only non-provider rows — provider rows are never adopted-over"]
+    decidesFor: "which provider has headroom for the next admission"
+  inputs:
+    purpose: "owner-named external inputs frozen at goal time as BYTES — the record, bound by sha256 ref, never path"
+    keyFields: [workflow_id, key, goal_revision, sha256, size, media_type, origin, bytes]
+    fks: ["workflow_id → workflows"]
+    invariants: ["PRIMARY KEY(workflow_id,key)", "readInput re-hashes bytes and refuses input-digest-mismatch on tamper",
+                 "replaced worktree copies that died with the worktree (restart test 2026-09-17)"]
+    decidesFor: "which frozen inputs an op may consume, under digest proof"
+  migrations:
+    purpose: "provenance of every migrated/imported source — the idempotency record"
+    keyFields: [source, kind, rows_json, at]
+    fks: []
+    invariants: ["PRIMARY KEY(source) — a recorded source is never re-imported; kinds: workflow-dir, journal-workflow, journal-shared, workflow-inputs, workflow-anchor, local-family-deleted"]
+    decidesFor: "is a second migrate a no-op; which _local families were reported deleted-not-imported (§13)"
+
+machineTables:
+  ledgers:
+    purpose: "registered ledgers: meta.ledger_id + last known file path for the sweep's read-only reopen"
+    keyFields: [ledger_id, file, registered_at, seen_at]
+    invariants: ["file refreshed on every register; a moved ledger keeps its rows"]
+  resources:
+    purpose: "cross-ledger capacity: ai/global ceiling + ai/provider:<name> quota + machine:* scopes"
+    keyFields: [resource_key, capacity]
+    invariants: ["CHECK(capacity>=0)"]
+  leases:
+    purpose: "live cross-ledger reservations; PK(resource_key,token) — token is what lands in ledger's machine_ref"
+    keyFields: [resource_key, token, ledger_id, workflow_id, job_id, units, expires_at]
+    invariants: ["ledger_id → ledgers", "CHECK(units>0)",
+                 "no FK to jobs — the job is in the caller's ledger, unreachable: the SWEEP proves the pair gone instead"]
+  budgets:
+    purpose: "machine-scoped budgets (machine:* scope_key)"
+    keyFields: [scope_key, limit_value, used_value, reserved_value]
+  budget_reservations:
+    purpose: "per-ledger job holds on machine budgets"
+    keyFields: [scope_key, ledger_id, job_id, units]
+    invariants: ["PRIMARY KEY(scope_key,ledger_id,job_id) — same job_id under two ledgers can't collide"]
+
+# ---------------------------------------------------------------------------
+# relationship edges — who owns whom (verbs are the business relationship)
+# ---------------------------------------------------------------------------
+edges:
+  - {from: goals,             to: workflows,            via: "workflow_id",      meaning: "a workflow's append-only goal revisions"}
+  - {from: state_snapshots,   to: workflows,            via: "workflow_id",      meaning: "recovery checkpoints of a workflow"}
+  - {from: events,            to: workflows,            via: "workflow_id",      meaning: "one workflow's ordered audit+custody chain (chain links row→row within same workflow_id)"}
+  - {from: jobs,              to: workflows,            via: "workflow_id",      meaning: "durable work units of a workflow"}
+  - {from: leases,            to: jobs,                 via: "job_id (CASCADE)", meaning: "reservations a job holds; die with the job"}
+  - {from: leases,            to: resources,            via: "resource_key (logical, no FK)", meaning: "consumption against declared capacity"}
+  - {from: leases,            to: "machine.leases",     via: "machine_ref=token", meaning: "mirror pair for ai/*/machine:* — the §6 two-phase seam"}
+  - {from: budget_reservations, to: budgets,            via: "scope_key",        meaning: "a hold against a declared pool"}
+  - {from: budget_reservations, to: jobs,               via: "job_id (CASCADE)", meaning: "the job's outstanding budget holds"}
+  - {from: incidents,         to: workflows,            via: "workflow_id",      meaning: "imported retry history (no live writer in 1.0.4)"}
+  - {from: reports,           to: workflows,            via: "workflow_id",      meaning: "worker outcome receipts"}
+  - {from: contracts,         to: workflows,            via: "workflow_id",      meaning: "dispatch authority issued to ops"}
+  - {from: checks,            to: workflows,            via: "workflow_id",      meaning: "kernel re-run results per op attempt"}
+  - {from: inbox,             to: workflows,            via: "workflow_id",      meaning: "owner inputs awaiting integration"}
+  - {from: signals,           to: workflows,            via: "scope=workflow_id (logical)", meaning: "keyed process facts; '*' scope is ledger-wide, hence no FK"}
+  - {from: inputs,            to: workflows,            via: "workflow_id",      meaning: "frozen goal inputs (bytes)"}
+  - {from: inputs,            to: goals,                via: "goal_revision (logical)", meaning: "the revision the input was frozen for"}
+  - {from: "machine.leases",  to: "machine.ledgers",    via: "ledger_id",        meaning: "which ledger's job the machine reservation pairs with"}
+  - {from: "machine.budget_reservations", to: "machine.budgets", via: "scope_key (logical, +ledger_id in PK)", meaning: "machine-budget holds"}
+
+# ---------------------------------------------------------------------------
+# why single-transaction — the invariants that justify §2's claim
+# ---------------------------------------------------------------------------
+whySingleTransaction:
+  - "saveState/transition: snapshot row + audit event + workflows.touch commit together — a crash mid-way can't leave a saved state without its receipt"
+  - "jobs.complete: budget consume + lease delete + job settle + job-<status> event in ONE tx — a settled job that still holds a fence cannot exist"
+  - "reserveTwoPhase (ledger leg): job leased + all repo leases inserted atomically; any failure rolls back the job row too — nothing half-reserved"
+  - "leases_match_job triggers run inside the writing transaction: drift is refused at INSERT/UPDATE, not found by a later audit"
+  - "setGoal: revision counter + goals row + workflows.goal_identity update together — no goal row without the workflow pointing at it"
+  - "the machine seam is the DELIBERATE exception: two files can't share a tx, so ai/* quota is mirrored (machine_ref) and swept by TTL + pair-proof (§6)"
+
+# ---------------------------------------------------------------------------
+# observed gaps (write what is OBSERVED, mark the inference)
+# ---------------------------------------------------------------------------
+observed:
+  - "incidents: no live writer in 1.0.4 — engine.incident() stores retry budgets in workflow STATE (state.engine.incidents), not this table. OBSERVED, not specified by the doc."
+  - "signals.expires_at: no query filters on it; expiry is evaluated in JS (continuation.mjs, launch.mjs). OBSERVED."
+  - "journal.mjs (starci/operational-journal@1) is RETIRED but still ships the shared helpers ledger-db.mjs re-exports (newToken, SETTLED_JOB_STATUSES, RETENTION, reclaimSpace, sqliteAtLeast) and serves as the migrator's read side."
+  - "kernel.mjs's 3 direct .prepare() calls reach through store.ledger.db for report digests and consumption — bypassing the store API surface; the ledger permits it because all ledger access is kernel-side anyway."
+  - "journal_mode: WAL requested, DELETE fallback recorded in meta.journal_mode rather than failing the open (§3) — a network/UNC path runs degraded but honest."
+  - "meta and events_digest_chain were added to the DDL WITHOUT a version bump: migrateLedger backfills both by probing sqlite_master, so user_version alone cannot distinguish a fresh v1 from a pre-meta v1."

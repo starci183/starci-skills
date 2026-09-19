@@ -1,0 +1,21 @@
+schema: starci/claude-provider-validation@1
+preflight:
+  - Read the active Claude Code tool schema.
+  - Confirm Task is exposed with description, prompt and subagent_type.
+  - Confirm the operation count will not exceed three concurrent Task calls.
+  - Confirm every operation prompt contains the normalized input and output envelopes.
+launchAcceptance:
+  - The Task call is native to the current Claude Code session.
+  - The description is `[Op] <operation> - <scope>`.
+  - No child worktree is created for solo mode.
+completionAcceptance:
+  - Task returns a result.
+  - Output validates against the normalized operation output envelope.
+  - The operation subagent did not create another subagent.
+failClosed:
+  - missing-active-tool-schema
+  - missing-task-tool
+  - task-schema-mismatch
+  - concurrency-limit-exceeded
+  - invented-agent-or-agent-output-call
+

@@ -1,0 +1,12 @@
+{
+  "app": "todo-app-backend",
+  "runner": "jest",
+  "command": "npx jest --coverage",
+  "lcov": "examples/todo-app-backend/coverage/lcov.info",
+  "suites": { "passed": 117, "total": 117 },
+  "tests": { "passed": 696, "total": 696 },
+  "lines": { "covered": 6079, "total": 6467, "pct": 94.0 },
+  "functions": { "covered": 1290, "total": 1445, "pct": 89.27 },
+  "branches": { "covered": 3361, "total": 6127, "pct": 54.85 },
+  "statements": { "covered": 6853, "total": 7949, "pct": 86.21 }
+}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {checkApplicationStacks} from '../checks/stacks.mjs';
+import {checkApplicationStacks} from '../scripts/checks/stacks.mjs';
 
 const source=path.resolve(import.meta.dirname,'../examples/todo-app-backend');
 

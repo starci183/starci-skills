@@ -1,0 +1,293 @@
+# modules/ops/ops/test.author.yaml - TINKLE-1 pure-yaml port of .claude/ops/test.author/operator.yaml
+# The operator contract below is verbatim; the trailing 'business:' block is the added
+# analysis (inference marked where the contract does not state it literally).
+
+id: test.author
+goal:
+  en: Author the test files one bounded slice needs - inside a test-paths-only allowlist - and prove
+    they are collected by the real runner; the pass/fail judgement of the product belongs to the
+    verify ops, never to this one.
+nodeKinds:
+  - implementation
+completionProfile: implementation
+sideEffects:
+  - test file authoring inside the declared test-paths-only allowlist
+  - scoped local commits when authorized
+  - runner collection/listing checks in the declared sandbox
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
+        and validator freshness. This consumer op requires its target node to exist. An absent
+        target is a scope/graph gap: report it and propose a separately selected scope op; do not
+        create a target or invent its acceptance/graph here. The assertions name what the authored
+        tests must exercise; they are never re-worded here."
+  - id: architecture
+    path: .starciwork/<business>/architecture/**/index.yaml
+    purpose:
+      en: Read the declared contracts, data ownership, authorization and error identity of the slice
+        the tests cover, so each authored test exercises a stated behavior. Where the design is
+        silent about an observable effect, report the gap instead of writing a test that invents an
+        expectation.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the delivered
+        slice, its public entry points and the test conventions its neighbors follow. The authored
+        tests bind the exact inspected tree.
+  - id: suite
+    path: repository:<repo-id>/<suite-paths>
+    purpose:
+      en: Inspect the existing test harness - its runner, naming convention, fixtures, helpers,
+        lifecycle hooks and the tests it already owns. New tests extend that harness; never stand up
+        a second parallel runner and never copy a neighboring test's assertions without the design
+        behind them.
+  - id: conventions
+    path: knowledge/patterns/fe/test.json + knowledge/patterns/be/test.json +
+      knowledge/coding-reference.json
+    purpose:
+      en: Read the adopted test conventions - naming, structure, fixture and assertion shape - for
+        the selected repository's side of the stack. Authored tests conform to the declared patterns
+        inside the suite's own harness; a convention the suite and the adopted patterns disagree on
+        is resolved toward the suite's local convention and recorded in evidence, never silently.
+  - id: matrix
+    path: selected complete-job matrix request + workflows/jobs.json
+    purpose:
+      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
+        input bindings, requested output JSON shapes and required criteria. Standalone execution
+        needs no fabricated matrix request. A template is not authority for extra effects.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles. Use current host model configuration; historical model names are not availability
+        proof. Capabilities are the intersection of actual tools, selected profile policy, op
+        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
+        or extra-agent permissions.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - blocker
+      - completion.inputDigest
+      - completion.evidence
+      - completion.codeRefs
+    content:
+      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
+        only state/blocker/completion here; authored test inventory and collection results belong to
+        the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a
+        reported gap or separately selected scope update; never add/remove them to obtain pass.
+  - id: source
+    path: repository:<repo-id>/<test-ceiling>
+    fields:
+      - test files
+      - test fixtures and helpers inside the declared test paths
+    content:
+      en: Only test files inside the explicit test-paths allowlist - specs, cases, fixtures and
+        helpers the suite convention owns. Product code, schema, configuration, declared
+        expectations and the runner's own manifest stay untouched; a product change the tests need
+        is a reported finding for a separate operation, never an edit hidden beside a test.
+  - id: evidence
+    path: E/manifest.yaml + E/authored-tests.json + E/collection.txt + E/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - codeRefs
+      - extensions
+    content:
+      en: "Map each covered assertion to the authored test file and cases that exercise it, and keep
+        the real runner's collection/listing output proving the new tests are discovered. Record
+        command, cwd, tested tree/commit, exit code and sanitized output of the collection check.
+        Operator-specific observed result in E/result.md: report tests authored and collected - the
+        pass/fail judgement of the product is the verify op's, and this evidence never claims it."
+  - id: matrixHandoff
+    path: E/job-result.json
+    fields:
+      - requestId
+      - requestDigest
+      - op
+      - operation when selected
+      - status
+      - criteria
+      - outputs
+      - artifacts
+    content:
+      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
+        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
+        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
+        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
+        The selected request freezes output field schemas before execution.
+steps:
+  - reads:
+      - target
+      - architecture
+      - repo
+      - suite
+      - conventions
+      - profile
+    writes:
+      - evidence
+    action:
+      en: "Bind the bounded slice and restate every selected assertion as the observable behavior a
+        test must exercise. Inspect the existing harness, its conventions and the adopted test
+        patterns before writing anything; reuse its fixtures and helpers. A behavior the design does
+        not state is a reported gap, not an invented expectation. Resolve the execution profile and
+        actual tool availability before selecting instruments; this does not switch the
+        model/runtime or spawn workers."
+  - reads:
+      - architecture
+      - repo
+      - suite
+      - conventions
+    writes:
+      - source
+    action:
+      en: Author one test file set per covered assertion inside the declared test paths, following
+        the suite's naming and fixture conventions and the adopted test patterns - the positive
+        path, the declared denial and the invalid-input case the records state. Seed only
+        preconditions through the suite's own fixtures, and never pre-create the outcome under test.
+        No product file changes here.
+  - reads:
+      - repo
+      - suite
+    writes:
+      - evidence
+    action:
+      en: Prove the authored tests are real by running the runner's collection/listing - the tests
+        are discovered, parse and register under the real harness. A test that cannot be collected
+        is fixed inside the allowlist or reported; a green/red run of the authored tests is not this
+        op's verdict to report - verification belongs to the verify ops.
+  - reads:
+      - target
+      - repo
+      - matrix
+    writes:
+      - node
+      - evidence
+      - matrixHandoff
+    action:
+      en: Review the diff and verify only test paths changed. Commit only when authorized, read back
+        the full SHA/diff and bind the authored tests to the inspected tree; otherwise report
+        uncommitted honestly. Report done once with the authored inventory and collection proof -
+        never a product verdict. When selected in a job matrix, produce E/job-result.json bound to
+        the exact request, its output schema and every required criterion.
+proofs:
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+        done.
+  - id: authored-coverage
+    requirement:
+      en: Every selected assertion maps to at least one authored test file whose cases exercise the
+        stated behavior - the positive path, the declared denial and the invalid input where the
+        records declare them. An assertion with no authored test is reported, never quietly dropped.
+  - id: collected
+    requirement:
+      en: The real runner's collection/listing output shows every authored test discovered and
+        registered on the exact inspected tree; an uncollectable test is a defect of this op, not of
+        the product.
+  - id: test-paths-only
+    requirement:
+      en: The actual repository status against the tested tree shows only allowlisted test paths
+        changed - no product file, schema, configuration, expectation or runner manifest was
+        touched.
+  - id: no-verdict
+    requirement:
+      en: The report claims authored and collected tests only. No product pass, fail or coverage
+        verdict is asserted; that judgement is the verify op's on a separate run.
+  - id: commit
+    requirement:
+      en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository,
+        and separately retain integration/tested mappings. Report uncommitted or no-change honestly.
+blockers:
+  - code: DESIGN_GAP
+    condition:
+      en: "The design record is silent about an observable behavior a required test must exercise -
+        report blocked with blocker kind sds-gap, never write a test that invents the expectation."
+  - code: OUTSIDE_TEST_ALLOWLIST
+    condition:
+      en: "Authored tests cannot be collected without touching a product file, schema, configuration
+        or runner manifest outside the test paths - report the exact paths as blocker kind
+        shared-change; the allowlist is never widened here."
+  - code: RUNNER_UNAVAILABLE
+    condition:
+      en: "The declared test runner or a required harness dependency cannot run in this environment
+        and the cause is provably unfixable from the allowlist - report blocked with blocker kind
+        environment naming the exact missing piece."
+  - code: AUTHORITY_REQUIRED
+    condition:
+      en: "Authoring the required tests needs an authority the goal does not grant - report blocked
+        with blocker kind authority, an owner decision, never a silent widening."
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never
+        run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  suite-paths: Existing test harness, fixture and helper paths
+  test-ceiling: Explicit owned test paths
+commitPolicy:
+  mode: scoped-local-commit
+  ownership: exact-selected-paths
+  verify: git-readback-full-sha-and-diff
+  push: false
+  reuseAuthorization: true
+  noChange: return-existing-verified-commit-no-empty-commit
+testPolicy:
+  writes: test-paths-only
+  judges: never
+  productCode: unchanged
+  verdict: verify-ops-own
+  collectionProof: runner-listing-required
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+# ---------------------------------------------------------------------------
+# TINKLE-1 business analysis (not part of the source contract; inference marked).
+business:
+  question: >-
+    "Are the tests this slice needs authored inside test-paths-only and proven
+    collected by the real runner - without claiming any product verdict?"
+  whenNeeded:
+    - When a test-gap blocker routes here, or a slice needs authored tests before the verify ops can run them.
+    - When existing suite conventions must be extended for the target assertions.
+  whenNot:
+    - Never touches product code, schema, config or the runner manifest - writes stay inside the test ceiling.
+    - Never reports pass/fail of the product - the verify ops own verdicts; collection is this op's proof.
+    - Design silence is an sds-gap, not license to invent an expectation.
+  consumes:
+    - Target assertions; architecture contracts; the repo slice; the existing suite + conventions; adopted test patterns.
+  produces:
+    - Test files/fixtures inside the test ceiling; authored-tests + collection evidence; scoped commit when authorized.
+  failureModes:
+    - DESIGN_GAP (sds-gap), OUTSIDE_TEST_ALLOWLIST (shared-change), RUNNER_UNAVAILABLE, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
+# ---------------------------------------------------------------------------
+# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
+# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
+# block alone — an agent never reads the whole contract to route.
+route:
+  nodeKinds: [implementation]
+  phase: [implement, implementation]
+  intent: [test, author, coverage]
+  prerequisites: ["test-gap blocker or code under test"]

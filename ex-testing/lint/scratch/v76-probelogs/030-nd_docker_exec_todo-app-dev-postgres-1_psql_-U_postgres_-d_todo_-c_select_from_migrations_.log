@@ -1,0 +1,7 @@
+$ docker exec todo-app-dev-postgres-1 psql -U postgres -d todo -c "select * from migrations;"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 1
+
+
+Error response from daemon: container c1aa08f80964fd81099b004e55a2db8a055e3bcc9eb1fd77cf492f3f957c79ee is not running
+

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { checkNestBoundaries, NEST_BOUNDARY_RULES } from '../checks/code-patterns/nest-boundaries.mjs';
+import { checkNestBoundaries, NEST_BOUNDARY_RULES } from '../scripts/checks/code-patterns/nest-boundaries.mjs';
 
 const require = createRequire(import.meta.url);
 function fixture(t, files, contract = {}) {

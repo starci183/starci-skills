@@ -1,0 +1,14 @@
+$ npx jest src/modules/bussiness/audit/audit-event.subscriber.spec.ts src/modules/bussiness/audit/append-log-line.handler.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/audit/append-log-line.handler.spec.ts
+PASS src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+
+Test Suites: 2 passed, 2 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        2.575 s
+Ran all test suites matching /src\\modules\\bussiness\\audit\\audit-event.subscriber.spec.ts|src\\modules\\bussiness\\audit\\append-log-line.handler.spec.ts/i.
+

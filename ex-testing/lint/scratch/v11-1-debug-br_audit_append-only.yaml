@@ -1,0 +1,38 @@
+schema: work/business-rule
+id: br.audit.append-only
+title: A log line is never altered
+state: done
+statements:
+  - Once a line is appended, its stored bytes and its position in the chain never change again.
+  - Any alteration of a line, or removal of a line, is detectable by recomputing the chain.
+authorityRefs:
+  - "owner-intent: A log nobody can trust is worthless; the check has to be real, not a promise."
+acceptance:
+  - id: ac.audit.append-only.chain-detects-tamper
+    given: A log with several appended lines, each line's hash covering its own content and the previous
+      line's hash
+    when: A test mutates one stored field on an already-appended line, or removes one line from the
+      middle of the store, then asks the module to recompute the chain from the first line forward
+    then:
+      - The recomputation reports the exact index where the recomputed hash first stops matching the
+        stored one, not merely "invalid" - a removed line must surface as a broken prevHash link at the
+        line that followed it, and a changed field must surface as a content mismatch at that line.
+      - The same recomputation over an untouched log reports every line valid.
+      - "The check that proves this: a node:test (or Nest e2e) suite that appends N lines, snapshots the
+        chain, mutates the underlying storage directly (bypassing the module's own write path, the way a
+        rogue admin or a compromised disk would), and asserts the recomputed break index equals the
+        mutated line's index. A test that only calls the module's own append/verify pair without an
+        out-of-band mutation does not prove tamper-evidence; it proves the happy path."
+module: src/modules/bussiness/audit
+
+change:
+change:
+  rev: 3
+  kind: editorial
+  at: 2026-09-19T15:44:01.435Z
+  reason: "gap.audit.unbuilt-module is closed: AuditLogService.verifyChain (src/modules/bussiness/audit
+    /audit-log.service.ts) recomputes the hash chain from the first line forward and reports the exact
+    break index and reason, proven by an out-of-band mutation fuzz over every line and field plus every
+    middle-line removal in audit-log.service.spec.ts - never through the module's own write path. module
+    corrected from the drafted src/audit/log (never built) to the real Nest capability directory. rev 3 (v11 ac-collapse): acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.audit.append-only#<former-ac-id>. Encoding change only, no semantic change."
+

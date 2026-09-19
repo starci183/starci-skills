@@ -1,0 +1,133 @@
+
+===== todo-be VULNERABILITY =====
+token file used: sonarqube-todo-app-backend-token.key
+count: 3
+[
+  {
+    "rule": "typescript:S4036",
+    "severity": "MINOR",
+    "type": "VULNERABILITY",
+    "component": "src/tests/e2e/resilience/e2e-infra-contract.ts",
+    "line": 77,
+    "message": "Make sure the \"PATH\" variable only contains fixed, unwriteable directories.",
+    "status": "OPEN",
+    "effort": "15min",
+    "tags": [
+      "cwe",
+      "former-hotspot"
+    ]
+  },
+  {
+    "rule": "typescript:S4036",
+    "severity": "MINOR",
+    "type": "VULNERABILITY",
+    "component": "src/tests/e2e/resilience/e2e-infra-contract.ts",
+    "line": 87,
+    "message": "Make sure the \"PATH\" variable only contains fixed, unwriteable directories.",
+    "status": "OPEN",
+    "effort": "15min",
+    "tags": [
+      "cwe",
+      "former-hotspot"
+    ]
+  },
+  {
+    "rule": "typescript:S4036",
+    "severity": "MINOR",
+    "type": "VULNERABILITY",
+    "component": "src/tests/infra/platform/stack/e2e-stack.service.ts",
+    "line": 180,
+    "message": "Make sure the \"PATH\" variable only contains fixed, unwriteable directories.",
+    "status": "OPEN",
+    "effort": "15min",
+    "tags": [
+      "cwe",
+      "former-hotspot"
+    ]
+  }
+]
+----- todo-be BUG (BLOCKER/CRITICAL/MAJOR) -----
+token file used: sonarqube-todo-app-backend-token.key
+count: 0
+[]
+
+===== ec-be VULNERABILITY =====
+token file used: sonarqube-ecommerce-app-be-token.key
+count: 5
+[
+  {
+    "rule": "typescript:S2068",
+    "severity": "MAJOR",
+    "type": "VULNERABILITY",
+    "component": "src/modules/bussiness/account/password.policy.ts",
+    "line": 14,
+    "message": "Review this potentially hard-coded password.",
+    "status": "OPEN",
+    "effort": "30min",
+    "tags": [
+      "cwe",
+      "secret",
+      "former-hotspot"
+    ]
+  },
+  {
+    "rule": "typescript:S2245",
+    "severity": "MAJOR",
+    "type": "VULNERABILITY",
+    "component": "src/tests/e2e/order-lifecycle/lifecycle.helpers.ts",
+    "line": 44,
+    "message": "Make sure that using this pseudorandom number generator is safe here.",
+    "status": "OPEN",
+    "effort": "10min",
+    "tags": [
+      "cwe",
+      "former-hotspot"
+    ]
+  },
+  {
+    "rule": "typescript:S4036",
+    "severity": "MINOR",
+    "type": "VULNERABILITY",
+    "component": "src/tests/e2e/resilience/e2e-infra-contract.ts",
+    "line": 88,
+    "message": "Make sure the \"PATH\" variable only contains fixed, unwriteable directories.",
+    "status": "OPEN",
+    "effort": "15min",
+    "tags": [
+      "cwe",
+      "former-hotspot"
+    ]
+  },
+  {
+    "rule": "typescript:S4036",
+    "severity": "MINOR",
+    "type": "VULNERABILITY",
+    "component": "src/tests/e2e/resilience/e2e-infra-contract.ts",
+    "line": 102,
+    "message": "Make sure the \"PATH\" variable only contains fixed, unwriteable directories.",
+    "status": "OPEN",
+    "effort": "15min",
+    "tags": [
+      "cwe",
+      "former-hotspot"
+    ]
+  },
+  {
+    "rule": "typescript:S4036",
+    "severity": "MINOR",
+    "type": "VULNERABILITY",
+    "component": "src/tests/infra/platform/stack/e2e-stack.service.ts",
+    "line": 396,
+    "message": "Make sure the \"PATH\" variable only contains fixed, unwriteable directories.",
+    "status": "OPEN",
+    "effort": "15min",
+    "tags": [
+      "cwe",
+      "former-hotspot"
+    ]
+  }
+]
+----- ec-be BUG (BLOCKER/CRITICAL/MAJOR) -----
+token file used: sonarqube-ecommerce-app-be-token.key
+count: 0
+[]

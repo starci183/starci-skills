@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.share.invite.expiry.expires-after-14-days
-rule: br.share.invite.expiry
-given: An invitation was sent and never accepted
-when: It is read fifteen days later
-then:
-  - Its status reads expired.
-  - An acceptance attempt against it is refused.

@@ -1,0 +1,7 @@
+$ node -e "const fs=require('fs'),p='../todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/assets/';const states=['idle','exporting','requesting-erasure','erasure-pending','erasure-complete','erasure-refused'];const vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of vps){for(const ext of ['png','html']){const f=p+'privacy-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const refused=fs.readFileSync(p+'privacy-erasure-refused-desktop-1280.html','utf8');if(!refused.includes('data-state=\"erasure-refused\"')){ok=false;console.log('refused markup lacks data-state');}for(const v of vps){const j=p+'todo-app-export-'+v+'.json';if(!fs.existsSync(j)){ok=false;console.log('missing export',j);}}if(!ok)process.exit(1);console.log('12 state captures + 2 real export downloads verified');"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend)
+exit 0
+
+12 state captures + 2 real export downloads verified
+
+

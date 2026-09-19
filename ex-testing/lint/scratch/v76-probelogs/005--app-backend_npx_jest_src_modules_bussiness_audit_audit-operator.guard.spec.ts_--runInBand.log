@@ -1,0 +1,27 @@
+$ npx jest src/modules/bussiness/audit/audit-operator.guard.spec.ts --runInBand
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/audit/audit-operator.guard.spec.ts
+  assertOperatorRead (gap.audit.operator-role)
+    √ refuses every actor without an operator claim - which is every actor this example can resolve today (3 ms)
+    √ honors operator and operator:* claims if sds.login.session-store ever grows a role field
+    √ carries a stable refusal code, per contract.login.identity-for-task's typed-refusal rule
+    √ asks and asserts the same one rule
+  AuditOperatorGuard
+    √ denies the session-only actor this example resolves today (SessionRecord carries no role) (6 ms)
+    √ admits an operator claim (1 ms)
+  operator filter/summary pair (fr.audit.log.read)
+    √ filters by action and by target, and passes everything when unfiltered (1 ms)
+    √ the summary carries exactly at/action/target - never actor, never keyId
+    √ readAllLines resolves a real tombstoned line into the same summary shape, unreadable but present (3 ms)
+  AUDIT_SEALED_ACTIONS (contract.audit.emitted-events)
+    √ names exactly the five events this lane declares (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        2.503 s
+Ran all test suites matching /src\\modules\\bussiness\\audit\\audit-operator.guard.spec.ts/i.
+

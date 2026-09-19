@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.plan.active-scope.excludes-complete
-rule: br.plan.active-scope
-given: A person with 20 tasks, one of which is complete
-when: The active count is computed
-then:
-  - The count is 19.
-  - Creating one more task is allowed.

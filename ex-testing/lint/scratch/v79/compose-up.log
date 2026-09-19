@@ -1,0 +1,119 @@
+Decrypted dev secrets under .starcistacks/dev/runtime/**; running: docker compose -f .starcistacks/dev/infra/compose/compose.yaml up postgres keycloak redis
+ Network compose_default Creating 
+ Network compose_default Created 
+ Volume compose_todo-postgres Creating 
+ Volume compose_todo-postgres Created 
+ Container compose-redis-1 Creating 
+ Container compose-keycloak-1 Creating 
+ Container compose-postgres-1 Creating 
+ Container compose-redis-1 Created 
+ Container compose-keycloak-1 Created 
+ Container compose-postgres-1 Created 
+Attaching to keycloak-1, postgres-1, redis-1
+ Container compose-keycloak-1 Starting 
+ Container compose-redis-1 Starting 
+ Container compose-postgres-1 Starting 
+ Container compose-redis-1 Started 
+redis-1  | 1:C 19 Sep 2026 11:41:48.116 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+redis-1  | 1:C 19 Sep 2026 11:41:48.116 * Redis version=7.4.11, bits=64, commit=00000000, modified=0, pid=1, just started
+redis-1  | 1:C 19 Sep 2026 11:41:48.116 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf
+redis-1  | 1:M 19 Sep 2026 11:41:48.117 * monotonic clock: POSIX clock_gettime
+redis-1  | 1:M 19 Sep 2026 11:41:48.117 * Running mode=standalone, port=6379.
+redis-1  | 1:M 19 Sep 2026 11:41:48.118 * Server initialized
+redis-1  | 1:M 19 Sep 2026 11:41:48.118 * Ready to accept connections tcp
+ Container compose-keycloak-1 Started 
+ Container compose-postgres-1 Started 
+postgres-1  | The files belonging to this database system will be owned by user "postgres".
+postgres-1  | This user must also own the server process.
+postgres-1  | 
+postgres-1  | The database cluster will be initialized with locale "en_US.utf8".
+postgres-1  | The default database encoding has accordingly been set to "UTF8".
+postgres-1  | The default text search configuration will be set to "english".
+postgres-1  | 
+postgres-1  | Data page checksums are disabled.
+postgres-1  | 
+postgres-1  | fixing permissions on existing directory /var/lib/postgresql/data ... ok
+postgres-1  | creating subdirectories ... ok
+postgres-1  | selecting dynamic shared memory implementation ... posix
+postgres-1  | selecting default max_connections ... 100
+postgres-1  | selecting default shared_buffers ... 128MB
+postgres-1  | selecting default time zone ... Etc/UTC
+postgres-1  | creating configuration files ... ok
+postgres-1  | running bootstrap script ... ok
+postgres-1  | performing post-bootstrap initialization ... ok
+keycloak-1  | Updating the configuration and installing your custom providers, if any. Please wait.
+postgres-1  | initdb: warning: enabling "trust" authentication for local connections
+postgres-1  | initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+postgres-1  | syncing data to disk ... ok
+postgres-1  | 
+postgres-1  | 
+postgres-1  | Success. You can now start the database server using:
+postgres-1  | 
+postgres-1  |     pg_ctl -D /var/lib/postgresql/data -l logfile start
+postgres-1  | 
+postgres-1  | waiting for server to start....2026-09-19 11:41:51.349 UTC [47] LOG:  starting PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+postgres-1  | 2026-09-19 11:41:51.352 UTC [47] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+postgres-1  | 2026-09-19 11:41:51.361 UTC [50] LOG:  database system was shut down at 2026-09-19 11:41:49 UTC
+postgres-1  | 2026-09-19 11:41:51.367 UTC [47] LOG:  database system is ready to accept connections
+postgres-1  |  done
+postgres-1  | server started
+postgres-1  | CREATE DATABASE
+postgres-1  | 
+postgres-1  | 
+postgres-1  | /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/01-schema.sql
+postgres-1  | CREATE TABLE
+postgres-1  | 
+postgres-1  | 
+postgres-1  | /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/02-tasks.sql
+postgres-1  | INSERT 0 1
+postgres-1  | 
+postgres-1  | 
+postgres-1  | waiting for server to shut down...2026-09-19 11:41:51.610 UTC [47] LOG:  received fast shutdown request
+postgres-1  | .2026-09-19 11:41:51.611 UTC [47] LOG:  aborting any active transactions
+postgres-1  | 2026-09-19 11:41:51.613 UTC [47] LOG:  background worker "logical replication launcher" (PID 53) exited with exit code 1
+postgres-1  | 2026-09-19 11:41:51.614 UTC [48] LOG:  shutting down
+postgres-1  | 2026-09-19 11:41:51.616 UTC [48] LOG:  checkpoint starting: shutdown immediate
+postgres-1  | 2026-09-19 11:41:51.708 UTC [48] LOG:  checkpoint complete: wrote 933 buffers (5.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.019 s, sync=0.068 s, total=0.095 s; sync files=305, longest=0.007 s, average=0.001 s; distance=4289 kB, estimate=4289 kB; lsn=0/1922E98, redo lsn=0/1922E98
+postgres-1  | 2026-09-19 11:41:51.714 UTC [47] LOG:  database system is shut down
+postgres-1  |  done
+postgres-1  | server stopped
+postgres-1  | 
+postgres-1  | PostgreSQL init process complete; ready for start up.
+postgres-1  | 
+postgres-1  | 2026-09-19 11:41:51.834 UTC [1] LOG:  starting PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+postgres-1  | 2026-09-19 11:41:51.834 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+postgres-1  | 2026-09-19 11:41:51.834 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+postgres-1  | 2026-09-19 11:41:51.837 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+postgres-1  | 2026-09-19 11:41:51.842 UTC [67] LOG:  database system was shut down at 2026-09-19 11:41:51 UTC
+postgres-1  | 2026-09-19 11:41:51.846 UTC [1] LOG:  database system is ready to accept connections
+keycloak-1  | 2026-09-19 11:42:06,556 INFO  [io.qua.dep.QuarkusAugmentor] (main) Quarkus augmentation completed in 14770ms
+keycloak-1  | 2026-09-19 11:42:12,778 INFO  [org.keycloak.quarkus.runtime.storage.infinispan.CacheManagerFactory] (main) Starting Infinispan embedded cache manager
+keycloak-1  | 2026-09-19 11:42:12,948 INFO  [org.keycloak.quarkus.runtime.storage.infinispan.CacheManagerFactory] (main) Persistent user sessions enabled and no memory limit found in configuration. Setting max entries for sessions to 10000 entries.
+keycloak-1  | 2026-09-19 11:42:12,949 INFO  [org.keycloak.quarkus.runtime.storage.infinispan.CacheManagerFactory] (main) Persistent user sessions enabled and no memory limit found in configuration. Setting max entries for clientSessions to 10000 entries.
+keycloak-1  | 2026-09-19 11:42:12,949 INFO  [org.keycloak.quarkus.runtime.storage.infinispan.CacheManagerFactory] (main) Persistent user sessions enabled and no memory limit found in configuration. Setting max entries for offlineSessions to 10000 entries.
+keycloak-1  | 2026-09-19 11:42:12,949 INFO  [org.keycloak.quarkus.runtime.storage.infinispan.CacheManagerFactory] (main) Persistent user sessions enabled and no memory limit found in configuration. Setting max entries for offlineClientSessions to 10000 entries.
+keycloak-1  | 2026-09-19 11:42:13,219 INFO  [org.infinispan.CONTAINER] (ForkJoinPool.commonPool-worker-1) ISPN000556: Starting user marshaller 'org.infinispan.commons.marshall.ImmutableProtoStreamMarshaller'
+keycloak-1  | 2026-09-19 11:42:13,898 INFO  [org.keycloak.connections.infinispan.DefaultInfinispanConnectionProviderFactory] (main) Node name: node_349499, Site name: null
+keycloak-1  | 2026-09-19 11:42:15,231 INFO  [org.keycloak.quarkus.runtime.storage.database.liquibase.QuarkusJpaUpdaterProvider] (main) Initializing database schema. Using changelog META-INF/jpa-changelog-master.xml
+keycloak-1  | 
+keycloak-1  | UPDATE SUMMARY
+keycloak-1  | Run:                        148
+keycloak-1  | Previously run:               0
+keycloak-1  | Filtered out:                 0
+keycloak-1  | -------------------------------
+keycloak-1  | Total change sets:          148
+keycloak-1  | 
+keycloak-1  | 2026-09-19 11:42:22,911 WARN  [io.agroal.pool] (main) Datasource '<default>': JDBC resources leaked: 1 ResultSet(s) and 0 Statement(s)
+keycloak-1  | 2026-09-19 11:42:24,728 INFO  [org.keycloak.broker.provider.AbstractIdentityProviderMapper] (main) Registering class org.keycloak.broker.provider.mappersync.ConfigSyncEventListener
+keycloak-1  | 2026-09-19 11:42:25,284 INFO  [org.keycloak.exportimport.dir.DirImportProvider] (main) Importing from directory /opt/keycloak/bin/../data/import
+keycloak-1  | 2026-09-19 11:42:25,293 INFO  [org.keycloak.services] (main) KC-SERVICES0050: Initializing master realm
+keycloak-1  | 2026-09-19 11:42:28,343 INFO  [org.keycloak.exportimport.singlefile.SingleFileImportProvider] (main) Full importing from file /opt/keycloak/bin/../data/import/realm-todo.json
+keycloak-1  | 2026-09-19 11:42:31,682 INFO  [org.keycloak.exportimport.util.ImportUtils] (main) Realm 'todo' imported
+keycloak-1  | 2026-09-19 11:42:31,683 INFO  [org.keycloak.services] (main) KC-SERVICES0030: Full model import requested. Strategy: OVERWRITE_EXISTING
+keycloak-1  | 2026-09-19 11:42:31,683 INFO  [org.keycloak.services] (main) KC-SERVICES0032: Import finished successfully
+keycloak-1  | 2026-09-19 11:42:31,693 WARN  [org.keycloak.services] (main) KC-SERVICES0110: Environment variable 'KEYCLOAK_ADMIN' is deprecated, use 'KC_BOOTSTRAP_ADMIN_USERNAME' instead
+keycloak-1  | 2026-09-19 11:42:31,876 WARN  [io.agroal.pool] (main) Datasource '<default>': JDBC resources leaked: 1 ResultSet(s) and 0 Statement(s)
+keycloak-1  | 2026-09-19 11:42:32,314 INFO  [io.quarkus] (main) Keycloak 26.0.8 on JVM (powered by Quarkus 3.15.1) started in 25.464s. Listening on: http://0.0.0.0:8089. Management interface listening on http://0.0.0.0:9000.
+keycloak-1  | 2026-09-19 11:42:32,315 INFO  [io.quarkus] (main) Profile dev activated. 
+keycloak-1  | 2026-09-19 11:42:32,315 INFO  [io.quarkus] (main) Installed features: [agroal, cdi, hibernate-orm, jdbc-h2, keycloak, narayana-jta, opentelemetry, reactive-routes, rest, rest-jackson, smallrye-context-propagation, smallrye-health, vertx]
+keycloak-1  | 2026-09-19 11:42:32,335 WARN  [org.keycloak.quarkus.runtime.KeycloakMain] (main) Running the server in development mode. DO NOT use this configuration in production.

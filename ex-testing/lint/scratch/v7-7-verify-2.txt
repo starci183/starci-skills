@@ -1,0 +1,4 @@
+MATCH unit-composed-rules: still pass (npx jest -t fr.checkout.place-order --runInBand)
+MATCH e2e: still pass (npx jest --config src/tests/e2e/jest.config.js checkout/checkout-journey)
+MATCH e2e-refusal-paths: still pass (npx jest --config src/tests/e2e/jest.config.js order-lifecycle checkout/payment-failure)
+fr.checkout.place-order: verified - every assertion replayed with a matching outcome

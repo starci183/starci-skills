@@ -1,0 +1,15 @@
+$ npx jest -t "ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/recur/occurrence.service.spec.ts (10.406 s)
+PASS src/modules/bussiness/recur/complete-occurrence.handler.spec.ts
+PASS src/modules/bussiness/recur/skip-occurrence.handler.spec.ts
+
+Test Suites: 114 skipped, 3 passed, 3 of 117 total
+Tests:       698 skipped, 3 passed, 701 total
+Snapshots:   0 total
+Time:        15.854 s, estimated 20 s
+Ran all test suites with tests matching "ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner".
+

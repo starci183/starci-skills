@@ -1,0 +1,27 @@
+schema: work/functional-requirement
+id: fr.checkout.cart.add
+title: Add a line to the cart
+state: todo
+actors: [person]
+trigger: The person with a live session asks to put a product in their cart, over the addCartItem mutation.
+mainFlow:
+  - The session is verified against the identity service over HTTP before the cart is touched.
+  - The line upserts on (person, product) - a fresh product inserts a row, a held product accumulates onto the held quantity.
+  - The answer is the line's new total.
+exceptionFlows:
+  - A call whose bearer token does not verify is refused before any cart work.
+  - A missing product id or a quantity that is not a positive integer is refused REQUEST_INVALID before the cart is touched.
+  - A product the catalog does not know is not refused here; it persists as a line until order confirmation refuses it.
+postconditions:
+  - The person's cart holds the accumulated line; no other person's cart changes.
+composes:
+  - rule: br.checkout.cart
+    module: src/modules/bussiness/cart
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npx jest --config src/tests/e2e/jest.config.js checkout/checkout-journey
+
+change: {rev: 1, kind: initial, at: 2026-09-19T14:00:00.000Z}

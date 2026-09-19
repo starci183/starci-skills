@@ -8,7 +8,7 @@ const run=args=>spawnSync(process.execPath,args,{cwd:root,encoding:'utf8',window
 
 test('the public compiled stale command preserves script JSON diagnostics and nonzero status',()=>{
   const args=['--work'];
-  const script=run(['scripts/check-stales.mjs',...args]);
+  const script=run(['scripts/checks/check-stales.mjs',...args]);
   const command=run(['bin/starci.mjs','check-stales',...args]);
   assert.equal(script.status,2,script.stderr);assert.equal(command.status,script.status,command.stderr);
   assert.deepEqual(JSON.parse(command.stdout),JSON.parse(script.stdout));

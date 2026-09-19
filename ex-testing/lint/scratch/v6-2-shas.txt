@@ -1,0 +1,14 @@
+962c84f025a4cd7d53d27424c434b1b7d00d6ca82c3335c894c963ba498eb5a1  packages/grammar/src/common/index.ts
+58dd5bcea875665290025aec81bf9ad4a821ec392aaed0eafa8baaa8e794828a  packages/grammar/src/common/renderers.ts
+60d5ebe4adc86e1b02ac566650d86e8e6fb087e001093072468dccbcc48ac357  packages/grammar/src/common/registry.tsx
+9f70f3e7507715cb77c8b8fc1c9a906811395dc6c9ed85c09d9451cee7e6cb10  packages/grammar/src/common/styles.css
+f0cbd5f51ef0aaf3db529c349489021c009c88d3187ae0946c24bd3be3168f5d  packages/grammar/src/common/spacing.ts
+367ff5ff3d2414a40962bb2908d26a0261178cfbe61ce87e0c6132ee957ce188  packages/grammar/src/common/state.ts
+1434661f2ee53825ec8de6cc5732d01d1a31d338be813237fafc4b3ec15ec532  packages/grammar/src/common/conformance.ts
+9608b068993f816ad474d4dc27cfd07d2df8fef2bbb6a8f932a6618214dd4c9c  packages/grammar/src/common/rule-catalog.generated.ts
+46bae8365da670b800819e0fe66d4b04ab1fc6e965d29b699ea7408174f7c6bb  packages/grammar/src/core/styles.css
+9a831f2b711a6f3768d9b1523d1b84805b6ddb7509ec9bbee7fe25f4f3412091  packages/grammar/src/core/dna.ts
+93b94f62216c656db74d9a88f5aef5837a8ba9a31b8066004b3014a6db6bf79b  packages/grammar/src/core/classNames.ts
+
+common/styles.css rules: 407, lines: 2625
+installed dist/common/styles.css matches src: true

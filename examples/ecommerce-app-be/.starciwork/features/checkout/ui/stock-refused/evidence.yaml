@@ -1,0 +1,34 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: ui.checkout.stock-refused
+recordDigest: 73d9bc3562067c4b982169e9afe1665a51bff4695f153c1b0c6d45ab46a11738
+outcome: fail
+assertions:
+  - id: direction-asset-custody
+    command: node examples/ecommerce-app-fe/captures/verify-render.mjs --record
+      ui.checkout.stock-refused custody
+    exit: 0
+    outcome: pass
+    observation: node examples/ecommerce-app-fe/captures/verify-render.mjs --record
+      ui.checkout.stock-refused custody exited 0
+  - id: declared-state-captures
+    command: node examples/ecommerce-app-fe/captures/verify-render.mjs --record
+      ui.checkout.stock-refused captures
+    exit: 1
+    outcome: fail
+    observation: node examples/ecommerce-app-fe/captures/verify-render.mjs --record
+      ui.checkout.stock-refused captures exited 1
+  - id: render-proof
+    command: node examples/ecommerce-app-fe/captures/verify-render.mjs --record
+      ui.checkout.stock-refused render
+    exit: 1
+    outcome: fail
+    observation: node examples/ecommerce-app-fe/captures/verify-render.mjs --record
+      ui.checkout.stock-refused render exited 1
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-19T16:11:46.481Z

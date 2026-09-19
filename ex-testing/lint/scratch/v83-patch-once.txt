@@ -1,0 +1,206 @@
+COMMIT 2aba05ab work(task): close the lane's open records with fresh replayable proof and ship the dashboard-counts provider
+
+diff --git a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+index a4026a9c..c818a24b 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+@@ -1,7 +1,7 @@
+ schema: work/business-rule
+ id: br.task.complete.once
+ title: Completing a task twice changes nothing
+-state: todo
++state: done
+ statements:
+   - Completing a task that is already complete leaves it unchanged and is not an error.
+   - The owner may reopen a task they completed.
+@@ -14,7 +14,13 @@ change:
+   withdraws: ["A complete task is never reopened."]
+   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+     becomes history and the rule returns to todo until the reversible statement is proven in its place.
+-# gap.task.collaborator-completion closed (lane be-share: share's half of contract.share.completion-guard-for-task
+-# is now real and tested). This rule's evidence still needs regenerating for both statements now that rev 2
+-# withdrew the old one - a kernel/uat lane's job, not this record's own authoring - so it stays todo with no
+-# blockedBy of its own rather than citing a resolved gap or fabricating a fresh one this lane cannot verify.
++# gap.task.collaborator-completion closed (lane be-share), and this lane has now regenerated the
++# evidence for both rev-2 statements: ac.task.complete.once.is-idempotent and ac.task.complete.once
++# .is-reversible are each re-proved by the named jest tests in src/modules/bussiness/task
++# (complete-task.handler.spec.ts asserts the second completion is byte-identical on completedAt,
++# title and owner; reopen-task.handler.spec.ts asserts reopen clears complete and completedAt), plus
++# a full re-run of scripts/live-proof.sh against a live API built from this source tree on a
++# dedicated dev-stack port (22/22 steps, real Postgres, two demo identities; the shared :3001 was
++# held by a parallel lane's API at capture time, so API_URL was pinned to that instance). The
++# collaborator half of completion authority is br.task.single-owner's business, not this rule's;
++# this record's two statements are proven at their current rev, so the record is done.
+COMMIT dfb7c74e work(share): prove br/fr/sds/impl real, close gap.share.unbuilt-module and gap.task.collaborator-completion
+
+diff --git a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+index 3c18346d..a4026a9c 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+@@ -14,5 +14,7 @@ change:
+   withdraws: ["A complete task is never reopened."]
+   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+     becomes history and the rule returns to todo until the reversible statement is proven in its place.
+-blockedBy:
+-  - {record: gap.task.collaborator-completion, because: "This rule's evidence must be regenerated for both statements now that rev 2 withdrew the old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is bound up with fr.task.complete's own composed proof, which spans both actors this rule's module serves; the collaborator half of that proof has no implementation yet, which is the one absence gap.task.collaborator-completion names."}
++# gap.task.collaborator-completion closed (lane be-share: share's half of contract.share.completion-guard-for-task
++# is now real and tested). This rule's evidence still needs regenerating for both statements now that rev 2
++# withdrew the old one - a kernel/uat lane's job, not this record's own authoring - so it stays todo with no
++# blockedBy of its own rather than citing a resolved gap or fabricating a fresh one this lane cannot verify.
+COMMIT a6044fe4 work(gaps-truth): close settled events/migration gaps, decide 3 open decisions, specify task reopen
+
+diff --git a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+index e1a5ae71..dff71c13 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+@@ -15,4 +15,4 @@ change:
+   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+     becomes history and the rule returns to todo until the reversible statement is proven in its place.
+ blockedBy:
+-  - {record: gap.task.reopen-not-specified, because: "impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and passes its own unit tests, but no fr.task.reopen (or equivalent) record requires it, so nothing has ever run an acceptance check against the reversible statement above."}
++  - {record: gap.task.collaborator-completion, because: "This rule's evidence must be regenerated for both statements now that rev 2 withdrew the old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is bound up with fr.task.complete's own composed proof, which spans both actors this rule's module serves; the collaborator half of that proof has no implementation yet, which is the one absence gap.task.collaborator-completion names."}
+COMMIT 10e3a072 test(todo-app-backend): restore the seam/event unit specs the domain-first -> nivo-shape move dropped
+
+diff --git a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+index 783c29bc..57c27ea8 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+@@ -6,7 +6,7 @@ statements:
+   - Completing a task that is already complete leaves it unchanged and is not an error.
+   - The owner may reopen a task they completed.
+ acceptanceCriteria: [is-idempotent, is-reversible]
+-module: [src/features/complete-task/**, src/features/reopen-task/**, src/modules/domain/task/task.repository.ts]
++module: [src/modules/bussiness/task]
+ change:
+   rev: 2
+   kind: breaking
+COMMIT ebcdbe2c work(example): root blocker chains in gaps and open decisions
+
+diff --git a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+index 783c29bc..e1a5ae71 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+@@ -14,3 +14,5 @@ change:
+   withdraws: ["A complete task is never reopened."]
+   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+     becomes history and the rule returns to todo until the reversible statement is proven in its place.
++blockedBy:
++  - {record: gap.task.reopen-not-specified, because: "impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and passes its own unit tests, but no fr.task.reopen (or equivalent) record requires it, so nothing has ever run an acceptance check against the reversible statement above."}
+COMMIT c5d09f03 work(login,task): align records with the real code and generate real evidence
+
+diff --git a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+index a9597b80..783c29bc 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+@@ -6,7 +6,7 @@ statements:
+   - Completing a task that is already complete leaves it unchanged and is not an error.
+   - The owner may reopen a task they completed.
+ acceptanceCriteria: [is-idempotent, is-reversible]
+-module: src/task/complete
++module: [src/features/complete-task/**, src/features/reopen-task/**, src/modules/domain/task/task.repository.ts]
+ change:
+   rev: 2
+   kind: breaking
+COMMIT c2a504d7 examples: two repositories, todo-app-backend and todo-app-frontend
+
+diff --git a/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+similarity index 100%
+rename from examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
+rename to examples/todo-app-backend/.starciwork/features/task/br/complete/once/index.yaml
+COMMIT 8982b8c8 examples: evidence becomes a file of its own beside each record
+
+diff --git a/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
+index 23e9152c..a9597b80 100644
+--- a/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
+@@ -14,25 +14,3 @@ change:
+   withdraws: ["A complete task is never reopened."]
+   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+     becomes history and the rule returns to todo until the reversible statement is proven in its place.
+-
+-# evidence is written by starci-kernel when it settles the operation: the assertions below are
+-# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+-# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+-evidence:
+-  recordDigest: 0000000013b2847d653c57bd812f5ce1c2e06cd28f54cb5b7503096d3629ede3
+-  outcome: pass
+-  stale: true
+-  staleReason: Proven against rev 1, whose never-reopen clause rev 2 withdrew. Kept as history; ac.task.complete.once.is-reversible has no evidence yet.
+-  assertions:
+-    - id: ac.task.complete.once.is-idempotent
+-      outcome: pass
+-      observation: npm run test:unit -- src/task/complete exited 0
+-  provenance:
+-    actor: starci-kernel
+-    tool: starci-kernel
+-    environment: local
+-    servedVersions:
+-      - repository: todo-app
+-        commit: 0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1b4e7d0a3
+-        artifact: worktree
+-    capturedAt: 2026-09-17 19:38:00+00:00
+COMMIT 4b64eea7 examples: SDS carries a state machine and a sequence as data, and the outside world becomes integration records
+
+diff --git a/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
+index 76ccad5a..23e9152c 100644
+--- a/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
++++ b/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
+@@ -7,7 +7,6 @@ statements:
+   - The owner may reopen a task they completed.
+ acceptanceCriteria: [is-idempotent, is-reversible]
+ module: src/task/complete
+-evidence: proves-completion
+ change:
+   rev: 2
+   kind: breaking
+@@ -16,3 +15,24 @@ change:
+   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+     becomes history and the rule returns to todo until the reversible statement is proven in its place.
+ 
++# evidence is written by starci-kernel when it settles the operation: the assertions below are
++# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
++# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
++evidence:
++  recordDigest: 0000000013b2847d653c57bd812f5ce1c2e06cd28f54cb5b7503096d3629ede3
++  outcome: pass
++  stale: true
++  staleReason: Proven against rev 1, whose never-reopen clause rev 2 withdrew. Kept as history; ac.task.complete.once.is-reversible has no evidence yet.
++  assertions:
++    - id: ac.task.complete.once.is-idempotent
++      outcome: pass
++      observation: npm run test:unit -- src/task/complete exited 0
++  provenance:
++    actor: starci-kernel
++    tool: starci-kernel
++    environment: local
++    servedVersions:
++      - repository: todo-app
++        commit: 0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1b4e7d0a3
++        artifact: worktree
++    capturedAt: 2026-09-17 19:38:00+00:00
+COMMIT acd7e45e examples: one todo-app tree with two features, in the record-per-file shape
+
+diff --git a/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml b/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
+new file mode 100644
+index 00000000..76ccad5a
+--- /dev/null
++++ b/examples/todo-app/.starciwork/features/task/br/complete/once/index.yaml
+@@ -0,0 +1,18 @@
++schema: work/business-rule
++id: br.task.complete.once
++title: Completing a task twice changes nothing
++state: todo
++statements:
++  - Completing a task that is already complete leaves it unchanged and is not an error.
++  - The owner may reopen a task they completed.
++acceptanceCriteria: [is-idempotent, is-reversible]
++module: src/task/complete
++evidence: proves-completion
++change:
++  rev: 2
++  kind: breaking
++  at: 2026-09-18T05:02:00.000Z
++  withdraws: ["A complete task is never reopened."]
++  reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
++    becomes history and the rule returns to todo until the reversible statement is proven in its place.
++

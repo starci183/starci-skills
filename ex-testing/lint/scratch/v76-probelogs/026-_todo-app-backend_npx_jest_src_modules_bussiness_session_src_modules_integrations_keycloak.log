@@ -1,0 +1,17 @@
+$ npx jest src/modules/bussiness/session src/modules/integrations/keycloak
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/integrations/keycloak/keycloak.client.spec.ts
+PASS src/modules/integrations/keycloak/keycloak.client-edge.spec.ts
+PASS src/modules/bussiness/session/session.service.spec.ts
+PASS src/modules/bussiness/session/sign-in.handler.spec.ts
+PASS src/modules/bussiness/session/sign-out.handler.spec.ts
+
+Test Suites: 5 passed, 5 total
+Tests:       28 passed, 28 total
+Snapshots:   0 total
+Time:        3.32 s
+Ran all test suites matching /src\\modules\\bussiness\\session|src\\modules\\integrations\\keycloak/i.
+

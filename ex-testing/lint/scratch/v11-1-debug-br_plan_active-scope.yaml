@@ -1,0 +1,33 @@
+schema: work/business-rule
+id: br.plan.active-scope
+title: What counts as an active task toward the cap
+state: done
+statements:
+  - An active task is a row currently owned by the person being capped; br.task.list.owned already means no
+    other person's row, and no shared row, can ever appear in that count, because this product has no sharing.
+  - A completed task does not count toward the cap; completing a task is how a person keeps working past a
+    cap without paying, and the cap must not punish that.
+  - This product has no soft-delete state for a task - br.task.delete.final removes the row outright - so
+    there is no deleted-but-present case to exclude today. If a soft delete is ever added, this rule must be
+    revisited before the count can be trusted again.
+authorityRefs:
+  - "product-intent: The cap counts work in flight, not work ever done; a person who finishes tasks should
+    never be told to delete history to make room for new ones."
+acceptance:
+  - id: ac.plan.active-scope.excludes-complete
+    given: A person with 20 tasks, one of which is complete
+    when: The active count is computed
+    then:
+      - The count is 19.
+      - Creating one more task is allowed.
+module: src/modules/bussiness/plan
+change:
+change:
+  rev: 3
+  kind: editorial
+  at: 2026-09-19T15:44:01.435Z
+  reason: PlanCapGuardPolicy (src/modules/bussiness/plan/cap-guard.policy.ts) computes the active count by
+    filtering out completed tasks from TaskService.listOwnedBy, proven by
+    cap-guard.policy.spec.ts's ac.plan.active-scope.excludes-complete case.
+    rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.plan.active-scope#<former-ac-id>. Encoding change only, no semantic change.
+refs: [br.task.list.owned, br.task.delete.final]

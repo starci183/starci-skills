@@ -6,8 +6,8 @@ import test from 'node:test';
 import {createRequire} from 'node:module';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../core/yaml.mjs';
-import {checkScopedLint} from '../scripts/check-scoped-lint.mjs';
-import {checkArchitecture} from '../checks/architecture/index.mjs';
+import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
+import {checkArchitecture} from '../scripts/checks/architecture/index.mjs';
 
 const require=createRequire(import.meta.url);
 const digest='a'.repeat(64);

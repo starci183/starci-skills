@@ -1,0 +1,16 @@
+tinkle-6 done — scripts/route/ resolvers implemented and fixture-tested.
+
+Artifacts:
+- .claude/scripts/route/route-op.mjs          op resolver on route: blocks (deterministic scoring, refusal exit 1)
+- .claude/scripts/route/route-model.mjs       model resolver executing modules/models/selection.yaml
+- .claude/scripts/route/build-ops-registry.mjs  registry generator + --check CI mode
+- .claude/modules/ops/registry.yaml           regenerated (GENERATED header, 30 ops, 6 engines)
+- .claude/modules/ops/ops/<id>.yaml           route: blocks added to all 30 (tinkle-1 gap filled)
+- .claude/modules/models/selection.yaml       line-49 quoted-scalar fix (kernelFunctionKinds)
+- .claude/ex-testing/lint/tinkle-6-REPORT.md  full test table + findings
+
+Checks (all pass):
+- 5 op routes incl. family-only and no-kind queries; bogus kind exits 1
+- 3 model workloads: probation pick (qwen-agent via declared chain), kernel-function full chain, elevated refusal exit 1
+- build-ops-registry.mjs --check reports registry current (idempotent)
+- all 30 per-op yamls re-parse under the strict parser with route: present

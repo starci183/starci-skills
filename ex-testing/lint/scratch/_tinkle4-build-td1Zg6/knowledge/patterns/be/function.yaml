@@ -1,0 +1,127 @@
+schema: starci/knowledge-source@1
+id: be.function
+title: Backend function
+purpose: Apply the adopted responsibility pattern. Read docs/backend-source-pattern.md for the coherent
+  layout, code forms, source critique and verification limits.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-16
+  sources:
+    - docs/backend-source-pattern.md
+    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/features/api/core/graphql/mutations/courses/add-to-cart/
+    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/modules/databases/postgresql/primary/primary.module-definition.ts
+    - https://docs.nestjs.com/fundamentals/dynamic-modules
+    - https://docs.nestjs.com/techniques/validation
+  limitations: Adopted Nest/TypeScript profile, not universal framework law. Historical Academy examples contain
+    debt and do not override these revised rules. Existing profile-specific lint/source needs an authorized
+    coherent migration; runtime installation neither migrates product source nor refreshes proof. Static
+    checks do not establish behavior.
+rules:
+  - id: BE-FUNCTION-1
+    title: A use case has one execution owner
+    kind: mandatory
+    requirement: Default to an injectable use case with a typed public execute method. When a bus has actual
+      semantics, its handler implements the installed command/query interface and owns that use case. Do not
+      add a second forwarding service or an execute-to-process base solely to copy Academy. Existing
+      ICQRSHandler subclasses retain their inherited execute contract until explicitly migrated.
+    rationale: One owner avoids duplicated orchestration and boilerplate without behavior.
+    verification:
+      automated: []
+      manual:
+        - Verify handler registration and test the public execution entry.
+    relatedExamples: []
+  - id: BE-FUNCTION-2
+    title: Messages carry stable application contracts
+    kind: mandatory
+    requirement: Command/query payloads are readonly plain application inputs with a minimal authenticated
+      principal context when required. They never import feature transport DTOs, ORM user entities or raw
+      provider tokens. Durable messages have explicit identity/version and serialization rules; an in-process
+      class is not automatically a durable contract.
+    rationale: Transport representations and credentials do not belong in generic execution envelopes.
+    verification:
+      automated: []
+      manual:
+        - Verify replay, serialization and authorization at the actual boundary.
+    relatedExamples: []
+  - id: BE-FUNCTION-3
+    title: Orchestrate capabilities, do not wrap names
+    kind: mandatory
+    requirement: A feature use case coordinates the scenario; a capability service owns cohesive
+      domain/platform/provider behavior. If one capability API already is the whole scenario, a second
+      forwarding class is unnecessary. A persistence port is justified by an actual boundary and must preserve
+      transaction identity; exposing Store.manager is not encapsulation.
+    rationale: Responsibilities justify abstractions, not suffixes or class counts.
+    verification:
+      automated: []
+      manual:
+        - Identify where invariant, transaction and effect ownership live.
+    relatedExamples: []
+  - id: BE-FUNCTION-4
+    title: Transport adapts protocol
+    kind: mandatory
+    requirement: Controllers/resolvers/consumers validate protocol input, obtain a verified principal, map to a
+      plain application input, invoke the use-case/capability API and project its result. They do not own
+      business decisions. Resource authorization remains in the use case/capability so alternative entry
+      points cannot bypass it.
+    rationale: A thin protocol adapter supports multiple entry points without duplicating policy.
+    verification:
+      automated: []
+      manual:
+        - Exercise malformed input, cross-workspace denial and safe response projection.
+    relatedExamples: []
+  - id: BE-FUNCTION-5
+    title: Injection preserves identity and transaction
+    kind: mandatory
+    requirement: Inject private readonly dependencies with the correct named connection/provider scope. The
+      Academy TypeORM profile uses its actual named EntityManager decorators; equivalent profiles must
+      preserve the same ownership facts. Every operation inside a transaction uses the callback manager. Do
+      not substitute Core primary for an instance connection or globally collapse distinct clients. Call super
+      only when a meaningful base requires it.
+    rationale: A decorator name alone does not prove connection identity or atomicity.
+    verification:
+      automated: []
+      manual:
+        - Inspect decorator/token bodies and test boot plus the real transaction boundary.
+    relatedExamples: []
+  - id: BE-FUNCTION-6
+    title: Validate authority and enforce concurrent invariants
+    kind: mandatory
+    requirement: Validate input, principal and resource scope before effects. Read-before-write is an
+      optimization, not concurrency-safe idempotency. Enforce uniqueness/conditional transitions/locks at the
+      owning store, define conflict behavior, and bind request idempotency to principal/workspace, operation
+      and request digest. Separate local transaction completion from remote acknowledgement and unknown
+      effects.
+    rationale: Two simultaneous callers or a crash expose invariants that serial mocks cannot prove.
+    verification:
+      automated: []
+      manual:
+        - Run competing attempts and applicable crash/retry cases against the real authority.
+    relatedExamples: []
+  - id: BE-FUNCTION-7
+    title: Helpers have cohesive ownership
+    kind: mandatory
+    requirement: Keep pure helpers with their owning capability or use case. Public contracts use named
+      input/output types where that improves clarity; a single primitive may remain positional. Prefer simple
+      functions over a provider class when no lifecycle/dependency injection is required. Follow the selected
+      formatter/lint profile without mistaking arrow-versus-function counts for architecture.
+    rationale: Reuse and clarity determine helper form.
+    verification:
+      automated: []
+      manual:
+        - Confirm purity and absence of hidden config, I/O or authority decisions.
+    relatedExamples: []
+  - id: BE-FUNCTION-8
+    title: Static modules first; dynamic options when real
+    kind: mandatory
+    requirement: Use a static Nest module for fixed providers/imports/exports. Use
+      ConfigurableModuleBuilder<Options> and module-definition.ts only when consumers configure behavior or
+      distinct instances. Validate runtime options at startup and keep secret custody outside source literals.
+      Dynamic options are not a substitute for provider identity or lifetime design.
+    rationale: Empty-options configurable modules add an API without a configuration responsibility.
+    verification:
+      automated: []
+      manual:
+        - Boot the module with valid/invalid options and verify intended provider identity.
+    relatedExamples: []

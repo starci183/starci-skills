@@ -1,0 +1,72 @@
+schema: work/sds-component
+id: sds.notify.delivery-lifecycle
+title: The life of one delivery attempt
+state: done
+responsibility: Carries one notification from admission to a terminal outcome, retrying a transient
+  failure a bounded number of times and never attempting a send that preference already rules out.
+interfaces:
+  - The pipeline is the only writer of a delivery's state; nothing reads or flushes a digest group
+    directly.
+refs: [br.notify.delivery.once, br.notify.digest.window, br.notify.failure.classified, br.notify.unsubscribe.honored]
+dependsOn: [integration.notify.smtp, integration.notify.queue]
+owners:
+  - {role: module, path: src/modules/bussiness/notify}
+
+stateMachine:
+  states: [queued, sending, delivered, bounced, suppressed]
+  initial: queued
+  terminal: [delivered, bounced, suppressed]
+  transitions:
+    - id: t-suppress
+      from: queued
+      to: suppressed
+      on: recipient-unsubscribed
+      guard: The recipient is unsubscribed from the channel at admission time.
+      effect: failureClass is set to unsubscribed. No dispatch is ever attempted.
+    - id: t-dispatch
+      from: queued
+      to: sending
+      on: window-closed-or-immediate
+      guard: The recipient is not unsubscribed from the channel.
+      effect: attempt is incremented and startedAt is set on the first attempt only.
+    - id: t-deliver
+      from: sending
+      to: delivered
+      on: provider-accepted
+      effect: endedAt is set. Terminal.
+    - id: t-bounce
+      from: sending
+      to: bounced
+      on: provider-rejected-permanent
+      effect: failureClass is set to permanent-bounce. endedAt is set. Terminal, and does not retry.
+    - id: t-retry
+      from: sending
+      to: queued
+      on: provider-failed-transient
+      guard: attempt is below the retry budget.
+      effect: failureClass is set to transient. The delivery re-enters queued for another t-dispatch.
+    - id: t-give-up
+      from: sending
+      to: bounced
+      on: provider-failed-transient
+      guard: attempt has reached the retry budget.
+      effect: failureClass is set to retries-exhausted, distinct from permanent-bounce even though both
+        land on the same state. endedAt is set. Terminal.
+
+sequence:
+  participants: [pipeline, smtp, person]
+  steps:
+    - {from: pipeline, to: smtp, message: "a send attempt for the dispatched message, observable: network"}
+    - {from: smtp, to: pipeline, message: "accept, permanent rejection, or a transient failure, observable: network"}
+    - {from: smtp, to: person, message: "the message arrives in their inbox, observable: external, note: not directly observable by this product; only smtp's acceptance is."}
+  note: A retry (t-retry, t-give-up) is internal looping over the same two observable steps and is not a
+    separate participant interaction; binding an internal retry count here would make a correct backoff
+    change read as a protocol change.
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "DeliveryService (src/modules/bussiness/notify/delivery.service.ts) implements all six transitions, named identically (t-suppress, t-dispatch, t-deliver, t-bounce, t-retry, t-give-up) so the record and the code read together, per this codebase's own tComplete/tReopen/tBegin/tAccept convention. NotifyService.dispatchGroup drives t-dispatch either on: window-closed (via DigestService.flush, scheduled through NotifyQueuePort and the real NotifyScheduler timer) or on: immediate (a retry's redispatch after backoff, also via the queue) - both readings of window-closed-or-immediate are real code paths, not just prose. Every transition has a passing delivery.service.spec.ts case (see evidence.yaml), and scripts/live-proof-notify.sh exercises t-suppress and a real t-dispatch attempt against the real dev stack. gap.notify.unbuilt-module's blocker is resolved; owners added naming the module this design was missing (OWNER_PATH_MISSING)."}

@@ -1,7 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.identity.sign-in.known-pair-issues-a-session-token
-rule: br.identity.sign-in
-given: A registered email and its password
-when: The pair is submitted to sign-in
-then:
-  - One live session answers with an opaque token, and a second sign-in issues a different token.

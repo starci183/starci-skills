@@ -88,33 +88,67 @@ export default class RunWriter implements Reporter {
       });
     }
 
-    fs.writeFileSync(
-      path.join(dir, 'walk.json'),
-      JSON.stringify({ schema: 'starci/uat-walk@1', flow: record.id, steps: walkEntries }, null, 2),
-    );
-    fs.writeFileSync(
-      path.join(dir, 'ux-checks.json'),
-      JSON.stringify({ schema: 'starci/uat-ux-checks@1', flow: record.id, checks: assertions }, null, 2),
-    );
-    fs.writeFileSync(
-      path.join(dir, 'flows.json'),
-      JSON.stringify(
-        { schema: 'starci/uat-flows@1', flow: { id: record.id, title: record.title, steps: record.steps, proves: record.proves } },
-        null,
-        2,
-      ),
-    );
+    // The op's evidence for this run is the whole set below. Per the v11-4 consolidated `uatRun`
+    // layout (schemas/work-layout.yaml) the run folder holds exactly {manifest.yaml, result.md,
+    // screens/, videos/}, so these six payloads fold into manifest.yaml under `files:` - keyed by
+    // their former sidecar filename - instead of each getting its own loose file.
+    const walkObj = { schema: 'starci/uat-walk@1', flow: record.id, steps: walkEntries };
+    const uxChecksObj = { schema: 'starci/uat-ux-checks@1', flow: record.id, checks: assertions };
+    const flowsObj = {
+      schema: 'starci/uat-flows@1',
+      flow: { id: record.id, title: record.title, steps: record.steps, proves: record.proves },
+    };
 
     const observedCount = assertions.filter(a => a.observed !== 'not-run').length;
     const failedCount = assertions.filter(a => a.observed !== 'not-run' && a.observed !== a.expected).length;
+    // A test that did not pass cannot back a pass outcome: the walk provably died before completing,
+    // no matter which assertions happened to be recorded beforehand. Without this guard a crashed walk
+    // wrote `Outcome: pass` for the checkpoints that ran (first seen on run 20260919T143618Z-5c10a673,
+    // which aborted mid-flow yet produced a passing result.md).
     const outcome =
-      assertions.length === 0 || observedCount === 0
-        ? 'inconclusive'
-        : failedCount > 0
-          ? 'fail'
-          : observedCount < assertions.length
-            ? 'partial-pass'
-            : 'pass';
+      result.status !== 'passed'
+        ? 'fail'
+        : assertions.length === 0 || observedCount === 0
+          ? 'inconclusive'
+          : failedCount > 0
+            ? 'fail'
+            : observedCount < assertions.length
+              ? 'partial-pass'
+              : 'pass';
+
+    const created = resourceEvents.filter(e => e.action === 'created');
+    const deleted = resourceEvents.filter(e => e.action === 'deleted');
+    const verifiedAbsent = resourceEvents.filter(e => e.action === 'verified-absent');
+
+    const runLedgerObj = {
+      schema: 'starci/uat-run-ledger@1',
+      runId: this.runId,
+      flow: record.id,
+      started: result.startTime.toISOString(),
+      finished: new Date(result.startTime.getTime() + result.duration).toISOString(),
+      accountsDeclared: accounts.map(a => ({ role: a.role, username: a.username })),
+      reused: [],
+      created: created.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
+    };
+    const readbackObj = {
+      schema: 'starci/uat-readback@1',
+      flow: record.id,
+      checked: assertions.filter(a => a.observed !== 'not-run').map(a => a.id),
+      notRun: assertions.filter(a => a.observed === 'not-run').map(a => a.id),
+    };
+    const cleanupObj = {
+      schema: 'starci/uat-cleanup@1',
+      flow: record.id,
+      ownedResourcesCreated: created.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
+      ownedResourcesDeleted: deleted.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
+      verifiedAbsent: verifiedAbsent.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
+      note:
+        created.length === 0
+          ? 'This run created no run-owned fixture rows against a database this lane owns; nothing to clean up.'
+          : created.length === deleted.length && created.length === verifiedAbsent.length
+            ? 'Every run-owned resource this run created was deleted and its absence verified by read-back.'
+            : 'Unresolved owned resource(s) remain - see ownedResourcesCreated vs ownedResourcesDeleted/verifiedAbsent.',
+    };
 
     const manifest = {
       schema: 'starci/uat-run-manifest@1',
@@ -132,64 +166,16 @@ export default class RunWriter implements Reporter {
         frontendCommit: frontendCommit(),
         backendCommit: backendCommit(),
       },
+      files: {
+        'cleanup.json': cleanupObj,
+        'flows.json': flowsObj,
+        'readback.json': readbackObj,
+        'run-ledger.json': runLedgerObj,
+        'ux-checks.json': uxChecksObj,
+        'walk.json': walkObj,
+      },
     };
     fs.writeFileSync(path.join(dir, 'manifest.yaml'), stringifyYaml(manifest));
-
-    fs.writeFileSync(
-      path.join(dir, 'run-ledger.json'),
-      JSON.stringify(
-        {
-          schema: 'starci/uat-run-ledger@1',
-          runId: this.runId,
-          flow: record.id,
-          started: result.startTime.toISOString(),
-          finished: new Date(result.startTime.getTime() + result.duration).toISOString(),
-          accountsDeclared: accounts.map(a => ({ role: a.role, username: a.username })),
-          reused: [],
-          created: resourceEvents.filter(e => e.action === 'created').map(e => ({ kind: e.kind, id: e.id, note: e.note })),
-        },
-        null,
-        2,
-      ),
-    );
-
-    fs.writeFileSync(
-      path.join(dir, 'readback.json'),
-      JSON.stringify(
-        {
-          schema: 'starci/uat-readback@1',
-          flow: record.id,
-          checked: assertions.filter(a => a.observed !== 'not-run').map(a => a.id),
-          notRun: assertions.filter(a => a.observed === 'not-run').map(a => a.id),
-        },
-        null,
-        2,
-      ),
-    );
-
-    const created = resourceEvents.filter(e => e.action === 'created');
-    const deleted = resourceEvents.filter(e => e.action === 'deleted');
-    const verifiedAbsent = resourceEvents.filter(e => e.action === 'verified-absent');
-    fs.writeFileSync(
-      path.join(dir, 'cleanup.json'),
-      JSON.stringify(
-        {
-          schema: 'starci/uat-cleanup@1',
-          flow: record.id,
-          ownedResourcesCreated: created.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
-          ownedResourcesDeleted: deleted.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
-          verifiedAbsent: verifiedAbsent.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
-          note:
-            created.length === 0
-              ? 'This run created no run-owned fixture rows against a database this lane owns; nothing to clean up.'
-              : created.length === deleted.length && created.length === verifiedAbsent.length
-                ? 'Every run-owned resource this run created was deleted and its absence verified by read-back.'
-                : 'Unresolved owned resource(s) remain - see ownedResourcesCreated vs ownedResourcesDeleted/verifiedAbsent.',
-        },
-        null,
-        2,
-      ),
-    );
 
     const resultMd = [
       `# ${record.title}`,

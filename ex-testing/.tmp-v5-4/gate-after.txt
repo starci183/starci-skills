@@ -1,0 +1,58 @@
+{
+  "app": "todo-be",
+  "project": "starci-todo-app-backend",
+  "via": "sonarqube-todo-app-backend-token.key",
+  "status": "ERROR",
+  "conditions": [
+    {
+      "status": "ERROR",
+      "metricKey": "new_coverage",
+      "comparator": "LT",
+      "errorThreshold": "80",
+      "actualValue": "68.9"
+    },
+    {
+      "status": "OK",
+      "metricKey": "new_duplicated_lines_density",
+      "comparator": "GT",
+      "errorThreshold": "3",
+      "actualValue": "0.47054"
+    },
+    {
+      "status": "ERROR",
+      "metricKey": "new_violations",
+      "comparator": "GT",
+      "errorThreshold": "0",
+      "actualValue": "20"
+    }
+  ]
+}
+{
+  "app": "ec-be",
+  "project": "starci-ecommerce-app-be",
+  "via": "sonarqube-ecommerce-app-be-token.key",
+  "status": "ERROR",
+  "conditions": [
+    {
+      "status": "ERROR",
+      "metricKey": "new_coverage",
+      "comparator": "LT",
+      "errorThreshold": "80",
+      "actualValue": "68.2"
+    },
+    {
+      "status": "OK",
+      "metricKey": "new_duplicated_lines_density",
+      "comparator": "GT",
+      "errorThreshold": "3",
+      "actualValue": "2.83988"
+    },
+    {
+      "status": "ERROR",
+      "metricKey": "new_violations",
+      "comparator": "GT",
+      "errorThreshold": "0",
+      "actualValue": "14"
+    }
+  ]
+}

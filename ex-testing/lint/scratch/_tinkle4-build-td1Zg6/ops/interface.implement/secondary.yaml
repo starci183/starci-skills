@@ -1,0 +1,137 @@
+schema: starci/op-secondary@1
+owner: interface.implement
+maxJobs: 3
+calls:
+  - op: architecture.decide
+    role: implementation.architecture
+    scope: Bounded SDS correction required to implement an already accepted frontend outcome.
+    parentState: waiting
+    matrixCell: same
+    allowedChangeKinds:
+      - design-gap
+      - technical-flow-correction
+    owns:
+      - the selected SDS correction and its reviewed architecture response
+    allowedEffects:
+      - Inspect accepted SRS, selected SDS, and observed source/render facts supplied by the parent.
+      - Edit only the selected architecture/SDS index.yaml leaves in a separate worktree.
+      - Run StarCi validation and return the reviewed SDS revision.
+    requiredCriteria:
+      - business-unchanged
+      - srs-preserved
+      - sds-source-independent
+      - sds-english-content
+      - sds-validated
+      - architecture-review-accepted
+    canCallOthers: false
+    maxSecondary: 0
+    canAdvanceWorkflow: false
+    canCompleteParent: false
+    businessChanged: false
+    sourceChanged: false
+    rules:
+      - Run architecture.decide in its own Orca child worktree; the frontend worker never edits SDS.
+      - Keep all canonical SRS/SDS content in English, including natural-language prose and
+        YAML/schema keys, stable IDs/refs, enum/API/type/variable/operation identifiers.
+      - Do not add product behavior, change accepted business policy, write product source, or store
+        source paths/symbols/evidence in SDS.
+      - Return the exact changed architecture paths and validation/review result. The Coordinator
+        integrates the accepted SDS before creating a fresh frontend resume attempt.
+      - A business change, scope expansion, missing authority, or unresolved alternative returns
+        blocked instead of being invented by architecture or implementation.
+    callSite:
+      step: discovery-or-verification
+      trigger: An observed source, API, render, or test fact proves that the selected SDS is missing,
+        contradictory, or technically insufficient for the already accepted frontend outcome.
+      skipWhen: The selected SDS is sufficient and consistent with the accepted SRS.
+      inputs:
+        - problem
+        - changeKind
+        - srsRefs
+        - sdsRefs
+        - architecturePaths
+        - observedSourceFacts
+      wait: Pause the frontend primary and its dependents until the architecture response is reviewed,
+        integrated, and bound as a dependency.
+      resume: Start a fresh frontend attempt from the integrated SDS revision, preserve the original
+        goal/criteria, and rerun every affected implementation, render, and quality check.
+      reentryFrom:
+        - discovery
+        - implementation
+        - verification
+      blockedWhen: The correction changes business intent, exceeds selected architecture ownership,
+        needs another secondary, or lacks review authority.
+    inputKind: design
+    outputFields:
+      - architectureRefs
+      - changedPaths
+      - validation
+      - review
+      - businessChanged
+      - sourceChanged
+  - op: backend.implement
+    role: interface.backend
+    scope: Compatible API or rendering-data repair required by this FE outcome.
+    parentState: waiting
+    matrixCell: same
+    allowedChangeKinds:
+      - api-integration
+      - render-data
+    owns:
+      - the bounded backend repair and its support response
+    allowedEffects:
+      - Inspect the actual API contract and selected backend source.
+      - Edit only exact request repository/path ownership.
+      - Run scoped regression checks and commit when authorized.
+    requiredCriteria:
+      - scope-preserved
+      - business-unchanged
+      - api-compatible
+      - backend-unit-pass
+      - backend-e2e-pass
+      - implementation-quality
+      - commit-verified
+    canCallOthers: false
+    maxSecondary: 0
+    canAdvanceWorkflow: false
+    canCompleteParent: false
+    businessChanged: false
+    apiCompatible: true
+    rules:
+      - Return to the FE parent in the same matrix cell.
+      - Do not add business rules, features, schema migrations or change authorization semantics.
+      - Missing decisions or broader changes return blocked; never silently promote yourself to
+        primary.
+      - Return actual changed paths, code commits and evidence. The parent must independently
+        recheck integration.
+    callSite:
+      step: 4
+      trigger: Observed API integration or render-data defect blocks an accepted frontend journey and can
+        be repaired without changing business.
+      skipWhen: No qualifying backend defect.
+      inputs:
+        - repository
+        - paths
+        - problem
+        - changeKind
+        - businessRefs
+      wait: Pause this primary cell until all required support responses pass.
+      resume: Require every listed criterion including implementation-quality and commit-verified; inspect
+        backend diff and integrate returned commits, resume step 4, then step 5 quality checks and
+        step 6 render verification.
+      reentryFrom:
+        - 5
+        - 6
+      blockedWhen: Needs business, schema or authorization changes, missing authority, or an unlisted
+        secondary operator.
+    inputKind: code
+    outputFields:
+      - codeRefs
+      - changedPaths
+      - apiContract
+      - runtime
+      - qualityEvidence
+      - testedCommit
+      - businessChanged
+      - apiCompatible
+maxDefinitions: 3

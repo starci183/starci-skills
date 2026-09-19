@@ -1,0 +1,21 @@
+schema: work/customer-journey
+id: journey.share.collaborate-on-a-task
+title: A person invites help onto their task and can take it back
+state: todo
+crossesFeatures: [task, share]
+steps:
+  - {actor: owner, does: "Creates a task, then invites a friend as an editor, expects: An invitation the
+      friend can accept within two weeks."}
+  - {actor: collaborator, does: "Accepts the invitation and marks the task complete, expects: The owner
+      sees it complete without doing anything themselves."}
+  - {actor: owner, does: "Changes their mind and revokes the collaborator, expects: The next thing that
+      collaborator tries fails, immediately, with no delay."}
+requirements: [fr.task.create, fr.share.invite, fr.share.accept, fr.share.revoke]
+blockedBy:
+  - {record: gap.share.live-proof, because: "fr.share.invite, fr.share.accept and fr.share.revoke are all done (their own composed rules are proven by jest and by scripts/live-proof-share.sh against the real stack), but no uat.verify run has walked this journey - uat.share.invite-and-collaborate - against a live product yet; that is the real remaining root, not the frs themselves."}
+
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements

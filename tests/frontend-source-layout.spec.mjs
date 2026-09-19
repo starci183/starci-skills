@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {createRequire} from 'node:module';
-import {checkArchitecture} from '../checks/architecture.mjs';
+import {checkArchitecture} from '../scripts/checks/architecture.mjs';
 
 const require=createRequire(import.meta.url);
 const ts=require('typescript');

@@ -1,0 +1,82 @@
+WROTE features/audit/br/append-only
+WROTE features/audit/br/erasure/logged
+WROTE features/audit/br/erasure/right
+WROTE features/audit/br/retention
+WROTE features/audit/data/log-line
+WROTE features/audit/fr/erasure/complete
+WROTE features/audit/fr/erasure/request
+WROTE features/audit/fr/export
+WROTE features/audit/fr/log/append
+WROTE features/audit/fr/log/read
+WROTE features/audit/impl/todo-app-backend/erasure
+WROTE features/audit/impl/todo-app-backend/log
+WROTE features/audit/impl/todo-app-backend/operator-read
+SKIP  features/audit/impl/todo-app-frontend/privacy — architecture: exited 1 (+1 more)
+WROTE features/audit/sds/erasure-request
+WROTE features/audit/sds/log-chain
+WROTE features/login/br/password/sign-in
+WROTE features/login/br/session/restores
+WROTE features/login/fr/sign-in
+WROTE features/login/impl/todo-app-backend/auth
+WROTE features/login/impl/todo-app-frontend/sign-in
+SKIP  features/login/integration/keycloak — real-keycloak-token-exchange: exited 1
+SKIP  features/login/integration/postgres — real-postgres-round-trip: exited 1 (+1 more)
+SKIP  features/login/journey/first-sign-in — uat-login-sign-in-run: exited 1
+WROTE features/login/sds/session-store
+WROTE features/notify/br/delivery/once
+WROTE features/notify/br/digest/window
+WROTE features/notify/br/failure/classified
+WROTE features/notify/br/unsubscribe/honored
+SKIP  features/notify/impl/todo-app-backend/pipeline — live: exited 1
+SKIP  features/notify/impl/todo-app-frontend/preferences — architecture: exited 1
+SKIP  features/notify/integration/queue — live-redis-roundtrip: exited 1
+WROTE features/notify/sds/delivery-lifecycle
+WROTE features/plan/br/active-scope
+WROTE features/plan/br/caps/limit
+WROTE features/plan/br/downgrade/freeze
+WROTE features/plan/br/lapse/reverts-on-read
+WROTE features/plan/br/payment/idempotent
+WROTE features/plan/contract/create-precondition
+WROTE features/plan/impl/todo-app-backend/plan
+WROTE features/plan/impl/todo-app-frontend/usage
+WROTE features/plan/sds/cap-guard
+WROTE features/plan/sds/subscription-lifecycle
+WROTE features/recur/br/ending/preserves-history
+SKIP  features/recur/br/generation/once — ac.recur.generation.once.is-idempotent-on-rerun: exited 0 but selected no test (Tests:       701 skipped, 701 total) — a vacuous run is not a proof
+WROTE features/recur/br/impossible-date/skips
+WROTE features/recur/br/occurrence/owned-by-rule-owner
+WROTE features/recur/br/timezone/owner-local-time
+SKIP  features/recur/impl/todo-app-backend/engine — live-e2e: exited 1
+WROTE features/recur/impl/todo-app-frontend/schedule
+WROTE features/recur/sds/generation-engine
+WROTE features/recur/sds/occurrence-lifecycle
+SKIP  features/share/br/editor/no-delete — live-proof: exited 1
+SKIP  features/share/br/invite/expiry — live-proof: exited 1
+SKIP  features/share/br/revoke/on-read — live-proof: exited 1
+SKIP  features/share/br/role/permissions — live-proof: exited 1
+SKIP  features/share/impl/todo-app-backend/access — live-proof: exited 1
+SKIP  features/share/impl/todo-app-backend/invitations — live-proof: exited 1
+SKIP  features/share/impl/todo-app-frontend/invite-screen — architecture: exited 1 (+2 more)
+SKIP  features/share/sds/invitation-lifecycle — live-proof: exited 1
+SKIP  features/task/br/complete/once — br.task.complete.once.live-proof: exited 7
+SKIP  features/task/br/delete/final — br.task.delete.final.live-proof: exited 7
+SKIP  features/task/br/list/owned — br.task.list.owned.live-proof: exited 7
+WROTE features/task/br/title/required
+WROTE features/task/event/completed
+WROTE features/task/event/created
+WROTE features/task/event/deleted
+WROTE features/task/fr/complete
+WROTE features/task/fr/create
+WROTE features/task/fr/reopen
+WROTE features/task/impl/todo-app-backend/complete-task
+WROTE features/task/impl/todo-app-backend/create-task
+WROTE features/task/impl/todo-app-backend/delete-task
+WROTE features/task/impl/todo-app-backend/list
+WROTE features/task/impl/todo-app-backend/ownership
+WROTE features/task/impl/todo-app-backend/platform-database
+WROTE features/task/impl/todo-app-backend/platform-events
+WROTE features/task/impl/todo-app-backend/reopen-task
+WROTE features/task/impl/todo-app-frontend/task-list
+WROTE features/task/sds/completion-state
+WROTE features/task/sds/ownership-guard
+summary {"considered":81,"written":61,"failedRestored":0,"skipped":20,"dryReady":0}

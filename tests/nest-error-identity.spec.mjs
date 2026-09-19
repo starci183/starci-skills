@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { checkNestErrorIdentity, NEST_ERROR_IDENTITY_RULES } from '../checks/code-patterns/nest-error-identity.mjs';
+import { checkNestErrorIdentity, NEST_ERROR_IDENTITY_RULES } from '../scripts/checks/code-patterns/nest-error-identity.mjs';
 
 const require = createRequire(import.meta.url);
 const typescriptRoot = path.dirname(require.resolve('typescript/package.json'));

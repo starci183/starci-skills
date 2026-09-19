@@ -1,0 +1,30 @@
+schema: starci/execution-profiles@1
+runtime: claude
+provider: anthropic
+source: legacy/resources/agents/model/claude.json
+modelPolicy: use-declared-profile-model-and-attest-effective-runtime; undeclared-models-inherit-current-host-configuration
+profiles:
+  opus:
+    role: working
+    legacyModelPreference: claude-opus-5
+    model: claude-opus-5
+    imageGeneration: false
+    roleDescription: "Heavy authoring and high-stakes mutation inside a frozen boundary: source apply,
+      backend implementation, release and platform operations."
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  opus-reviewer:
+    role: reasoning
+    legacyModelPreference: claude-opus-5
+    model: claude-opus-5
+    imageGeneration: false
+    roleDescription: "Judge, decide and verify on the evidence without repairing the product under
+      review: the reasoning half of the Opus pool, so allocation may hand Opus a review or a decision
+      when the dedicated reasoning pools are saturated or cooling."
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  fable-5.1:
+    role: reasoning
+    legacyModelPreference: claude-fable-5-1
+    model: null
+    imageGeneration: false
+    roleDescription: Reason, plan and judge on the evidence under the same ownership boundary as the Codex reasoning profile.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization

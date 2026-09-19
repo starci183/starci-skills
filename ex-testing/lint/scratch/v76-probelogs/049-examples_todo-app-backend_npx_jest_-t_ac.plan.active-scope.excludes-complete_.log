@@ -1,0 +1,14 @@
+$ npx jest -t "ac.plan.active-scope.excludes-complete"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/plan/plan-usage.handler.spec.ts
+PASS src/modules/bussiness/plan/cap-guard.policy.spec.ts
+
+Test Suites: 115 skipped, 2 passed, 2 of 117 total
+Tests:       699 skipped, 2 passed, 701 total
+Snapshots:   0 total
+Time:        15.479 s, estimated 20 s
+Ran all test suites with tests matching "ac.plan.active-scope.excludes-complete".
+

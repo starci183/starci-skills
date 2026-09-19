@@ -1,0 +1,30 @@
+$ npx jest src/modules/bussiness/share/invitation.service.spec.ts -t "creates a pending invitation bound"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/share/invitation.service.spec.ts
+  InvitationService
+    √ fr.share.invite: creates a pending invitation bound to the task, email and role (8 ms)
+    ○ skipped fr.share.invite exceptionFlows: an invalid email is refused and nothing is created
+    ○ skipped fr.share.invite exceptionFlows: a role other than viewer or editor is refused
+    ○ skipped data.share.invitation invariant: a second invite to the same pending pair is refused
+    ○ skipped ac.share.invite.expiry.accept-before-expiry-succeeds: accepting thirteen days in still succeeds
+    ○ skipped ac.share.invite.expiry.expires-after-14-days: reading fifteen days later reports expired and refuses acceptance
+    ○ skipped fr.share.accept exceptionFlows: accepting with a different email is refused
+    ○ skipped fr.share.accept exceptionFlows: accepting a revoked invitation is refused
+    ○ skipped ac.share.revoke.on-read.removed-loses-access-next-read: revoke clears the collaborator cache immediately
+    ○ skipped fr.share.revoke exceptionFlows: revoking an already revoked invitation is refused
+    ○ skipped fr.share.revoke: only the owner may revoke
+    ○ skipped fr.share.list exceptionFlows: a stranger sees nothing
+    ○ skipped fr.share.list: the owner sees every row with a live status
+    ○ skipped fr.share.list: a bound collaborator sees the list too
+    ○ skipped fr.share.list postconditions: an expired row reads expired at read time, never cached
+    ○ skipped re-inviting an expired address re-opens a fresh pending row instead of a second one
+
+Test Suites: 1 passed, 1 total
+Tests:       15 skipped, 1 passed, 16 total
+Snapshots:   0 total
+Time:        2.439 s, estimated 6 s
+Ran all test suites matching /src\\modules\\bussiness\\share\\invitation.service.spec.ts/i with tests matching "creates a pending invitation bound".
+

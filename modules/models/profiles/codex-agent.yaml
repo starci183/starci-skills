@@ -1,0 +1,74 @@
+# Profile: codex-agent — the OpenAI managed-agent pool.
+# Business frame: the generalist workhorse with the widest role coverage AND the
+# fleet's only image generator. Leads every verify chain and owns the entire
+# interface.draw/interface.asset route; last resort on cost for plain implement.
+
+target: codex-agent           # registry.json + runtimes.json
+provider: codex               # runtimes.json
+runtime: codex                # registry.json targets.codex-agent.runtime
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: gpt-5.6-luna   # registry.json targets.codex-agent.requestedModel
+  profiles:
+    working: gpt-5.6-luna        # codex.json — Execute bounded implementation inside
+                                 # frozen goal/write boundaries
+    reasoning: gpt-6-astra       # codex.json — plan strategy, analyze complex
+                                 # evidence, decide; never implements
+  modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # codex.json
+
+capacity:
+  maxParallel: 10             # runtimes.json — the largest pool
+  roles: [implement, verify, write, decide, plan]   # all five
+  models:                     # runtimes.json runtimes.codex-agent.models
+    implement: gpt-5.6-luna
+    verify: gpt-5.6-sol
+    write: gpt-5.6-luna
+    decide: gpt-6-astra
+    plan: gpt-6-astra
+  sharedQuota: >-
+    Sol, Astra and Luna consume the SAME observed Codex provider capacity — the
+    per-model slot counts do not multiply provider headroom
+    (docs/model-catalog.md). One quota cooldown on the provider parks all three.
+
+launch:
+  orca: {kind: managed-agent, agent: codex}
+  headless: codex exec --json --model {gpt-5.6-sol|gpt-6-astra}   # model-functions.md; answer reduced to last assistant message by extractCodex
+  imageGeneration: >-
+    TRUE for the gpt-5.6-sol profile (codex.json imageGeneration:true) — the ONLY
+    image-capable pool in the fleet (registry.json costPolicy: "only the Codex
+    pool carries an image generator"). interface.draw and interface.asset carry
+    single-target chains that are exactly this route; asset generation has NO
+    deferral fallback.
+
+position:
+  hardTier: third in default/implement/write; third in verify; second in decide/plan
+  mediumTier: first in default; second in decide/plan
+  easyTier: third
+  chainLeads: [e2e.verify, integration.verify, perf.verify, security.verify, brand.decide, decision.prepare, provision.ask, goal.revise, scope.define, interface.draw, interface.asset]
+  chainLast: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.retire, task.execute, uat.verify, workspace.manage]
+  rationale: >-
+    Two opposite positions, both deliberate (registry.json costPolicy): it leads
+    verify because independent judgment is the product there, and it trails
+    implement/write because the established cost order is Qwen→Devin→Claude→Codex.
+    It leads brand.decide/interface.* because it owns the image tool.
+
+business:
+  question: >-
+    "Which pool judges the work others did, and which pool can draw?" —
+    codex-agent is the primary verifier seat and the sole visual-design route.
+  whenNeeded:
+    - verify-role operations — first in every verify chain (e2e, integration, security, perf, plus goal-adjacent decide ops).
+    - interface.draw / interface.asset — the ONLY route; no other pool can produce the representative ImageGen candidates.
+    - decide/plan work when claude-fable's window is exhausted — Astra is the standing second.
+    - Medium-tier general work as first default.
+  whenNot:
+    - As first pick for routine implement/write — the declared cost order deliberately spends Qwen/Devin/Claude capacity first.
+    - For anything where image output is needed but the observed host tools lack it — availability is observed, never assumed (examplesNote).
+  pickedBy: >-
+    Allocator role preference + tier lists; verify role and the image routes are
+    where it structurally dominates.
+  failureModes:
+    - "Confusing requestedModel (luna) with the verify-role model (sol): the pool pins per-role models; attestation reads the role's model, not the target's request."
+    - Provider-level quota exhaustion disables ALL of luna/sol/astra at once — the interface.draw route then has no fallback; a failed image op is parked, not rerouted to a non-image pool.
+    - "INFERRED: using its 10-slot pool to parallelize easy implementation burns the shared quota the verify lane depends on."

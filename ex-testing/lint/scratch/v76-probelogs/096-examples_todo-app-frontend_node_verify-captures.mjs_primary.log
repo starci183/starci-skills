@@ -1,0 +1,16 @@
+$ node verify-captures.mjs primary
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend)
+exit 0
+
+PASS primary-absent running-page-empty-desktop-1280: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 87% of its saturated pixels.
+PASS primary-absent running-page-empty-mobile-390: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 88% of its saturated pixels.
+PASS primary-absent running-page-inviting-desktop-1280: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #346eff, 3% of its saturated pixels.
+PASS primary-absent running-page-inviting-mobile-390: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #346eff, 2% of its saturated pixels.
+PASS primary-absent running-page-pending-list-desktop-1280: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 87% of its saturated pixels.
+PASS primary-absent running-page-pending-list-mobile-390: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 88% of its saturated pixels.
+PASS primary-absent running-page-accepted-desktop-1280: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 87% of its saturated pixels.
+PASS primary-absent running-page-accepted-mobile-390: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 88% of its saturated pixels.
+PASS primary-absent running-page-refused-desktop-1280: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 53% of its saturated pixels.
+PASS primary-absent running-page-refused-mobile-390: The brand's primary `--starci-core-accent` (#2f6bff) is in the capture as #2f6bff, 71% of its saturated pixels.
+
+

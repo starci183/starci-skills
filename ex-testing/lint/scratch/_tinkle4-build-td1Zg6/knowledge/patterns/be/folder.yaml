@@ -1,0 +1,118 @@
+schema: starci/knowledge-source@1
+id: be.folder
+title: Backend folder
+purpose: Apply the adopted responsibility pattern. Read docs/backend-source-pattern.md for the coherent
+  layout, code forms, source critique and verification limits.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-16
+  sources:
+    - docs/backend-source-pattern.md
+    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/features/api/core/graphql/mutations/courses/add-to-cart/
+    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/modules/databases/postgresql/primary/primary.module-definition.ts
+    - https://docs.nestjs.com/fundamentals/dynamic-modules
+    - https://docs.nestjs.com/techniques/validation
+  limitations: Adopted Nest/TypeScript profile, not universal framework law. Historical Academy examples contain
+    debt and do not override these revised rules. Existing profile-specific lint/source needs an authorized
+    coherent migration; runtime installation neither migrates product source nor refreshes proof. Static
+    checks do not establish behavior.
+rules:
+  - id: BE-FOLDER-1
+    title: Responsibility roots
+    kind: mandatory
+    requirement: Apps own process composition; src/features/<feature> owns use-case orchestration and transport
+      adapters; src/modules/{domain,platform,integrations}/<capability> owns cohesive reusable capabilities.
+      Single application composition may be src/main.ts and src/app.module.ts. Package monorepos preserve
+      these roles through explicit root mappings. A module may have one consumer.
+    rationale: Ownership decides placement; repository topology and reuse count do not decide semantics.
+    verification:
+      automated:
+        - BE_MODULE_IMPORTS_FEATURE
+        - BE_MODULE_IMPORTS_APP
+        - BE_FEATURE_IMPORTS_APP
+      manual:
+        - Verify the actual owner and public API, not only folder names.
+    relatedExamples: []
+  - id: BE-FOLDER-2
+    title: One feature, explicit protocol boundary
+    kind: mandatory
+    requirement: New features place protocol-neutral use cases/contracts in application/ and protocol
+      DTOs/controllers/resolvers/consumers in transport/<protocol>/. Use a direct <action>.use-case.ts by
+      default. Add command/query/handler files only for an adopted bus contract. Do not require forwarding
+      services, template bases, or a fixed file count. Existing transport-first layouts are explicitly mapped
+      compatibility profiles, not the default for new source.
+    rationale: Multiple entry protocols must share one scenario without importing transport DTOs into the
+      application layer.
+    verification:
+      automated: []
+      manual:
+        - Review application contracts for request-context, ORM entity and protocol DTO leaks.
+    relatedExamples: []
+  - id: BE-FOLDER-3
+    title: Registration is executable composition
+    kind: mandatory
+    requirement: The consuming Nest module imports actual feature/module registrations and exports only required
+      APIs. Fixed registration uses a static module. Add dynamic registration only for real caller
+      configuration or instance identity. A CQRS-selected feature must register its bus and handlers.
+    rationale: Import syntax and direct handler construction do not establish a working DI container.
+    verification:
+      automated: []
+      manual:
+        - Boot the applicable app container and resolve real provider tokens.
+    relatedExamples: []
+  - id: BE-FOLDER-4
+    title: Capability shape follows owned behavior
+    kind: mandatory
+    requirement: A capability has an explicit index.ts public API and meaningful providers/contracts/policies with
+      colocated tests. Add a Nest module only when DI registration is needed. Add module-definition only for
+      meaningful typed dynamic options. Keep helpers with their owner; do not create empty conventional
+      folders.
+    rationale: A capability boundary is useful independently of boilerplate.
+    verification:
+      automated:
+        - BE_MODULE_IMPORTS_FEATURE
+        - BE_MODULE_IMPORTS_APP
+      manual:
+        - Check exported contracts, state owner and lifetime.
+    relatedExamples: []
+  - id: BE-FOLDER-5
+    title: Errors stay with their semantic owner
+    kind: mandatory
+    requirement: Domain error codes/types belong to the owning capability. Platform exceptions own generic error
+      representation and transport mapping infrastructure; transport adapters own protocol response
+      projection. Existing centralized Academy errors are a legacy profile whose lint must be migrated
+      coherently before moving classes. Do not copy feature policy into a generic error module.
+    rationale: Error mapping must not reverse dependencies or couple domain policy to HTTP/GraphQL.
+    verification:
+      automated: []
+      manual:
+        - Review safe client projection and private cause/log separation.
+    relatedExamples: []
+  - id: BE-FOLDER-6
+    title: One persistence and migration owner
+    kind: mandatory
+    requirement: Entities, database constraints/enums and migrations belong to the declared named
+      database/persistence owner. In the new layout this may be
+      modules/platform/databases/<connection>/{entities,migrations}; existing modules/databases paths can be
+      mapped. Capability domain values are not automatically database enums. No feature transport owns a
+      second schema definition or migration history.
+    rationale: Explicit connection and schema ownership prevents competing migrations and wrong-tenant access.
+    verification:
+      automated: []
+      manual:
+        - Verify the data owner, actual connection token and transaction boundary.
+    relatedExamples: []
+  - id: BE-FOLDER-7
+    title: Tests belong to behavior
+    kind: mandatory
+    requirement: Colocate unit/integration tests with their owner; keep shared fixtures and app/DB harnesses in
+      src/tests or the equivalent declared test root. Select boot, contract, concurrency and crash tests from
+      actual effects. Do not create empty tests for every conventional filename.
+    rationale: Useful evidence checks invariants at their real boundary.
+    verification:
+      automated: []
+      manual:
+        - A mocked manager test is not database isolation, boot or remote-effect evidence.
+    relatedExamples: []

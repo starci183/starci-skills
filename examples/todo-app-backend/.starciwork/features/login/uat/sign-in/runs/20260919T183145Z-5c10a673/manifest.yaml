@@ -1,0 +1,120 @@
+schema: starci/uat-run-manifest@1
+id: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+nodeId: uat.login.sign-in
+inputDigest: dc1ef715c18fe44e72704eb5751b459a0739bccddaa9cd1507371ddd5e1bfd7b
+outcome: partial-pass
+assertions: &a1
+  - id: ux.sign-in.validation-feedback
+    expected: yes
+    observed: yes
+    note: The submit button stays disabled while either field is empty
+      (SignInFormView disabled logic).
+  - id: fr.login.sign-in
+    expected: yes
+    observed: not-run
+    note: A successful sign-in writes a session row to Postgres.
+      UAT_LIVE_LOGIN_AUTHORIZED is not true in this environment, so this step is
+      not-run here rather than attempted against infrastructure this run does
+      not own.
+  - id: br.login.session.restores
+    expected: yes
+    observed: not-run
+    note: Depends on the real signed-in session from fr.login.sign-in above; not-run
+      for the same reason.
+  - id: ux.sign-in.error-feedback
+    expected: yes
+    observed: not-run
+    note: No response observed from /graphql within the timeout; the API origin did
+      not answer.
+  - id: br.login.password.sign-in
+    expected: yes
+    observed: not-run
+    note: "Same reason: no backend response to compare against a normalized refusal
+      message."
+assets:
+  - path: screens/empty.png
+    sha256: 9b5609164d27692bdb3ab323248adb0eab30a4138d3f6f5e0a92a8d8c0be1cb1
+    size: 139850
+  - path: screens/filled.png
+    sha256: 01b81a3ebd46051502d803223feb2b89d5c50c9dbc9f07d77fb593e1e89d22bb
+    size: 138478
+  - path: screens/working-and-refused.png
+    sha256: d5108d8cd744bb8c04c1d98b073a60315f77bad18821e09b6936423d4fb5ef2b
+    size: 142594
+  - path: screens/screenshot.png
+    sha256: 3fe2050ac15f0da6965ae7ac970f31701ac3f5b01337eea16c6f637feb90d08e
+    size: 143046
+  - path: videos/sign-in.webm
+    sha256: 379ec5bb9d7d43e897d145aa7e59408d13451990f06c39cda019cff74d67fc45
+    size: 221098
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:3000
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.login.sign-in
+    ownedResourcesCreated: []
+    ownedResourcesDeleted: []
+    verifiedAbsent: []
+    note: This run created no run-owned fixture rows against a database this lane
+      owns; nothing to clean up.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.login.sign-in
+      title: Sign in, close the browser, come back
+      steps:
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+        - "[object Object]"
+      proves:
+        - fr.login.sign-in
+        - br.login.password.sign-in
+        - br.login.session.restores
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.login.sign-in
+    checked:
+      - ux.sign-in.validation-feedback
+    notRun:
+      - fr.login.sign-in
+      - br.login.session.restores
+      - ux.sign-in.error-feedback
+      - br.login.password.sign-in
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T183145Z-5c10a673
+    flow: uat.login.sign-in
+    started: 2026-09-19T18:31:45.461Z
+    finished: 2026-09-19T18:31:57.367Z
+    accountsDeclared:
+      - role: person
+        username: demo@todo.dev
+    reused: []
+    created: []
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.login.sign-in
+    checks: *a1
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.login.sign-in
+    steps:
+      - step: empty
+        startedAt: 2026-09-19T18:31:46.639Z
+        endedAt: 2026-09-19T18:31:46.669Z
+        screenshot: empty
+      - step: filled
+        startedAt: 2026-09-19T18:31:46.745Z
+        endedAt: 2026-09-19T18:31:46.798Z
+        screenshot: filled
+      - step: working-and-refused
+        startedAt: 2026-09-19T18:31:46.859Z
+        endedAt: 2026-09-19T18:31:56.871Z
+        screenshot: working-and-refused

@@ -1,0 +1,273 @@
+schema: starci/knowledge-source@1
+id: fe.naming
+title: Naming
+purpose: |
+  Given a folder, export, type, constant or function in the frontend, what is it called?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - src/components/pages/*
+    - src/components/blocks/*/*
+    - src/components/leaves/*
+    - src/hooks/swr/*
+    - src/modules/api/graphql/**
+  limitations: |
+    Historical reference-source observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
+rules:
+  - id: FE-NAMING-1
+    title: Unit folder and applicable exports
+    kind: mandatory
+    requirement: |
+      UI feature units live below features/pages, features/layouts or features/overlays. Reusable visual
+      units live below components/blocks, components/composites, components/branches or components/leaves.
+      The folder name is the public unit export. A connected block uses sibling index.tsx and component.tsx
+      exports. Its resolved presentation export commonly appends Base when that name is selected by the
+      unit's public contract; the suffix is not required merely because component.tsx exists. Lower reusable
+      tiers and feature UI units do not acquire a twin for symmetry. Route wrappers use a local …Route const.
+    rationale: |
+      Matching folder and export names makes ownership discoverable; Base marks an actual resolved
+      presentation contract rather than a mandatory second file.
+    cases:
+      - id: case-1
+        when: "Feature page entry, features/pages/CartPage/index.tsx"
+        write: "export const CartPage = (props: CartPageProps) => … (49/49 pages)"
+      - id: case-2
+        when: "Historical page render half, features/pages/AuthenticationPage/component.tsx"
+        write: >
+          export const AuthenticationPageBase = (props: AuthenticationPageProps) => … (47/49; the two
+          CoursePlayground*Page units export …PageShell)
+      - id: case-3
+        when: "Connected block render half whose selected public name uses Base, components/blocks/StarCiAiChat/component.tsx"
+        write: "export const StarCiAiChatBase = … (98 of 118 component.tsx exports end in Base)"
+      - id: case-4
+        when: "Leaf, components/leaves/ButtonStateSample/index.tsx"
+        write: "export const ButtonStateSample = … — no Base, no twin"
+      - id: case-5
+        when: "Route wrapper, app/[lang]/authentication/page.tsx"
+        write: "const AuthenticationRoute = () => …"
+      - id: case-6
+        kind: exception
+        when: "One client visual unit owns only focus, disclosure, measurement, drag, or motion"
+        write: "Export X from the unit entry; do not invent XBase."
+    notes: |
+      The two CoursePlayground*Page …PageShell exports are residual naming for those units, not a
+      template for new pages.
+    verification:
+      automated: []
+      manual:
+        - Confirm split units use X / XBase and unsplit units do not add an empty forwarding twin.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-2
+    title: Contracts and their parts
+    kind: mandatory
+    requirement: |
+      Public contract names follow their owning feature, module or visual unit. Props, Data, Labels,
+      Actions and State suffixes are available when those parts are real. One public entry does not export
+      two different shapes under the same XProps name; local implementation input stays local.
+    rationale: |
+      Stable semantic names make contracts searchable without imposing a three-part envelope or an
+      ambiguous duplicate props type.
+    cases:
+      - id: case-1
+        when: "The props type"
+        write: "export type StarCiAiChatProps = { … } (403 export type …Props against 6 export interface …Props)"
+      - id: case-2
+        when: "Resolved facts"
+        write: "export type StarCiAiChatData = { … }, export type ButtonStateSampleData = { … }"
+      - id: case-3
+        when: "Resolved copy"
+        write: "export type StarCiAiChatLabels = { … }, CourseAdvisorRecommendationCardLabels"
+      - id: case-4
+        when: "Handlers"
+        write: "export type StarCiAiChatActions = { … }, AuthenticationPageActions"
+      - id: case-5
+        when: "State inventory"
+        write: >
+          export type StarCiAiChatState = "sessionsPending" | …; export type StarCiAiMode = "general" |
+          "history"
+      - id: case-6
+        kind: residual
+        when: "Legacy connected and render files both declare AuthenticationPageProps"
+        write: >
+          Treat the duplicate as Academy source history, not a pattern. A changed unit names the
+          route/connected input separately or keeps it unexported.
+    verification:
+      automated:
+        - FE_CONTRACT_NAME_SHAPE
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-3
+    title: Class-name exports
+    kind: mandatory
+    requirement: |
+      One role uses …ClassName; a map of roles uses …ClassNames; call-time variants use get…ClassName.
+    rationale: |
+      Naming encodes whether a string is fixed, mapped or derived.
+    cases:
+      - id: case-1
+        when: "One string for one role"
+        write: "export const authenticationPageClassName = cn(formPageClassName) (931 …ClassName exports)"
+      - id: case-2
+        when: "A map of roles for one unit"
+        write: >
+          export const aiChatClassNames = { root: cn(…), intro: cn(…), … } as const (9 …ClassNames
+          exports; 7 of 151 classNames.ts files use the object form)
+      - id: case-3
+        when: "A variant resolved at call time"
+        write: >
+          export const getAiChatBubbleClassName = (role: "user" | "assistant") => …; export const
+          getButtonStateSampleClassName = (variant: …) => buttonVariants({ variant, size: "sm" })
+      - id: case-4
+        when: "Grammar package"
+        write: >
+          export const railClassName, railFrameClassName, railBodyClassName, railFooterClassName
+          (core/branch/Rail/classNames.ts)
+    verification:
+      automated: []
+      manual:
+        - Verify Grammar helper names against installed @starci/grammar/common exports before copying.
+    relatedExamples: []
+
+  - id: FE-NAMING-4
+    title: Feature data hooks and cache keys
+    kind: mandatory
+    requirement: |
+      Every authored custom hook lives below hooks/<domain>, starts with use, and names the lifecycle it
+      owns. When SWR is selected, read/write hooks and keys follow the repository's Query/Mutate convention.
+      GraphQL documents and wire adapters live below modules/api and use the owning adapter's basename
+      convention. Generated document names remain generator-owned.
+    rationale: |
+      Parallel suffixes make cache keys and hook roles obvious at the call site.
+    cases:
+      - id: case-1
+        when: "Read hook"
+        write: "hooks/course/useQueryCourseSwr.ts, hooks/cart/useQueryMyCartSwr.ts (80 files useQuery…Swr.ts)"
+      - id: case-2
+        when: "Write hook"
+        write: "hooks/cart/useMutateAddToCartSwr.ts, hooks/cart/useMutateClearCartSwr.ts (32 files useMutate…Swr.ts)"
+      - id: case-3
+        when: "Key constant"
+        write: >
+          export const QUERY_COURSE_SWR_KEY = "QUERY_COURSE_SWR", export const
+          MUTATE_ADD_TO_CART_SWR_KEY = "MUTATE_ADD_TO_CART_SWR"
+      - id: case-4
+        when: "Hook params type"
+        write: >
+          export interface UseQueryCourseSwrParams { displayId?: string }; trigger arg export type
+          AddToCartArg, export type AddToCartTrigger
+      - id: case-5
+        when: "Non-data hooks"
+        write: "useAuthentication under hooks/authentication; useSessionToken under hooks/session"
+      - id: case-6
+        when: "GraphQL document module"
+        write: >
+          A legacy handwritten adapter may use modules/api/graphql/query-course.ts/queryCourse. A generated
+          operation keeps its generated name and is mapped behind the owning hooks/<domain> entry before
+          presentation.
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-5
+    title: Constants and module-level values
+    kind: mandatory
+    requirement: |
+      Frozen module values use UPPER_SNAKE. Exported state inventories use UNIT_STATES arrays.
+      Component vocabulary is not an enum; GraphQL/provider enums stay inside the transport adapter
+      and are mapped before presentation.
+    rationale: |
+      Distinguishing frozen inventories from open props keeps state unions closed and searchable.
+    cases:
+      - id: case-1
+        when: "Frozen module value"
+        write: >
+          const HISTORY_STATES = new Set<StarCiAiChatState>([…]), const PENDING_TURN_IDS =
+          ["pending-1", "pending-2"] as const, const DEFAULT_MESSAGES: ToastMessages = { … }
+          (120 exported + 163 local UPPER_SNAKE consts)
+      - id: case-2
+        when: "Exported inventory"
+        write: "export const STARCI_AI_CHAT_STATES: ReadonlyArray<StarCiAiChatState> = […]"
+      - id: case-3
+        when: "Grammar lookup tables"
+        write: >
+          const VARIANTS = { primary: "primary", … } as const, const SIZES = { sm: "sm", md: "md",
+          lg: "lg" } as const, const SKELETON_CLASS_NAME = … (core/primitive/Button/index.tsx)
+      - id: case-4
+        when: "Legacy operation-name enum"
+        write: >
+          export enum MutationCvBlocks { Create = "create", … } remains inside modules/api/graphql;
+          feature/view code consumes a mapped literal contract.
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-NAMING-6
+    title: Handlers, booleans, helpers
+    kind: mandatory
+    requirement: |
+      Pure-half action handlers are bare verbs inside on. Boolean props use is/has prefixes. Local
+      helpers are camelCase; local sub-renders are PascalCase with their own props type.
+    rationale: |
+      handler-on-prefix and boolean prefixes keep the actions object distinct from DOM onX props.
+    cases:
+      - id: case-1
+        when: "Action handler"
+        write: >
+          bare verb inside the on object: on?: { signedIn?: () => void }, on?.send,
+          on?.selectMode?.("general") — never onX on the pure half (lint handler-on-prefix)
+      - id: case-2
+        when: "Boolean prop"
+        write: "is/has prefix — isLoading, isEnrolled, isPartial, isArchived, isOnline (286 of 366 boolean props)"
+      - id: case-3
+        when: "Local pure helper"
+        write: "verb or noun phrase in camelCase — stateNeedsRetry, turnMarkdown, routeState"
+      - id: case-4
+        when: "Local sub-render"
+        write: "PascalCase with its own props type — const Turn = (props: TurnProps) => …"
+    verification:
+      automated:
+        - handler-on-prefix
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-7
+    title: File names outside component folders
+    kind: mandatory
+    requirement: |
+      Hook files live below hooks/<domain> and are camelCase equal to the export. Module files are
+      kebab-case. Spec files add .spec to the basename. describe uses the export under test.
+    rationale: |
+      Parallel basenames keep specs and modules locatable beside their subjects.
+    cases:
+      - id: case-1
+        when: "Hook file"
+        write: "camelCase equal to the export — useQueryCourseSwr.ts, useSessionToken.ts"
+      - id: case-2
+        when: "Module file"
+        write: >
+          kebab-case — query-course.ts, course-advisor-response.ts, content-ai-selection-context.ts,
+          create-apollo-client.ts
+      - id: case-3
+        when: "Spec file"
+        write: "same basename plus .spec — useQueryCourseSwr.spec.ts, component.spec.tsx, index.spec.tsx"
+      - id: case-4
+        when: "Spec describe"
+        write: >
+          the export name — describe("StarCiAiChatBase" in component.spec.tsx (85/97),
+          describe("CartBlock" in index.spec.tsx (0 …Base there)
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []

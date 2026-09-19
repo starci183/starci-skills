@@ -1,0 +1,37 @@
+schema: work/functional-requirement
+id: fr.share.list
+title: List a task's collaborators
+state: done
+actors: [owner, collaborator]
+trigger: The owner or a collaborator reads a task's collaborator list.
+mainFlow:
+  - The reader is the owner or a collaborator whose invitation exists on the task.
+  - Every collaborator's email, role and live status - pending, accepted, expired or revoked - is returned.
+exceptionFlows:
+  - A reader with no relationship to the task sees nothing; the list is not exposed to a stranger.
+postconditions:
+  - The returned status for each row is computed at read time, never cached from an earlier read.
+composes:
+  - {rule: br.share.revoke.on-read, module: src/modules/bussiness/share}
+  - {rule: br.share.invite.expiry, module: src/modules/bussiness/share}
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: br.share.revoke.on-read and br.share.invite.expiry are both done; ListCollaboratorsHandler
+    dispatches to InvitationService.listFor, proven by list-collaborators.handler.spec.ts,
+    invitation.service.spec.ts (the stranger exceptionFlow and the read-time status recompute) and
+    scripts/live-proof-share.sh's collaborators-query steps against the real GraphQL endpoint. A reader
+    is recognised as "a collaborator" only once their invitation is bound to their personId (i.e.
+    accepted at least once) - a still-pending invitee has no session-derived identity on the row yet to
+    match against, so they are not distinguishable from a stranger for this query until they accept;
+    see the final report for this narrowing. requiresProof.uat.required is not yet satisfied by a
+    recorded uat.verify walk - see the same gap.share.live-proof note on fr.share.invite's own change
+    entry.

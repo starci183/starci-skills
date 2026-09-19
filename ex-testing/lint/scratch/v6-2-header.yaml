@@ -1,0 +1,190 @@
+schema: starci/knowledge-source@1
+id: grammar.common.dna
+title: Common Grammar — DNA
+purpose: |
+  Package snapshot of the `@starci/grammar/common` public entry: the custom-property names its own
+  stylesheet writes or reads, the 42 renderers it publishes with the class names and rule ids those
+  sources stamp, and the absences observed while reading them. Historical observation only — not a
+  claim that the currently installed package has these names, classes or gaps. Static source
+  inspection does not prove runtime behavior; nothing here was rendered in a browser.
+  Common is the semantic/props entry, not a visual family: it supplies renderer anatomy and the
+  universal `--grammar-*` rhythm, and it supplies no colour of its own.
+appliesTo:
+  - grammar
+family: common
+provenance:
+  package: "@starci/grammar"
+  version: "0.4.13"
+  publicEntry: "@starci/grammar/common"
+  styleEntrypoint: "@starci/grammar/common/styles.css"
+  exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
+  observedSource: "packages/grammar/src/common (host source tree of @starci/grammar@0.4.13)"
+  checkout: "5c10a6734181a69f8482d8786a7d9e161c249c93"
+  captured: "2026-09-19"
+  installedCopyAgrees: |
+    The source census agrees byte-for-byte with an installed consumer copy: the sha256 of
+    packages/grammar/src/common/styles.css equals the sha256 of
+    examples/todo-app-frontend/node_modules/@starci/grammar/dist/common/styles.css and of the value the
+    todo-app brand record (rev 3) already cites for that installed file. The snapshot therefore
+    describes what a consumer of 0.4.13 actually receives, not a fork of it.
+  method: |
+    Every table below is a measurement of the Common entry's own source, taken by
+    ex-testing/lint/scratch/v6-2-dna.mjs (read-only; re-runnable). `digests` is the sha256 of each file
+    that measurement read, so a reader can tell whether these tables still describe the tree in front of
+    them; a digest that moved means re-capture, not reinterpretation.
+      * tokens[] — every custom property named in `src/common/styles.css` outside a comment, keyed by
+        whether that file assigns it (`assignedBy: common`, with the value and the count of rules that
+        assign different values) or only reads it inside a `var()` (`assignedBy: family` for the
+        `--starci-core-*` namespace a visual sheet supplies, `host` for the generic/system names the
+        same fallback chain reaches). `uses` and `source` are positions in that file, so any row can be
+        re-read at its line.
+      * renderers[] — the components `src/common/renderers.ts` re-exports, cross-checked against the
+        frozen `COMMON_GRAMMAR_COMPONENTS` registry in `src/common/registry.tsx` (the two lists are
+        equal: 42 names). `kind` is the physical storage path under `src/core` (primitive/composition/
+        branch/composite, or `core` for a file that sits directly in it), which `renderers.ts` documents
+        as internal compatibility storage, not a public tier. `classes` are the `starci-core-*` and
+        `grammar-*` literals in the component's own module directory plus the class constants it
+        imports by name from a shared module — so a class listed here can be one a nested Grammar
+        component puts on its own element. `claims` are the rule ids written in a literal
+        `data-contract="…"`; `computedClaims` are the ids that appear only inside an expression the
+        component assembles. Only the union of the two is stable; the split is this census's rule, and
+        it differs from the StarCi Core snapshot's split for a few components while agreeing on the
+        union for all 42.
+  limitations: |
+    Snapshot generated 2026-09-19 from @starci/grammar@0.4.13 source at the recorded host commit, read
+    statically. Before use, inspect the selected repository's manifest/lockfile, exported types,
+    renderers and CSS, and record actual source/version in the .starciwork node; if source is
+    unavailable, report unverified. Do not infer current APIs or defects from these tables, and do not
+    invent an API that is absent from them. Specifically what this census does NOT measure:
+      * No props tables. `propsType` names the exported props type only; the closed value sets
+        (`variant`, `tone`, `measure`, …) are not enumerated here — the StarCi Core snapshot's
+        `closedValues` is a different census and was not re-derived.
+      * No rendered DOM. Vendor classes ride along on real markup (`button`, `button--md`, `textfield`,
+        `input`, `label`, `typography typography--h1`, and the consumer's own Tailwind utilities);
+        `classes[]` names only grammar-owned classes, so it is not a complete class list for any element.
+      * No runtime behaviour: state, focus, motion, contrast and dark mode were not executed or measured.
+      * Values are quoted from the Common layer alone. Where Common only reads a name, this snapshot
+        deliberately carries no value for it: the colour values live in a family sheet
+        (`src/core/styles.css`), which belongs to the StarCi Core snapshot, not here.
+      * A brand record may declare token names this snapshot does not carry — the Tailwind primitives
+        `--color-white` and `--color-black` appear in no grammar source file at this version, so they
+        are absent from `tokens[]` by design, not by omission. `checks/brand.mjs` `tokens-in-grammar`
+        will report such a name as missing; that is the brand importing outside the grammar, not a
+        grammar gap.
+identity:
+  package: "@starci/grammar"
+  version: "0.4.13"
+  checkout: "5c10a6734181a69f8482d8786a7d9e161c249c93"
+  familyId: "common"
+  rootComponent: "GrammarRoot"
+  rootClass: "grammar-common-root"
+  rootAttributes: "data-grammar=\"common\" data-grammar-theme=\"<system|light|dark>\""
+  familyScope: |
+    None. Common is the neutral boundary: it writes no `data-grammar-family` value, and every rule in
+    its own sheet is scoped on `.grammar-common-root` alone. A visual family installs its material DNA
+    by adding `[data-grammar-family="<id>"]` to that root (`defineGrammarFamily` returns `scopeProps`
+    and rejects a style scope that does not equal its own id); `GrammarRootProps` types the attribute as
+    an open string, so the root itself validates nothing.
+  styleEntrypoint: "@starci/grammar/common/styles.css"
+  publicEntry: "@starci/grammar/common"
+  cssLayers: "declares starci-grammar-common, starci-grammar-core, starci-grammar-heritage, starci-grammar-offset-pop; writes into starci-grammar-common only"
+  dependencyDirection: "src/core/styles.css imports ../common/styles.css; the Common sheet imports nothing"
+  peerDependencies:
+    react: ">=18"
+    "@heroui/react": ">=3.2.0"
+  presentationStates:
+    - neutral
+    - informative
+    - affirmative
+    - cautionary
+    - negative
+    - pending
+    - unavailable
+  publishedSpacingTokens:
+    inline: "--grammar-inline-gap"
+    row: "--grammar-row-gap"
+    section: "--grammar-section-gap"
+    region: "--grammar-region-gap"
+    pageInset: "--grammar-page-inset"
+  publishedSpacingScale: "0=0, 1=0.25rem, 2=0.5rem, 3=0.75rem, 4=1rem, 6=1.5rem, 8=2rem"
+  ruleCatalog: "COMMON_UI_RULE_IDS is generated from the knowledge tree by scripts/generate-rule-catalog.mjs (139 ids at capture)"
+  counts:
+    renderers: 42
+    tokens: 108
+    tokensAssignedByCommon: 12
+    tokensAssignedAndAlsoReadByCommon: 7
+    tokensReadOnlyByCommon: 96
+    tokensReadByCommon: 103
+    claimEntries: 174
+    distinctClaimIds: 47
+    emittedClasses: 135
+    classesWithARuleInAShippedSheet: 133
+    gaps: 10
+observations:
+  - id: common-supplies-no-colour
+    observation: |
+      The Common layer assigns 12 custom properties: the five `--grammar-*` rhythm values on
+      `.grammar-common-root` and seven derived structural properties (band geometry, the workspace
+      tracks, the highlight angle, the verdict edge). It assigns no colour. `src/common/styles.spec.ts`
+      enforces that by asserting the sheet does not contain `--starci-core-accent: #7547ff`, so this is
+      owned direction, not an oversight of this version.
+  - id: the-rhythm-does-not-meet-the-anatomy
+    observation: |
+      `src/common/styles.css` reads no `--grammar-*` name anywhere. Its rules read the
+      `--starci-core-*` namespace with literal fallbacks (`var(--starci-core-region-gap, 1.5rem)`), and
+      the aliasing that lets the published scale reach anatomy is done by a family sheet
+      (`src/core/styles.css:34` assigns `--starci-core-inline-gap: var(--grammar-inline-gap)`). A page
+      that imports `@starci/grammar/common/styles.css` alone therefore sets `--grammar-region-gap` on
+      its root and changes no rendered gap.
+  - id: card-surface-canon
+    observation: |
+      Of the three `*Card` renderers, the classes that name a card surface itself — this is what
+      `checks/render.mjs` `cardClassesOf` keeps (a `starci-core-*` name ending in `-surface` or
+      `-surface-card` after the `--modifier` is stripped) — are `starci-core-surface`,
+      `starci-core-surface-card`, `starci-core-frameless-surface` and `starci-core-form-surface`. The
+      last is applied beside `starci-core-surface-card` on the same element (`measure: form`), so it
+      marks a card, never a region inside one. `SurfaceListCard` contributes only
+      `starci-core-surface`; `starci-core-surface-content`, `-label`, `-fact` and `-footer` are regions
+      inside a card and are listed beside their component without being card hooks.
+  - id: family-selection-is-a-string
+    observation: |
+      `COMMON_GRAMMAR_COMPONENTS` is a frozen map of the same 42 components the barrel exports, and
+      `defineGrammarFamily` merges a family's `replacements` and `extensions` over it — rejecting an
+      extension that collides with a Common name and a replacement for an unknown name. What it cannot
+      reject is a root that carries no family attribute at all, which is the shape a consumer page is in
+      when it imports Common's sheet and stops there.
+  - id: vendor-anatomy-underneath
+    observation: |
+      Each renderer builds on a HeroUI part (`Card.Header`, `Drawer.Trigger`, `Accordion.Heading`,
+      `Typography` for Heading) and the vendor's own class names appear on the same elements as the
+      grammar's. Where a grammar rule must win over the vendor's `components` layer, the Common sheet
+      re-states the box in its own `@layer` with `!important` rather than relying on a consumer's
+      Tailwind scan — the debt `src/shipped-geometry.spec.ts` and `src/common/styles.spec.ts` refuse.
+  - id: two-class-hooks-carry-no-rule
+    observation: |
+      133 of the 135 grammar classes the renderers emit have at least one selector in a shipped sheet.
+      The two that do not are `starci-core-rank-artwork`, which no sheet mentions, and
+      `starci-core-surface-card--fill`, whose fill form is drawn instead by
+      `.starci-core-surface-card[data-grammar-surface-height="fill"]` — the component writes both the
+      class and that attribute, so only one of the two is a paint hook.
+guidance:
+  - id: common-is-not-a-family
+    requirement: |
+      Do not read this snapshot as a visual family's palette. A brand bound to `identity.family: common`
+      is bound to the semantic entry; the colour it must supply comes from the family sheet it installs
+      on the Common root, or from the host's own tokens.
+    rationale: |
+      Common's own sheet assigns no colour, so a colour claim checked only against this table would pass
+      while the page stayed unpainted.
+  - id: read-the-line
+    requirement: |
+      Treat `source`/`uses`/`value` as pointers to re-open, not as a substitute for opening. A row whose
+      line no longer carries that name is evidence the snapshot is stale, not evidence about the package.
+    rationale: |
+      Every row was measured at one commit; the package moves faster than the canon.
+  - id: gaps-are-findings
+    requirement: |
+      A recorded gap is a finding at the captured commit, not a live inventory and not authority to edit
+      the library. Extending the package needs separately authorized scope and operation.
+    rationale: |
+      Knowledge snapshots describe; they do not license a change to the thing they describe.

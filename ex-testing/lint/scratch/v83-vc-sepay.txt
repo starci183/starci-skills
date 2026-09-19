@@ -1,0 +1,9 @@
+revisions: 2
+
+WITHDRAWN CLAUSE: "no module exists yet at src/plan/payments (gap.plan.unbuilt-module)"
+  exact verbatim elsewhere: (none)
+  whitespace-folded/contained: ebcdbe2c A statement (containment) "integration.plan.sepay names the sandbox endpoints and requires a live proof, but no module exists yet at src/plan/payments (gap.plan.unbuilt-module) and no req"
+
+WITHDRAWN CLAUSE: "no request has ever reached SePay's sandbox merchant account for real"
+  exact verbatim elsewhere: (none)
+  whitespace-folded/contained: ebcdbe2c A statement (containment) "integration.plan.sepay names the sandbox endpoints and requires a live proof, but no module exists yet at src/plan/payments (gap.plan.unbuilt-module) and no req"

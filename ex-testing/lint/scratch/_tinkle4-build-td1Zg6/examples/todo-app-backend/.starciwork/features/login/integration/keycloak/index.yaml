@@ -1,0 +1,22 @@
+schema: work/integration
+id: integration.login.keycloak
+title: Keycloak issues and validates the person's identity
+state: done
+provider: keycloak
+boundary: The product never stores a password. Keycloak owns the credential; this product owns the session
+  row that follows a successful token exchange.
+endpoints:
+  - {name: token, method: POST, path: /realms/todo/protocol/openid-connect/token}
+  - {name: userinfo, method: GET, path: /realms/todo/protocol/openid-connect/userinfo}
+credential:
+  name: KEYCLOAK_ADMIN_PASSWORD_FILE
+  providedBy: owner
+  where: .starcistacks/dev/runtime/files/keycloak-admin-password.key.enc
+sandbox: The dev environment runs its own Keycloak on 8089 with an imported realm; it is a real Keycloak,
+  not a stub, which is why a run against it counts.
+refs: [br.login.password.sign-in]
+
+requiresProof:
+  live:
+    required: true
+    note: A run against the real provider. Evidence must carry proof.boundary live and an empty fakes list.

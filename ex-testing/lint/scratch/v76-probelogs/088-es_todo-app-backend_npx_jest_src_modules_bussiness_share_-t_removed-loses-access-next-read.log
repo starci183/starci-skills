@@ -1,0 +1,14 @@
+$ npx jest src/modules/bussiness/share -t removed-loses-access-next-read
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/share/invitation.service.spec.ts
+PASS src/modules/bussiness/share/completion-authority.spec.ts
+
+Test Suites: 6 skipped, 2 passed, 2 of 8 total
+Tests:       35 skipped, 2 passed, 37 total
+Snapshots:   0 total
+Time:        5.299 s
+Ran all test suites matching /src\\modules\\bussiness\\share/i with tests matching "removed-loses-access-next-read".
+

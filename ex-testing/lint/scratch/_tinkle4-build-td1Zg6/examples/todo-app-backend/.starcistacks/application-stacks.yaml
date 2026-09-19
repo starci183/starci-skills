@@ -1,0 +1,115 @@
+schema: starci/application-stacks
+sources:
+  - repository: todo-app
+components:
+  postgres:
+    image: postgres:16
+    role: stateful
+    compose: infra/compose/postgres.yaml
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    role: stateful
+    compose: infra/compose/keycloak.yaml
+  redis:
+    image: redis:7
+    role: stateful
+    compose: infra/compose/redis.yaml
+  minio:
+    image: minio/minio:latest
+    role: stateful
+    compose: infra/compose/minio.yaml
+  prometheus:
+    image: prom/prometheus:latest
+    role: observability
+    compose: infra/compose/prometheus.yaml
+  api:
+    image: todo-app/api
+    role: service
+    compose: infra/compose/api.yaml
+  web:
+    image: todo-app/web
+    role: service
+    compose: infra/compose/web.yaml
+environments:
+  dev:
+    status: supported
+    runtime: docker-compose
+    composeFiles:
+      - infra/compose/compose.yaml
+    components:
+      postgres:
+        port: 5432
+      keycloak:
+        port: 8089
+      redis:
+        port: 6379
+      minio:
+        port: 9000
+      prometheus:
+        port: 9090
+      api:
+        port: 3001
+      web:
+        port: 3000
+    runbook: README.md
+    secrets:
+      - name: app.env
+        where: runtime/env/app.env
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: seed.yaml
+        where: runtime/config/seed.yaml
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: keycloak-admin-password.key
+        where: runtime/files/keycloak-admin-password.key
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: postgres-password.key
+        where: runtime/files/postgres-password.key
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: minio-root-password.key
+        where: runtime/files/minio-root-password.key
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: sepay-api-key.key
+        where: runtime/files/sepay-api-key.key
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: sepay-webhook-secret.key
+        where: runtime/files/sepay-webhook-secret.key
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: uat
+        where: secrets/uat
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+  vps:
+    status: supported
+    runtime: docker-swarm
+    composeFiles:
+      - infra/stack.yaml
+    components:
+      postgres: {}
+      keycloak: {}
+      redis: {}
+      minio: {}
+      api:
+        replicas: 2
+      web:
+        replicas: 2
+    runbook: README.md
+    secrets:
+      - name: app.env
+        where: runtime/env/app.env
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity shared from dev/runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: uat
+        where: secrets/uat
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity shared from dev/runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+k8s:
+  status: deferred
+  reason: One host serves the current load; a cluster would add a control plane nobody operates yet.
+

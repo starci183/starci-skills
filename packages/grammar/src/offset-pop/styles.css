@@ -1,0 +1,292 @@
+@import "../common/styles.css";
+
+@layer starci-grammar-offset-pop {
+    .grammar-common-root[data-grammar-family="offset-pop"] {
+        color-scheme: light;
+
+        --offset-pop-canvas: #fff8ef;
+        --offset-pop-ink: #1c1524;
+        --offset-pop-muted: #716a76;
+        --offset-pop-surface: #fffdf9;
+        --offset-pop-surface-muted: #f8dbe8;
+        --offset-pop-pink: #ff3593;
+        --offset-pop-yellow: #ffd447;
+        --offset-pop-mint: #91e4ca;
+        --offset-pop-blush: #f8d8e6;
+        --offset-pop-critical: #e84a5f;
+        --offset-pop-outline-width: 2px;
+        --offset-pop-shadow-x: 0.25rem;
+        --offset-pop-shadow-y: 0.5rem;
+        --offset-pop-shadow-ink: var(--offset-pop-ink);
+        --offset-pop-surface-radius: 1.5rem;
+        --offset-pop-control-radius: 1rem;
+        --offset-pop-transition: 140ms cubic-bezier(.2, .8, .2, 1);
+
+        --accent: var(--offset-pop-pink);
+        --accent-foreground: white;
+        --focus: var(--offset-pop-pink);
+        --background: var(--offset-pop-canvas);
+        --foreground: var(--offset-pop-ink);
+        --surface: var(--offset-pop-surface);
+        --surface-foreground: var(--offset-pop-ink);
+        --surface-secondary: var(--offset-pop-surface-muted);
+        --surface-secondary-foreground: var(--offset-pop-ink);
+        --muted: var(--offset-pop-muted);
+        --border: var(--offset-pop-ink);
+        --separator: var(--offset-pop-ink);
+        --success: var(--offset-pop-mint);
+        --success-foreground: var(--offset-pop-ink);
+        --warning: var(--offset-pop-yellow);
+        --warning-foreground: var(--offset-pop-ink);
+        --danger: var(--offset-pop-critical);
+        --danger-foreground: white;
+        --info: var(--offset-pop-blush);
+        --info-foreground: var(--offset-pop-ink);
+        --field-background: var(--offset-pop-surface);
+        --field-border: var(--offset-pop-ink);
+        --field-foreground: var(--offset-pop-ink);
+        --field-placeholder: var(--offset-pop-muted);
+        --radius: var(--offset-pop-control-radius);
+        --field-radius: var(--offset-pop-control-radius);
+        --shadow-surface:
+            var(--offset-pop-shadow-x)
+            var(--offset-pop-shadow-y)
+            0
+            var(--offset-pop-shadow-ink);
+
+        color: var(--foreground);
+        background: var(--background);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"][data-grammar-theme="dark"] {
+        color-scheme: dark;
+
+        --offset-pop-canvas: #17121d;
+        --offset-pop-ink: #fff8ef;
+        --offset-pop-muted: #c8bdca;
+        --offset-pop-surface: #251d2c;
+        --offset-pop-surface-muted: #3b2936;
+        --offset-pop-shadow-ink: #050306;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Heading"][data-scale="display"] {
+        color: var(--foreground);
+        font-weight: 900;
+        letter-spacing: -.045em;
+        line-height: .96;
+        text-wrap: balance;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Text"][data-tone="muted"] {
+        color: var(--muted);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Text"][data-tone="accent"] {
+        color: var(--accent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Button"] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0.25rem 0.25rem 0 var(--offset-pop-shadow-ink);
+        font-weight: 800;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Badge"] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        border-radius: 999px;
+        color: var(--foreground);
+        font-weight: 800;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] {
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        border-radius: var(--offset-pop-surface-radius);
+        color: var(--surface-foreground);
+        background: var(--surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-depth="top"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface][data-grammar-surface-depth="top"] {
+        box-shadow: var(--shadow-surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-depth="nested"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface][data-grammar-surface-depth="nested"] {
+        box-shadow: none;
+        background: var(--surface-secondary);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-label] {
+        color: var(--foreground);
+        font-weight: 800;
+        letter-spacing: -.015em;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-list] {
+        overflow: clip;
+        border-radius: calc(var(--offset-pop-surface-radius) - var(--offset-pop-outline-width));
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row] {
+        border-block-end: var(--offset-pop-outline-width) solid var(--separator);
+        background: transparent;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row]:last-child {
+        border-block-end: 0;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state-mark] {
+        color: var(--success-foreground);
+        background: var(--success);
+        border: var(--offset-pop-outline-width) solid var(--border);
+        border-radius: 999px;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-rail] {
+        color: var(--foreground);
+        background: var(--background);
+        border-inline-end: var(--offset-pop-outline-width) solid var(--border);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-navigation-feature-nav] {
+        border-block-end-width: var(--offset-pop-outline-width);
+        border-block-end-color: var(--border);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Button"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row] {
+        transition:
+            transform var(--offset-pop-transition),
+            box-shadow var(--offset-pop-transition),
+            background-color var(--offset-pop-transition),
+            opacity var(--offset-pop-transition);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Button"]:active:not([disabled]) {
+        box-shadow: 0 0 0 var(--offset-pop-shadow-ink);
+        transform: translate(0.25rem, 0.25rem);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"]:has([data-grammar-whole-action]:focus-visible),
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row]:focus-within {
+        outline: 2px solid var(--focus);
+        outline-offset: 0.25rem;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-depth="top"]:has([data-grammar-whole-action]:active) {
+        box-shadow: 0.25rem 0.25rem 0 var(--offset-pop-shadow-ink);
+        transform: translate(0.25rem, 0.25rem);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-depth="nested"]:has([data-grammar-whole-action]:active) {
+        transform: translateY(0.25rem);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row]:has(:is(a, button):hover) {
+        background: color-mix(in srgb, var(--offset-pop-yellow) 32%, transparent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="affirmative"] {
+        --offset-pop-state-color: var(--success);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="informative"] {
+        --offset-pop-state-color: var(--info);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="cautionary"] {
+        --offset-pop-state-color: var(--warning);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="negative"] {
+        --offset-pop-state-color: var(--danger);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row][data-grammar-state]:not([data-grammar-state="neutral"]) {
+        box-shadow: inset 0.25rem 0 0 var(--offset-pop-state-color, transparent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="unavailable"] {
+        box-shadow: none;
+        opacity: .56;
+        transform: none;
+        cursor: not-allowed;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="pending"] {
+        pointer-events: none;
+    }
+
+    @media (max-width: 40rem) {
+        .grammar-common-root[data-grammar-family="offset-pop"] {
+            --offset-pop-shadow-y: 0.25rem;
+            --offset-pop-surface-radius: 1.25rem;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .grammar-common-root[data-grammar-family="offset-pop"] {
+            --offset-pop-transition: 0ms linear;
+        }
+
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Button"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row] {
+            transform: none;
+        }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .grammar-common-root[data-grammar-family="offset-pop"][data-grammar-theme="system"] {
+            color-scheme: dark;
+
+            --offset-pop-canvas: #17121d;
+            --offset-pop-ink: #fff8ef;
+            --offset-pop-muted: #c8bdca;
+            --offset-pop-surface: #251d2c;
+            --offset-pop-surface-muted: #3b2936;
+            --offset-pop-shadow-ink: #050306;
+        }
+    }
+
+    @media (forced-colors: active) {
+        .grammar-common-root[data-grammar-family="offset-pop"] {
+            --offset-pop-canvas: Canvas;
+            --offset-pop-ink: CanvasText;
+            --offset-pop-muted: GrayText;
+            --offset-pop-surface: Canvas;
+            --offset-pop-surface-muted: Canvas;
+            --offset-pop-pink: Highlight;
+            --offset-pop-yellow: Canvas;
+            --offset-pop-mint: Canvas;
+            --offset-pop-blush: Canvas;
+            --offset-pop-critical: CanvasText;
+            --offset-pop-shadow-ink: CanvasText;
+            --shadow-surface: none;
+        }
+
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Button"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Badge"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state-mark],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-rail] {
+            border-color: CanvasText;
+            color: CanvasText;
+            background: Canvas;
+            box-shadow: none;
+        }
+    }
+}

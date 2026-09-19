@@ -1,0 +1,4 @@
+schema: work/disposable-accounts
+disposable: true
+accounts:
+  - {role: owner, identity: identity.todo-app.demo}

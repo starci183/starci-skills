@@ -1,0 +1,66 @@
+
+### nfr/sign-in-timing/index.yaml  clause="sign-in-timing.mjs"
+    revisions=9  with the clause somewhere=9
+    WORKTREE: rev=2 kind=breaking withdraws=2 statements=0 dup=false clauseAt=change.withdraws[1]|change.reason
+    0 c5d09f03 M: rev=2 kind=breaking withdraws=2 statements=0 dup=true clauseAt=change.withdraws[1]|change.reason
+    1 d140aa88 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=measurement.how
+    2 c2a504d7 R: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=measurement.how
+    3 8982b8c8 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=true clauseAt=measurement.how
+    4 4b64eea7 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=measurement.how
+
+### contract/identity-for-task/index.yaml  clause="x-session-token"
+    revisions=8  with the clause somewhere=2
+    WORKTREE: rev=3 kind=breaking withdraws=1 statements=0 dup=false clauseAt=surface[0].transport|change.withdraws[0]|change.reason
+    1 accb7b04 M: rev=3 kind=breaking withdraws=1 statements=0 dup=false clauseAt=surface[0].transport|change.withdraws[0]|change.reason
+
+### gap/sepay-not-reachable/index.yaml  clause="sandbox merchant account"
+    revisions=3  with the clause somewhere=3
+    WORKTREE: rev=2 kind=clarifying withdraws=2 statements=0 dup=false clauseAt=change.withdraws[1]
+    0 a0d0060b M: rev=2 kind=clarifying withdraws=2 statements=0 dup=true clauseAt=change.withdraws[1]
+    1 ebcdbe2c A: rev=1 kind=initial withdraws=0 statements=0 dup=false clauseAt=statement
+
+### fr/upgrade/index.yaml  clause="upgrade action exists yet"
+    revisions=5  with the clause somewhere=3
+    WORKTREE: rev=3 kind=editorial withdraws=1 statements=0 dup=false clauseAt=change.withdraws[0]
+    0 4173abba M: rev=3 kind=editorial withdraws=1 statements=0 dup=true clauseAt=change.withdraws[0]
+    1 d75c2d95 M: rev=2 kind=editorial withdraws=0 statements=0 dup=false clauseAt=blockedBy[0].because
+
+### sds/session-store/index.yaml  clause="observable: http"
+    revisions=12  with the clause somewhere=8
+    WORKTREE: rev=2 kind=clarifying withdraws=2 statements=0 dup=false clauseAt=sequence.steps[0].message|sequence.steps[1].message|sequence.steps[2].message|sequence.steps[4
+    0 67b940b9 M: rev=2 kind=clarifying withdraws=2 statements=0 dup=false clauseAt=sequence.steps[0].message|sequence.steps[1].message|sequence.steps[2].message|sequence.ste
+    1 10e3a072 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=sequence.steps[0].message|sequence.steps[1].message|sequence.steps[2].message|sequence.st
+    2 83d920c2 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=sequence.steps[0].message|sequence.steps[1].message|sequence.steps[2].message|sequence.st
+    3 ded62a70 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=sequence.steps[0].message|sequence.steps[1].message|sequence.steps[2].message|sequence.st
+    4 c2a504d7 R: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=sequence.steps[0].message|sequence.steps[1].message|sequence.steps[2].message|sequence.st
+
+### data/person/index.yaml  clause="never read back out"
+    revisions=6  with the clause somewhere=6
+    WORKTREE: rev=2 kind=breaking withdraws=1 statements=0 dup=false clauseAt=change.withdraws[0]
+    0 c5d09f03 M: rev=2 kind=breaking withdraws=1 statements=0 dup=true clauseAt=change.withdraws[0]
+    1 d140aa88 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=invariants[1]
+    2 c2a504d7 R: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=invariants[1]
+    3 e2048b55 M: rev=(none) kind=(none) withdraws=0 statements=0 dup=true clauseAt=invariants[1]
+    4 acd7e45e A: rev=(none) kind=(none) withdraws=0 statements=0 dup=false clauseAt=invariants[1]
+
+### fr/downgrade/index.yaml  clause="downgrade action exists yet"
+    revisions=5  with the clause somewhere=3
+    WORKTREE: rev=3 kind=editorial withdraws=1 statements=0 dup=false clauseAt=change.withdraws[0]
+    0 4173abba M: rev=3 kind=editorial withdraws=1 statements=0 dup=true clauseAt=change.withdraws[0]
+    1 d75c2d95 M: rev=2 kind=editorial withdraws=0 statements=0 dup=false clauseAt=blockedBy[0].because
+
+### uat/upgrade-after-cap/index.yaml  clause="upgrade-button.tsx"
+    revisions=7  with the clause somewhere=4
+    WORKTREE: rev=3 kind=editorial withdraws=1 statements=0 dup=false clauseAt=change.withdraws[0]
+    0 4173abba M: rev=3 kind=editorial withdraws=1 statements=0 dup=true clauseAt=change.withdraws[0]
+    1 d75c2d95 M: rev=2 kind=editorial withdraws=0 statements=0 dup=false clauseAt=blockedBy[1].because
+    2 e3f81587 M: rev=1 kind=editorial withdraws=0 statements=0 dup=false clauseAt=blockedBy[1].because
+
+### br/single-owner/index.yaml  clause="collaborator"
+    revisions=14  with the clause somewhere=10
+    WORKTREE: rev=3 kind=editorial withdraws=0 statements=3 dup=false clauseAt=statements[2]|change.retains[2]|change.reason
+    0 755f68db M: rev=3 kind=editorial withdraws=0 statements=3 dup=true clauseAt=statements[2]|change.retains[2]|change.reason
+    1 2aba05ab M: rev=2 kind=breaking withdraws=1 statements=3 dup=false clauseAt=statements[2]|change.reason
+    2 10e3a072 M: rev=2 kind=breaking withdraws=1 statements=3 dup=false clauseAt=statements[2]|change.reason|blockedBy[1].record|blockedBy[1].because
+    3 ebcdbe2c M: rev=2 kind=breaking withdraws=1 statements=3 dup=false clauseAt=statements[2]|change.reason|blockedBy[0].record|blockedBy[0].because
+    4 756c95c8 M: rev=2 kind=breaking withdraws=1 statements=3 dup=false clauseAt=statements[2]|change.reason|blockedBy[1].record|blockedBy[1].because

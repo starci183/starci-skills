@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { checkNextErrors, NEXT_ERROR_RULES } from '../checks/code-patterns/next-errors.mjs';
+import { checkNextErrors, NEXT_ERROR_RULES } from '../scripts/checks/code-patterns/next-errors.mjs';
 
 const require = createRequire(import.meta.url);
 

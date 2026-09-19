@@ -1,0 +1,144 @@
+schema: starci/knowledge-source@1
+id: grammar.starci.playbook
+title: StarCi Core — playbook
+purpose: |
+  Which idioms a business shape asks for, and what a supplied reference is allowed to contribute to
+  that answer. The idioms themselves are in idioms.yaml; what the package publishes is in DNA.yaml.
+  A shape not listed here is not a house idiom. It may still be composed for the approved product
+  direction when existing Common semantics, family anatomy and product facts can express it; only
+  promotion into the family's reusable idiom set belongs to the family owner.
+appliesTo:
+  - grammar
+family: starci
+provenance:
+  publicEntry: "@starci/grammar/common"
+  limitations: |
+    Use this playbook only when this family is selected in the current .starciwork specification.
+    Examples below are historical references; verify actually installed exports (prefer
+    @starci/grammar/common as the current public entry where supported), renderers and CSS before
+    promising a capability. Reading steps below are reasoning within one op, not an auto-running op
+    chain. Do not invent Grammar component APIs absent from DNA/installed source.
+shapes:
+  - id: purchase-decision-page
+    title: Purchase decision page — one offer, one price, one commitment (subscriptions)
+    referenceMayContribute: |
+      Keep: the order of regions (what is read before the price), which single decision dominates, and
+      what folds away instead of competing with it. Never crosses over: page layout, brand, palette,
+      type scale, component anatomy, or any control the reference draws that this Grammar does not
+      publish.
+    idiomSequence:
+      - idiom: joined-bands-flush-card
+        role: Explanatory column in primary of PrimaryRailLayout
+      - idiom: neutral-summary-band
+        role: A neutral band opens the card with its summary for its intro line
+      - idiom: generated-art-band
+        role: Generated art is a band, not a card for the journey asset
+      - idiom: title-supporting-line
+        role: Title and one supporting line for each included outcome
+      - idiom: one-highlighted-card
+        role: One highlighted card on the decision itself
+      - idiom: bottom-action-band
+        role: The card's one action closes the bottom band for the purchase
+      - idiom: pending-same-tree
+        role: Pending is the same tree, resting across the offer read
+    notes: |
+      Secondary explanation folds away; whether it folds into a disclosure is a
+      DIRECTION_CHOICE_REQUIRED (seen once). Decision card sits in rail.
+
+  - id: learner-dashboard
+    title: Learner dashboard — many peer sections, one intended next step
+    referenceMayContribute: |
+      Keep: which sections exist and their reading order, and which single section is the reader's
+      next action. Never crosses over: grid geometry, card chrome, densities, or a section that would
+      need a renderer this family does not publish.
+    idiomSequence:
+      - idiom: joined-bands-flush-card
+        role: Per section
+      - idiom: neutral-summary-band
+        role: Where the section states a measure
+      - idiom: title-supporting-line
+        role: Inside every row
+      - idiom: bottom-action-band
+        role: Where a section leads somewhere
+      - idiom: pending-same-tree
+        role: For every read, with EmptyNotice for empty and failed
+      - idiom: one-highlighted-card
+        role: Across the page exactly once, on the resume or next-step section
+
+  - id: sign-in
+    title: Sign-in — one surface, several journeys, one submit per step
+    referenceMayContribute: |
+      Keep: the order of the ways in (shortcut before form, or the reverse), which journeys share one
+      surface, and where the way to the other journey sits. Never crosses over: provider branding,
+      illustration, field chrome, or a social-login row this product does not have a provider for.
+    idiomSequence:
+      - idiom: title-supporting-line
+        role: Surface header (Heading + muted subtitle)
+      - idiom: single-column-form-stack
+        role: Per step, one Button variant="primary" type="submit" each
+      - idiom: pending-same-tree
+        role: Through isPending and isDisabled rather than a replaced tree
+    notes: |
+      The way onward as TextAction, last. Whether the provider shortcut precedes the form is seen
+      once; carry the reference's order and say so.
+
+readingSteps:
+  - id: business-shape-first
+    order: 1
+    title: Business shape first
+    instruction: |
+      Name the shape and the one outcome the surface exists to produce. The shape selects the idiom
+      sequence; nothing else does.
+  - id: then-reference
+    order: 2
+    title: Then the reference, if the request supplied one
+    instruction: |
+      A reference contributes region order, which decision dominates, and what folds away. It never
+      contributes layout, brand, palette, or component anatomy — those are already owned, by this
+      family and by knowledge/ui. A reference that can only be honoured by breaking an idiom is
+      evidence about the reference, not about StarCi.
+  - id: then-idioms
+    order: 3
+    title: Then the idioms
+    instruction: |
+      Composed in the order the shape's row gives, each one taken whole: an idiom is a relationship,
+      and half of it is a different shape.
+  - id: compare-dna
+    order: 4
+    title: Compare DNA with actually installed source
+    instruction: |
+      Confirm named renderers/props against DNA.yaml and installed exports (public entry
+      @starci/grammar/common where supported), and read the gaps in family.yaml before promising a
+      capability. A composition that needs a recorded gap is not a direction yet.
+  - id: resolve-product-composition
+    order: 5
+    title: Then resolve the remaining product composition
+    instruction: |
+      Reuse an established idiom where it fits; otherwise compose existing Common semantics and family
+      anatomy, extend an existing owner when evidence shows its declared gap, and add a new owner only
+      for an evidenced gap. A shape absent from this table and a shape seen once are evidence limits
+      on house style, not reasons to stop creative work already inside the approved product scope.
+
+authoritySplit:
+  directionChoiceRequired: |
+    DIRECTION_CHOICE_REQUIRED is reserved for a material product choice whose acceptable options lead
+    to different outcomes and whose answer is absent from the request. A reference/idiom conflict is
+    resolved by the authority split: product facts and approved region order come from the request,
+    Common semantics come from knowledge/ui, and family anatomy and reusable style come from the
+    selected Grammar source. State assumptions for minor in-scope choices; when a material choice has
+    no answer, ask the user. Do not invent a fallback algorithm or run the next op.
+imageryClarification:
+  date: "2026-09-05"
+  guidance: |
+    Imagery can highlight the key idea, explain content, strengthen recognition or create a relevant,
+    evocative focal point. Deliberate visual emphasis is a concrete role; an image need not be a
+    functional diagram to earn its place. Name the subject, the idea or claim it highlights, and the
+    intended order of attention in the selected .starciwork design node. Judge its scale, contrast and
+    crop on the rendered surface: it should support that hierarchy without obscuring the content or
+    competing with the primary action. Blank space alone is never a reason to add an image; filling
+    space or balancing density without a content or emphasis role does not qualify. Record no image
+    when imagery would not improve the composition.
+  limitation: |
+    Extending or adding an owner is not authorized by this playbook; it needs an op with explicit
+    library-edit scope. Historical image notes are design references, not decisions for the current
+    product.

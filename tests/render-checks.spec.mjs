@@ -12,7 +12,7 @@ import {
   CHECK_IDS,MIN_BUCKET_SHARE,PALETTE_TOLERANCE,RENDER_CHECKS,
   cardClassesOf,checkEntityListInCard,checkMascotSlot,checkPalette,decodePng,dominantColours,
   formatRenderChecks,renderChecksFor,runRenderChecks,scanMarkup,uiDirOf
-} from '../checks/render.mjs';
+} from '../scripts/checks/render.mjs';
 
 const cli=fileURLToPath(new URL('../cli/main.mjs',import.meta.url));
 const grammarRoot=fileURLToPath(new URL('../knowledge/grammars',import.meta.url));

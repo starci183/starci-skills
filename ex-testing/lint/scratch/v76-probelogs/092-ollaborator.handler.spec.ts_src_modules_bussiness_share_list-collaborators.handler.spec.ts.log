@@ -1,0 +1,17 @@
+$ npx jest src/modules/bussiness/share/invitation.service.spec.ts src/modules/bussiness/share/invite.handler.spec.ts src/modules/bussiness/share/accept-invitation.handler.spec.ts src/modules/bussiness/share/revoke-collaborator.handler.spec.ts src/modules/bussiness/share/list-collaborators.handler.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/share/invite.handler.spec.ts (5.299 s)
+PASS src/modules/bussiness/share/list-collaborators.handler.spec.ts (5.414 s)
+PASS src/modules/bussiness/share/revoke-collaborator.handler.spec.ts (5.414 s)
+PASS src/modules/bussiness/share/invitation.service.spec.ts (5.417 s)
+PASS src/modules/bussiness/share/accept-invitation.handler.spec.ts (5.405 s)
+
+Test Suites: 5 passed, 5 total
+Tests:       23 passed, 23 total
+Snapshots:   0 total
+Time:        6.25 s
+Ran all test suites matching /src\\modules\\bussiness\\share\\invitation.service.spec.ts|src\\modules\\bussiness\\share\\invite.handler.spec.ts|src\\modules\\bussiness\\share\\accept-invitation.handler.spec.ts|src\\modules\\bussiness\\share\\revoke-collaborator.handler.spec.ts|src\\modules\\bussiness\\share\\list-collaborators.handler.spec.ts/i.
+

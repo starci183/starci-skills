@@ -1,0 +1,24 @@
+$ npx jest src/modules/bussiness/recur
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/recur/calendar.util.spec.ts
+PASS src/modules/bussiness/recur/zone.util.spec.ts
+PASS src/modules/bussiness/recur/occurrence.service.spec.ts (5.274 s)
+PASS src/modules/bussiness/recur/rule.service.spec.ts (5.28 s)
+PASS src/modules/bussiness/recur/edit-recurrence.handler.spec.ts (5.358 s)
+PASS src/modules/bussiness/recur/end-recurrence.handler.spec.ts (5.357 s)
+PASS src/modules/bussiness/recur/complete-occurrence.handler.spec.ts (5.395 s)
+PASS src/modules/bussiness/recur/skip-occurrence.handler.spec.ts (5.387 s)
+PASS src/modules/bussiness/recur/make-recurring.handler.spec.ts (5.398 s)
+PASS src/modules/bussiness/recur/generator.service.spec.ts (5.411 s)
+PASS src/modules/bussiness/recur/upcoming-occurrences.handler.spec.ts (5.42 s)
+PASS src/modules/bussiness/recur/scheduler.service.spec.ts (5.508 s)
+
+Test Suites: 12 passed, 12 total
+Tests:       50 passed, 50 total
+Snapshots:   0 total
+Time:        6.383 s, estimated 11 s
+Ran all test suites matching /src\\modules\\bussiness\\recur/i.
+

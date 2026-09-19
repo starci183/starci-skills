@@ -1,0 +1,169 @@
+@import "../common/styles.css";
+
+@layer starci-grammar-core {
+    /*
+     * StarCi visual DNA is opt-in through GrammarRoot. It supplies a complete,
+     * portable semantic theme while keeping product/UI laws out of CSS.
+     */
+    .grammar-common-root[data-grammar-family="core"] {
+        color-scheme: light;
+
+        --starci-core-accent: #7547ff;
+        --starci-core-accent-foreground: oklch(100% 0 0);
+        --starci-core-focus: #7248ff;
+        --starci-core-canvas: oklch(97.02% 0.0015 354.13);
+        --starci-core-surface: oklch(100% 0.0008 354.13);
+        --starci-core-surface-secondary: oklch(95.24% 0.0012 354.13);
+        --starci-core-foreground: oklch(21.03% 0.0015 354.13);
+        --starci-core-muted: oklch(55.17% 0.003 354.13);
+        --starci-core-border: oklch(90% 0.0015 354.13);
+        --starci-core-separator: oklch(92% 0.0015 354.13);
+        --starci-core-success: oklch(73.29% 0.1941 162.85);
+        --starci-core-success-foreground: oklch(21.03% 0.0059 162.85);
+        --starci-core-warning: oklch(78.19% 0.159 84.37);
+        --starci-core-warning-foreground: oklch(21.03% 0.0059 84.37);
+        --starci-core-danger: oklch(65.32% 0.2335 37.78);
+        --starci-core-danger-foreground: oklch(99.11% 0 0);
+        --starci-core-info: oklch(72% 0.17 250);
+        --starci-core-info-foreground: oklch(21.03% 0.0059 250);
+        --starci-core-page-measure: 80rem;
+        --starci-core-reading-measure: 72ch;
+        --starci-core-page-inset: var(--grammar-page-inset);
+        --starci-core-region-gap: var(--grammar-region-gap);
+        --starci-core-section-gap: var(--grammar-section-gap);
+        --starci-core-inline-gap: var(--grammar-inline-gap);
+        --starci-core-row-gap: var(--grammar-row-gap);
+        --starci-core-surface-radius: 1rem;
+        --starci-core-control-radius: 0.75rem;
+        --starci-core-pill-radius: 999px;
+        --starci-core-surface-shadow: 0 8px 28px oklch(21.03% 0.0059 354.13 / 0.07);
+        --starci-core-motion-duration: 180ms;
+        --starci-core-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+
+        /* HeroUI and existing Grammar anatomy resolve through the same DNA. */
+        --accent: var(--starci-core-accent);
+        --accent-foreground: var(--starci-core-accent-foreground);
+        --focus: var(--starci-core-focus);
+        --background: var(--starci-core-canvas);
+        --foreground: var(--starci-core-foreground);
+        --surface: var(--starci-core-surface);
+        --surface-foreground: var(--starci-core-foreground);
+        --surface-secondary: var(--starci-core-surface-secondary);
+        --surface-secondary-foreground: var(--starci-core-foreground);
+        --muted: var(--starci-core-muted);
+        --border: var(--starci-core-border);
+        --separator: var(--starci-core-separator);
+        --success: var(--starci-core-success);
+        --success-foreground: var(--starci-core-success-foreground);
+        --warning: var(--starci-core-warning);
+        --warning-foreground: var(--starci-core-warning-foreground);
+        --danger: var(--starci-core-danger);
+        --danger-foreground: var(--starci-core-danger-foreground);
+        --info: var(--starci-core-info);
+        --info-foreground: var(--starci-core-info-foreground);
+        --field-background: var(--starci-core-surface);
+        --field-border: transparent;
+        --field-foreground: var(--starci-core-foreground);
+        --field-placeholder: var(--starci-core-muted);
+        --radius: var(--starci-core-control-radius);
+        --field-radius: var(--starci-core-control-radius);
+        --shadow-surface: var(--starci-core-surface-shadow);
+
+        min-width: 0;
+        background: var(--starci-core-canvas);
+        color: var(--starci-core-foreground);
+        font-family: var(--starci-font-sans, ui-sans-serif, system-ui, sans-serif);
+    }
+
+    .grammar-common-root[data-grammar-family="core"][data-grammar-theme="dark"] {
+        color-scheme: dark;
+        --starci-core-canvas: oklch(12% 0.0015 354.13);
+        --starci-core-surface: oklch(21.03% 0.003 354.13);
+        --starci-core-surface-secondary: oklch(25.7% 0.0023 354.13);
+        --starci-core-foreground: oklch(99.11% 0.0015 354.13);
+        --starci-core-muted: oklch(70.5% 0.003 354.13);
+        --starci-core-border: oklch(28% 0.0015 354.13);
+        --starci-core-separator: oklch(25% 0.0015 354.13);
+        --starci-core-success: oklch(73.29% 0.1941 162.85);
+        --starci-core-success-foreground: oklch(21.03% 0.0059 162.85);
+        --starci-core-warning: oklch(82.03% 0.1392 88.38);
+        --starci-core-warning-foreground: oklch(21.03% 0.0059 88.38);
+        --starci-core-danger: oklch(59.4% 0.1973 36.67);
+        --starci-core-danger-foreground: oklch(99.11% 0 0);
+        --starci-core-info: oklch(72% 0.17 250);
+        --starci-core-info-foreground: oklch(21.03% 0.0059 250);
+    }
+
+    /* StarCi labelled surfaces paint one material box around label and content. */
+    .grammar-common-root[data-grammar-family="core"]
+        .starci-core-surface-card[data-grammar-surface-labelled="true"][data-grammar-frame="bounded"] {
+        overflow: hidden;
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        background: var(--starci-core-surface, var(--surface, Canvas));
+        box-shadow: var(--starci-core-surface-shadow, var(--shadow-surface, none));
+    }
+
+    .grammar-common-root[data-grammar-family="core"]
+        .starci-core-surface-card[data-grammar-surface-labelled="true"][data-grammar-frame="bounded"]
+        > [data-grammar-surface-label] {
+        padding: var(--starci-core-surface-inset, 1rem) var(--starci-core-surface-inset, 1rem) 0;
+    }
+
+    .grammar-common-root[data-grammar-family="core"]
+        .starci-core-surface-card[data-grammar-surface-labelled="true"][data-grammar-frame="bounded"]
+        > [data-grammar-frame="bounded"],
+    .grammar-common-root[data-grammar-family="core"]
+        .starci-core-surface-card[data-grammar-surface-labelled="true"][data-grammar-frame="bounded"]
+        > [data-grammar-highlight="true"]
+        > [data-grammar-frame="bounded"] {
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+@media (prefers-color-scheme: dark) {
+        .grammar-common-root[data-grammar-family="core"][data-grammar-theme="system"] {
+            color-scheme: dark;
+            --starci-core-canvas: oklch(12% 0.0015 354.13);
+            --starci-core-surface: oklch(21.03% 0.003 354.13);
+            --starci-core-surface-secondary: oklch(25.7% 0.0023 354.13);
+            --starci-core-foreground: oklch(99.11% 0.0015 354.13);
+            --starci-core-muted: oklch(70.5% 0.003 354.13);
+            --starci-core-border: oklch(28% 0.0015 354.13);
+            --starci-core-separator: oklch(25% 0.0015 354.13);
+            --starci-core-success: oklch(73.29% 0.1941 162.85);
+            --starci-core-success-foreground: oklch(21.03% 0.0059 162.85);
+            --starci-core-warning: oklch(82.03% 0.1392 88.38);
+            --starci-core-warning-foreground: oklch(21.03% 0.0059 88.38);
+            --starci-core-danger: oklch(59.4% 0.1973 36.67);
+            --starci-core-danger-foreground: oklch(99.11% 0 0);
+            --starci-core-info: oklch(72% 0.17 250);
+            --starci-core-info-foreground: oklch(21.03% 0.0059 250);
+        }
+    }
+
+    @media (forced-colors: active) {
+        .grammar-common-root[data-grammar-family="core"] {
+            --starci-core-accent: Highlight;
+            --starci-core-focus: Highlight;
+            --starci-core-canvas: Canvas;
+            --starci-core-surface: Canvas;
+            --starci-core-surface-secondary: Canvas;
+            --starci-core-foreground: CanvasText;
+            --starci-core-muted: GrayText;
+            --starci-core-border: CanvasText;
+            --starci-core-separator: CanvasText;
+            --starci-core-success: CanvasText;
+            --starci-core-success-foreground: Canvas;
+            --starci-core-warning: CanvasText;
+            --starci-core-warning-foreground: Canvas;
+            --starci-core-danger: CanvasText;
+            --starci-core-danger-foreground: Canvas;
+            --starci-core-info: CanvasText;
+            --starci-core-info-foreground: Canvas;
+            --starci-core-surface-shadow: none;
+        }
+    }
+}
+

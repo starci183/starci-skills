@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.login.session.single-device.second-sign-in-ends-the-first
-rule: br.login.session.single-device
-given: A person signed in on one device
-when: They sign in on another
-then:
-  - The first session is refused on its next request.
-

@@ -1,0 +1,684 @@
+diff --git a/examples/todo-app-backend/.starciwork/_resources/environments/dev/resource.yaml b/examples/todo-app-backend/.starciwork/_resources/environments/dev/resource.yaml
+index 0d85030b..842d53da 100644
+--- a/examples/todo-app-backend/.starciwork/_resources/environments/dev/resource.yaml
++++ b/examples/todo-app-backend/.starciwork/_resources/environments/dev/resource.yaml
+@@ -12 +12,4 @@ target:
+-  compose: infra/compose/compose.yaml
++  # v7-3 (2026-09-19): the compose file lives under the stack directory, not at a bare
++  # infra/compose/compose.yaml - that path resolved to nothing in this repository. The real file is
++  # the one whose services this environment's ports and origins come from.
++  compose: .starcistacks/dev/infra/compose/compose.yaml
+@@ -40 +43,8 @@ probes:
+-    target: http://localhost:8089/realms/todo-app
++    # v7-3 (2026-09-19): the realm this probe reads is the one the stack imports. realm-todo.json
++    # declares "realm": "todo" and keycloak.yaml boots it with --import-realm, so the old
++    # /realms/todo-app target could never go green on a healthy stack - Keycloak answers 404 for a
++    # realm that does not exist. The silent hazard is the near miss: expect 200 verifies only that
++    # *some* realm answers, so the moment a realm is named by two authorities (project name here,
++    # import file there) a probe that keeps passing proves readiness for the wrong one. The name now
++    # comes from the import file, and custody.realm on identity.todo-app.demo says the same thing.
++    target: http://localhost:8089/realms/todo
+@@ -44 +54,2 @@ allowedEffects:
+-  - create/delete disposable Keycloak users under the todo-app realm
++  # v7-3: same correction as custody.realm on identity.todo-app.demo.
++  - create/delete disposable Keycloak users under the todo realm
+diff --git a/examples/todo-app-backend/.starciwork/_resources/identities/todo-app-demo/resource.yaml b/examples/todo-app-backend/.starciwork/_resources/identities/todo-app-demo/resource.yaml
+index 6654f9f1..4b7c97b7 100644
+--- a/examples/todo-app-backend/.starciwork/_resources/identities/todo-app-demo/resource.yaml
++++ b/examples/todo-app-backend/.starciwork/_resources/identities/todo-app-demo/resource.yaml
+@@ -13 +13,7 @@ custody:
+-  realm: todo-app
++  # v7-3 (2026-09-19): the realm is the code's, not the project's. The imported realm file declares
++  # "realm": "todo" (.starcistacks/dev/infra/compose/realm-todo.json, mounted with --import-realm),
++  # app-config.service.ts defaults the token URL to /realms/todo/..., and integration.login.keycloak
++  # names /realms/todo/... too. "todo-app" is this workspace's project name (workspace.yaml project),
++  # which the record ids below also carry - an id segment is not a realm claim. A realm target that
++  # does not exist is a silent hazard, not a loud one: see environment.todo-app.dev's probe note.
++  realm: todo
+diff --git a/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/complete/index.yaml b/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/complete/index.yaml
+index 36c1de54..c0fef3cf 100644
+--- a/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/complete/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/complete/index.yaml
+@@ -25 +25 @@ requiresProof:
+-    command: npm run test:e2e -- audit/erasure-complete
++    command: npm run test:e2e -- src/tests/e2e/audit/erasure-journey.e2e-spec.ts
+@@ -30,14 +30,8 @@ change:
+-  rev: 2
+-  kind: clarifying
+-  at: 2026-09-18T12:00:00.000Z
+-  reason: "fr.audit.erasure.request and gap.audit.unbuilt-module are both closed. This example has no
+-    background worker; the GraphQL completeErasure mutation
+-    (features/todo/graphql/mutations/audit/complete-erasure) exposes the worker's pickup directly for
+-    the caller who requested it to trigger, dispatching CompleteErasureCommand to
+-    AuditErasureService.execute (src/modules/bussiness/audit/audit-erasure.service.ts) - t-execute, the
+-    unreadability confirmation, then t-complete, refusing with ERASURE_NOT_CONFIRMED rather than
+-    completing if any line still decrypted (the exceptionFlow above), all proven in
+-    audit-erasure.service.spec.ts and complete-erasure.handler.spec.ts, and exercised end to end by
+-    scripts/live-proof-audit.sh. composes[].module corrected to the real capability directory.
+-    requiresProof.uat stays unfulfilled: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not
+-    run and is outside this backend lane's scope."
++  rev: 3
++  kind: editorial
++  at: 2026-09-19T00:00:00.000Z
++  reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern
++    'audit/erasure-complete' matched no file under src/tests/e2e; erasure-journey.e2e-spec.ts is the
++    spec that walks request -> verify -> complete -> anonymized against the assembled stack. Rev 2's
++    clarifying content stands; requiresProof.uat stays unfulfilled as before
++    (uat.audit.right-to-be-forgotten, gap.audit.live-proof)."
+diff --git a/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/request/index.yaml b/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/request/index.yaml
+index eee9cc5e..d886ff45 100644
+--- a/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/request/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/audit/fr/erasure/request/index.yaml
+@@ -20 +20 @@ requiresProof:
+-    command: npm run test:e2e -- audit/erasure-request
++    command: npm run test:e2e -- src/tests/e2e/audit/erasure-journey.e2e-spec.ts
+@@ -25,11 +25,7 @@ change:
+-  rev: 2
+-  kind: clarifying
+-  at: 2026-09-18T12:00:00.000Z
+-  reason: "sds.audit.erasure-request and gap.audit.unbuilt-module are both closed. The GraphQL
+-    requestErasure mutation (features/todo/graphql/mutations/audit/request-erasure) dispatches
+-    RequestErasureCommand, handled by RequestErasureHandler, which calls
+-    AuditErasureService.request (src/modules/bussiness/audit/audit-erasure.service.ts) - t-request then
+-    t-verify, proven in audit-erasure.service.spec.ts and request-erasure.handler.spec.ts, and exercised
+-    end to end by scripts/live-proof-audit.sh. composes[].module corrected to the real capability
+-    directory. requiresProof.uat stays unfulfilled: uat.audit.right-to-be-forgotten (gap.audit.live-proof)
+-    has not run and is outside this backend lane's scope."
++  rev: 3
++  kind: editorial
++  at: 2026-09-19T00:00:00.000Z
++  reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern
++    'audit/erasure-request' matched no file under src/tests/e2e; erasure-journey.e2e-spec.ts is the
++    spec that walks request -> verify -> complete against the assembled stack. Rev 2's clarifying
++    content stands."
+diff --git a/examples/todo-app-backend/.starciwork/features/audit/fr/export/index.yaml b/examples/todo-app-backend/.starciwork/features/audit/fr/export/index.yaml
+index 84e80248..a73df685 100644
+--- a/examples/todo-app-backend/.starciwork/features/audit/fr/export/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/audit/fr/export/index.yaml
+@@ -21 +21 @@ requiresProof:
+-    command: npm run test:e2e -- audit/export
++    command: npm run test:e2e -- src/tests/e2e/audit/export-and-log.e2e-spec.ts
+@@ -26,12 +26,8 @@ change:
+-  rev: 2
+-  kind: clarifying
+-  at: 2026-09-18T12:00:00.000Z
+-  reason: "gap.audit.unbuilt-module is closed. The GraphQL exportMyData query
+-    (features/todo/graphql/queries/audit/export-my-data) dispatches ExportMyDataQuery to
+-    ExportMyDataHandler, which calls AuditLogService.exportForPerson
+-    (src/modules/bussiness/audit/audit-log.service.ts) - filters by the caller's own keyId, decrypts,
+-    and returns nothing once a completed erasure has destroyed that keyId's mapping (the exceptionFlow
+-    above), proven in export-my-data.handler.spec.ts and exercised end to end by
+-    scripts/live-proof-audit.sh. composes[].module corrected to the real capability directory.
+-    requiresProof.uat stays unfulfilled: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not
+-    run and is outside this backend lane's scope."
++  rev: 3
++  kind: editorial
++  at: 2026-09-19T00:00:00.000Z
++  reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern
++    'audit/export' matched no file under src/tests/e2e; export-and-log.e2e-spec.ts is the spec that
++    walks tracked activity -> appended lines -> exportMyData -> auditLog agreement against the
++    assembled stack. Rev 2's clarifying content stands; requiresProof.uat stays unfulfilled as before
++    (uat.audit.right-to-be-forgotten, gap.audit.live-proof)."
+diff --git a/examples/todo-app-backend/.starciwork/features/audit/fr/log/append/index.yaml b/examples/todo-app-backend/.starciwork/features/audit/fr/log/append/index.yaml
+index a735d695..85aaf542 100644
+--- a/examples/todo-app-backend/.starciwork/features/audit/fr/log/append/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/audit/fr/log/append/index.yaml
+@@ -23 +23 @@ requiresProof:
+-    command: npm run test:e2e -- audit/log-append
++    command: npm run test:e2e -- src/tests/e2e/audit/export-and-log.e2e-spec.ts
+@@ -28,11 +28,8 @@ change:
+-  rev: 2
+-  kind: clarifying
+-  at: 2026-09-18T12:00:00.000Z
+-  reason: "gap.audit.unbuilt-module is closed. AuditEventSubscriber (src/modules/bussiness/audit
+-    /audit-event.subscriber.ts) subscribes to PlatformEventBus for exactly the five events `subscribes`
+-    names and dispatches AppendLogLineCommand for each, proven per-event in
+-    audit-event.subscriber.spec.ts; AuditLogService.append/verifyChain prove the postconditions in
+-    audit-log.service.spec.ts. Also exercised end to end by scripts/live-proof-audit.sh against the
+-    real dev stack. composes[].module corrected to the real capability directory. requiresProof.uat
+-    stays unfulfilled here: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not run and is
+-    outside this backend lane's scope."
++  rev: 3
++  kind: editorial
++  at: 2026-09-19T00:00:00.000Z
++  reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern
++    'audit/log-append' matched no file under src/tests/e2e; export-and-log.e2e-spec.ts is the spec
++    that drives tracked activity -> appended audit lines against the assembled stack. Rev 2's
++    clarifying content stands; requiresProof.uat stays unfulfilled as before
++    (uat.audit.right-to-be-forgotten, gap.audit.live-proof)."
+diff --git a/examples/todo-app-backend/.starciwork/features/audit/fr/log/read/index.yaml b/examples/todo-app-backend/.starciwork/features/audit/fr/log/read/index.yaml
+index 841b716a..19c9fb24 100644
+--- a/examples/todo-app-backend/.starciwork/features/audit/fr/log/read/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/audit/fr/log/read/index.yaml
+@@ -23 +23 @@ requiresProof:
+-    command: npm run test:e2e -- audit/log-read
++    command: npm run test:e2e -- src/tests/e2e/audit/export-and-log.e2e-spec.ts
+@@ -28,15 +28,8 @@ change:
+-  rev: 2
+-  kind: clarifying
+-  at: 2026-09-19T12:00:00.000Z
+-  reason: "decision.audit.operator-role is now decided (audit-verified-roster), so the blockedBy edge on it
+-    is satisfied and dropped - the layout refuses a stale blockedBy on a done record. The operator read is
+-    therefore live: AuditLogHandler checks the verified claim (audit-operator-read.ts) before any line is
+-    touched, an allowlisted operator reads the whole chain filtered by an action the contract emits
+-    (contract.audit.emitted-events' five sealed kinds) via readAllLines -> matchOperatorFilter ->
+-    toAuditLineSummary, a tombstoned line reads back as tombstoned, and the summary shape carries exactly
+-    at/action/target - never a sealed actor blob or keyId (postconditions). Proven at unit level bound to
+-    impl.audit.todo-app-backend.operator-read's fresh evidence (audit-log.handler.spec.ts +
+-    audit-operator.guard.spec.ts). composes[].module corrected to the real capability directory, matching
+-    fr.audit.log.append. requiresProof.e2e and the live uat run stay unfulfilled here as they do for every
+-    audit backend record: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not produced a run and
+-    is outside this backend lane."
++  rev: 3
++  kind: editorial
++  at: 2026-09-19T00:00:00.000Z
++  reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern
++    'audit/log-read' matched no file under src/tests/e2e; export-and-log.e2e-spec.ts is the spec that
++    reads auditLog and exportMyData against the assembled stack. Rev 2's clarifying content stands;
++    requiresProof.uat stays unfulfilled as before (uat.audit.right-to-be-forgotten,
++    gap.audit.live-proof)."
+diff --git a/examples/todo-app-backend/.starciwork/features/audit/gap/live-proof/index.yaml b/examples/todo-app-backend/.starciwork/features/audit/gap/live-proof/index.yaml
+index 84de5aac..618be81e 100644
+--- a/examples/todo-app-backend/.starciwork/features/audit/gap/live-proof/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/audit/gap/live-proof/index.yaml
+@@ -8 +8,4 @@ statement: uat.audit.right-to-be-forgotten names its entry, actor, ordered steps
+-  only the designed flow this record and its accounts.yaml/fixtures ref describe.
++  only the designed flow this record and its accounts.yaml/fixtures ref describe. As of 2026-09-19 the
++  blocker is narrower than "never attempted" - the Playwright spec exists
++  (examples/todo-app-frontend/uat/flows/uat.audit.right-to-be-forgotten.spec.ts) but is an unimplemented
++  test.skip stub - writing the walk is app work, outside the evidence lane that ran the suite.
+@@ -10 +13 @@ closedBy: uat.audit.right-to-be-forgotten
+-change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}
++change: {rev: 2, kind: clarifying, at: 2026-09-19T11:45:00.000Z, reason: "v7-11 ran the uat suite against a real stack; this flow's spec skipped itself, so the open blocker is now precisely the missing spec implementation."}
+diff --git a/examples/todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/index.yaml b/examples/todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/index.yaml
+index aecbd818..c735fc7f 100644
+--- a/examples/todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/index.yaml
+@@ -6,0 +7,5 @@ repository: todo-app-frontend
++# v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
++# under the [lang] locale segment (locales en|vi); src/app/audit never existed, so the rev-1 narrative
++# below names a route adapter at a path the repository has never had. src/app/[lang]/audit holds only
++# privacy/, so the served route is still /<lang>/audit/privacy as that narrative says. Quoted because
++# core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
+@@ -8 +13 @@ owners:
+-  - {role: route, path: src/app/audit}
++  - {role: route, path: "src/app/[lang]/audit"}
+diff --git a/examples/todo-app-backend/.starciwork/features/login/contract/identity-for-task/index.yaml b/examples/todo-app-backend/.starciwork/features/login/contract/identity-for-task/index.yaml
+index 88ca0a04..b4d8aa0a 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/contract/identity-for-task/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/contract/identity-for-task/index.yaml
+@@ -76,2 +76,3 @@ change:
+-provenBy:
+-  provider: [impl.login.todo-app-backend.auth]
++# An agent-authored provenBy is refused: it would be this record speaking for another one.
++# A hand-authored block sat here (provider: [impl.login.todo-app-backend.auth]); it is removed, and the
++# kernel derives the real one.
+diff --git a/examples/todo-app-backend/.starciwork/features/login/event/signed-in/index.yaml b/examples/todo-app-backend/.starciwork/features/login/event/signed-in/index.yaml
+index 60f8143a..94b3bd06 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/event/signed-in/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/event/signed-in/index.yaml
+@@ -13 +13 @@ change:
+-  rev: 2
++  rev: 3
+@@ -15,6 +15,9 @@ change:
+-  at: 2026-09-18T12:00:00.000Z
+-  reason: "blockedBy on gap.audit.unbuilt-module removed - it is done: AuditEventSubscriber
+-    (examples/todo-app-backend/src/modules/bussiness/audit/audit-event.subscriber.ts) now subscribes
+-    to this exact event on the platform event bus and turns it into an appended log line
+-    (fr.audit.log.append), proven in that module's own audit-event.subscriber.spec.ts. This record's
+-    own state is left for login's lane to advance."
++  at: 2026-09-19T00:00:00.000Z
++  reason: "wiring verified against code, state left todo for the evidence lane: SignInHandler publishes
++    SignedInEvent on the PlatformEventBus after a successful sign-in
++    (src/modules/bussiness/session/sign-in.handler.ts) and the named test 'event.login.signed-in:
++    publishes on the PlatformEventBus after a successful sign-in' in sign-in.handler.spec.ts asserts
++    the payload (personId) - plus 'a refused sign-in publishes nothing'. The payload fields here match
++    SignedInEvent exactly (personId, signedInAt, sourceEventId). The consumer edge resolves the other
++    way: fr.audit.log.append's subscribes names this event. Promotion to done needs a sibling
++    evidence.yaml, which the evidence lane owns."
+diff --git a/examples/todo-app-backend/.starciwork/features/login/event/signed-out/index.yaml b/examples/todo-app-backend/.starciwork/features/login/event/signed-out/index.yaml
+index 943f5a9d..ff91164e 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/event/signed-out/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/event/signed-out/index.yaml
+@@ -13 +13 @@ change:
+-  rev: 2
++  rev: 3
+@@ -15,6 +15,8 @@ change:
+-  at: 2026-09-18T12:00:00.000Z
+-  reason: "blockedBy on gap.audit.unbuilt-module removed - it is done: AuditEventSubscriber
+-    (examples/todo-app-backend/src/modules/bussiness/audit/audit-event.subscriber.ts) now subscribes
+-    to this exact event on the platform event bus and turns it into an appended log line
+-    (fr.audit.log.append), proven in that module's own audit-event.subscriber.spec.ts. This record's
+-    own state is left for login's lane to advance."
++  at: 2026-09-19T00:00:00.000Z
++  reason: "wiring verified against code, state left todo for the evidence lane: SignOutHandler publishes
++    SignedOutEvent on the PlatformEventBus after the session row is revoked
++    (src/modules/bussiness/session/sign-out.handler.ts) and the named test 'event.login.signed-out:
++    publishes on the PlatformEventBus after the session is revoked' in sign-out.handler.spec.ts asserts
++    the payload (personId). The payload fields here match SignedOutEvent exactly (personId, signedOutAt,
++    sourceEventId). The consumer edge resolves the other way: fr.audit.log.append's subscribes names
++    this event. Promotion to done needs a sibling evidence.yaml, which the evidence lane owns."
+diff --git a/examples/todo-app-backend/.starciwork/features/login/fr/sign-in/index.yaml b/examples/todo-app-backend/.starciwork/features/login/fr/sign-in/index.yaml
+index 40be5ac8..d965b415 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/fr/sign-in/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/fr/sign-in/index.yaml
+@@ -24 +24 @@ requiresProof:
+-    command: npm run test:e2e -- auth/sign-in
++    command: npm run test:e2e -- src/tests/e2e/auth/sign-in.e2e-spec.ts
+@@ -29 +28,0 @@ requiresProof:
+-    command: node scripts/load/sign-in-timing.mjs
+@@ -33,8 +32,4 @@ requiresProof:
+-provenBy:
+-  unit: [impl.login.todo-app-backend.auth]
+-  e2e:
+-    - command: npm run test:e2e -- auth/sign-in
+-      exit: 0
+-      at: 6f1e4b7d
+-  uat: [uat.login.sign-in]
+-  perf: []
++# A hand-authored block sat here naming a captured run at 6f1e4b7d and uat.login.sign-in as proof; it is
++# removed, and the kernel derives the real one. Two dead commands were also corrected: e2e now names the
++# real spec path, and perf's `node scripts/load/sign-in-timing.mjs` named a harness that does not exist
++# in this repository (no scripts/load/), so the optional demand stands without a fabricated command.
+diff --git a/examples/todo-app-backend/.starciwork/features/login/fr/sign-out/index.yaml b/examples/todo-app-backend/.starciwork/features/login/fr/sign-out/index.yaml
+index e5ba42de..db3c6c0b 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/fr/sign-out/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/fr/sign-out/index.yaml
+@@ -12,4 +11,0 @@ composes:
+-  - rule: br.login.session.single-device
+-    module: src/modules/bussiness/session
+-blockedBy:
+-  - {record: br.login.session.single-device, because: "br.login.session.single-device is todo; the device rule it composes has no evidence yet."}
+@@ -21 +17 @@ requiresProof:
+-    command: npm run test:e2e -- auth/sign-out
++    command: npm run test:e2e -- src/tests/e2e/session/sign-out.e2e-spec.ts
+@@ -23,0 +20,10 @@ requiresProof:
++
++# The compose of br.login.session.single-device is removed: that rule governs a *new* sign-in ending a
++# prior session (its ac is second-sign-in-ends-the-first), which sign-out never exercises - the compose
++# made this flow wait on a rule its own steps do not touch (v6-3 Q2-10). The blockedBy edge that cited
++# it existed only because of that compose ("the device rule it composes"), so it is removed with it;
++# the code agrees - SignOutHandler revokes the row and publishes event.login.signed-out and touches no
++# device logic (src/modules/bussiness/session/sign-out.handler.ts). This record stays todo on its own
++# requiresProof: the e2e command now names the real spec (session/sign-out.e2e-spec.ts walks
++# sign-in -> sign-out -> token refused -> re-sign-in) but no passing run is captured as evidence here,
++# and requiresProof.uat is unmet - uat.login.sign-in is the only login uat flow.
+diff --git a/examples/todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/index.yaml b/examples/todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/index.yaml
+index 4b37014c..fe1a5ff8 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/index.yaml
+@@ -5,0 +6,6 @@ repository: todo-app-frontend
++# v7-3 (2026-09-19): this record was the one fe route that passed OWNER_PATH_MISSING while still
++# naming the wrong directory. src/app/sign-in exists, but it holds only turtle-master.png/route.ts -
++# the mascot bytes the rev-2 reason credits the MediaFrame with serving - not the screen. The page
++# that renders this record's own four captured states is src/app/[lang]/sign-in/page.tsx (locales
++# en|vi), so the route ownership is now both directories: the page and its media handler. A path
++# that exists but is not the implementation is invisible to an existence check; that is the hazard.
+@@ -6,0 +13 @@ owners:
++  - {role: route, path: "src/app/[lang]/sign-in"}
+diff --git a/examples/todo-app-backend/.starciwork/features/login/journey/first-sign-in/index.yaml b/examples/todo-app-backend/.starciwork/features/login/journey/first-sign-in/index.yaml
+index 8dc794b0..bc916dcc 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/journey/first-sign-in/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/journey/first-sign-in/index.yaml
+@@ -20,3 +20,2 @@ requiresProof:
+-provenBy:
+-  requirements: [fr.login.sign-in]
+-  uat: [uat.login.sign-in]
++# A hand-authored block sat here (requirements: [fr.login.sign-in], uat: [uat.login.sign-in]); it is
++# removed, and the kernel derives the real one.
+diff --git a/examples/todo-app-backend/.starciwork/features/login/sds/session-store/index.yaml b/examples/todo-app-backend/.starciwork/features/login/sds/session-store/index.yaml
+index 5859cd67..deb6e6c4 100644
+--- a/examples/todo-app-backend/.starciwork/features/login/sds/session-store/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/login/sds/session-store/index.yaml
+@@ -86,3 +86,3 @@ change:
+-provenBy:
+-  implementation: [impl.login.todo-app-backend.auth]
+-  transitions: [t-begin, t-accept, t-refuse, t-expire, t-revoke]
++# An agent-authored provenBy is refused: it would be this record speaking for another one.
++# A hand-authored block sat here (implementation: [impl.login.todo-app-backend.auth], transitions:
++# [t-begin, t-accept, t-refuse, t-expire, t-revoke]); it is removed, and the kernel derives the real one.
+diff --git a/examples/todo-app-backend/.starciwork/features/notify/fr/on-new-device/index.yaml b/examples/todo-app-backend/.starciwork/features/notify/fr/on-new-device/index.yaml
+index d1221aa6..1c403206 100644
+--- a/examples/todo-app-backend/.starciwork/features/notify/fr/on-new-device/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/notify/fr/on-new-device/index.yaml
+@@ -17,2 +17,2 @@ composes:
+-  - {rule: br.notify.delivery.once, module: src/notify/dedupe}
+-  - {rule: br.notify.digest.window, module: src/notify/digest}
++  - {rule: br.notify.delivery.once, module: src/modules/bussiness/notify}
++  - {rule: br.notify.digest.window, module: src/modules/bussiness/notify}
+diff --git a/examples/todo-app-backend/.starciwork/features/notify/gap/live-proof/index.yaml b/examples/todo-app-backend/.starciwork/features/notify/gap/live-proof/index.yaml
+index 0a27a69d..2ac8b76d 100644
+--- a/examples/todo-app-backend/.starciwork/features/notify/gap/live-proof/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/notify/gap/live-proof/index.yaml
+@@ -8 +8,4 @@ statement: uat.notify.digest-and-unsubscribe names its entry, actor, ordered ste
+-  only the designed flow this record and its accounts.yaml/fixtures ref describe.
++  only the designed flow this record and its accounts.yaml/fixtures ref describe. As of 2026-09-19 the
++  blocker is narrower than "never attempted" - the Playwright spec exists
++  (examples/todo-app-frontend/uat/flows/uat.notify.digest-and-unsubscribe.spec.ts) but is an unimplemented
++  test.skip stub - writing the walk is app work, outside the evidence lane that ran the suite.
+@@ -10 +13 @@ closedBy: uat.notify.digest-and-unsubscribe
+-change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}
++change: {rev: 2, kind: clarifying, at: 2026-09-19T11:45:00.000Z, reason: "v7-11 ran the uat suite against a real stack; this flow's spec skipped itself, so the open blocker is now precisely the missing spec implementation."}
+diff --git a/examples/todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/index.yaml b/examples/todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/index.yaml
+index c5d8caf5..e0755414 100644
+--- a/examples/todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/index.yaml
+@@ -5,0 +6,4 @@ repository: todo-app-frontend
++# v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
++# under the [lang] locale segment (locales en|vi); src/app/notify never existed. The extent is
++# unchanged - this record owns both notify routes, as its rev-1 reason already says. Quoted because
++# core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
+@@ -7 +11 @@ owners:
+-  - {role: route, path: src/app/notify}
++  - {role: route, path: "src/app/[lang]/notify"}
+diff --git a/examples/todo-app-backend/.starciwork/features/plan/gap/live-proof/index.yaml b/examples/todo-app-backend/.starciwork/features/plan/gap/live-proof/index.yaml
+index a837c7ca..1f08a9e6 100644
+--- a/examples/todo-app-backend/.starciwork/features/plan/gap/live-proof/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/plan/gap/live-proof/index.yaml
+@@ -8 +8,4 @@ statement: uat.plan.upgrade-after-cap names its entry, actor, ordered steps, fix
+-  only the designed flow this record and its accounts.yaml/fixtures ref describe.
++  only the designed flow this record and its accounts.yaml/fixtures ref describe. As of 2026-09-19 the
++  blocker is narrower than "never attempted" - the Playwright spec exists
++  (examples/todo-app-frontend/uat/flows/uat.plan.upgrade-after-cap.spec.ts) but is an unimplemented
++  test.skip stub - writing the walk is app work, outside the evidence lane that ran the suite.
+@@ -10 +13 @@ closedBy: uat.plan.upgrade-after-cap
+-change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}
++change: {rev: 2, kind: clarifying, at: 2026-09-19T11:45:00.000Z, reason: "v7-11 ran the uat suite against a real stack; this flow's spec skipped itself, so the open blocker is now precisely the missing spec implementation."}
+diff --git a/examples/todo-app-backend/.starciwork/features/plan/impl/todo-app-frontend/usage/index.yaml b/examples/todo-app-backend/.starciwork/features/plan/impl/todo-app-frontend/usage/index.yaml
+index 379aaee3..f0363048 100644
+--- a/examples/todo-app-backend/.starciwork/features/plan/impl/todo-app-frontend/usage/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/plan/impl/todo-app-frontend/usage/index.yaml
+@@ -5,0 +6,5 @@ repository: todo-app-frontend
++# v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
++# under the [lang] locale segment (locales en|vi); src/app/plan never existed, so the rev-3 reason's
++# claim "Owners are the real directories now" was false for this entry. The route dir still covers
++# both plan/page.tsx and plan/usage/page.tsx, so the claimed extent is unchanged. Quoted because
++# core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
+@@ -7 +12 @@ owners:
+-  - {role: route, path: src/app/plan}
++  - {role: route, path: "src/app/[lang]/plan"}
+diff --git a/examples/todo-app-backend/.starciwork/features/recur/fr/edit-rule/index.yaml b/examples/todo-app-backend/.starciwork/features/recur/fr/edit-rule/index.yaml
+index af72f807..21decbbc 100644
+--- a/examples/todo-app-backend/.starciwork/features/recur/fr/edit-rule/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/recur/fr/edit-rule/index.yaml
+@@ -23 +23 @@ requiresProof:
+-    command: npm run test:e2e -- recur/edit-rule
++    command: npm run test:e2e -- src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts
+@@ -28,2 +28,2 @@ blockedBy:
+-  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real and unit-tested (EditRecurrenceHandler/RuleService.edit, edit-recurrence.handler.spec.ts), and this flow's backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's editRecurrence step, including the non-owner refusal). What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e's npm run test:e2e script, which does not exist in this generation of the backend."}
+-change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "composes module path corrected from the stale pre-migration src/recur/occurrence to the real module root src/modules/bussiness/recur; blockedBy re-rooted from the now-resolved gap.recur.unbuilt-module to gap.recur.live-proof."}
++  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real and unit-tested (EditRecurrenceHandler/RuleService.edit, edit-recurrence.handler.spec.ts), and this flow's backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's editRecurrence step, including the non-owner refusal). What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e, whose command now names the real spec (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks the edit -> occurrences-reflect-edit leg) but has no passing run captured as evidence here yet."}
++change: {rev: 2, kind: editorial, at: 2026-09-19T00:00:00.000Z, reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern 'recur/edit-rule' matched no file under src/tests/e2e; recurrence-lifecycle.e2e-spec.ts covers the edit leg. Rev 1's module-path correction stands."}
+diff --git a/examples/todo-app-backend/.starciwork/features/recur/fr/end-rule/index.yaml b/examples/todo-app-backend/.starciwork/features/recur/fr/end-rule/index.yaml
+index a23fc4e8..4126ba75 100644
+--- a/examples/todo-app-backend/.starciwork/features/recur/fr/end-rule/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/recur/fr/end-rule/index.yaml
+@@ -22 +22 @@ requiresProof:
+-    command: npm run test:e2e -- recur/end-rule
++    command: npm run test:e2e -- src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts
+@@ -27,2 +27,2 @@ blockedBy:
+-  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real and unit-tested (EndRecurrenceHandler/OccurrenceService.orphanEndedOccurrences, end-recurrence.handler.spec.ts, proving ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences exactly), and this flow's backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's endRecurrence step). What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e's npm run test:e2e script, which does not exist in this generation of the backend."}
+-change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "composes module path corrected from the stale pre-migration src/recur/occurrence to the real module root src/modules/bussiness/recur; blockedBy re-rooted from the now-resolved gap.recur.unbuilt-module to gap.recur.live-proof."}
++  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real and unit-tested (EndRecurrenceHandler/OccurrenceService.orphanEndedOccurrences, end-recurrence.handler.spec.ts, proving ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences exactly), and this flow's backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's endRecurrence step). What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e, whose command now names the real spec (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks end -> no-new-occurrences) but has no passing run captured as evidence here yet."}
++change: {rev: 2, kind: editorial, at: 2026-09-19T00:00:00.000Z, reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern 'recur/end-rule' matched no file under src/tests/e2e; recurrence-lifecycle.e2e-spec.ts covers the end leg. Rev 1's module-path correction stands."}
+diff --git a/examples/todo-app-backend/.starciwork/features/recur/fr/make-recurring/index.yaml b/examples/todo-app-backend/.starciwork/features/recur/fr/make-recurring/index.yaml
+index 81bac7e7..1547ded7 100644
+--- a/examples/todo-app-backend/.starciwork/features/recur/fr/make-recurring/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/recur/fr/make-recurring/index.yaml
+@@ -26 +26 @@ requiresProof:
+-    command: npm run test:e2e -- recur/make-recurring
++    command: npm run test:e2e -- src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts
+@@ -31,2 +31,2 @@ blockedBy:
+-  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real, unit-tested (composes' both rules pass) and this flow's own backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's makeRecurring/upcomingOccurrences steps). What remains unmet is this record's own uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope) and requiresProof.e2e's npm run test:e2e script does not exist in this generation of the backend (scripts/live-proof-recur.sh is its current successor, per this feature's own brief, but requiresProof.e2e.command itself is left as authored rather than edited by this lane)."}
+-change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "module paths in composes corrected from the stale pre-migration src/recur/rule and src/recur/zone to the real module root src/modules/bussiness/recur; blockedBy re-rooted from the now-resolved gap.recur.unbuilt-module to gap.recur.live-proof, the real remaining reason this record cannot yet be claimed done."}
++  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real, unit-tested (composes' both rules pass) and this flow's own backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's makeRecurring/upcomingOccurrences steps). What remains unmet is this record's own uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope) and requiresProof.e2e, whose command now names the real spec (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks makeRecurring -> occurrences against the assembled stack) but has no passing run captured as evidence here yet."}
++change: {rev: 2, kind: editorial, at: 2026-09-19T00:00:00.000Z, reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern 'recur/make-recurring' matched no file under src/tests/e2e; recurrence-lifecycle.e2e-spec.ts is the spec that walks make recurring -> occurrences -> edit -> end against the assembled stack. Rev 1's module-path correction stands."}
+diff --git a/examples/todo-app-backend/.starciwork/features/recur/fr/see-upcoming/index.yaml b/examples/todo-app-backend/.starciwork/features/recur/fr/see-upcoming/index.yaml
+index e0b37eaf..cc826050 100644
+--- a/examples/todo-app-backend/.starciwork/features/recur/fr/see-upcoming/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/recur/fr/see-upcoming/index.yaml
+@@ -23 +23 @@ requiresProof:
+-    command: npm run test:e2e -- recur/see-upcoming
++    command: npm run test:e2e -- src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts
+@@ -28,2 +28,2 @@ blockedBy:
+-  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved on the backend - impl.recur.todo-app-backend.engine is real and unit-tested (UpcomingOccurrencesHandler, upcoming-occurrences.handler.spec.ts, including the ended-rule-shows-no-preview exceptionFlow), and this flow's backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's upcomingOccurrences steps, before and after ending). The frontend schedule screen (impl.recur.todo-app-frontend.schedule) remains unbuilt and is outside this lane's scope. What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e's npm run test:e2e script, which does not exist in this generation of the backend."}
+-change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "composes module path corrected from the stale pre-migration src/recur/rule to the real module root src/modules/bussiness/recur; blockedBy re-rooted from the now-resolved (backend half of) gap.recur.unbuilt-module to gap.recur.live-proof."}
++  - {record: gap.recur.live-proof, because: "gap.recur.unbuilt-module is resolved on the backend - impl.recur.todo-app-backend.engine is real and unit-tested (UpcomingOccurrencesHandler, upcoming-occurrences.handler.spec.ts, including the ended-rule-shows-no-preview exceptionFlow), and this flow's backend half runs end to end against the live dev stack (scripts/live-proof-recur.sh's upcomingOccurrences steps, before and after ending). The frontend schedule screen (impl.recur.todo-app-frontend.schedule) remains unbuilt and is outside this lane's scope. What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e, whose command now names the real spec (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts reads upcoming occurrences before and after ending) but has no passing run captured as evidence here yet."}
++change: {rev: 2, kind: editorial, at: 2026-09-19T00:00:00.000Z, reason: "requiresProof.e2e.command corrected to a real spec path: the jest positional pattern 'recur/see-upcoming' matched no file under src/tests/e2e; recurrence-lifecycle.e2e-spec.ts covers the upcoming-occurrences read. Rev 1's module-path correction stands."}
+diff --git a/examples/todo-app-backend/.starciwork/features/recur/gap/live-proof/index.yaml b/examples/todo-app-backend/.starciwork/features/recur/gap/live-proof/index.yaml
+index d34a0b9c..4dedc091 100644
+--- a/examples/todo-app-backend/.starciwork/features/recur/gap/live-proof/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/recur/gap/live-proof/index.yaml
+@@ -8 +8,4 @@ statement: uat.recur.make-recurring names its entry, actor, ordered steps, fixtu
+-  only the designed flow this record and its accounts.yaml/fixtures ref describe.
++  only the designed flow this record and its accounts.yaml/fixtures ref describe. As of 2026-09-19 the
++  blocker is narrower than "never attempted" - the Playwright spec exists
++  (examples/todo-app-frontend/uat/flows/uat.recur.make-recurring.spec.ts) but is an unimplemented
++  test.skip stub - writing the walk is app work, outside the evidence lane that ran the suite.
+@@ -10 +13 @@ closedBy: uat.recur.make-recurring
+-change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}
++change: {rev: 2, kind: clarifying, at: 2026-09-19T11:45:00.000Z, reason: "v7-11 ran the uat suite against a real stack; this flow's spec skipped itself, so the open blocker is now precisely the missing spec implementation."}
+diff --git a/examples/todo-app-backend/.starciwork/features/recur/impl/todo-app-frontend/schedule/index.yaml b/examples/todo-app-backend/.starciwork/features/recur/impl/todo-app-frontend/schedule/index.yaml
+index 8bf7a214..8488b3c5 100644
+--- a/examples/todo-app-backend/.starciwork/features/recur/impl/todo-app-frontend/schedule/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/recur/impl/todo-app-frontend/schedule/index.yaml
+@@ -5,0 +6,6 @@ repository: todo-app-frontend
++# v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
++# under the [lang] locale segment (locales en|vi); src/app/recur never existed. The rev-2 reason below
++# claims the owners were already "corrected to the module-root directories that exist" - that held
++# for src/components/recur and not for the route, and the comment naming "src/app/recur" as where the
++# route now lives is stale for the same reason. Quoted because core/yaml.mjs rejects a bracketed
++# plain scalar inside a flow mapping.
+@@ -7 +13 @@ owners:
+-  - {role: route, path: src/app/recur}
++  - {role: route, path: "src/app/[lang]/recur"}
+diff --git a/examples/todo-app-backend/.starciwork/features/share/gap/live-proof/index.yaml b/examples/todo-app-backend/.starciwork/features/share/gap/live-proof/index.yaml
+index edb52092..101ee6f8 100644
+--- a/examples/todo-app-backend/.starciwork/features/share/gap/live-proof/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/share/gap/live-proof/index.yaml
+@@ -8 +8,4 @@ statement: uat.share.invite-and-collaborate names its entry, actor, ordered step
+-  only the designed flow this record and its accounts.yaml/fixtures ref describe.
++  only the designed flow this record and its accounts.yaml/fixtures ref describe. As of 2026-09-19 the
++  blocker is narrower than "never attempted" - the Playwright spec exists
++  (examples/todo-app-frontend/uat/flows/uat.share.invite-and-collaborate.spec.ts) but is an unimplemented
++  test.skip stub - writing the walk is app work, outside the evidence lane that ran the suite.
+@@ -10 +13 @@ closedBy: uat.share.invite-and-collaborate
+-change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}
++change: {rev: 2, kind: clarifying, at: 2026-09-19T11:45:00.000Z, reason: "v7-11 ran the uat suite against a real stack; this flow's spec skipped itself, so the open blocker is now precisely the missing spec implementation."}
+diff --git a/examples/todo-app-backend/.starciwork/features/share/impl/todo-app-frontend/invite-screen/index.yaml b/examples/todo-app-backend/.starciwork/features/share/impl/todo-app-frontend/invite-screen/index.yaml
+index 6dbbf608..5578cbf1 100644
+--- a/examples/todo-app-backend/.starciwork/features/share/impl/todo-app-frontend/invite-screen/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/share/impl/todo-app-frontend/invite-screen/index.yaml
+@@ -5,0 +6,4 @@ repository: todo-app-frontend
++# v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
++# under the [lang] locale segment (locales en|vi), so the dynamic task segment is one level deeper
++# than authored: src/app/[lang]/tasks/[taskId]/share. src/app/tasks never existed. The rev-1 reason's
++# served-route claim /tasks/<id>/share is the locale-prefixed URL beneath that segment.
+@@ -7 +11 @@ owners:
+-  - {role: route, path: "src/app/tasks/[taskId]/share"}
++  - {role: route, path: "src/app/[lang]/tasks/[taskId]/share"}
+diff --git a/examples/todo-app-backend/.starciwork/features/task/event/deleted/index.yaml b/examples/todo-app-backend/.starciwork/features/task/event/deleted/index.yaml
+index 336c9443..d070a405 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/event/deleted/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/event/deleted/index.yaml
+@@ -5 +5 @@ state: done
+-producer: br.task.delete.final
++producer: fr.task.delete
+@@ -12 +12 @@ delivery: {guarantee: at-least-once, ordering: per-key}
+-refs: [br.task.delete.final]
++refs: [fr.task.delete, br.task.delete.final]
+@@ -14 +14 @@ change:
+-  rev: 2
++  rev: 3
+@@ -16,7 +16,5 @@ change:
+-  at: 2026-09-18T12:00:00.000Z
+-  reason: "blockedBy on gap.audit.unbuilt-module removed - it is done: AuditEventSubscriber
+-    (examples/todo-app-backend/src/modules/bussiness/audit/audit-event.subscriber.ts) now subscribes
+-    to this exact event on the platform event bus and turns it into an appended log line
+-    (fr.audit.log.append), proven in that module's own audit-event.subscriber.spec.ts. This record's
+-    own state is left for task's lane to advance."
+-# State advanced by task's lane: DeleteTaskHandler publishes this exact payload only after the row is
++  at: 2026-09-19T00:00:00.000Z
++  reason: "producer corrected from br.task.delete.final to fr.task.delete - the flow record now exists
++    and is what publishes this event (a business rule was only ever standing in for the missing flow,
++    v6-3 Q1/Q3). The rule stays named in refs; nothing about payload or delivery changed."
++# State was advanced by task's lane: DeleteTaskHandler publishes this exact payload only after the row is
+@@ -26,2 +24,3 @@ change:
+-# br.task.delete.final, is done; the subscriber named by rev 2 (audit) is done. delivery is scoped to
+-# the live process, per event-bus.providers.ts's own comment, same as event.task.created's note says.
++# fr.task.delete, is todo on its own requiresProof - as with event.task.completed, a done event is not a
++# done flow. The subscriber named by rev 2 (audit) is done. delivery is scoped to the live process, per
++# event-bus.providers.ts's own comment, same as event.task.created's note says.
+diff --git a/examples/todo-app-backend/.starciwork/features/task/fr/complete/index.yaml b/examples/todo-app-backend/.starciwork/features/task/fr/complete/index.yaml
+index 3099b993..96ff9fd5 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/fr/complete/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/fr/complete/index.yaml
+@@ -13,3 +13,3 @@ composes:
+-  - {rule: br.task.single-owner, module: src/modules/domain/task/**}
+-  - {rule: br.task.complete.once, module: src/features/complete-task/**}
+-  - {rule: br.share.role.permissions, module: src/share/access.service.ts}
++  - {rule: br.task.single-owner, module: src/modules/bussiness/task}
++  - {rule: br.task.complete.once, module: src/modules/bussiness/task}
++  - {rule: br.share.role.permissions, module: src/modules/bussiness/share}
+@@ -26,6 +26,9 @@ blockedBy:
+-# onto a done record. What still keeps this flow todo is br.task.single-owner's held flag above,
+-# requiresProof.e2e (the named `npm run test:e2e -- tasks/complete` script does not exist in this
+-# repository; the live boundary steps of scripts/live-proof.sh cover the same behavior against an
+-# API built from this tree, but requiresProof is acceptance data and is left untouched per this op's
+-# rules), and requiresProof.uat (no uat.flow for completing a task exists under features/task/uat/**
+-# - uat.task.create is the only one, and it is itself blocked by gap.task.live-proof).
++# onto a done record. composes[].module paths were corrected to the real capability directories
++# (src/modules/bussiness/task and src/modules/bussiness/share - the earlier src/modules/domain/task/**,
++# src/features/complete-task/** and src/share/access.service.ts were pre-migration paths that never
++# existed in this generation). What still keeps this flow todo is br.task.single-owner's held flag
++# above, requiresProof.e2e (the command now names the real spec - task-lifecycle.e2e-spec.ts covers
++# complete and reopen through the assembled stack, and task-isolation.e2e-spec.ts covers the stranger
++# refusal - but no passing run is captured as evidence here yet), and requiresProof.uat (no uat.flow
++# for completing a task exists under features/task/uat/** - uat.task.create is the only one, and its
++# settled run walks create, not complete).
+@@ -37 +40 @@ requiresProof:
+-    command: npm run test:e2e -- tasks/complete
++    command: npm run test:e2e -- src/tests/e2e/task/task-lifecycle.e2e-spec.ts
+diff --git a/examples/todo-app-backend/.starciwork/features/task/fr/create/index.yaml b/examples/todo-app-backend/.starciwork/features/task/fr/create/index.yaml
+index 5f305bcd..998b56af 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/fr/create/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/fr/create/index.yaml
+@@ -15,2 +15,2 @@ composes:
+-  - {rule: br.task.single-owner, module: src/modules/domain/task/**}
+-  - {rule: br.task.title.required, module: src/features/create-task/**}
++  - {rule: br.task.single-owner, module: src/modules/bussiness/task}
++  - {rule: br.task.title.required, module: src/modules/bussiness/task}
+@@ -22 +22 @@ requiresProof:
+-    command: npm run test:e2e -- tasks/create
++    command: npm run test:e2e -- src/tests/e2e/task/task-lifecycle.e2e-spec.ts
+@@ -28,7 +28,6 @@ requiresProof:
+-provenBy:
+-  unit: [impl.task.todo-app-backend.ownership]
+-  e2e:
+-    - command: npm run test:e2e -- tasks/create
+-      exit: 0
+-      at: 6f1e4b7d
+-  uat: [uat.task.create]
++# A hand-authored block sat here claiming uat.task.create as uat proof at a time when that flow was
++# todo with no settled run (v6-3 finding 5); it is removed, and the kernel derives the real one.
++# (uat.task.create has since settled a real run - runs/20260919T112844Z-5c10a673, outcome pass - which
++# is the uat lane's evidence, not something this record may claim by hand.)
++# composes[].module paths were corrected from pre-migration paths that never existed
++# (src/modules/domain/task/**, src/features/create-task/**) to the real capability directory.
+diff --git a/examples/todo-app-backend/.starciwork/features/task/fr/reopen/index.yaml b/examples/todo-app-backend/.starciwork/features/task/fr/reopen/index.yaml
+index 56a144a6..337af35f 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/fr/reopen/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/fr/reopen/index.yaml
+@@ -13 +13 @@ composes:
+-  - {rule: br.task.complete.once, module: src/features/reopen-task}
++  - {rule: br.task.complete.once, module: src/modules/bussiness/task}
+@@ -19 +19 @@ requiresProof:
+-    command: npm run test:e2e -- tasks/reopen
++    command: npm run test:e2e -- src/tests/e2e/task/task-lifecycle.e2e-spec.ts
+@@ -26,5 +26,5 @@ requiresProof:
+-# from this tree), which is exactly what that edge said was still missing. This record stays todo on
+-# its own requiresProof: the named e2e command (`npm run test:e2e -- tasks/reopen`) does not exist in
+-# this repository (acceptance data; left untouched per this op's rules - scripts/live-proof.sh's
+-# reopenTask step is the live equivalent and passed), and no uat.flow for reopening exists under
+-# features/task/uat/**.
++# from this tree), which is exactly what that edge said was still missing. composes[].module was
++# corrected from the pre-migration src/features/reopen-task to the real capability directory, and
++# requiresProof.e2e now names the real spec (task-lifecycle.e2e-spec.ts drives the reopen step through
++# the assembled stack). This record stays todo on its own requiresProof: no passing e2e run is captured
++# as evidence here yet, and no uat.flow for reopening exists under features/task/uat/**.
+diff --git a/examples/todo-app-backend/.starciwork/features/task/gap/live-proof/index.yaml b/examples/todo-app-backend/.starciwork/features/task/gap/live-proof/index.yaml
+index b2b6c3aa..f5ef3ff9 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/gap/live-proof/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/gap/live-proof/index.yaml
+@@ -4 +4 @@ title: No uat.verify run has produced a live run for task.create
+-state: todo
++state: done
+@@ -8 +8,5 @@ statement: uat.task.create names its entry, actor, ordered steps, fixtures, effe
+-  only the designed flow this record and its accounts.yaml/fixtures ref describe.
++  only the designed flow this record and its accounts.yaml/fixtures ref describe. Closed by the
++  ex-testing v7-11 lane - it booted a run-owned compose stack (postgres + keycloak realm todo + redis,
++  compose.e2e.yaml), this worktree's api on 3001 and frontend on 3000, and ran uat.task.create for real
++  with UAT_LIVE_LOGIN_AUTHORIZED=true. See runs/20260919T112844Z-5c10a673/result.md (outcome pass,
++  every assertion observed yes, all four steps walked).
+@@ -10 +14,6 @@ closedBy: uat.task.create
+-change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}
++verificationSource: authored-claim
++because: A gap closes through its closer being done, not through its own replayable command; uat.task.create
++  (this gap's closedBy) carries the real evidence - runs/20260919T112844Z-5c10a673's result.md, screens
++  and video, plus a cleanup.json whose created/deleted/verified-absent triplet accounts for the one
++  run-owned task row the walk created.
++change: {rev: 2, kind: editorial, at: 2026-09-19T11:30:00.000Z, reason: "state flips to done now that the live run this gap named actually happened; the statement's history of why it was open is retained rather than deleted."}
+diff --git a/examples/todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/index.yaml b/examples/todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/index.yaml
+index 9b37279d..07929f39 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/index.yaml
+@@ -5,0 +6,4 @@ repository: todo-app-frontend
++# v7-3 (2026-09-19): the route path names the directory as it exists on disk. Every page route in this
++# app sits under the [lang] locale segment (src/app/[lang]/, locales en|vi per src/i18n/config.ts);
++# src/app/tasks never existed. The path is quoted because core/yaml.mjs rejects a bracketed plain
++# scalar inside a flow mapping. Historical prose elsewhere in this record keeps its original paths.
+@@ -9 +13 @@ owners:
+-  - {role: route, path: src/app/tasks}
++  - {role: route, path: "src/app/[lang]/tasks"}
+diff --git a/examples/todo-app-backend/.starciwork/features/task/journey/first-task/index.yaml b/examples/todo-app-backend/.starciwork/features/task/journey/first-task/index.yaml
+index 152d0806..df1bfd8f 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/journey/first-task/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/journey/first-task/index.yaml
+@@ -18,3 +17,0 @@ requiresProof:
+-blockedBy:
+-  - {record: gap.task.live-proof, because: "This journey's requiresProof.uat names uat.task.create and uat.login.sign-in; both are themselves todo - no uat/create/runs/<runId>/ or uat/sign-in/runs/<runId>/ folder with real screenshots and a passing result.md exists yet. The former evidence.yaml here (provenance: starci-kernel, stale: true) pointed at runs that never happened."}
+-
+@@ -23,2 +20,2 @@ blockedBy:
+-provenBy:
+-  requirements: [fr.login.sign-in, fr.task.create]
++# A hand-authored block sat here (requirements: [fr.login.sign-in, fr.task.create]); it is removed, and
++# the kernel derives the real one.
+diff --git a/examples/todo-app-backend/.starciwork/features/task/nfr/list/latency/index.yaml b/examples/todo-app-backend/.starciwork/features/task/nfr/list/latency/index.yaml
+index d5659f9d..ec6b02d3 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/nfr/list/latency/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/nfr/list/latency/index.yaml
+@@ -15,0 +16,7 @@ requiresProof:
++
++# measurement.how names k6 run scripts/load/list.js, but no scripts/load directory or k6 script exists
++# anywhere in this repository - the same absence plan's and share's nfrs record through gap records
++# (gap.plan.no-load-harness, gap.share.load-proof). Naming a gap for the missing harness is the gaps
++# lane's; this record stays todo on requiresProof.measurement regardless. impl.task.todo-app-backend.list
++# already declined to claim it ("nfr.task.list.latency has been dropped from proves: this lane never
++# measured a p95 - there is no k6 harness on this host").
+diff --git a/examples/todo-app-backend/.starciwork/features/task/uat/create/index.yaml b/examples/todo-app-backend/.starciwork/features/task/uat/create/index.yaml
+index 85945844..aaf070d6 100644
+--- a/examples/todo-app-backend/.starciwork/features/task/uat/create/index.yaml
++++ b/examples/todo-app-backend/.starciwork/features/task/uat/create/index.yaml
+@@ -4 +4 @@ title: Create a task, and fail to delete somebody else's
+-state: todo
++state: done
+@@ -20,3 +20,6 @@ cleanup:
+-proves: [fr.task.create, br.task.single-owner]
+-blockedBy:
+-  - {record: gap.task.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/create/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}
++# The run's stranger step did observe br.task.single-owner's stranger-delete arm (assertion recorded
++# yes in runs/20260919T112844Z-5c10a673's result.md/ux-checks.json/manifest.yaml), but the rule stays
++# todo - its own evidence never exercises the accepted-editor arm - and the gate refuses a done flow
++# whose proves names a todo record. The observation lives in the run artifacts, not on this edge.
++proves: [fr.task.create]
++change: {rev: 1, kind: editorial, at: 2026-09-19T11:30:00.000Z, reason: "state flips to done: run 20260919T112844Z-5c10a673 walked every step against the real stack (screens + video + outcome: pass in result.md; see evidence.yaml's run). The former blockedBy edge on gap.task.live-proof is removed because that gap is now closed by this record, and proves is narrowed to fr.task.create - br.task.single-owner was observed in the run but is still todo, and a done record may not claim to prove it."}

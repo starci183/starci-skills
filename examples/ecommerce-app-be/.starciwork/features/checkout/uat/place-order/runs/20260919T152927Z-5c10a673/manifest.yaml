@@ -1,0 +1,312 @@
+schema: starci/uat-run-manifest@1
+id: uat.checkout.place-order.runs.20260919T152927Z-5c10a673
+nodeId: uat.checkout.place-order
+inputDigest: 94ce378031a56224ac426858751238cc021c63a0ad0281881605d31ac0a02891
+outcome: fail
+assertions:
+  - id: step1.loading
+    expected: yes
+    observed: yes
+    note: The sign-in submit shows its own pending label ("Signing in…") while /api/session answers; the
+      catalogue read is a server render, so the grid is the settled answer.
+  - id: step1.completion
+    expected: yes
+    observed: yes
+    note: After signing in through /api/session, /en/browse listed the catalogue with prices (the order
+      service's session-guarded cart query's catalog snapshot).
+  - id: step2.completion
+    expected: yes
+    observed: yes
+    note: "The tile's add control answered \"In your cart: 1\" (the addCartItem mutation's line
+      quantity) and /en/cart renders the Enamel mug line."
+  - id: step3.loading
+    expected: yes
+    observed: yes
+    note: The confirm button renders its pending label ("Confirming…") while placeOrder answers.
+  - id: step3.completion
+    expected: yes
+    observed: yes
+    note: 'The confirmation card answered order d4558e99-ea50-42be-92dc-813c5b15c101 with status, total
+      and payment id; the cart then read as the empty state ("Your cart is empty": true).'
+  - id: step4.completion
+    expected: yes
+    observed: yes
+    note: Re-pressing the same rendered confirmation re-sent the same idempotency key; the service
+      returned the first order (same orderId shown) marked "already sent" - no second order was
+      written.
+  - id: step4.errorFeedback
+    expected: no
+    observed: no
+    note: A replayed confirmation must not surface a refusal line.
+  - id: step5.errorFeedback
+    expected: yes
+    observed: yes
+    note: 'The empty-cart refusal rendered: "The order service refused: your cart is empty. Nothing was
+      placed and nothing changed."'
+  - id: step6.errorFeedback
+    expected: yes
+    observed: yes
+    note: "The insufficient-stock refusal named the product, the stock that exists and the asked
+      quantity (catalogue stock is 2, the cart asked for 3); the cart kept its lines (Steel thermos
+      still listed: true)."
+  - id: step7.order-known
+    expected: yes
+    observed: yes
+    note: The account surface names the signed-in person and the order service's joined answer that this
+      account HAS placed orders (hasOrders).
+  - id: step7.completion
+    expected: yes
+    observed: no
+    note: "BE_CAPABILITY_MISSING: the confirmed order d4558e99-ea50-42be-92dc-813c5b15c101 is NOT listed
+      - the backend serves no order-list door (identity's account query answers hasOrders only, and
+      order serves no orders read), so the surface honestly states that orders exist without
+      fabricating rows."
+assets:
+  - path: screens/step1-sign-in-and-catalogue.png
+    sha256: 75e7365bbdfe850e8f4b25e4b3e561d292c1c7f43cec8e5f6d0d08a8ef593db1
+    size: 36295
+  - path: screens/step2-add-one-product.png
+    sha256: c7c7c18a5635a10fef2ba8670dc5d7b64e7880463545bf96b9da4889103f522b
+    size: 27387
+  - path: screens/step3-confirm-order.png
+    sha256: 3d84f489a38db56eb6a4c811985c3a26b8402f037fe574160909a409b9f2a6f6
+    size: 41235
+  - path: screens/step4-replay-confirmation.png
+    sha256: a3a32f1907d55d277f55088c37fc976b3275a2416319d101b374b06216e7a85b
+    size: 47192
+  - path: screens/step5-confirm-empty-cart.png
+    sha256: 4d91c4822181e6265b657472cd7a98ef883f91d64ab46a092688f269999ffb25
+    size: 38462
+  - path: screens/step6-beyond-stock-refusal.png
+    sha256: 644b78f9c020e0f9733a6ff11acb99fe911b57d99ec0b43c067a10b6d5b79d2c
+    size: 27690
+  - path: screens/step7-account-page.png
+    sha256: 6a330165236e9bfc6ea2160b109c5ad75cbf2370dc356a9504d7630193017dba
+    size: 33244
+  - path: screens/screenshot.png
+    sha256: 6a330165236e9bfc6ea2160b109c5ad75cbf2370dc356a9504d7630193017dba
+    size: 33244
+  - path: videos/place-order.webm
+    sha256: 220b7777d819041269b673e39afea9af3c2daf695c426c4fc9e7933b6e31b4c7
+    size: 18190
+  - path: videos/place-order.webm
+    sha256: 7a3a4968a8e73dafe7f8aab63997a9ebf350594f1e3f45f389aa5f1c40e91bde
+    size: 216442
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:4469
+  frontendCommit: 5c10a673
+  backendCommit: 5c10a673
+files:
+  cleanup.json:
+    schema: starci/uat-cleanup@1
+    flow: uat.checkout.place-order
+    ownedResourcesCreated:
+      - kind: person
+        id: uat-buyer@ecommerce.dev
+        note: Disposable person already existed on the store (EMAIL_TAKEN); the walk signed into it.
+      - kind: order
+        id: d4558e99-ea50-42be-92dc-813c5b15c101
+        note: Written by the checkout confirmation this run pressed; per the record's own cleanup note a
+          confirmed order is final - no delete door exists, so it stays.
+    ownedResourcesDeleted: []
+    verifiedAbsent: []
+    note: Unresolved owned resource(s) remain - see ownedResourcesCreated vs
+      ownedResourcesDeleted/verifiedAbsent.
+  flows.json:
+    schema: starci/uat-flows@1
+    flow:
+      id: uat.checkout.place-order
+      title: Browse, confirm an order, replay it, and hit both refusals
+      steps:
+        - order: 1
+          actor: person
+          action: Sign in as the disposable person and open the catalogue.
+          expected: products list with their prices
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: person
+          action: Add one product to the cart.
+          expected: the cart shows the line
+          checks:
+            - id: completion
+              expected: yes
+        - order: 3
+          actor: person
+          action: Confirm the order.
+          expected: a confirmation shows and the cart reads empty
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 4
+          actor: person
+          action: Send the same confirmation again unchanged.
+          expected: the first confirmation returns; no second order is written
+          checks:
+            - id: completion
+              expected: yes
+            - id: errorFeedback
+              expected: no
+        - order: 5
+          actor: person
+          action: Try to confirm with the cart now empty.
+          expected: a refusal shows the cart-empty reason; nothing changes
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 6
+          actor: person
+          action: Add a line for more of a product than the catalogue holds, then confirm.
+          expected: a refusal names the product, the requested quantity and the stock that exists; the cart
+            keeps its lines
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 7
+          actor: person
+          action: Open the account page.
+          expected: the confirmed order is listed for this person
+          checks:
+            - id: completion
+              expected: yes
+      proves:
+        - fr.checkout.place-order
+        - br.checkout.place-order
+        - fr.checkout.cart.add
+        - fr.checkout.cart.list
+        - br.checkout.cart
+  readback.json:
+    schema: starci/uat-readback@1
+    flow: uat.checkout.place-order
+    checked:
+      - step1.loading
+      - step1.completion
+      - step2.completion
+      - step3.loading
+      - step3.completion
+      - step4.completion
+      - step4.errorFeedback
+      - step5.errorFeedback
+      - step6.errorFeedback
+      - step7.order-known
+      - step7.completion
+    notRun: []
+  run-ledger.json:
+    schema: starci/uat-run-ledger@1
+    runId: 20260919T152927Z-5c10a673
+    flow: uat.checkout.place-order
+    started: 2026-09-19T15:29:28.118Z
+    finished: 2026-09-19T15:29:35.510Z
+    accountsDeclared:
+      - role: person
+        username: uat-buyer@ecommerce.dev
+    reused: []
+    created:
+      - kind: person
+        id: uat-buyer@ecommerce.dev
+        note: Disposable person already existed on the store (EMAIL_TAKEN); the walk signed into it.
+      - kind: order
+        id: d4558e99-ea50-42be-92dc-813c5b15c101
+        note: Written by the checkout confirmation this run pressed; per the record's own cleanup note a
+          confirmed order is final - no delete door exists, so it stays.
+  ux-checks.json:
+    schema: starci/uat-ux-checks@1
+    flow: uat.checkout.place-order
+    checks:
+      - id: step1.loading
+        expected: yes
+        observed: yes
+        note: The sign-in submit shows its own pending label ("Signing in…") while /api/session answers; the
+          catalogue read is a server render, so the grid is the settled answer.
+      - id: step1.completion
+        expected: yes
+        observed: yes
+        note: After signing in through /api/session, /en/browse listed the catalogue with prices (the order
+          service's session-guarded cart query's catalog snapshot).
+      - id: step2.completion
+        expected: yes
+        observed: yes
+        note: "The tile's add control answered \"In your cart: 1\" (the addCartItem mutation's line
+          quantity) and /en/cart renders the Enamel mug line."
+      - id: step3.loading
+        expected: yes
+        observed: yes
+        note: The confirm button renders its pending label ("Confirming…") while placeOrder answers.
+      - id: step3.completion
+        expected: yes
+        observed: yes
+        note: 'The confirmation card answered order d4558e99-ea50-42be-92dc-813c5b15c101 with status, total
+          and payment id; the cart then read as the empty state ("Your cart is empty": true).'
+      - id: step4.completion
+        expected: yes
+        observed: yes
+        note: Re-pressing the same rendered confirmation re-sent the same idempotency key; the service
+          returned the first order (same orderId shown) marked "already sent" - no second order was
+          written.
+      - id: step4.errorFeedback
+        expected: no
+        observed: no
+        note: A replayed confirmation must not surface a refusal line.
+      - id: step5.errorFeedback
+        expected: yes
+        observed: yes
+        note: 'The empty-cart refusal rendered: "The order service refused: your cart is empty. Nothing was
+          placed and nothing changed."'
+      - id: step6.errorFeedback
+        expected: yes
+        observed: yes
+        note: "The insufficient-stock refusal named the product, the stock that exists and the asked
+          quantity (catalogue stock is 2, the cart asked for 3); the cart kept its lines (Steel
+          thermos still listed: true)."
+      - id: step7.order-known
+        expected: yes
+        observed: yes
+        note: The account surface names the signed-in person and the order service's joined answer that this
+          account HAS placed orders (hasOrders).
+      - id: step7.completion
+        expected: yes
+        observed: no
+        note: "BE_CAPABILITY_MISSING: the confirmed order d4558e99-ea50-42be-92dc-813c5b15c101 is NOT listed
+          - the backend serves no order-list door (identity's account query answers hasOrders only,
+          and order serves no orders read), so the surface honestly states that orders exist without
+          fabricating rows."
+  walk.json:
+    schema: starci/uat-walk@1
+    flow: uat.checkout.place-order
+    steps:
+      - step: step1-sign-in-and-catalogue
+        startedAt: 2026-09-19T15:29:28.415Z
+        endedAt: 2026-09-19T15:29:30.070Z
+        screenshot: step1-sign-in-and-catalogue
+      - step: step2-add-one-product
+        startedAt: 2026-09-19T15:29:30.106Z
+        endedAt: 2026-09-19T15:29:30.742Z
+        screenshot: step2-add-one-product
+      - step: step3-confirm-order
+        startedAt: 2026-09-19T15:29:30.774Z
+        endedAt: 2026-09-19T15:29:32.138Z
+        screenshot: step3-confirm-order
+      - step: step4-replay-confirmation
+        startedAt: 2026-09-19T15:29:32.169Z
+        endedAt: 2026-09-19T15:29:32.255Z
+        screenshot: step4-replay-confirmation
+      - step: step5-confirm-empty-cart
+        startedAt: 2026-09-19T15:29:32.287Z
+        endedAt: 2026-09-19T15:29:32.907Z
+        screenshot: step5-confirm-empty-cart
+      - step: step6-beyond-stock-refusal
+        startedAt: 2026-09-19T15:29:32.937Z
+        endedAt: 2026-09-19T15:29:34.949Z
+        screenshot: step6-beyond-stock-refusal
+      - step: step7-account-page
+        startedAt: 2026-09-19T15:29:34.978Z
+        endedAt: 2026-09-19T15:29:35.531Z
+        screenshot: step7-account-page

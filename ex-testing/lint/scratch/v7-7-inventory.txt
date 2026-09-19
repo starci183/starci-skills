@@ -1,0 +1,49 @@
+== br.checkout.place-order | outcome pass | stale false
+    ac.checkout.place-order.becomes-a-buyer | exit 0 | pass | npx jest --config src/tests/e2e/jest.config.js order-lifecycle
+    ac.checkout.place-order.empty-cart-is-refused | exit 0 | pass | npx jest -t ac.checkout.place-order.empty-cart-is-refused --runInBand
+    ac.checkout.place-order.stock-is-checked-at-confirmation | exit 0 | pass | npx jest -t ac.checkout.place-order.stock-is-checked-at-confirmation --runInBand
+== contract.checkout.order-for-identity | outcome pass | stale false
+    provider | exit 0 | pass | npx jest buyer.controller.spec --runInBand
+    consumer | exit 0 | pass | npx jest order.client.spec --runInBand
+    wire | exit 0 | pass | npx jest --config src/tests/e2e/jest.config.js order-lifecycle
+== fr.checkout.place-order | outcome pass | stale false
+    unit-composed-rules | exit 0 | pass | npx jest -t fr.checkout.place-order --runInBand
+    e2e | exit 0 | pass | npx jest --config src/tests/e2e/jest.config.js order-lifecycle checkout/payment-failure
+== impl.checkout.ecommerce-app-be.order-checkout | outcome pass | stale false
+    unit | exit 0 | pass | npx jest src/modules/bussiness/order src/modules/bussiness/cart src/modules/bussiness/catalog src/modules/bussiness/payment src/modules/integrations/identity src/features/checkout --runInBand
+    e2e | exit 0 | pass | npx jest --config src/tests/e2e/jest.config.js order-lifecycle checkout/payment-failure
+== sds.checkout.order-flow | outcome pass | stale false
+    implementation | exit 0 | pass | npx jest -t sds.checkout.order-flow --runInBand
+    transitions | exit 0 | pass | npx jest -t t-refuse --runInBand
+    live-sequence | exit 0 | pass | npx jest --config src/tests/e2e/jest.config.js order-lifecycle
+== br.identity.sign-in | outcome pass | stale false
+    ac.identity.sign-in.known-pair-issues-a-session-token | exit 0 | pass | npx jest -t ac.identity.sign-in.known-pair-issues-a-session-token --runInBand
+    ac.identity.sign-in.wrong-pair-is-refused-alike | exit 0 | pass | npx jest -t ac.identity.sign-in.wrong-pair-is-refused-alike --runInBand
+== fr.identity.sign-in | outcome pass | stale false
+    unit-composed-rules | exit 0 | pass | npx jest -t fr.identity.sign-in --runInBand
+    e2e | exit 0 | pass | npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+== impl.identity.ecommerce-app-be.identity-account | outcome pass | stale false
+    unit | exit 0 | pass | npx jest src/modules/bussiness/account src/modules/bussiness/session src/modules/integrations/order src/features/identity --runInBand
+    e2e | exit 0 | pass | npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in order-lifecycle/cross-service-identity
+REC brand | work/brand | done | owns: (none)
+REC ac.checkout.place-order.becomes-a-buyer | work/acceptance-criterion | - | owns: (none)
+REC ac.checkout.place-order.empty-cart-is-refused | work/acceptance-criterion | - | owns: (none)
+REC ac.checkout.place-order.stock-is-checked-at-confirmation | work/acceptance-criterion | - | owns: (none)
+REC br.checkout.place-order | work/business-rule | done | owns: src/modules/bussiness/order,src/modules/integrations/identity,src/modules/integrations/order
+REC contract.checkout.order-for-identity | work/contract | done | owns: (none)
+REC fr.checkout.place-order | work/functional-requirement | done | owns: (none)
+REC gap.checkout.second-example-gates | work/gap | todo | owns: (none)
+REC impl.checkout.ecommerce-app-be.order-checkout | work/implementation | done | owns: src/modules/bussiness/order,src/modules/bussiness/cart,src/modules/bussiness/catalog,src/modules/bussiness/payment,src/modules/integrations/identity,src/features/checkout
+REC integration.checkout.postgres | work/integration | todo | owns: (none)
+REC integration.checkout.redis | work/integration | todo | owns: (none)
+REC sds.checkout.order-flow | work/sds-component | done | owns: src/modules/bussiness/order,src/modules/bussiness/cart,src/modules/bussiness/payment,src/modules/bussiness/catalog
+REC ui.checkout.cart | work/ui-screen | uninvestigate | owns: (none)
+REC ui.checkout.landing-home | work/ui-screen | uninvestigate | owns: (none)
+REC ui.checkout.shop-browse | work/ui-screen | uninvestigate | owns: (none)
+REC ui.checkout.stock-refused | work/ui-screen | uninvestigate | owns: (none)
+REC ac.identity.sign-in.known-pair-issues-a-session-token | work/acceptance-criterion | - | owns: (none)
+REC ac.identity.sign-in.wrong-pair-is-refused-alike | work/acceptance-criterion | - | owns: (none)
+REC br.identity.sign-in | work/business-rule | done | owns: src/modules/bussiness/account,src/modules/bussiness/session
+REC fr.identity.sign-in | work/functional-requirement | done | owns: (none)
+REC impl.identity.ecommerce-app-be.identity-account | work/implementation | done | owns: src/modules/bussiness/account,src/modules/bussiness/session,src/modules/integrations/order,src/features/identity
+REC ui.identity.sign-in | work/ui-screen | uninvestigate | owns: (none)

@@ -1,0 +1,7 @@
+$ C:\PROGRA~1\Git\bin\bash.exe -c "API_URL=http://localhost:3005 scripts/live-proof.sh"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 7
+
+-- signIn demo (correct password) -> sessionToken
+
+

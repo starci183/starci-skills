@@ -19,7 +19,7 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
       assert.ok(contract.steps[0].reads.includes('application-stacks'),id);
     }
   }
-  for(const file of ['checks/stacks.mjs','schemas/application-stacks.schema.json','knowledge/application-stacks.json',
+  for(const file of ['scripts/checks/stacks.mjs','schemas/application-stacks.schema.json','knowledge/application-stacks.json',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
     ...['gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
@@ -50,7 +50,7 @@ test('stacks CLI refuses missing or malformed evidence without echoing file cont
 test('runtime packaging excludes accidental generated example plaintext and ciphertext',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-package-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-package-'));fs.rmSync(directory,{recursive:true,force:true});});
-  for(const entry of ['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','checks','providers','approvals',
+  for(const entry of ['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','providers','approvals',
     'execution','knowledge','contracts','specifications','examples','scripts','core','schemas'])
     fs.cpSync(path.join(root,entry),path.join(directory,entry),{recursive:true});
   const base='examples/todo-app-backend/.starcistacks/dev/';

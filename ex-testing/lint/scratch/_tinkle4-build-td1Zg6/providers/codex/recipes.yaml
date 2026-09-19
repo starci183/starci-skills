@@ -1,0 +1,25 @@
+schema: starci/codex-recipes@1
+api: api.json
+recipes:
+  solo-workflow:
+    host: current-codex-chat
+    controlLayers:
+      - plan
+      - coordinator
+      - workflow-wrapper
+    operationSequence:
+      - collaboration.spawn_agent
+      - collaboration.wait_agent
+      - normalize-operation-output
+    concurrency: only-independent-ready-operations-up-to-three
+  bootstrap-orca:
+    host: external-codex-chat
+    sequence:
+      - load-providers-orca-contracts
+      - create-native-orca-plan-coordinator
+      - hand-off-run
+      - leave-control-loop
+forbidden:
+  - codex-hosted-orchestration
+  - spawn-agent-for-plan-or-workflow-wrapper
+  - op-agent-spawns-subagent

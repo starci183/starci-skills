@@ -1,0 +1,11 @@
+schema: work/gap
+id: gap.share.load-proof
+title: No k6 run has measured nfr.share.revoke.read-latency against the live stack
+state: todo
+statement: nfr.share.revoke.read-latency names its measurement exactly (k6 run scripts/load/share-status.js
+  with 20 seeded collaborators and 50 virtual users for 60 seconds, p95 < 200ms), but neither that k6
+  script nor a load run against this lane's own api (port 3101, database todo_share) exists yet. This
+  lane proved the invitation read path functionally (invitation.service.spec.ts, scripts/live-proof-share.sh)
+  but ran no load tool and measured no percentile, which is a different fact from a functional pass.
+closedBy: nfr.share.revoke.read-latency
+change: {rev: 1, kind: initial, at: 2026-09-18T16:00:00.000Z}

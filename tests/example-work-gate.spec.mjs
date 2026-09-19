@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { checkWorkTree, checkFamiliesDrift, FAMILIES } from '../scripts/check-example-work.mjs';
+import { checkWorkTree, checkFamiliesDrift, FAMILIES } from '../scripts/checks/check-example-work.mjs';
 
 /**
- * One fixture tree per new-concept rule in scripts/check-example-work.mjs, proving each rule refuses the
+ * One fixture tree per new-concept rule in scripts/checks/check-example-work.mjs, proving each rule refuses the
  * exact malformed shape it targets - and, where useful, that the corrected shape is accepted. Fixtures live
  * on the same drive as the repo (never os.tmpdir(), which can be a different drive on this host and break
  * relative path handling used elsewhere in the toolchain).
@@ -575,4 +575,148 @@ test('concept 13: _resources custody is the plain work/resource schema (no @N), 
     '_resources/identities/demo/resource.yaml': 'schema: work/resource\nid: identity.f.demo\nkind: identity\nowner: o\nrevision: r\ndetails: {}\n',
   });
   assert.equal(good.length, 0, good.join('\n'));
+});
+
+test('payload rule: a yaml whose schema is not a work/* record schema is an artifact payload - INFO PAYLOAD_SKIPPED, never id-matched to its path, never ref-collected', () => {
+  // A tool receipt inside a family path: no id, foreign schema. Before the rule this drew
+  // "id is undefined, but its place says ..."; now it is counted as a skipped payload.
+  const workRoot = tree({
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: todo\n',
+    'features/f/ui/screen/assets/generation-receipts.yaml': 'schema: starci/generation-receipts@1\ntool: image_gen.imagegen\ncalls: []\n',
+  });
+  const problems = [];
+  const infos = [];
+  checkWorkTree(workRoot, problems, [], infos);
+  assert.equal(problems.length, 0, problems.join('\n'));
+  assert.ok(infos.some(i => i.includes('PAYLOAD_SKIPPED') && i.includes('generation-receipts.yaml')), infos.join('\n'));
+
+  // A run manifest's own id registers no record, and record-shaped ids inside it (assertions,
+  // nodeId) are the tool's output - not edges. A dangling-looking id inside a payload cannot refuse.
+  const workRoot2 = tree({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: todo\n',
+    'features/f/uat/x/runs/run-1/manifest.yaml': 'schema: starci/uat-run-manifest@1\nid: uat.f.x.runs.run-1\nnodeId: uat.f.x\nassertions:\n  - {id: br.f.ghost, expected: yes, observed: not-run}\n',
+  });
+  const problems2 = [];
+  checkWorkTree(workRoot2, problems2);
+  assert.equal(problems2.length, 0, problems2.join('\n'));
+
+  // ...while the same dangling id authored on a real record still refuses - the payload skip
+  // narrows the walk, not the ref check itself.
+  const stillChecked = refusalsFor({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: todo\nproves: [br.f.ghost]\n',
+  });
+  assert.ok(stillChecked.some(p => p.includes('br.f.ghost, which no record owns')), stillChecked.join('\n'));
+
+  // A yaml carrying NO schema line is not payload: it stays on the record path and the
+  // id-matches-path rule still sees it.
+  const schemaLess = refusalsFor({
+    'features/f/ui/screen/assets/loose.yaml': 'note: no schema declared\n',
+  });
+  assert.ok(schemaLess.some(p => p.includes('id is undefined, but its place says ui.f.screen.assets')), schemaLess.join('\n'));
+});
+
+// ---------- v11 compact format: inlined acceptance criteria ----------
+
+test('v11 compact: `parent#frag` resolves an inlined criterion by short name, last id segment, and full former ac id', () => {
+  const workRoot = tree({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when, text: "it works"}\n',
+    'features/f/br/other/index.yaml': 'schema: work/business-rule\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [br.f.rule#works-when, br.f.rule#ac.f.rule.works-when]\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.equal(problems.length, 0, problems.join('\n'));
+  assert.equal(warnings.length, 0, warnings.join('\n'));
+
+  // a fragment no criterion of the parent carries is refused
+  const badFrag = refusalsFor({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\n',
+    'features/f/br/other/index.yaml': 'schema: work/business-rule\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [br.f.rule#nothing-here]\n',
+  });
+  assert.ok(badFrag.some(p => p.includes('br.f.rule#nothing-here') && p.includes('names no criterion')), badFrag.join('\n'));
+
+  // a fragment on a parent that is not a record is refused
+  const badParent = refusalsFor({
+    'features/f/br/other/index.yaml': 'schema: work/business-rule\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [br.f.ghost#works-when]\n',
+  });
+  assert.ok(badParent.some(p => p.includes('br.f.ghost#works-when') && p.includes('no record owns br.f.ghost')), badParent.join('\n'));
+
+  // and the truncated `something#` form is refused, not silently ignored
+  const malformed = refusalsFor({
+    'features/f/br/other/index.yaml': 'schema: work/business-rule\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [br.f.rule#]\n',
+  });
+  assert.ok(malformed.some(p => p.includes('REF_MALFORMED')), malformed.join('\n'));
+});
+
+test('v11 compact: a bare collapsed ac id still resolves through the parent, but warns AC_UNREMAPPED_REF; the entry\'s own declaration never warns', () => {
+  const workRoot = tree({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\n',
+    'features/f/br/other/index.yaml': 'schema: work/business-rule\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [ac.f.rule.works-when]\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.equal(problems.length, 0, problems.join('\n'));
+  const remapped = warnings.filter(w => w.includes('AC_UNREMAPPED_REF'));
+  assert.equal(remapped.length, 1, warnings.join('\n')); // only br.f.other's ref warns
+  assert.ok(remapped[0].includes('br/other/index.yaml'), remapped[0]);
+  assert.ok(remapped[0].includes('br.f.rule#ac.f.rule.works-when'), remapped[0]);
+});
+
+test('v11 compact: an inline criterion id must be the id its place implies, may not collide, and may not carry its own lifecycle', () => {
+  // wrong prefix - the compact form keeps the former record's own id
+  const mismatch = refusalsFor({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.elsewhere.works-when, name: works-when}\n',
+  });
+  assert.ok(mismatch.some(p => p.includes('AC_ID_MISMATCH')), mismatch.join('\n'));
+
+  // an inline id that a live record already owns
+  const liveCollision = refusalsFor({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.kept, name: kept}\n',
+    'features/f/br/rule/ac/kept/index.yaml': 'schema: work/acceptance-criterion\nid: ac.f.rule.kept\ntitle: t\nrule: br.f.rule\n',
+  });
+  assert.ok(liveCollision.some(p => p.includes('AC_ID_COLLISION')), liveCollision.join('\n'));
+
+  // the same inline id claimed under two parents
+  const dualClaim = refusalsFor({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.a.dup, name: dup}\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.a.dup, name: dup}\n',
+  });
+  assert.ok(dualClaim.some(p => p.includes('AC_ID_COLLISION') && p.includes('br.f.a') && p.includes('br.f.b')), dualClaim.join('\n'));
+
+  // an entry carrying state/evidence/change is lifecycle content smuggled inline - it belongs in its own ac record
+  const lifecycle = refusalsFor({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.tracked, name: tracked, state: todo}\n',
+  });
+  assert.ok(lifecycle.some(p => p.includes('AC_LIFECYCLE_INLINE')), lifecycle.join('\n'));
+});
+
+test('v11 compact: structured ref fields (blockedBy.record, closedBy, appliesTo) resolve `parent#frag` and collapsed ac ids to the carrying record', () => {
+  // a blockedBy on one criterion of a record is a wait on that record - resolves, no dangling refusal
+  const blocked = refusalsFor({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\n',
+    'features/f/br/other/index.yaml': 'schema: work/business-rule\nid: br.f.other\ntitle: t\nstate: todo\nblockedBy:\n  - {record: "br.f.rule#works-when", because: "waiting on that criterion"}\n',
+  });
+  assert.equal(blocked.filter(p => p.includes('does not exist')).length, 0, blocked.join('\n'));
+
+  // closedBy naming a collapsed criterion's old id still finds the record that owns it
+  const gapClosed = refusalsFor({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: done\nacceptance:\n  - {id: ac.f.rule.works-when, name: works-when}\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: done\nstatement: s\nclosedBy: ac.f.rule.works-when\nverificationSource: authored-claim\nbecause: closed\n',
+  });
+  assert.equal(gapClosed.filter(p => p.includes('no record owns') || p.includes('closedBy')).length, 0, gapClosed.join('\n'));
+});
+
+test('v11 compact: a kept-separate ac record still resolves as itself, and `parent#ac-id` reaches it through the parent', () => {
+  const workRoot = tree({
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule\nid: br.f.rule\ntitle: t\nstate: todo\nacceptanceCriteria: [has-own]\n',
+    'features/f/br/rule/ac/has-own/index.yaml': 'schema: work/acceptance-criterion\nid: ac.f.rule.has-own\ntitle: t\nrule: br.f.rule\n',
+    'features/f/br/other/index.yaml': 'schema: work/business-rule\nid: br.f.other\ntitle: t\nstate: todo\nrefs: [br.f.rule#ac.f.rule.has-own, ac.f.rule.has-own]\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.equal(problems.length, 0, problems.join('\n'));
+  // the kept ac is still a live record, so the bare id is a normal ref - no remap warning
+  assert.equal(warnings.filter(w => w.includes('AC_UNREMAPPED_REF')).length, 0, warnings.join('\n'));
 });

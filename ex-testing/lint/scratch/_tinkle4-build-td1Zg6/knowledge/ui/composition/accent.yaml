@@ -1,0 +1,136 @@
+schema: starci/knowledge-source@1
+id: ui.composition.accent
+title: Accent composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: the page has a small budget of strongest emphasis, so where is it
+  spent, and what does spending it there promise?
+  Accent is scarce by design. Every extra dominant treatment reduces what the previous one meant, so
+  the decision is about allocation, not about paint. Nothing in this file may change what the product
+  is claiming; accent only makes an existing claim easier to find.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+rules:
+  - id: ACCENT-1
+    title: One dominant decision accent
+    governs: |-
+      Governs how many strongest treatments a decision region may hold.
+    cases:
+      - id: case-1
+        when: A decision region offers one clear next action
+        assert: |-
+          Exactly one dominant accent sits inside that decision owner, on `Button variant="primary"`, whether it carries `onPress` or `href`
+      - id: case-2
+        when: Sibling actions share the region
+        assert: |-
+          Each sibling carries a weaker published variant that states its real consequence
+      - id: case-3
+        when: Two peer choices genuinely carry equal consequence
+        assert: |-
+          Neither carries the dominant accent, and no paint breaks the tie
+      - id: case-4
+        when: Separate regions each have their own next step
+        assert: |-
+          Each dominant accent is counted within its own decision owner, and none is counted twice
+      - id: case-5
+        when: |-
+          The count would change in a compact layout or a loading state
+        assert: |-
+          The count of dominant accents is identical in every state and at every width
+  - id: ACCENT-2
+    title: Compact identity accent
+    governs: |-
+      Governs the small visual anchor that helps a reader scan peers.
+    cases:
+      - id: case-1
+        when: |-
+          Peer features, rows, or sections need a compact anchor for scanning
+        assert: |-
+          `IconTile tone="accent"`, or `Icon` in its declared role, carries it, with a reviewed semantic glyph named in the `.starciwork` specification
+      - id: case-2
+        when: The anchor sits beside a name
+        assert: |-
+          The visible text identity remains, and the mark never replaces it
+      - id: case-3
+        when: The direction wants a different plate size or shape
+        assert: |-
+          The published geometry carries it, at `sm` 32 or `md` 40 nominal CSS pixels, and no coloured rounded square is rebuilt around an icon
+      - id: case-4
+        when: |-
+          The glyph would be the only identity for an unfamiliar feature
+        assert: |-
+          Every unfamiliar feature carries a name; no glyph is its sole identity
+  - id: ACCENT-3
+    title: Selection, destination, and focus stay distinct
+    governs: |-
+      Governs three treatments that tend to collapse into one another.
+    cases:
+      - id: case-1
+        when: |-
+          A region can hold a persistent selection, a destination, a command emphasis, and keyboard focus at once
+        assert: |-
+          Each of the four resolves to its own published owner and its own treatment
+      - id: case-2
+        when: Selection is being expressed
+        assert: |-
+          Selection carries a non-colour cue and survives focus moving elsewhere
+      - id: case-3
+        when: A destination sits inside body copy
+        assert: |-
+          It is identifiable as a destination at rest, before hover and before focus
+      - id: case-4
+        when: Colour is removed, or the viewer is in forced colours
+        assert: |-
+          All three remain distinguishable, because none relies on fill alone
+      - id: case-5
+        when: A brief hover is mistaken for selection
+        assert: No transient cue carries a persistent value
+  - id: ACCENT-4
+    title: Accent progress requires a real measurement
+    governs: Governs the accent fill that reads as completion.
+    cases:
+      - id: case-1
+        when: Authority supplies a verified value from 0 to 100
+        assert: |-
+          `Progress` carries a truthful `label` and that `value`, and the accent fill presents that measurement only
+      - id: case-2
+        when: The value has not resolved
+        assert: |-
+          `isSkeleton` is bound, and no zero-length bar states a measurement nobody made
+      - id: case-3
+        when: |-
+          A bar, ring, or line is decorative, or expresses a ranking rather than completion
+        assert: It carries no progress semantics at all
+      - id: case-4
+        when: The fill is tempting to read as an outcome
+        assert: |-
+          The fill states a measurement, and a separate outcome owner states the outcome
+  - id: ACCENT-5
+    title: Outcome and destructive authority are not accent
+    governs: Governs the treatments accent must not stand in for.
+    cases:
+      - id: case-1
+        when: |-
+          Content reports success, warning, danger, pending, or selection
+        assert: |-
+          `Badge`, a presentation-state owner, or the current-state owner carries it; the primary accent carries none of them
+      - id: case-2
+        when: A final destructive CTA is required
+        assert: |-
+          A typed danger action treatment is required first, and while `ButtonVariant` publishes no danger value the `.starciwork` specification records that gap
+      - id: case-3
+        when: Local red would bridge that gap today
+        assert: |-
+          No local red and no family repaint of `primary` appears against that action
+      - id: case-4
+        when: An ordinary primary action looks consequential
+        assert: |-
+          Consequence and confirmation are named in the product decision, not inferred from the emphasis
+doesNotDecide: |-
+  Which rank the content carries is [Hierarchy](hierarchy.yaml), and which action deserves the decision
+  emphasis is [CTA](cta.yaml). Which conditions the state owners can be in is [State](state.yaml).
+  Whether a distinction survives forced colours and reduced motion once rendered is
+  [Accessibility](../proof/accessibility.yaml) and [Motion](../proof/motion.yaml), and whether the
+  emphasis claims something authority never said is [Render truth](../proof/render-truth.yaml).

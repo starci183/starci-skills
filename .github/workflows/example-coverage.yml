@@ -1,0 +1,69 @@
+name: example-coverage
+
+# Uploads unit-test coverage for the example apps that have a unit suite. Each app uploads under its
+# own Codecov flag so the examples stay separable from each other and from the main repository's
+# coverage (root ci.yml already uploads coverage/lcov.info without flags for the main tree).
+# ecommerce-app-fe is intentionally absent: it has no unit suite today. Additive lane — this file
+# edits no existing workflow; OIDC usage mirrors root ci.yml's codecov-action@v5 wiring.
+
+on:
+  push:
+    paths:
+      - 'examples/**'
+  pull_request:
+    paths:
+      - 'examples/**'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: example-coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  coverage:
+    name: ${{ matrix.app.flag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - dir: examples/todo-app-backend
+            flag: todo-be
+            run: npx jest --coverage
+          - dir: examples/ecommerce-app-be
+            flag: ecommerce-be
+            run: npx jest --coverage
+          - dir: examples/todo-app-frontend
+            flag: todo-fe
+            run: npx vitest run --coverage
+    defaults:
+      run:
+        working-directory: ${{ matrix.app.dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests with coverage
+        run: ${{ matrix.app.run }}
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ${{ matrix.app.dir }}/coverage/lcov.info
+          flags: ${{ matrix.app.flag }}
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true

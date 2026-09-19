@@ -1,0 +1,8 @@
+v3-2-todo-fe-lint DONE 2026-09-19
+app: examples/todo-app-frontend
+config: eslint.config.mjs mirrors starci-academy-fe reference (starciFeConfig layout single-app, jsx-a11y verbatim, lang-file exemption, APP_GLOBS scoping)
+canon: @starci/eslint-canon-fe = file:../../packages/fe (local v3.1.0, incl. route-slot-fixed-name at error)
+deps: eslint@^9.39.5 typescript-eslint@^8.70.0 globals@^17.12.0 @eslint/js@^9.39.5 eslint-plugin-react@^7.37.5 eslint-plugin-react-hooks@^7.1.1 eslint-plugin-jsx-a11y@^6.10.2 @testing-library/dom@^10.4.2
+verify: npx eslint src -> 0 errors (all of src/**) | npx tsc --noEmit -> clean | vitest -> 101/101 passed
+debt: ex-testing/lint/debt-todo-fe.json
+note: [lang]/layout.tsx default export renamed LocaleLayout -> Layout for route-slot-fixed-name

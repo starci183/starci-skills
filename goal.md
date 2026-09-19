@@ -253,8 +253,8 @@ reads `.starciwork/_local` again.
     `application-stacks`, `coding-reference`. Implement ops consume the patterns of their lane;
     verify ops consume the same records as the standard they check against.
   - `checks` — executable commands the op must run and record with exit codes:
-    `scripts/check-scoped-lint.mjs`, `checks/code-patterns/*.mjs`, `checks/architecture/*.mjs`,
-    `checks/acceptance.mjs`, `checks/proof.mjs`. `code.refactor` must declare the regression
+    `scripts/checks/check-scoped-lint.mjs`, `scripts/checks/code-patterns/*.mjs`, `scripts/checks/architecture/*.mjs`,
+    `scripts/checks/acceptance.mjs`, `scripts/checks/proof.mjs`. `code.refactor` must declare the regression
     suite + architecture check it runs before and after (invariant evidence).
   - `stacks` — `.stacks/<env>/infra/compose/*` service defs and `.starciwork` schemas
     (`goal-plan`, `execution-request`, `execution-receipt`) for `runtime.operate`,
@@ -267,9 +267,9 @@ reads `.starciwork/_local` again.
   invent paths. An op that writes at the wrong path/name/schema fails `checks:`
   immediately — layout is op input. Coverage: every node type in `work-layout.yaml` and
   every `.starciwork` record class needs a `*.schema.yaml` + runnable validator; every
-  `.stacks` env/service file must conform to the declared topology (`checks/stacks.mjs`).
+  `.stacks` env/service file must conform to the declared topology (`scripts/checks/stacks.mjs`).
 - **Pattern coverage parity.** Every record under `knowledge/patterns/{fe,be}/` must have an
-  executable check under `checks/code-patterns/` (or an explicit `check: manual` marker with a
+  executable check under `scripts/checks/code-patterns/` (or an explicit `check: manual` marker with a
   reason). Current gap: comment/folder/function/naming/typing/imports/test patterns lack
   dedicated scripts — the tests workstream closes this matrix.
 - **Per-op allow override.** `allows(op)` defaults to the role set and may only narrow.

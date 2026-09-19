@@ -1,0 +1,317 @@
+lines:652
+# assigned-by-common (12)
+- name: "--grammar-inline-gap"
+  value: "0.5rem"
+- name: "--grammar-page-inset"
+  value: "clamp(1rem, 3vw, 2rem)"
+- name: "--grammar-region-gap"
+  value: "1.5rem"
+- name: "--grammar-row-gap"
+  value: "0.75rem"
+- name: "--grammar-section-gap"
+  value: "1rem"
+- name: "--starci-core-band-height"
+  value: "calc(4rem + 1px)"
+- name: "--starci-core-band-offset"
+  value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
+- name: "--starci-core-band-subnav-height"
+  value: "calc(3.25rem + 1px)"
+- name: "--starci-core-highlight-angle"
+  value: "360deg"
+- name: "--starci-core-verdict-edge"
+  value: "inset 2px 0 0 0 var(--success, var(--starci-core-success, #15803d))"
+- name: "--starci-core-workspace-navigation-track"
+  value: "minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem))"
+- name: "--starci-core-workspace-rail-track"
+  value: "minmax(16rem, var(--starci-core-rail-standard, 20rem))"
+# family-supplied (52)
+- name: "--starci-core-accent"
+  uses: 15
+  commonDefault: ", Highlight"
+- name: "--starci-core-border"
+  uses: 2
+  commonDefault: ", ButtonBorder"
+- name: "--starci-core-canvas"
+  uses: 7
+  commonDefault: ", Canvas"
+- name: "--starci-core-contained-max-height"
+  uses: 1
+  commonDefault: ", calc(100dvh - 3rem)"
+- name: "--starci-core-control-min-size"
+  uses: 4
+  commonDefault: ", 2.75rem"
+- name: "--starci-core-control-radius"
+  uses: 2
+  commonDefault: ", 0.75rem"
+- name: "--starci-core-copy-gap"
+  uses: 1
+  commonDefault: ", 0.25rem"
+- name: "--starci-core-danger"
+  uses: 1
+  commonDefault: ", #b91c1c"
+- name: "--starci-core-disabled-opacity"
+  uses: 1
+  commonDefault: ", 0.55"
+- name: "--starci-core-field-gap"
+  uses: 1
+  commonDefault: ", 0.5rem"
+- name: "--starci-core-focus"
+  uses: 2
+  commonDefault: ", Highlight"
+- name: "--starci-core-foreground"
+  uses: 14
+  commonDefault: ", CanvasText"
+- name: "--starci-core-form-compact-measure"
+  uses: 1
+  commonDefault: ", 28rem"
+- name: "--starci-core-form-measure"
+  uses: 1
+  commonDefault: ", 30rem"
+- name: "--starci-core-highlight-inset"
+  uses: 1
+  commonDefault: ", 0"
+- name: "--starci-core-inline-gap"
+  uses: 6
+  commonDefault: ", 0.5rem"
+- name: "--starci-core-motion-duration"
+  uses: 7
+  commonDefault: ", 180ms"
+- name: "--starci-core-motion-easing"
+  uses: 7
+  commonDefault: ", cubic-bezier(0.2, 0, 0, 1)"
+- name: "--starci-core-muted"
+  uses: 10
+  commonDefault: ", GrayText"
+- name: "--starci-core-navbar-z"
+  uses: 1
+  commonDefault: ", 50"
+- name: "--starci-core-page-inset"
+  uses: 1
+  commonDefault: ", clamp(1rem, 3vw, 2rem)"
+- name: "--starci-core-page-measure"
+  uses: 1
+  commonDefault: ", 80rem"
+- name: "--starci-core-pill-radius"
+  uses: 5
+  commonDefault: ", 999px"
+- name: "--starci-core-rail-collapsed"
+  uses: 1
+  commonDefault: ", 4rem"
+- name: "--starci-core-rail-compact"
+  uses: 3
+  commonDefault: ", 16rem"
+- name: "--starci-core-rail-gap"
+  uses: 1
+  commonDefault: ", 1rem"
+- name: "--starci-core-rail-gap-compact"
+  uses: 1
+  commonDefault: ", 0.75rem"
+- name: "--starci-core-rail-offset"
+  uses: 2
+  commonDefault: ", var(--starci-core-band-offset, 5.5rem)"
+- name: "--starci-core-rail-standard"
+  uses: 3
+  commonDefault: ", 20rem"
+- name: "--starci-core-rail-wide"
+  uses: 3
+  commonDefault: ", 24rem"
+- name: "--starci-core-reading-measure"
+  uses: 1
+  commonDefault: ", 72ch"
+- name: "--starci-core-region-gap"
+  uses: 7
+  commonDefault: ", 1.5rem"
+- name: "--starci-core-row-gap"
+  uses: 3
+  commonDefault: ", 0.75rem"
+- name: "--starci-core-row-gap-compact"
+  uses: 1
+  commonDefault: ", 0.5rem"
+- name: "--starci-core-row-inset"
+  uses: 2
+  commonDefault: ", 1rem"
+- name: "--starci-core-section-gap"
+  uses: 3
+  commonDefault: ", 0.75rem"
+- name: "--starci-core-separator"
+  uses: 10
+  commonDefault: ", GrayText"
+- name: "--starci-core-sidebar-collapsed-width"
+  uses: 1
+  commonDefault: ", 4rem"
+- name: "--starci-core-sidebar-width"
+  uses: 1
+  commonDefault: ", 16rem"
+- name: "--starci-core-subnav-offset"
+  uses: 1
+  commonDefault: ", var(--starci-core-band-height, 4rem)"
+- name: "--starci-core-subnav-z"
+  uses: 1
+  commonDefault: ", 40"
+- name: "--starci-core-success"
+  uses: 1
+  commonDefault: ", #15803d"
+- name: "--starci-core-surface"
+  uses: 3
+  commonDefault: ", Canvas"
+- name: "--starci-core-surface-inset"
+  uses: 1
+  commonDefault: ", 1rem"
+- name: "--starci-core-surface-radius"
+  uses: 3
+  commonDefault: ", 1rem"
+- name: "--starci-core-surface-secondary"
+  uses: 7
+  commonDefault: ", Canvas"
+- name: "--starci-core-surface-shadow"
+  uses: 1
+  commonDefault: ", var(--shadow-surface, 0 1px 3px rgb(0 0 0 / 0.16))"
+- name: "--starci-core-workspace-floating-inset"
+  uses: 4
+  commonDefault: ", 1rem"
+- name: "--starci-core-workspace-floating-max"
+  uses: 1
+  commonDefault: ", 22rem"
+- name: "--starci-core-workspace-floating-z"
+  uses: 1
+  commonDefault: ", 40"
+- name: "--starci-core-workspace-leading-seam"
+  uses: 1
+  commonDefault: ", 2rem"
+- name: "--starci-core-workspace-navigation-width"
+  uses: 1
+  commonDefault: ", 18rem"
+# host-supplied (44)
+- name: "--accent"
+  uses: 5
+  commonDefault: ", Highlight"
+- name: "--accent-soft"
+  uses: 4
+  commonDefault: ", var(--starci-core-surface-secondary, var(--surface-secondary, Canvas))"
+- name: "--accent-soft-foreground"
+  uses: 6
+  commonDefault: ", var(--starci-core-accent, HighlightText)"
+- name: "--background"
+  uses: 7
+  commonDefault: ", Canvas"
+- name: "--border"
+  uses: 15
+  commonDefault: ", GrayText"
+- name: "--code-surface"
+  uses: 3
+  commonDefault: ", color-mix(in srgb, CanvasText 6%, Canvas)"
+- name: "--danger"
+  uses: 2
+  commonDefault: ", Canvas"
+- name: "--danger-foreground"
+  uses: 1
+  commonDefault: ", CanvasText"
+- name: "--danger-soft"
+  uses: 1
+  commonDefault: ", var(--danger, Canvas)"
+- name: "--danger-soft-foreground"
+  uses: 1
+  commonDefault: ", var(--danger-foreground, CanvasText)"
+- name: "--default"
+  uses: 4
+  commonDefault: ", var(--starci-core-surface-secondary, Canvas)"
+- name: "--field-background"
+  uses: 2
+  commonDefault: ", var(--surface, Canvas)"
+- name: "--field-border"
+  uses: 2
+  commonDefault: ", var(--border, ButtonBorder)"
+- name: "--field-border-hover"
+  uses: 1
+  commonDefault: ", var(--field-border, var(--border, ButtonBorder))"
+- name: "--field-border-width"
+  uses: 1
+  commonDefault: ", 1px"
+- name: "--field-foreground"
+  uses: 1
+  commonDefault: ", var(--foreground, CanvasText)"
+- name: "--field-hover"
+  uses: 1
+  commonDefault: ", var(--field-background, var(--surface, Canvas))"
+- name: "--field-placeholder"
+  uses: 1
+  commonDefault: ", var(--muted, GrayText)"
+- name: "--field-radius"
+  uses: 2
+  commonDefault: ", calc(var(--radius, 0.5rem) * 1.5)"
+- name: "--field-shadow"
+  uses: 1
+  commonDefault: ", none"
+- name: "--focus"
+  uses: 4
+  commonDefault: ", Highlight"
+- name: "--font-mono"
+  uses: 1
+  commonDefault: ", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace"
+- name: "--foreground"
+  uses: 15
+  commonDefault: ", CanvasText"
+- name: "--link"
+  uses: 1
+  commonDefault: ", LinkText"
+- name: "--muted"
+  uses: 15
+  commonDefault: ", GrayText"
+- name: "--muted-surface"
+  uses: 1
+  commonDefault: ", color-mix(in srgb, CanvasText 7%, Canvas)"
+- name: "--radius"
+  uses: 9
+  commonDefault: ", 0.5rem"
+- name: "--radius-lg"
+  uses: 1
+  commonDefault: ", var(--radius, 0.5rem)"
+- name: "--radius-md"
+  uses: 1
+  commonDefault: ", calc(var(--radius, 0.5rem) * 0.75)"
+- name: "--radius-sm"
+  uses: 1
+  commonDefault: ", calc(var(--radius, 0.5rem) * 0.75)"
+- name: "--radius-xl"
+  uses: 3
+  commonDefault: ", calc(var(--radius, 0.5rem) * 1.5)"
+- name: "--separator"
+  uses: 14
+  commonDefault: ", var(--border, GrayText)"
+- name: "--shadow-surface"
+  uses: 1
+  commonDefault: ", 0 1px 3px rgb(0 0 0 / 0.16)"
+- name: "--success"
+  uses: 3
+  commonDefault: ", #15803d"
+- name: "--success-foreground"
+  uses: 1
+  commonDefault: ", CanvasText"
+- name: "--success-soft"
+  uses: 1
+  commonDefault: ", var(--success, Canvas)"
+- name: "--success-soft-foreground"
+  uses: 1
+  commonDefault: ", var(--success-foreground, CanvasText)"
+- name: "--surface"
+  uses: 5
+  commonDefault: ", Canvas"
+- name: "--surface-foreground"
+  uses: 1
+  commonDefault: ", CanvasText"
+- name: "--surface-secondary"
+  uses: 3
+  commonDefault: ", Canvas"
+- name: "--warning"
+  uses: 1
+  commonDefault: ", Canvas"
+- name: "--warning-foreground"
+  uses: 1
+  commonDefault: ", CanvasText"
+- name: "--warning-soft"
+  uses: 1
+  commonDefault: ", var(--warning, Canvas)"
+- name: "--warning-soft-foreground"
+  uses: 1
+  commonDefault: ", var(--warning-foreground, CanvasText)"
+# totals: 108 names, assigned=0, read=0

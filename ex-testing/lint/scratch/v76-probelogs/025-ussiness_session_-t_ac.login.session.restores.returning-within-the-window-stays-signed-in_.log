@@ -1,0 +1,13 @@
+$ npx jest src/modules/bussiness/session -t "ac.login.session.restores.returning-within-the-window-stays-signed-in"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/session/session.service.spec.ts
+
+Test Suites: 2 skipped, 1 passed, 1 of 3 total
+Tests:       13 skipped, 1 passed, 14 total
+Snapshots:   0 total
+Time:        2.948 s
+Ran all test suites matching /src\\modules\\bussiness\\session/i with tests matching "ac.login.session.restores.returning-within-the-window-stays-signed-in".
+

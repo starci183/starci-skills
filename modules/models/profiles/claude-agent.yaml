@@ -1,0 +1,71 @@
+# Profile: claude-agent — the Anthropic managed-agent pool.
+# Business frame: the "senior default". First choice for hard-tier work and for
+# operations that edit this runtime itself; the persistent supervisors sit here.
+# Every claim below traces to a cited source; inferred analysis is marked.
+
+target: claude-agent            # registry.json: targets.claude-agent
+provider: claude                # runtimes.json: runtimes.claude-agent.provider
+runtime: claude                 # registry.json: targets.claude-agent.runtime
+schema: starci/module-model-profile@1  # TINKLE-local document kind; no upstream schema
+
+identity:
+  requestedModel: claude-opus-5   # registry.json targets.claude-agent.requestedModel
+  profiles:                     # registry.json targets.claude-agent.profiles
+    working: opus               # → claude.json profiles.opus → model claude-opus-5
+    reasoning: opus-reviewer    # → claude.json profiles.opus-reviewer → model claude-opus-5
+  note: >-
+    The stable `claude-opus` runtime ID names the exact `claude-opus-5` model for
+    both operation profiles and non-operation calls; an unversioned host default
+    is not proof of Opus 5 (docs/model-catalog.md). modelPolicy in claude.json:
+    "use-declared-profile-model-and-attest-effective-runtime;
+    undeclared-models-inherit-current-host-configuration".
+
+capacity:
+  maxParallel: 6                # runtimes.json
+  roles: [implement, verify, write, decide, plan]   # runtimes.json — all five
+  models:                       # runtimes.json runtimes.claude-agent.models
+    implement: claude-opus-5
+    verify: claude-opus-5
+    write: claude-opus-5
+    decide: claude-opus-5
+    plan: claude-opus-5
+
+launch:
+  orca: {kind: managed-agent, agent: claude}   # registry.json orcaLaunch — worker-start path
+  headless: claude -p --output-format json --model claude-opus  # docs/model-functions.md HEADLESS_PROVIDERS
+  imageGeneration: false        # claude.json: every profile imageGeneration:false
+
+position:
+  # Where this pool sits in declared order. Sources: runtimes.json allocation.tiers,
+  # registry.json operators.<op>.chain, registry.json supervisors, selection text.
+  hardTier: first in default/implement/write; second in verify/decide/plan (after claude-fable)
+  mediumTier: second in default; third in decide/plan
+  easyTier: last
+  chainLeads: [grammar.update, knowledge.repair]   # registry.json operators — only these two lead with claude-agent
+  supervisors: [planCoordinator, workflowMonitor]  # registry.json supervisors — both lead claude-agent, effort high
+  rationale: >-
+    registry.json supervisors.note: "Session stability outranks model depth here,
+    so the working Claude profile leads." grammar.update and knowledge.repair lead
+    with Claude because they mutate the installed grammar/this runtime — highest
+    blast radius per unit of work (costPolicy text, registry.json).
+
+business:
+  question: >-
+    "Which pool do I trust with the heaviest bounded mutation and with the
+    always-on coordinator/monitor seats?" — claude-agent is the hard-tier default
+    and the supervisor seat.
+  whenNeeded:
+    - Hard-tier implement/write work where the cheaper Qwen/Devin order has already failed or is unsuitable (prefer-then-overflow, runtimes.json allocation.policy).
+    - grammar.update / knowledge.repair — runtime self-editing ops whose chains lead here.
+    - decide/plan/verify work when claude-fable's weekly window is saturated or cooling — opus-reviewer exists precisely as the reasoning half of the pool (claude.json roleDescription).
+    - Supervisor roles (planCoordinator, workflowMonitor) — session stability first.
+  whenNot:
+    - "Image-generation routes: no profile carries imageGeneration — interface.draw/interface.asset never route here (costPolicy: only the Codex pool carries an image generator)."
+    - "Cost-sensitive easy work: easy tier orders it last; picking it first wastes the strongest pool on the weakest work (inference from tier order)."
+    - "INFERRED: bulk medium-tier implementation — the medium default order puts codex-agent and qwen-agent ahead, so default routing keeps Opus for harder slices."
+  pickedBy: >-
+    The kernel allocator via role preference + tier + qualification (selection.yaml);
+    humans only via the declared chains in registry.json operators.
+  failureModes:
+    - "Treating the alias `claude-opus` as proof of model: attestation must show claude-opus-5 (model-catalog.md)."
+    - Burning the supervisor-capable pool on easy fan-out — an availability/cost mistake, not an eligibility error.

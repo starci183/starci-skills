@@ -1,0 +1,16 @@
+$ npx jest src/modules/bussiness/task/task-counts.handler.spec.ts
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/task/task-counts.handler.spec.ts
+  TaskCountsHandler
+    √ contract.task.list-for-dashboard.counts-obey-owned-list: the two counts cover exactly the reader's own tasks (15 ms)
+    √ contract.task.list-for-dashboard.counts-track-completion: completing and reopening move a task between the two counters (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        3.891 s, estimated 7 s
+Ran all test suites matching /src\\modules\\bussiness\\task\\task-counts.handler.spec.ts/i.
+

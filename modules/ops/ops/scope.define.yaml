@@ -1,0 +1,226 @@
+# modules/ops/ops/scope.define.yaml - TINKLE-1 pure-yaml port of .claude/ops/scope.define/operator.yaml
+# The operator contract below is verbatim; the trailing 'business:' block is the added
+# analysis (inference marked where the contract does not state it literally).
+
+id: scope.define
+goal:
+  en: Turn one request into a bounded scope record - the nodes, dependencies and exclusions the
+    selected workflow may touch - by read-only analysis that writes the scope record and nothing
+    else.
+nodeKinds:
+  - operations
+completionProfile: operations
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: request
+    path: current user request, supplied files/references and existing task authorization
+    purpose:
+      en: Identify the intended result, concrete inputs, permitted effects and observable completion
+        criteria from the request. Ask only material missing choices while continuing independent
+        inspection; vague scope is not permission for arbitrary scope, deployment or data mutation.
+  - id: intake
+    path: selected request.analyze intake record + workflows/catalog.json selection when present
+    purpose:
+      en: Read the workflow selection and scope statement the intake produced when one exists. An
+        absent intake record is not a gap - the request itself is the input; a present one is
+        preserved, not restated.
+  - id: records
+    path: .starciwork/**/index.yaml + .starciwork/_resources/**/resource.yaml
+    purpose:
+      en: Read existing decided records and resource declarations so the bounded scope neither
+        duplicates nor contradicts work the tree already owns. An overlap belongs to the existing
+        node, which the scope record names as an exclusion or a dependency, never a rewrite.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths> when source is relevant
+    purpose:
+      en: Discover the actual selected repository/root/HEAD and dirty changes, then read applicable
+        instructions, owning source, callers, scripts and relevant tests so proposed nodes name real
+        inspected paths. If there is no source task, record not applicable. A path that was not
+        opened is never written into the scope.
+  - id: profile
+    path: model/registry.json + actual host tools/model
+    purpose:
+      en: Resolve the working runtime profile against actual available tools. Do not switch
+        providers, invent tools or dispatch agents solely from a profile.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - blocker
+      - completion.inputDigest
+      - completion.evidence
+    content:
+      en: Write only state/blocker/completion on this operation's own node; the bounded scope belongs
+        to the scope record and actual observations to the evidence result, never to semantic node
+        prose.
+  - id: scope
+    path: .starciwork/<scope>/index.yaml
+    fields:
+      - schema
+      - id
+      - kind
+      - required
+      - state
+      - description
+      - dependsOn
+      - refs
+      - assertions
+      - extensions.work3.scope
+    content:
+      en: One scope record (work/node@2, state todo) carrying the bounded scope as typed data under
+        extensions.work3.scope - nodes[] with stable proposed ids, deps[] as real declared node ids
+        and exclusions[] naming what the workflow must not touch. Every named node traces to the
+        request or to an inspected path; a scope item that cannot be grounded is an open question in
+        the record, not an invented entry. Existing decided records are referenced by id, never
+        restated.
+  - id: evidence
+    path: E/manifest.yaml + E/scope.json + E/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - extensions
+    content:
+      en: Record the request digest, the inspected records and source paths, each proposed node with
+        its grounding, the dependency rationale and every exclusion with its reason. Open questions
+        stay open; an honest not-run validator result is recorded, never hidden.
+steps:
+  - reads:
+      - request
+      - intake
+      - profile
+    writes:
+      - evidence
+    action:
+      en: Distinguish the whole requested outcome from the bounded scope being defined. Preserve the
+        request verbatim and the intake selection when one exists; identify desired outcome, known
+        inputs, effect ceiling, criteria and unknowns. Resolve the execution profile and actual tool
+        availability before selecting instruments; this does not switch the model/runtime or spawn
+        workers.
+  - reads:
+      - request
+      - records
+      - repo
+    writes:
+      - evidence
+    action:
+      en: "Research just enough actual context to bound the scope correctly: existing decided records
+        that already cover part of the request, real source ownership and caller shape, and the
+        exclusions the request states or implies. Identify what the tree already owns before
+        proposing a node that duplicates it."
+  - reads:
+      - request
+      - records
+      - repo
+    writes:
+      - scope
+      - evidence
+    action:
+      en: Write the one scope record with the bounded scope as typed data - the proposed nodes, the
+        declared dependencies between them and onto existing records, and the explicit exclusions.
+        Scope the smallest set that completes the request; a material ambiguity about what is wanted
+        is an open question or a blocker, never a guessed node.
+  - reads:
+      - request
+      - records
+    writes:
+      - node
+      - scope
+      - evidence
+    action:
+      en: Run the record-class validator `starci validate` over the authored scope record and confirm every cited id exists
+        or is explicitly proposed, every dep is a real declared node id, and no exclusion is dropped.
+        Report done once with the scope record id; defining the scope performs no effect the scope
+        names.
+proofs:
+  - id: bounded
+    requirement:
+      en: The scope record names exactly the nodes, dependencies and exclusions the request requires
+        and nothing more; every node is grounded in the request, a decided record or an inspected
+        path, and every exclusion has a recorded reason.
+  - id: typed
+    requirement:
+      en: The output is the scope record itself - nodes, deps and exclusions as typed fields a
+        planning operation can consume without re-reading the request; free text is the evidence,
+        not the deliverable.
+  - id: no-effects
+    requirement:
+      en: The analysis performed no source, runtime, publication, deployment or data effect; the only
+        writes are the scope record, this node's kernel fields and the evidence bundle.
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+        done.
+blockers:
+  - code: INTENT_UNRESOLVED
+    condition:
+      en: An essential outcome, boundary or permitted effect cannot be resolved from the request,
+        the intake record and safe inspection; report blocked with blocker kind authority naming the
+        exact open choice rather than guessing a scope.
+  - code: SCOPE_CONFLICT
+    condition:
+      en: The request overlaps an existing decided node whose ownership cannot be preserved by a
+        dependency or an exclusion; report the conflicting node ids as a shared-change instead of
+        authoring a duplicate.
+  - code: AUTHORITY_REQUIRED
+    condition:
+      en: Bounding the scope requires a scope or authority change the request does not grant;
+        report blocked with blocker kind authority - an owner decision, never a silently widened
+        scope.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is
+        missing. Report node/resource IDs and propose a separately selected graph update when
+        needed; never run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  scope: Selected scope node directory the record is authored under
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+# ---------------------------------------------------------------------------
+# TINKLE-1 business analysis (not part of the source contract; inference marked).
+business:
+  question: >-
+    "What is the bounded scope - the nodes, dependencies and exclusions the
+    selected workflow may touch - grounded in the request and inspected records
+    and source?"
+  whenNeeded:
+    - After intake (or directly from a request) when a workflow needs a typed scope record before any effects run.
+    - When exclusions and cross-node dependencies must be declared so later ops cannot widen silently.
+  whenNot:
+    - Never performs the effects the scope names - it authors the boundary record only.
+    - Never guesses an ungrounded node - an unresolved item becomes an open question, not an invented ID.
+    - Overlaps with decided records become exclusions/dependencies, never rewrites of accepted authority.
+  consumes:
+    - The request; the intake record when present; existing Work records + resources; repo inspection for grounding.
+  produces:
+    - One scope record (work/node@2 with extensions.work3.scope: nodes/dependencies/exclusions); evidence of the grounding reads.
+  failureModes:
+    - INTENT_UNRESOLVED, SCOPE_CONFLICT, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
+# ---------------------------------------------------------------------------
+# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
+# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
+# block alone — an agent never reads the whole contract to route.
+route:
+  nodeKinds: [operations]
+  phase: [scope, pre-implementation]
+  intent: [scope, define, bound]
+  prerequisites: ["request analyzed"]

@@ -1,0 +1,28 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: ui.identity.sign-in
+recordDigest: bacdaaffe814230603e69d863e8af219a85854e46284bac0da4d339e954851ad
+outcome: fail
+assertions:
+  - id: direction-asset-custody
+    command: node captures/verify-render.mjs --record ui.identity.sign-in custody
+    exit: 0
+    outcome: pass
+    observation: node captures/verify-render.mjs --record ui.identity.sign-in custody exited 0
+  - id: declared-state-captures
+    command: node captures/verify-render.mjs --record ui.identity.sign-in captures
+    exit: 0
+    outcome: pass
+    observation: node captures/verify-render.mjs --record ui.identity.sign-in captures exited 0
+  - id: render-proof
+    command: node captures/verify-render.mjs --record ui.identity.sign-in render
+    exit: 1
+    outcome: fail
+    observation: node captures/verify-render.mjs --record ui.identity.sign-in render exited 1
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-19T15:01:35.184Z

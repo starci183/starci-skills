@@ -1,0 +1,14 @@
+$ npx jest -t "ac.plan.payment.idempotent.replay-is-noop"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+
+
+PASS src/modules/bussiness/plan/confirm-payment.handler.spec.ts
+PASS src/modules/bussiness/plan/payment.service.spec.ts
+
+Test Suites: 115 skipped, 2 passed, 2 of 117 total
+Tests:       699 skipped, 2 passed, 701 total
+Snapshots:   0 total
+Time:        16.027 s, estimated 20 s
+Ran all test suites with tests matching "ac.plan.payment.idempotent.replay-is-noop".
+

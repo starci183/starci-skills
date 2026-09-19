@@ -1,0 +1,110 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Repositories/starci-academy-backend/.claude/examples/todo-app-frontend[39m
+
+ [32m✓[39m src/modules/api/graphql.spec.ts[2m > [22mgraphql[2m > [22msends the document, variables and an Authorization: Bearer <token> header, and unwraps the one top-level field
+ [32m✓[39m src/modules/api/graphql.spec.ts[2m > [22mgraphql[2m > [22momits the Authorization header when no token is given
+ [32m✓[39m src/modules/api/graphql.spec.ts[2m > [22mgraphql[2m > [22mturns a GraphQL error into a refused Result carrying its extensions.code
+ [32m✓[39m src/modules/api/graphql.spec.ts[2m > [22mgraphql[2m > [22mnever throws on a network failure; it resolves a refused Result instead
+ [32m✓[39m src/modules/api/graphql.spec.ts[2m > [22mgraphql[2m > [22mreports a malformed (non-JSON) response as a refused Result rather than throwing
+ [32m✓[39m src/modules/api/graphql.spec.ts[2m > [22mgraphql[2m > [22mreports a response with no data field as empty
+ [32m✓[39m src/modules/api/auth.spec.ts[2m > [22msignIn[2m > [22mreturns the session token on a successful sign-in
+ [32m✓[39m src/modules/api/auth.spec.ts[2m > [22msignIn[2m > [22mcollapses a wrong-password refusal to the one uniform message (br.login.password.sign-in)
+ [32m✓[39m src/modules/api/auth.spec.ts[2m > [22msignIn[2m > [22mcollapses an unknown-email refusal to the exact same message as a wrong password
+ [32m✓[39m src/modules/api/auth.spec.ts[2m > [22msignOut[2m > [22mreports true when the backend acknowledges the sign-out
+ [32m✓[39m src/modules/api/auth.spec.ts[2m > [22msignOut[2m > [22mreports false rather than throwing when the transport refuses
+ [32m✓[39m src/hooks/auth/useSignIn.spec.ts[2m > [22museSignIn[2m > [22mfr.login.sign-in: a successful sign-in navigates to /tasks (grit #36 - lands on their list)
+ [32m✓[39m src/hooks/auth/useSignIn.spec.ts[2m > [22museSignIn[2m > [22ma refused sign-in never navigates
+ [32m✓[39m src/components/plan/api.spec.ts[2m > [22mreadPlanUsage[2m > [22mreturns the planUsage payload the backend contract declares (fr.plan.usage.view)
+ [32m✓[39m src/components/plan/api.spec.ts[2m > [22mreadPlanUsage[2m > [22mcarries cap null through for the paid plan (sds.plan.subscription-lifecycle)
+ [32m✓[39m src/components/plan/api.spec.ts[2m > [22mreadPlanUsage[2m > [22mthrows when the transport refuses (an expired or missing session)
+ [32m✓[39m src/components/plan/api.spec.ts[2m > [22mstartPlanCheckout[2m > [22mreturns the checkout URL the upgrade mutation issues (fr.plan.upgrade)
+ [32m✓[39m src/components/plan/api.spec.ts[2m > [22mstartPlanCheckout[2m > [22mthrows when the transport refuses, so no paid state can be invented from a failed call
+ [32m✓[39m src/modules/api/share.spec.ts[2m > [22mlistCollaborators[2m > [22mprojects the collaborators query result into the Collaborator shape (fr.share.list)
+ [32m✓[39m src/modules/api/share.spec.ts[2m > [22mlistCollaborators[2m > [22mthrows when the transport refuses (an expired or missing session)
+ [32m✓[39m src/modules/api/share.spec.ts[2m > [22minviteCollaborator[2m > [22msends the task, email and role as one InviteInput and projects the created invitation (fr.share.invite)
+ [32m✓[39m src/modules/api/share.spec.ts[2m > [22minviteCollaborator[2m > [22mthrows the refusal with its stable code on cause when the email is not well formed
+ [32m✓[39m src/modules/api/share.spec.ts[2m > [22mrevokeCollaborator[2m > [22mresolves with nothing once the backend confirms the revoke (fr.share.revoke)
+ [32m✓[39m src/modules/api/share.spec.ts[2m > [22mrevokeCollaborator[2m > [22mthrows when the invitation is already closed
+ [32m✓[39m src/modules/api/tasks.spec.ts[2m > [22mlistTasks[2m > [22mprojects the tasks query result into the Task shape (br.task.list.owned)
+ [32m✓[39m src/modules/api/tasks.spec.ts[2m > [22mlistTasks[2m > [22mthrows when the transport refuses (an expired or missing session)
+ [32m✓[39m src/modules/api/tasks.spec.ts[2m > [22mcreateTask[2m > [22mcreates an incomplete task from its trimmed title
+ [32m✓[39m src/modules/api/tasks.spec.ts[2m > [22msetTaskComplete[2m > [22mdispatches completeTask when setting complete to true
+ [32m✓[39m src/modules/api/tasks.spec.ts[2m > [22msetTaskComplete[2m > [22mdispatches reopenTask when setting complete to false (br.task.complete.once reopen half)
+ [32m✓[39m src/modules/api/tasks.spec.ts[2m > [22mdeleteTask[2m > [22mresolves with nothing once the backend confirms the delete (br.task.delete.final)
+ [32m✓[39m src/modules/api/tasks.spec.ts[2m > [22mdeleteTask[2m > [22mthrows when the caller does not own the task
+ [32m✓[39m src/components/blocks/sign-in-form/component.spec.tsx[2m > [22mSignInFormView[2m > [22mui.login.sign-in: empty state has no values and a disabled submit
+ [32m✓[39m src/components/blocks/sign-in-form/component.spec.tsx[2m > [22mSignInFormView[2m > [22mui.login.sign-in: filled state enables submit once both fields hold a value
+ [32m✓[39m src/components/blocks/sign-in-form/component.spec.tsx[2m > [22mSignInFormView[2m > [22mui.login.sign-in: working state disables the form while submitting
+ [32m✓[39m src/components/blocks/sign-in-form/component.spec.tsx[2m > [22mSignInFormView[2m > [22mac.login.password.sign-in.refusal-does-not-name-the-half: refused state carries one message regardless of which half was wrong
+ [32m✓[39m src/components/blocks/sign-in-form/component.spec.tsx[2m > [22mSignInFormView[2m > [22mac.login.password.sign-in.wrong-pair-is-refused: submitting calls onSubmit exactly once
+ [32m✓[39m src/components/login/sign-in/index.spec.tsx[2m > [22mSignInScreenBlock[2m > [22mui.login.sign-in: a settled refusal keeps the email and clears the password
+ [32m✓[39m src/features/pages/tasks/index.spec.tsx[2m > [22mTasksPage[2m > [22mui.task.list: the workspace shell carries the Todo app brand, the named destinations and the account presence
+ [32m✓[39m src/features/pages/tasks/index.spec.tsx[2m > [22mTasksPage[2m > [22mui.task.list: Tasks is the current destination and the other three carry their recorded hrefs
+ [32m✓[39m src/features/pages/tasks/index.spec.tsx[2m > [22mTasksPage[2m > [22mui.task.list: exactly one main landmark, named after the screen it holds
+ [32m✓[39m src/features/pages/tasks/index.spec.tsx[2m > [22mTasksPage[2m > [22mui.task.list: Sign out clears the session and lands on sign-in
+ [32m✓[39m src/features/pages/tasks/index.spec.tsx[2m > [22mTasksPage[2m > [22mui.task.list: the footer carries the recorded legal destinations
+ [32m✓[39m src/components/login/sign-in/component.spec.tsx[2m > [22mSignInScreenView[2m > [22mui.login.sign-in: empty state has no values, a disabled submit and explicit guidance
+ [32m✓[39m src/components/login/sign-in/component.spec.tsx[2m > [22mSignInScreenView[2m > [22mui.login.sign-in: filled state enables submit once both fields hold a value
+ [32m✓[39m src/components/login/sign-in/component.spec.tsx[2m > [22mSignInScreenView[2m > [22mui.login.sign-in: working state disables the form while submitting
+ [32m✓[39m src/components/login/sign-in/component.spec.tsx[2m > [22mSignInScreenView[2m > [22mac.login.password.sign-in.refusal-does-not-name-the-half: refused state carries one message regardless of which half was wrong
+ [32m✓[39m src/components/login/sign-in/component.spec.tsx[2m > [22mSignInScreenView[2m > [22mac.login.password.sign-in.wrong-pair-is-refused: submitting calls onSubmit exactly once
+ [32m✓[39m src/components/login/sign-in/component.spec.tsx[2m > [22mSignInScreenView[2m > [22mui.login.sign-in: the direction furniture is all real - welcome panel, turtle, form and destinations
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx[2m > [22mUsageScreenView[2m > [22mui.plan.usage: over-cap-frozen shows 40 active tasks against the 20 cap, creation paused, both actions
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx[2m > [22mUsageScreenView[2m > [22mui.plan.usage: under-cap shows a plain usage count with no warning and no upgrade prompt
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx[2m > [22mUsageScreenView[2m > [22mui.plan.usage: at-cap warns the next create will be refused and offers the upgrade action
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx[2m > [22mUsageScreenView[2m > [22mui.plan.usage: paid-unlimited removes the cap and the upgrade action, keeping only the count
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx[2m > [22mUsageScreenView[2m > [22mui.plan.usage: refused announces the session refusal assertively
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx[2m > [22mUsageScreenView[2m > [22mui.plan.usage: the shell carries the four destinations, account presence and the footer links
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx[2m > [22mUsageScreenView[2m > [22mui.plan.usage: the upgrade press hands the checkout intent to the owner
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx[2m > [22mScheduleScreenView[2m > [22mui.recur.schedule: no-rule shows only the make-recurring form and no upcoming list
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx[2m > [22mScheduleScreenView[2m > [22mui.recur.schedule: refused retains the invalid value and names the field assertively
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx[2m > [22mScheduleScreenView[2m > [22mui.recur.schedule: monthly-day asks for a day of the month instead of an interval
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx[2m > [22mScheduleScreenView[2m > [22mui.recur.schedule: active shows the rule summary, upcoming previews and the end action
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx[2m > [22mScheduleScreenView[2m > [22mui.recur.schedule: ended keeps materialised history and drops the preview and end action
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx[2m > [22mScheduleScreenView[2m > [22mui.recur.schedule: active end-rule asks for the consequence confirmation in place
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx[2m > [22mScheduleScreenView[2m > [22mfr.recur.make-recurring: submitting the form calls onSubmit exactly once
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx[2m > [22mNotifyPreferencesView[2m > [22mui.notify.preferences: loading rests the toggle as a skeleton, disables save, shows no message
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx[2m > [22mNotifyPreferencesView[2m > [22mui.notify.preferences: subscribed shows the on toggle and an available save
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx[2m > [22mNotifyPreferencesView[2m > [22mui.notify.preferences: unsubscribed shows the off toggle and a non-danger confirmation
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx[2m > [22mNotifyPreferencesView[2m > [22mui.notify.preferences: saving disables the save action and shows its busy label
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx[2m > [22mNotifyPreferencesView[2m > [22mui.notify.preferences: refused announces the refusal and keeps the pre-save value
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx[2m > [22mNotifyPreferencesView[2m > [22mui.notify.preferences: every state in the closed vocabulary renders its own data-state
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx[2m > [22mNotifyPreferencesView[2m > [22mui.notify.preferences: the shell carries the settled furniture - brand, four destinations, Alex, footer, no mascot
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: empty state shows the no-tasks message
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: empty state shows the brand turtle master as decorative artwork
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: one-task state renders exactly one row
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: many-tasks state renders every row
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: the collection is a section headed "All tasks" with the task count
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: every row carries Share and Schedule destinations bound to its own task
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: Delete asks an inline confirmation naming the task before calling onDelete
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: Cancel dismisses the confirmation without deleting and returns focus to Delete
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: refused state hides the list and the create form
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mui.task.list: refused state shows no collection and no mascot
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mac.task.list.owned.excludes-others: renders only the rows it was given, not a wider set
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mac.task.complete.once.is-reversible: toggling a complete task calls onToggleComplete with complete=false
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx[2m > [22mTaskListView[2m > [22mac.task.title.required.refuses-empty: a blank title submits nothing
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: idle state offers both actions and no message
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: exporting state disables export and shows its busy label
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: requesting-erasure replaces the request action with a confirm/cancel pair
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: erasure-pending disables both actions with a non-danger pending note
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: erasure-complete removes both actions and confirms politely
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: erasure-refused announces the real refusal while export stays available
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: every state in the closed vocabulary renders its own data-state
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx[2m > [22mPrivacyView[2m > [22mui.audit.privacy: the shell carries the settled furniture - brand, four destinations, Alex, footer
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mui.share.invite: empty state shows only the invite form, no collaborator section
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mui.share.invite: inviting state disables the form and marks the invite button pending
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mui.share.invite: pending-list state shows the collaborators region with role and revoke
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mui.share.invite: accepted state shows the accepted status and keeps revoke available
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mui.share.invite: refused state retains the entered email, the role choice, an assertive refusal and the rows
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mui.share.invite: refused state can also place the assertive refusal on the form
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mfr.share.invite: viewer/editor is a labelled native radio group and the choice reports through onRoleChange
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mfr.share.invite: submitting the form reports through onInvite
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mfr.share.revoke: only live invitations offer revoke and it reports the row identity
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mfr.share.list: every row shows email, role and status
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx[2m > [22mShareInviteView[2m > [22mui.shell: the breadcrumb and Back to task point at the real task destination
+
+[2m Test Files [22m [1m[32m16 passed[39m[22m[90m (16)[39m
+[2m      Tests [22m [1m[32m101 passed[39m[22m[90m (101)[39m
+[2m   Start at [22m 18:33:55
+[2m   Duration [22m 31.93s[2m (transform 1.97s, setup 54.63s, collect 69.77s, tests 3.20s, environment 243.29s, prepare 17.86s)[22m
+

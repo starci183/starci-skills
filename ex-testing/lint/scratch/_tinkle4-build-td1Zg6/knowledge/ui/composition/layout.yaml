@@ -1,0 +1,154 @@
+schema: starci/knowledge-source@1
+id: ui.composition.layout
+title: Layout composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: before any DOM exists, which visible task regions does this page
+  have, and who owns each one?
+  Layout is the first composition decision. It settles how many regions the reader sees, which
+  published composition owns each region's tracks and scrolling, and what happens to a region that
+  leaves normal flow or disappears. Everything measured after the page renders belongs to the audit
+  operator, not to this file.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+ownerVocabulary:
+  owners:
+    - name: A composition name
+      meaning: "`@grammar/common` already owns that region's tracks and geometry"
+    - name: App
+      meaning: The direction supplies content, state, and labels into a published slot
+    - name: —
+      meaning: No published composition covers this region; the direction records the
+        gap
+  notes: |-
+    Reaching for a vendor grid where a composition name is the owner is `APP_REIMPLEMENTATION`.
+    Reaching for one where the owner is `—` indicates `COMMON_CAPABILITY_MISSING` after installed-source
+    verification. Record the gap and proposed owner; adding a reusable composition requires separately
+    authorized library scope/op.
+rules:
+  - id: LAYOUT-1
+    title: Which regions exist at all
+    governs: |-
+      Governs how many visible task regions the page carries and what justifies each one.
+    cases:
+      - id: case-1
+        when: Business content has one task and no supporting material
+        assert: |-
+          The `.starciwork` specification lists exactly one dominant region, and every further region it lists carries a named task role
+      - id: case-2
+        when: A primary task has support the reader consults alongside it
+        assert: |-
+          The support is a rail, and the `.starciwork` specification names the task role that earns it
+      - id: case-3
+        when: Routed page content needs shell chrome around it
+        assert: |-
+          `WorkspaceShell` owns the shell regions, and exactly one element is named as the main landmark
+      - id: case-4
+        when: Destinations need to be grouped and browsed
+        assert: |-
+          `Sidebar` owns the grouping; the `.starciwork` specification supplies only destinations and labels into it
+      - id: case-5
+        when: A conversation needs a composer that stays put
+        assert: |-
+          `ChatWorkspace` owns the pairing of conversation and composer
+      - id: case-6
+        when: The required arrangement has no published composition
+        assert: |-
+          A `GRAMMAR_REQUIRED` gap names the missing composition, and no substitute arrangement appears in the tree
+    notThisRule: |-
+      which of several regions carries the strongest anchor is HIERARCHY-2.
+  - id: LAYOUT-2
+    title: Every region's owner is a published composition
+    governs: |-
+      Governs which code decides a region's tracks, not which content sits inside them.
+    cases:
+      - id: case-1
+        when: A primary column sits beside a support column
+        assert: |-
+          `PrimaryRailLayout` owns both tracks; the `.starciwork` specification names only `railWidth` and `align`, and no track formula appears against that region
+      - id: case-2
+        when: Shell regions and the main landmark must be named
+        assert: |-
+          `WorkspaceShell` owns the slots, and the `.starciwork` specification supplies `primaryLabel`
+      - id: case-3
+        when: A conversation surface needs a bounded height
+        assert: |-
+          `ChatWorkspace` owns the bound, and the host supplies the height it requires
+      - id: case-4
+        when: |-
+          The direction is tempted by a vendor grid or child width arithmetic
+        assert: |-
+          Every region resolves to a published composition or to a recorded gap; no vendor grid and no width arithmetic owns a region
+      - id: case-5
+        when: A family wants a region to look different
+        assert: |-
+          The family delta replaces a renderer with compatible props only; the region's role and its number of owners are unchanged
+    notThisRule: |-
+      how much space separates the objects inside a region is a presentation decision.
+  - id: LAYOUT-3
+    title: One owner per region and per scroll axis
+    governs: |-
+      Governs how many things may claim the same region or the same overflow axis.
+    cases:
+      - id: case-1
+        when: Several regions coexist on one page
+        assert: |-
+          Each visible region resolves to exactly one composition owner and one intended track
+      - id: case-2
+        when: |-
+          Content is essentially wider than its column, such as a table
+        assert: |-
+          Exactly one named `HorizontalScrollRegion` owns the inline axis, and no page-level inline scroll exists
+      - id: case-3
+        when: Block flow must be bounded inside a region
+        assert: |-
+          `VerticalScrollRegion isScrollable`, or the exact named composition, owns that block axis
+      - id: case-4
+        when: A conversation must scroll while its composer stays put
+        assert: |-
+          `ChatWorkspace` owns conversation scrolling, and the composer is its sibling outside that scroller
+      - id: case-5
+        when: A nested scroller is proposed
+        assert: |-
+          Each nested scroller carries a different named axis or a different named task from its ancestor
+    notThisRule: |-
+      whether a scroll region can actually be reached and traversed by keyboard once rendered is FOCUS-2.
+  - id: LAYOUT-4
+    title: Regions that leave normal flow
+    governs: |-
+      Governs sticky, fixed, drawer, floating, reordered, and conditionally absent regions.
+    cases:
+      - id: case-1
+        when: |-
+          A support column should stay in view while the primary column scrolls
+        assert: |-
+          `Rail mode="sticky"` carries its published bound, and below the narrow width the region returns to normal flow
+      - id: case-2
+        when: An overlay needs bounded fixed geometry
+        assert: |-
+          `WorkspaceShell.floatingLayer` supplies geometry only; if focus containment and dismissal are also required, the `.starciwork` specification names a modal owner or records a gap
+      - id: case-3
+        when: Compact space cannot hold the conversation rail inline
+        assert: |-
+          `ChatWorkspace` owns the drawer, and the `.starciwork` specification supplies `isRailOpen` and `onRailOpenChange`
+      - id: case-4
+        when: A region is absent in the current state
+        assert: |-
+          No wrapper, track, divider, rule, spacer, or reserved scroll range for that region survives its absence
+      - id: case-5
+        when: The direction wants a different visual order at one width
+        assert: |-
+          DOM, reading, focus, and action order are identical to task order at every width; the composition differs, the order does not
+    notThisRule: |-
+      whether the projection actually clears the content beneath it at a given viewport is observed by the audit operator, not settled here.
+    retired: |-
+      LAYOUT-5 is retired into COVERAGE-1 and is not reused; the address stays spent.
+doesNotDecide: |-
+  Which rank the content inside a region carries is [Hierarchy](hierarchy.yaml). How a region recomposes
+  as space changes is [Responsive](responsive.yaml). Which action inside a region is dominant is
+  [CTA](cta.yaml) and [Accent](accent.yaml). What the `.starciwork` specification must enumerate about these regions is
+  [Coverage](coverage.yaml). Whether the rendered result matches this direction is the audit operator's
+  business, in [Focus](../proof/focus.yaml), [Accessibility](../proof/accessibility.yaml),
+  [Motion](../proof/motion.yaml), and [Render truth](../proof/render-truth.yaml).

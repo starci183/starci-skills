@@ -1,0 +1,6 @@
+schema: work/node@2
+id: vps
+kind: business
+required: true
+description: Vps. Describe the selected scope, decisions, exclusions, and observable acceptance
+  here. This synthetic example claims no investigation, implementation, or acceptance.

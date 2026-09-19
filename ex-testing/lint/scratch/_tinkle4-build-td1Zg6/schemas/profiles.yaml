@@ -1,0 +1,41 @@
+business:
+  assertions: true
+architecture:
+  assertions: true
+implementation:
+  assertions: true
+  code: true
+uat:
+  assertions: true
+  uat: true
+  image: true
+  behavior: true
+uat.ui:
+  assertions: true
+  uat: true
+  image: true
+uat.ux:
+  assertions: true
+  uat: true
+  behavior: true
+release:
+  assertions: true
+  code: true
+operations:
+  assertions: true
+# An API-level end-to-end scenario node: proven by a run on the real stack, no capture, no UAT provenance.
+e2e:
+  assertions: true
+# One declared external integration: proven by a live call to the real provider with the owner's credential.
+# Assertions only - the proof is the recorded run against the provider, not a capture and not a UAT walk.
+integration:
+  assertions: true
+ui:
+  assertions: true
+  image: true
+business-overview:
+  assertions: true
+# The product's brand: decided by the owner through a review, proven by machine checks against the real
+# frontend token sources it names. Nothing is launched into a worktree to settle it.
+brand:
+  assertions: true

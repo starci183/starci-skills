@@ -1,0 +1,24 @@
+schema: work/non-functional-requirement
+id: nfr.notify.delivery.guarantee
+title: Effectively-once delivery, measured, not asserted
+quality: reliability
+state: todo
+observableCriterion: "The guarantee is at-least-once transport collapsed to effectively-once by dedupe
+  key: replaying the same (kind, sourceEventId, recipientId) triple any number of times within 24 hours
+  produces exactly one notification with exactly one terminal delivery-attempt outcome recorded against
+  it, and never a second attempt once a terminal outcome is reached."
+measurement:
+  how: A harness admits the same triple N times (N from 2 to 100) at random intervals within 24h,
+    drives the resulting delivery to a terminal state once, and asserts the notification store's size
+    for that key stays 1 and no second delivery-attempt row is created for it.
+  threshold: 100% of runs show exactly one notification and exactly one terminal delivery-attempt per
+    dedupe key; 0 duplicate sends.
+  environment: dev
+refs: [br.notify.delivery.once]
+requiresProof:
+  measurement:
+    required: true
+
+change: {rev: 1, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "Dropped the blockedBy on fr.notify.on-completion: it is done, task now supplies a stable sourceEventId per real completion, and DedupeService's admit-by-primary-key is unit-proven (dedupe.service.spec.ts) and live-proven not to duplicate a notification (scripts/live-proof-notify.sh's event-A/event-B checks). What remains genuinely blocked is fr.notify.on-new-device (still todo: login supplies no deviceId to derive a stable per-event id from), and the dedicated measurement harness this record's own `measurement.how` describes (a run admitting the same triple N times at random intervals over 24h) has not been built or run by this lane - the small-scale unit/live checks above demonstrate the mechanism, not the described measurement at that scale, so this nfr stays todo for that reason too."}
+blockedBy:
+  - {record: fr.notify.on-new-device, because: "Effectively-once is only as strong as the dedupe key's inputs, per decision.notify.dedupe-key - it holds for a retried delivery of the same real event, and it does not hold if a producer is ever forced to invent a new sourceEventId for what is really the same event. login supplies no deviceId today (gap.notify.new-device-event), so a new-device notification has no honest sourceEventId to hash yet."}

@@ -1,0 +1,56 @@
+# Profile: gpt-5.6-luna — a named Codex operation target (not a pool).
+# Business frame: the bounded-allocation Codex route. Same provider window as
+# codex-agent but pinned to Luna as both worker and reviewer, with its own small
+# default slot count an owner can explicitly resize per workflow.
+
+target: gpt-5.6-luna          # registry.json targets — a TARGET, distinct from the codex-agent pool entry
+provider: codex
+runtime: codex                # registry.json targets.gpt-5.6-luna.runtime
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: gpt-5.6-luna
+  profiles:
+    working: gpt-5.6-luna           # codex.json — bounded implementation/content/maintenance
+    reasoning: gpt-5.6-luna-reviewer # codex.json — independent review of bounded implementation
+  sharedQuota: >-
+    Luna consumes the same observed Codex provider capacity as Sol and Astra —
+    its slot count does not add headroom (docs/model-catalog.md).
+
+capacity:
+  defaultSlots: 2             # model-catalog.md: "default capacity is two slots;
+                            # an owner can explicitly allocate a different bounded
+                            # count for a workflow"
+  tiers: [easy, medium]       # model-catalog.md: "eligible for easy/medium
+                            # operation tiers by default" — NOT hard tier
+  roles: [implement, verify, write]   # INFERRED from model-catalog.md scope
+                                    # ("implementation, verification and
+                                    # writing") — not declared in runtimes.json,
+                                    # which only lists the five pool runtimes.
+
+launch:
+  orca: {kind: managed-agent, agent: codex}
+  imageGeneration: false      # codex.json gpt-5.6-luna profile
+
+business:
+  question: >-
+    "When do I want Codex execution on a bounded, explicitly-sized allocation
+    rather than the shared codex-agent pool?" — this target.
+  whenNeeded:
+    - Easy/medium implement/verify/write where an owner wants a bounded Luna allocation.
+    - As an ordinary Codex operation model — model-catalog.md is explicit that it is "an ordinary Codex operation model", not a special gate.
+  whenNot:
+    - "\"business-decision, planning or ImageGen routes\" — model-catalog.md excludes all three verbatim."
+    - Hard-tier work — easy/medium eligibility only.
+    - "Never as a way to buy qualification: \"a requested allocation never supplies missing model qualification, permits prohibited tools, weakens independent review or expands write authority\" (model-catalog.md)."
+  pickedBy: >-
+    Explicit target selection only — an owner names it; the allocator does not
+    spontaneously prefer it over the pool. OBSERVED subtlety: the bare name is
+    double-bound in registry.json — `targets["gpt-5.6-luna"]` is this route while
+    `targetAliases["gpt-5.6-luna"]` resolves the same string to `codex-agent`
+    (as do `codex-gpt-5.6-luna` / `codex-gpt-5.6-luna-reviewer`). Which binding a
+    caller gets depends on whether it resolves through targets or aliases;
+    an agent should not assume the bare name reaches this route.
+  failureModes:
+    - Assuming Luna slots add provider capacity — shared quota with the whole Codex window.
+    - "INFERRED: treating the separate target as an escape from codex-agent cooldowns — the provider window is shared, so provider-level quota failure parks both."

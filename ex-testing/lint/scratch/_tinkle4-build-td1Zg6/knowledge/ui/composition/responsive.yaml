@@ -1,0 +1,127 @@
+schema: starci/knowledge-source@1
+id: ui.composition.responsive
+title: Responsive composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: as the space available to a task changes, what must survive, and
+  which published query owns the change?
+  Responsive decisions are made before any DOM exists, because they are decisions about which regions
+  recompose, which branch disappears, and what the reader must still be able to do afterwards. A
+  device name is never an answer here; the answer is always a named query on a named owner.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+rules:
+  - id: RESPONSIVE-1
+    title: What survives when space shrinks
+    governs: Governs the floor the compact composition must keep.
+    cases:
+      - id: case-1
+        when: A task must fit into markedly less space
+        assert: |-
+          The compact branch keeps the required meaning, the primary action, and the current state in one readable flow, and support remains reachable from it
+      - id: case-2
+        when: Content would otherwise force the page to scroll sideways
+        assert: |-
+          The composition recomposes; no clipping, no squeezing, and no page-level inline overflow appears in that branch
+      - id: case-3
+        when: A branch is hidden in compact space
+        assert: |-
+          The branch is genuinely absent, and a trigger with controlled state, focus return, and a recovery path stands in its place
+      - id: case-4
+        when: Parallel regions are wanted at a wider width
+        assert: |-
+          Every parallel region at that width resolves to a published composition that already offers the mode
+      - id: case-5
+        when: The required compact behaviour has no published composition
+        assert: |-
+          A `GRAMMAR_REQUIRED` gap names the missing behaviour, and no parallel breakpoint is authored in its place
+  - id: RESPONSIVE-2
+    title: The query owner is named, not the device
+    governs: Governs which space is actually being observed.
+    cases:
+      - id: case-1
+        when: A primary column sits beside a rail
+        assert: |-
+          The branch names the `PrimaryRailLayout` container query at inline-size `56rem` as its owner, so a narrow container stacks inside a wide window
+      - id: case-2
+        when: Shell regions recompose
+        assert: |-
+          Each `WorkspaceShell` boundary is named separately: the named-container queries at `72rem` and `56rem`, and the viewport rule at `69.999rem`
+      - id: case-3
+        when: Global navigation switches between full and compact
+        assert: |-
+          `NavigationFeatureNav` is named as the owner, observing the layout viewport around `48rem`
+      - id: case-4
+        when: A conversation rail switches between persistent and drawer
+        assert: |-
+          `ChatWorkspace` is named as the owner, observing the layout viewport through `matchMedia("(max-width: 47.999rem)")` alongside a CSS rule from `48rem`
+      - id: case-5
+        when: |-
+          The direction wants a generic tablet breakpoint over these regions
+        assert: |-
+          No breakpoint outside the published owning queries governs those regions
+    notThisRule: which regions exist for the query to act on is LAYOUT-1.
+  - id: RESPONSIVE-3
+    title: Every compact branch has exactly one owner
+    governs: |-
+      Governs who holds the state when a composition has two forms.
+    cases:
+      - id: case-1
+        when: "`NavigationFeatureNav` exposes its compact trigger"
+        assert: |-
+          The application owns the compact drawer through that extension point and supplies the same destinations, labels, state, focus return, and recovery
+      - id: case-2
+        when: |-
+          `ChatWorkspace` switches its rail between persistent and drawer
+        assert: |-
+          The composition owns the switch; the `.starciwork` specification passes controlled state and callbacks only, and declares no listener of its own
+      - id: case-3
+        when: "`PrimaryRailLayout` reflows a rail that is present"
+        assert: |-
+          The published CSS owns the reflow, and a rail that is absent is absent in DOM rather than hidden
+      - id: case-4
+        when: Both forms would render and one is merely hidden
+        assert: |-
+          Exactly one branch exists at a time, and the other leaves no layout and no accessibility footprint
+  - id: RESPONSIVE-4
+    title: Pressure that is not viewport width
+    governs: Governs the other ways space runs out.
+    cases:
+      - id: case-1
+        when: |-
+          The reader zooms, enlarges text, or applies their own text spacing
+        assert: |-
+          The composition recomposes; no fixed text height and no clipping carries that pressure
+      - id: case-2
+        when: |-
+          Copy grows because it was translated or because a state added words
+        assert: |-
+          The `.starciwork` specification names that growth inside the fit decision rather than as an exception to it
+      - id: case-3
+        when: Content is essentially two-dimensional and cannot reflow
+        assert: |-
+          Exactly one named `HorizontalScrollRegion` owns it, and the surrounding page stays inside its inline bound
+      - id: case-4
+        when: |-
+          A virtual keyboard, an orientation change, or a safe-area inset reduces usable space
+        assert: |-
+          Persistent geometry still fits, stays visible, and occludes no part of the task; a layout query staying in wide mode is not accepted as proof of fit
+      - id: case-5
+        when: |-
+          A state expands the surface, as an error, an expanded panel, or an overlay does
+        assert: |-
+          The expanded form is decided in the same `.starciwork` specification entry as the resting one
+      - id: case-6
+        when: The decision is checked for fit
+        assert: |-
+          It is checked twice, and neither pass replaces the other. Before the tree exists, every candidate is rendered and served once per viewport of the coverage, so a person compares the wide and the narrow render while the direction can still change. After the tree is built, the audit captures every viewport of that same coverage and measures the rules above on what rendered. A decision looked at once has been checked at one width only
+    retired: |-
+      RESPONSIVE-5 is retired into COVERAGE-1 and is not reused; the address stays spent.
+doesNotDecide: |-
+  Which regions exist and who owns their tracks is [Layout](layout.yaml). Whether meaning keeps its rank
+  through a reflow is [Hierarchy](hierarchy.yaml), and whether an action group keeps its order is
+  [CTA](cta.yaml). What the `.starciwork` specification must enumerate about these branches is [Coverage](coverage.yaml).
+  Whether a compact branch is genuinely absent is decided in [State](state.yaml) and evidenced in
+  [Focus](../proof/focus.yaml).

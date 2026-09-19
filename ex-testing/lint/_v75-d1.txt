@@ -1,0 +1,9 @@
+diff --git a/examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml b/examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml
+index ab257553..6ff02a9f 100644
+--- a/examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml
++++ b/examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml
+@@ -1,3 +1,4 @@
++schema: starci/generation-receipts@1
+ tool: image_gen.imagegen
+ recordedAt: '2026-09-18T16:38:48.982865+00:00'
+ calls:

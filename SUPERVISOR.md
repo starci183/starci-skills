@@ -111,11 +111,11 @@ retry lên pin mới nhiều khả năng gỡ được.
 
 **1. `shared-1` — `protected-proof` inconclusive. Không phải lỗi của op.**
 
-Đã truy tới tận gốc. `source:oracle-189` = `scripts/check-fe-architecture.spec.mjs`,
+Đã truy tới tận gốc. `source:oracle-189` = `scripts/checks/check-fe-architecture.spec.mjs`,
 command khớp theo basename là:
 
 ```
-node node_modules/vitest/vitest.mjs run --changed a01a7bd7... && node --test scripts/check-fe-architecture.spec.mjs
+node node_modules/vitest/vitest.mjs run --changed a01a7bd7... && node --test scripts/checks/check-fe-architecture.spec.mjs
 ```
 
 `runProtectedProof` chạy đúng command đó ở **cả** base root lẫn candidate root.

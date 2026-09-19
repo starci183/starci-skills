@@ -1,0 +1,112 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: sds.recur.occurrence-lifecycle
+recordDigest: 2c769a647d3220573df7f260a412acdd34a275fcff287508362371cf05208bb7
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/recur/calendar.util.spec.ts
+      sha256: 40bc22c5a02894aba4c83614222ea944685e2bcc4b2f09ce033d682d1bd64f87
+    - path: src/modules/bussiness/recur/calendar.util.ts
+      sha256: 4ae39d711e8d01af13651339a371c6477aa81cfb727c6261bfe01e28398fabd0
+    - path: src/modules/bussiness/recur/complete-occurrence.command.ts
+      sha256: fa62ed135d18e20c5de09c1bbb94ebc01a3449067b6b28a32e6d75b4163248af
+    - path: src/modules/bussiness/recur/complete-occurrence.handler.spec.ts
+      sha256: 1301d24bc711a5230c39139c129c60585c12bc747e38515575c9a124429335b7
+    - path: src/modules/bussiness/recur/complete-occurrence.handler.ts
+      sha256: 10ce2c2151c8410eb5eadc74c7636cebcb6e4a308db1c31485182e4f0bea3040
+    - path: src/modules/bussiness/recur/edit-recurrence.command.ts
+      sha256: 01fcaa77c64a9474da267a58084a8cfbf29674b783323d9baef402616e5a74da
+    - path: src/modules/bussiness/recur/edit-recurrence.handler.spec.ts
+      sha256: fc7d19a2f488f5f3bdb56399f0377aa71a84c2c4a0460f926a54b45432894214
+    - path: src/modules/bussiness/recur/edit-recurrence.handler.ts
+      sha256: c8d7615ba1f7c720d29de2eb8b07d283c625f97837fc89b615dd3c0e6f10adf5
+    - path: src/modules/bussiness/recur/end-recurrence.command.ts
+      sha256: 9b331b66841fbacbe8e6d20d2cef7a1ef2d98697f913c55ff25e6b4c4c3a21a5
+    - path: src/modules/bussiness/recur/end-recurrence.handler.spec.ts
+      sha256: e6d4096bc1d8c8c5466bf2d80069cb1cfb6f35aff79b561f0c66cda9a990c70f
+    - path: src/modules/bussiness/recur/end-recurrence.handler.ts
+      sha256: b155f186083d037eeb159166178166b875676f2a5154d5813a89c6a876965dc4
+    - path: src/modules/bussiness/recur/generator.service.spec.ts
+      sha256: 5887fa6bb3e5795ec18769a224892987eb395dd8fa771365ea609971dc859fdc
+    - path: src/modules/bussiness/recur/generator.service.ts
+      sha256: 361b2b0d85f2538d2c7839d113079ec4c3ebe59671eddedf1c391c069ab06591
+    - path: src/modules/bussiness/recur/index.ts
+      sha256: 57fb723e3b75fade7b1010f9f516efbeac0fd82282921e1b7c6618ce1e80ed4d
+    - path: src/modules/bussiness/recur/make-recurring.command.ts
+      sha256: 5278fc29de39161b31c7d3c135c689f04b3ed936fc41343e99d230f1b3546ac9
+    - path: src/modules/bussiness/recur/make-recurring.handler.spec.ts
+      sha256: 5ab034f81360b9622ad653895d47c36c81649919010d0fd4cb9c77ce042a5d7c
+    - path: src/modules/bussiness/recur/make-recurring.handler.ts
+      sha256: 46e035050099b23655050001bc0daa053e2d82229fa18df02f23659b2fd4034f
+    - path: src/modules/bussiness/recur/occurrence.service.spec.ts
+      sha256: 3daf64f38a199adab71276c5b2a7592c234864f4359617c344d02da4b91420e1
+    - path: src/modules/bussiness/recur/occurrence.service.ts
+      sha256: 3ce38e8743d5814f740bfad652bfd44098d310679a484a462c791a007a18082e
+    - path: src/modules/bussiness/recur/recur.module-definition.ts
+      sha256: 96f994e348469e15b078bf22efbac4e61f47aaed29e54f9b5c50ad55825c08a6
+    - path: src/modules/bussiness/recur/recur.module.ts
+      sha256: 321d5d82a33b69c2a64b4adbe64eede0b5a5ab27295ed60b76dfa2a36feb136f
+    - path: src/modules/bussiness/recur/rule.service.spec.ts
+      sha256: 1b6761149f03a553b695834dc2a80a278d3666d8bebbc8e20ea4bcf2ba780686
+    - path: src/modules/bussiness/recur/rule.service.ts
+      sha256: 61774687c98135aca6762a673cfd922e1f24002407045f38e121a35f16bf7b20
+    - path: src/modules/bussiness/recur/scheduler.service.ts
+      sha256: 919213a4943708cdfe21a39090e5594153f0289001ab0c7e2fe04130e34b5a22
+    - path: src/modules/bussiness/recur/skip-occurrence.command.ts
+      sha256: 257e7a89f11edf1d2bc43d87af36aedd9a6daa3badc020ff3e832c71a9d8f16f
+    - path: src/modules/bussiness/recur/skip-occurrence.handler.spec.ts
+      sha256: 0bcc149f697fb55f02572857c7720c2090d644f3c006caebf10b8e334e5792b4
+    - path: src/modules/bussiness/recur/skip-occurrence.handler.ts
+      sha256: 0d1dbb6a41fba5e15185f4bcfc2e65e4d19db66acf0270cd5d46480af5a0b32a
+    - path: src/modules/bussiness/recur/testing/fake-recur-entity-manager.ts
+      sha256: 87387977a5fca584ac3dad353fe34e3118c9755042c52fc34db81d9f767c09f1
+    - path: src/modules/bussiness/recur/types/occurrence-record.ts
+      sha256: 6432e3d370ed5582f027204321f89be02378559df14ce7bca0c8c404626f1076
+    - path: src/modules/bussiness/recur/types/rule-record.ts
+      sha256: a6f1d2168659b6d97e5cb9b47e8b4bfba5682541837f98f63b5a55869f906aa2
+    - path: src/modules/bussiness/recur/upcoming-occurrences.handler.spec.ts
+      sha256: 31557f65880e4e458e4206143841543a0770c5c5426d25a1943cdc13c8f1f195
+    - path: src/modules/bussiness/recur/upcoming-occurrences.handler.ts
+      sha256: d1067e22c9cbf7d5059646367a6518150b9ac5ae14761ada08968e667e9f22ae
+    - path: src/modules/bussiness/recur/upcoming-occurrences.query.ts
+      sha256: ddebaf13d663d793145ef708388652eb1bbd0faf1a676fcbde6665f72e279d3e
+    - path: src/modules/bussiness/recur/zone.util.spec.ts
+      sha256: ecc481ce0a5b339e7bcad3775484394c70bb0bbeab7af489bac5a6e5615afdde
+    - path: src/modules/bussiness/recur/zone.util.ts
+      sha256: d7315070ee8e09ae69756d4422ee1ec4d6bc6848f8bfd8ec20674d7a20a0d36e
+  digest: ea722d078e5e0eff9724c45ef780eefe3af223b4d11ba4d30a840e0897ab3d34
+outcome: pass
+assertions:
+  - id: t-materialise
+    command: npx jest -t "t-materialise"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "t-materialise" exited 0
+  - id: t-complete
+    command: npx jest -t "t-complete"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "t-complete" exited 0
+  - id: t-skip
+    command: npx jest -t "t-skip"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "t-skip" exited 0
+  - id: t-orphan
+    command: npx jest -t "t-orphan"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "t-orphan" exited 0
+  - id: implementation
+    command: npx jest src/modules/bussiness/recur
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/recur exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:11:57.844Z

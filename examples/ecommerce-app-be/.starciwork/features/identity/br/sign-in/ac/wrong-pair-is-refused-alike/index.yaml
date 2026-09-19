@@ -1,7 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.identity.sign-in.wrong-pair-is-refused-alike
-rule: br.identity.sign-in
-given: Any email and any password that do not form a known pair
-when: The pair is submitted to sign-in
-then:
-  - The refusal is one status and one body, indistinguishable whether the email is unknown or the password is wrong.

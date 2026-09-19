@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { checkArchitecture } from '../checks/architecture.mjs';
-import { loadArchitectureConfig } from '../checks/architecture/config.mjs';
-import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from '../checks/architecture/contracts.mjs';
-import { buildTypeScriptContext } from '../checks/architecture/typescript.mjs';
+import { checkArchitecture } from '../scripts/checks/architecture.mjs';
+import { loadArchitectureConfig } from '../scripts/checks/architecture/config.mjs';
+import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from '../scripts/checks/architecture/contracts.mjs';
+import { buildTypeScriptContext } from '../scripts/checks/architecture/typescript.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');

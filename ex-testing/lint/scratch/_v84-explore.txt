@@ -1,0 +1,370 @@
+
+===== examples\todo-app-backend\.starciwork =====
+CATALOG index.yaml: {"schema":"work/catalog","id":"todo","description":"Product catalog. One entry per feature; every record of a feature lives under its directory.","features":[{"id":"login","directory":"features/login","description":"Getting into the product and staying in."},{"id":"task","directory":"features/task","description":"A task a person creates, completes and deletes."},{"id":"share","directory":"features/share","description":"A task shared with other people through role-bounded, expiring invitations."},{"id":"notify","directory":"features/notify","description":"Telling a person something happened, outside the product - email now, other channels later."},{"id":"plan","directory":"features/plan","des
+
+===== examples\ecommerce-app-be\.starciwork =====
+CATALOG index.yaml: {"schema":"work/catalog","id":"ecommerce-app","description":"Product catalog. One entry per feature; every record of a feature lives under its directory.","features":[{"id":"checkout","directory":"features/checkout","description":"Cart, stock, payment and the confirmed order - the first thing that needs a second service."},{"id":"identity","directory":"features/identity","description":"The person behind a session. Skeleton seeded beside checkout; its full design is a later pass."}]}
+
+===== field shapes =====
+starci/uat-run-manifest@1.schema: 11 occurrence(s), shapes: string
+   features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/manifest.yaml: "starci/uat-run-manifest@1"
+   features/login/uat/sign-in/runs/20260918T070052Z-b037b5fe/manifest.yaml: "starci/uat-run-manifest@1"
+   features/login/uat/sign-in/runs/20260918T080854Z-f7ab26f0/manifest.yaml: "starci/uat-run-manifest@1"
+work/acceptance-criterion.schema: 50 occurrence(s), shapes: string
+   features/audit/br/append-only/ac/chain-detects-tamper/index.yaml: "work/acceptance-criterion"
+   features/audit/br/erasure/logged/ac/request-and-completion-are-lines/index.yaml: "work/acceptance-criterion"
+   features/audit/br/erasure/right/ac/identifying-fields-unreadable/index.yaml: "work/acceptance-criterion"
+work/brand.schema: 2 occurrence(s), shapes: string
+   brand/index.yaml: "work/brand"
+   brand/index.yaml: "work/brand"
+work/brand.state: 2 occurrence(s), shapes: string
+   brand/index.yaml: "done"
+   brand/index.yaml: "done"
+work/business-rule.acceptanceCriteria: 34 occurrence(s), shapes: [string]
+   features/audit/br/append-only/index.yaml: ["chain-detects-tamper"]
+   features/audit/br/erasure/logged/index.yaml: ["request-and-completion-are-lines"]
+   features/audit/br/erasure/right/index.yaml: ["identifying-fields-unreadable"]
+work/business-rule.conflictsWith: 1 occurrence(s), shapes: [{record,rev,because}]
+   features/audit/br/erasure/right/index.yaml: [{"record":"br.audit.retention","rev":2,"because":"retention promises a line is never lost within 400 days; a verified erasure request can arrive on day one of that window and must still take effect immediately, so the two rules cannot both be satisfied by 'keep everything, always, for 400 days' - retention has to mean
+work/business-rule.schema: 34 occurrence(s), shapes: string
+   features/audit/br/append-only/index.yaml: "work/business-rule"
+   features/audit/br/erasure/logged/index.yaml: "work/business-rule"
+   features/audit/br/erasure/right/index.yaml: "work/business-rule"
+work/business-rule.state: 34 occurrence(s), shapes: string
+   features/audit/br/append-only/index.yaml: "done"
+   features/audit/br/erasure/logged/index.yaml: "done"
+   features/audit/br/erasure/right/index.yaml: "done"
+work/catalog.schema: 2 occurrence(s), shapes: string
+   index.yaml: "work/catalog"
+   index.yaml: "work/catalog"
+work/contract.conflictsWith: 2 occurrence(s), shapes: [{record,rev,because}] | [{record,because}]
+   features/notify/contract/new-device-signal/index.yaml: [{"record":"br.login.session.single-device","rev":1,"because":"the login session store has no device field: sds.login.session-store's stateMachine and data.login.person's fields carry no device identity, and session.mjs's accept()/actorOf() take no device argument. decision.login.session.devices is now decided (single-
+   features/plan/contract/create-precondition/index.yaml: [{"record":"fr.task.create","because":"fr.task.create's mainFlow creates a task for any non-empty title with no precondition step and no dependency on this contract, so its done state and this contract's consumerObligations describe two different, currently incompatible realities for the same code path."}]
+work/contract.requiresProof: 8 occurrence(s), shapes: {provider,consumer}
+   features/audit/contract/emitted-events/index.yaml: {"provider":{"required":true,"note":"task's impl.task.todo-app-backend.platform-events (the bus and its three task emissions) and login's session-side prover for SignedInEvent/SignedOutEvent (the handler specs assert each publish today) must prove they honour the surface. This lane never writes those records - the brie
+   features/login/contract/identity-for-task/index.yaml: {"provider":{"required":true,"note":"The provider proves it honours the surface."},"consumer":{"required":true,"note":"The consumer proves it honours its obligations."}}
+   features/notify/contract/new-device-signal/index.yaml: {"provider":{"required":true,"note":"login proves it calls onNewDeviceSignIn exactly once per sign-in that ends a prior session, with a deviceId that survives decision.login.session.devices being settled."},"consumer":{"required":true,"note":"notify proves it only ever reads deviceId from this surface."}}
+work/contract.schema: 8 occurrence(s), shapes: string
+   features/audit/contract/emitted-events/index.yaml: "work/contract"
+   features/login/contract/identity-for-task/index.yaml: "work/contract"
+   features/notify/contract/new-device-signal/index.yaml: "work/contract"
+work/contract.state: 8 occurrence(s), shapes: string
+   features/audit/contract/emitted-events/index.yaml: "todo"
+   features/login/contract/identity-for-task/index.yaml: "todo"
+   features/notify/contract/new-device-signal/index.yaml: "todo"
+work/customer-journey.requiresProof: 6 occurrence(s), shapes: {uat,requirements}
+   features/audit/journey/right-to-be-forgotten/index.yaml: {"uat":{"required":true},"requirements":{"forEach":"requirements"}}
+   features/login/journey/first-sign-in/index.yaml: {"uat":{"required":true},"requirements":{"forEach":"requirements"}}
+   features/plan/journey/hits-the-cap/index.yaml: {"uat":{"required":true},"requirements":{"forEach":"requirements"}}
+work/customer-journey.schema: 7 occurrence(s), shapes: string
+   features/audit/journey/right-to-be-forgotten/index.yaml: "work/customer-journey"
+   features/login/journey/first-sign-in/index.yaml: "work/customer-journey"
+   features/notify/journey/told-about-completion/index.yaml: "work/customer-journey"
+work/customer-journey.state: 7 occurrence(s), shapes: string
+   features/audit/journey/right-to-be-forgotten/index.yaml: "todo"
+   features/login/journey/first-sign-in/index.yaml: "done"
+   features/notify/journey/told-about-completion/index.yaml: "todo"
+work/data.conflictsWith: 2 occurrence(s), shapes: [{record,rev,because}] | [{record,because}]
+   features/audit/data/log-line/index.yaml: [{"record":"br.task.delete.final","rev":1,"because":"stays-gone requires a deleted task's identifier to resolve to nothing anywhere, now and after a restart, but target here is exactly that identifier, kept byte-for-byte in a task.deleted line for the full retention window - append-only forbids scrubbing it, so a task'
+   features/recur/data/occurrence/index.yaml: [{"record":"sds.task.completion-state","because":"an occurrence's lifecycle has five states because a rule can end under it (materialised can become orphaned); sds.task.completion-state models exactly two (open, complete) for a task with no such ending, and this feature does not own that record to widen its state machi
+work/data.schema: 14 occurrence(s), shapes: string
+   features/audit/data/erasure-request/index.yaml: "work/data"
+   features/audit/data/log-line/index.yaml: "work/data"
+   features/login/data/person/index.yaml: "work/data"
+work/data.state: 14 occurrence(s), shapes: string
+   features/audit/data/erasure-request/index.yaml: "done"
+   features/audit/data/log-line/index.yaml: "done"
+   features/login/data/person/index.yaml: "done"
+work/disposable-accounts.schema: 9 occurrence(s), shapes: string
+   features/audit/uat/right-to-be-forgotten/accounts.yaml: "work/disposable-accounts"
+   features/login/uat/sign-in/accounts.yaml: "work/disposable-accounts"
+   features/notify/uat/digest-and-unsubscribe/accounts.yaml: "work/disposable-accounts"
+work/event.schema: 6 occurrence(s), shapes: string
+   features/login/event/new-device-signin/index.yaml: "work/event"
+   features/login/event/signed-in/index.yaml: "work/event"
+   features/login/event/signed-out/index.yaml: "work/event"
+work/event.state: 6 occurrence(s), shapes: string
+   features/login/event/new-device-signin/index.yaml: "todo"
+   features/login/event/signed-in/index.yaml: "todo"
+   features/login/event/signed-out/index.yaml: "todo"
+work/evidence.schema: 120 occurrence(s), shapes: string
+   brand/evidence.yaml: "work/evidence"
+   features/audit/br/append-only/evidence.yaml: "work/evidence"
+   features/audit/br/erasure/logged/evidence.yaml: "work/evidence"
+work/feature.schema: 9 occurrence(s), shapes: string
+   features/audit/index.yaml: "work/feature"
+   features/login/index.yaml: "work/feature"
+   features/notify/index.yaml: "work/feature"
+work/functional-requirement.composes: 33 occurrence(s), shapes: [{rule,module}]
+   features/audit/fr/erasure/complete/index.yaml: [{"rule":"br.audit.erasure.right","module":"src/modules/bussiness/audit"},{"rule":"br.audit.erasure.logged","module":"src/modules/bussiness/audit"}]
+   features/audit/fr/erasure/request/index.yaml: [{"rule":"br.audit.erasure.right","module":"src/modules/bussiness/audit"},{"rule":"br.audit.erasure.logged","module":"src/modules/bussiness/audit"}]
+   features/audit/fr/export/index.yaml: [{"rule":"br.audit.append-only","module":"src/modules/bussiness/audit"}]
+work/functional-requirement.conflictsWith: 1 occurrence(s), shapes: [{record,rev,because}]
+   features/notify/fr/on-new-device/index.yaml: [{"record":"br.login.session.single-device","rev":1,"because":"the login session store (sds.login.session-store, data.login.person) exposes no device identity field at all - only prose in sds.login.session-store's responsibility and br.login.session.single-device's title mention a device - and decision.login.session.de
+work/functional-requirement.requiresProof: 32 occurrence(s), shapes: {unit,e2e,uat} | {unit,e2e,uat,perf} | {unit,e2e} | {unit,uat} | {uat}
+   features/audit/fr/erasure/complete/index.yaml: {"unit":{"forEach":"composes"},"e2e":{"command":"npm run test:e2e -- src/tests/e2e/audit/erasure-journey.e2e-spec.ts"},"uat":{"required":true}}
+   features/audit/fr/erasure/request/index.yaml: {"unit":{"forEach":"composes"},"e2e":{"command":"npm run test:e2e -- src/tests/e2e/audit/erasure-journey.e2e-spec.ts"},"uat":{"required":true}}
+   features/audit/fr/export/index.yaml: {"unit":{"forEach":"composes"},"e2e":{"command":"npm run test:e2e -- src/tests/e2e/audit/export-and-log.e2e-spec.ts"},"uat":{"required":true}}
+work/functional-requirement.schema: 34 occurrence(s), shapes: string
+   features/audit/fr/erasure/complete/index.yaml: "work/functional-requirement"
+   features/audit/fr/erasure/request/index.yaml: "work/functional-requirement"
+   features/audit/fr/export/index.yaml: "work/functional-requirement"
+work/functional-requirement.state: 34 occurrence(s), shapes: string
+   features/audit/fr/erasure/complete/index.yaml: "done"
+   features/audit/fr/erasure/request/index.yaml: "done"
+   features/audit/fr/export/index.yaml: "done"
+work/gap.closedBy: 35 occurrence(s), shapes: string | [string]
+   features/audit/gap/direction-not-drawn/index.yaml: "ui.audit.privacy"
+   features/audit/gap/emitted-events/index.yaml: ["impl.task.todo-app-backend.platform-events"]
+   features/audit/gap/live-proof/index.yaml: "uat.audit.right-to-be-forgotten"
+work/gap.schema: 38 occurrence(s), shapes: string
+   features/audit/gap/direction-not-drawn/index.yaml: "work/gap"
+   features/audit/gap/emitted-events/index.yaml: "work/gap"
+   features/audit/gap/live-proof/index.yaml: "work/gap"
+work/gap.state: 38 occurrence(s), shapes: string
+   features/audit/gap/direction-not-drawn/index.yaml: "done"
+   features/audit/gap/emitted-events/index.yaml: "todo"
+   features/audit/gap/live-proof/index.yaml: "todo"
+work/implementation.proves: 26 occurrence(s), shapes: [string]
+   features/audit/impl/todo-app-backend/erasure/index.yaml: ["br.audit.erasure.right","br.audit.erasure.logged","sds.audit.erasure-request"]
+   features/audit/impl/todo-app-backend/log/index.yaml: ["br.audit.append-only","br.audit.retention","sds.audit.log-chain"]
+   features/audit/impl/todo-app-backend/operator-read/index.yaml: ["fr.audit.log.read"]
+work/implementation.schema: 26 occurrence(s), shapes: string
+   features/audit/impl/todo-app-backend/erasure/index.yaml: "work/implementation"
+   features/audit/impl/todo-app-backend/log/index.yaml: "work/implementation"
+   features/audit/impl/todo-app-backend/operator-read/index.yaml: "work/implementation"
+work/implementation.state: 26 occurrence(s), shapes: string
+   features/audit/impl/todo-app-backend/erasure/index.yaml: "done"
+   features/audit/impl/todo-app-backend/log/index.yaml: "done"
+   features/audit/impl/todo-app-backend/operator-read/index.yaml: "done"
+work/integration.requiresProof: 8 occurrence(s), shapes: {live}
+   features/login/integration/keycloak/index.yaml: {"live":{"required":true,"note":"A run against the real provider. Evidence must carry proof.boundary live and an empty fakes list."}}
+   features/login/integration/postgres/index.yaml: {"live":{"required":true,"note":"A migration applied and a row round-tripped against the real server, not against a fake."}}
+   features/notify/integration/queue/index.yaml: {"live":{"required":true,"note":"A run against the real dev Redis. Evidence must carry proof.boundary live and an empty fakes list."}}
+work/integration.schema: 8 occurrence(s), shapes: string
+   features/login/integration/keycloak/index.yaml: "work/integration"
+   features/login/integration/postgres/index.yaml: "work/integration"
+   features/notify/integration/queue/index.yaml: "work/integration"
+work/integration.state: 8 occurrence(s), shapes: string
+   features/login/integration/keycloak/index.yaml: "done"
+   features/login/integration/postgres/index.yaml: "done"
+   features/notify/integration/queue/index.yaml: "done"
+work/non-functional-requirement.requiresProof: 9 occurrence(s), shapes: {measurement}
+   features/audit/nfr/retention/index.yaml: {"measurement":{"required":true}}
+   features/audit/nfr/tamper-evidence/index.yaml: {"measurement":{"required":true}}
+   features/login/nfr/sign-in-timing/index.yaml: {"measurement":{"required":true}}
+work/non-functional-requirement.schema: 9 occurrence(s), shapes: string
+   features/audit/nfr/retention/index.yaml: "work/non-functional-requirement"
+   features/audit/nfr/tamper-evidence/index.yaml: "work/non-functional-requirement"
+   features/login/nfr/sign-in-timing/index.yaml: "work/non-functional-requirement"
+work/non-functional-requirement.state: 9 occurrence(s), shapes: string
+   features/audit/nfr/retention/index.yaml: "done"
+   features/audit/nfr/tamper-evidence/index.yaml: "done"
+   features/login/nfr/sign-in-timing/index.yaml: "done"
+work/policy-decision.schema: 15 occurrence(s), shapes: string
+   features/audit/decision/erasure-method/index.yaml: "work/policy-decision"
+   features/audit/decision/operator-role/index.yaml: "work/policy-decision"
+   features/login/decision/session/devices/index.yaml: "work/policy-decision"
+work/policy-decision.state: 15 occurrence(s), shapes: string
+   features/audit/decision/erasure-method/index.yaml: "done"
+   features/audit/decision/operator-role/index.yaml: "done"
+   features/login/decision/session/devices/index.yaml: "done"
+work/policy-decision.tension: 1 occurrence(s), shapes: {records,statement}
+   features/audit/decision/erasure-method/index.yaml: {"records":["br.audit.append-only","br.audit.retention","br.audit.erasure.right"],"statement":"Each rule is individually true and agreed. Held together they are jointly unsatisfiable under the plain reading of never lost: append-only forbids altering a line, retention forbids losing one inside 400 days, and erasure.rig
+work/resource.schema: 3 occurrence(s), shapes: string
+   _resources/environments/dev/resource.yaml: "work/resource"
+   _resources/fixtures/todo-app-seed/resource.yaml: "work/resource"
+   _resources/identities/todo-app-demo/resource.yaml: "work/resource"
+work/sds-component.requiresProof: 13 occurrence(s), shapes: {implementation,transitions} | {implementation}
+   features/audit/sds/erasure-request/index.yaml: {"implementation":{"required":true},"transitions":{"forEach":"stateMachine.transitions"}}
+   features/audit/sds/log-chain/index.yaml: {"implementation":{"required":true},"transitions":{"forEach":"stateMachine.transitions"}}
+   features/login/sds/session-store/index.yaml: {"implementation":{"required":true},"transitions":{"forEach":"stateMachine.transitions"}}
+work/sds-component.schema: 13 occurrence(s), shapes: string
+   features/audit/sds/erasure-request/index.yaml: "work/sds-component"
+   features/audit/sds/log-chain/index.yaml: "work/sds-component"
+   features/login/sds/session-store/index.yaml: "work/sds-component"
+work/sds-component.state: 13 occurrence(s), shapes: string
+   features/audit/sds/erasure-request/index.yaml: "done"
+   features/audit/sds/log-chain/index.yaml: "done"
+   features/login/sds/session-store/index.yaml: "done"
+work/uat-flow.proves: 8 occurrence(s), shapes: [string]
+   features/audit/uat/right-to-be-forgotten/index.yaml: ["fr.audit.erasure.request","fr.audit.erasure.complete","fr.audit.export","fr.audit.log.read"]
+   features/login/uat/sign-in/index.yaml: ["fr.login.sign-in","br.login.password.sign-in","br.login.session.restores"]
+   features/notify/uat/digest-and-unsubscribe/index.yaml: ["fr.notify.digest","fr.notify.unsubscribe","br.notify.digest.window","br.notify.unsubscribe.honored"]
+work/uat-flow.schema: 9 occurrence(s), shapes: string
+   features/audit/uat/right-to-be-forgotten/index.yaml: "work/uat-flow"
+   features/login/uat/sign-in/index.yaml: "work/uat-flow"
+   features/notify/uat/digest-and-unsubscribe/index.yaml: "work/uat-flow"
+work/uat-flow.state: 9 occurrence(s), shapes: string
+   features/audit/uat/right-to-be-forgotten/index.yaml: "todo"
+   features/login/uat/sign-in/index.yaml: "done"
+   features/notify/uat/digest-and-unsubscribe/index.yaml: "todo"
+work/ui-screen.schema: 12 occurrence(s), shapes: string
+   features/audit/ui/privacy/index.yaml: "work/ui-screen"
+   features/login/ui/sign-in/index.yaml: "work/ui-screen"
+   features/notify/ui/preferences/index.yaml: "work/ui-screen"
+work/ui-screen.state: 12 occurrence(s), shapes: string
+   features/audit/ui/privacy/index.yaml: "done"
+   features/login/ui/sign-in/index.yaml: "done"
+   features/notify/ui/preferences/index.yaml: "done"
+work/workspace.schema: 2 occurrence(s), shapes: string
+   workspace.yaml: "work/workspace"
+   workspace.yaml: "work/workspace"
+
+===== tree layout sample (first feature of each tree) =====
+examples\todo-app-backend\.starciwork features: audit, login, notify, plan, recur, share, task
+   features/audit/br/append-only/ac/chain-detects-tamper/index.yaml
+   features/audit/br/append-only/evidence.yaml
+   features/audit/br/append-only/index.yaml
+   features/audit/br/erasure/logged/ac/request-and-completion-are-lines/index.yaml
+   features/audit/br/erasure/logged/evidence.yaml
+   features/audit/br/erasure/logged/index.yaml
+   features/audit/br/erasure/right/ac/identifying-fields-unreadable/index.yaml
+   features/audit/br/erasure/right/evidence.yaml
+   features/audit/br/erasure/right/index.yaml
+   features/audit/br/retention/ac/available-through-window/index.yaml
+   features/audit/br/retention/evidence.yaml
+   features/audit/br/retention/index.yaml
+   features/audit/contract/emitted-events/index.yaml
+   features/audit/data/erasure-request/index.yaml
+   features/audit/data/log-line/evidence.yaml
+   features/audit/data/log-line/index.yaml
+   features/audit/decision/erasure-method/evidence.yaml
+   features/audit/decision/erasure-method/index.yaml
+   features/audit/decision/operator-role/index.yaml
+   features/audit/fr/erasure/complete/evidence.yaml
+   features/audit/fr/erasure/complete/index.yaml
+   features/audit/fr/erasure/request/evidence.yaml
+   features/audit/fr/erasure/request/index.yaml
+   features/audit/fr/export/evidence.yaml
+   features/audit/fr/export/index.yaml
+   features/audit/fr/log/append/evidence.yaml
+   features/audit/fr/log/append/index.yaml
+   features/audit/fr/log/read/evidence.yaml
+   features/audit/fr/log/read/index.yaml
+   features/audit/gap/direction-not-drawn/index.yaml
+   features/audit/gap/emitted-events/index.yaml
+   features/audit/gap/live-proof/index.yaml
+   features/audit/gap/operator-role/evidence.yaml
+   features/audit/gap/operator-role/index.yaml
+   features/audit/gap/render-proof/index.yaml
+   features/audit/gap/unbuilt-module/evidence.yaml
+   features/audit/gap/unbuilt-module/index.yaml
+   features/audit/impl/todo-app-backend/erasure/evidence.yaml
+   features/audit/impl/todo-app-backend/erasure/index.yaml
+   features/audit/impl/todo-app-backend/log/evidence.yaml
+   features/audit/impl/todo-app-backend/log/index.yaml
+   features/audit/impl/todo-app-backend/operator-read/evidence.yaml
+   features/audit/impl/todo-app-backend/operator-read/index.yaml
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-complete-desktop-1280.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-complete-desktop-1280.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-complete-mobile-390.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-complete-mobile-390.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-pending-desktop-1280.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-pending-desktop-1280.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-pending-mobile-390.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-pending-mobile-390.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-refused-desktop-1280.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-refused-desktop-1280.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-refused-mobile-390.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-erasure-refused-mobile-390.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-exporting-desktop-1280.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-exporting-desktop-1280.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-exporting-mobile-390.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-exporting-mobile-390.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-idle-desktop-1280.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-idle-desktop-1280.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-idle-mobile-390.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-idle-mobile-390.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-requesting-erasure-desktop-1280.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-requesting-erasure-desktop-1280.png
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-requesting-erasure-mobile-390.html
+   features/audit/impl/todo-app-frontend/privacy/assets/privacy-requesting-erasure-mobile-390.png
+   features/audit/impl/todo-app-frontend/privacy/assets/todo-app-export-desktop-1280.json
+   features/audit/impl/todo-app-frontend/privacy/assets/todo-app-export-mobile-390.json
+   features/audit/impl/todo-app-frontend/privacy/evidence.yaml
+   features/audit/impl/todo-app-frontend/privacy/index.yaml
+   features/audit/index.yaml
+   features/audit/journey/right-to-be-forgotten/index.yaml
+   features/audit/nfr/retention/evidence.yaml
+   features/audit/nfr/retention/index.yaml
+   features/audit/nfr/tamper-evidence/evidence.yaml
+   features/audit/nfr/tamper-evidence/index.yaml
+   features/audit/sds/erasure-request/evidence.yaml
+   features/audit/sds/erasure-request/index.yaml
+   features/audit/sds/log-chain/evidence.yaml
+   features/audit/sds/log-chain/index.yaml
+   features/audit/uat/right-to-be-forgotten/accounts.yaml
+   features/audit/uat/right-to-be-forgotten/index.yaml
+   features/audit/ui/privacy/assets/direction-check.txt
+   features/audit/ui/privacy/assets/privacy-erasure-refused.png
+   features/audit/ui/privacy/assets/privacy-erasure-refused.prompt.txt
+   features/audit/ui/privacy/assets/privacy-erasure-refused.v4.png
+   features/audit/ui/privacy/assets/privacy-erasure-refused.v4.prompt.txt
+   features/audit/ui/privacy/assets/verify-direction.mjs
+   features/audit/ui/privacy/assets/visual-review.md
+   features/audit/ui/privacy/evidence.yaml
+   features/audit/ui/privacy/index.yaml
+examples\ecommerce-app-be\.starciwork features: checkout, identity
+   features/checkout/br/cart/ac/accumulates-on-held-product/index.yaml
+   features/checkout/br/cart/ac/clear-empties-every-line/index.yaml
+   features/checkout/br/cart/ac/lines-are-person-scoped/index.yaml
+   features/checkout/br/cart/index.yaml
+   features/checkout/br/place-order/ac/becomes-a-buyer/index.yaml
+   features/checkout/br/place-order/ac/empty-cart-is-refused/index.yaml
+   features/checkout/br/place-order/ac/stock-is-checked-at-confirmation/index.yaml
+   features/checkout/br/place-order/evidence.yaml
+   features/checkout/br/place-order/index.yaml
+   features/checkout/contract/order-for-identity/evidence.yaml
+   features/checkout/contract/order-for-identity/index.yaml
+   features/checkout/fr/cart/add/index.yaml
+   features/checkout/fr/cart/clear/index.yaml
+   features/checkout/fr/cart/list/index.yaml
+   features/checkout/fr/place-order/evidence.yaml
+   features/checkout/fr/place-order/index.yaml
+   features/checkout/gap/live-proof/index.yaml
+   features/checkout/gap/second-example-gates/index.yaml
+   features/checkout/impl/ecommerce-app-be/order-checkout/evidence.yaml
+   features/checkout/impl/ecommerce-app-be/order-checkout/index.yaml
+   features/checkout/index.yaml
+   features/checkout/integration/postgres/index.yaml
+   features/checkout/integration/redis/index.yaml
+   features/checkout/sds/order-flow/evidence.yaml
+   features/checkout/sds/order-flow/index.yaml
+   features/checkout/uat/place-order/accounts.yaml
+   features/checkout/uat/place-order/index.yaml
+   features/checkout/ui/cart/assets/cart.anatomy.png
+   features/checkout/ui/cart/assets/cart.anatomy.prompt.txt
+   features/checkout/ui/cart/assets/cart.initial.png
+   features/checkout/ui/cart/assets/cart.initial.prompt.txt
+   features/checkout/ui/cart/assets/cart.png
+   features/checkout/ui/cart/assets/cart.prompt.txt
+   features/checkout/ui/cart/assets/generation-receipts.yaml
+   features/checkout/ui/cart/evidence.yaml
+   features/checkout/ui/cart/index.yaml
+   features/checkout/ui/landing-home/assets/B3-source.txt
+   features/checkout/ui/landing-home/assets/direction-check.yaml
+   features/checkout/ui/landing-home/assets/directions.md
+   features/checkout/ui/landing-home/assets/generation-receipts.yaml
+   features/checkout/ui/landing-home/assets/landing-home.initial.png
+   features/checkout/ui/landing-home/assets/landing-home.initial.prompt.txt
+   features/checkout/ui/landing-home/assets/landing-home.png
+   features/checkout/ui/landing-home/assets/landing-home.prompt.txt
+   features/checkout/ui/landing-home/evidence.yaml
+   features/checkout/ui/landing-home/index.yaml
+   features/checkout/ui/shop-browse/assets/generation-receipts.yaml
+   features/checkout/ui/shop-browse/assets/shop-browse.initial.png
+   features/checkout/ui/shop-browse/assets/shop-browse.initial.prompt.txt
+   features/checkout/ui/shop-browse/assets/shop-browse.png
+   features/checkout/ui/shop-browse/assets/shop-browse.prompt.txt
+   features/checkout/ui/shop-browse/evidence.yaml
+   features/checkout/ui/shop-browse/index.yaml
+   features/checkout/ui/stock-refused/assets/generation-receipts.yaml
+   features/checkout/ui/stock-refused/assets/stock-refused.anatomy.png
+   features/checkout/ui/stock-refused/assets/stock-refused.anatomy.prompt.txt
+   features/checkout/ui/stock-refused/assets/stock-refused.initial.png
+   features/checkout/ui/stock-refused/assets/stock-refused.initial.prompt.txt
+   features/checkout/ui/stock-refused/assets/stock-refused.png
+   features/checkout/ui/stock-refused/assets/stock-refused.prompt.txt
+   features/checkout/ui/stock-refused/evidence.yaml
+   features/checkout/ui/stock-refused/index.yaml

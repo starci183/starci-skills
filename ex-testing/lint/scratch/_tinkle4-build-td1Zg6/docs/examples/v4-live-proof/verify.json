@@ -1,0 +1,6 @@
+{
+  "schema": "starci/orca-live-contract-verification@1",
+  "ok": true,
+  "errors": [],
+  "commandCount": 232
+}

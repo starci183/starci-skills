@@ -1,0 +1,20 @@
+schema: work/business-rule
+id: br.task.complete.once
+title: Completing a task twice changes nothing
+state: todo
+statements:
+  - Completing a task that is already complete leaves it unchanged and is not an error.
+  - The owner may reopen a task they completed.
+acceptanceCriteria: [is-idempotent, is-reversible]
+module: [src/modules/bussiness/task]
+change:
+  rev: 2
+  kind: breaking
+  at: 2026-09-18T05:02:00.000Z
+  withdraws: ["A complete task is never reopened."]
+  reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+    becomes history and the rule returns to todo until the reversible statement is proven in its place.
+# gap.task.collaborator-completion closed (lane be-share: share's half of contract.share.completion-guard-for-task
+# is now real and tested). This rule's evidence still needs regenerating for both statements now that rev 2
+# withdrew the old one - a kernel/uat lane's job, not this record's own authoring - so it stays todo with no
+# blockedBy of its own rather than citing a resolved gap or fabricating a fresh one this lane cannot verify.

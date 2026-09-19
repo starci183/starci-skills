@@ -1,8 +1,0 @@
-schema: work/acceptance-criterion
-id: ac.notify.delivery.once.dedupe-collapses-retry
-rule: br.notify.delivery.once
-given: A notification already admitted for a kind, a source event id and a recipient
-when: The same triple is admitted again
-then:
-  - The same notification object is returned, not a new one.
-  - The store's count of notifications does not increase.

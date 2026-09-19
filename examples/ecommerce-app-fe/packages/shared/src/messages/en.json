@@ -1,0 +1,196 @@
+{
+  "app": {
+    "landing": {
+      "title": "Northwind Supply — everyday objects, built to be kept",
+      "description": "The public storefront for Northwind Supply. Browse the catalogue, then continue to the shop."
+    },
+    "shop": {
+      "title": "Northwind Shop",
+      "description": "Browse the catalogue, manage your cart and review your orders."
+    }
+  },
+  "display": {
+    "label": "Display and language",
+    "theme": {
+      "toLight": "Switch to light",
+      "toDark": "Switch to dark"
+    },
+    "locale": {
+      "en": "English",
+      "vi": "Tiếng Việt"
+    }
+  },
+  "landing": {
+    "shell": {
+      "brand": "Northwind Supply",
+      "navLabel": "Site",
+      "catalogue": "Catalogue",
+      "about": "About",
+      "enterShop": "Enter shop",
+      "tagline": "Northwind Supply — everyday objects, built to be kept.",
+      "shopCta": "Shop the full catalogue →"
+    },
+    "hero": {
+      "title": "Everyday objects, built to be kept.",
+      "lede": "Northwind Supply makes a small, opinionated catalogue: things you reach for daily and expect to still have in ten years. No endless scroll, no filler.",
+      "startShopping": "Start shopping",
+      "seePicks": "See the picks"
+    },
+    "catalogue": {
+      "title": "This season’s picks",
+      "description": "A curated slice of the catalogue - the full feed lives in the shop.",
+      "viewFull": "View the full catalogue →"
+    },
+    "pillars": {
+      "title": "Why Northwind",
+      "repairable": {
+        "title": "Repairable by design",
+        "copy": "Every item ships with the parts and the manual to fix it."
+      },
+      "onePrice": {
+        "title": "One price, no games",
+        "copy": "The number you see is the number you pay — no timers, no dark patterns."
+      },
+      "carbonNeutral": {
+        "title": "Carbon-neutral delivery",
+        "copy": "Offset on every parcel, measured and reported each quarter."
+      }
+    }
+  },
+  "shop": {
+    "nav": {
+      "brand": "Northwind Shop",
+      "label": "Shop",
+      "browse": "Browse",
+      "cart": "Cart",
+      "checkout": "Checkout",
+      "account": "Account"
+    },
+    "browse": {
+      "title": "Browse",
+      "description": "Everything Northwind stocks.",
+      "descriptionCount": "Everything Northwind stocks — {count} items.",
+      "stockLabel": "{count} in stock",
+      "addToCart": "Add to cart",
+      "addingToCart": "Adding…",
+      "inCartLabel": "In your cart: {count}",
+      "addRefused": "The order service refused the add — sign in first, or try again once it is reachable.",
+      "signedOut": {
+        "title": "Sign in to browse",
+        "description": "The catalogue is read through your session — the order service only answers it for a signed-in shopper. Sign in on your account, then reload."
+      },
+      "unreachable": {
+        "title": "No products to show",
+        "description": "The catalogue is served by the order API at {url}. It is not reachable right now ({reason}). Start the order service, or point NEXT_PUBLIC_ORDER_API_URL at a running one, then reload."
+      },
+      "empty": {
+        "title": "The catalogue is empty",
+        "description": "The order service answered, but it has no products yet."
+      }
+    },
+    "cart": {
+      "title": "Cart",
+      "description": "What you are about to order.",
+      "linesTitle": "Your cart",
+      "lineQuantity": "× {count}",
+      "clearLabel": "Clear cart",
+      "clearingLabel": "Clearing…",
+      "clearRefused": "The order service refused the clear — your cart is unchanged.",
+      "checkoutCta": "Go to checkout →",
+      "empty": {
+        "title": "Your cart is empty",
+        "description": "Items you add while browsing will appear here."
+      },
+      "backToBrowse": "Back to browse →",
+      "accountCta": "Your account →",
+      "signedOut": {
+        "title": "Sign in to see your cart",
+        "description": "Your cart lives on the order service under your session. Sign in on your account, then reload."
+      },
+      "unreachable": {
+        "title": "Cart unavailable",
+        "description": "The cart is served by the order API at {url}. It is not reachable right now ({reason})."
+      }
+    },
+    "checkout": {
+      "title": "Checkout",
+      "description": "Review and place your order.",
+      "summaryTitle": "Your order",
+      "lineQuantity": "× {count}",
+      "confirmCta": "Confirm order",
+      "confirmingCta": "Confirming…",
+      "confirmed": {
+        "title": "Order confirmed",
+        "detail": "Order {orderId} is {status} — {total}. Payment {paymentId}.",
+        "replayedNote": "This confirmation was already sent — the order service returned the same order instead of writing a second one."
+      },
+      "refused": {
+        "cartEmpty": "The order service refused: your cart is empty. Nothing was placed and nothing changed.",
+        "insufficientStock": "The order service refused: {product} has {available} in stock and you asked for {requested}. Nothing was placed — your cart is unchanged.",
+        "unknownProduct": "The order service refused: {productId} is not a product it sells. Nothing was placed — your cart is unchanged.",
+        "sessionInvalid": "The order service refused: your session is not live. Sign in on your account, then confirm.",
+        "generic": "The order service refused: {reason}. Nothing was placed."
+      },
+      "empty": {
+        "title": "Nothing to check out yet",
+        "description": "Your cart is empty — the order service refuses a confirmation on it. Add items from browse first."
+      },
+      "signedOut": {
+        "title": "Sign in to check out",
+        "description": "Checkout confirms against your session on the order service. Sign in on your account, then reload."
+      },
+      "unreachable": {
+        "title": "Checkout unavailable",
+        "description": "Checkout is served by the order API at {url}. It is not reachable right now ({reason})."
+      },
+      "browseCta": "Browse the catalogue →",
+      "accountCta": "Your account →"
+    },
+    "account": {
+      "title": "Account",
+      "signedInAs": "Signed in as {email}.",
+      "anonymous": "You are browsing anonymously.",
+      "unreachable": "The account service at {url} is not reachable ({reason}).",
+      "auth": {
+        "headline": "Your Northwind account.",
+        "lede": "Sign in — or create one — to keep a cart and place orders.",
+        "signInTitle": "Welcome back",
+        "signInIntro": "Sign in with your email and password.",
+        "registerTitle": "Create your account",
+        "registerIntro": "One email and a password is the whole of it.",
+        "email": "Email",
+        "password": "Password",
+        "passwordHint": "Choose a password — this demo stores it hashed locally.",
+        "submitSignIn": "Sign in",
+        "submitRegister": "Register",
+        "submittingSignIn": "Signing in…",
+        "submittingRegister": "Registering…",
+        "switchToRegister": "New here? Create an account",
+        "switchToSignIn": "Already have an account? Sign in",
+        "backToBrowse": "Back to browse →",
+        "refusal": "That email and password did not open a session.",
+        "taken": "That email already has an account — sign in instead.",
+        "invalid": "Enter an email and a password to continue.",
+        "unavailable": "The account service could not be reached ({reason}).",
+        "signOut": "Sign out"
+      },
+      "ordersTitle": "Orders",
+      "ordersSignedOut": {
+        "title": "Sign in to see orders",
+        "description": "Orders belong to a signed-in account; nobody is signed in here."
+      },
+      "ordersUnreachable": {
+        "title": "No order status to show",
+        "description": "The account service at {url} is not reachable ({reason})."
+      },
+      "ordersEmpty": {
+        "title": "No orders yet",
+        "description": "The order service confirms this account has placed none."
+      },
+      "ordersBuyer": {
+        "title": "The order service confirms this account has placed orders.",
+        "description": "A per-order list is not served yet — each checkout confirmation shows that order's id, total and payment."
+      }
+    }
+  }
+}

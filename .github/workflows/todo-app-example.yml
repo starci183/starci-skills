@@ -10,14 +10,14 @@ on:
     paths:
       - 'examples/**'
       - 'schemas/**'
-      - 'scripts/check-example-*.mjs'
-      - 'checks/**'
+      - 'scripts/checks/check-example-*.mjs'
+      - 'scripts/checks/**'
   pull_request:
     paths:
       - 'examples/**'
       - 'schemas/**'
-      - 'scripts/check-example-*.mjs'
-      - 'checks/**'
+      - 'scripts/checks/check-example-*.mjs'
+      - 'scripts/checks/**'
 
 # A second push to the same branch/PR makes the still-running attempt pointless; cancel it instead of
 # burning two live Postgres/Keycloak stacks on the same ref.
@@ -49,10 +49,10 @@ jobs:
         run: node scripts/ensure-build.mjs
 
       - name: Check example YAML parses under the runtime's own loader
-        run: node scripts/check-example-yaml.mjs
+        run: node scripts/checks/check-example-yaml.mjs
 
       - name: Check example Work-tree layout (ids, refs, evidence)
-        run: node scripts/check-example-work.mjs
+        run: node scripts/checks/check-example-work.mjs
 
       - name: Run the example Work-gate fixture suite
         run: node --test tests/example-work-gate.spec.mjs
@@ -131,7 +131,7 @@ jobs:
       - name: Scoped lint (nest profile) [guarded off - see ex-be-nest]
         if: false
         working-directory: .
-        run: node scripts/check-scoped-lint.mjs --profile nest --root examples/todo-app-backend --architecture-config architecture.json --all
+        run: node scripts/checks/check-scoped-lint.mjs --profile nest --root examples/todo-app-backend --architecture-config architecture.json --all
 
   # 3) todo-app-frontend: type-check, unit tests, lint, production build, architecture check and the
   #    scoped-lint profile, which must already be clean (unlike the backend's).
@@ -204,7 +204,7 @@ jobs:
       - name: Scoped lint (next profile) must be clean
         working-directory: .
         run: |
-          node scripts/check-scoped-lint.mjs --profile next --root examples/todo-app-frontend --architecture-config architecture.json --all | tee scoped-lint-frontend.json
+          node scripts/checks/check-scoped-lint.mjs --profile next --root examples/todo-app-frontend --architecture-config architecture.json --all | tee scoped-lint-frontend.json
           node -e '
             const fs = require("node:fs");
             const result = JSON.parse(fs.readFileSync("scoped-lint-frontend.json", "utf8"));

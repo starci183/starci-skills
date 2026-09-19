@@ -1,0 +1,196 @@
+{
+  "app": {
+    "landing": {
+      "title": "Northwind Supply — vật dụng mỗi ngày, làm để dùng lâu",
+      "description": "Sân trước công khai của Northwind Supply. Duyệt danh mục, rồi tiếp tục đến cửa hàng."
+    },
+    "shop": {
+      "title": "Cửa hàng Northwind",
+      "description": "Duyệt danh mục, quản lý giỏ hàng và xem lại đơn hàng của bạn."
+    }
+  },
+  "display": {
+    "label": "Hiển thị và ngôn ngữ",
+    "theme": {
+      "toLight": "Chuyển sang sáng",
+      "toDark": "Chuyển sang tối"
+    },
+    "locale": {
+      "en": "English",
+      "vi": "Tiếng Việt"
+    }
+  },
+  "landing": {
+    "shell": {
+      "brand": "Northwind Supply",
+      "navLabel": "Trang",
+      "catalogue": "Danh mục",
+      "about": "Giới thiệu",
+      "enterShop": "Vào cửa hàng",
+      "tagline": "Northwind Supply — vật dụng mỗi ngày, làm để dùng lâu.",
+      "shopCta": "Xem toàn bộ danh mục →"
+    },
+    "hero": {
+      "title": "Vật dụng mỗi ngày, làm để dùng lâu.",
+      "lede": "Northwind Supply làm một danh mục nhỏ, có chọn lọc: những thứ bạn với tới mỗi ngày và mong còn dùng được mười năm nữa. Không cuộn vô tận, không thứ lấp chỗ.",
+      "startShopping": "Bắt đầu mua sắm",
+      "seePicks": "Xem lựa chọn"
+    },
+    "catalogue": {
+      "title": "Lựa chọn mùa này",
+      "description": "Một phần danh mục được tuyển chọn - toàn bộ nguồn dữ liệu nằm trong cửa hàng.",
+      "viewFull": "Xem toàn bộ danh mục →"
+    },
+    "pillars": {
+      "title": "Vì sao chọn Northwind",
+      "repairable": {
+        "title": "Sửa được ngay từ thiết kế",
+        "copy": "Mỗi món đều đi kèm phụ tùng và hướng dẫn để bạn tự sửa."
+      },
+      "onePrice": {
+        "title": "Một giá, không mánh khóe",
+        "copy": "Con số bạn thấy là con số bạn trả — không đếm ngược, không thủ thuật giá."
+      },
+      "carbonNeutral": {
+        "title": "Giao hàng trung hòa carbon",
+        "copy": "Bù trừ phát thải cho mỗi kiện hàng, đo lường và công khai mỗi quý."
+      }
+    }
+  },
+  "shop": {
+    "nav": {
+      "brand": "Cửa hàng Northwind",
+      "label": "Cửa hàng",
+      "browse": "Sản phẩm",
+      "cart": "Giỏ hàng",
+      "checkout": "Thanh toán",
+      "account": "Tài khoản"
+    },
+    "browse": {
+      "title": "Sản phẩm",
+      "description": "Tất cả hàng Northwind có.",
+      "descriptionCount": "Tất cả hàng Northwind có — {count} món.",
+      "stockLabel": "Còn {count} trong kho",
+      "addToCart": "Thêm vào giỏ",
+      "addingToCart": "Đang thêm…",
+      "inCartLabel": "Trong giỏ: {count}",
+      "addRefused": "Order service đã từ chối — hãy đăng nhập trước, hoặc thử lại khi dịch vụ kết nối được.",
+      "signedOut": {
+        "title": "Đăng nhập để xem hàng",
+        "description": "Danh mục được đọc qua phiên của bạn — order service chỉ trả lời người mua đã đăng nhập. Đăng nhập trong tài khoản, rồi tải lại."
+      },
+      "unreachable": {
+        "title": "Chưa có sản phẩm để hiển thị",
+        "description": "Danh mục được phục vụ bởi order API tại {url}. Hiện không kết nối được ({reason}). Hãy khởi động order service, hoặc trỏ NEXT_PUBLIC_ORDER_API_URL tới một dịch vụ đang chạy, rồi tải lại."
+      },
+      "empty": {
+        "title": "Danh mục trống",
+        "description": "Order service đã trả lời, nhưng chưa có sản phẩm nào."
+      }
+    },
+    "cart": {
+      "title": "Giỏ hàng",
+      "description": "Những gì bạn sắp đặt.",
+      "linesTitle": "Giỏ của bạn",
+      "lineQuantity": "× {count}",
+      "clearLabel": "Xóa giỏ hàng",
+      "clearingLabel": "Đang xóa…",
+      "clearRefused": "Order service đã từ chối — giỏ hàng không đổi.",
+      "checkoutCta": "Tới thanh toán →",
+      "empty": {
+        "title": "Giỏ hàng trống",
+        "description": "Các món bạn thêm khi duyệt sẽ xuất hiện ở đây."
+      },
+      "backToBrowse": "Quay lại xem hàng →",
+      "accountCta": "Tài khoản của bạn →",
+      "signedOut": {
+        "title": "Đăng nhập để xem giỏ",
+        "description": "Giỏ hàng nằm trên order service theo phiên của bạn. Đăng nhập trong tài khoản, rồi tải lại."
+      },
+      "unreachable": {
+        "title": "Không đọc được giỏ hàng",
+        "description": "Giỏ hàng được phục vụ bởi order API tại {url}. Hiện không kết nối được ({reason})."
+      }
+    },
+    "checkout": {
+      "title": "Thanh toán",
+      "description": "Kiểm tra và đặt đơn.",
+      "summaryTitle": "Đơn của bạn",
+      "lineQuantity": "× {count}",
+      "confirmCta": "Xác nhận đơn",
+      "confirmingCta": "Đang xác nhận…",
+      "confirmed": {
+        "title": "Đơn đã xác nhận",
+        "detail": "Đơn {orderId} — {status} — {total}. Thanh toán {paymentId}.",
+        "replayedNote": "Xác nhận này đã được gửi — order service trả lại cùng một đơn thay vì ghi đơn thứ hai."
+      },
+      "refused": {
+        "cartEmpty": "Order service đã từ chối: giỏ hàng trống. Không có đơn nào được đặt và không có gì thay đổi.",
+        "insufficientStock": "Order service đã từ chối: {product} chỉ còn {available} trong kho, bạn yêu cầu {requested}. Không có đơn nào được đặt — giỏ hàng không đổi.",
+        "unknownProduct": "Order service đã từ chối: {productId} không phải sản phẩm nó bán. Không có đơn nào được đặt — giỏ hàng không đổi.",
+        "sessionInvalid": "Order service đã từ chối: phiên của bạn không còn hiệu lực. Đăng nhập trong tài khoản, rồi xác nhận lại.",
+        "generic": "Order service đã từ chối: {reason}. Không có đơn nào được đặt."
+      },
+      "empty": {
+        "title": "Chưa có gì để thanh toán",
+        "description": "Giỏ hàng trống — order service sẽ từ chối xác nhận. Hãy thêm món từ trang sản phẩm trước."
+      },
+      "signedOut": {
+        "title": "Đăng nhập để thanh toán",
+        "description": "Thanh toán xác nhận theo phiên của bạn trên order service. Đăng nhập trong tài khoản, rồi tải lại."
+      },
+      "unreachable": {
+        "title": "Không thanh toán được",
+        "description": "Thanh toán được phục vụ bởi order API tại {url}. Hiện không kết nối được ({reason})."
+      },
+      "browseCta": "Xem danh mục →",
+      "accountCta": "Tài khoản của bạn →"
+    },
+    "account": {
+      "title": "Tài khoản",
+      "signedInAs": "Đã đăng nhập: {email}.",
+      "anonymous": "Bạn đang xem với tư cách khách.",
+      "unreachable": "Account service tại {url} hiện không kết nối được ({reason}).",
+      "auth": {
+        "headline": "Tài khoản Northwind của bạn.",
+        "lede": "Đăng nhập — hoặc tạo tài khoản — để giữ giỏ hàng và đặt đơn.",
+        "signInTitle": "Chào mừng trở lại",
+        "signInIntro": "Đăng nhập bằng email và mật khẩu của bạn.",
+        "registerTitle": "Tạo tài khoản",
+        "registerIntro": "Chỉ cần một email và một mật khẩu.",
+        "email": "Email",
+        "password": "Mật khẩu",
+        "passwordHint": "Chọn một mật khẩu — bản demo này lưu nó dưới dạng băm cục bộ.",
+        "submitSignIn": "Đăng nhập",
+        "submitRegister": "Đăng ký",
+        "submittingSignIn": "Đang đăng nhập…",
+        "submittingRegister": "Đang đăng ký…",
+        "switchToRegister": "Mới đến? Tạo tài khoản",
+        "switchToSignIn": "Đã có tài khoản? Đăng nhập",
+        "backToBrowse": "Quay lại xem hàng →",
+        "refusal": "Email và mật khẩu đó không mở được phiên.",
+        "taken": "Email đó đã có tài khoản — hãy đăng nhập.",
+        "invalid": "Nhập email và mật khẩu để tiếp tục.",
+        "unavailable": "Không kết nối được account service ({reason}).",
+        "signOut": "Đăng xuất"
+      },
+      "ordersTitle": "Đơn hàng",
+      "ordersSignedOut": {
+        "title": "Đăng nhập để xem đơn",
+        "description": "Đơn hàng thuộc về tài khoản đã đăng nhập; hiện chưa có ai đăng nhập."
+      },
+      "ordersUnreachable": {
+        "title": "Không có trạng thái đơn để hiển thị",
+        "description": "Account service tại {url} hiện không kết nối được ({reason})."
+      },
+      "ordersEmpty": {
+        "title": "Chưa có đơn nào",
+        "description": "Order service xác nhận tài khoản này chưa đặt đơn nào."
+      },
+      "ordersBuyer": {
+        "title": "Order service xác nhận tài khoản này đã đặt đơn.",
+        "description": "Danh sách từng đơn chưa được phục vụ — trang xác nhận thanh toán cho thấy id, tổng tiền và thanh toán của đơn đó."
+      }
+    }
+  }
+}

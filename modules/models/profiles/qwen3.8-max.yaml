@@ -1,0 +1,51 @@
+# Profile: qwen3.8-max — installed Qwen exception target.
+# Business frame: present but OFF every automatic chain. It exists for explicit
+# benchmark runs and user-approved exceptions only — a deliberate capacity the
+# routing policy refuses to spend by default.
+
+target: qwen3.8-max           # registry.json targets
+provider: qwen
+runtime: qwen                 # runs through the same Qwen command-terminal shape
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: qwen3.8-max
+  profiles:
+    working: qwen3.8-max-worker     # qwen.json — "complex bounded implementation
+                                    # or repair ONLY when explicitly selected for
+                                    # a benchmark or user-approved exception"
+    reasoning: qwen3.8-max-reviewer # qwen.json — analyze architecture/business/
+                                  # verification evidence without repairing
+  modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch
+
+launch:
+  orca:
+    kind: command-terminal
+    command: "qwen --model qwen3.8-max --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
+    dispatch: return-preamble-and-send
+    adapter: qwen
+    nestedAgents: forbidden
+  imageGeneration: false
+
+position:
+  automaticChains: excluded   # registry.json selection + costPolicy: "Qwen 3.8 Max
+                            # and DeepSeek command terminals stay out of automatic
+                            # chains"; "excluded from automatic chains"
+  tiers: absent — appears in no allocation.tiers or preference list
+
+business:
+  question: >-
+    "What do I run when a benchmark or the owner explicitly calls for Qwen's
+    larger model?" — this target, and only that.
+  whenNeeded:
+    - A benchmark comparing bounded representative operations (costPolicy mandates benchmarking before proposing routing changes).
+    - A user-approved exception dispatch.
+  whenNot:
+    - Any automatic chain — structurally excluded; absence from chains is policy, not an omission to fix.
+    - "INFERRED: as a silent upgrade for hard work the flash pool failed — the correct move after a failed attempt is the declared chain, not an unapproved model swap."
+  pickedBy: >-
+    Explicit selection only — an owner decision or a benchmark harness; the
+    allocator never reaches it.
+  failureModes:
+    - A ceiling stop (240 turns / 90m / 600 calls) is a failed attempt, not partial success.
+    - "INFERRED: its exclusion means a workflow that quietly needs Max-level quality has no legitimate automatic route to it — surface that as a user choice, don't reroute."

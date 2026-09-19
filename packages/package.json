@@ -1,0 +1,23 @@
+{
+  "name": "starci-eslint",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The machines behind the StarCi lint canon: one flat-config plugin per side, each rule paired with the test that proves it fires. Lives in the .claude trust tree; published as @starci/eslint-canon-{be,fe}.",
+  "workspaces": [
+    "eslint/*"
+
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "test:fe": "npm test --workspace @starci/eslint-canon-fe",
+    "test:be": "npm test --workspace @starci/eslint-canon-be"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.18.0",
+    "@typescript-eslint/parser": "^8.20.0"
+  }
+}

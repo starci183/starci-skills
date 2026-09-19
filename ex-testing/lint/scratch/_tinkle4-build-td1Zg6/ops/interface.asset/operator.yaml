@@ -1,0 +1,203 @@
+id: interface.asset
+goal:
+  en: Generate every artwork the approved interface candidate embeds as a real repository asset at the size,
+    format and brand references the design record declares, and bind each produced file back to its slot.
+nodeKinds:
+  - ui
+completionProfile: ui
+sideEffects:
+  - generated artwork files inside the owned asset paths of the bound repository
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the interface design record this operation serves: its screens, their enumerated states, the
+        blueprint regions and - the input this operation exists for - the declared artwork slots, each with its
+        region, purpose, brief, size, format, brand references and the crop of the chosen candidate it was taken
+        from. The record governs. A slot the record does not declare is not generated here, and a record that
+        declares no slot at all leaves this operation nothing to do; neither is a licence to decide what the
+        screen should contain."
+  - id: design
+    path: N/assets/*
+    purpose:
+      en: Open the actual chosen candidate image beside the record and the crop each slot names inside it, so the
+        artwork that is produced is the artwork that was approved rather than a fresh interpretation of its
+        brief. A slot whose crop cannot be located in the candidate is a reported gap, never a free redraw.
+  - id: brand
+    path: .starciwork/brand/index.yaml + brand/assets/**
+    purpose:
+      en: Read the product brand record the kernel attaches - its colour tokens, its mascot and logo masters with
+        the placements each one allows and forbids, and its imagery prompt rules - and read the actual master
+        files a slot references. These rules bound every prompt and every result; a brief that cannot be honoured
+        inside them is reported, not quietly widened, and an asset is never produced from a master the record
+        forbids in that placement.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve the bound repository, its checkout and its owned asset paths, and read whatever already exists
+        at the slot's destination, so an existing verified asset is reused or replaced deliberately instead of
+        duplicated under a second name. Reading the surrounding code is for placing the file only; this operation
+        changes no product code.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: "Resolve this operator's request-bound external-agent chain and confirm the actual host carries an
+        image generator before any slot is attempted. Historical model names are not availability proof, and a
+        profile without an image model cannot carry this operation: report the limitation instead of substituting
+        a hand-authored, scripted or placeholder image for a generated one."
+writes:
+  - id: source
+    path: repository:<repo-id>/<asset-path>
+    fields:
+      - generated artwork files only
+    content:
+      en: "Write each slot's artwork at the owned asset path the allowlist names, in the declared format and at
+        the declared pixel size, one file per slot and nothing else. No source file, no stylesheet, no component
+        and no configuration is edited here: wiring the file into a component is the build's step, and an asset
+        written outside the allowlisted asset paths is a reported scope blocker rather than a wider write."
+  - id: node
+    path: N/index.yaml
+    fields:
+      - schema
+      - ui.artworkSlots[].file
+      - ui.artworkSlots[].sha256
+      - ui.artworkSlots[].status
+      - ui.artworkSlots[].provenance
+      - assets:[{path}]
+    content:
+      en: "Record the produced artwork on the work/node@2 record against the slots it already declares: per slot the repository path
+        of the file, its sha256, its status and the tool provenance of the generation, and bind each path in the
+        record's asset list so the bytes are covered. Add no slot, remove no slot and rewrite no brief, region,
+        size or crop: those are the drawing's, and a slot that turned out wrong is a reported gap, not an edit of
+        what was approved. A slot with no file is left explicitly unproduced with its reason."
+  - id: evidence
+    path: E/manifest.yaml + E/artwork-slots.yaml + E/prompt.txt
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - extensions
+    content:
+      en: Retain the slot-to-file table as readable YAML, the full prompt and reference list used per slot
+        (including the candidate crop and each brand master passed as a reference), the real tool provenance, and
+        the inspection of every produced file against its brief and the brand rules. Record an honest unproduced
+        or failed slot; a slot reported as produced without opened bytes is a failure, not a draft.
+steps:
+  - reads:
+      - target
+      - design
+      - brand
+      - profile
+    writes:
+      - evidence
+    action:
+      en: "Read the declared artwork slots of the design record and freeze the work before generating anything:
+        per slot its id, screen, state, blueprint region, purpose, brief, pixel size and viewport, format, brand
+        references and the crop of the chosen candidate it came from. Open the candidate and locate every crop.
+        Confirm the host actually carries an image generator. Compare each brief against the brand rules and the
+        placements its referenced masters allow, and settle which slots are producible before the first image is
+        requested; an embedded artwork visible in the candidate that the record never declared is reported rather
+        than invented into a slot here."
+  - reads:
+      - design
+      - brand
+      - repo
+    writes:
+      - source
+    action:
+      en: Generate each producible slot with the image model, passing the candidate crop and the brand mascot or
+        logo masters the slot references as actual input references, so the result is the approved artwork rather
+        than a new one matching the same words. Produce exactly the declared pixel size and format, one file per
+        slot, at the owned asset path the allowlist names, reusing a verified existing file instead of writing a
+        second copy of the same artwork under another name. Do not drift the brief, do not restyle the candidate,
+        do not add or remove content the region does not carry, and do not touch product code.
+  - reads:
+      - target
+      - repo
+    writes:
+      - node
+      - evidence
+    action:
+      en: Open every produced file and inspect it as bytes and as an image against its slot - the crop it must
+        reproduce, its declared size and format, and the brand rules and placement its references allow. Then
+        record each slot's file path, sha256, status and provenance back into the design record and bind the path
+        in its asset list. A file that differs from the approved crop, misses its declared size or breaks a brand
+        rule is regenerated or reported; it is never recorded as the slot's asset.
+  - reads:
+      - target
+      - design
+      - brand
+    writes:
+      - node
+      - evidence
+    action:
+      en: Report once with the complete slot-to-file table, naming every declared slot and the file that now
+        carries it. A slot whose brief cannot be honoured inside the brand rules is blocked as a brand gap with
+        the exact rule and the exact brief that conflict. Artwork the candidate embeds that the record never
+        declared is blocked as an interface gap naming the screen, state and region, so the drawing declares it
+        instead of this operation guessing at it. An asset path outside the allowlist is blocked with the exact
+        paths. Stop without wiring anything into a component and without advancing the workflow.
+proofs:
+  - id: slot-coverage
+    requirement:
+      en: Every artwork slot the design record declares is accounted for - produced with a file and sha256, or
+        explicitly unproduced with a named blocker. A partial table reported as complete, or a slot silently
+        dropped, is a failure.
+  - id: candidate-fidelity
+    requirement:
+      en: Each produced file was opened and compared against the candidate crop its slot names, at the declared
+        pixel size and format. A generated image that reinterprets the approved artwork instead of reproducing it
+        does not satisfy its slot, and a similar-looking result is not proof of the same artwork.
+  - id: brand-conformance
+    requirement:
+      en: "Every prompt and every result stayed inside the brand record: the referenced masters were passed as
+        real references, the placement each master allows was respected, and no colour, mark or imagery rule the
+        record forbids was produced. A visual acceptance does not substitute for the record's own rules."
+  - id: binding
+    requirement:
+      en: Every recorded path exists in the bound repository with the recorded sha256, every path is inside the
+        allowlisted asset scope, the declared slot briefs, regions, sizes and crops are byte-identical to what the
+        drawing authored, and no product code changed. An honest not-run cannot earn done.
+blockers:
+  - code: BRAND_RULE_UNSATISFIABLE
+    condition:
+      en: A slot's brief cannot be honoured inside the brand record - the placement its master requires is
+        forbidden, the imagery rules contradict the brief, or the record names no master the brief depends on -
+        so any asset produced would be outside the brand. Report the rule and the brief; never widen the rules.
+  - code: ARTWORK_SLOT_UNDECLARED
+    condition:
+      en: The chosen candidate embeds artwork the design record does not declare as a slot, or a declared slot
+        names a crop, region or state the candidate and the record do not contain, so the brief would have to be
+        authored here. Report the screen, state and region for the drawing to declare.
+  - code: IMAGE_MODEL_UNAVAILABLE
+    condition:
+      en: The resolved profile and actual host carry no image generator, so no slot can be produced. Report the
+        limitation; a scripted, hand-drawn or placeholder file is never a generated asset.
+  - code: SCOPE_OUTSIDE_ALLOWLIST
+    condition:
+      en: A slot's destination lies outside the owned asset paths this operation may write. Report the exact
+        paths and wait; never widen the write ceiling to place a file.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: The design record, the chosen candidate or the brand record this operation depends on is missing or not
+        effectively done. Report the node/resource IDs; never author the missing record, draw the missing
+        candidate or run a predecessor here.
+placeholders:
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  asset-path: Owned asset destination declared by the allowlist
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

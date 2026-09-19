@@ -1,0 +1,75 @@
+# Profile: devin-agent — the Cognition Devin command-terminal pool.
+# Business frame: the owner-gated executor. Installed but CLOSED by default
+# (maxParallel 0) — it only runs when a workflow is explicitly granted slots.
+# Orca-only; there is no headless path.
+
+target: devin-agent           # registry.json + runtimes.json
+provider: devin               # runtimes.json — provider cognition-devin (devin.json)
+runtime: devin                # registry.json
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: swe-2-max   # registry.json
+  profiles:
+    working: devin-worker     # devin.json — one bounded task in the workflow worktree via Devin CLI
+    reasoning: devin-reviewer # devin.json — verify one bounded change, never expand scope
+  logicalIdentity: >-
+    docs/model-catalog.md: the logical model identity is `devin-agent`; the local
+    CLI may use an account-selected underlying model and StarCi does not rename or
+    infer it. modelPolicy: "pin-swe-2-max-and-attest-the-devin-cli-runtime-before-dispatch".
+
+capacity:
+  maxParallel: 0              # runtimes.json — deliberately closed at rest
+  capacityAuthority: explicit-workflow-quota   # only a granted workflow quota opens slots
+  quotaTelemetry: launch-status                # quota is observed through launch status
+  roles: [implement, verify, write]            # NO decide, NO plan
+  models:
+    implement: swe-2-max
+    verify: swe-2-max
+    write: swe-2-max
+
+launch:
+  executionHosts: [orca]      # registry.json — Orca ONLY; not a headless provider
+  orca:
+    kind: command-terminal
+    command: "devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false"
+    reasoningCommand: same command shape
+    dispatch: return-preamble-and-send
+    adapter: devin
+    nestedAgents: forbidden   # forbids Devin subagents / cloud handoff (model-catalog.md)
+    capacityGate: explicit-workflow-quota
+  adapterPreflight: >-
+    model-catalog.md: the adapter runs read-only `devin models list --format json`
+    BEFORE the interactive CLI, because `auth status` exits zero even while logged
+    out. accept-edits is the permission mode; the workspace-trust dialog is
+    disabled because the worktree is already isolated; Task delivery and
+    settlement stay under Orca's Dispatch.
+
+position:
+  easyTier: second
+  mediumTier: last in default
+  hardTier: second in default/implement/write; last in verify
+  chainSecond: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.retire, task.execute, uat.verify, workspace.manage, review.verify]
+  note: >-
+    It is second in most execution chains but maxParallel 0 means "in the chain"
+    is not "available" — the allocator skips it until a workflow quota exists.
+
+business:
+  question: >-
+    "Which pool do I open when the owner explicitly grants Devin CLI capacity to
+    a workflow?" — devin-agent, and only then.
+  whenNeeded:
+    - Bounded implement/verify/write inside an Orca workflow worktree after explicit slot grant.
+    - Second-seat execution behind qwen-agent in the declared cost order.
+    - Hard-tier execution behind claude-agent when a quota is open.
+  whenNot:
+    - Anywhere outside Orca — executionHosts is [orca]; a headless-host workflow cannot serve it.
+    - decide/plan/manager/planner/validator/ImageGen roles — none exist (model-catalog.md lists these exclusions verbatim).
+    - "By default at all: maxParallel 0 means absence of granted quota is the normal state, not an outage."
+  pickedBy: >-
+    Allocator by role + tier + quota; the explicit-workflow-quota gate sits before
+    eligibility — capacity is an owner decision, not a scheduler guess.
+  failureModes:
+    - "Reading chain-second position as readiness: without granted quota it admits nothing."
+    - Trusting `auth status` for login state — the adapter checks `devin models list` because auth status can pass while logged out.
+    - "INFERRED: expecting cloud handoff/subagent behavior — both are forbidden; the op's boundary is the worktree."

@@ -1,0 +1,4 @@
+$ npx jest -t "ac.task.title.required.refuses-empty"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
+exit 0
+

@@ -1,0 +1,14 @@
+{
+  "app": "todo-be",
+  "project": "starci-todo-app-backend",
+  "via": "sonarqube-todo-app-backend-token.key",
+  "status": "OK",
+  "conditions": []
+}
+{
+  "app": "ec-be",
+  "project": "starci-ecommerce-app-be",
+  "via": "sonarqube-ecommerce-app-be-token.key",
+  "status": "OK",
+  "conditions": []
+}

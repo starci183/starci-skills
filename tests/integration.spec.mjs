@@ -361,7 +361,7 @@ test('a fresh install carries the 5-plus runtime roots and an update sheds the f
   // The renamed tree must actually arrive: one file from each root the release introduced, so an install that
   // shipped the package.json `files` list without one of them fails here instead of at the first workflow.
   for (const relative of ['.claude/kernel/kernel.mjs', '.claude/model/kinds.yaml', '.claude/model/hosts.yaml',
-    '.claude/hosts/index.mjs', '.claude/hosts/orca/launch.mjs', '.claude/models/functions.mjs', '.claude/checks/brand.mjs']) {
+    '.claude/hosts/index.mjs', '.claude/hosts/orca/launch.mjs', '.claude/models/functions.mjs', '.claude/scripts/checks/brand.mjs']) {
     assert.ok(fs.existsSync(path.join(root, relative)), relative);
   }
   // An install upgraded from before the rename still has `profiles/` from its own manifest. It is ours and

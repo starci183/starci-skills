@@ -1,0 +1,23 @@
+schema: work/gap
+id: gap.task.single-owner-editor-arm
+title: br.task.single-owner's accepted-editor complete arm has no captured proof
+state: todo
+statement: >-
+  br.task.single-owner's third statement lets an accepted editor collaborator complete a task through
+  contract.share.completion-guard-for-task. The capability exists and is proven elsewhere -
+  impl.share.todo-app-backend.access is done, ShareCompletionAuthority registers into task's own
+  CompletionAuthorityRegistry, and completion-authority.spec.ts asserts a registered widened authority
+  lets a non-owner complete/reopen - but no run bound to this rule's own evidence.yaml exercises that
+  arm: its single assertion is a jest name filter over ac.task.single-owner.refuses-stranger that
+  selects three stranger negatives and skips the whole of completion-authority.spec.ts, and the file
+  already carries stale: true with exactly that reason recorded. The contract whose provider/consumer
+  proof would cover the arm end to end is itself still todo. What is absent is not code but this
+  rule's captured proof of it.
+verificationSource: authored-claim
+because: >-
+  Authored by the edges lane (v7-4) reading br.task.single-owner's own evidence.yaml staleReason,
+  which already measures this: the captured run exits 0 on "3 passed, 233 skipped" and the 233 skipped
+  include all of completion-authority.spec.ts. Verifiable by inspection - no run was or may be
+  executed by this lane; closing it is the evidence lane's re-capture plus
+  contract.share.completion-guard-for-task's provider/consumer proof settling.
+change: {rev: 1, kind: initial, at: 2026-09-19T12:00:00.000Z, reason: "Named so the four blockedBy chains that dead-ended at br.task.single-owner - fr.task.complete, fr.task.delete, contract.share.completion-guard-for-task and journey.notify.told-about-completion - have a real root: the rule is todo because this proof is missing, a fact previously carried only in its evidence's staleReason."}

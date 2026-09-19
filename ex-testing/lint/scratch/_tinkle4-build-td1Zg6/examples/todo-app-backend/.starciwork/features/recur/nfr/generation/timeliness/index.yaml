@@ -1,0 +1,29 @@
+schema: work/non-functional-requirement
+id: nfr.recur.generation.timeliness
+title: A due occurrence is materialised close to its due instant
+quality: timeliness
+state: todo
+observableCriterion: A rule's occurrence is materialised within 5 minutes of its dueAtUtc for at least 95%
+  of occurrences over a rolling 7-day window, measured on the dev server's own scheduler tick, excluding
+  occurrences produced by a backfill run after a scheduler outage (those are measured separately, against
+  decision.recur.generation.backfill, not against this window).
+measurement:
+  how: Compare each occurrence's dueAtUtc to the createdAt of the row the generator wrote for it, over
+    every occurrence materialised by the live integration.recur.scheduler tick in the window.
+  threshold: p95 lag < 5 minutes
+  environment: dev
+
+refs: [integration.recur.scheduler, br.recur.generation.once]
+requiresProof:
+  measurement:
+    required: true
+
+# gap.recur.unbuilt-module is resolved (impl.recur.todo-app-backend.engine is real and its scheduler tick
+# runs live - see integration.recur.scheduler), so the blockedBy edge that named it is removed rather than
+# left stale. This record still cannot honestly move past todo: requiresProof.measurement needs a real
+# rolling 7-day window this session cannot produce, and measurement.how compares against each occurrence
+# row's createdAt, a column data.recur.occurrence does not declare and OccurrenceEntity does not have -
+# a second, real absence this record's own text assumes away. Neither is a missing module (the reason a
+# gap record would name), so no blockedBy edge is authored here, matching
+# impl.task.todo-app-backend.list's own precedent for nfr.task.list.latency.
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "Removed the stale blockedBy on the now-resolved gap.recur.unbuilt-module; recorded why this record still cannot be claimed done (see comment above) instead of citing a gap that would misname the actual reason."}

@@ -1,0 +1,7 @@
+$ node -e "const fs=require('fs'),p='../todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/assets/';const states=['subscribed','loading','unsubscribed','refused','saving'];const vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of vps){for(const ext of ['png','html']){const f=p+'preferences-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}for(const v of vps){for(const ext of ['png','html']){const f=p+'unsubscribe-link-unsubscribed-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const refused=fs.readFileSync(p+'preferences-refused-desktop-1280.html','utf8');if(!refused.includes('We could')){ok=false;console.log('refused markup lacks refusal sentence');}if(!ok)process.exit(1);console.log('12 state captures verified');"
+(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-frontend)
+exit 0
+
+12 state captures verified
+
+

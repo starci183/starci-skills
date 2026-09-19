@@ -1,0 +1,165 @@
+@import "../common/styles.css";
+
+@layer starci-grammar-heritage {
+    .grammar-common-root[data-grammar-family="heritage"] {
+        color-scheme: light;
+
+        --heritage-green-900: oklch(29% 0.085 147);
+        --heritage-green-700: oklch(42% 0.12 147);
+        --heritage-ink: oklch(18% 0.018 145);
+        --heritage-muted: oklch(49% 0.018 145);
+        --heritage-ivory: oklch(97.5% 0.014 96);
+        --heritage-paper: oklch(99.3% 0.005 96);
+        --heritage-line: oklch(88% 0.012 110);
+        --heritage-display: Georgia, "Times New Roman", serif;
+        --heritage-sans: "Segoe UI", Arial, ui-sans-serif, system-ui, sans-serif;
+
+        --accent: var(--heritage-green-700);
+        --accent-foreground: white;
+        --focus: var(--heritage-green-700);
+        --background: var(--heritage-ivory);
+        --foreground: var(--heritage-ink);
+        --surface: var(--heritage-paper);
+        --surface-foreground: var(--heritage-ink);
+        --surface-secondary: var(--heritage-ivory);
+        --surface-secondary-foreground: var(--heritage-ink);
+        --muted: var(--heritage-muted);
+        --border: var(--heritage-line);
+        --separator: var(--heritage-line);
+        --success: var(--heritage-green-700);
+        --success-foreground: white;
+        --warning: oklch(76% 0.13 82);
+        --warning-foreground: var(--heritage-ink);
+        --danger: oklch(55% 0.18 28);
+        --danger-foreground: white;
+        --info: oklch(70% 0.09 235);
+        --info-foreground: var(--heritage-ink);
+        --field-background: var(--heritage-paper);
+        --field-border: var(--heritage-line);
+        --field-foreground: var(--heritage-ink);
+        --field-placeholder: var(--heritage-muted);
+        --radius: 0;
+        --field-radius: 0;
+        --shadow-surface: 0 1.5rem 4rem rgb(16 68 37 / 12%);
+
+        color: var(--foreground);
+        background: var(--background);
+        font-family: var(--heritage-sans);
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"][data-grammar-theme="dark"] {
+        color-scheme: dark;
+
+        --heritage-green-900: oklch(88% 0.08 147);
+        --heritage-green-700: oklch(74% 0.12 147);
+        --heritage-ink: oklch(96% 0.01 96);
+        --heritage-muted: oklch(75% 0.018 110);
+        --heritage-ivory: oklch(16% 0.018 145);
+        --heritage-paper: oklch(21% 0.018 145);
+        --heritage-line: oklch(38% 0.025 145);
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface-card][data-slot="card"] {
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"],
+    .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface] {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow-surface);
+        color: var(--surface-foreground);
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-depth="nested"],
+    .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface][data-grammar-surface-depth="nested"] {
+        background: var(--surface-secondary);
+        box-shadow: none;
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface-label] {
+        color: var(--heritage-green-900);
+        font-family: var(--heritage-display);
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-family-component="Brand"] {
+        display: inline-flex;
+        min-height: 3.5rem;
+        align-items: center;
+        gap: var(--grammar-row-gap);
+        text-align: start;
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-family-part="brand-mark"] {
+        display: grid;
+        inline-size: 3.5rem;
+        block-size: 3.5rem;
+        overflow: hidden;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        background: white;
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-family-part="brand-mark"] img {
+        inline-size: 100%;
+        block-size: 100%;
+        object-fit: cover;
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-family-part="brand-copy"] {
+        display: grid;
+        gap: 0.125rem;
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-family-part="brand-copy"] strong {
+        color: var(--heritage-green-900);
+        font-family: var(--heritage-display);
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: .125em;
+    }
+
+    .grammar-common-root[data-grammar-family="heritage"] [data-family-part="brand-copy"] span {
+        color: var(--heritage-muted);
+        font-size: .75rem;
+        font-weight: 650;
+        letter-spacing: .0625em;
+        text-transform: uppercase;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .grammar-common-root[data-grammar-family="heritage"][data-grammar-theme="system"] {
+            color-scheme: dark;
+
+            --heritage-green-900: oklch(88% 0.08 147);
+            --heritage-green-700: oklch(74% 0.12 147);
+            --heritage-ink: oklch(96% 0.01 96);
+            --heritage-muted: oklch(75% 0.018 110);
+            --heritage-ivory: oklch(16% 0.018 145);
+            --heritage-paper: oklch(21% 0.018 145);
+            --heritage-line: oklch(38% 0.025 145);
+        }
+    }
+
+    @media (forced-colors: active) {
+        .grammar-common-root[data-grammar-family="heritage"] {
+            --heritage-green-900: CanvasText;
+            --heritage-green-700: Highlight;
+            --heritage-ink: CanvasText;
+            --heritage-muted: GrayText;
+            --heritage-ivory: Canvas;
+            --heritage-paper: Canvas;
+            --heritage-line: CanvasText;
+            --shadow-surface: none;
+        }
+
+        .grammar-common-root[data-grammar-family="heritage"] [data-family-part="brand-mark"] {
+            border: 1px solid CanvasText;
+            background: Canvas;
+        }
+    }
+}
