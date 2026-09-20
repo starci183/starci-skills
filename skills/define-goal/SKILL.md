@@ -26,15 +26,19 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    `--project <name>` selects which bound project's `.starciwork/runtime.sqlite`
    receives the goal; `--repo <path>` is single-repo mode where the named
    repository owns the ledger. The two flags are mutually exclusive.
-2. **Extract routing bias** — deterministic, no model:
+2. **Extract routing bias** — read the owner prompt yourself and write
+   `{prefer:[], avoid:[]}` from its intent (e.g. "ưu tiên codex", "prefer
+   claude", "đừng dùng qwen" → prefer/avoid those pools; aliases:
+   codex/claude/fable/qwen/devin → `<name>-agent`, `fable` → `claude-fable`).
+   You understand the phrasing — a regex would not. Then normalize it through
+   the canonicalizer so casing/aliases are cleaned and `avoid` wins conflicts:
 
    ```
-   node .claude/scripts/agent/bias.mjs "<owner prompt>"
+   node .claude/scripts/agent/bias.mjs --normalize '{"prefer":["<agents>"],"avoid":["<agents>"]}'
    ```
 
-   Prints `{prefer:[], avoid:[]}` parsed from the owner's wording
-   (`ưu tiên`/`prefer` → prefer, `tránh`/`avoid`/`không dùng` → avoid, over the
-   pool aliases codex/claude/fable/qwen/devin). Keep the JSON — it persists as
+   (`bias.mjs "<text>"` is the no-agent fallback — automation calling
+   define-goal without anyone to read intent.) Keep the JSON — it persists as
    `routing_bias` in the goal payload at the persist step so the kernel router
    honors the owner's provider preference without re-parsing prose. An empty
    `{prefer:[], avoid:[]}` is a valid result — persist it anyway.
