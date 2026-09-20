@@ -1,0 +1,81 @@
+schema: starci/module-goal-define@1
+id: goal.define
+aliases: [genesis]
+
+# ============================================================================
+# DEFINE-GOAL — the intake ritual. One owner prompt becomes ONE durable goal row
+# in .starciwork/runtime.sqlite PLUS the derived ideal op chain, and ONE pending
+# inbox entry (the queue). Chat is ephemeral; the ledger is the only thing that
+# survives restarts, worktree deletion and agent death. Nothing downstream may
+# read the goal from chat history — only from the ledger.
+# ============================================================================
+
+about:
+  en: >-
+    Entry skill of every project lifecycle. The owner says what they want in any
+    chat; define-goal derives the goal AND the ideal op chain (via
+    scripts/route/route-plan.mjs backward-chaining through
+    modules/goal/legality.yaml), freezes both into the ledger and queues the
+    workflow. A [Kernel] claims queued goals from the inbox — never from a
+    prompt string held in a terminal.
+
+actor: any chat / agent surface holding an owner prompt
+executable: scripts/goal/define-goal.mjs
+
+input:
+  prompt: the raw owner text, verbatim — recorded for provenance
+  repo: >-
+    single-repo mode: the repository root that owns .starciwork/runtime.sqlite
+    (defaults to cwd). Mutually exclusive with project.
+  project: >-
+    project mode: a name resolved through
+    <source>/.workspaces/projects/<name>/work.json
+    (starci/workspace-binding@1), where <source> is the repository containing
+    this .claude. Each repositories.<role>.pathFromSource resolves to a project
+    repository — all of them are cold-scanned by --plan — and work.ownerRole
+    names the repository that owns the project ledger: the goal persists to
+    <owner-repo>/.starciwork/runtime.sqlite, never to the host repo that holds
+    .claude/.workspaces. Mutually exclusive with repo.
+  title: optional short name; derived from the prompt when absent
+  plan: >-
+    dry-run flag. Prints the plan table and writes nothing: STATE (per-repo
+    cold signals from scripts/goal/assess.mjs --repo <each repo in scope>
+    --json — degrades to 'assess unavailable' when the script is absent or
+    fails, never blocks), GOAL text, OP CHAIN (the derived legs, each mapped to
+    a cold tier estimate easy=15m / medium=45m / hard=90m, labelled 'estimate
+    is cold'), WILL-WRITE list and the resolved ledger path. The skill shows
+    the table to the owner; only an explicit ok re-runs without --plan, which
+    is the run that persists.
+
+derives:
+  goal_markdown: the goal statement rendered from the prompt
+  goal_identity: sha256(markdown) — the identity every later generation must match
+  op_chain: 'route-plan output: ordered op legs with per-leg produces/consumes; stored in goals.json — the kernel re-derives at boot and diffs, never trusts it blindly'
+  assess: 'per-repo cold signals from scripts/goal/assess.mjs (--repo <p> [--repo <p2>] --json); plan-only, advisory, null when unavailable'
+
+writes:
+  - table: workflows
+    row: {workflow_id, title, created_at, ledger_mode, phase: 'queued'}
+  - table: goals
+    row: {workflow_id, revision: 0, goal_identity, markdown, json: {opChain, star}}
+  - table: inbox
+    row: {workflow_id, kind: 'goal', key: workflow_id, payload_json: {prompt, at}, status: 'pending'}
+    note: THE QUEUE. pending = unclaimed; start-workflow claims it atomically.
+
+guarantees:
+  - 'crash before ledger write → nothing happened; re-enter the prompt'
+  - 'crash after ledger write → goal sits queued until a kernel claims it'
+  - 'no agent memory is part of correctness'
+
+rules:
+  - 'goal row written BEFORE inbox row — a queue entry without its goal is refused'
+  - 'define-goal never dispatches — it only queues'
+  - 'one prompt → one workflow; amendments → goals.revision+1 via goal.revise'
+  - 'when the workflow finishes, the goal is retired (workflows.phase=finished, inbox consumed) — a completed goal leaves the queue forever'
+  - '--project and --repo are mutually exclusive; --project binds the ledger to work.ownerRole''s repository, not the host'
+  - 'the flow is plan → owner ok → persist: --plan exits 0 having written nothing; only the ok re-run without --plan opens the ledger transaction'
+
+returns:
+  workflow_id: the durable id start-workflow binds to
+  op_chain: the derived legs (advisory — kernel re-derives on boot)
+  queued: true

@@ -93,7 +93,7 @@ test('original request cannot approve a subsequently presented goal',t=>{
  * The four-document split (index/goal/approval/run) was the bundle's file layout, and it goes with the
  * bundle. What it encoded is a property of the run value itself, which is what is asserted now: a proposed
  * run carries its goal and its approval state separately and exactly once, so reading approval can never be
- * reading a second copy of the goal. `scripts/plan.mjs create` still writes the four documents, to a
+ * reading a second copy of the goal. `scripts/work/plan.mjs create` still writes the four documents, to a
  * caller-named directory; `tests/plan-coverage.spec.mjs` owns that.
  */
 test('a run separates goal from approval state without duplicating the goal',t=>{

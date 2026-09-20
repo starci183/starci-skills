@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../core/yaml.mjs';
 import {
   loadRecords, readWorkspace, resolveOwnedDirs,
-} from '../example-ownership.mjs';
+} from '../example/example-ownership.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 

@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example-ownership.mjs';
+import {readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
  * The audits' sharpest surface complaint was the `/buyers` vs `/internal/buyers` class: a done contract

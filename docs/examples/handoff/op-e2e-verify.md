@@ -50,7 +50,7 @@ Do not invent a schema family and **do not edit `schemas/`** — the owner has r
 it is refactored later, from findings like this one. Instead:
 
 - Attach the proof where this tree does keep proof: a sibling `evidence.yaml` per record, written by
-  really running the command — `node scripts/example-evidence.mjs --work
+  really running the command — `node scripts/example/example-evidence.mjs --work
   examples/todo-app-backend/.starciwork --record <id> --cwd examples/todo-app-backend --assert
   <assertion-id>=<the real e2e command>`. Read that script's header before using it.
 - Write up the missing family precisely for the grit ledger: which operator lines have no home
@@ -74,8 +74,8 @@ it is refactored later, from findings like this one. Instead:
 
 `node scripts/checks/check-example-yaml.mjs`, `node scripts/checks/check-example-work.mjs` (paste the summary; it
 must not gain a refusal because of you), `npx tsc --noEmit` and `npx jest` in the backend, then
-`node scripts/example-derive.mjs --work examples/todo-app-backend/.starciwork --write`,
-`node scripts/example-critique.mjs --work examples/todo-app-backend/.starciwork --write`,
+`node scripts/example/example-derive.mjs --work examples/todo-app-backend/.starciwork --write`,
+`node scripts/example/example-critique.mjs --work examples/todo-app-backend/.starciwork --write`,
 `node scripts/checks/check-example-derived.mjs`. Commit in slices ending with
 `Co-Authored-By: Qwen Code <noreply@alibabacloud.com>`.
 

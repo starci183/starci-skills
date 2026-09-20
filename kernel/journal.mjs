@@ -8,7 +8,7 @@ const require=createRequire(import.meta.url);
 /**
  * Retired as of runtime 1.0.4: the global `journal.sqlite` (schema below) is superseded by
  * `.starciwork/runtime.sqlite` (docs/ledger-db.md). This module stays as the legacy reader -
- * `inspectJournal`/`openJournal` back `scripts/ledger-migrate.mjs`, the pruning maintenance verbs and the
+ * `inspectJournal`/`openJournal` back `scripts/ledger/ledger-migrate.mjs`, the pruning maintenance verbs and the
  * historical specs - and must not grow new writers.
  */
 export const JOURNAL_SCHEMA='starci/operational-journal@1';

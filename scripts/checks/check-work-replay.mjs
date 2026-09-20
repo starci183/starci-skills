@@ -5,7 +5,7 @@ import {spawn, execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example-ownership.mjs';
+import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
  * The v6 audits' core complaint about the work tree's trust model: an evidence.yaml pins a
@@ -22,7 +22,7 @@ import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRec
  * passes are strictly read-only against the tree: a captured `>` redirect is stripped before
  * execution (its stdout is captured into this report instead), because re-running a command
  * verbatim would overwrite the very artifact the evidence cited - re-capture belongs to
- * scripts/example-evidence.mjs, never to a check.
+ * scripts/example/example-evidence.mjs, never to a check.
  *
  * cwd resolution is the part the audits showed every shortcut gets wrong: one .starciwork tree
  * owns records for every bound repository, so a `npm run build` on a `repository:

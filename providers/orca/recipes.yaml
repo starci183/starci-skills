@@ -136,6 +136,38 @@ recipes:
     sequence:
       - orchestration.check-wait
     timeoutAction: rearm-only
+
+  spawn-plain-terminal:
+    mode: direct
+    actor: any
+    sequence:
+      - terminal.create-without-worktree
+      - terminal.read-screen-until-input-prompt
+      - terminal.send-with-enter
+    terminalName: "[<role>] <name>"
+    note: 'terminal.create accepts --command and optionally --worktree; omitting --worktree spawns in the runtime default cwd. Use for probes/diagnostics; operation lanes always bind a worktree.'
+  unstick-permission-prompt:
+    mode: direct
+    actor: launcher-or-kernel
+    sequence:
+      - terminal.read-screen-detect-permission-menu
+      - terminal.send-bypass-choice-with-enter
+      - terminal.read-screen-confirm-moving
+    note: 'Devin TUI: send "5" (Switch to bypass mode). Qwen without --yolo: respawn instead — per-kind allows never generalize. Never answer individual allow options; they re-prompt per command kind.'
+  respawn-dead-agent-child:
+    mode: direct
+    actor: launcher-or-kernel
+    sequence:
+      - terminal.read-screen-detect-child-exit
+      - terminal.close
+      - terminal.create-fresh-lane
+      - redeliver-brief-via-file
+    signal: 'Agent connection lost: agent child exited'
+    note: 'A dead child never drains queued sends. The fresh lane must survey the tree for partial work — markers, not memory, carry state.'
+cliGotchas:
+  - 'orca terminal create flag is --title, not --name (a rejected --name cost a whole respawn wave, 2026-09-20).'
+  - 'orca worktree rm removes the worktree from Orca AND git — it deletes files on disk; never use it to "unregister" a path that must be kept.'
+  - 'terminal read --screen shows tail only; idle detection uses lastOutputAt freshness, not scrollback.'
 forbiddenSequences:
   - external-chat-runs-plan-loop
   - plan-coordinator-calls-operation

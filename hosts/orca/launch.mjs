@@ -781,7 +781,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     regenerate .starciwork/ledger-anchor.json from a healthy ledger: one workflow with --id, every workflow
     otherwise. A workflow whose chain does not verify is refused, never anchored.
   node bin/starci.mjs ledger-migrate --repo <ledger-repository-root> [--journal-file <old-journal.sqlite>] [--machine-file <machine.sqlite>] [--dry-run] [--archive true]
-    forwards to scripts/ledger-migrate.mjs: folds .starciwork/_local/workflows/<id> plus the retired journal's
+    forwards to scripts/ledger/ledger-migrate.mjs: folds .starciwork/_local/workflows/<id> plus the retired journal's
     rows for it into .starciwork/runtime.sqlite, per workflow, refusing a workflow a live kernel lock or an
     unreconciled generation still owns.
   node bin/starci.mjs ledger-prune --repo <ledger-repository-root> [--retire <id[,id]>] [--vacuum true] [--dry-run]
@@ -983,7 +983,7 @@ export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
     if(command==='ledger-migrate'){
       // Imported by path, per contract: if s7's script is not on this branch yet, the import error names it.
       return (async()=>{
-        const {migrateLedger}=await import('../../scripts/ledger-migrate.mjs');
+        const {migrateLedger}=await import('../../scripts/ledger/ledger-migrate.mjs');
         const summary=await migrateLedger({repoRoot:path.resolve(required(options.repo,'ledger repository root')),
           ...(options['journal-file']?{journalFile:path.resolve(options['journal-file'])}:{}),
           ...(options['machine-file']?{machineFile:path.resolve(options['machine-file'])}:{}),

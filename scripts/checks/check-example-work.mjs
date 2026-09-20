@@ -3,8 +3,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
-import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example-ownership.mjs';
-import {renderProofProblems} from '../example-render-proof.mjs';
+import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
+import {renderProofProblems} from '../example/example-render-proof.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -153,7 +153,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
 
     // ---- trust concept 2: replayable evidence ----
     // Every assertion must carry the exact `command` that was run, not only a prose `observation`, so
-    // scripts/example-verify.mjs can re-run it later and compare outcomes. An assertion missing `command`
+    // scripts/example/example-verify.mjs can re-run it later and compare outcomes. An assertion missing `command`
     // is refused as not replayable.
     for (const assertion of Array.isArray(record.assertions) ? record.assertions : []) {
       if (!assertion || typeof assertion.command !== 'string' || !assertion.command.trim()) {
@@ -389,7 +389,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       }
     }
     // `owners[].path` / `module` name module-root directories (schemas/work-layout.yaml's `impl` shape
-    // entry; scripts/example-ownership.mjs's moduleRootOf normalises a legacy file or `/**` glob path down
+    // entry; scripts/example/example-ownership.mjs's moduleRootOf normalises a legacy file or `/**` glob path down
     // to that root). A done record naming one that does not exist on disk is refused; a todo one is only
     // warned, since the module a todo record targets may not have been built yet.
     if (declaresOwnPaths(data)) {
@@ -591,7 +591,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
 
   /** Every direct or transitive `blockedBy` root reachable from `startId`, stopping at a gap, an open
    * decision, a cycle back into the walk, or a dead end with no further blockedBy of its own - the same
-   * shape scripts/example-derive.mjs's own resolveBlockers computes, reimplemented here (not imported: this
+   * shape scripts/example/example-derive.mjs's own resolveBlockers computes, reimplemented here (not imported: this
    * module and example-derive.mjs already import from each other in the other direction, and importing
    * back would create a cycle in the module graph itself, not just the data). Returns a Map(id -> kind),
    * kind one of gap|decision|record|cyclic|missing. */

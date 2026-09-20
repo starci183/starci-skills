@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example-ownership.mjs';
+import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
  * The gate verifies declarations, not bytes. check-example-work.mjs asks whether a done uat-flow has a

@@ -48,7 +48,7 @@ allocation:
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
-  fanOut: {seamFirst: true, maxPerGroup: 9}
+  fanOut: {seamFirst: true, maxPerGroup: 10}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
@@ -98,19 +98,19 @@ runtimes:
     target: qwen-agent
     provider: qwen
     roles: [implement, verify, write]
-    maxParallel: 4
+    maxParallel: 10
     models:
       implement: qwen3.8-flash
       verify: qwen3.8-flash
       write: qwen3.8-flash
-  # Devin has no machine-readable account headroom equivalent to Orca's provider windows. It therefore starts
-  # closed and is admitted only when the workflow owner explicitly assigns slots (`devin-agent=N`). The CLI's
-  # auth/readiness and observed launch/refusal status are then the live capacity signal.
+  # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
+  # capacity: 10 parallel lanes. The CLI's auth/readiness and observed launch/refusal status are the live
+  # capacity signal on top of this cap.
   devin-agent:
     target: devin-agent
     provider: devin
     roles: [implement, verify, write]
-    maxParallel: 0
+    maxParallel: 10
     capacityAuthority: explicit-workflow-quota
     quotaTelemetry: launch-status
     models:
@@ -151,4 +151,3 @@ roleOfKind:
   work.author: plan
   implementation.plan: plan
   workspace.manage: plan
-

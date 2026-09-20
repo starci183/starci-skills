@@ -1,0 +1,87 @@
+schema: starci/module-kernel-start@1
+id: kernel.start-workflow
+aliases: [kernel.boot]
+
+# ============================================================================
+# START-WORKFLOW <goal-id> — claims a queued goal from the ledger inbox and
+# spawns ONE long-lived [Kernel] agent bound to that workflow_id. The kernel
+# then runs modules/kernel/driver-loop.yaml until the workflow finishes. On
+# finish the goal is retired — the queue entry is consumed and the workflow
+# closes; a finished goal never re-enters the queue.
+# ============================================================================
+
+about:
+  en: >-
+    Complement of goal.define. define-goal queues; start-workflow claims and
+    launches. The spawned kernel receives only {workflow_id, goal_revision} —
+    everything else it re-reads from the ledger. Kernel death → re-run
+    start-workflow with the same goal id spawns a REPLACEMENT kernel
+    (kernel attempt+1, same workflow generation), never a duplicate. Durable
+    plan/jobs/events survive agent churn.
+
+actor: any launcher — owner chat, a host automation, another kernel
+executable: scripts/kernel/start-workflow.mjs
+
+usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--provider <name>]
+# without --goal: claims the oldest pending inbox goal
+# without --provider: the kernel host is routed, not chosen — same machinery as ops
+
+claim:
+  transaction: >-
+    UPDATE inbox SET status='claimed' WHERE workflow_id=<goal> AND status='pending'
+    inside BEGIN IMMEDIATE — two starts never claim the same goal.
+  onDeadKernel: >-
+    inbox 'claimed' with no signal, an expired startup reservation, or a signal
+    whose Orca terminal is disconnected/unwritable → clear the stale binding and
+    spawn a replacement kernel for the same workflow (kernel attempt+1; workflow
+    generation is unchanged).
+  onFinished: >-
+    workflows.phase='finished' refuses a new kernel — a completed goal is gone
+    from the queue for good.
+
+spawn:
+  title: '[Kernel] <workflow_id>'
+  routing: >-
+    kernel host resolved by scripts/route/route-model.mjs --kind
+    model.manageWorkflow --risk high (selection.yaml kernelFunctionKinds) —
+    the same model-routing machinery ops use. pick.target →
+    modules/models/profiles/<target>.yaml provider field. Router refusal
+    ('no eligible model') or failure falls back to provider devin with
+    routedBy: fallback. --provider <name> is an explicit operator override
+    (routedBy: override).
+  command: >-
+    spawn flags from the provider adapter card
+    providers/orca/adapters/<provider>.yaml — commandPrefix/credentialRefresh
+    [platform] + kernelCommandRequirements when declared (Devin uses dangerous
+    mode only for its dedicated kernel terminal so API commands cannot stall),
+    otherwise commandRequirements (qwen --yolo + credential refresh, Devin
+    ACP_BACKEND strip + auth probe),
+    or terminalFallback.command + bypassFlag for native-managed agents
+    (claude --dangerously-skip-permissions, codex --full-auto). The
+    PROVIDER_CMD map is the fallback when the card carries no command fields.
+  prompt: >-
+    kernel packet: resolved Source host, project binding, BE/FE roots, ledger and
+    absolute API path + {workflow_id, goal_revision} + mandatory load order —
+    Source SKILL.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
+    read goal from .starciwork/runtime.sqlite → run the loop. Every state
+    mutation goes through node scripts/kernel/api.mjs <cmd>
+    (survey/status/plan/enqueue/dispatch/settle/incident/retire) — never
+    direct sqlite writes, never self-spawned op terminals; dispatch goes
+    through api dispatch.
+
+records:
+  jobs_row: {kind: 'kernel', workflow_id, status: 'running', worker_id: <terminal handle>}
+  signals_row: {scope: 'kernel', key: workflow_id, token}  # the singleton lock
+
+rules:
+  - 'one kernel per workflow — signals singleton enforces it'
+  - 'startup reserves the singleton with a bounded TTL before terminal creation'
+  - 'prompt delivery is successful only after readiness and visible TUI activity'
+  - 'kernel outlives ops; ops are ephemeral, kernel is not'
+  - 'claim first, spawn second — never spawn for an unclaimed goal'
+  - 'workflow finish retires the goal: workflows.phase=finished, inbox consumed'
+
+returns:
+  kernel_terminal: handle
+  workflow_id: bound
+  replaced: true|false

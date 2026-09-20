@@ -12,7 +12,7 @@ StarCi keeps **local runtime preferences** in ignored `config.json` at the skill
 
 ## Init copy policy
 
-`scripts/config.mjs` `loadConfig(root, {initialize:true})`:
+`scripts/config/config.mjs` `loadConfig(root, {initialize:true})`:
 
 1. If `config.json` already exists under `root`, load and validate it. Do not rewrite it from the example.
 2. If absent, resolve the example in this order under the same `root`:

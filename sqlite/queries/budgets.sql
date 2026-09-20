@@ -38,7 +38,7 @@ UPDATE budgets SET reserved_value=MAX(0,reserved_value-?),used_value=used_value+
 DELETE FROM budget_reservations WHERE job_id=?;
 
 -- ---------------------------------------------------------------------------
--- MIGRATION reads/writes (scripts/ledger-migrate.mjs)
+-- MIGRATION reads/writes (scripts/ledger/ledger-migrate.mjs)
 -- ---------------------------------------------------------------------------
 
 -- journal-side read: the reservations of one workflow's jobs (journal has no

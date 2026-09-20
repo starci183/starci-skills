@@ -21,7 +21,7 @@ folders:
   specifications: Business and architecture contracts
   sqlite: Ledger DB schema and migrations for .starciwork/runtime.sqlite
   cli: Inspection commands
-  scripts: Tooling; scripts/checks/ owns verification and scripts/route/ owns selection
+  scripts: Tooling; scripts/checks/ owns verification, scripts/route/ owns selection, scripts/example/ the example-derivation and evidence tools, scripts/work/ the plan/presentation/work-tree tools, scripts/ledger/ ledger migration, scripts/config/ local config loading, scripts/goal/ and scripts/kernel/ lifecycle entry points
   tests: Regression checks
   docs: Documentation, one file per concept
   sites: Documentation sites generated from catalogs

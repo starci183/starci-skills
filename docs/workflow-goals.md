@@ -18,7 +18,7 @@ use the export command. For a Plan-bound workflow, export the selected workflow
 and complete Plan for delivery with:
 
 ```text
-node scripts/present-goal.mjs <goal/index.yaml> <job-id> <new-local-presentation-directory>
+node scripts/work/present-goal.mjs <goal/index.yaml> <job-id> <new-local-presentation-directory>
 ```
 
 Keep presentations under the existing Plan's `_local` location, for example

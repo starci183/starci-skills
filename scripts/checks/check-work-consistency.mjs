@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../example-ownership.mjs';
+import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
  * Every check in the fleet so far reads one record and asks whether that record agrees with itself: an id
@@ -300,7 +300,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
   // half is the asymmetry this tree actually lives with: a todo uat flow lists done requirements in its
   // `proves`, and whatever derives the requirement's provenance from `proves` edges now says it is proven by
   // a run that has not happened. The derived index classifies `proves` as an unclassified edge
-  // (scripts/example-derive.mjs's EDGE_FIELD_NAMES), so "is it in the derived provenance" would answer no for
+  // (scripts/example/example-derive.mjs's EDGE_FIELD_NAMES), so "is it in the derived provenance" would answer no for
   // all 89 edges in both trees and mean nothing - the asymmetry worth naming is the state disagreement.
   for (const [id, rec] of records) {
     if (rec.data?.state !== 'todo' || !Array.isArray(rec.data.proves)) continue;

@@ -1,0 +1,51 @@
+---
+title: "Kind và contract"
+description: "Cách mọi file đi qua giữa các bậc được định kiểu: contract cho markdown, schema cho dữ liệu, và các template ép chúng."
+---
+
+# Kind và contract
+
+Một **kind** định kiểu cho một file. `templates/kinds/` "định kiểu mọi file đi qua giữa các bậc", và
+có hai dạng:
+
+- kind dạng markdown mang `<kind>.contract.json` cùng một `<kind>.skeleton.md` để chép;
+- kind dạng dữ liệu mang `<kind>.schema.json`, tức JSON Schema của một kind máy đọc.
+
+`scripts/validate-response.mjs` nạp contract theo kind sau mỗi nhánh, nên một tài liệu không thoả
+contract của nó thì không bao giờ định tuyến được.
+
+## Một contract markdown cố định điều gì
+
+Contract là JSON thuần, và bản thân nó bị kiểm theo `kinds/contract.schema.json`. Nó nêu regex
+`title` mà dòng đầu phải khớp, và các mục `##` theo thứ tự mà tài liệu phải mang. Một mục có thể mang
+`table`, tức dòng tiêu đề chính xác phải mở đầu bảng, rồi thêm:
+
+| Khoá | Nghĩa |
+| --- | --- |
+| `minRows` / `exactRows` | Bảng phải có bao nhiêu dòng dữ liệu |
+| `rows` | Những giá trị cột đầu bắt buộc phải xuất hiện, bỏ qua dấu backtick |
+| `cell` | Một regex cho mỗi cột, mọi ô dữ liệu dưới cột đó phải khớp |
+
+README của templates nói rõ vì sao hình dạng lại hẹp như vậy: contract là thẩm quyền, còn skeleton là
+cách một người đọc nó.
+
+## Template ngoài phiên
+
+`templates/` còn giữ một template cho mỗi kind tài liệu viết tay — các họ tri thức
+(`ui-composition`, `ui-presentation`, `ui-proof`, `grammars`, `patterns`) và `operator.template.md`.
+Mỗi template mang một khối `json template-contract` mà `scripts/validate-templates.mjs` ép lên mọi
+file template đó áp dụng, và lên cả bản `.vi.md` cùng tên.
+
+Hai luật đáng mang theo từ README đó:
+
+- Template không bao giờ nhận `INDEX.md`: đó là chỉ mục để đọc, không phải tài liệu của một kind.
+- Mọi `.md` mà template nhận đều phải có `.vi.md` cùng tên, kiểm theo dạng `vi` của chính contract
+  đó. Bản đối chiếu là bản đọc cho người, không bao giờ là authority lúc chạy.
+
+## Đổi một contract
+
+Sửa contract, chạy `node scripts/validate-templates.mjs`, và đưa mọi tài liệu nó gọi tên về đúng
+chuẩn trong cùng một commit. Template mà cây không thoả thì không được publish.
+
+Mọi contract và mọi schema, kèm các mục và thuộc tính bắt buộc, được liệt kê ở
+[Tham chiếu → Kind](/vi/reference/kinds).

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
-import {migrateLedger} from '../scripts/ledger-migrate.mjs';
+import {migrateLedger} from '../scripts/ledger/ledger-migrate.mjs';
 import {verifyChain,inspectLedger} from '../kernel/ledger-db.mjs';
 import {openJournal} from '../kernel/journal.mjs';
 import {WORKFLOW_STATE,workflowsRoot} from '../kernel/store.mjs';

@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
 import {walk, FAMILIES} from './check-example-work.mjs';
-import {readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example-ownership.mjs';
+import {readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
  * Deep/semantic staleness checks layered on top of check-example-work.mjs, which only sees local shape:

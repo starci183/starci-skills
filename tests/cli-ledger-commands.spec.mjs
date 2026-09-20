@@ -101,7 +101,7 @@ test('ledger-verify walks the hash chain of every workflow or one named by --id,
   assert.throws(()=>main(['ledger-verify','--repo',path.join(repo,'nowhere')]),/No ledger at/);
 });
 
-test('ledger-migrate forwards to scripts/ledger-migrate.mjs and reports nothing to import for a plain repository',async t=>{
+test('ledger-migrate forwards to scripts/ledger/ledger-migrate.mjs and reports nothing to import for a plain repository',async t=>{
   const fx=fixture(t),repo=fx.repo();
   const result=await main(['ledger-migrate','--repo',repo]);
   assert.equal(result.command,'ledger-migrate');

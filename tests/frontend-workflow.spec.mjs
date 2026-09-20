@@ -135,8 +135,8 @@ test('relocated workflow executes without source checkout or native agent dispat
   fs.cpSync(path.join(packageRoot, 'kernel'), path.join(relocated, 'kernel'), { recursive: true });
   fs.cpSync(path.join(packageRoot, 'core'), path.join(relocated, 'core'), { recursive: true });
   for (const dir of ['modules', 'providers', 'hosts', 'execution', 'approvals', 'knowledge', 'models', 'legacy']) if (fs.existsSync(path.join(packageRoot, dir))) fs.cpSync(path.join(packageRoot, dir), path.join(relocated, dir), { recursive: true });
-  fs.mkdirSync(path.join(relocated,'scripts'));
-  fs.copyFileSync(path.join(packageRoot,'scripts/config.mjs'),path.join(relocated,'scripts/config.mjs'));
+  fs.mkdirSync(path.join(relocated,'scripts','config'),{recursive:true});
+  fs.copyFileSync(path.join(packageRoot,'scripts/config/config.mjs'),path.join(relocated,'scripts/config/config.mjs'));
   if (fs.existsSync(path.join(packageRoot,'config.example.yaml'))) fs.copyFileSync(path.join(packageRoot,'config.example.yaml'),path.join(relocated,'config.example.yaml'));
   if (fs.existsSync(path.join(packageRoot,'config.example.json'))) fs.copyFileSync(path.join(packageRoot,'config.example.json'),path.join(relocated,'config.example.json'));
   fs.copyFileSync(path.join(packageRoot, 'workflows/frontend.mjs'), path.join(relocated, 'workflows/frontend.mjs'));

@@ -30,7 +30,7 @@ sources:
   - kernel/candidate-bridge.mjs  # custody receipts via events
   - kernel/terminals.mjs / supervisor.mjs / owner.mjs / kernel.mjs
   - hosts/orca/launch.mjs     # ledger-verify/anchor/retire verbs
-  - scripts/ledger-migrate.mjs
+  - scripts/ledger/ledger-migrate.mjs
   - schemas/ledger-db.schema.yaml  # column-catalog contract (documentation schema)
   - kernel/ledger.mjs         # NOT this DB — the Work-tree ledger (yaml nodes); see design.yaml naming trap
 

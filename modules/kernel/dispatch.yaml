@@ -2,14 +2,20 @@
 # TINKLE-9 / WAVE2-w1 — modules/kernel/dispatch.yaml
 # Brief: ex-testing/briefs/tinkle/tinkle-9.md + ex-testing/briefs/wave2/w1.md.
 #
-# THE SPAWN CONTRACT — the packet the [Kernel] hands each ephemeral [Op] agent
-# it launches. Every field is defined once, with the kernel mechanism that
-# enforces it named beside it. The packet is the whole world the op knows:
-# its brief, the records it may read, the paths it may write, the model and
-# budget it was allocated, and the lease token that binds everything it does
-# back to one durable job identity.
+# THE SPAWN CONTRACT — the packet each ephemeral [Op] agent is launched with.
+# The packet now flows through `api dispatch`: the [Kernel] agent calls
+# `node scripts/kernel/api.mjs dispatch --job <id> --spawn` and the api —
+# never the kernel itself — reserves the lease, renders the packet and runs
+# the Orca terminal sequence (modules/kernel/api.yaml dispatch).
+# Every field is defined once, with the kernel mechanism that enforces it
+# named beside it. The packet is the whole world the op knows: its brief,
+# the records it may read, the paths it may write, the model and budget it
+# was allocated, and the lease token that binds everything it does back to
+# one durable job identity.
 #
 # Sources (all under .claude/, relative to the skill root):
+#   scripts/kernel/api.mjs   — the dispatch command: packet build, lease,
+#                              terminal spawn (contract: modules/kernel/api.yaml)
 #   kernel/engine.mjs        — opIdentity, reserveOperation (intent-v1),
 #                              reservationPhase, beginLaunchIntent, launched,
 #                              settled, settleStoppedOperation, beginCandidate,
@@ -49,6 +55,7 @@ about:
     and enforced at the database trigger level, so an agent physically cannot
     record evidence for another job.
   sources:
+    - scripts/kernel/api.mjs
     - kernel/engine.mjs
     - kernel/ledger-db.mjs
     - kernel/dispatcher.mjs
@@ -207,12 +214,21 @@ fields:
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.
 # ============================================================================
 spawnMechanics:
+  caller: >-
+    The kernel agent invokes `node scripts/kernel/api.mjs dispatch --job
+    <job_id> --spawn` and reads the JSON receipt — it never runs an orca
+    terminal-* command itself (modules/kernel/api.yaml conventions.neverDoes).
+    Without --spawn the same call is a dry-run: the packet prints, nothing is
+    reserved and nothing launches.
   sequence: >-
-    reserve (durable lease, intent-v1) -> beginLaunchIntent
-    (operation-launch-intent event) -> Orca terminal-create titled
-    `[Op] <op-or-task>` + terminal-read readiness + terminal-send of the
-    launch command -> operation-launch-observed/launched (job -> running,
-    worker_id = dispatch) -> wait for verdict.
+    Inside the api call: reserve (durable lease, intent-v1) ->
+    beginLaunchIntent (operation-launch-intent event) -> Orca
+    terminal-create titled `[Op] <op-or-task>` + terminal-read readiness +
+    terminal-send of the rendered packet -> operation-launch-observed/
+    launched (job -> running, worker_id = dispatch) -> wait for verdict.
+    Command flags and readiness patterns come from the provider adapter card
+    providers/orca/adapters/<provider>.yaml; a managed-agent profile refuses
+    --spawn (providers/orca/index.yaml managedFallback — worker-start path).
     The supervisor's own kernel launch shows the same primitive sequence
     (kernel/supervisor.mjs startKernel: terminal-create -> terminal-read ->
     terminal-send -> bindStartupTerminal).

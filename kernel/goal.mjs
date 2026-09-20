@@ -17,7 +17,7 @@ import {recordDigests} from './reconciliation.mjs';
 import {stateGoalIdentity} from './store.mjs';
 import {decisionKindFor} from './io.mjs';
 import {isAsk,openOwnerAsk} from './owner.mjs';
-import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
+import {loadConfig,nonOperationModels} from '../scripts/config/config.mjs';
 import {laneView} from './lanes.mjs';
 import {featureScope,intakeOp,narrowIntakeScopes,scopeNames} from './intake.mjs';
 import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneGoal,laneOf,laneText,laneWalked} from './sync.mjs';

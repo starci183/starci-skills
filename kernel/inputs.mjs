@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawn} from 'node:child_process';
-import {loadConfig} from '../scripts/config.mjs';
+import {loadConfig} from '../scripts/config/config.mjs';
 import {GOAL_RECORD,REF_KINDS,plain,sealedRuntimeOf} from './common.mjs';
 import {fillWaitingAsks} from './fill.mjs';
 import {inputBinding} from './inputs-model.mjs';

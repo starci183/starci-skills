@@ -5,8 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {createBundle} from '../scripts/plan.mjs';
-import {exportGoalPresentation} from '../scripts/present-goal.mjs';
+import {createBundle} from '../scripts/work/plan.mjs';
+import {exportGoalPresentation} from '../scripts/work/present-goal.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 
 function fixture(t) {

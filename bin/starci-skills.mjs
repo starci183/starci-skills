@@ -11,7 +11,7 @@
 // Every command takes --dir <repo> (default: the current directory). init refuses a non-empty
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
-import {loadConfig} from '../scripts/config.mjs';
+import {loadConfig} from '../scripts/config/config.mjs';
 import {ENGINE_SCHEMA} from '../kernel/common.mjs';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';

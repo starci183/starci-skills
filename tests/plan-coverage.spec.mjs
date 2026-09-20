@@ -6,7 +6,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {validatePlan,planProgress} from '../workflows/plan.mjs';
-import {createBundle,renderPlan} from '../scripts/plan.mjs';
+import {createBundle,renderPlan} from '../scripts/work/plan.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 
 import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
@@ -72,6 +72,6 @@ test('new four-file bundles keep all future jobs pending and round-trip through 
  const stored=read('run/index.yaml');assert.equal(stored.status,'awaiting-plan-approval');
  assert.deepEqual(Object.keys(stored.jobs),p.workflows.map(j=>j.id));
  for(const id of Object.keys(stored.jobs)){assert.equal(stored.jobs[id].status,'planned');assert.deepEqual(read('approval/index.yaml').jobs[id].receipts,[]);}
- const output=execFileSync(process.execPath,[fileURLToPath(new URL('../scripts/plan.mjs',import.meta.url)),'render',path.join(dir,'goal/index.yaml')],{encoding:'utf8'});
+ const output=execFileSync(process.execPath,[fileURLToPath(new URL('../scripts/work/plan.mjs',import.meta.url)),'render',path.join(dir,'goal/index.yaml')],{encoding:'utf8'});
  assert.equal(output,renderPlan(p));assert.deepEqual(read('goal/index.yaml').plan,p);
 });

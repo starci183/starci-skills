@@ -12,7 +12,7 @@ import {inputAsk} from './helpers/input-fixture.mjs';
 import {PRESENTATION_RETRY_MS,sweepSettledCandidates,decisionRecordOptions,releaseSettledOperationLeases,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget,sealedCandidateOwnedBaseline} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {authoredDecisionOf} from '../kernel/owner.mjs';
-import {loadConfig} from '../scripts/config.mjs';
+import {loadConfig} from '../scripts/config/config.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
 import {recordDone,syncLedgerOps} from '../kernel/sync.mjs';

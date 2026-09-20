@@ -6,7 +6,7 @@ import os from 'node:os';
 import {sha256,validateWorkspace} from '../core/index.mjs';
 import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
 import {validatePlan,planProgress} from '../workflows/plan.mjs';
-import {renderPlan,createBundle} from '../scripts/plan.mjs';
+import {renderPlan,createBundle} from '../scripts/work/plan.mjs';
 import {autoASAPWindow,autoASAPStatus} from '../workflows/auto.mjs';
 import {presentAutoPlan,approveAutoPlan,assessAutoGoal,nextAutoJob,hasAutoAcceptance,assertAutoAuthority,completeAutoPlan} from '../workflows/auto.mjs';
 /**

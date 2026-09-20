@@ -197,7 +197,7 @@ comment: "Written by starci-kernel when it settles the operation: the assertions
 re-ran itself, not what the worker reported." Its `recordDigest` is a sha256 over the sibling `index.yaml`'s
 exact bytes — the same digest `kernel/reconciliation.mjs`'s `recordDigests`/`nodeFileOf` compute for
 reconciliation, and the same one `scripts/checks/check-example-work.mjs` recomputes to refuse a mismatched, non-stale
-evidence file. A script named `scripts/example-evidence.mjs`, generating this file mechanically for the
+evidence file. A script named `scripts/example/example-evidence.mjs`, generating this file mechanically for the
 example tree, does not exist in this base yet; it is landing separately and its brief was not found in
 `schemas/work-layout.yaml` or elsewhere in this tree (see section 9).
 
@@ -377,7 +377,7 @@ not built":
   `secrets/<name>.enc`, `seeds/**`, a runbook `README.md`) — only the root directory name itself differs from
   what the schema states.
 
-- **`scripts/example-evidence.mjs`, the script this brief expected for mechanically generating example
+- **`scripts/example/example-evidence.mjs`, the script this brief expected for mechanically generating example
   evidence, does not exist anywhere in this base**, and no brief for it was found in
   `schemas/work-layout.yaml` or any other file searched. Every `evidence.yaml` currently in the tree was
   produced by some other means (the file headers say "Written by starci-kernel," but the mechanism that wrote

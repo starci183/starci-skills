@@ -1,0 +1,113 @@
+---
+title: "Getting started"
+description: "How one mission runs: workspace.bind, a workflow match or a composed chain, request.json, the branch layout, the validators, stop codes and resume."
+---
+
+# How a mission runs
+
+A mission is one pass through the tree, from a person's request to a published boundary or to a
+question only a person can answer. Nothing here is optional sequencing advice: each step below is a
+rule stated in `SKILL.md`, `workflows/README.md`, or `resources/orchestrator.json`.
+
+## 1. Freeze the scope
+
+`SKILL.md` starts by freezing one mission scope: "the unit, the target, inclusions and exclusions,
+write roots, external effects, and what will count as proof. Two readings that would change any of
+those is one focused question, not a guess."
+
+## 2. Bind the workspace
+
+`workspace.bind` runs for any mission that reads or writes routed source. Nothing else may resolve a
+checkout, and a similar directory name is never route authority. It returns one typed route receipt:
+a verified checkout identity, its exact source head, and the closed runtime binding the mission may
+consume. See [`workspace.bind`](/reference/operators/workspace-bind).
+
+## 3. Match a workflow, or compose one
+
+The entry reads the `when` of every example in `workflows/`. A match is run as written and its
+presets fill `request.json`; the person is asked only for fields with no default. No match means
+composing a chain from the operators' `## Next` tables, under the rules
+`scripts/validate-workflows.mjs` enforces on the examples: every required input of a branch is
+produced by an earlier step, branches of one step share no write alias, a loop goes back to an
+earlier step and carries `maxRounds`, and the chain ends at `git.publish`, `release.deploy`, or
+`user`. A composed chain worth keeping becomes a new example.
+
+## 4. One agent, one operator
+
+One invocation of one operator is one agent, created fresh on the profile its `operator.json` names,
+with only the grants and the aliases its Context table declares. At most three agents run at once.
+An agent never starts another agent; a nested exchange — a critique, a review — is a second fresh
+agent the orchestrator spawns for a branch that paused. See [Resources](/concepts/resources).
+
+## 5. `request.json`
+
+The orchestrator writes the branch's `request/request.json` and validates it with
+`scripts/validate-request.mjs` before the agent starts. The gate is
+[`templates/step/request.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/step/request.schema.json),
+and it carries `operatorId`, `step`, `parallel`, `sessionId`, the `contexts` each with its frozen
+`head`, the `requirements` the operator's Requirements table declares, the `inputs` — each an
+explicit path from the session root to a file an earlier branch produced — and `resume`.
+
+## 6. The branch layout
+
+The session root is `<Source>/.worktrees/sessions/<sessionId>/`, with `state.json` beside the steps.
+One branch is `step-<N>/parallel-<M>/`, and `parallel-1` always exists:
+
+```text
+step-<N>/parallel-<M>/
+  request/request.json                the gate in; the orchestrator writes it
+  response/response.json              the gate out; the only thing routing reads
+  response/response.md                the operator's document kind
+  response/<other>.md                 when the operator has one
+  response/data/<name>.json           machine kinds
+  response/artifacts/<file>           everything else
+  <exchange>/request/ and response/   a nested exchange
+```
+
+Paths point differently depending on where they are written: inside `request.json` inputs they run
+from the session root (`step-1/parallel-1/response/response.md`); inside `response.json` fields and
+an operator's Outputs table they run from the branch (`response/response.md`).
+
+## 7. The two validators, then routing
+
+```text
+request/request.json -> validate-request.mjs -> agent writes response/ -> validate-response.mjs + the operator's validate.mjs -> route
+```
+
+`validate-response.mjs` checks the shared gate and loads each kind's contract; the operator's own
+`validate.mjs` checks what only that operator can check. Only then does routing look at
+`response.json`:
+
+- `done` advances the chain to the next step the workflow names;
+- `waiting` runs the nested exchange the response awaits, then resumes the same agent while sibling
+  branches keep running;
+- `blocked` reads `stop`.
+
+"A response that fails either validator does not route. Prose in `response.md` does not route. Only a
+validated field of `response.json` does."
+
+## 8. Stop codes
+
+A blocked branch carries a code. The code is looked up in the merged registry — `operators/errors.json`
+for the codes several operators share, plus the operator's own `errors.json` — for its `domain`, and
+that domain resolves in `routing.json` to one of four kinds: `operator` invokes the named operator,
+`resume` re-enters the same operator in a new step, `user` stops and reports what a person must
+decide, `external` stops and reports what outside the runtime must change. A code whose disposition
+is `fallback` never blocks: the agent performs the fallback, records it under `## Fallbacks taken`,
+and continues. See [Stop codes](/concepts/stop-codes) and
+[the full registry](/reference/stop-codes).
+
+## 9. Resume
+
+A blocked branch stays on disk as evidence. It re-enters the same operator as a new agent in
+`step-(N+1)/parallel-1`, with `request.json.resume` naming the blocked step and parallel. A resume
+that adds no evidence, constraint, inventory or approval delta stops with `NO_PROGRESS`, and
+`SKILL.md` is explicit about what that means: "the same input reached the same wall: report the wall
+rather than trying again."
+
+## 10. The end of the session
+
+The session folder is created by the orchestrator before the first agent starts and deleted when
+`git.publish` finishes. What survives is what the steps published — commits, business heads, UAT
+pairs, remote runs — and any audit record the owner copied out first. A blocked session keeps its
+folder, and its session branch, for the resume.

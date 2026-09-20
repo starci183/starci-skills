@@ -1,5 +1,5 @@
 -- ============================================================================
--- queries/migration.sql — every statement `scripts/ledger-migrate.mjs` runs:
+-- queries/migration.sql — every statement `scripts/ledger/ledger-migrate.mjs` runs:
 -- reads against the RETIRED journal (journal.sqlite, schema
 -- starci/operational-journal@1) and writes into the ledger + machine DB.
 -- Nothing is deleted from the sources; the `migrations` table is what makes a

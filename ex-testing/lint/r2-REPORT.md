@@ -1,126 +1,392 @@
-# r2 — evidence re-record + legality vocabulary reconcile
+# R2 REPORT — contracts/data surface triage
 
-Lane: `r2` (reconcile). Scope: (A) re-derive the 48 `CODE_DIGEST_STALE` evidence
-records under `examples/todo-app-backend/.starciwork/` by actually re-running
-`scripts/example-evidence.mjs`; (B) reconcile `modules/goal/legality.yaml`
-`producesVocabulary` against the real `modules/ops/ops/*.yaml` catalog so
-w7/tinkle-13 check 4 passes.
+Lane: `R2`. Scope: `modules/`, `schemas/` (root), `contracts/`, `approvals/`,
+`specifications/`, `providers/`, `skills/` + canonical home for the `define-goal`
+and `start-kernel` entry skills.
 
-Constraints honored: `knowledge/` untouched (0 modified files), nothing
-committed, no `.dist/` created.
+Method: per-file inventory, then importer/reference tracing restricted to the
+keep-set of the draft HFS (`scripts/{goal,kernel,route,checks,example}`,
+`kernel/ledger-db.mjs`, `core/{yaml,runtime-root}.mjs`, `bin/`, `modules/`,
+`providers/`, `init/`, `docs/`, `tests/`). Old-engine consumers (`cli/`,
+`workflows/`, `hosts/`, `execution/`, `models/`, `upgrades/`, `legacy/`,
+`packages/`, `kernel/*` except `ledger-db.mjs`, `core/index.mjs`,
+`scripts/{agent,api,config,ledger,work}` pending lane decisions) are reported as
+**old-engine evidence**, not as proof of life. `rg` is not on PATH; all greps
+ran through the repo grep tool / `grep -rn`. Sealed payloads under
+`runtime/engine/builds/` excluded as noise.
 
-## A) Evidence re-record — check-example-work green
+Nothing moved, edited, or deleted. Only this report and the done marker were
+written.
 
-Baseline: `node scripts/checks/check-example-work.mjs` exited 1 with exactly
-**48 `CODE_DIGEST_STALE` refusals**, all under
-`examples/todo-app-backend/.starciwork/features/{audit,notify,plan,recur,share,task}/`
-(br/sds/fr/contract/event/impl evidence.yaml files). They staled because lanes
-w8/w9 changed real source (upload, observability, seeds), moving the owned-dir
-digests.
+---
 
-Method (per policy — evidence re-derived by re-running, never hand-edited):
+## 1. `modules/` — the new contract tree
 
-1. Extracted each stale evidence.yaml's recorded assertions (`id` + `command`)
-   into `ex-testing/lint/scratch/r2/.r2-stale-evidence.json` using
-   `core/yaml.mjs`'s parser.
-2. Re-ran `node scripts/example-evidence.mjs --work
-   examples/todo-app-backend/.starciwork --record <id> --cwd
-   examples/todo-app-backend --assert <id>=<command> ...` for all 48 records
-   (driver: `ex-testing/lint/scratch/r2/r2-rerecord.mjs`; full per-assertion
-   log: `ex-testing/lint/scratch/r2/.r2-rerecord-log.json`).
-3. **47/48 re-recorded clean, outcome pass** on the first pass — including the
-   live proofs (`scripts/live-proof.sh`, `live-proof-share.sh`,
-   `live-proof-notify.sh` against the dev API on `localhost:3001`, and
-   `npx tsc --noEmit` typechecks).
-4. `impl.recur.todo-app-backend.engine`'s `live-e2e` assertion
-   (`node .starciwork/features/recur/impl/todo-app-backend/engine/assets/live-proof.mjs`)
-   failed on the first pass with `fetch failed` — the script targets its own
-   lane API instance at `http://localhost:3105` (default `API_URL`), which was
-   not running. The recorded command was correct; the *environment* was
-   missing. Per the script's own header I started the prescribed instance:
-   `DATABASE_URL=postgres://postgres:postgres@localhost:5432/todo_recur
-   PORT=3105 RECUR_TICK_CRON='*/5 * * * * *' node dist/main.js` (the
-   `todo_recur` database already exists in `compose-postgres-1`), then re-ran
-   the evidence script for that record — both assertions (`unit`,
-   `live-e2e`) now exit 0, outcome pass.
+### 1.1 `modules/goal/` — KEEP all 5
 
-**Recorded-command fixes needed: none.** No assertion path 404'd; no
-`scripts/` → `scripts/checks/` move affected any recorded command (all
-commands run inside `examples/todo-app-backend`, whose own `scripts/` dir is
-unchanged). Every re-run used the assertion commands exactly as previously
-recorded.
+| File | Verdict | Evidence |
+|---|---|---|
+| `anatomy.yaml` | KEEP | Read by `scripts/route/route-plan.mjs`; self-references `existing.yaml`, `legality.yaml`, `archetypes.yaml`. |
+| `archetypes.yaml` | KEEP | Read by `scripts/route/route-plan.mjs`; cited by `anatomy.yaml`. |
+| `define-goal.yaml` | KEEP | Implemented by `scripts/goal/define-goal.mjs`; exercised by `tests/goal-entry.spec.mjs`. The contract half of the `define-goal` entry skill. |
+| `existing.yaml` | KEEP | Read by `scripts/route/route-plan.mjs`; referenced by `modules/kernel/driver-loop.yaml` + `anatomy.yaml`. |
+| `legality.yaml` | KEEP | Read by `scripts/route/route-plan.mjs`; declares `producesVocabulary` (see §7 finding on `task.execute`). |
 
-Verification: `node scripts/checks/check-example-work.mjs` now exits 0 —
-"277 record(s), 3240 ref(s), 140 evidence file(s), 44 artifact payload(s)
-skipped: every id matches its place, every ref resolves, and every
-new-concept rule is satisfied". Zero refusals.
+No orphans. Target: `modules/goal/` unchanged.
 
-Note for other lanes/operator: the recur-lane API instance on :3105 was left
-running (background shell) in case sibling reconcile lanes need to re-derive
-recur evidence too.
+### 1.2 `modules/kernel/` — KEEP all 5
 
-## B) Legality vocabulary reconcile — check 4 clean
+| File | Verdict | Evidence |
+|---|---|---|
+| `api.yaml` | KEEP | Contract for `scripts/kernel/api.mjs` (survey/status/plan/enqueue/dispatch/settle/incident/retire). **But see §7**: it cites `schemas/goal-plan.yaml` as "the plan --file shape" while `api.mjs` actually parses `{legs:[{op,paths?,notes?}]}` — the cited schema describes a different record. |
+| `dispatch.yaml` | KEEP | Contract for `api dispatch` + `scripts/route/dispatch-op.mjs` packet shape. |
+| `driver-loop.yaml` | KEEP | Kernel loop contract; references `goal/existing.yaml`, legality. |
+| `start-workflow.yaml` | KEEP | Implemented by `scripts/kernel/start-workflow.mjs`. Contract half of `start-kernel`. |
+| `verdict-contract.yaml` | KEEP | Read directly by `scripts/kernel/api.mjs` (verdict parsing on settle). |
 
-w7's check 4 (`ex-testing/lint/scratch/w7/check4c.mjs`, refined form of
-`check4-vars.mjs`) reported two drifts:
+Target: `modules/kernel/` unchanged.
 
-1. `opProduces` key `implementation.plan` has no `modules/ops/ops/*.yaml` —
-   vocabulary without an operator.
-2. Five `opProduces` vars had no `stateVariables` family match:
-   `request: analyzed`, `node.X: cut into disjoint children`,
-   `knowledge: repaired`, `workspace: managed`, `task: executed`.
+### 1.3 `modules/ops/` — KEEP; registry complete but kind/role registries are stale
 
-Findings that decided the direction:
+- 31 operator YAMLs in `modules/ops/ops/`; every file's `id:` matches its
+  filename; every file carries a `route:` block.
+- `modules/ops/registry.yaml` is generated by
+  `scripts/route/build-ops-registry.mjs` and is **complete** — all 31 ops
+  present (my earlier count of "30 operators" was an indentation artifact;
+  `ex-test.probe` is at `registry.yaml:404`). Verdict: KEEP as a generated
+  artifact; enforce with `build-ops-registry.mjs --check` in CI. Never hand-edit.
+- **Real mismatch (SSOT violation)**: `modules/models/kinds.yaml` `kinds:` map
+  (33) and `modules/models/runtimes.yaml` `roleOfKind` (33) both declare five
+  kinds with **no op file**: `architecture.revise`, `business.revise`,
+  `frontend.implement`, `goal.validate`, `implementation.plan`. Three op files
+  have **no kind/roleOfKind entry**: `ex-test.probe`, `interface.implement`,
+  `task.execute`.
+  - `frontend.implement` vs `interface.implement` looks like a rename where the
+    registries weren't updated.
+  - `task.execute` is referenced by live contracts (`dispatch.yaml:112`,
+    `verdict-contract.yaml:91`, `legality.yaml:123`) — it's a real op missing
+    from the taxonomy, not a stray file.
+  - `ex-test.probe` is self-contained canary (writes only `ex-testing/probe/`);
+    deliberately untaxed is plausible, but then `kinds.yaml`/`roleOfKind` should
+    say so.
+- `legacy/ops/*.mjs` are engine-role documentation inside the generated
+  registry only; no new-arch code path loads them.
 
-- `implementation.plan` is a **kind**, not an op: `modules/models/kinds.yaml`
-  (`implementation.plan:` entry, `operator: work.author`, "it carries the
-  `work.author` operator contract under its `work.cut` sequence, so no second
-  operator exists") and `legacy/ops/tests/ops.spec.mjs` actively asserts
-  `catalogue.ops.some(op=>op.id==='implementation.plan') === false` — "the cut
-  is a kind, never a second operator". So the contract does **not** support
-  adding `modules/ops/ops/implementation.plan.yaml`; the fix is in the
-  vocabulary.
-- `work.author`'s own contract carries cut mode (writes `parts` at
-  `.starciwork/<node-dir>/<part>/index.yaml`; `business.produces` lists
-  "cut-mode children + the derived parent"), so `node.X: cut into disjoint
-  children` is genuinely produced by `work.author`.
-- `route:` blocks carry `prerequisites` but no `produces:` — the documented
-  KNOWN GAP in legality.yaml's own header; `opProduces` *is* the machine
-  table for it, so the route-side `PRODUCES-DIFF` informational lines in
-  `check4-vars.mjs` are expected, not drift.
+Target: `modules/ops/` unchanged (ops source + generated registry).
 
-Changes to `modules/goal/legality.yaml` (vocabulary derives from ops):
+### 1.4 `modules/models/` — split: 14 keep, 6 dead/orphan
 
-- `producesVocabulary.opProduces`: removed the `implementation.plan:` key;
-  folded `"node.X: cut into disjoint children"` into `work.author`'s list.
-  opProduces now has exactly the 30 catalog ops.
-- `producesVocabulary.stateVariables`: added the five missing variables
-  (`request: analyzed`, `node.X: cut into disjoint children`,
-  `knowledge: repaired`, `workspace: managed`, `task: executed`) — each is
-  produced by a real op (`request.analyze`, `work.author` cut mode,
-  `knowledge.repair`, `workspace.manage`, `task.execute`).
-- Added a comment on `opProduces` recording that it is keyed by operator and
-  that `implementation.plan` is a kind carried by `work.author`.
+| File | Verdict | Evidence |
+|---|---|---|
+| `selection.yaml` | KEEP | Declared source of truth for routing; read by `scripts/route/route-model.mjs` (kernel function kinds, highKinds, probation rules). Note `highKinds` lists `deployment.operate`, `data.correct`, `production.deploy` — kinds that exist nowhere else (stale vocabulary, harmless in a closed-set list but should be reconciled). |
+| `kinds.yaml` | KEEP | Operation kind taxonomy + vocabularies; read by `route-model.mjs`; bound by `tests/kind-graph.spec.mjs`. Stale vs ops — see §1.3. |
+| `runtimes.yaml` | KEEP | `roleOfKind` + `maxParallelOps`; read by `route-model.mjs`. Same staleness as kinds.yaml. |
+| `registry.yaml` | KEEP | Runtime/provider registry; read by `route-model.mjs`, checked by `providers/validate.mjs`. Line 54 `approvalPolicy: approvals/policy.json` is a declared-but-unread pointer (see §4). |
+| `qualifications.yaml` | KEEP | Evidence store (empty = probation only); read by `route-model.mjs`. |
+| `capabilities.yaml` | KEEP (contract) | Capability *policy* doc (`starci/model-capability-policy@1`). Code readers are `kernel/kernel.mjs`/`kernel/model-policy.mjs` (old engine); new-arch readers: none — but `selection.yaml` cites it as the policy the qualification gate implements. Keep as module contract. |
+| `code-patterns.yaml` | KEEP | Lint profile catalog (`starci/code-pattern-profile@1`); consumed by `check-scoped-lint` path + `tests/{scoped-lint,pattern-coverage}.spec.mjs`. |
+| `records.yaml` | KEEP (contract) | Closed catalog of record kinds; `kinds.yaml` inputs/outputs range over it; `tests/{io,kind-graph,graph-invalidation,pattern-coverage}.spec.mjs` bind it. Its only *code* reader, `kernel/io.mjs`, is old-engine — keep as vocabulary contract, or MERGE into `kinds.yaml`. |
+| `index.yaml` | KEEP | Module map/documentation. |
+| `profiles/{claude-agent,claude-fable,codex-agent,deepseek-v4-pro,devin-agent,gpt-5.6-luna,qwen-agent,qwen3.8-max}.yaml` | KEEP | Read by `start-workflow.mjs` (target→provider), `route-model.mjs`, `api.mjs` dispatch. |
+| `index.mjs` | **DELETE** | Self-declared "single public API" for the module — but its only importers are old-engine (`kernel/{chains,common,engine,loads,schedule}.mjs`, `hosts/headless/host.mjs`, `workflows/frontend.mjs`, `models/`) + 2 specs. New-arch scripts bypass it entirely and read YAML directly via `core/yaml.mjs`/`runtime-root.mjs`. Dead code whose own contract the new architecture already violates. |
+| `{claude,codex,qwen,devin}.yaml` | **DELETE** | `starci/execution-profiles@1` per-runtime profiles. **Zero code readers** (dynamic and literal greps both empty), and each is **byte-identical** to `legacy/model/<runtime>.yaml`. Orphaned duplicates of retired legacy data; per-runtime launch facts now live in `profiles/*.yaml` + `providers/orca/adapters/*.yaml`. |
+| `hosts.yaml` | **DELETE** | `starci/hosts@1` host descriptors. Readers: `hosts/{index,orca/calls,orca/launch,headless/host}.mjs` — all delete-scheduled. The facts it carries (parallelism, host capabilities) are superseded by `providers/orca/adapters/*` + `runtimes.yaml.maxParallelOps`. Salvage its `capabilities` vocabulary note into `kinds.yaml` if needed. |
 
-Verification:
+### 1.5 `modules/quality/` — KEEP
 
-- `node ex-testing/lint/scratch/w7/check4c.mjs` → clean: `opProduces keys not
-  in ops catalog: []`, `ops missing from opProduces: []`, zero vars without a
-  `stateVariables` family match, zero unproduced `stateVariables`.
-- `node scripts/route/route-plan.mjs --target "ui.X: verified"` → still emits
-  the same 10-leg chain, exit 0 (route-plan consumes `opProduces` as its CHAIN
-  lookup; `implementation.plan` was never a chain leg — `work.author` is
-  injected instead).
-- `node ex-testing/lint/scratch/w7/modules-parse.mjs` → "62 yaml file(s)
-  under modules/: all parse".
+`quality-bar.yaml` read by `scripts/goal/assess.mjs` (define-goal cold-scan).
+Target unchanged.
 
-## Files changed by this lane
+### 1.6 `modules/schemas/` — KEEP, becomes the merged schema home
 
-- `modules/goal/legality.yaml` — producesVocabulary reconcile (above).
-- 48 `examples/todo-app-backend/.starciwork/features/**/evidence.yaml` —
-  re-derived by `scripts/example-evidence.mjs` (fresh codeDigest/recordDigest,
-  fresh capturedAt, same recorded commands, all outcome pass).
-- `ex-testing/lint/scratch/r2/` — lane scratch (driver + extracted assertions
-  + full re-run log).
-- `ex-testing/lint/r2-REPORT.md`, `ex-testing/lint/done/r2.done` — this report
-  and the done marker.
+`index.yaml` + `relationships.yaml` are catalog/meta documents (they state
+root `schemas/` is currently the authored canonical tree and index all 45
+files). If the HFS merge below is accepted, these become the index of
+`modules/schemas/` proper. Both KEEP.
+
+### Proposed `modules/` subtree for release
+
+```
+modules/
+  goal/      anatomy, archetypes, define-goal, existing, legality
+  kernel/    api, dispatch, driver-loop, start-workflow, verdict-contract
+             (+ approval-policy.yaml IF the §4 decision is to keep it)
+  ops/       ops/<31>.yaml, registry.yaml (generated)
+  models/    selection, kinds, runtimes, registry, qualifications,
+             capabilities, code-patterns, records, index.yaml, profiles/
+  quality/   quality-bar.yaml
+  schemas/   index.yaml, relationships.yaml, spec/, + merged root schemas/
+```
+
+## 2. `schemas/` (root, 45 files) — per-file verdicts
+
+`modules/schemas/index.yaml` confirms these are the authored canonical bodies
+(.dist projections retired). Verdicts below classify by *new-architecture*
+consumer; every KEEP/MOVE targets `modules/schemas/` unless noted.
+
+### KEEP — consumed by keep-set scripts or contracts (move to `modules/schemas/`)
+
+| File | Live consumer |
+|---|---|
+| `work-layout.yaml` | `scripts/checks/check-example-work.mjs` (checkFamiliesDrift), `scripts/checks/work-layout.mjs`, op `reads:` contracts. |
+| `work-*.schema.yaml` (16 family files: acceptance-criterion, brand, business-rule, catalog, customer-journey, data, disposable-accounts, evidence, feature, functional-requirement, implementation, non-functional-requirement, policy-decision, sds-component, uat-flow, ui-screen, workspace) | `scripts/checks/check-work-consistency.mjs` loads them dynamically per family. |
+| `work.schema.yaml` | v1 monolith; consumed by `core/index.mjs` validators — needed **iff** the `starci-validate` check is rehomed (see §5). |
+| `profiles.yaml` | `core/index.mjs` completion-evidence profiles — same condition as `work.schema.yaml`. |
+| `application-stacks.schema.yaml` | `scripts/checks/stacks.mjs`. |
+| `stacks-layout.yaml` | `scripts/checks/stacks.mjs` (layout half of the stacks contract). |
+| `json-exceptions.yaml` | `scripts/checks/check-json-exceptions.mjs` (allowlist data, not a schema — could equally live beside the check). |
+| `code-pattern-profile.schema.yaml` + `code-pattern-check.schema.yaml` | `check-scoped-lint` contract pair; compiled by `tests/scoped-lint.spec.mjs` against `modules/models/code-patterns.yaml`. |
+| `source-staleness.schema.yaml` | Output contract of `scripts/checks/check-stales.mjs` (`starci/source-staleness-report@1`). Note: `check-stales.mjs` imports `kernel/source-staleness.mjs` — an engine dependency for the kernel lane. |
+| `orca-call.schema.yaml` | Contract doc for `providers/orca/calls.yaml` (`starci/orca-calls@1`, asserted by `providers/validate.mjs`). Best moved *next to* `providers/orca/`, not into modules/schemas. |
+| `workspace-routing.yaml` | `.workspaces` binding contract; `scripts/goal/define-goal.mjs` resolves the project workspace through it (also `init/*.md`, `SKILL.md`). |
+| `knowledge-source.schema.yaml`, `knowledge-rule.schema.yaml`, `code-example-manifest.schema.yaml`, `code-example-catalog.schema.yaml` | Contracts of the kept `knowledge/` tree. **No live validator** (former consumer `compile-knowledge.mjs` retired to `legacy/builders/`); keep as contracts of a shipped dir or delete with a knowledge-lane decision. |
+| `ledger-db.schema.yaml` | Column-catalog doc duplicating `kernel/ledger-db.mjs` DDL + `sqlite/schema.sql`. MERGE: with "schema-as-data" in `engine/`, `schema.sql` becomes the loaded DDL source and this file becomes redundant → delete after consolidation (see §7). |
+| `sds.schema.yaml`, `srs-v3.schema.yaml`, `sds-map.yaml`, `srs-sections.yaml`, `contract.yaml` | Already covered under §5 (`specifications/` owns these five; they are not in root `schemas/`). |
+
+### DELETE — bound only to delete-scheduled machinery
+
+| File | Why |
+|---|---|
+| `goal.schema.yaml` (`starci/goal@1`) | Old goal *record* schema; consumer `workflows/lifecycle.mjs`. New arch stores goals as sqlite rows via `api enqueue`; the goal contract is `modules/goal/define-goal.yaml`. Also resolves one half of the `goal@1` vs `workflow-goal@1` duplicate-id problem. |
+| `goal-plan.yaml` (`starci/workflow-goal@1`) | Cited by `modules/kernel/api.yaml` but describes `{definitionOfDone, ledger, ops, risks, questions}` — **not** the `{legs:[…]}` shape `api.mjs` parses. Mismatch: either rewrite to the real shape or fold the shape into `api.yaml` and delete. Recommend rewrite→`modules/schemas/` since a plan-file schema is still needed. |
+| `op-io.yaml`, `op-report.schema.yaml` | Old op envelope + report records; superseded by `modules/kernel/dispatch.yaml` packet + `verdict-contract.yaml`. |
+| `workflow-report.schema.yaml` | Monitor→Coordinator records; no monitor exists in the new arch. |
+| `workflow-amendment.schema.yaml` | `kernel/amendment.mjs` (delete); `api.mjs` has no amend verb. |
+| `workflow-state.schema.yaml` | `kernel/store.mjs` snapshots (delete); sqlite rows are the state. |
+| `orchestration-supervision.yaml` | Governs `workflows/supervision.yaml` (delete-scheduled). |
+| `execution-request.schema.yaml`, `execution-receipt.schema.yaml` | `execution/*` consumers only. |
+| `source-layout.yaml` | `workflows/source-layout.mjs` + `bin` `source-layout` verb (delete-scheduled). Salvage only if a checks script re-implements the lint. |
+
+### SSOT notes inside schemas/
+
+- `goal@1` and `workflow-goal@1` are two coexisting goal identities — resolved
+  by the deletes above (keep neither; the new goal is a ledger row + the
+  `modules/goal/` contract set, plus rewritten `goal-plan.yaml` if kept).
+- `work-layout.yaml` declares 15 families; only 11 have per-family schema
+  files (missing: `work/contract`, `work/integration`, `work/gap`,
+  `work/event`) — recorded in `modules/schemas/index.yaml` known-gaps; the
+  consistency check tolerates it, but it is a real contract hole.
+- `starci/code-pattern-script@1` has no schema file (documented gap).
+
+## 3. `contracts/` — MERGE into `scripts/checks/spec/`
+
+| File | Verdict | Evidence |
+|---|---|---|
+| `journeys.mjs` (`validateJourneys`) | MERGE → `scripts/checks/spec/journeys.mjs` | Importers: `specifications/validate.mjs` (kept, moves to same target), `workflows/frontend.mjs` (dies), `tests/frontend-workflow.spec.mjs`. It must travel with the spec validators. |
+| `assets.mjs` (`validateAssets`) | MERGE → `scripts/checks/spec/assets.mjs` (recommended) | Importers today: `workflows/frontend.mjs` (dies) + `tests/profiles-assets.spec.mjs`. **No new-arch consumer** — but `interface.asset` is a kept op whose output (asset manifests) is exactly what this validates; deleting it leaves that op's `starci-validate` check with nothing covering assets. Cheap to keep. |
+
+f1 called `contracts/` live — true for the old tree; under the new arch both
+files survive only as check-library code, hence MERGE not KEEP.
+
+## 4. `approvals/` — code DELETE; policy data is a decision flag
+
+| File | Verdict | Evidence |
+|---|---|---|
+| `policy.mjs` (`decideApproval`, `validateApprovalPolicy`) | DELETE | Sole code consumer is `cli/main.mjs` (`starci approval policy|decide`) — delete-scheduled. **No importer in `scripts/{kernel,route,goal,checks}`, `modules/`, `bin/`, or `core/runtime-root.mjs`.** f2's "live" verdict was under the old engine; under the new arch it is unreferenced. |
+| `schema.yaml` | DELETE | `starci/approval-policy@1` validator schema; dies with `policy.mjs`. |
+| `README.md` | DELETE | Docs for the same. |
+| `policy.yaml` | **Decision flag** — recommend MERGE → `modules/kernel/approval-policy.yaml` | The only live-tree reference is `modules/models/registry.yaml:54` (`approvalPolicy: approvals/policy.json`) — a declared path that **no code reads**. The new architecture's approval surface is the exact-`ok` owner gate in the `define-goal`/`start-kernel` skills plus settle-time verdicts — *that contract currently lives only in `.devin/skills/` prompt text* (see §6). This file is the repo's only authored statement of which actions are auto vs need-user (pre-brief read-only auto, material goal/scope/ownership changes need-user, unknown effects need-user). If the kernel is expected to enforce owner-gates beyond the two entry skills, this is the contract to keep; otherwise delete with the engine. I recommend keeping it as data and folding the decision logic into `api.mjs` (or a checks script) only if a live caller emerges. |
+
+## 5. `specifications/` — split exactly as briefed
+
+| File | Verdict | Target |
+|---|---|---|
+| `validate.mjs` | MOVE | `scripts/checks/spec/validate.mjs` — the `starci-validate` entry; imports `contracts/journeys.mjs` (co-move per §3). |
+| `sds.mjs` | MOVE | `scripts/checks/spec/sds.mjs` (`validateSDSBindings`, `SDS_SCHEMA`). |
+| `sds-map.mjs` | MOVE | `scripts/checks/spec/sds-map.mjs` (`classifySDSPath`, `validateSDSMap`, `SDS_AGGREGATE_SCHEMA`). |
+| `srs-sections.mjs` | MOVE | `scripts/checks/spec/srs-sections.mjs` — imports `core/policy-options.mjs`, whose only other importer is `kernel/decision-inputs.mjs` (dies) → **co-move `core/policy-options.mjs` here or into `engine/`**. |
+| `srs-v3.mjs` | MOVE | `scripts/checks/spec/srs-v3.mjs` (compat reader + `SRS_V3_SCHEMA`). |
+| `v2.mjs` | MOVE | `scripts/checks/spec/v2.mjs` (`validateSRSDetails` library). |
+| `contract.yaml` (`starci/specification-contract@1`) | MOVE | `modules/schemas/spec/contract.yaml`. |
+| `sds.schema.yaml` (`starci/specification@3`) | MOVE | `modules/schemas/spec/sds.schema.yaml`. |
+| `sds-map.yaml` (`starci/sds-map@1`) | MOVE | `modules/schemas/spec/sds-map.yaml`. |
+| `srs-sections.yaml` (`starci/srs-sections@1`) | MOVE | `modules/schemas/spec/srs-sections.yaml` (exists on disk — the earlier listing concern was unfounded). |
+| `srs-v3.schema.yaml` (`starci/srs@3`) | MOVE | `modules/schemas/spec/srs-v3.schema.yaml`. |
+
+Naming inconsistency to fix during the move: schema bodies are split between
+`*.schema.yaml` (`sds`, `srs-v3`) and plain `.yaml` (`sds-map`, `srs-sections`,
+`contract`) — normalize to `*.schema.yaml` for schema bodies.
+
+**Load-bearing caveat**: the only non-test importer of all six `.mjs` files is
+`core/index.mjs` — itself old-engine. Under the cut, `starci-validate` (the
+check declared by kept ops `architecture.decide`, `business.decide`, etc.) has
+**no executable** unless this validator set + the `core/index.mjs` work-record
+validators are rehomed as a checks entry. This move is therefore not optional
+tidy-up — it's how the ops' declared checks survive. Op contracts also still
+cite `specifications/*.json` compatibility paths (`business.decide.yaml`,
+`architecture.decide.yaml`) — those `reads:` entries must be repointed at the
+new paths or marked legacy-input-only (they already say "compatibility inputs;
+must not become new output").
+
+## 6. `providers/` — KEEP tree; two structural notes
+
+### Catalog completeness — PASS
+
+`providers/catalog.yaml` lists all four adapters on disk
+(`orca/adapters/{claude,codex,devin,qwen}`) plus the `orca`, `codex`, `claude`
+family trees and `common/envelopes`. No adapter file lacks a catalog entry;
+no catalog entry lacks a file. (`catalog.yaml` uses `.json` names resolved to
+authored `.yaml` by `readDistJson` — the compatibility naming documented in
+`core/runtime-root.mjs`.)
+
+### Adapter field check — asymmetric but kind-consistent
+
+| Adapter | kind | start | readiness | approval | knownFailures |
+|---|---|---|---|---|---|
+| `devin.yaml` | command-terminal-agent | ✓ | ✓ | `approvalMode` + `kernelApprovalMode` | ✓ (17 lines) |
+| `qwen.yaml` | command-terminal-agent | ✓ | ✓ | `approvalMode` | ✓ |
+| `claude.yaml` | native-managed-agent | ✓ (`orchestration.worker-start`) | ✓ (`worker-start-receipt`) | — (approval rides the worker-start contract; `terminalFallback.bypassFlag` documents the bypass rule) | — |
+| `codex.yaml` | native-managed-agent | ✓ | ✓ | — (same as claude) | — (one known failure recorded inline as `terminalFallback.note`, not in a `knownFailures` block) |
+
+Gap (minor): the two `native-managed-agent` adapters omit `approval` and
+`knownFailures` keys entirely. Either that's correct-by-kind (managed agents
+get approval via `worker-start`), or the `starci/orca-agent-adapter@1` schema
+should make the keys explicit-optional and codex's inline note promoted to a
+`knownFailures` entry. Recommend normalizing the adapter schema so a validator
+can check it mechanically.
+
+### Per-file verdicts
+
+- `catalog.yaml`, `common/envelopes.yaml`, `orca/{index,capabilities,api,calls,recipes,validation}.yaml`, `claude/*`, `codex/*` (5 each): KEEP as data.
+  - `common/envelopes.yaml` overlaps `modules/kernel/dispatch.yaml`'s packet contract (operationInput/Output ≈ packet/returns) — SSOT pair; recommend folding the envelope invariants into `dispatch.yaml` and dropping `envelopes.yaml`, since its only code-era consumer (`kernel/reports.mjs`) is old-engine.
+- `providers/orca/adapters/*.yaml`: KEEP — **load-bearing**: `scripts/kernel/start-workflow.mjs` reads `providers/orca/adapters/<provider>.yaml` to build spawn/launch args; `dispatch-op.mjs` uses `providers/orca/{calls,index}.yaml`.
+- `providers/validate.mjs`: MOVE → `scripts/checks/providers.mjs` (code in a data dir). **Critical gap**: under the new arch it has *zero callers* — its only importers are `execution/supervision.mjs` (dies) and tests. The fail-closed "validate live provider surface before effects" contract is currently unenforced by any keep-set code; wire it into `start-workflow.mjs` or a checks entry, or accept the regression explicitly.
+- `providers/README.md`: KEEP.
+
+## 7. `skills/` — shipped product + the entry-skill gap
+
+### Existing tree — KEEP all 4
+
+`skills/{computer-use,orca-cli,orchestration,workflow-chat}/SKILL.md` are
+package-shipped (`package.json` `files`), frontmatter-checked and
+repo-agnostic per `tests/skills-tree.spec.mjs`. Verdict: KEEP unchanged.
+
+### `define-goal` / `start-kernel` — canonical home: `skills/`, installed to `.devin/skills/`
+
+The entry skills' authored SKILL.md files live at
+`D:\Repositories\starci-academy-backend\.devin\skills\{define-goal,start-kernel}\SKILL.md`
+— **outside the package tree entirely** (repo root, the host install
+location). Meanwhile their executable contracts live inside the package
+(`modules/goal/define-goal.yaml`, `modules/kernel/start-workflow.yaml`,
+`scripts/goal/define-goal.mjs`, `scripts/kernel/start-workflow.mjs`).
+
+Recommendation:
+1. Commit canonical copies as `skills/define-goal/SKILL.md` and
+   `skills/start-kernel/SKILL.md` (they pass the existing skills-tree spec:
+   frontmatter `name` matches dir, repository-agnostic, route through
+   `bin/starci.mjs`, forbid direct state writes).
+2. `.devin/skills/` is install *output*, not source — the owner repo's copy
+   should be produced by an installer, same pattern as `init/{AGENTS,CLAUDE,DEVIN}.md`
+   (which `bin/starci-skills.mjs` already installs). Extend that installer to
+   drop entry skills into the host's `.devin/skills/` (and `.agents/skills/`
+   for portability).
+3. The exact-`ok` approval gate currently exists *only* as prose inside those
+   SKILL.md files — it deserves a contract home; see §4 decision flag.
+
+## 8. Single-source-of-truth violations found
+
+1. **Ledger DDL × 3**: `sqlite/schema.sql` (19 tables) vs inlined `LEDGER_DDL`
+   in `kernel/ledger-db.mjs` (w7 verified parity, but parity-by-test is drift
+   waiting to happen) vs `schemas/ledger-db.schema.yaml` column catalog. Under
+   "schema-as-data", `engine/schema.sql` should be the loaded DDL and the other
+   two deleted.
+2. **Op taxonomy × 3**: `modules/ops/ops/*.yaml` (31 authored) vs
+   `modules/models/kinds.yaml` (33) vs `modules/models/runtimes.yaml`
+   `roleOfKind` (33) — five phantom kinds, three unregistered ops
+   (`ex-test.probe`, `interface.implement`, `task.execute`). `registry.yaml`
+   (generated) is the only one that matches disk — promote it to the sole
+   catalog and generate or drop the other lists.
+3. **Plan-file shape**: `modules/kernel/api.yaml` cites
+   `schemas/goal-plan.yaml`, which describes a different record than the
+   `{legs:[…]}` `api.mjs` parses.
+4. **Provider facts × 3**: `providers/catalog.yaml`, `providers/<family>/*`,
+   `modules/models/registry.yaml`, and `providers/orca/adapters/*` overlap.
+5. **Model accessor dead by bypass**: `modules/models/index.mjs` declares
+   itself the only API while every keep-set reader goes straight to YAML.
+6. **Envelope vs packet**: `providers/common/envelopes.yaml` duplicates
+   `dispatch.yaml`'s operation I/O contract.
+7. **Runtime-profile duplicates**: `modules/models/{claude,codex,qwen,devin}.yaml`
+   are byte-identical copies of `legacy/model/*.yaml` with zero readers.
+8. **Approval policy referenced but unread**: `registry.yaml:54` →
+   `approvals/policy.json` (also a `.json` compat name for a `.yaml` file).
+9. **Entry-skill logic outside the package**: the owner-approval contract for
+   both entry skills lives in `.devin/skills/` prose, not in `modules/`.
+10. **Compatibility aliases everywhere**: `readDistJson` maps `.json` names to
+    authored `.yaml` — fine as a bridge, but catalog/registry/op files should
+    stop *authoring* `.json` references so the bridge can eventually go.
+
+## 9. HFS critique for this surface
+
+- **`engine/` dependency is bigger than `ledger-db.mjs`.** `kernel/ledger-db.mjs`
+  imports `newToken, sqliteAtLeast, SETTLED_JOB_STATUSES, RETENTION, reclaimSpace`
+  from `kernel/journal.mjs`, and `journal.mjs` is old-engine. `engine/` must
+  absorb those helpers (or they must be inlined) — flag for the kernel lane.
+  `ledger-db.mjs`'s `RUNTIME_MARKER` also hardcodes `bin/starci.mjs` +
+  `kernel/ledger-db.mjs` paths, so the marker itself must be updated on the
+  move (it's already the second clause for `.dist`).
+- **Code-in-data-dirs needs a rule.** `modules/models/index.mjs` and
+  `providers/validate.mjs` are code files inside contract trees. The HFS should
+  state whether `modules/` may contain accessor modules; current new-arch
+  practice says no (direct YAML reads), which is itself an SSOT smell —
+  either sanction an accessor layer or keep `modules/` data-only and put all
+  validators under `scripts/checks/`.
+- **Mass path rewrite is unpriced.** `scripts/checks/*` hardcode `schemas/`
+  paths. Merging `schemas/` → `modules/schemas/` touches every one; the HFS
+  should either keep `schemas/` at root or mandate a path constant.
+- **`starci-validate` has no owner.** The ops' declared check depends on
+  `core/index.mjs` + `specifications/` + `contracts/` — none of which survive
+  the cut as-is. `scripts/checks/spec/` must explicitly rehome the whole chain
+  (incl. `contracts/{journeys,assets}.mjs` and `core/policy-options.mjs`) or
+  the op contracts' `checks:` blocks are dead declarations.
+- **Approval has no home.** The draft tree has no `approval/` module and the
+  owner-gate currently lives only in `.devin/skills/` prose. Either adopt
+  `approvals/policy.yaml` → `modules/kernel/` or document the decision that
+  the only owner-gates are the two entry-skill `ok` prompts.
+- **`scripts/` inventory is incomplete in the draft.** Existing
+  `scripts/{agent,api/orca,config,ledger,work}/` aren't accounted for; several
+  are old-engine but `scripts/ledger/ledger-migrate.mjs` touches the kept
+  ledger DB.
+- **`package.json` `files[]` ships the delete list** (`models/`, `hosts/`,
+  `execution/`, `workflows/`, `legacy/ops/`, `upgrades/`, `approvals/`,
+  `contracts/`) — the manifest must be rewritten in lockstep or the release
+  package ships the old engine.
+- **Schema-body naming is inconsistent** (`*.schema.yaml` vs `.yaml` in
+  `specifications/` and `schemas/`) — pick one in `modules/schemas/`.
+
+## 10. Verdict summary counts
+
+- `modules/`: 36 files KEEP, 6 DELETE (`index.mjs`, 4 runtime-profile yamls,
+  `hosts.yaml`), `registry.yaml` KEEP-generated.
+- `schemas/`: ~22 KEEP/MERGE→`modules/schemas/`, ~12 DELETE (incl.
+  `ledger-db.schema.yaml` merge-delete), rest bound to the `starci-validate`
+  decision.
+- `contracts/`: 2 MERGE→`scripts/checks/spec/`.
+- `approvals/`: 3 DELETE, 1 decision-flag (recommend keep-as-data →
+  `modules/kernel/`).
+- `specifications/`: 6 `.mjs` → `scripts/checks/spec/`, 5 `.yaml` →
+  `modules/schemas/spec/`.
+- `providers/`: all data KEEP; `validate.mjs` MOVE→`scripts/checks/` + needs a
+  caller; adapter schema normalization recommended.
+- `skills/`: 4 KEEP; add `define-goal` + `start-kernel` canonical copies +
+  installer path.
+
+## Greps run
+
+- Per-file name greps across keep-set dirs for every `modules/`, `schemas/`,
+  `contracts/`, `approvals/`, `specifications/`, `providers/`, `skills/` entry.
+- `import.*(specifications|contracts|approvals|modules/models)` across `*.mjs`
+  (excluding `ex-testing/`, `runtime/`, `node_modules/`, `legacy/`).
+- `readdir`/registry checks: `build-ops-registry.mjs` filter logic; python diff
+  of `ops/*.yaml` vs `registry.yaml` ids vs `kinds.yaml` `kinds:` vs
+  `runtimes.yaml` `roleOfKind`.
+- `diff -q legacy/model/<r>.yaml modules/models/<r>.yaml` for the four runtime
+  profiles (all identical).
+- Adapter field audit: top-level keys of all four `providers/orca/adapters/*.yaml`.
+
+## File-collision note
+
+A prior, unrelated `r2` lane (evidence re-record) already produced tracked
+`ex-testing/lint/r2-REPORT.md` + `done/r2.done`. On this case-insensitive
+filesystem this report occupies the same path — the old content is preserved
+in git history. Sibling lanes in this wave use the uppercase `R<N>-REPORT.md`
+convention.

@@ -15,12 +15,19 @@
 #   [Kernel] <p>  = ONE agent per project, LONG-LIVED. plan -> dispatch ->
 #                   settle -> re-plan. Terminal title `[Kernel] <project>`
 #                   (kernel/supervisor.mjs startKernel, title literal line ~97).
-#   [Op] <name>   = 1 op = 1 EPHEMERAL agent, spawned per dispatch through an
-#                   Orca terminal, dies when its verdict settles. Terminal title
-#                   `[Op] <op-or-task>` (fleet naming rule, ex-testing/
-#                   FLEET-STARCI.md; kernel/terminals.mjs sweepStaleTerminals).
+#   [Op] <name>   = 1 op = 1 EPHEMERAL agent, spawned per dispatch BY
+#                   `api dispatch --spawn` through an Orca terminal, dies when
+#                   its verdict settles. Terminal title `[Op] <op-or-task>`
+#                   (fleet naming rule, ex-testing/FLEET-STARCI.md;
+#                   kernel/terminals.mjs sweepStaleTerminals).
+#
+# The kernel agent touches NO state directly: every read/write below is one
+# `node scripts/kernel/api.mjs <command>` call — the full command contract is
+# modules/kernel/api.yaml; the packet contract is modules/kernel/dispatch.yaml.
 #
 # Sources (all under .claude/, relative to the skill root):
+#   scripts/kernel/api.mjs   — the kernel's only door to the ledger + spawn
+#   modules/kernel/api.yaml  — its contract (args, reads/writes, refusals)
 #   kernel/kernel.mjs        — the loop itself: "schedule, launch, accept a
 #                              report, route what it implies, run the gates,
 #                              finish" (head comment ~line 91); rank(), pulse()
@@ -60,131 +67,168 @@ about:
     both ready and legal. It decides order and assignment; it never decides
     scope, identity or authority.
   sources:
+    - scripts/kernel/api.mjs
     - kernel/kernel.mjs
     - kernel/engine.mjs
     - kernel/dispatcher.mjs
 
 # ============================================================================
-# 1 — THE TICK. One iteration of the driver loop, in order. The kernel never
-#    skips ahead: a verdict it has not settled is a verdict the next pick does
-#    not know about.
+# 1 — THE TICK. One iteration of the driver loop, in order — expressed in api
+#    calls. The kernel agent NEVER opens .starciwork/runtime.sqlite and never
+#    spawns a terminal itself: every state operation is
+#    `node scripts/kernel/api.mjs <command>` (modules/kernel/api.yaml — args,
+#    read/write sets, refusal strings). A refusal is a fact the loop routes,
+#    never a crash. The kernel never skips ahead: a report it has not settled
+#    is a verdict the next pick does not know about.
 # ============================================================================
 tick:
   order:
-    - settle    # read every verdict/report that landed; re-run its checks
-    - pick      # rank the ready legs; plan this tick's launch set
-    - route     # route-op (which op kind) + route-model (which runtime)
-    - dispatch  # reserve the durable lease, then spawn the [Op] agent
-    - wait      # subscribe to verdicts; poll liveness; do nothing else
-  citation: "kernel/kernel.mjs head comment: 'schedule, launch, accept a report, route what it implies, run the gates, finish'"
+    - survey    # api survey --workflow — the tick opens on the ledger, never on memory
+    - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
+    - enqueue   # api enqueue --workflow --op --paths — a pending job row per planned op the queue lacks
+    - drive     # loop{ status -> dispatch -> wait -> settle -> retry|incident } until the frontier empties
+    - retire    # api retire --workflow — every job settled AND the final verify passed
+  citation: "modules/kernel/api.yaml commands; kernel/kernel.mjs head comment: 'schedule, launch, accept a report, route what it implies, run the gates, finish'"
 
-  settle:
+  survey:
     rule: >-
-      A verdict is the FIRST thing consumed each tick, never the last thing
-      remembered from the previous one. The report file is the source of
-      truth; the Orca message is only the wake-up signal (kernel/reports.mjs
-      head comment).
-    neverTrust: >-
-      `done` is never taken on trust — the kernel re-runs the operation's own
-      checks itself and commits only what it could reproduce; changed files
-      are computed from git, not read from the report
-      (kernel/kernel.mjs ~88; kernel/verify.mjs changedFiles,
-      attributedFiles, validateAccepted, recordVerdict).
-    durableHalf: >-
-      On the enrolled path the settle is a ledger transaction:
-      engine.settled() completes the durable job and releases its machine
-      lease refs (kernel/engine.mjs settled, machineRefs, releaseRefs);
-      jobs.complete drops the lease rows (kernel/jobs.mjs). A report that
-      cannot bind the exact {workflowId, opId, attempt, generation,
-      leaseToken} is rejected, not partially accepted (settled()'s `exact`
-      check; 'stale operation settlement fence').
-    prototypeNote: >-
-      Fleet prototype equivalent: the driver polls ex-testing/lint/done/*.done
-      markers and reads the lane's *-REPORT.md; the marker is the wake-up, the
-      report the verdict. Same discipline: file first, signal second.
+      `api survey` is the tick's one deep read — goal (latest revision + the
+      approved opChain), jobs, inbox, signals, events tail, open incidents,
+      in one projection. The kernel never queries sqlite itself; a state it
+      cannot survey is a state it may not act on.
+    neverMemory: >-
+      The frontier is COMPUTED from the survey, never remembered — what was
+      dispatched, what settled, what is parked is all re-read each tick
+      (kernel/engine.mjs rank -> kernel/scheduler.mjs rankJobs is the same
+      discipline on the durable spine).
 
-  pick:
+  plan:
     rule: >-
-      The next leg is COMPUTED from state, never remembered. rank() orders the
-      ready ops by critical-path depth and unlock count
-      (kernel/engine.mjs rank -> kernel/scheduler.mjs rankJobs);
-      planDispatch() then decides which of them may share the tick
-      (kernel/dispatcher.mjs).
-    stateMachine: >-
-      Op lifecycle: ready -> (lease reserved) -> running|answering ->
-      done|blocked|cancelled|failed; an op holding a lease is never
-      re-launched — 'the operation already holds its durable reservation; the
-      engine settles it, not a new launch' (dispatcher.mjs planDispatch).
-      Statuses in IN_FLIGHT=['running','answering'] hold slots;
-      SETTLED=['done','blocked','cancelled'] free them.
-    launchSet: >-
-      planDispatch returns {launch, cut, wait, reasons}. An op launches only
-      when ALL THREE levels pass: file (no write/write or write/read overlap
-      with anything in flight — opScopes/firstConflict), lease (no contested
-      capacity-1 resource — canonical-writer:*, runtime-projection:*,
-      machine:* — firstLease/writerKeys), group (seam runs alone and first;
-      siblings bounded by allocation.fanOut.maxPerGroup — fanOutReason).
-      An op past the cut bounds (CUT_FILES/CUT_ASSERTIONS/CUT_COMPONENTS) is
-      not launched at all — it is cut into disjoint children
-      (cutSizeReason -> sync.mjs cutOversizedOps).
-    starvation: >-
-      'no runtime with the <role> role and a free slot' is a wait reason, not
-      a failure; maxParallelOps (DEFAULT_MAX_PARALLEL_OPS) bounds the fleet.
+      The kernel derives the plan from the surveyed goal and hands it to
+      `api plan --file <plan.json>` (shape: schemas/goal-plan.yaml). The api
+      persists the digest + diff as a 'plan-derived' event and returns the
+      STRUCTURAL diff of the derived op set vs the approved opChain in
+      goals.json (define-goal.yaml: the chain is advisory — re-derived at
+      boot, never trusted blindly).
+    divergence: >-
+      Structural divergence — legs added, removed or re-rooted vs the
+      approved shape — is NOT a dispatch decision: `api incident --kind
+      plan-divergence` and escalate per the ladder below; no dispatch runs
+      on a divergent plan. Order tweaks and allowlist wording inside the
+      approved shape are the driver's own call (escalation.driverAlone
+      ORDER).
 
-  route:
-    routeOp: >-
-      Which op kind a workload needs resolves against the route: blocks of
-      modules/ops/ops/*.yaml — {nodeKinds, phase, intent[], prerequisites[]}
-      matched by scripts/route/route-op.mjs; the output is pick + reasons +
-      yaml path citations, deterministic. The agent never reads a whole op
-      contract to route (tinkle/_common.md amendment).
-    routeModel: >-
-      Which runtime may take the dispatch resolves against
-      modules/models/selection.yaml — the source of truth for eligibility
-      (risk/qualityFloor ladders, probation gates, highKinds exclusions),
-      executed by scripts/route/route-model.mjs; on the durable path the same
-      decision is eligibleModelSelection (kernel/engine.mjs): eligibility
-      first, then budget ordering — budget never makes a model eligible.
-    verifyIsolation: >-
-      A verify op is allocated AWAY from the runtime that implemented the
-      slice (dispatcher.mjs verifyAvoids: review.verify avoids the runtimes of
-      every op sharing its ledgerIds).
-
-  dispatch:
+  enqueue:
     rule: >-
-      Dispatch is two committed facts, not one hope: (1) the durable
-      reservation — reserveOperation writes the operation job row with
-      reservationProtocol 'intent-v1' + expectedResources and takes the lease
-      (kernel/engine.mjs reserveOperation; admission.reserve ttlMs 10min);
-      (2) the launch — beginLaunchIntent records operation-launch-intent, the
-      spawn lands, launched() flips the job to running with worker_id=dispatch
-      and records operation-launched.
-    spawnForm: >-
-      On Orca the launch is a supervised native agent: terminal-create with
-      title `[Op] <op-or-task>`, the op contract delivered as the task
-      (kernel/supervisor.mjs startKernel shows the terminal-create /
-      terminal-read / terminal-send sequence for the kernel itself;
-      kernel/kernel.mjs launchWithCandidate/startOperation for ops).
-      One op = one agent: an operation never fans out into several agents.
-    packet: "the full spawn contract is modules/kernel/dispatch.yaml"
-    reservationPhases: >-
-      reservationPhase() is the launch-time truth: absent -> reserved ->
-      effect-intent -> launched -> settled; anything else is 'unknown' and
-      stops the launch — the kernel never guesses past an unreadable
-      reservation (kernel/engine.mjs reservationPhase, beginLaunchIntent).
-
-  wait:
-    rule: >-
-      Between settle and the next event the kernel WAITS — it does not poll
-      for work to invent. pulse() renews live leases, expires dead ones, and
-      reconciles pure model jobs (kernel/engine.mjs pulse; admission.renew /
-      admission.expire); reconcileWithOrca runs on a cadence
-      (RECONCILE_EVERY=10 ticks, kernel/terminals.mjs).
+      Each planned op with no job row gets one: `api enqueue --op <opId>
+      --paths <owned_paths csv>` writes status='pending' with the op's
+      write-set on the row. A duplicate is a refusal, not a hazard — an
+      existing pending or in-flight row IS the queue entry and is never
+      re-enqueued (api.yaml already-queued).
     boundary: >-
-      Waiting is itself supervised: a kernel whose event log is silent past
-      the health window is restarted by the supervisor (see supervision
-      below). The wait is where the failure detectors live — failureHandling
-      section.
+      Enqueue is declaration, not launch: owned_paths ride on the job row so
+      dispatch-time disjointness is checkable before any agent exists
+      (modules/goal/legality.yaml splitRules; schemas/goal-plan.yaml disjoint
+      allowlists).
+
+  drive:
+    status: >-
+      Each loop iteration opens on `api status` — phase, job counts by
+      status, live leases, the pending list. Cheap by design; survey is the
+      deep read. An expired lease under a 'running' job is a detector, not
+      free capacity (admission.expire keeps unproved leases held).
+    dispatch:
+      rule: >-
+        For each ELIGIBLE pending job — owned_paths disjoint from every
+        in-flight job's read/write set AND capacity free — `api dispatch
+        --job <id> --spawn` reserves the durable lease, renders the packet
+        and lands the `[Op]` terminal itself. The kernel picks WHICH jobs;
+        the api owns the mechanics (modules/kernel/dispatch.yaml
+        spawnMechanics). Without --spawn it is a dry-run packet preview.
+      eligibility: >-
+        planDispatch's three levels, enforced inside the api's refusals:
+        file (no write/write or write/read overlap with anything in flight —
+        opScopes/firstConflict), lease (no contested capacity-1 resource —
+        canonical-writer:*, runtime-projection:*, machine:* —
+        firstLease/writerKeys), group (seam runs alone and first; siblings
+        bounded by allocation.fanOut.maxPerGroup — fanOutReason). An op past
+        the cut bounds (CUT_FILES/CUT_ASSERTIONS/CUT_COMPONENTS) is cut into
+        disjoint children BEFORE it is ever enqueued (dispatcher.mjs
+        cutSizeReason -> sync.mjs cutOversizedOps).
+      route: >-
+        The op id was route-op's pick during plan (scripts/route/route-op.mjs
+        — pick + reasons + citations, never a whole-contract read). The
+        packet's constraints.model resolves through route-model inside the
+        api (modules/models/selection.yaml — eligibility first, budget orders
+        the eligible; budget never makes a model eligible). A verify job is
+        allocated AWAY from the runtime that implemented its slice
+        (dispatcher.mjs verifyAvoids).
+      oneOpOneAgent: >-
+        One pending job = one dispatch = one ephemeral [Op] agent; a job
+        holding a lease is never re-dispatched and a settled job is never
+        re-launched — a retry is a NEW row at attempt+1
+        (dispatch.yaml oneOpOneAgent; dispatcher.mjs 'the engine settles it,
+        not a new launch').
+      starvation: >-
+        'contested-lease' / 'no free slot' is a wait reason, not a failure —
+        the loop waits; it does not force (DEFAULT_MAX_PARALLEL_OPS bound).
+    wait:
+      rule: >-
+        Between dispatch and the next report the kernel WAITS — it polls
+        `api status` on a cadence and reads the op terminal for liveness; it
+        does not poll for work to invent. The marker+report discipline is
+        unchanged: the report FILE is the verdict, the done-marker/Orca
+        message is only the wake-up (kernel/reports.mjs head; fleet prototype
+        ex-testing/lint/done/*.done + *-REPORT.md).
+      boundary: >-
+        Waiting is itself supervised — a kernel whose event log is silent
+        past the health window is restarted (failureHandling.kernelDeath).
+        The wait is where the failure detectors live — failureHandling
+        section.
+    settle:
+      rule: >-
+        A landed report settles through `api settle --job <id> --verdict <v>
+        --report <path>` — the api validates the envelope, binds the exact
+        durable identity {workflow_id, op_id, attempt, generation,
+        lease_token}, releases the lease and records the verdict. A refused
+        settle is a routed verdict, never silent loss (api.yaml refuses).
+      neverTrust: >-
+        `done` is never taken on trust — the op's own checks are re-run and
+        the changed files are computed from git, not read from the report
+        (kernel/kernel.mjs ~88; kernel/verify.mjs changedFiles,
+        attributedFiles, validateAccepted, recordVerdict). Evidence is bytes
+        on disk, never words in a summary (verdict-contract.yaml).
+      durableHalf: >-
+        The settle is a ledger transaction: the durable job completes and its
+        machine lease refs release (engine.mjs settled, machineRefs,
+        releaseRefs). A report that cannot bind the exact identity is refused
+        ('stale-settlement' fence), not partially accepted.
+      prototypeNote: >-
+        Fleet equivalent: poll ex-testing/lint/done/*.done, read the lane's
+        *-REPORT.md — marker is the wake-up, report is the verdict. File
+        first, signal second.
+    repair:
+      onFail: >-
+        verdict fail -> retry inside the route's limit: `api enqueue` the
+        same op at attempt+1 with the failure named back (model/kinds.yaml
+        routes; kernel/common.mjs RETRY_LIMIT=3 — the full table is
+        verdictTable below).
+      onBlocked: >-
+        verdict blocked -> the typed blocker is the route key
+        (verdictTable.blocked); environment/authority/ask go to needUser.
+      budget: >-
+        Past the route's limit, `api incident --kind <k> --detail <s>`
+        records the fingerprint and the workflow asks the user — identical
+        evidence is not progress and a runtime swap alone never resets the
+        budget (engine.mjs incident; scheduler.mjs progressExhausted).
+
+  retire:
+    rule: >-
+      When `api status` shows every job settled AND the final verify leg
+      settled pass, `api retire` closes the workflow: phase=finished, goal
+      retired, history preserved (api.yaml retire). A refusal
+      (jobs-unsettled / verify-open) is a fact — the loop keeps driving.
+    citation: "modules/kernel/api.yaml retire; kernel/kernel.mjs 'run the gates, finish'"
 
 # ============================================================================
 # 2 — VERDICT HANDLING. What the driver does with each settled verdict.

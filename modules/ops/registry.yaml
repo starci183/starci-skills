@@ -27,7 +27,7 @@ coarsePhases:
   verify: post-implementation
   release: post-implementation
   operate: cross-cutting
-count: 30
+count: 31
 ops:
   - id: architecture.decide
     family: architecture
@@ -401,6 +401,38 @@ ops:
     businessQuestion: '"Does the delivered slice prove every assertion through its public API on a real
       stack the suite starts itself - one scenario per assertion, declared checks run verbatim?"'
     whenNeeded: Post-implementation API-level proof of a delivered backend slice.
+  - id: ex-test.probe
+    family: ex-test
+    goal: Canary op — proves the dispatch loop end-to-end with the smallest possible real work.
+    nodeKinds:
+      - probe
+    completionProfile: probe
+    sideEffects:
+      count: 2
+      summary: one file write inside ex-testing/probe/
+    reads:
+      - contract
+    writes:
+      - artifact
+      - report
+      - marker
+    route:
+      nodeKinds:
+        - probe
+      phase:
+        - operate
+        - cross-cutting
+      intent:
+        - probe
+        - smoke-test
+        - canary
+      riskHints:
+        - trivial
+    lifecyclePosition: operate | cross-cutting
+    kindInferred: probe
+    businessQuestion: Did the dispatched agent read its contract, produce exactly the declared artifact,
+      and settle honestly?
+    whenNeeded: kernel/Orca dispatch smoke tests
   - id: goal.revise
     family: goal
     goal: Produce goal v(n+1) from the frozen goal v(n) and the requested change - explicit diff, rev

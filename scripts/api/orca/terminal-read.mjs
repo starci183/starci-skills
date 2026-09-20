@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+// terminal-read.mjs — `orca terminal read` as a callable function.
+//   node scripts/api/orca/terminal-read.mjs --terminal <handle> [--screen] [--limit <n>]
+// Returns {ok, screen} — screen is the extracted frame text, ready to pattern-test.
+import { orcaRun, terminalOf, frameText, arg, flag } from './lib.mjs';
+
+export function terminalRead({ terminal, screen = true, limit }) {
+  const argv = ['terminal', 'read', '--terminal', terminal, '--json'];
+  if (screen) argv.push('--screen');
+  if (limit) argv.push('--limit', String(limit));
+  const r = orcaRun(argv);
+  const t = terminalOf(r);
+  return { ok: r.status === 0, terminal: t, screen: frameText(t), error: r.error ?? r.stderr };
+}
+
+if (process.argv[1]?.endsWith('terminal-read.mjs')) {
+  const argv = process.argv.slice(2);
+  const out = terminalRead({ terminal: arg(argv, 'terminal'), screen: !flag(argv, 'tail'), limit: arg(argv, 'limit') });
+  console.log(JSON.stringify(out, null, 2));
+  process.exit(out.ok ? 0 : 1);
+}

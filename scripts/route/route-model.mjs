@@ -16,6 +16,10 @@
 //       [--unapproved]          workflow not approved (probation forbidden)
 //       [--no-review]           no fresh independent review planned
 //       [--no-checks]           op declares no machine checks
+//       [--difficulty <easy|medium|hard>]   (with --plan) which allocation tier to preview
+//       [--plan]                what-if view: walk the runtimes.yaml difficulty tier
+//                               instead of the declared operator chain; missing or
+//                               stale qualification evidence is ANNOTATED, not fatal
 //       [--json] [--modelsDir <dir>] [--verbose]
 //
 // Prints: picked target (+model for the role), the rule that fired, the ordered
@@ -50,6 +54,8 @@ function parseArgs(argv) {
     else if (k === '--unapproved') a.approved = false;
     else if (k === '--no-review') a.review = false;
     else if (k === '--no-checks') a.checks = false;
+    else if (k === '--difficulty') a.difficulty = take(i), i++;
+    else if (k === '--plan') a.plan = true;
     else if (k === '--json') a.json = true;
     else if (k === '--verbose') a.verbose = true;
     else if (k === '--modelsDir') a.modelsDir = take(i), i++;
@@ -192,6 +198,122 @@ function candidateOrder(kind, role, registry, runtimes) {
   return { order: pref, source: `runtimes.yaml allocation.preference[${role ?? 'implement'}]` };
 }
 
+// --- plan mode: what-if tier preview ---------------------------------------------
+//
+// --plan previews allocation for goal planning: instead of the declared operator
+// chain it walks the runtimes.yaml difficulty tier (allocation.tiers.<difficulty>,
+// role-keyed where the tier is a map) and evaluates each runtime entry with the
+// same qualification/probation gates — except a missing or stale evidence file is
+// annotated rather than allowed to fail the pick. Nothing is admitted, launched or
+// written; this is a view, not a route.
+
+const PLAN_COLD_MINUTES = { easy: 15, medium: 45, hard: 90 };
+// Failures that mean "no usable evidence" rather than "evidence proved unfit":
+// a pick may still be previewed past these, annotated.
+const PLAN_EVIDENCE_ABSENT = new Set([
+  'model qualification evidence is missing',
+  'qualification is stale',
+  'qualification date is invalid',
+]);
+
+function planChain(runtimes, difficulty, role) {
+  const tier = runtimes?.allocation?.tiers?.[difficulty];
+  const at = `runtimes.yaml allocation.tiers.${difficulty}`;
+  if (!tier) return { chain: [], source: `${at} (missing)` };
+  if (Array.isArray(tier)) return { chain: tier, source: at };
+  if (role && Array.isArray(tier[role])) return { chain: tier[role], source: `${at}.${role}` };
+  return { chain: tier.default ?? [], source: `${at}.default` };
+}
+
+function planEvidenceNote(evidence, qr) {
+  if (!evidence || evidence.schema !== 'starci/model-qualification@1')
+    return 'no qualification evidence on disk';
+  if (qr.includes('qualification is stale')) return 'qualification evidence on disk is stale';
+  if (qr.includes('qualification date is invalid')) return 'qualification evidence on disk has an invalid date';
+  return null;
+}
+
+function planCandidates(chain, runtimes, w, rules, evidenceByRuntime) {
+  const probationReasons = probationAdmissionReasons(w, rules);
+  return chain.map(id => {
+    const rt = runtimes?.runtimes?.[id] ?? null;
+    if (!rt) return { id, target: id, status: 'rejected', structural: true, reasons: ['no runtimes.yaml entry for this pool'] };
+    const model = (w.role && rt.models?.[w.role]) || rt.target || id;
+    const base = { id, target: rt.target ?? id, provider: rt.provider ?? null, model, maxParallel: rt.maxParallel ?? null };
+    if (w.role && rt.roles?.length && !rt.roles.includes(w.role))
+      return { ...base, status: 'rejected', structural: true, reasons: [`pool does not serve role '${w.role}'`] };
+    const evidence = evidenceByRuntime[id];
+    const qr = qualificationReasons({ provider: rt.provider, model, target: rt.target ?? id, version: null }, evidence, w, rules);
+    const note = planEvidenceNote(evidence, qr);
+    if (!qr.length) return { ...base, status: 'qualified', structural: false, reasons: [], note, qr };
+    if (!probationReasons.length) return { ...base, status: 'probation-only', structural: false, reasons: [], note, qr };
+    return { ...base, status: 'rejected', structural: false, reasons: [...qr, ...probationReasons], note, qr };
+  });
+}
+
+function runPlan(args, rules, runtimes, w, evidenceByRuntime) {
+  const { chain, source } = planChain(runtimes, args.difficulty, w.role);
+  const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime);
+  // Pickable = not structurally off the chain, and any rejection rests only on
+  // absent/stale evidence (annotation, not a real disqualification) — the point
+  // of plan mode is "who takes this once qualification exists". Probation
+  // reasons are workload-level and never disqualify a pool in this preview.
+  const pickable = evaluated.filter(c => !c.structural
+    && (c.status !== 'rejected' || c.qr.every(r => PLAN_EVIDENCE_ABSENT.has(r))));
+  const statusRank = { qualified: 0, 'probation-only': 1, rejected: 2 };
+  const ordered = [...pickable].sort((a, b) => statusRank[a.status] - statusRank[b.status] || chain.indexOf(a.id) - chain.indexOf(b.id));
+  const primary = ordered[0] ?? null;
+  const fallbacks = ordered.slice(1);
+  const reasonFor = c => c.status === 'qualified'
+    ? 'measured qualification evidence passes'
+    : c.status === 'probation-only'
+      ? (c.note ? `${c.note}; scoped probation would admit` : 'scoped probation would admit')
+      : `what-if pick: ${c.note ?? 'no usable qualification evidence'} — launch still requires measured qualification (probation cannot satisfy this workload)`;
+  const estimate = { difficulty: args.difficulty, coldMinutes: PLAN_COLD_MINUTES[args.difficulty] };
+
+  if (args.json) {
+    console.log(JSON.stringify({
+      plan: true,
+      difficulty: args.difficulty,
+      workload: w,
+      tier: { source, chain },
+      candidates: evaluated.map(c => ({
+        target: c.target, provider: c.provider, model: c.model,
+        maxParallel: c.maxParallel, status: c.status,
+        ...(c.note ? { evidence: c.note } : {}), ...(c.reasons?.length ? { reasons: c.reasons } : {}),
+      })),
+      pick: primary
+        ? { primary: { target: primary.target, model: primary.model, status: primary.status }, reason: reasonFor(primary),
+            fallbacks: fallbacks.map(c => ({ target: c.target, model: c.model, status: c.status })) }
+        : null,
+      estimate,
+    }, null, 2));
+  } else {
+    console.log(`plan what-if: kind=${w.kind} role=${w.role ?? '(none)'} difficulty=${args.difficulty}`);
+    console.log(`workload: risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
+      (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
+    console.log(`chain: ${source}  ->  [${chain.join(', ') || '(empty)'}]`);
+    console.log('candidates:');
+    evaluated.forEach((c, i) => {
+      const spec = c.provider !== undefined
+        ? `provider=${c.provider ?? '(none)'}  model=${c.model ?? '(none)'}  maxParallel=${c.maxParallel ?? '(none)'}`
+        : '';
+      console.log(`  ${i + 1}. ${c.target}  ${spec}  status=${c.status}` +
+        (c.note ? `  (${c.note})` : ''));
+      if (args.verbose && c.reasons?.length) console.log(`     reasons: ${c.reasons.join('; ')}`);
+    });
+    if (primary) {
+      console.log(`primary: ${primary.target} (${reasonFor(primary)})`);
+      console.log(`fallbacks: [${fallbacks.map(c => `${c.target} (${c.status})`).join(', ')}]`);
+    } else {
+      console.log(`primary: none — no pool on the ${args.difficulty} tier can preview this workload`);
+      for (const c of evaluated.filter(c => c.reasons?.length)) console.log(`  ${c.target}: ${c.reasons.join('; ')}`);
+    }
+    console.log(`estimate: cold ~${estimate.coldMinutes}m for ${/^[aeiou]/i.test(args.difficulty) ? 'an' : 'a'} ${args.difficulty} operation`);
+  }
+  if (!primary) process.exit(1);
+}
+
 // --- main -------------------------------------------------------------------------
 
 function main() {
@@ -211,7 +333,16 @@ function main() {
   // layoutPolicy.checks (every record-writing op runs e.g. starci-validate).
   const opYaml = readYaml(path.join(skillRoot, 'modules', 'ops', 'ops', `${args.kind}.yaml`));
   const declaredChecks = [...(kindEntry?.checks ?? []), ...(opYaml?.layoutPolicy?.checks ?? [])];
-  const w = deriveWorkload(args, rules, kindEntry, declaredChecks);
+  const w = args.plan
+    // Plan mode derives the role from runtimes.yaml roleOfKind (the allocator's
+    // own kind→role map), falling back to kinds.yaml like the live path.
+    ? deriveWorkload({ ...args, role: args.role ?? runtimes?.roleOfKind?.[args.kind] ?? kindEntry?.role }, rules, kindEntry, declaredChecks)
+    : deriveWorkload(args, rules, kindEntry, declaredChecks);
+  if (args.plan) {
+    if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard>'); process.exit(2); }
+    runPlan(args, rules, runtimes, w, evidenceByRuntime);
+    return;
+  }
   const candidates = loadCandidates(modelsDir);
   const { order, source: orderSource } = candidateOrder(args.kind, w.role, registry, runtimes);
   const ordered = [...candidates].sort((a, b) => {

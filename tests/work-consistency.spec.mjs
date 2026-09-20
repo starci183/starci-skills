@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {checkWorkConsistencyTree, checkTreeParity, declaredStateValues} from '../scripts/checks/check-work-consistency.mjs';
-import {loadRecords} from '../scripts/example-ownership.mjs';
+import {loadRecords} from '../scripts/example/example-ownership.mjs';
 import {walk} from '../scripts/checks/check-example-work.mjs';
 
 /**

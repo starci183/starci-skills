@@ -13,6 +13,14 @@ name:
   api: terminal.rename
 release:
   api: orchestration.worker-release
+terminalFallback:
+  when: orchestration.worker-start is unavailable or a plain-command lane is wanted
+  command: claude
+  bypassFlag: '--dangerously-skip-permissions'
+  bypassReason: Unattended lanes stall on per-tool permission menus; same rule as qwen --yolo / devin bypass mode.
+  headless: 'claude -p "<prompt>" runs non-interactively (used by the kernel-watchdog automation ticks).'
+verifiedAt: 2026-09-20
+verifiedAgainst: 'claude CLI (installed)'
 forbidden:
   - shell-only-role
   - unsupervised-dispatch-inject-as-success

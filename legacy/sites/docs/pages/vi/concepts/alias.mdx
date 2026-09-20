@@ -1,0 +1,58 @@
+---
+title: "Alias"
+description: "Bộ từ vựng duy nhất về vị trí: sáu vùng, cách một alias giải và ràng buộc, và vì sao operator không đọc gì khác."
+---
+
+# Alias
+
+Một operator không bao giờ gọi tên một đường dẫn. Nó gọi tên một alias, và `alias/alias.json` là nơi
+duy nhất một alias giải ra vị trí. `alias/INDEX.md` là bản đồ đọc được theo vùng, sinh bởi
+`scripts/generate-alias-doc.mjs` với `--check` chạy trong `npm test`.
+
+> Một operator chỉ đọc những alias mà bảng Refs của chính nó gọi tên; trang này là toàn bộ từ vựng mà
+> các bảng đó lấy ra. Việc giải lấy tiền tố đã đăng ký dài nhất, một sub-path thu hẹp một alias, và
+> một đoạn trong ngoặc nhọn do lần gọi cung cấp.
+
+## Sáu vùng
+
+| Vùng | Chứa gì |
+| --- | --- |
+| Workspaces | Khu làm việc: các checkout đã route, khai báo route, cổng, và danh tính máy |
+| Grammar | Gói `@starci/grammar` như app đang bind giải ra nó — sự thật duy nhất về việc component sở hữu gì |
+| Knowledge | Luật chuẩn: `ui`, `grammars`, `patterns`. Chỉ đọc |
+| Worktrees | Thẩm quyền và bằng chứng cục bộ nằm ngoài mọi checkout: business head, cặp UAT, nợ chất lượng, template, chủ sở hữu runtime |
+| Remote | Internet: registry, git remote, image registry, các lần chạy CI, object storage |
+| Dynamic | Mọi thứ sinh ra bên trong phiên hiện tại, và không gì có trước nó |
+
+## Ràng buộc, không chỉ là giải
+
+Mỗi alias còn khai cách nó ràng buộc, và chính cách ràng buộc mới làm cho trôi dạt bị phát hiện. Một
+checkout ràng bằng fingerprint cộng `sourceHead`. `@grammar` ràng bằng version của gói cộng
+fingerprint của vị trí đã giải. `@remote/ghcr` ràng bằng digest, và sổ đăng ký nói rõ vì sao: "Một
+tag không bao giờ là một ràng buộc; digest mới là." `@remote/npm` ràng bằng version, vì `latest`
+không bao giờ là ràng buộc.
+
+## Ai được ghi
+
+Mỗi alias gọi tên ai được ghi nó. Chỉ `frontend.source.apply` ghi `@workspaces/fe`, chỉ
+`backend.source.apply` ghi `@workspaces/be`, chỉ `business.decide` ghi `@worktrees/businesses`, chỉ
+`uat.verify` ghi `@worktrees/uat`. Đây cũng chính là sự thật mà luật workflow dựa vào khi cấm hai
+nhánh trong một bậc dùng chung một alias ghi.
+
+## Các đoạn thân thiện
+
+Bên trong một alias checkout, một từ thân thiện thay cho một đường dẫn chính xác: `husky` cho
+`.husky/`, `package` cho `package.json`, `gates` cho các script cùng những config chúng gọi tên,
+`grammar` cho `packages/grammar`. Hai đoạn khác nói về thời điểm chứ không phải vị trí:
+`/branch/session` là nhánh phiên — "nhánh duy nhất mà một operator có ghi source được phép commit
+lên" — còn `/commit/<sha>` gọi tên một checkout tại đúng một commit, tức cách một bậc sau trỏ chính
+xác vào thứ một bậc trước đã ghi.
+
+## Dynamic không đi qua đường alias
+
+File sinh ra trong phiên được truyền dưới dạng kind, bằng đường dẫn tường minh trong `request.json`,
+không bao giờ dưới dạng alias. Thư mục phiên do orchestrator tạo và bị xoá khi `git.publish` xong
+việc; một lần chạy bị chặn giữ nó lại để chạy lại.
+
+Toàn bộ sổ đăng ký, với từng alias, tham số, cách giải, cách ràng buộc và người được ghi, nằm ở
+[Tham chiếu → Alias](/vi/reference/alias).

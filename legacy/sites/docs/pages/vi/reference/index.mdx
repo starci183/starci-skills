@@ -1,0 +1,17 @@
+---
+title: "Tham chiếu"
+description: "Sinh từ cây lúc build."
+---
+
+# Tham chiếu
+
+Mọi trang trong mục Tham chiếu đều do `docs/scripts/generate-docs.mjs` sinh ra từ chính các tệp mà runtime đọc. `npm run check` trong `sites/docs` sinh lại và báo lỗi khi bản đã commit khác đi, nên một trang ở đây không thể mô tả một cái cây không còn tồn tại.
+
+| Trang | Sinh từ |
+| --- | --- |
+| [Các operator](/reference/operators) | `operators/<id>/operator.md`, `operator.json` |
+| [Workflow](/reference/workflows) | `workflows/*.json` |
+| [Kind](/reference/kinds) | `templates/kinds/*` |
+| [Alias](/reference/alias) | `alias/INDEX.md` |
+| [Mã dừng](/reference/stop-codes) | `operators/INDEX.md` § Stop codes |
+| [Tri thức](/reference/knowledge) | `knowledge/**/INDEX.md` |

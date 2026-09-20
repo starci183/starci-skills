@@ -1,0 +1,84 @@
+---
+title: "Session"
+description: "The session folder, its branch layout, the two gates, and the lifecycle from create to delete."
+---
+
+# Session
+
+A session is the only place a mission's work exists while it runs. `resources/orchestrator.json` owns
+its rules; the operators never read the session container directly, they read the `@dynamic` alias
+that names their own branch.
+
+## The container
+
+```text
+<Source>/.worktrees/sessions/<sessionId>/
+  state.json
+  step-1/parallel-1/
+  step-2/parallel-1/  step-2/parallel-2/
+  ...
+```
+
+The id is `<yyyymmdd-HHMMss>-<project>-<first operator>`. `state.json` is the manifest: id, project,
+`startedAt`, status (`running | blocked | done`), the chain as a list of branch keys, `steps` mapping
+each key to its operator, `current`, the `leases` each agent holds, and the sha256 of every branch's
+`request/request.json`.
+
+## One branch
+
+`step-<N>/parallel-<M>/` — N is the position in the chain, M the parallel branch, and `parallel-1`
+always exists. The agent writes only `response/` of its own branch; a nested-exchange agent writes
+only `<exchange>/response/` of that branch. A source-writing operator additionally writes the session
+branch of its checkout, under an exclusive lease.
+
+```text
+request/request.json
+response/response.json
+response/response.md
+response/<other>.md            when the operator has one
+response/data/
+response/artifacts/
+<exchange>/request/request.json and <exchange>/response/
+```
+
+## The two gates
+
+`templates/step/request.schema.json` and `templates/step/response.schema.json` are shared by every
+operator and every nested exchange. `scripts/validate-request.mjs` runs before an agent;
+`scripts/validate-response.mjs` runs after, followed by the operator's own `validate.mjs`.
+
+`response.json` carries `status` (`done | blocked | waiting`), `stop` when blocked, `awaiting` when
+waiting, `fields` — the registry of what the branch produced, each a path relative to the branch —
+`fallbacks`, `commits`, and `next`.
+
+## Hand-off
+
+A kind is passed by explicit path. The producing branch records it in `response.json.fields`; the
+orchestrator writes the next branch's `request.json.inputs` pointing at
+`step-N/parallel-M/<path>` from the session root. The nearest earlier producer guides the
+orchestrator, never the agent.
+
+## Lifecycle
+
+| Phase | What happens |
+| --- | --- |
+| create | The orchestrator writes `state.json` and takes the leases before the first agent starts |
+| branch | Each agent gets a fresh branch with `request/request.json` already written and hashed |
+| advance | `done` plus both validators green; the orchestrator writes the next branches' requests |
+| wait | `waiting` runs the nested exchange, then resumes the same agent |
+| block | `blocked` keeps the session on disk; the operator re-enters in `step-(N+1)/parallel-1` with `resume` set |
+| done | Routing reaches `user` or `external`, or `git.publish` emits `done`: leases released, folder deleted |
+
+What survives a deleted session is what the steps published — commits, business heads, UAT pairs,
+remote runs — and any audit record the owner copied out first.
+
+## Source writes
+
+An operator that writes source writes only on `session/<sessionId>` of the routed checkout, in a git
+worktree the orchestrator prepared from the frozen head. It commits the declared write set once and
+records the sha in `response.json.commits`; the person's checked-out branch is never touched.
+`changes.md` names every path with before/after hashes and the commit, so the next requests can pin
+the checkout at exactly what was written. `git.publish` then merges the session branch: fast-forward
+when the target has not moved, a merge commit only when there is no conflict and the gates are re-run
+on the merge result. A conflict is `NON_FAST_FORWARD` and a person resolves it — never a rebase,
+never a force.

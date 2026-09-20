@@ -28,7 +28,7 @@ The four refusals, and what an honest settlement means for each:
 2. `features/task/impl/todo-app-backend/platform-database/evidence.yaml` — `CODE_DIGEST_STALE`. Five
    features registered their own entities and migrations inside that one shared platform module. Two
    honest endings exist: re-capture by really running its assertions through
-   `node scripts/example-evidence.mjs`, or mark it `stale: true` with a reason that names the cause.
+   `node scripts/example/example-evidence.mjs`, or mark it `stale: true` with a reason that names the cause.
    Pick one and be able to defend it. Do not hand-edit a digest.
 3. `features/login/impl/todo-app-frontend/sign-in/evidence.yaml` — the record changed after the
    evidence was captured. Same two honest endings.
@@ -62,8 +62,8 @@ The four refusals, and what an honest settlement means for each:
 `node scripts/checks/check-example-yaml.mjs` (all accepted), `node scripts/checks/check-example-work.mjs`
 (**0 refused**; paste the warnings), `node --test tests/example-work-gate.spec.mjs
 tests/example-evidence.spec.mjs`, then
-`node scripts/example-derive.mjs --work examples/todo-app-backend/.starciwork --write` and
-`node scripts/example-critique.mjs --work examples/todo-app-backend/.starciwork --write` and
+`node scripts/example/example-derive.mjs --work examples/todo-app-backend/.starciwork --write` and
+`node scripts/example/example-critique.mjs --work examples/todo-app-backend/.starciwork --write` and
 `node scripts/checks/check-example-derived.mjs`. Commit in slices ending with
 `Co-Authored-By: Qwen Code <noreply@alibabacloud.com>`.
 

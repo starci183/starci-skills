@@ -27,9 +27,9 @@ The historical internal `cli/main.mjs init` remains an implementation entrypoint
 From the installed `.claude` directory:
 
 ```sh
-node scripts/plan.mjs template
-node scripts/plan.mjs create /absolute/filled-plan.yaml /absolute/backend/.starciwork/_local/plans/my-task
-node scripts/plan.mjs render /absolute/backend/.starciwork/_local/plans/my-task/goal/index.yaml
+node scripts/work/plan.mjs template
+node scripts/work/plan.mjs create /absolute/filled-plan.yaml /absolute/backend/.starciwork/_local/plans/my-task
+node scripts/work/plan.mjs render /absolute/backend/.starciwork/_local/plans/my-task/goal/index.yaml
 ```
 
 The template intentionally fails validation until filled from real scope. `create` refuses an existing destination and creates the four-file plan bundle. These helpers do not confer user approval. The top-level `starci plan` preflights a workflow goal; it is not a replacement for the complete Plan v2 authoring helper.

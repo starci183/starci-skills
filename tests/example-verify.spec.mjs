@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { verifyRecord } from '../scripts/example-verify.mjs';
-import { generateEvidence } from '../scripts/example-evidence.mjs';
+import { verifyRecord } from '../scripts/example/example-verify.mjs';
+import { generateEvidence } from '../scripts/example/example-evidence.mjs';
 
 /** Fixtures live on the repo's own drive, matching the other example-*.spec.mjs files' own reasoning. */
 const TMP_ROOT = path.join(path.parse(process.cwd()).root, 'starci-tmp');

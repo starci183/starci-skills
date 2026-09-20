@@ -1,0 +1,79 @@
+---
+title: "Đóng góp"
+description: "npm test, các template, thêm một luật kèm bằng chứng, và thêm một workflow mẫu."
+---
+
+# Đóng góp
+
+Mọi thay đổi trong cây này đều phải hạ cánh cùng một `npm test` xanh. `INDEX.md` nêu chuẩn đó không
+kèm thời gian ân hạn: `npm test` xanh ở head đã publish, hoặc head đó không publish được.
+
+## `npm test` chạy những gì
+
+Theo `package.json`, lần lượt: kiểm định tuyến, kiểm tài nguyên, kiểm trích dẫn tri thức, kiểm alias
+và `--check` của tài liệu alias, kiểm operator, kiểm workflow, `--check` của chỉ mục operator, kiểm
+template, self-test của từng operator, và các spec script (`node --test scripts/*.spec.mjs`).
+
+Hai trong số đó là kiểm sinh lại chứ không phải kiểm khẳng định: `operators/INDEX.md` và
+`alias/INDEX.md` là file sinh ra, và một bản cũ làm hỏng build. Bộ sinh tài liệu của trang này hoạt
+động y hệt — `node docs/scripts/generate-docs.mjs --check`.
+
+## Template
+
+Không gì viết tay trong cây này là tự do hình thức. `templates/` giữ một template cho mỗi kind tài
+liệu, mỗi template mang một khối `json template-contract` mà `scripts/validate-templates.mjs` ép lên
+mọi file template đó áp dụng và lên bản `.vi.md` cùng tên. Muốn đổi hình dạng: sửa contract, chạy
+`node scripts/validate-templates.mjs`, và đưa mọi tài liệu nó gọi tên về đúng chuẩn trong cùng một
+commit. Template mà cây không thoả thì không được publish.
+
+`scripts/validate-templates.spec.mjs` chứng minh chính validator trên một cây tổng hợp, nên thiếu một
+mục, sai thứ tự, sai dòng tiêu đề bảng, thừa một bảng dưới một rule, và thiếu bản đối chiếu đều thất
+bại kèm dòng gọi tên chúng.
+
+## Thêm một luật tri thức
+
+Một luật là một địa chỉ, không phải một đoạn văn. Những ràng buộc đúng ở khắp nơi:
+
+- Thêm `PREFIX-n` kế tiếp theo thứ tự. Mã rule là địa chỉ công khai ổn định: chỉ thêm, không đánh số
+  lại, không dùng lại, không lặng lẽ đổi nghĩa.
+- Viết nó vào đúng file mà người đọc nó ràng buộc — composition, presentation hay proof cho `ui/`;
+  file gia đình cho `grammars/`; file chủ đề cho `patterns/`.
+- Cho nó đúng bảng mà template đòi: `Case | When | Assert` cho composition,
+  `Case | When | Owner | Render` cho presentation, `Case | When | Observe` cho proof,
+  `Case | Rule | Common owner | Core realization` cho grammars, và `Case | When | Write` cho patterns.
+- Mang bằng chứng theo. Các luật trong `knowledge/patterns/` được rút ra từ `starci-academy-fe/src/`
+  và `starci-academy-fe/packages/grammar/src/` bằng cách mở file và đếm, và mỗi bảng dẫn ra chính
+  những file nó được đọc từ đó; một luật pattern dẫn hai đường dẫn có thật, và chỗ nào mã bị chia thì
+  file ghi biến thể chiếm ưu thế kèm số đếm thay vì áp luật.
+  `scripts/validate-knowledge-citations.mjs` chạy trong `npm test`.
+- Viết bản `.vi.md` trong cùng commit. Nó là bản đọc cho người, không bao giờ là authority lúc chạy.
+
+Một luật mà không kho ràng buộc nào của operator với tới được thì không phải luật; nó là một file
+không ai đọc.
+
+## Thêm một workflow mẫu
+
+Một chuỗi tự ghép còn dùng lại được thì thành một file trong `workflows/`, kèm `when` ở cả `en` và
+`vi`. Nó phải thoả mọi điều `scripts/validate-workflows.mjs` kiểm: mỗi nhánh gọi tên một operator có
+thật và chỉ preset field operator đó khai, mọi Input bắt buộc do một bậc trước sinh ra, các nhánh
+trong một bậc không dùng chung alias ghi, mọi vòng lặp quay về bậc trước kèm `maxRounds`, và chuỗi
+kết thúc ở `git.publish`, `release.deploy` hoặc `user`. Thêm dòng tương ứng vào bảng trong
+`workflows/README.md` và bản đối chiếu tiếng Việt của nó.
+
+## Tài liệu
+
+`docs/` là nguồn của trang này. Các trang viết tay nằm ở gốc và dưới `concepts/`; mọi thứ dưới
+`docs/reference/` do `docs/scripts/generate-docs.mjs` sinh ra và không bao giờ được sửa tay. Luật cho
+một trang viết tay cũng chính là luật cây này sống theo: chỗ nào luật đã nằm trong một file, hãy
+trích file đó hoặc dẫn link tới nó. Một trang diễn đạt lại luật bằng lời của mình đã trở thành ngôi
+nhà thứ hai của luật đó, và ngôi nhà thứ hai thì sẽ cũ đi.
+
+Làm việc với trang web:
+
+```bash
+cd sites/docs
+npm install
+npm run dev        # sinh lại các trang tham chiếu trước
+npm run build      # xuất tĩnh ra sites/docs/out
+npm run check      # báo lỗi khi các trang tham chiếu đã commit khác với cây
+```

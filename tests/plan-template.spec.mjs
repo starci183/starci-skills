@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {createBundle,renderPlan} from '../scripts/plan.mjs';import {parseYaml} from '../core/yaml.mjs';
+import {createBundle,renderPlan} from '../scripts/work/plan.mjs';import {parseYaml} from '../core/yaml.mjs';
 import {readWorkflow} from './helpers/read-public.mjs';
 test('Plan template requires concrete content and creates pending four-file bundle',()=>{
 const plan=readWorkflow('plan.template.json');assert.throws(()=>renderPlan(plan));

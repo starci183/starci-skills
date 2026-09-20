@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { generateEvidence } from '../scripts/example-evidence.mjs';
+import { generateEvidence } from '../scripts/example/example-evidence.mjs';
 import { parseYaml } from '../core/yaml.mjs';
 
 /** Fixtures live on the repo's own drive, matching tests/example-work-gate.spec.mjs's own reasoning. */

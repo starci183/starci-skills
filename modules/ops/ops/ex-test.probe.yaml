@@ -1,0 +1,67 @@
+id: ex-test.probe
+goal:
+  en: Canary op — proves the dispatch loop end-to-end with the smallest possible real work.
+nodeKinds:
+  - probe
+completionProfile: probe
+sideEffects:
+  - one file write inside ex-testing/probe/
+  - report + done marker writes
+graphPolicy:
+  mode: none
+  dispatch: never
+reads:
+  - id: contract
+    path: modules/ops/ops/ex-test.probe.yaml
+    purpose:
+      en: This file is the whole context. No other reads are needed.
+writes:
+  - id: artifact
+    path: ex-testing/probe/<run-id>.txt
+    fields: [content]
+    content:
+      en: "Write one text file containing: the current UTC timestamp, the word 'probe-ok', and one
+        sentence naming this op id. Nothing else may be created or modified."
+  - id: report
+    path: ex-testing/lint/probe-REPORT.md
+    fields: [verdict, evidence, suspicion]
+    content:
+      en: "Standard lane report: verdict pass|fail|blocked, evidence paths, optional suspicion."
+  - id: marker
+    path: ex-testing/lint/done/probe.done
+    fields: []
+    content:
+      en: Empty file. Only when verdict is pass.
+steps:
+  - reads: [contract]
+    writes: [artifact]
+    action:
+      en: Write the probe artifact exactly as specified.
+  - reads: []
+    writes: [report, marker]
+    action:
+      en: Verify the artifact exists and matches the spec; then write report + marker.
+proofs:
+  - id: artifact-exists
+    requirement:
+      en: The artifact file exists, contains 'probe-ok' and this op id.
+blockers:
+  - code: WRITE_FAILED
+    condition:
+      en: The artifact path cannot be written.
+commitPolicy:
+  mode: no-commit
+  push: false
+business:
+  question: "Did the dispatched agent read its contract, produce exactly the declared artifact, and settle honestly?"
+  whenNeeded: [kernel/Orca dispatch smoke tests, post-migration cold-start verification]
+  whenNot: [never a substitute for real ops; produces nothing a product consumes]
+  consumes: [nothing but its own contract]
+  produces: [ex-testing/probe artifact, report, done marker]
+  failureModes: [WRITE_FAILED]
+route:
+  nodeKinds: [probe]
+  phase: [operate, cross-cutting]
+  intent: [probe, smoke-test, canary]
+  prerequisites: []
+  riskHints: [trivial]

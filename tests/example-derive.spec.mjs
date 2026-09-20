@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {computeDerived, buildYamlDocument, runDerive} from '../scripts/example-derive.mjs';
+import {computeDerived, buildYamlDocument, runDerive} from '../scripts/example/example-derive.mjs';
 import {checkExampleDerived} from '../scripts/checks/check-example-derived.mjs';
-import {resolveOwnedDirs, hashOwnedDirs} from '../scripts/example-ownership.mjs';
+import {resolveOwnedDirs, hashOwnedDirs} from '../scripts/example/example-ownership.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 
 /**

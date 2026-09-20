@@ -1,6 +1,6 @@
-# Fleet status — 07:06:05 20/09  (.claude repo)
+# Fleet status — 11:43:14 20/09  (.claude repo)
 
-## Done markers: 58
+## Done markers: 59
 
 | Lane | State |
 |---|---|
@@ -32,6 +32,6 @@
 | v7-9 | ⏳ running |
 | v11-5 | ⏳ running |
 
-## Dirty (.claude): 1131
+## Dirty (.claude): 4
 ## .dist: GONE
 ## legacy/: exists

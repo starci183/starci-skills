@@ -8,14 +8,29 @@ why: |-
   worktree, so Orca owns a fresh terminal and Dispatch for each attempt and observes the same report boundary
   as every other operation agent. The underlying account-selected model is deliberately not inferred.
 commandPrefix:
-  win32: '$devinExe=(Get-Command devin -ErrorAction SilentlyContinue).Source; if (-not $devinExe) { $devinExe=Join-Path $env:LOCALAPPDATA ''devin\cli\bin\devin.exe'' }; if (-not (Test-Path -LiteralPath $devinExe)) { Write-Error ''Devin CLI is not installed''; exit 127 }; & $devinExe models list --format json *> $null; if ($LASTEXITCODE -ne 0) { Write-Error ''Devin CLI is not authenticated''; exit $LASTEXITCODE }; Set-Alias -Name devin -Value $devinExe; '
-  posix: 'command -v devin >/dev/null 2>&1 && devin models list --format json >/dev/null && '
+  win32: '$devinExe=(Get-Command devin -ErrorAction SilentlyContinue).Source; if (-not $devinExe) { $devinExe=Join-Path $env:LOCALAPPDATA ''devin\cli\bin\devin.exe'' }; if (-not (Test-Path -LiteralPath $devinExe)) { Write-Error ''Devin CLI is not installed''; exit 127 }; Remove-Item Env:ACP_BACKEND -ErrorAction SilentlyContinue; & $devinExe models list --format json *> $null; if ($LASTEXITCODE -ne 0) { Write-Error ''Devin CLI is not authenticated''; exit $LASTEXITCODE }; Set-Alias -Name devin -Value $devinExe; '
+  posix: 'command -v devin >/dev/null 2>&1 && env -u ACP_BACKEND devin models list --format json >/dev/null && '
   reason: Fail before Task delivery when the official CLI is absent or the owner is not authenticated; auth status alone exits zero while logged out, so the read-only model inventory is the probe. No token is copied into commands or receipts.
+environmentStrip:
+  - name: ACP_BACKEND
+    reason: |-
+      Observed 2026-09-20: ACP_BACKEND=windsurf leaked into terminal environments makes the spawned
+      devin agent child pick the wrong backend surface; interactive sessions then exit immediately
+      with 'agent child exited: exit code: 0'. The strip must run inside the terminal command before
+      devin starts — clearing it in the spawn host does not help a terminal that already inherited it.
 commandRequirements:
   - '--permission-mode accept-edits'
   - '--respect-workspace-trust false'
+kernelCommandRequirements:
+  - '--permission-mode dangerous'
+  - '--respect-workspace-trust false'
+kernelPermissionReason: |-
+  The long-lived kernel is not an implementation worker: its required loop repeatedly invokes the declared
+  Node kernel API and Orca observation commands. Per-command menus deadlock an unattended kernel. Dangerous
+  mode is scoped to this dedicated terminal; the kernel packet still forbids direct ledger writes, source
+  implementation and self-spawned operation terminals. Ordinary Devin operation lanes remain accept-edits.
 readiness:
-  screenPattern: '(?:Ask Devin|Message Devin|Type your message|Enter a prompt|(^|\n)\s*[>❯]\s*$)'
+  screenPattern: '(?:Ask Devin|Message Devin|Type your message|Enter a prompt|(^|\n)\s*[>❯❭]\s*$)'
   identityPattern: 'Devin'
   timeoutMs: 120000
   intervalMs: 5000
@@ -35,6 +50,9 @@ approvalMode:
   working: accept-edits
   reasoning: accept-edits
   reason: File edits are automatic inside the isolated workflow worktree; command execution still follows Devin normal permission checks and the operation contract.
+kernelApprovalMode:
+  working: dangerous
+  reasoning: dedicated-long-lived-kernel-must-not-stall-on-declared-api-commands
 start:
   - {api: terminal.create, binding: declared-target-command-after-auth-status}
   - {api: terminal.read, phase: readiness}
@@ -45,6 +63,28 @@ start:
 release:
   api: orchestration.worker-stop
   then: terminal.close
+bypassMode:
+  interactive: 'At a permission menu, send "5" + Enter (Switch to bypass mode) — equivalent of qwen --yolo for the session.'
+  headless: 'devin -p "<prompt>" runs non-interactively and exits when done; used when the TUI child is unhealthy.'
+knownFailures:
+  - signal: 'Agent connection lost: agent child exited: exit code: 0'
+    meaning: The spawned agent child process died; queued sends will not be processed.
+    action: Close the terminal and spawn a fresh lane; do not keep sending into the dead TUI.
+    seenAt: 2026-09-20
+  - signal: 'TUI sits at a permission menu (1 Yes / 2-4 allow-variants / 5 bypass / 8 No)'
+    meaning: Command approval is being asked per tool; the lane is stalled waiting for input.
+    action: 'Send "5" + Enter once (session bypass) — do not answer individual allows, they re-prompt per command kind.'
+    seenAt: 2026-09-20
+  - signal: 'devin opens a login menu instead of a prompt'
+    meaning: 'Missing credentials or ACP_BACKEND leak (see environmentStrip).'
+    action: devin auth login, or strip the env var inside the terminal command.
+    seenAt: 2026-09-20
+  - signal: 'Spinner "Thinking" for >60 min with no output and no writes to disk'
+    meaning: Wedged agent, not a slow task — output freshness is the health signal.
+    action: Kill and respawn the lane; work is recovered by the next lane surveying the tree.
+    seenAt: 2026-09-20
+verifiedAt: 2026-09-20
+verifiedAgainst: 'devin CLI v3000.10.27'
 forbidden:
   - provider-native-subagent
   - cloud-handoff

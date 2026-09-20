@@ -1,0 +1,78 @@
+---
+title: "Tri thức"
+description: "ui, grammars và patterns: mỗi nhánh sở hữu gì, ai đọc nó, và vì sao file tiếng Anh là authority duy nhất."
+---
+
+# Tri thức
+
+`knowledge/INDEX.md` mở đầu bằng ranh giới: cây này chứa thẩm quyền quyết định, không chứa quy trình.
+Không dòng nào trong đó mô tả một nhiệm vụ diễn ra ra sao; nó mô tả điều gì là đúng, để một operator
+có thể quyết.
+
+## Ba nhánh, đặt theo người đọc
+
+| Nhánh | Quyết điều gì | Ai đọc |
+| --- | --- | --- |
+| `ui/composition/` | Ràng buộc mà một hướng phải thoả, sau khi gu đã được quyết trong grammars | `frontend.direction.decide` |
+| `ui/presentation/` | Một ranh giới do app sở hữu lấy giá trị CSS nào | `frontend.presentation.resolve` |
+| `ui/proof/` | Điều chỉ trở thành đúng khi đã render | `frontend.surface.audit` |
+| `grammars/<family>/` | Cách một gia đình thị giác hiện thực hoá Common | mọi operator soạn gia đình đó |
+| `patterns/fe`, `patterns/be` | Mã sinh ra tất cả những thứ trên được viết thế nào | `frontend.source.apply`, `backend.source.apply` |
+
+Một chủ đề sống cùng operator đọc nó. Chủ đề không operator nào đọc thì không có lý do tồn tại.
+
+### Phép thử đặt một chủ đề
+
+`knowledge/ui/INDEX.md` nêu nó thành một câu hỏi — đọc source có trả lời được không. Một giá trị
+spacing đọc được từ class, nên nó thuộc presentation. Số lượng hành động chủ đạo được chốt trước khi
+có bất kỳ cây nào, nên nó thuộc composition. Thứ tự bàn phím có khớp thứ tự thị giác hay không thì
+cần một trang đang chạy, nên nó thuộc proof.
+
+## ui: luật phổ quát
+
+`ui/` giữ luật dùng chung cho mọi gia đình Grammar đã publish: hiện có 114 luật `X-n` còn sống, kèm
+điều kiện chọn quan sát được, quyết định về quyền sở hữu, phán quyết tất định và vector audit. Nó
+được nói rõ là không phải sách công thức, và nó không sở hữu sự thật nghiệp vụ, chữ trên trang, route,
+quyền hạn, danh tính artwork, hiệu ứng sản phẩm hay lựa chọn chất liệu của một gia đình.
+
+## grammars: một gia đình hiện thực hoá ra sao
+
+`knowledge/grammars/starci/` ghi lại một gia đình thị giác và gu chỉ đạo cách soạn nó. Nó ánh xạ các
+luật `X-n` phổ quát lên gia đình Core đang sống; nó không kể lại giải phẫu renderer, vì `DNA.md` —
+sinh ra từ chính gói — đã nói cái gì tồn tại. Chuỗi thẩm quyền của nó gọn trong một dòng:
+
+```text
+knowledge/ui X-n → @starci/grammar/common props/anatomy/state → @starci/grammar/core DNA và CSS scoped → product adapter
+```
+
+Chỗ nào một dòng ghi gu mâu thuẫn với gói, gói là sự thật và dòng đó là một finding.
+
+## patterns: mã được viết thế nào
+
+`knowledge/patterns/fe/` và `be/` quyết một unit nằm ở đâu, file của nó tên gì, một hàm component có
+hình dạng nào, chuỗi class đặt ở đâu, một thất bại được biểu diễn ra sao, và spec đi đâu. Sự phân
+công được nêu thành một cặp: một luật pattern không bao giờ chọn thứ nhìn thấy được; một luật `ui/`
+không bao giờ chọn tên file. Mọi luật đều được rút ra bằng cách mở file và đếm trong hai nguồn sống,
+và mỗi bảng đều dẫn ra chính những file nó được đọc từ đó; chỗ nào mã bị chia, file ghi lại biến thể
+chiếm ưu thế kèm số đếm thay vì áp luật.
+
+## Ràng buộc và định danh
+
+Một operator ràng buộc tập chủ đề nhỏ nhất mà quyết định của nó cần, mỗi chủ đề kèm fingerprint và
+kho luật đầy đủ, và không được phát ra định danh nào ngoài kho đó. Với tay ra một định danh ngoài kho
+đã ràng là `UNKNOWN_RULE`; một điều kiện mà không case nào đã publish khớp là `RULE_MISSING`, và đó
+là việc của chủ sở hữu tri thức, không phải một nhiệm vụ nghiên cứu.
+
+Mã rule là địa chỉ công khai ổn định: chỉ thêm `PREFIX-n` kế tiếp, không đánh số lại, không dùng lại,
+không lặng lẽ đổi nghĩa một mã đã có.
+
+## EN là authority, VI là bản đối chiếu
+
+> File `.md` tiếng Anh là authority duy nhất lúc chạy. File `.vi.md` cùng tên là bản đọc cho người,
+> không bao giờ vào context manifest, danh sách phụ thuộc, input của validator, hay binding của
+> operator.
+
+Các bản đối chiếu là đầy đủ, và `scripts/validate-templates.mjs` đòi phải có một bản cho mọi `.md` mà
+template nhận — nhưng bản đối chiếu là để người đọc, không bao giờ để agent quyết.
+
+Ba chỉ mục đọc được chép lại ở [Tham chiếu → Tri thức](/vi/reference/knowledge).

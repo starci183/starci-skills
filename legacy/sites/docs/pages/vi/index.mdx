@@ -1,0 +1,84 @@
+---
+title: "Giới thiệu"
+description: "StarCi Skills là gì: một cửa vào, mười bốn operator, các workflow mẫu, và một phiên làm việc bằng request/response."
+---
+
+# StarCi Skills
+
+StarCi Skills là runtime hoàn tất một nhiệm vụ StarCi. Nó là một cây file, không phải một
+framework: `SKILL.md` là cửa vào, `operators/` giữ mười bốn đơn vị làm việc, `workflows/` giữ các
+chuỗi mẫu, còn `routing.json` là bản đồ đóng quyết định điều gì xảy ra sau mỗi bước. `INDEX.md` nói
+thẳng cây này để làm gì: nó "là runtime", và `SKILL.md` là cửa vào duy nhất đóng băng phạm vi nhiệm
+vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các operator dựa trên kết quả có kiểu.
+
+Trang web này giải thích cây đó và dẫn link vào nó. Nó không chép lại luật: chỗ nào luật đã nằm
+trong cây thì trang trích đúng file hoặc dẫn link tới file, và mọi trang trong mục
+[Tham chiếu](/vi/reference) đều được sinh ra từ chính những file mà runtime đọc.
+
+## Một cửa vào
+
+Chỉ có đúng một đường vào. `SKILL.md` đóng băng phạm vi, chạy `workspace.bind` cho mọi thứ chạm vào
+source đã route, tìm workflow, chọn operator đầu tiên, rồi sắp xếp phần còn lại. Bản thân nó không
+làm việc gì: "không quyết một giá trị, không ghi source, không phán xét một kết quả."
+
+Bảng Cửa vào ánh xạ một yêu cầu tới operator đầu tiên của nó — hỏi dự án nào thì về `workspace.bind`,
+hỏi sản phẩm hứa gì thì về `business.decide`, hỏi một surface đã render có đứng vững không thì về
+`frontend.surface.audit`. Một yêu cầu không gọi tên chủ sở hữu nào, hoặc gọi tên hai chủ sở hữu có
+phạm vi khác nhau về bản chất, dừng ngay tại đó bằng một câu hỏi tập trung.
+
+## Mười bốn operator
+
+Một operator là một việc trong một lượt tuyến tính. Nó không gọi operator khác, không điều phối
+workflow, không tự dừng giữa chừng, không trả về chỉ dẫn điều khiển dạng văn xuôi; chỉ nhánh cha mới
+ánh xạ một output đã validate sang bước chuyển kế tiếp. Mỗi operator là một `operator.md` viết tay —
+Việc, các mục luật riêng của nó, rồi tám bảng Context, Đầu vào, Yêu cầu, Các bước, Đầu ra, Dừng và
+Kế tiếp — nằm cạnh `operator.json`, `errors.json`, `validate.mjs` và `self-test.mjs`.
+
+Xem [Operator](/vi/concepts/operator) để biết hình dạng, và
+[trang tham chiếu operator](/vi/reference/operators) để đọc cả mười bốn gói.
+
+## Workflow
+
+Một workflow là một chuỗi ghép sẵn: các bậc theo thứ tự, mỗi bậc là danh sách nhánh chạy song song,
+kèm vòng lặp quay về bậc trước và preset cho Yêu cầu của từng nhánh. Tám file trong `workflows/` là
+ví dụ chứ không phải những chuỗi duy nhất được phép; khi không ví dụ nào khớp, cửa vào tự ghép một
+chuỗi theo đúng luật mà `scripts/validate-workflows.mjs` ép lên chính các file đó.
+
+Xem [Workflow](/vi/concepts/workflow) và [trang tham chiếu workflow](/vi/reference/workflows).
+
+## Phiên làm việc bằng request/response
+
+Mọi thứ một operator nhận và mọi thứ nó sinh ra đều nằm trên đĩa, trong một thư mục phiên, theo một
+layout nhánh cố định. Vòng lặp mà `SKILL.md` mô tả rất ngắn:
+
+```text
+request/request.json -> validate-request.mjs -> agent ghi response/ -> validate-response.mjs + validate.mjs của operator -> định tuyến
+```
+
+Định tuyến chỉ đọc `response.json` và không đọc gì khác. Response trượt một trong hai validator thì
+không định tuyến; văn xuôi trong `response.md` cũng không định tuyến. Xem
+[Phiên](/vi/concepts/session) và [Kind và contract](/vi/concepts/kinds-and-contracts).
+
+## Vì sao tri thức chia làm ba
+
+`knowledge/` là thẩm quyền quyết định chứ không phải quy trình, và nó được chia theo operator đọc nó.
+`knowledge/ui/` là luật UI phổ quát mà mọi gia đình Grammar đã publish đều dùng chung, tự nó lại chia
+thành composition (một cây phải chứa gì, trước khi cây tồn tại), presentation (một ranh giới do app
+sở hữu lấy giá trị CSS nào) và proof (điều chỉ đúng khi đã render). `knowledge/grammars/<family>/` là
+cách một gia đình thị giác hiện thực hoá Common — gu của chủ sở hữu, và những gì gói thật sự phơi ra.
+`knowledge/patterns/fe` và `knowledge/patterns/be` là quy ước mã nguồn rút ra từ hai nguồn sống, ở đó
+mỗi luật đều dẫn ra chính những file nó được đọc từ đó.
+
+Phép thử đặt một chủ đề vào đâu, theo `knowledge/ui/INDEX.md`, là hỏi đọc source có trả lời được
+không: một giá trị spacing đọc được từ class nên nó thuộc presentation; số lượng hành động chủ đạo
+được chốt trước khi có bất kỳ cây nào nên nó thuộc composition; thứ tự bàn phím có khớp thứ tự thị
+giác hay không thì cần một trang đang chạy, nên nó thuộc proof.
+
+Xem [Tri thức](/vi/concepts/knowledge) và [trang tham chiếu tri thức](/vi/reference/knowledge).
+
+## Ngôn ngữ
+
+File `.md` tiếng Anh là authority duy nhất lúc chạy. File `.vi.md` cùng tên là bản đọc cho người,
+không bao giờ vào context manifest, danh sách phụ thuộc, input của validator, hay binding của
+operator. Trang web này giữ đúng ranh giới đó: các trang tiếng Anh là bản khớp với runtime, còn các
+trang tiếng Việt ở đây là bản đối chiếu cho người đọc.

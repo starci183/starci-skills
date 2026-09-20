@@ -6,7 +6,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
 import {canonicalJSON, sha256} from '../../core/index.mjs';
 import {walk} from './check-example-work.mjs';
-import {loadRecords} from '../example-ownership.mjs';
+import {loadRecords} from '../example/example-ownership.mjs';
 import {classifyChange} from './work-change.mjs';
 
 /**

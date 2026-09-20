@@ -1,0 +1,67 @@
+---
+title: "Tài nguyên"
+description: "Profile, quyền, ba câu trả lời chính sách thường trực, và luật một agent cho một operator."
+---
+
+# Tài nguyên
+
+Ai chạy mỗi operator, bằng gì, dưới chính sách nào. Hai nơi đóng giữ chuyện đó, và
+`scripts/validate-resources.mjs` giữ cho chúng không trôi khỏi nhau:
+
+- `resources/agents/profiles/<runtime>.json` — một file cho mỗi runtime, `openai.json` và
+  `claude.json`. Một profile mang model, cách cô lập, `capabilities` (model làm được gì ở đây) và
+  `permits` (operator chạy trên profile đó được phép dùng gì).
+- `operators/<id>/operator.json → resources` — đúng một profile chạy operator từ đầu tới cuối, những
+  quyền nó thật sự cần, và câu trả lời cho ba câu hỏi thường trực. Không có file phân công tập trung.
+
+## Luật ràng buộc
+
+> Operator ràng đúng một profile và chạy trọn trên đó, không theo từng lần gọi và không chia cho
+> nhiều profile: một bước phản biện, review hay phán xét bên trong operator là một bước của chính lần
+> thực thi đó, và đưa model thứ hai vào là thành workflow.
+
+Năng lực và quyền là hai sự thật khác nhau. Năng lực thuộc về model; quyền là chính sách áp lên
+operator. `sol-fresh` và `sol-reviewer` chạy cùng một model, nhưng reviewer chỉ được phép dùng
+browser, "vì một reviewer có sản xuất thì không còn là reviewer nữa." Một quyền không có trong
+`requires` là không dùng được, kể cả khi profile vốn cho phép.
+
+## Ba câu hỏi thường trực
+
+**Có tìm trên mạng khi trong cây không có tham chiếu không?** Chỉ ở nơi `policy.webSearch` là
+`bounded` — các operator ra quyết định và bước brief của nội dung. Nghiên cứu bị giới hạn bởi đúng
+khoảng trống phải lấp, ghi lại đã dùng gì, và không bao giờ chép một trang, một thương hiệu, một
+bảng màu hay giải phẫu của một component. Một giá trị presentation mà tri thức chưa publish là
+`RULE_MISSING`, không bao giờ là một nhiệm vụ nghiên cứu.
+
+**Có bị ràng vào Grammar đã publish không?** Ở nơi `policy.grammarBound` là true — bốn operator
+frontend. Thiếu một năng lực tái dùng là `GRAMMAR_REQUIRED` hoặc `COMMON_CAPABILITY_MISSING`, không
+bao giờ là một bản nhái cục bộ.
+
+**Có sinh ảnh không?** Ba giá trị, và chỉ ba:
+
+| Giá trị | Ở đâu | Nghĩa là gì |
+| --- | --- | --- |
+| `never` | Mọi nơi còn lại | Operator không sinh ảnh |
+| `judged` | `frontend.direction.decide` | Hướng tự render một trang xem được và tự phán xét khi một vùng trống tới mức không đứng nổi nếu thiếu ảnh; artwork sản phẩm chỉ được sinh khi thẩm quyền sản phẩm gọi tên |
+| `required` | `content.generate` | Ảnh được làm theo một claim đã nêu và được soi lại xem có trung thành với claim đó không |
+
+## Một agent cho một operator, tối đa ba cùng lúc
+
+`resources/orchestrator.json` cố định phần điều phối: một lần gọi một operator là một agent, tạo mới
+trên chính profile của operator, với những alias mà bảng Context của nó khai và không gì khác.
+
+Orchestrator sở hữu việc dispatch: nó ghi `request.json` của nhánh, kiểm, khởi động agent, kiểm
+response, rồi đi theo `routing.json`. Nó không bao giờ gộp hai operator vào một agent và không bao
+giờ để một agent khởi động agent khác — một bậc tạm dừng với `waiting` được phục vụ bởi một agent
+*thứ hai* hoàn toàn mới, với `request/` và `response/` riêng bên trong nhánh.
+
+Tối đa ba agent chạy cùng lúc, và các nhánh trong một bậc chỉ chạy song song khi phần ghi của chúng
+không chạm chung alias nào. Hai agent được đọc chung một checkout; chỉ một được giữ nó để ghi.
+`business.decide` độc quyền theo gốc businesses, `platform.operate` độc quyền theo chủ sở hữu runtime.
+
+## Đổi bất kỳ điều gì ở đây
+
+Model hay quyền của một profile, profile của một operator, và mọi câu trả lời chính sách đều là quyết
+định của chủ sở hữu. Đổi một thứ nghĩa là sửa trong file profile và trong `operator.json` của
+operator, cộng một `npm test` xanh. Thêm một loại quyền mới nghĩa là thêm nó vào mọi profile một cách
+tường minh, vì validator từ chối profile nào bỏ trống một loại quyền.

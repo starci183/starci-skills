@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {computeCritique, runCritique} from '../scripts/example-critique.mjs';
+import {computeCritique, runCritique} from '../scripts/example/example-critique.mjs';
 
 /**
  * One fixture tree per section this lane was asked to compute, plus its freshness gate. Fixtures live on

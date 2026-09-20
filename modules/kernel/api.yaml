@@ -1,0 +1,278 @@
+# ============================================================================
+# KERNEL-API — modules/kernel/api.yaml
+#
+# THE KERNEL'S ONLY DOOR TO THE LEDGER. The [Kernel] is ONE long-lived LLM
+# agent per workflow (start-workflow.yaml); it never opens
+# .starciwork/runtime.sqlite, never writes a job row, never spawns a terminal
+# itself — every state operation is one call:
+#   node scripts/kernel/api.mjs <command> ...
+# Ops are ephemeral [Op] agents spawned per job by `api dispatch`
+# (dispatch.yaml). The kernel reasons; the api transacts.
+#
+# Sources (all under .claude/, relative to the skill root):
+#   scripts/kernel/api.mjs      — the executable half; this file is its contract
+#   kernel/ledger-db.mjs        — the tables named below (LEDGER_DDL)
+#   kernel/engine.mjs           — reserveOperation/settled/incident semantics the
+#                                 api wraps (identity fence, lease release)
+#   kernel/dispatcher.mjs       — planDispatch disjointness the api refuses on
+#   kernel/admission.mjs        — reserve/renew/expire, driftGuard
+#   modules/kernel/driver-loop.yaml    — the caller's tick
+#   modules/kernel/dispatch.yaml       — the packet `dispatch` builds
+#   modules/kernel/verdict-contract.yaml — what `settle` validates
+#   schemas/goal-plan.yaml      — the plan --file shape (starci/goal-plan@1)
+# ============================================================================
+
+schema: starci/module-kernel-api@1
+
+about:
+  kind: kernel-api-contract
+  businessQuestion: >-
+    "If the kernel is an LLM agent that may not touch the database, what is
+    the exact command surface it reasons through — what does each call read,
+    what does each call write, and when does it refuse?"
+  businessAnswer: >-
+    Eight verbs. Reads return projections (survey, status); writes are single
+    ledger transactions that each append one hash-chained event (plan,
+    enqueue, dispatch, settle, incident, retire). Every command prints one
+    JSON object to stdout; a refusal exits non-zero with {ok:false, reason} —
+    a refusal is a fact for the driver loop, never a crash to route around.
+  sources:
+    - scripts/kernel/api.mjs
+    - kernel/ledger-db.mjs
+    - kernel/engine.mjs
+
+# ============================================================================
+# CONVENTIONS — true of every command below.
+# ============================================================================
+conventions:
+  invoke: 'node scripts/kernel/api.mjs <command> [--repo <path>] [--json]'
+  ledger: '.starciwork/runtime.sqlite under the bound repo (kernel/ledger-db.mjs ledgerFileFor)'
+  stdout: 'one JSON object — {ok:true, ...} on success, {ok:false, reason:<kebab-string>} on refusal; callers match on the reason string, it is the contract'
+  exitCode: '0 ok / 1 refusal / 2 usage error'
+  writes: >-
+    every mutation runs inside BEGIN IMMEDIATE and appends its event —
+    events is hash-chained (kernel/ledger-db.mjs EVENTS_DIGEST_TRIGGER), so a
+    half-write or a silent edit is impossible
+  identity: >-
+    a job's durable identity is {workflow_id, op_id, attempt, generation} +
+    lease_token; a command that cannot bind the COMPLETE identity refuses
+    rather than partial-match (kernel/engine.mjs settled `exact` fence;
+    ledger-db.mjs leases_match_job RAISE(ABORT,'lease-identity-drift'))
+  neverDoes:
+    - 'never picks the next op or the model — the kernel reasons, route-model resolves'
+    - 'never answers an ask or revises a goal — intent is the owners (provision.ask)'
+    - 'never deletes history — retire preserves goals/jobs/reports/events'
+    - 'never spawns outside dispatch --spawn — one job, one terminal, one agent'
+
+# ============================================================================
+# COMMANDS
+# ============================================================================
+commands:
+
+  # --------------------------------------------------------------------------
+  # READS — projections only; a read never mutates the ledger.
+  # --------------------------------------------------------------------------
+
+  survey:
+    args: '--workflow <id>'
+    reads: >-
+      workflows row; latest goals row (revision, goal_identity, json.opChain —
+      the approved shape plan diffs against); all jobs; inbox rows; live
+      signals; the tail of events; open incidents
+    writes: 'nothing — pure projection'
+    returns:
+      ok: true
+      workflow: '{workflow_id, title, phase, generation, goal_identity}'
+      goal: '{revision, goal_identity, opChain[]}'
+      jobs: '[{job_id, op_id, attempt, generation, status, lease_token, worker_id, owned_paths}]'
+      inbox: '[{inbox_id, kind, key, status}]'
+      signals: '[{scope, key, token, expires_at}]'
+      events: '[{seq, kind, entity_id, created_at}] — newest last, bounded tail'
+      incidents: '[{incident_id, kind, status, attempts, last_progress}]'
+    refuses:
+      - unknown-workflow: 'no workflows row for --workflow'
+    usedBy: 'the ticks deep read — first call of every iteration (driver-loop.yaml tick.survey)'
+
+  status:
+    args: '--workflow <id>'
+    reads: 'workflows.phase + generation; jobs grouped by status; leases joined to live jobs'
+    writes: 'nothing'
+    returns:
+      ok: true
+      phase: '<workflows.phase>'
+      counts: '{pending, running, answering, done, blocked, cancelled, failed}'
+      pending: '[{job_id, op_id, attempt, owned_paths}] — the dispatch candidates'
+      leases: '[{job_id, resource_key, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
+    refuses:
+      - unknown-workflow
+    usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
+
+  # --------------------------------------------------------------------------
+  # PLAN — persist the derived plan + structural diff vs the approved shape.
+  # --------------------------------------------------------------------------
+
+  plan:
+    args: '--workflow <id> --file <plan.json>'
+    reads: 'latest goals row — the approved opChain is goals.json.opChain (define-goal.yaml: advisory, re-derived at boot, never trusted blindly)'
+    writes: >-
+      one events row kind 'plan-derived' {payload: {goal_revision, plan_digest,
+      diff}} — the file stays the artifact; the ledger stores its digest and
+      its diff, not a copy
+    diff: >-
+      STRUCTURAL only — the derived op ids + dependsOn edges vs the approved
+      opChain legs. Added/removed/re-rooted legs are divergence; leg order
+      and allowlist wording inside the approved shape are not
+      (schemas/goal-plan.yaml rules: acyclic dependsOn, disjoint allowlists).
+    returns:
+      ok: true
+      goalRevision: '<revision the plan was derived against>'
+      diff: '{added[], removed[], changed[], identical:true|false}'
+      divergent: 'true|false — structural divergence: the driver escalates and dispatches nothing on it'
+    refuses:
+      - plan-unreadable: 'file missing, unparseable, or fails goal-plan rules — the refusal names the rule'
+      - unknown-workflow
+    usedBy: 'tick.plan — divergence -> api incident --kind plan-divergence, never a quiet re-plan (driver-loop.yaml)'
+
+  # --------------------------------------------------------------------------
+  # QUEUE — pending job rows are the queue; a duplicate is a refusal.
+  # --------------------------------------------------------------------------
+
+  enqueue:
+    args: '--workflow <id> --op <opId> --paths <csv>'
+    reads: 'workflows.phase; existing jobs for {workflow_id, op_id}; the brief modules/ops/ops/<opId>.yaml must exist'
+    writes: >-
+      jobs row {job_id, workflow_id, op_id, attempt=max(prior attempts)+1
+      (1 on first enqueue), generation, kind:'operation', status:'pending',
+      payload_json:{owned_paths:[--paths]}} + events 'job-enqueued'
+    returns: '{ok:true, job:{job_id, op_id, attempt, status:pending}}'
+    refuses:
+      - unknown-workflow: 'no workflows row'
+      - workflow-finished: 'a finished phase takes no new work (retire below)'
+      - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
+      - already-queued: 'a pending or in-flight job for this op exists — the row IS the queue entry, never doubled'
+      - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
+    usedBy: 'tick.enqueue — one row per planned op the queue lacks; retries enqueue attempt+1'
+
+  # --------------------------------------------------------------------------
+  # DISPATCH — packet + lease + (with --spawn) the [Op] terminal.
+  # --------------------------------------------------------------------------
+
+  dispatch:
+    args: '--job <job_id> [--spawn] [--model <target>]'
+    reads: >-
+      the job row + its workflow; resources/leases/budgets for admission;
+      the op brief modules/ops/ops/<op>.yaml; the model resolution through
+      route-model (modules/models/selection.yaml — eligibility first, budget
+      orders the eligible)
+    writes: >-
+      jobs.status pending->running with lease_token + worker_id; leases +
+      budget_reservations rows taken atomically (kernel/admission.mjs
+      reserve, ttlMs 10min); contracts row = the rendered packet markdown;
+      events 'operation-launch-intent' then 'operation-launched'
+      (engine.mjs reserveOperation/beginLaunchIntent/launched semantics)
+    packet: >-
+      the dispatch.yaml packet, fields unchanged — {op, brief,
+      context:{records, owned_paths}, constraints:{model, budget, lease},
+      returns:{verdict, evidence, suspicion}}
+    spawn: >-
+      with --spawn the api runs the Orca sequence itself: terminal create
+      titled `[Op] <op-id>` -> readiness read -> send the rendered packet —
+      command, flags and readiness patterns from the provider adapter card
+      providers/orca/adapters/<provider>.yaml. The kernel agent never calls
+      orca directly. Without --spawn: dry-run — the packet prints, nothing
+      is reserved and nothing launches.
+    returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
+    refuses:
+      - not-pending: 'job already running/settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
+      - contested-lease: 'an in-flight job holds a capacity-1 resource this op needs (canonical-writer:*, runtime-projection:*, machine:*)'
+      - path-collision: 'owned_paths overlap an in-flight jobs read/write set (dispatcher.mjs firstConflict)'
+      - managed-agent-spawn: '--spawn on a managed-agent profile — that path is orca orchestration worker-start (providers/orca/index.yaml managedFallback)'
+      - spawn-failed: 'create/read/send sequence did not land — the reservation is settled, never left leasing a ghost'
+    usedBy: 'drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free'
+
+  # --------------------------------------------------------------------------
+  # SETTLE — marker+report is the verdict; the api re-proves before recording.
+  # --------------------------------------------------------------------------
+
+  settle:
+    args: '--job <job_id> --verdict <pass|fail|blocked> --report <path>'
+    reads: 'the job row (complete identity + lease_token); the report file; the ops declared checks'
+    writes: >-
+      reports row (UNIQUE(workflow_id, dispatch_id) — one dispatch, one
+      report); jobs.status -> done|failed|blocked + result_json; lease and
+      budget_reservation rows released — a settle frees the slot; events
+      'operation-settled' {verdict}
+    validates: >-
+      The report FILE is the source of truth; the done-marker/message is
+      only the wake-up (kernel/reports.mjs head). validateReport runs
+      starci/op-report@1: outcome's payload present, files inside the job's
+      owned_paths, identity binds {workflow_id, op_id, attempt, generation,
+      lease_token} exactly. `pass` records only after the declared checks
+      re-ran green and changed files computed from git — evidence is bytes
+      on disk, never words in a summary (verdict-contract.yaml accepts).
+    returns: '{ok:true, verdict, job:{job_id, status}, report_id}'
+    refuses:
+      - report-missing: 'report path unreadable'
+      - report-invalid: 'fails starci/op-report@1 validation — outcome payload, signal match, check entries'
+      - out-of-scope-files: 'report.files outside the jobs owned_paths — named per file'
+      - stale-settlement: 'lease_token no longer binds the durable job — the settlement fence'
+      - verdict-enum: 'verdict outside pass|fail|blocked'
+      - not-in-flight: 'job already settled — a duplicate settle is refused, never double-counted'
+    usedBy: 'drive.settle — a refused settle is a routed verdict (usually retry), never silent loss'
+
+  # --------------------------------------------------------------------------
+  # INCIDENT — the fingerprinted escalation record.
+  # --------------------------------------------------------------------------
+
+  incident:
+    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>]'
+    reads: 'existing incidents — same {kind, op} fingerprint is ONE incident, not a pile'
+    writes: >-
+      incidents row upserted {incident_id, workflow_id, op_id, attempts+1,
+      status:'open', last_progress:detail} + events 'incident' {kind,
+      fingerprint} — identical evidence is not progress
+      (kernel/engine.mjs incident; scheduler.mjs progressExhausted)
+    returns: '{ok:true, incident_id, attempts, exhausted:true|false}'
+    refuses:
+      - unknown-workflow: 'no workflows row'
+      - empty-field: 'kind or detail empty — an incident without a named cause is noise'
+    usedBy: >-
+      plan divergence, retry budgets past their limit, unreconciled op
+      deaths — anything the driver may not decide alone (driver-loop.yaml
+      escalation.mustAskOwner)
+
+  # --------------------------------------------------------------------------
+  # RETIRE — the last call of the loop. History preserved; nothing deleted.
+  # --------------------------------------------------------------------------
+
+  retire:
+    args: '--workflow <id>'
+    reads: 'workflows row; every jobs row; the final verify verdict'
+    writes: >-
+      workflows.phase='finished' + finished_json {at, verdict}; the inbox
+      goal row consumed (status 'consumed'); the kernel signals row released;
+      events 'workflow-retired'. goals/jobs/reports/events all stay — a
+      retired goal is history, not deletion
+      (start-workflow.yaml: finished goals never re-enter the queue).
+    returns: '{ok:true, phase:finished, workflow_id, settled:<n>}'
+    refuses:
+      - jobs-unsettled: 'any job pending/running/answering — retire waits, never force-closes a live lease'
+      - verify-open: 'the final verify leg has not settled pass — finish is proven, not declared'
+      - already-finished: 'phase already finished — idempotent refusal'
+      - unknown-workflow
+    usedBy: 'tick.retire — every job settled AND final verify pass (driver-loop.yaml)'
+
+# ============================================================================
+# TABLE MAP — which command touches which ledger table (ledger-db.mjs DDL).
+# ============================================================================
+tableMap:
+  workflows:  {read: [survey, status, plan, enqueue, incident, retire], write: [retire]}
+  goals:      {read: [survey, plan], write: []}
+  jobs:       {read: [survey, status, enqueue, dispatch, settle, retire], write: [enqueue, dispatch, settle]}
+  inbox:      {read: [survey], write: [retire]}
+  signals:    {read: [survey], write: [retire]}
+  leases:     {read: [status, dispatch], write: [dispatch, settle]}
+  incidents:  {read: [survey], write: [incident]}
+  events:     {read: [survey], write: [plan, enqueue, dispatch, settle, incident, retire]}
+  reports:    {read: [], write: [settle]}
+  contracts:  {read: [], write: [dispatch]}

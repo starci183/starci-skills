@@ -1,4 +1,4 @@
-import {loadConfig} from '../scripts/config.mjs';
+import {loadConfig} from '../scripts/config/config.mjs';
 const clip=(value,max=220)=>String(value??'').replace(/\s+/g,' ').replace(/(bearer\s+)[^\s]+/ig,'$1[redacted]')
   .replace(/\b([A-Za-z0-9_]*(?:TOKEN|PASSWORD|SECRET|CREDENTIAL|API_KEY|ACCESS_KEY)[A-Za-z0-9_]*)\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^,;]+)/ig,'$1=[redacted]').slice(0,max);
 

@@ -8,7 +8,7 @@
  */
 
 import {registry, runtimes, normalizeRuntime, canonicalTarget, resolveModel} from '../modules/models/index.mjs';
-import {loadConfig} from '../scripts/config.mjs';
+import {loadConfig} from '../scripts/config/config.mjs';
 
 const isPlainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const need = (condition, message) => { if (!condition) throw Error(message); };

@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {scanTree, applyScan, findTargetRoot, searchRoots} from '../scripts/work-remap-path.mjs';
+import {scanTree, applyScan, findTargetRoot, searchRoots} from '../scripts/work/work-remap-path.mjs';
 
 /**
- * Fixture specs for scripts/work-remap-path.mjs - the rename-survival tool v6-4's FM3 asked for.
+ * Fixture specs for scripts/work/work-remap-path.mjs - the rename-survival tool v6-4's FM3 asked for.
  * Each test builds a throwaway .starciwork tree on the same drive as the repo (never os.tmpdir(),
  * which can be a different drive on this host) plus the real directories --to must resolve to.
  */

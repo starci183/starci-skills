@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {loadConfig} from '../scripts/config.mjs';
+import {loadConfig} from '../scripts/config/config.mjs';
 import fs from 'node:fs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import path from 'node:path';

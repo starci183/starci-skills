@@ -1,0 +1,135 @@
+# quality-bar.yaml — the canonical code quality contract.
+#
+# One bar for every workflow. Ops reference this file from their qualityPolicy
+# instead of re-listing ad-hoc checks; audits score a codebase layer by layer.
+#
+# status meanings:
+#   enforced     — a script in scripts/checks/ verifies it
+#   tool-covered — a standard tool (eslint/sonar/vitest/audit/…) computes it;
+#                  the gate is: run the tool, read the real result, verdict
+#                  comes from the output — never from the agent's say-so
+#   partial      — some metrics covered, some not
+#   gap          — nothing verifies it today; audits must report it, not skip
+version: 2
+
+layers:
+  static-correctness:
+    summary: compiles strict, lints strict, formats, builds
+    metrics:
+      - tsc --strict clean, no any leaks
+      - eslint strict — zero disables without a recorded reason
+      - prettier/format consistent
+      - production build passes
+    tools: [tsc, eslint, prettier]
+    enforcedBy: [scripts/checks/check-scoped-lint.mjs, scripts/checks/architecture/typescript.mjs]
+    status: tool-covered
+
+  tests:
+    summary: real assertions, real coverage, deterministic
+    metrics:
+      - branch + line + function coverage >= floor
+      - zero skipped/flaky tests
+      - E2E on true behavior paths, including denial/negative cases
+      - mutation score where stryker is wired (bonus, not required)
+    tools: [vitest --coverage, jest --coverage, stryker]
+    enforcedBy: [scripts/checks/code-patterns/nest-tests.mjs]
+    status: tool-covered
+
+  architecture:
+    summary: layers, boundaries, dependency direction, ownership
+    metrics:
+      - layer boundaries respected, no cross-layer imports
+      - no circular dependencies
+      - contracts match implementation
+      - every module has a declared owner
+    tools: [dependency-cruiser, madge --circular]
+    enforcedBy: [scripts/checks/architecture/]
+    status: enforced
+
+  errors-resilience:
+    summary: typed errors, retry, timeout, graceful degradation
+    metrics:
+      - errors carry identity (typed/coded, never bare throws)
+      - retry + idempotency on side effects
+      - timeout on every external call
+    tools: []
+    enforcedBy: [scripts/checks/code-patterns/nest-error-identity.mjs, scripts/checks/code-patterns/nest-errors.mjs, scripts/checks/code-patterns/next-errors.mjs]
+    status: partial          # error identity yes; retry/timeout/idempotency manual
+
+  security:
+    summary: secrets, deps, validation, authz, injection
+    metrics:
+      - zero secrets in code/history
+      - dependency audit clean
+      - input validation at every boundary
+      - authorization on every endpoint
+      - injection-safe queries
+    tools: [gitleaks, npm audit, osv-scanner, sonar security-hotspots]
+    enforcedBy: []
+    status: tool-covered
+
+  performance:
+    summary: budgets and no pathological patterns
+    metrics:
+      - no N+1 queries
+      - pagination on every list endpoint
+      - bundle size / response time budgets
+    tools: [lighthouse-ci, bundlesize, eslint-plugin-sonarjs]
+    enforcedBy: []
+    status: partial          # tools exist; wiring is per-project
+
+  maintainability:
+    summary: complexity, duplication, dead code, size caps
+    metrics:
+      - cyclomatic complexity under cap
+      - function/file length under cap
+      - duplication under threshold
+      - zero dead code, bounded TODO count
+    tools: [sonar (complexity/duplication/smells), depcheck, knip]
+    enforcedBy: []
+    status: tool-covered
+
+  observability:
+    summary: logs, metrics, tracing, health
+    metrics:
+      - structured logs
+      - metrics endpoint
+      - request-id / tracing
+      - health/readiness probes
+    tools: []
+    enforcedBy: []
+    status: partial          # pattern inspection; no metric tool
+
+  dependencies:
+    summary: fresh, licensed, minimal
+    metrics:
+      - within freshness window
+      - license-compatible
+      - minimal footprint, no unused deps
+    tools: [npm outdated, license-checker, depcheck]
+    enforcedBy: []
+    status: tool-covered
+
+  starciwork-artifacts:
+    summary: the durable tree is complete — nodes, media, UAT, evidence
+    metrics:
+      - full node tree (business → architecture → implementation)
+      - sufficient gen-AI image/mockup assets
+      - sufficient UAT scenario coverage
+      - evidence re-derives (never refreshed by assertion)
+    enforcedBy: [scripts/checks/work-layout.mjs, scripts/checks/check-work-consistency.mjs, scripts/checks/check-stales.mjs, scripts/checks/acceptance.mjs, scripts/checks/render.mjs]
+    status: enforced
+
+aggregator:
+  # SonarQube rolls up static-correctness, tests, security and maintainability.
+  # A layer counts as sonar-passed only with a real server result — a
+  # submission-only scan or a missing runner is `blocked`, never `pass`.
+  sonar:
+    covers: [static-correctness, tests, security, maintainability]
+    rule: server-result-or-blocked
+
+verdict-rule:
+  # Best effort is acceptable where hard enforcement doesn't exist — but the
+  # report must say which layers were tool-verified vs inspected vs skipped.
+  # A skipped or unverifiable layer is reported, never silently dropped.
+  rule: report-coverage-per-layer

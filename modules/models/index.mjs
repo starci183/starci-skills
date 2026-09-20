@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../core/yaml.mjs';
-import {loadConfig, validateConfig} from '../../scripts/config.mjs';
+import {loadConfig, validateConfig} from '../../scripts/config/config.mjs';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const isPlainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);

@@ -46,7 +46,7 @@ import {AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,BRAND_DECIDE,BRAND_KI
   tail,toOp,unique,validateCommandAt,workModule,workOpId,workValidateCommand,writeJson} from './common.mjs';
 import {ioBlock,kindsReadingBrand,undeclaredWrites,writesWorkRecords} from './io.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
-import {configuredAllocationPolicy,loadConfig,nonOperationModels} from '../scripts/config.mjs';
+import {configuredAllocationPolicy,loadConfig,nonOperationModels} from '../scripts/config/config.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../scripts/checks/render.mjs';
 import {CONTINUATION_SECTION_END,CONTINUATION_SECTION_START,bindContinuationPath,continuationBoundary,exportContinuationBrief} from './continuation.mjs';

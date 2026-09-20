@@ -28,13 +28,12 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../core/yaml.mjs';
-import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example-ownership.mjs';
+import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
+import { spawnAgent, buildSpawnCommand } from '../agent/lib.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const ORCA = process.platform === 'win32' ? 'orca.cmd' : 'orca';
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
 function usage(code) {
@@ -109,24 +108,26 @@ function resolveModel(target, modelsDir) {
 }
 
 function buildPrompt(packet) {
-  // Compact prompt the shell agent receives (tinkle-12): op id, brief path,
-  // records, owned_paths, verdict contract path, and the return instruction.
+  // Compact prompt the shell agent receives. The LOAD ORDER is mandatory —
+  // an agent that acts without reading its contract is the failure mode this
+  // packet exists to prevent (fleet wave lessons, 2026-09-20: agents that
+  // skipped reads forgot yolo flags, missed context, and never persisted).
   const lines = [
     `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel.`,
-    `brief: ${packet.brief}  (read it first — it is your contract)`,
+    `MANDATORY LOAD ORDER — read before any action:`,
+    `  1. SKILL.md (repo root) — the runtime's load order`,
+    `  2. ${packet.brief} — your contract. It declares your reads, writes, steps, proofs and blockers.`,
+    `  3. ${VERDICT_CONTRACT} — what your return must look like`,
+    `brief: ${packet.brief}  (your contract — never renegotiate it)`,
     `records: ${packet.context.records.join(', ') || '(none bound)'}`,
     `owned_paths: ${[...new Set(packet.context.owned_paths.map(p => p.path))].join(', ') || '(per brief write-ceiling)'}`,
     `   only owned_paths may be modified; anything else is out of scope.`,
     `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
+    `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory. Markers and reports are the truth.`,
     `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${VERDICT_CONTRACT}`,
     `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
   ];
   return lines.join('\n');
-}
-
-function orcaRun(args) {
-  const r = spawnSync(ORCA, args, { encoding: 'utf8', timeout: 120000 });
-  return { status: r.status, error: r.error?.message, stdout: r.stdout?.trim(), stderr: r.stderr?.trim() };
 }
 
 function main() {
@@ -169,12 +170,17 @@ function main() {
   const title = `[Op] ${args.op}`;
   const worktree = args.worktree ?? 'active';
 
-  // Spawn sequence per modules/kernel/dispatch.yaml spawnMechanics +
-  // providers/orca/index.yaml calls: create -> read (readiness/prompt landed)
-  // -> send the prompt text.
+  // Spawn sequence per modules/kernel/dispatch.yaml spawnMechanics. The
+  // terminal command is composed by the agent layer: profile launch command
+  // (model+tuning) with the provider card's env prefix injected — devin's
+  // ACP strip and qwen's credential refresh can no longer be forgotten.
+  const spawnCmd = model.kind === 'command-terminal'
+    ? buildSpawnCommand({ provider: model.provider, command: model.command })
+    : null;
+  const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
     ? [
-      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', model.command, '--json'] },
+      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', composedCommand, '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle-from-create>', '--screen', '--json'],
         note: 'readiness — verify the prompt landed before sending; a long typed command can leave Enter un-landed (dispatch.yaml launchWindow)' },
       { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle-from-create>', '--text', prompt, '--enter', '--json'] },
@@ -204,25 +210,14 @@ function main() {
       console.error(`--spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`);
       process.exit(1);
     }
-    const create = orcaRun(orcaCommands[0].argv);
-    result.spawn = { create: { status: create.status, error: create.error, stdout: create.stdout, stderr: create.stderr } };
-    let handle = null;
-    try { handle = JSON.parse(create.stdout)?.result?.terminal?.handle ?? null; } catch { /* fall through */ }
-    if (create.status !== 0 || !handle) {
-      result.spawn.ok = false;
-      result.spawn.reason = !handle ? 'no result.terminal.handle in create receipt' : `orca exited ${create.status}`;
-      console.log(JSON.stringify(result, null, 2));
-      process.exit(1);
-    }
-    // readiness read (awaitPrompt) — confirm the prompt rendered before sending
-    const readArgv = ['terminal', 'read', '--terminal', handle, '--screen', '--json'];
-    const read = orcaRun(readArgv);
-    result.spawn.read = { status: read.status, error: read.error, tail: read.stdout?.slice(-400) };
-    const sendArgv = ['terminal', 'send', '--terminal', handle, '--text', prompt, '--enter', '--json'];
-    const send = orcaRun(sendArgv);
-    result.spawn.ok = send.status === 0;
-    result.spawn.handle = handle;
-    result.spawn.send = { status: send.status, error: send.error, stdout: send.stdout, stderr: send.stderr };
+    const spawned = spawnAgent({
+      provider: model.provider, worktree: args.worktree ?? undefined,
+      title, prompt, command: model.command, dispatchId: args.op,
+    });
+    result.spawn = {
+      ok: spawned.ok === true, handle: spawned.terminal ?? null,
+      step: spawned.step, error: spawned.error ?? null, command: spawned.command,
+    };
     console.log(JSON.stringify(result, null, 2));
     if (!result.spawn.ok) process.exit(1);
     return;

@@ -15,7 +15,7 @@ import {inspectLedger,ledgerFileFor,machineFileFor,openLedger,openMachine} from 
 import {GLOBAL_AI_RESOURCE,createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
 import {ENGINE_SCHEMA,hasNumberedEngineMarker,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
-import {nonOperationModels} from '../scripts/config.mjs';
+import {nonOperationModels} from '../scripts/config/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
 import {pidAlive,readLoads} from './loads.mjs';
 /** The engine version is the package version: one source tree, one name. */

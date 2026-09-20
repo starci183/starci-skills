@@ -49,7 +49,7 @@ sources:
   - kernel/owner.mjs
   - kernel/kernel.mjs
   - hosts/orca/launch.mjs
-  - scripts/ledger-migrate.mjs
+  - scripts/ledger/ledger-migrate.mjs
   - docs/ledger-db.md
   - schemas/ledger-db.schema.yaml
 

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {readDistJson} from '../core/runtime-root.mjs';
 import {normalizeResolvedReferences} from './validator-transport.mjs';
-import {nonOperationModels} from '../scripts/config.mjs';
+import {nonOperationModels} from '../scripts/config/config.mjs';
 import {KINDS as OPERATION_KINDS,writesOf} from '../kernel/graph.mjs';
 import {AUDIT_OPERATIONS,auditDefinitionErrors} from '../kernel/audit.mjs';
 /**

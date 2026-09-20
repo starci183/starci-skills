@@ -18,7 +18,7 @@ StarCi is a local supervised delivery system. Its deterministic kernel owns work
 
 **StarCi `1.0.0-alpha.1`** (see `VERSION`): open source under MIT, not yet published to npm · **Requirements:** Node.js 22.13+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
 
-**Alpha status:** this tree is the canonical distless layout — the runtime reads `kernel/`, `modules/`, `schemas/*.yaml`, `scripts/{checks,route}/` and `docs/` sources directly; there is no `.dist` build. Drafts and experiments live under [.experiments/](.experiments/README.md) and are not part of the official contract until promoted (see [.experiments/OPENSOURCE-GOAL.md](.experiments/OPENSOURCE-GOAL.md) for the 1.0.0 release bar). The operating model is one long-lived `[Kernel]` agent per project dispatching one ephemeral `[Op]` agent per operation; chat is the trigger only.
+**Alpha status:** this tree is the canonical distless layout — the runtime reads `kernel/`, `modules/`, `schemas/*.yaml`, `scripts/{checks,route,example,work,ledger,config,goal,kernel}/` and `docs/` sources directly; there is no `.dist` build. Drafts and experiments live under [.experiments/](.experiments/README.md) and are not part of the official contract until promoted (see [.experiments/OPENSOURCE-GOAL.md](.experiments/OPENSOURCE-GOAL.md) for the 1.0.0 release bar). The operating model is one long-lived `[Kernel]` agent per project dispatching one ephemeral `[Op]` agent per operation; chat is the trigger only.
 
 [Quick start](#quick-start) · [First project](#first-project) · [Execution modes](#execution-modes) · [CLI](#cli) · [Documentation](#documentation)
 
@@ -160,6 +160,11 @@ The runtime is laid out by concept, one folder per concern:
 | `models/` | the model functions and their headless providers |
 | `scripts/checks/` | machine checks over bytes — the brand record, a drawing's capture and markup, a proof bundle |
 | `scripts/route/` | deterministic selection — `route-op.mjs`/`route-model.mjs` resolve the `route:` keys and rules declared in `modules/` |
+| `scripts/example/` | example-tree derivation, critique, evidence capture/verify and render-proof tools |
+| `scripts/work/` | Plan bundle create/render (`plan.mjs`), goal presentation (`present-goal.mjs`) and work-tree path remap |
+| `scripts/ledger/` | `ledger-migrate.mjs` — fold `_local` + retired journal into `runtime.sqlite` |
+| `scripts/config/` | `config.mjs` — local `config.json`/`config.example.yaml` loading and validation |
+| `scripts/goal/`, `scripts/kernel/` | lifecycle entry points (`define-goal`, `start-workflow`) |
 | `legacy/` | superseded trees (the old `ops/` operator dirs and `model/` catalog) kept for recovery; nothing live reads it |
 
 **One command line.** Everything is `node <host>/.claude/bin/starci.mjs <command>`; no instruction ever names a module path inside the runtime.

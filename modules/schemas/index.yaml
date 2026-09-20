@@ -53,7 +53,7 @@ schemas:
       - scripts/build-workflows.mjs (readBuilt 'schemas/work-layout.json' — layout fed to runtime discovery)
       - scripts/checks/work-layout.mjs (the report-only `work-layout check` behind bin/starci.mjs)
       - scripts/checks/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
-      - scripts/checks/check-work-consistency.mjs, ops/validate.mjs, scripts/work-example.mjs
+      - scripts/checks/check-work-consistency.mjs, ops/validate.mjs, scripts/example/work-example.mjs
     business:
       question: "Is this .starciwork tree laid out the way every checker, gate and agent assumes?"
       whenNeeded: Before any gate that walks Work records, and whenever a workflow creates a new node/family folder.
@@ -73,7 +73,7 @@ schemas:
     usedBy:
       - core/index.mjs (metadataSchema = readDistJson 'schemas/work.schema.json')
       - model/kinds.yaml (its knowledge-schema list names the v1 kinds verbatim)
-      - scripts/work-example.mjs, cli/main.mjs (projected for readers)
+      - scripts/example/work-example.mjs, cli/main.mjs (projected for readers)
     business:
       question: "Is a legacy/versioned Work record still structurally valid?"
       whenNeeded: Reading trees authored before the Work v2 per-family split, and the auxiliary kinds (source-identity, design-review, evidence-packet) that v2 does not re-issue.
@@ -128,7 +128,7 @@ schemas:
     subsystem: work-tree
     governs: "The product's brand as ONE root record beside features/ — identity inputs every feature shares."
     binds: .starciwork/brand/index.yaml (+ brand/assets/**)
-    usedBy: ["scripts/example-render-proof.mjs (the record's own brand: spec is what render checks read)"]
+    usedBy: ["scripts/example/example-render-proof.mjs (the record's own brand: spec is what render checks read)"]
     business:
       question: "What does the product look and sound like, once, for everyone?"
       whenNeeded: UI design and render-proof lanes read it as shared context.
@@ -300,7 +300,7 @@ schemas:
     subsystem: work-tree
     governs: "What was observed, when, by whom, against which record/source version — carries recordDigest so expiry is computed not noticed; stale-marked, never rewritten or deleted."
     binds: .starciwork/**/evidence.yaml (and evidence/<id>/ bundles per evidence.mjs)
-    usedBy: [workflows/evidence.mjs (publishEvidence staging->node evidence/<id>/), scripts/example-evidence.mjs]
+    usedBy: [workflows/evidence.mjs (publishEvidence staging->node evidence/<id>/), scripts/example/example-evidence.mjs]
     business:
       question: "What proof exists for this record's claim, and is it still about the current version?"
       whenNeeded: Every accepted leaf — done is only as good as its evidence manifest.

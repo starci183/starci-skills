@@ -23,7 +23,7 @@ guidance:
   - id: probe-helper
     requirement: |
       Repeat the installed-rule behavioral probes with
-      `node scripts/probe-reference-conventions.mjs <backend-reference-root>`. Passing these
+      `node scripts/checks/probe-reference-conventions.mjs <backend-reference-root>`. Passing these
       probes confirms the documented checker behavior, including gaps; it is not a product
       quality gate.
   - id: collocation
