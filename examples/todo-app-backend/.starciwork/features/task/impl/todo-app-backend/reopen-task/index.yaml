@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.task.todo-app-backend.reopen-task
 title: The reopen-task feature
 state: done

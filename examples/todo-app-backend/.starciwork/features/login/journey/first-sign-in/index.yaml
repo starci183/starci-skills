@@ -1,4 +1,4 @@
-schema: work/customer-journey
+schema: work/customer-journey@1
 id: journey.login.first-sign-in
 title: A new person gets in and stays in
 state: done

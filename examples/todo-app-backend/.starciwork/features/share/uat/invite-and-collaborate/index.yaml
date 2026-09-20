@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.share.invite-and-collaborate
 title: Invite an editor, have them complete a task, then revoke them
 state: inprogress

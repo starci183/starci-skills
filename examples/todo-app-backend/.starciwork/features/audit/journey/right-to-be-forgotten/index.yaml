@@ -1,4 +1,4 @@
-schema: work/customer-journey
+schema: work/customer-journey@1
 id: journey.audit.right-to-be-forgotten
 title: A person asks to be forgotten, and later checks it held
 state: todo

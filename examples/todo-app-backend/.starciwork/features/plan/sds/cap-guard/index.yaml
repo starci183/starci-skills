@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.plan.cap-guard
 title: The guard that refuses over the cap
 state: done

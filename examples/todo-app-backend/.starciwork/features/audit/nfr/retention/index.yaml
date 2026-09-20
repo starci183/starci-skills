@@ -1,4 +1,4 @@
-schema: work/non-functional-requirement
+schema: work/non-functional-requirement@1
 id: nfr.audit.retention
 title: A line survives its full retention window
 quality: compliance

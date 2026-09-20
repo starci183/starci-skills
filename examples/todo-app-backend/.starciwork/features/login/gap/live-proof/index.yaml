@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.login.live-proof
 title: No live proof exists against the real Keycloak/Postgres stack, and no uat.verify run has executed login.sign-in against it
 state: done

@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.plan.lapse.reverts-on-read
 title: A lapsed plan reverts to free on read, not by a sweep
 state: done

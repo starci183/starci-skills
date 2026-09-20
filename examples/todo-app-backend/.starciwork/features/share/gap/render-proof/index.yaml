@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.share.render-proof
 title: The invite-screen captures fail the canonical render checks - impl.share.todo-app-frontend.invite-screen cannot claim done
 state: done

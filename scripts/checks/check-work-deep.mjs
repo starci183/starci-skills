@@ -300,9 +300,9 @@ function checkTree(workRoot, out, baseline) {
     }
 
     // EVENT_PRODUCER_KIND + EVENT_UNPRODUCED
-    if (data.schema === 'work/event') {
+    if (data.schema === 'work/event@1') {
       const producer = recOf(data.producer);
-      if (producer?.schema === 'work/business-rule') {
+      if (producer?.schema === 'work/business-rule@1') {
         suspect(indexFile, 'EVENT_PRODUCER_IS_RULE', `${id} producer is ${data.producer}, a business-rule - rules do not emit events; the real producer (handler/impl) has no record`);
       }
       const emitted = emittedEvents ??= eventClasses(backendRoot);
@@ -316,7 +316,7 @@ function checkTree(workRoot, out, baseline) {
     }
 
     // UAT_RUN_AGING: settled run older than the code it proves (mtime heuristic)
-    if (data.schema === 'work/uat-flow' && data.state === 'done' && evEntry?.ev?.run) {
+    if (data.schema === 'work/uat-flow@1' && data.state === 'done' && evEntry?.ev?.run) {
       const runDir = path.join(evEntry.dir, evEntry.ev.run);
       if (fs.existsSync(runDir)) {
         const runMtime = Math.max(...walk(runDir).map(f => fs.statSync(f).mtimeMs));
@@ -403,7 +403,7 @@ function checkTree(workRoot, out, baseline) {
   // GHOST_SURFACE: contract-declared http path that no controller serves
   const servedPaths = new Set(routes.map(r => `${r.method} ${r.path.replace(/\/:[^/]+/g, '/:_')}`));
   for (const [id, rec] of records) {
-    if (rec.schema !== 'work/contract') continue;
+    if (rec.schema !== 'work/contract@1') continue;
     const shapes = [];
     const surf = rec.data?.surface;
     for (const item of Array.isArray(surf?.http) ? surf.http : surf?.http ? [surf.http] : []) {

@@ -4,7 +4,7 @@ SURFACE MAP
   34 record(s) total; 4 contract http declaration(s), 0 integration endpoint(s), 1 contract graphql declaration(s), 5 ui route claim(s)
   todo-app-backend: 2 http route(s) (1 declared, 1 owned-only); 27 graphql op(s), 27 claimed; 6 event class(es), 5 emitted, 2 subscriber file(s)
   todo-app-frontend: 0 http route(s) (0 declared, 0 owned-only); 10 fe route(s), 5 ui-claimed
-  6 work/event record(s) (3 done), 5 emitted, 2 feature(s) declaring subscribes
+  6 work/event@1 record(s) (3 done), 5 emitted, 2 feature(s) declaring subscribes
   227 record(s) total; 0 contract http declaration(s), 5 integration endpoint(s), 0 contract graphql declaration(s), 7 ui route claim(s)
 
 REFUSE  examples/todo-app-backend/.starciwork/features/audit/ui/privacy/index.yaml: ui.audit.privacy claims route /privacy (as /privacy) but no page.tsx serves it in any bound fe repository - a screen the record says exists that no route reaches [UI_ROUTE_GHOST]

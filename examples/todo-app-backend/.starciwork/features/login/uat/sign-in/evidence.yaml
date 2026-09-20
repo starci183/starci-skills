@@ -4,7 +4,7 @@
 # actually checks (a `run` field naming runs/<runId>, that run having screens/, videos/ and a result.md
 # whose outcome is pass). Every byte named below was produced by the Playwright harness at
 # examples/todo-app-frontend/uat, which wrote runs/<runId>/ itself; this file only settles which run.
-schema: work/evidence
+schema: work/evidence@1
 record: uat.login.sign-in
 recordDigest: dc1ef715c18fe44e72704eb5751b459a0739bccddaa9cd1507371ddd5e1bfd7b
 run: runs/20260918T174721Z-023dd8d9
@@ -16,7 +16,7 @@ assets:
   - path: runs/20260918T174721Z-023dd8d9/videos/sign-in.webm
     sha256: 7fa50cc65c40f04462686a68af4a676ea4e292da8e61844857bd72a111b7a910
 provenance:
-  # The layout declares exactly two provenance.actor values (schemas/work-layout.yaml's work/evidence
+  # The layout declares exactly two provenance.actor values (schemas/work-layout.yaml's work/evidence@1
   # rule): starci-kernel, for a live kernel workflow's own markDone write, and example-evidence, for a
   # file scripts/example-evidence.mjs produced by running its --assert commands. Neither is true of this
   # file - no kernel workflow settled it, and example-evidence.mjs cannot produce a `run:` field, so it

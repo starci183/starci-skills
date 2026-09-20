@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.share.role.permissions
 title: A collaborator holds exactly one of two roles
 state: done

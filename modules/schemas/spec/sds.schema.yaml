@@ -1,5 +1,5 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: starci/specification@3
+$id: starci/sds@1
 title: Source-independent Software Design Specification
 type: object
 additionalProperties: false
@@ -17,7 +17,7 @@ required:
   - limitations
 properties:
   schema:
-    const: starci/specification@3
+    const: starci/sds@1
   op:
     const: architecture.decide
   status:

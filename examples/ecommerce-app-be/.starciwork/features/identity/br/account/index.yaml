@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.identity.account
 title: An account view joins the known person with their live buyer status
 state: todo

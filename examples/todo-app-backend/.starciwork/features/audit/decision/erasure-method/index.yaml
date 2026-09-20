@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.audit.erasure-method
 title: How an erasure actually removes identifying data from an append-only, hash-chained log
 state: done

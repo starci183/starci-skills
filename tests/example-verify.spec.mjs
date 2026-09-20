@@ -30,7 +30,7 @@ const FAIL = process.platform === 'win32' ? 'exit 1' : 'false';
 test('verifyRecord: a passing assertion whose command still passes verifies clean', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: todo\n');
+  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: todo\n');
   generateEvidence({ workRoot, recordId: 'fr.f.thing', cwd: root, assertions: [{ id: 'ac.f.thing.works', command: PASS }] });
 
   const result = verifyRecord({ workRoot, recordId: 'fr.f.thing', cwd: root });
@@ -41,7 +41,7 @@ test('verifyRecord: a passing assertion whose command still passes verifies clea
 test('verifyRecord: PROOF_STALE when the claimed outcome no longer matches what replaying the command produces', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: todo\n');
+  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: todo\n');
   // captured while it passed...
   generateEvidence({ workRoot, recordId: 'fr.f.thing', cwd: root, assertions: [{ id: 'ac.f.thing.works', command: PASS }] });
   // ...but the evidence on disk is hand-edited afterwards to claim a command that now fails (simulating
@@ -59,9 +59,9 @@ test('verifyRecord: PROOF_STALE when the claimed outcome no longer matches what 
 test('verifyRecord: an assertion with no command is reported as not replayable rather than skipped', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n');
+  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n');
   write(workRoot, 'features/f/fr/thing/evidence.yaml',
-    'schema: work/evidence\nrecord: fr.f.thing\noutcome: pass\nassertions:\n  - {id: ac.f.thing.works, outcome: pass, observation: "trust me"}\n');
+    'schema: work/evidence@1\nrecord: fr.f.thing\noutcome: pass\nassertions:\n  - {id: ac.f.thing.works, outcome: pass, observation: "trust me"}\n');
 
   const result = verifyRecord({ workRoot, recordId: 'fr.f.thing', cwd: root });
   assert.equal(result.ok, false);
@@ -72,13 +72,13 @@ test('verifyRecord: an assertion with no command is reported as not replayable r
 test('verifyRecord: throws when no record with the given id exists under --work', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'index.yaml', 'schema: work/catalog\nid: fixture\nfeatures: []\n');
+  write(workRoot, 'index.yaml', 'schema: work/catalog@1\nid: fixture\nfeatures: []\n');
   assert.throws(() => verifyRecord({ workRoot, recordId: 'fr.f.ghost', cwd: root }), /no record with id fr\.f\.ghost/);
 });
 
 test('verifyRecord: throws when the record exists but has no evidence.yaml beside it', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: todo\n');
+  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: todo\n');
   assert.throws(() => verifyRecord({ workRoot, recordId: 'fr.f.thing', cwd: root }), /no evidence\.yaml/);
 });

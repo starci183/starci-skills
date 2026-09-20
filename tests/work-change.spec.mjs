@@ -39,7 +39,7 @@ const inline=change=>`{${Object.entries(change).map(([key,value])=>`${key}: ${Ar
 function plant(root,{statements=['A task is created only with a non-empty title.'],change={rev:1,kind:'initial',at:AT},
   state='done',title='A rule',description=null,criteria={'refuses-empty':['The creation is refused.']},evidence=null,extra=''}={}){
   const dir=path.join(root,'features/demo/br/rule');
-  write(path.join(dir,'index.yaml'),[`schema: work/business-rule`,`id: br.demo.rule`,`title: ${title}`,
+  write(path.join(dir,'index.yaml'),[`schema: work/business-rule@1`,`id: br.demo.rule`,`title: ${title}`,
     ...(description?[`description: ${description}`]:[]),`state: ${state}`,'statements:',quoted(statements),
     `acceptanceCriteria: [${Object.keys(criteria).join(', ')}]`,'module: src/demo/rule',
     ...(change?[`change: ${inline(change)}`]:[]),...(extra?[extra]:[]),
@@ -54,7 +54,7 @@ function plant(root,{statements=['A task is created only with a non-empty title.
       '  provenance:','    actor: starci-kernel','    tool: starci-kernel','    environment: local',
       `    capturedAt: ${evidence.capturedAt??AT}`]:[]),''].join('\n'));
   for(const [name,then] of Object.entries(criteria))
-    write(path.join(dir,'ac',name,'index.yaml'),[`schema: work/acceptance-criterion`,`id: ac.demo.rule.${name}`,
+    write(path.join(dir,'ac',name,'index.yaml'),[`schema: work/acceptance-criterion@1`,`id: ac.demo.rule.${name}`,
       `rule: br.demo.rule`,`given: A person at the form`,`when: They submit it`,'then:',quoted(then),''].join('\n'));
   return root;
 }
@@ -84,7 +84,7 @@ test('the four kinds are computed from the two revisions, not read from the auth
 });
 
 test('the normative digest moves for a statement and stands still for prose',()=>{
-  const rule={schema:'work/business-rule',id:'br.demo.rule',title:'A rule',state:'done',
+  const rule={schema:'work/business-rule@1',id:'br.demo.rule',title:'A rule',state:'done',
     statements:['A complete task is never reopened.'],change:{rev:1,kind:'initial',at:AT}};
   const prose={...rule,title:'A much better title',description:'Three paragraphs of it.',state:'todo',
     change:{rev:2,kind:'editorial',at:LATER},evidence:'proves-rule'};
@@ -222,7 +222,7 @@ test('a clarifying addition never expires proof the old criteria still hold',t=>
 
 test('a record that cannot be read is not a clean record',t=>{
   const dir=world(t);const root=plant(path.join(dir,'only'));
-  write(path.join(root,'features/demo/br/broken/index.yaml'),'schema: work/business-rule\nid: br.demo.broken\nstate: todo\nstate: done\n');
+  write(path.join(root,'features/demo/br/broken/index.yaml'),'schema: work/business-rule@1\nid: br.demo.broken\nstate: todo\nstate: done\n');
   const report=checkWorkChange({workRoot:root});
   assert.deepEqual(codes(report),['RECORD_UNREADABLE']);
   assert.equal(report.clean,false);

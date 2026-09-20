@@ -12,7 +12,7 @@ test('canonical SRS authoring publishes English prose and token policy',()=>{ass
 function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-split-srs-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const put=(relative,value)=>{const file=path.join(root,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(value));};
- const node=(relative,id,extra={})=>put(relative,{schema:'work/node@2',id,kind:'business',required:true,description:'Synthetic split SRS fixture.',...extra});
+ const node=(relative,id,extra={})=>put(relative,{schema:'work/node@1',id,kind:'business',required:true,description:'Synthetic split SRS fixture.',...extra});
  const aggregate=(relative,id,section)=>node(relative,id,{extensions:{work3:{srs:{schema:'starci/srs-aggregate@1',section,title:section}}}});
  put('workspace.yaml',{schema:'work/workspace@1',id:'split-srs'});node('features/index.yaml','features');node('features/chatbot/index.yaml','chatbot');node('features/chatbot/business/index.yaml','chatbot.business');
  node('features/chatbot/business/overview/index.yaml','chatbot.overview',{kind:'business-overview',state:'todo',businessOverview:{purpose:'Help a customer ask for support.',customerUnderstanding:'A chatbot answers or routes a question.',desiredOutcome:'The customer receives a useful result.',scope:'Question answering and human handoff.',openQuestions:'None stated in this synthetic fixture.'}});

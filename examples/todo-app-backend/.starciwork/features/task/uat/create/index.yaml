@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.task.create
 title: Create a task, and fail to delete somebody else's
 state: done

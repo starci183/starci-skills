@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.share.invitation-lifecycle
 title: Where an invitation lives and how it ends
 state: done

@@ -1,4 +1,4 @@
-schema: work/non-functional-requirement
+schema: work/non-functional-requirement@1
 id: nfr.login.sign-in-timing
 title: A refusal does not leak through timing
 quality: security

@@ -1,7 +1,7 @@
 schema: starci/uat-run-manifest@1
 id: uat.checkout.place-order.runs.20260919T152927Z-5c10a673
 nodeId: uat.checkout.place-order
-inputDigest: 94ce378031a56224ac426858751238cc021c63a0ad0281881605d31ac0a02891
+inputDigest: 412f396078936896366e174dd237ca6b8845aaa7f27ff05089ae330851a8a5c9
 outcome: fail
 assertions:
   - id: step1.loading

@@ -73,7 +73,7 @@ writes:
       - assertions
       - extensions.work3.scope
     content:
-      en: One scope record (work/node@2, state todo) carrying the bounded scope as typed data under
+      en: One scope record (work/node@1, state todo) carrying the bounded scope as typed data under
         extensions.work3.scope - nodes[] with stable proposed ids, deps[] as real declared node ids
         and exclusions[] naming what the workflow must not touch. Every named node traces to the
         request or to an inspected path; a scope item that cannot be grounded is an open question in
@@ -211,7 +211,7 @@ business:
   consumes:
     - The request; the intake record when present; existing Work records + resources; repo inspection for grounding.
   produces:
-    - One scope record (work/node@2 with extensions.work3.scope: nodes/dependencies/exclusions); evidence of the grounding reads.
+    - One scope record (work/node@1 with extensions.work3.scope: nodes/dependencies/exclusions); evidence of the grounding reads.
   failureModes:
     - INTENT_UNRESOLVED, SCOPE_CONFLICT, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------

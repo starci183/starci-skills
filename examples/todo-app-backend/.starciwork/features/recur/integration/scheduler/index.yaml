@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.recur.scheduler
 title: A scheduled tick materialises every rule's due occurrences
 state: done

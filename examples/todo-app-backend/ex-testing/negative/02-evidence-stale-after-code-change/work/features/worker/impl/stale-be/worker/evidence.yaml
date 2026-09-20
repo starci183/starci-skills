@@ -1,6 +1,6 @@
 # Negative-corpus fixture: the record digest is honest (it matches this record's current bytes), but
 # the codeDigest still stamps the OLD bytes of src/worker/index.ts - the code moved after the proof.
-schema: work/evidence
+schema: work/evidence@1
 record: impl.worker.stale-be.worker
 recordDigest: 8a5769d0481d6039267661b3f40c5f3ba098f4ef3bf93dd57ca66b8cf477f1a0
 codeDigest:

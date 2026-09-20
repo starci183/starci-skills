@@ -1,8 +1,8 @@
-# Written by hand: a work/integration's requiresProof.live asks for proof {boundary: live, fakes: []}
+# Written by hand: a work/integration@1's requiresProof.live asks for proof {boundary: live, fakes: []}
 # against the real provider (schemas/work-layout.yaml). scripts/live-proof.sh is the replayable command;
 # the migration check below was run directly against the container as a second, independent proof that
 # the schema (not only a session row) is real.
-schema: work/evidence
+schema: work/evidence@1
 record: integration.login.postgres
 proof:
   boundary: live

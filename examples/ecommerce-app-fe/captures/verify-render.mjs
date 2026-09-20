@@ -10,7 +10,7 @@ import {defaultGrammarRoot} from '../../../scripts/checks/brand.mjs';
  * Running-page render proof for the ecommerce-app-fe pair, per ui-screen record.
  *
  * `scripts/example-render-proof.mjs` is the gate's own composition of the canon checks, but it is defined
- * only for `work/implementation` records: it returns no problems for any other schema, and this product's
+ * only for `work/implementation@1` records: it returns no problems for any other schema, and this product's
  * Work tree authors no frontend implementation node at all (its two `impl/*` records are both
  * `repository: ecommerce-app-be`, role `be`, and neither names a ui-screen in `proves`). So the ecommerce
  * captures have no gate-side proof path, and `scripts/checks/render.mjs` has to be called directly — the same thing
@@ -70,7 +70,7 @@ const findRecord = (dir, id) => {
 const found = findRecord(workRoot, args.record);
 if (!found) { console.error(`REFUSED no record with id ${args.record} under ${workRoot}`); process.exit(1); }
 const {dir: recordDir, doc} = found;
-if (doc.schema !== 'work/ui-screen') { console.error(`REFUSED ${args.record} is ${doc.schema}, not work/ui-screen`); process.exit(1); }
+if (doc.schema !== 'work/ui-screen@1') { console.error(`REFUSED ${args.record} is ${doc.schema}, not work/ui-screen@1`); process.exit(1); }
 const ui = doc.ui ?? {};
 
 let failed = false;

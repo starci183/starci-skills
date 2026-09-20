@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.observability.todo-app-backend.observability
 title: The observability capability and its probe doors
 state: done

@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.audit.export
 title: Export a person's data from the log
 state: done

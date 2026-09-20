@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.notify.new-device-event
 title: login never emits a new-device sign-in signal today
 state: todo

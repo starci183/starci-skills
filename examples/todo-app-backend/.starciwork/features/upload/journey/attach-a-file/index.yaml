@@ -1,4 +1,4 @@
-schema: work/customer-journey
+schema: work/customer-journey@1
 id: journey.upload.attach-a-file
 title: A person puts a file on a task and gets it back
 state: done

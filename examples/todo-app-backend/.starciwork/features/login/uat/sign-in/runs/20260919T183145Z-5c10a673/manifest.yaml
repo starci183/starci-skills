@@ -1,7 +1,7 @@
 schema: starci/uat-run-manifest@1
 id: uat.login.sign-in.runs.20260919T183145Z-5c10a673
 nodeId: uat.login.sign-in
-inputDigest: dc1ef715c18fe44e72704eb5751b459a0739bccddaa9cd1507371ddd5e1bfd7b
+inputDigest: a920637d5fc6f6a750cbe8165614c0c65e10bcf397fd176ba051f9bd35acc58f
 outcome: partial-pass
 assertions:
   - id: ux.sign-in.validation-feedback

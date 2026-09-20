@@ -7,7 +7,7 @@ import { validateWorkspace } from '../engine/index.mjs';
 import { base, node, resource, complete, mutateJSON, mutateNode, imageAsset, COMMIT } from './fixtures/build-workspace.mjs';
 
 function temporary(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'work-v3-acceptance-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'work-acceptance-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return base(root);
 }
@@ -24,10 +24,10 @@ test('synthetic complete business leaf binds observations; changing operational 
   let result = validateWorkspace(root);
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.equal(result.nodes[0].effectiveState, 'done');
-  mutateNode(path.join(root, 'business/node.md'), value => { value.state = 'doing'; delete value.completion; });
+  mutateNode(path.join(root, 'business/index.yaml'), value => { value.state = 'todo'; delete value.completion; });
   result = validateWorkspace(root);
   assert.equal(result.nodes[0].inputDigest, proof.inputDigest);
-  assert.equal(result.nodes[0].effectiveState, 'doing');
+  assert.equal(result.nodes[0].effectiveState, 'todo');
 });
 
 test('duplicate IDs, missing references, and dependency cycles are executable failures', t => {
@@ -45,18 +45,18 @@ test('parents derive state and cannot self-certify while required children remai
   const root = temporary(t);
   node(root, 'business', { state: 'done' }); node(root, 'business/required');
   rejected(root, 'BRANCH_STATE');
-  mutateNode(path.join(root, 'business/node.md'), value => { delete value.state; });
+  mutateNode(path.join(root, 'business/index.yaml'), value => { delete value.state; });
   const result = validateWorkspace(root);
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.equal(result.nodes.find(item => item.id === 'business').effectiveState, 'todo');
 });
 
-test('semantic requirement edit suspends done rather than preserving an old checkmark', t => {
+test('semantic requirement edit sends done back to uninvestigate rather than preserving an old checkmark', t => {
   const root = temporary(t);
   complete(root, 'business');
-  fs.appendFileSync(path.join(root, 'business/node.md'), '\nRequirement changed: now verify restart.\n');
+  mutateNode(path.join(root, 'business/index.yaml'), v => { v.extensions = { ...(v.extensions ?? {}), requirement: { changed: 'restart-verified' } }; });
   const result = rejected(root, 'STALE_COMPLETION');
-  assert.equal(result.nodes[0].effectiveState, 'suspended');
+  assert.equal(result.nodes[0].effectiveState, 'uninvestigate');
 });
 
 test('resource revisions and transitive dependencies invalidate downstream completions', t => {
@@ -75,7 +75,7 @@ test('extension data is retained in input binding; unknown kinds cannot earn don
   node(root, 'piece', { kind: 'custom.mobile', extensions: { 'example.mobile': { variant: 1 } } });
   const before = validateWorkspace(root);
   assert.equal(before.ok, true, JSON.stringify(before.errors));
-  mutateNode(path.join(root, 'piece/node.md'), value => { value.extensions['example.mobile'].variant = 2; });
+  mutateNode(path.join(root, 'piece/index.yaml'), value => { value.extensions['example.mobile'].variant = 2; });
   assert.notEqual(validateWorkspace(root).nodes[0].inputDigest, before.nodes[0].inputDigest);
   complete(root, 'piece', { kind: 'custom.mobile' });
   rejected(root, 'UNSUPPORTED_PROFILE');
@@ -104,9 +104,9 @@ test('implementation binds full source commit and selected evidence commit, not 
   resource(root, 'repo', 'repository');
   const proof = complete(root, 'code', { kind: 'implementation', refs: ['repo'] }, { codeRefs: [{ repository: 'repo', commit: COMMIT }] });
   assert.equal(validateWorkspace(root).ok, true);
-  mutateNode(path.join(root, 'code/node.md'), value => { value.completion.codeRefs[0].commit = COMMIT.slice(0, 8); });
+  mutateNode(path.join(root, 'code/index.yaml'), value => { value.completion.codeRefs[0].commit = COMMIT.slice(0, 8); });
   rejected(root, 'COMMIT');
-  mutateNode(path.join(root, 'code/node.md'), value => { value.completion.codeRefs[0].commit = COMMIT; });
+  mutateNode(path.join(root, 'code/index.yaml'), value => { value.completion.codeRefs[0].commit = COMMIT; });
   mutateJSON(proof.evidenceFile, value => { value.codeRefs[0].commit = 'b'.repeat(40); });
   rejected(root, 'CODE_EVIDENCE_BINDING');
 });
@@ -124,7 +124,7 @@ test('asset traversal, missing files, and byte tampering refuse completion', t =
 
 test('symlink escape cannot supply evidence from outside a workspace', t => {
   const root = temporary(t);
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'work-v3-external-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'work-external-'));
   t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
   const proof = complete(root, 'piece');
   fs.writeFileSync(path.join(outside, 'capture.png'), 'external bytes');
@@ -171,7 +171,7 @@ test('UAT refuses absent served revision, source-HEAD-only proof, and unbound re
   mutateJSON(proof.evidenceFile, value => { value.provenance.servedVersions[0].artifact = `sha256:${'b'.repeat(64)}`; delete value.provenance.servedVersionEvidence; });
   rejected(root, 'SERVED_VERSION_PROOF');
   mutateJSON(proof.evidenceFile, value => { value.provenance.servedVersionEvidence = 'runtime-version'; });
-  mutateNode(path.join(root, 'uat/node.md'), value => { value.refs = ['repo']; });
+  mutateNode(path.join(root, 'uat/index.yaml'), value => { value.refs = ['repo']; });
   rejected(root, 'UNBOUND_PROVENANCE');
 });
 
@@ -199,7 +199,7 @@ test('malformed nested code references produce structured errors rather than cra
   const root = temporary(t);
   resource(root, 'repo', 'repository');
   complete(root, 'code', { kind: 'implementation', refs: ['repo'] }, { codeRefs: [{ repository: 'repo', commit: COMMIT }] });
-  mutateNode(path.join(root, 'code/node.md'), value => { value.completion.codeRefs = [null]; });
+  mutateNode(path.join(root, 'code/index.yaml'), value => { value.completion.codeRefs = [null]; });
   rejected(root, 'COMMIT');
 });
 
@@ -214,7 +214,7 @@ test('ancestor dependency gates apply to executable descendants, not only the ro
   const root = temporary(t);
   node(root, 'contract', { id: 'contract' });
   node(root, 'implementation', { id: 'implementation', dependsOn: ['contract'] });
-  mutateNode(path.join(root, 'implementation/node.md'), value => { delete value.state; });
+  mutateNode(path.join(root, 'implementation/index.yaml'), value => { delete value.state; });
   node(root, 'implementation/backend', { id: 'backend' });
   const result = validateWorkspace(root);
   assert.equal(result.ok, true, JSON.stringify(result.errors));
@@ -226,13 +226,13 @@ test('one evidence bundle supports explicitly bound consumers but not unauthoriz
   const proof = complete(root, 'first');
   node(root, 'second');
   const secondDigest = validateWorkspace(root).nodes.find(item => item.id === 'second').inputDigest;
-  mutateNode(path.join(root, 'second/node.md'), value => { value.state = 'done'; value.completion = { inputDigest: secondDigest, evidence: [proof.evidenceId] }; });
+  mutateNode(path.join(root, 'second/index.yaml'), value => { value.state = 'done'; value.completion = { inputDigest: secondDigest, evidence: [proof.evidenceId] }; });
   rejected(root, 'EVIDENCE_OWNER');
   mutateJSON(proof.evidenceFile, value => { value.bindings = [{ nodeId: 'second', inputDigest: secondDigest }]; });
   let result = validateWorkspace(root);
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.ok(result.nodes.every(item => item.effectiveState === 'done'));
-  fs.appendFileSync(path.join(root, 'second/node.md'), '\nChanged second-consumer acceptance only.\n');
+  mutateNode(path.join(root, 'second/index.yaml'), v => { v.extensions = { ...(v.extensions ?? {}), acceptance: { changed: true } }; });
   result = rejected(root, 'STALE_COMPLETION');
   assert.notEqual(result.nodes.find(item => item.id === 'second').effectiveState, 'done');
   assert.equal(result.nodes.find(item => item.id === 'first').effectiveState, 'done');
@@ -247,12 +247,12 @@ test('business changes suspend architecture, implementation and UAT across multi
   const verification = uat(root, 'uat.ux', { dependsOn: ['code'] });
   const proofs = [business, architecture, code, verification].map(item => [item.evidenceFile, fs.readFileSync(item.evidenceFile, 'utf8')]);
   assert.equal(validateWorkspace(root).ok, true);
-  fs.appendFileSync(path.join(root, 'business/node.md'), '\nNew authoritative business requirement.\n');
+  mutateNode(path.join(root, 'business/index.yaml'), v => { v.extensions = { ...(v.extensions ?? {}), requirement: { added: 'New authoritative business requirement.' } }; });
   const result = rejected(root, 'STALE_COMPLETION');
   for (const id of ['business', 'architecture', 'code', 'uat']) {
     const current = result.nodes.find(item => item.id === id);
     assert.equal(current.state, 'done', `${id} must preserve authored completion state`);
-    assert.equal(current.effectiveState, 'suspended', `${id} must suspend outdated completion`);
+    assert.equal(current.effectiveState, 'uninvestigate', `${id} must lose investigated status when its completion is outdated`);
   }
   assert.ok(result.nodes.find(item => item.id === 'uat').blockedBy.includes('code'));
   for (const [file, bytes] of proofs) assert.equal(fs.readFileSync(file, 'utf8'), bytes);
@@ -268,7 +268,7 @@ test('account and chat pieces cannot execute before their module exists and has 
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.equal(result.nodes.find(item => item.id === 'account').eligible, false);
   assert.ok(result.nodes.find(item => item.id === 'chat').blockedBy.includes('module'));
-  node(root, 'module', { state: 'na', naReason: 'Synthetic module deliberately absent; this cannot satisfy dependents.' });
+  node(root, 'module', { state: 'uninvestigate' });
   result = validateWorkspace(root);
   assert.equal(result.nodes.find(item => item.id === 'account').eligible, false);
   complete(root, 'module');
@@ -285,12 +285,12 @@ test('completed dependent suspends when a prerequisite loses done even if all se
   const account = complete(root, 'account', { dependsOn: ['module'] });
   const evidenceBefore = fs.readFileSync(account.evidenceFile, 'utf8');
   const before = validateWorkspace(root).nodes.find(item => item.id === 'account');
-  mutateNode(path.join(root, 'module/node.md'), value => { value.state = 'todo'; delete value.completion; });
+  mutateNode(path.join(root, 'module/index.yaml'), value => { value.state = 'todo'; delete value.completion; });
   const result = rejected(root, 'DEPENDENCY_NOT_DONE');
   const current = result.nodes.find(item => item.id === 'account');
   assert.equal(current.inputDigest, before.inputDigest);
   assert.equal(current.state, 'done');
-  assert.equal(current.effectiveState, 'suspended');
+  assert.equal(current.effectiveState, 'uninvestigate');
   assert.ok(current.blockedBy.includes('module'));
   assert.ok(current.suspensionReasons.some(reason => reason.code === 'PREREQUISITE_NOT_DONE' && reason.ids.includes('module')));
   assert.equal(fs.readFileSync(account.evidenceFile, 'utf8'), evidenceBefore);
@@ -311,10 +311,10 @@ test('an art-direction image byte edit suspends UI and dependent UAT while unrel
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   fs.appendFileSync(path.join(path.dirname(artFile), image.path), Buffer.from('synthetic-art-revision'));
   result = rejected(root, 'STALE_COMPLETION');
-  assert.equal(result.nodes.find(item => item.id === 'ui').effectiveState, 'suspended');
-  assert.equal(result.nodes.find(item => item.id === 'uat').effectiveState, 'suspended');
+  assert.equal(result.nodes.find(item => item.id === 'ui').effectiveState, 'uninvestigate');
+  assert.equal(result.nodes.find(item => item.id === 'uat').effectiveState, 'uninvestigate');
   assert.equal(result.nodes.find(item => item.id === 'backend').effectiveState, 'done');
-  assert.equal(fs.readFileSync(artFile, 'utf8'), resourceBefore, 'actual bytes, not a manual revision edit, caused suspension');
+  assert.equal(fs.readFileSync(artFile, 'utf8'), resourceBefore, 'actual bytes, not a manual revision edit, caused the invalidation');
   for (const [file, bytes] of evidenceBefore) assert.equal(fs.readFileSync(file, 'utf8'), bytes);
 });
 

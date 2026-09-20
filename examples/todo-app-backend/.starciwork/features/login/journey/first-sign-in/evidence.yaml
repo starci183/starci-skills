@@ -3,7 +3,7 @@
 # in") are exactly what that flow's signed-in/task-list-after-sign-in/session-restores-on-reload steps
 # walked for real. The former evidence.yaml here (removed, provenance starci-kernel, stale: true)
 # pointed at a run that had never actually happened; this one points at one that has.
-schema: work/evidence
+schema: work/evidence@1
 record: journey.login.first-sign-in
 outcome: pass
 assertions:

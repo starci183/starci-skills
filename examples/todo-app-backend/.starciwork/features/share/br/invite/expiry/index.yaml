@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.share.invite.expiry
 title: An invitation expires after fourteen days
 state: done

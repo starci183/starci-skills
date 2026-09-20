@@ -83,7 +83,7 @@ writes:
       - assertions
       - rev
     content:
-      en: "Write the whole identity into the one brand record (schema work/node@2): identity (name and the installed grammar
+      en: "Write the whole identity into the one brand record (schema work/node@1): identity (name and the installed grammar
         family), colour tokens as grammar token name -> value with role and the policy that governs them
         (`dangerMayMatchPrimary`, `minContrast`), typography, mascot, logo, iconography, imagery, voice,
         motion, the explicit forbidden list, the `artworkSlots` conventions every later prompt fills, and

@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.share.todo-app-frontend.invite-screen
 title: The invitation screen and its create/revoke controls
 state: done
@@ -60,8 +60,8 @@ change:
     THEME_IMPLEMENTATION_REQUIRED gap ui.share.invite already records, and globals.css is outside
     this lane's ceiling. Installed @starci/grammar 0.4.13 has no danger Button variant
     (GRAMMAR_REQUIRED), so revoke uses ghost variant exactly as the coverage map declares.
-    `starci render check` cannot run on this example tree (its brand record is work/brand while
-    checks/brand.mjs reads work/node@2), so the three render rules were executed directly:
+    `starci render check` cannot run on this example tree (its brand record is work/brand@1 while
+    checks/brand.mjs reads work/node@1), so the three render rules were executed directly:
     entity-list-in-card and primary-absent pass on all 10 captures, palette-off-brand fails as
     recorded. Sonar and coverage gates: no runner is configured in this repository - not run,
     never claimed."

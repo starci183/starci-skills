@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.recur.generation.backfill
 title: A generator that missed a window backfills everything, one, or nothing
 state: done

@@ -8,7 +8,7 @@ const dir=path.dirname(assetDir),root=path.resolve(assetDir,'../../../../../../.
 const read=p=>fs.readFileSync(p),hash=p=>crypto.createHash('sha256').update(read(p)).digest('hex');
 const d=parseYaml(read(path.join(dir,'index.yaml')).toString());
 const check=(ok,message)=>{if(!ok)throw Error(message);console.log('PASS '+message);};
-check(d.schema==='work/ui-screen'&&d.brand.rev===3,'UI schema and brand rev 3');
+check(d.schema==='work/ui-screen@1'&&d.brand.rev===3,'UI schema and brand rev 3');
 check(JSON.stringify(d.assets)===JSON.stringify(d.ui.assets),'top-level/ui asset bindings agree');
 for(const a of d.assets){
  const p=path.join(dir,a.path);check(hash(p)===a.sha256,'asset hash '+a.path);

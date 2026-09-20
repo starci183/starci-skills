@@ -122,7 +122,7 @@ function semanticDependencies(node,raw,owners){
   if(sds?.schema==='starci/sds-deployment@1')add('sds',array(sds.placements).map(row=>row?.componentRef));
   if(sds?.schema==='starci/sds-decision@1')add('sds',sds.affectedRefs);
   if(sds?.schema==='starci/sds-verification@1'){add('srs',sds.businessAcceptanceRefs);add('sds',sds.scopeRefs);}
-  const specification=value?.extensions?.work3?.specification;if(!refs.length&&specification?.schema==='starci/srs@3')for(const ref of array(specification.refs))if(text(ref?.nodeId)&&ref.nodeId!==node.id)refs.push(ref.nodeId);
+  const specification=value?.extensions?.work3?.specification;if(!refs.length&&specification?.schema==='starci/srs@1')for(const ref of array(specification.refs))if(text(ref?.nodeId)&&ref.nodeId!==node.id)refs.push(ref.nodeId);
   return unique(refs);
 }
 

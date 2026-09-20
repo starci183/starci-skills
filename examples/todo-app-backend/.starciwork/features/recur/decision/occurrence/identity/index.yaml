@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.recur.occurrence.identity
 title: What makes two generator runs agree they made the same occurrence
 state: done

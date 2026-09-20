@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.upload.attach
 title: Attach an upload to a task
 state: done

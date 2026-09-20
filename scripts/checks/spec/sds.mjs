@@ -3,7 +3,7 @@ import { skillRoot } from '../../../engine/runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const SDS_SCHEMA = 'starci/specification@3';
+export const SDS_SCHEMA = 'starci/sds@1';
 export const sdsSchema = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'schemas', 'spec', 'sds.schema.yaml'), 'utf8'));
 const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 

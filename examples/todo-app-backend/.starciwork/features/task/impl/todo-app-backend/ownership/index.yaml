@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.task.todo-app-backend.ownership
 title: Ownership binding and its guard
 state: done

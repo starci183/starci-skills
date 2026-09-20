@@ -18,7 +18,7 @@ function fixture(t) {
  // deleted nested-business SRS leaf with its one proposal-kind source promoted to an observed citation,
  // the minimal shape this file's SPECIFICATION_SOURCE_* binding checks need.
  const spec=JSON.parse(fs.readFileSync(new URL('fixtures/source-provenance-business.json',import.meta.url),'utf8'));
- const node={schema:'work/node@2',id:'synthetic.business',kind:'business',required:true,state:'todo',assertions:['review'],description:'Synthetic metadata binding test only.',sourceRefs:spec.sources.filter(s=>s.kind==='observed').map(({repository,revision,path,symbol,observation})=>({repository,revision,path,symbol,observation})),extensions:{work3:{specification:spec}}};
+ const node={schema:'work/node@1',id:'synthetic.business',kind:'business',required:true,state:'todo',assertions:['review'],description:'Synthetic metadata binding test only.',sourceRefs:spec.sources.filter(s=>s.kind==='observed').map(({repository,revision,path,symbol,observation})=>({repository,revision,path,symbol,observation})),extensions:{work3:{specification:spec}}};
  const write=()=>put('module/business/index.yaml',node);
  const check=()=>{write();return validateWorkspace(root);};
  return {root,node,spec,put,write,check};
@@ -72,14 +72,14 @@ test('malformed sourceRefs still return diagnostics rather than crashing validat
 });
 test('ancestor and sibling citations cannot silently supply an owning-node observed binding',t=>{
  const f=fixture(t),refs=f.node.sourceRefs;f.node.sourceRefs=[];
- f.put('module/index.yaml',{schema:'work/node@2',id:'synthetic.module',kind:'group',required:true,sourceRefs:refs});
- f.put('sibling/index.yaml',{schema:'work/node@2',id:'synthetic.sibling',kind:'operations',required:true,state:'todo',sourceRefs:refs,description:'Synthetic unrelated source observations.'});
+ f.put('module/index.yaml',{schema:'work/node@1',id:'synthetic.module',kind:'group',required:true,sourceRefs:refs});
+ f.put('sibling/index.yaml',{schema:'work/node@1',id:'synthetic.sibling',kind:'operations',required:true,state:'todo',sourceRefs:refs,description:'Synthetic unrelated source observations.'});
  f.node.refs=['synthetic.sibling'];assert.ok(f.check().errors.some(e=>e.code==='SPECIFICATION_SOURCE_UNBOUND'));
 });
 test('direct provenance preserves dangling refs, dependency, owner and completion gates',t=>{
  const f=fixture(t);f.node.refs=['missing'];assert.ok(f.check().errors.some(e=>e.code==='MISSING_REF'));
  delete f.node.refs;
- f.put('prerequisite/index.yaml',{schema:'work/node@2',id:'prerequisite',kind:'operations',required:true,state:'uninvestigate',description:'Synthetic unapproved prerequisite.'});
+ f.put('prerequisite/index.yaml',{schema:'work/node@1',id:'prerequisite',kind:'operations',required:true,state:'uninvestigate',description:'Synthetic unapproved prerequisite.'});
  f.node.dependsOn=['prerequisite'];let result=f.check();const own=result.nodes.find(n=>n.id===f.node.id);assert.equal(own.eligible,false);assert.ok(own.blockedBy.includes('prerequisite'));
  f.node.state='done';result=f.check();assert.ok(result.errors.some(e=>e.code==='SPECIFICATION_NOT_ACCEPTED'));assert.notEqual(result.nodes.find(n=>n.id===f.node.id).effectiveState,'done');
  f.node.state='todo';f.node.kind='architecture';assert.ok(f.check().errors.some(e=>e.code==='SPECIFICATION_OWNER'));

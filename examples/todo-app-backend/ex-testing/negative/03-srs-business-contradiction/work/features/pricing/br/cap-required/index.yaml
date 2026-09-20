@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.pricing.cap-required
 title: Every account is capped
 state: done

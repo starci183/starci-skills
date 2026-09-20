@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.share.revoke.on-read
 title: A removed collaborator loses access on their next read, not by a sweep
 state: done

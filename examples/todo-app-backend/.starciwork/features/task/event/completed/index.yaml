@@ -1,4 +1,4 @@
-schema: work/event
+schema: work/event@1
 id: event.task.completed
 title: A task was completed
 state: done

@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.task.todo-app-backend.platform-events
 title: The platform events module (typed in-process event bus)
 state: done

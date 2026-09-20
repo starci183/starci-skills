@@ -1,5 +1,5 @@
 {
-  "schema": "starci/rendered-environment",
+  "schema": "starci/rendered-environment@1",
   "environment": "dev",
   "renderedFrom": "application-stacks.yaml",
   "renderedAt": "2026-09-18T06:00:00.000Z",

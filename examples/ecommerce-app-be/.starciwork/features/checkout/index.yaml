@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: checkout
 title: Buying what is in the cart
 description: The cart, the stock check, the payment capture and the confirmed order.

@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.observability.probes
 title: An orchestrator probes the api's health, readiness and metrics
 state: done

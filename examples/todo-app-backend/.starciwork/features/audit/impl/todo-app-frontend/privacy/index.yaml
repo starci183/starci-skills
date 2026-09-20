@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.audit.todo-app-frontend.privacy
 title: The privacy screen - export data, request erasure
 state: done

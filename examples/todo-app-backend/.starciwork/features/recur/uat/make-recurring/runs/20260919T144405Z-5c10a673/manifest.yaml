@@ -1,7 +1,7 @@
 schema: starci/uat-run-manifest@1
 id: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
 nodeId: uat.recur.make-recurring
-inputDigest: ff6af24461b221f1be8ad99892bb27af643b421bca0bdef0fc1896b03edbaed1
+inputDigest: df59de25338e76685de4c939db792f64c07c268602638a932c6ac9768891e3b7
 outcome: fail
 assertions:
   - id: fr.recur.make-recurring

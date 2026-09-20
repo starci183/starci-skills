@@ -1,7 +1,7 @@
 # Written by scripts/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
-# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
-schema: work/evidence
+# and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
+schema: work/evidence@1
 record: br.observability.access-log-shape
 recordDigest: 1f0c1a913858d0ea025b4a419c3c2de813e92037475d6348b7fce6451c8e72ae
 codeDigest:

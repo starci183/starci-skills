@@ -6,8 +6,8 @@ import {decodePng, checkPalette, checkEntityListInCard} from '../../scripts/chec
 
 /**
  * Replays the render evidence for the share invite screen's running-page captures. The generic
- * `starci render check` command cannot read this example tree's `work/brand` record (it expects the
- * newer `work/node@2` brand shape), so this script calls the same canon checks in scripts/checks/render.mjs
+ * `starci render check` command cannot read this example tree's `work/brand@1` record (it expects the
+ * newer `work/node@1` brand shape), so this script calls the same canon checks in scripts/checks/render.mjs
  * directly against the same brand block.
  *
  * Usage: node verify-captures.mjs <assets|palette|primary|entity-list>

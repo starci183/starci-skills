@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.checkout.order-for-identity
 title: How identity learns a person has orders
 state: done

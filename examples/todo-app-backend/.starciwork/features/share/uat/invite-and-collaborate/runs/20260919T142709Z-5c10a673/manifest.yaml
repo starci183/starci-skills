@@ -1,7 +1,7 @@
 schema: starci/uat-run-manifest@1
 id: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
 nodeId: uat.share.invite-and-collaborate
-inputDigest: 7b0cb889b0b936c07b7cb363af621b7dfa671978114b19e194054f316d856b69
+inputDigest: 94876e4ae7690652c9c09389f78f1520bcb5390d4f7b24573b02aad722cd3c73
 outcome: partial-pass
 assertions:
   - id: fr.share.invite

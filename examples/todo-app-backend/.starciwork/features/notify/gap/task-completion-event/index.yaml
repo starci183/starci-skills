@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.notify.task-completion-event
 title: task never emits a completion event today
 state: todo

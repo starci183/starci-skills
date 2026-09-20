@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.audit.deleted-task-target
 title: Does a deleted task's identifier staying in the audit log violate stays-gone
 state: done

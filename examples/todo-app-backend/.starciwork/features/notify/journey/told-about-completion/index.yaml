@@ -1,4 +1,4 @@
-schema: work/customer-journey
+schema: work/customer-journey@1
 id: journey.notify.told-about-completion
 title: A person closes their laptop and later learns their task was handled
 state: todo

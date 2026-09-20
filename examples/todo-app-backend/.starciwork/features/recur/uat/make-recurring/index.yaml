@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.recur.make-recurring
 title: Make a task recurring, see its upcoming occurrences, then end it
 state: todo

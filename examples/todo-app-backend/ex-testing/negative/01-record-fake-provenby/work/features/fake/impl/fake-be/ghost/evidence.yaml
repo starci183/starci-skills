@@ -1,5 +1,5 @@
 # Negative-corpus fixture: evidence that settles on a run directory that does not exist.
-schema: work/evidence
+schema: work/evidence@1
 record: impl.fake.fake-be.ghost
 run: runs/20990101T000000Z-ghost
 outcome: pass

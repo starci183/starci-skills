@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.notify.new-device-signal
 title: What notify needs from login to notify on a new device
 state: todo

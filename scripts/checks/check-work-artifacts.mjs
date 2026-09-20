@@ -157,7 +157,7 @@ const MANIFEST_DECLARATIONS = [
   {trail: 'assets[].path', base: 'run', what: 'asset', digestKey: 'sha256'},
 ];
 
-// A work/resource is the only record whose declared files are repository paths: the seed SQL, the compose
+// A work/resource@1 is the only record whose declared files are repository paths: the seed SQL, the compose
 // file and the sealed credential are what ops/uat.verify reads before a flow may run.
 const RESOURCE_DECLARATIONS = [
   {trail: 'target.compose', base: 'repo', what: 'input', digestKey: null},
@@ -428,7 +428,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     if (typeof data.schema === 'string' && !data.schema.startsWith('work/')) continue;
     const indexFile = path.join(rec.dir, 'index.yaml');
     const ctx = {...ctxFor(rec.dir), repoRoot: repoRootFor(workRoot, data.repository, workspaceDoc)};
-    const table = data.schema === 'work/resource' ? RESOURCE_DECLARATIONS : RECORD_DECLARATIONS;
+    const table = data.schema === 'work/resource@1' ? RESOURCE_DECLARATIONS : RECORD_DECLARATIONS;
     for (const found of declarationsOf(data, table, ctx)) {
       if (found.digest) counts.digests += 1;
       verifyDeclaration(found, indexFile, ctx, wrapped, counts);
@@ -451,7 +451,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
         wrapped.refuse(indexFile, 'ASSET_MAGIC', `${entry.path} is kept as ${kept} but its provenance says the tool produced ${entry.provenance.toolOutputBasename} - one of the two names is not this artifact's`);
       }
     }
-    if (data.schema === 'work/uat-flow' && data.accounts) {
+    if (data.schema === 'work/uat-flow@1' && data.accounts) {
       counts.accountsFiles += 1;
       if (!fs.existsSync(path.join(rec.dir, String(data.accounts).trim()))) {
         wrapped.refuse(indexFile, 'RESOURCE_FILE_MISSING', `accounts: ${data.accounts} names a file that is not beside the flow - the base gate opens it only if existsSync, so its absence passes there`);
@@ -503,7 +503,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
   // ---- concept 7: a parent cannot be done on its members' unproven claims ----
   let doneParents = 0;
   for (const [id, rec] of records) {
-    if (!['work/feature', 'work/catalog'].includes(rec.schema) || rec.data?.state !== 'done') continue;
+    if (!['work/feature@1', 'work/catalog@1'].includes(rec.schema) || rec.data?.state !== 'done') continue;
     doneParents += 1;
     const members = [...records.entries()]
       .filter(([, other]) => other !== rec && !path.relative(rec.dir, other.dir).startsWith('..'));
@@ -521,7 +521,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
       }
     }
   }
-  const parents = [...records.values()].filter(rec => ['work/feature', 'work/catalog'].includes(rec.schema)).length;
+  const parents = [...records.values()].filter(rec => ['work/feature@1', 'work/catalog@1'].includes(rec.schema)).length;
   const latent = parents && !doneParents ? ', so the rule is latent here today' : '';
   emit.info(path.join(workRoot, 'index.yaml'), 'PARENT_STATE_UNUSED',
     `${parents} feature/catalog record(s) in this tree, ${doneParents} claiming done - FEATURE_DONE_INCOMPLETE can only fire on a parent that claims done${latent}`);

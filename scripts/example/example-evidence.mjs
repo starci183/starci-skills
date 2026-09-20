@@ -30,7 +30,7 @@ import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveReco
  *
  * codeDigest (concept 1): alongside recordDigest, this script also hashes the actual source the record's
  * `owners[].path`/`module` name (resolved via scripts/example/example-ownership.mjs - the record's own repository,
- * or, when it names no owners/module itself, every work/implementation whose `proves` names this record)
+ * or, when it names no owners/module itself, every work/implementation@1 whose `proves` names this record)
  * and writes `codeDigest: {algorithm, files: [{path, sha256}], digest}`. This is what lets a later code
  * change stale a proof without anyone touching the record: scripts/checks/check-example-work.mjs refuses an
  * evidence.yaml whose codeDigest no longer matches the code on disk unless it carries `stale: true`.
@@ -43,7 +43,7 @@ import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveReco
  * context (an open ledger `store`, workflow `state`, `ctx.work.api`/`ctx.guards.gitQueue`, git-queued
  * writes, and so on) that a standalone script run outside a kernel workflow does not have and cannot
  * honestly construct. Rather than fabricate that context or lie about the actor, this script writes
- * `provenance.actor: example-evidence` (see schemas/work-layout.yaml's work/evidence section for what
+ * `provenance.actor: example-evidence` (see schemas/work-layout.yaml's work/evidence@1 section for what
  * that actor means), which is the truthful claim: a real command was run, by this tool, outside any
  * kernel workflow.
  */
@@ -129,7 +129,7 @@ export function generateEvidence({workRoot, recordId, cwd, assertions, now = () 
     : null;
 
   const evidence = {
-    schema: 'work/evidence',
+    schema: 'work/evidence@1',
     record: canonicalId,
     recordDigest: sha256File(recordFile),
     ...(codeDigest ? {codeDigest} : {}),
@@ -146,7 +146,7 @@ export function generateEvidence({workRoot, recordId, cwd, assertions, now = () 
   const evidenceFile = path.join(path.dirname(recordFile), 'evidence.yaml');
   const header = '# Written by scripts/example-evidence.mjs by actually running the assertion commands below\n'
     + '# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header\n'
-    + '# and schemas/work-layout.yaml\'s work/evidence section for what that distinction means).\n';
+    + '# and schemas/work-layout.yaml\'s work/evidence@1 section for what that distinction means).\n';
   fs.writeFileSync(evidenceFile, header + stringifyYaml(evidence));
 
   return {evidenceFile, evidence, ok: outcome === 'pass'};

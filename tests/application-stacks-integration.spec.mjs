@@ -35,7 +35,7 @@ test('stacks check refuses missing or malformed evidence without echoing file co
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-cli-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-cli-'));fs.rmSync(directory,{recursive:true,force:true});});
   fs.mkdirSync(path.join(directory,'.starcistacks'));
-  fs.writeFileSync(path.join(directory,'.starcistacks/application-stacks.yaml'),'schema: starci/application-stacks\n');
+  fs.writeFileSync(path.join(directory,'.starcistacks/application-stacks.yaml'),'schema: starci/application-stacks@1\n');
   const model=path.join(directory,'rendered.json'),sentinel='synthetic-secret-never-echo';
   fs.writeFileSync(model,'{"token":"'+sentinel+'",BROKEN');
   const before=fs.readFileSync(model);

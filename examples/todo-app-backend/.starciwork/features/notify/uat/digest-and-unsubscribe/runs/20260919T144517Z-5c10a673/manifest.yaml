@@ -1,7 +1,7 @@
 schema: starci/uat-run-manifest@1
 id: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
 nodeId: uat.notify.digest-and-unsubscribe
-inputDigest: 7c0608bc723fdd99735972e9274fc0907d0c4cd21c0e8325dc45a6561a3efa8c
+inputDigest: 3cb7cac7a202c9a3c1583097f220673f9b4945857a141ffd9cd50c4599f93354
 outcome: partial-pass
 assertions:
   - id: ux.notify.preferences.reachable

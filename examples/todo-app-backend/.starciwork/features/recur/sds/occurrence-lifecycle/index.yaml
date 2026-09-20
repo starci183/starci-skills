@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.recur.occurrence-lifecycle
 title: How an occurrence is born, finished, and outlives its rule
 state: done

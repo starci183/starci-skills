@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { validateWorkspace, sha256 } from '../../engine/index.mjs';
+import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 
 export const COMMIT = 'a'.repeat(40);
 export function json(root, relative, value) {
@@ -11,9 +12,9 @@ export function json(root, relative, value) {
   return target;
 }
 export function node(root, relative, metadata = {}, body = 'Scope: synthetic contract. Done when the declared assertion is observed.') {
-  const target = path.join(root, relative, 'node.md');
+  const target = path.join(root, relative, 'index.yaml');
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, `---\n${JSON.stringify({ schema: 'work/node@1', id: relative.replaceAll('/', ':'), kind: 'business', required: true, state: 'todo', assertions: ['accept'], ...metadata }, null, 2)}\n---\n${body}\n`);
+  fs.writeFileSync(target, stringifyYaml({ schema: 'work/node@1', id: relative.replaceAll('/', ':'), kind: 'business', required: true, state: 'todo', assertions: ['accept'], description: body, ...metadata }));
   return target;
 }
 export function resource(root, id, kind, details = {}) {
@@ -40,10 +41,8 @@ export function mutateJSON(file, mutate) {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 export function mutateNode(file, mutate) {
-  const source = fs.readFileSync(file, 'utf8');
-  const match = source.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  const metadata = JSON.parse(match[1]); mutate(metadata);
-  fs.writeFileSync(file, `---\n${JSON.stringify(metadata, null, 2)}\n---\n${match[2]}`);
+  const metadata = parseYaml(fs.readFileSync(file, 'utf8')); mutate(metadata);
+  fs.writeFileSync(file, stringifyYaml(metadata));
 }
 export function imageAsset(directory) {
   // Real decodable 1x1 PNG, explicitly a synthetic fixture, never a claimed browser screenshot.

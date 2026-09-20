@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.recur.timezone.dst
 title: What a rule does at a DST gap and at a DST fold
 state: done

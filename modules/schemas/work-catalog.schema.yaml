@@ -13,7 +13,7 @@ required:
   - features
 properties:
   schema:
-    const: work/catalog
+    const: work/catalog@1
     description: Record family discriminator. Every record names its own family so a file can be validated
       without inferring its meaning from the directory it happens to sit in.
   id:
@@ -40,7 +40,7 @@ properties:
       properties:
         id:
           $ref: "#/$defs/slug"
-          description: The feature's stable identifier, matching the id its own work/feature record carries.
+          description: The feature's stable identifier, matching the id its own work/feature@1 record carries.
             It is what every record id of that feature embeds as its second segment.
         directory:
           type: string

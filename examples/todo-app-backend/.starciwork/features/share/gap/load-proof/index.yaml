@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.share.load-proof
 title: No k6 run has measured nfr.share.revoke.read-latency against the live stack
 state: todo

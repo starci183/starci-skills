@@ -1,4 +1,4 @@
-schema: work/event
+schema: work/event@1
 id: event.login.new-device-signin
 title: A person signed in from a device that ended a prior session
 state: todo

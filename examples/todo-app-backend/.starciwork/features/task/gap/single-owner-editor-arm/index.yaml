@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.task.single-owner-editor-arm
 title: br.task.single-owner's accepted-editor complete arm has no captured proof
 state: todo

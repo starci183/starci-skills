@@ -12,8 +12,8 @@ const sourceIdentity={schema:'starci/source-identity@1',repositories:[{repositor
 function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-split-freshness-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const file=relative=>path.join(root,relative),put=(relative,value)=>{const target=file(relative);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,stringifyYaml(value));};
- const branch=(relative,id,kind,extension)=>put(relative,{schema:'work/node@2',id,kind,required:true,description:'Synthetic aggregate.',...(extension?{extensions:{work3:extension}}:{})});
- const leaf=(relative,id,kind,extra={})=>put(relative,{schema:'work/node@2',id,kind,required:true,description:'Synthetic split freshness leaf.',state:'todo',...extra});
+ const branch=(relative,id,kind,extension)=>put(relative,{schema:'work/node@1',id,kind,required:true,description:'Synthetic aggregate.',...(extension?{extensions:{work3:extension}}:{})});
+ const leaf=(relative,id,kind,extra={})=>put(relative,{schema:'work/node@1',id,kind,required:true,description:'Synthetic split freshness leaf.',state:'todo',...extra});
  const aggregate=(relative,id,kind,payload,section)=>branch(relative,id,kind,{[payload]:{schema:payload==='srs'?'starci/srs-aggregate@1':'starci/sds-aggregate@1',section,title:section}});
  put('workspace.yaml',{schema:'work/workspace@1',id:'split-freshness'});branch('features/index.yaml','features','business');branch('features/chatbot/index.yaml','chatbot','business');
  branch('features/chatbot/business/index.yaml','business','business');leaf('features/chatbot/business/overview/index.yaml','business.overview','business-overview',{businessOverview:{purpose:'Answer one question.',customerUnderstanding:'A customer asks and receives an outcome.',desiredOutcome:'An honest answer or failure.',scope:'Synthetic question only.',openQuestions:'None.'}});

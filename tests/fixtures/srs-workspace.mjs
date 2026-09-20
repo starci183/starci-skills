@@ -2,12 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {stringifyYaml,parseYaml} from '../../engine/yaml.mjs';
 import {validateWorkspace} from '../../engine/index.mjs';
-import {documentSRSV3} from './srs-v3.mjs';
+import {documentSRS} from './srs.mjs';
 
-const review=()=>({schema:'starci/design-review@1',reviewer:'Synthetic fixture reviewer',authority:'Synthetic runtime regression authority only.',reviewedAt:'2026-09-10T00:00:00Z',observations:[{id:'contract-reviewed',outcome:'pass',observation:'The synthetic Business specification is complete enough to exercise runtime bindings; no product acceptance is claimed.'}],limitations:['This compatibility fixture does not claim architecture, implementation or verification results.']});
-const node=(id,kind,description,extra={})=>({schema:'work/node@2',id,kind,required:true,description,...extra});
+const review=()=>({schema:'starci/design-review@1',reviewer:'Synthetic fixture reviewer',authority:'Synthetic runtime regression authority only.',reviewedAt:'2026-09-10T00:00:00Z',observations:[{id:'contract-reviewed',outcome:'pass',observation:'The synthetic Business specification is complete enough to exercise runtime bindings; no product acceptance is claimed.'}],limitations:['This fixture does not claim architecture, implementation or verification results.']});
+const node=(id,kind,description,extra={})=>({schema:'work/node@1',id,kind,required:true,description,...extra});
 
-export function writeSRSV3Workspace(root,{complete=true}={}){
+export function writeSRSWorkspace(root,{complete=true}={}){
   const write=(relative,value)=>{const file=path.join(root,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(value));};
   fs.mkdirSync(root,{recursive:true});
   write('workspace.yaml',{schema:'work/workspace@1',id:'synthetic-srs-sds-runtime'});
@@ -23,7 +23,7 @@ export function writeSRSV3Workspace(root,{complete=true}={}){
   ];
   for(const [file,id,description,kind] of aggregates)write(file,node(id,kind,description));
   write('module/business/overview/index.yaml',node('business-overview','business-overview','Synthetic accepted intent and scope overview.',{state:'todo',assertions:['contract-reviewed'],businessOverview:{purpose:'Exercise a complete synthetic SRS compatibility workspace.',customerUnderstanding:'An operator receives one scoped recipient result.',desiredOutcome:'Every Business item has one typed owner and reviewable linkage.',scope:'Synthetic runtime validation only.',openQuestions:'None for the fixture; no product decision is asserted.'}}));
-  const srs=documentSRSV3();
+  const srs=documentSRS();
   const leaves=[
     ['module/business/srs/functional-requirements/command/index.yaml','srs-fr-command',srs.fr],
     ['module/business/srs/non-functional-requirements/reliability/index.yaml','srs-nfr-command',srs.nfr],

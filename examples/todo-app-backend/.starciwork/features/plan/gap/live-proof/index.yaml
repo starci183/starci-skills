@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.plan.live-proof
 title: uat.plan.upgrade-after-cap's gateway leg and the create-refusal feedback surface are unproven
 state: todo

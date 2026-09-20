@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.login.session.restores
 title: A session survives a browser restart
 state: done

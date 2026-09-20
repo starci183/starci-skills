@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.checkout.place-order
 title: A visitor becomes a buyer by placing an order
 state: done

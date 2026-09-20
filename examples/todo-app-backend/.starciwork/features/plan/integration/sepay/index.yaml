@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.plan.sepay
 title: SePay processes the checkout and confirms payment
 state: inprogress

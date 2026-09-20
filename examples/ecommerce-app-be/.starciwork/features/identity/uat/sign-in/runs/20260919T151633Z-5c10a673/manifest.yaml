@@ -1,7 +1,7 @@
 schema: starci/uat-run-manifest@1
 id: uat.identity.sign-in.runs.20260919T151633Z-5c10a673
 nodeId: uat.identity.sign-in
-inputDigest: 3dae04f43b2b6515fe818d36c280f114fe0ceb767eb07623fbb745a5104d770a
+inputDigest: 0202eeecdfb4cb139032eb1a3a20ba71d2d41d97cbe1ce45d71c2eadbc2e3ffe
 outcome: pass
 assertions:
   - id: loading

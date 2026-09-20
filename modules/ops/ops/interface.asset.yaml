@@ -74,7 +74,7 @@ writes:
       - ui.artworkSlots[].provenance
       - assets:[{path}]
     content:
-      en: "Record the produced artwork on the work/node@2 record against the slots it already declares: per slot the repository path
+      en: "Record the produced artwork on the work/node@1 record against the slots it already declares: per slot the repository path
         of the file, its sha256, its status and the tool provenance of the generation, and bind each path in the
         record's asset list so the bytes are covered. Add no slot, remove no slot and rewrite no brief, region,
         size or crop: those are the drawing's, and a slot that turned out wrong is a reported gap, not an edit of

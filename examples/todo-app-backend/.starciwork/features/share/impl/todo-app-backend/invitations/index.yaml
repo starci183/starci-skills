@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.share.todo-app-backend.invitations
 title: The invitation store and its lifecycle
 state: done

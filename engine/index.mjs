@@ -7,7 +7,7 @@ import { validateSpecification } from '../scripts/checks/spec/validate.mjs';
 import { validateSDSBindings, SDS_SCHEMA } from '../scripts/checks/spec/sds.mjs';
 import {classifySDSPath,validateSDSMap,SDS_AGGREGATE_SCHEMA} from '../scripts/checks/spec/sds-map.mjs';
 import {classifySRSPath,validateSRSGraph,SRS_AGGREGATE_SCHEMA} from '../scripts/checks/spec/srs-sections.mjs';
-import { validateSRSV3Bindings, SRS_V3_SCHEMA } from '../scripts/checks/spec/srs-v3.mjs';
+import { validateSRSBindings, SRS_SCHEMA } from '../scripts/checks/spec/srs.mjs';
 import { readDistJson } from './runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,20 +64,15 @@ function validate(root,completions=null,authoredTargets=null) {
     if (fs.lstatSync(absolute).isSymbolicLink() || !fs.statSync(absolute).isDirectory()) throw new Error('Root must be a real directory, not a symlink.');
     absolute = fs.realpathSync(absolute);
   } catch { issue('ROOT',String(root),'Cannot read a real workspace directory.'); return result(); }
-  function read(p, markdown=false) {
+  function read(p) {
     try {
       if (fs.lstatSync(p).isSymbolicLink() || !within(absolute,fs.realpathSync(p))) { issue('UNSAFE_PATH',rel(p),'Metadata must not use symlinks or escape workspace.'); return null; }
-      let source = fs.readFileSync(p,'utf8').replace(/^\uFEFF/,''); let body = '';
-      if (markdown) {
-        const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);
-        if (!match) { issue('FRONTMATTER',rel(p),'Expected --- delimited JSON front matter.'); return null; }
-        source=match[1]; body=match[2].replace(/\r\n/g,'\n').trim();
-      }
+      const source = fs.readFileSync(p,'utf8').replace(/^\uFEFF/,''); let body = '';
       let meta;
       try { meta=parseYaml(source); } catch { issue('UNSUPPORTED_METADATA',rel(p),'Invalid YAML 1.2 metadata; duplicate keys, custom tags and aliases are not accepted.'); return null; }
       if (!object(meta)) { issue('METADATA_OBJECT',rel(p),'Metadata must be an object.'); return null; }
-      if(!markdown){if(meta.description!==undefined&&typeof meta.description!=='string'){issue('DESCRIPTION',rel(p),'description must be text');return null;}body=(meta.description??'').replace(/\r\n/g,'\n').trim();}
-      return {meta,body,markdown,path:rel(p),file:p,dir:path.dirname(p)};
+      if(meta.description!==undefined&&typeof meta.description!=='string'){issue('DESCRIPTION',rel(p),'description must be text');return null;}body=(meta.description??'').replace(/\r\n/g,'\n').trim();
+      return {meta,body,path:rel(p),file:p,dir:path.dirname(p)};
     } catch { issue('READ',rel(p),'Cannot read metadata.'); return null; }
   }
   function register(item,type) {
@@ -88,7 +83,7 @@ function validate(root,completions=null,authoredTargets=null) {
     if (!text(item.meta.id) || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(item.meta.id)) issue('ID',item.path,'Stable id is required and must contain only letters, digits, dot, underscore, colon or hyphen.');
     else if (ids.has(item.meta.id)) issue('DUPLICATE_ID',item.path,'Duplicate stable id.');
     else ids.set(item.meta.id,item);
-    if (item.meta.schema !== `work/${type}@1` && !(type==='node'&&item.meta.schema==='work/node@2')) issue('SCHEMA',item.path,`Expected work/${type}@1 (nodes also support @2).`);
+    if (item.meta.schema !== `work/${type}@1`) issue('SCHEMA',item.path,`Expected work/${type}@1.`);
     if (item.meta.extensions !== undefined && !object(item.meta.extensions)) issue('EXTENSIONS',item.path,'extensions must be an object.');
   }
   function checkKeys(value,shape,p) {
@@ -118,9 +113,9 @@ function validate(root,completions=null,authoredTargets=null) {
   const workspace=read(path.join(absolute,'workspace.yaml'));
   if (workspace) register(workspace,'workspace');
   function hasCanonicalNode(dir){
-    try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name==='assets'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@2(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
+    try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name==='assets'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@1(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
   }
-  const workV2=hasCanonicalNode(absolute);
+  const canonicalWork=hasCanonicalNode(absolute);
   // The runtime's own record at the workspace root, not Work artifacts: the ledger `runtime.sqlite` (+ its
   // WAL siblings) with the tracked anchor `ledger-anchor.json` beside it (docs/ledger-db.md §3, §12). None
   // of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
@@ -143,18 +138,20 @@ function validate(root,completions=null,authoredTargets=null) {
       if(inAssets){if(ent.isDirectory())walk(p,true);continue;}
       if (ent.isDirectory()) {
         // `_resources` is traversed for typed resource metadata and opaque/encrypted payloads. Every other
-        // underscore directory is flagged RESERVED_DIRECTORY in a Work v2 tree and walked otherwise.
+        // underscore directory is flagged RESERVED_DIRECTORY in a canonical Work tree and walked otherwise.
         if(dir===absolute&&ent.name==='_resources'){walk(p);continue;}
-        if(ent.name.startsWith('_')){if(workV2)reservedDirectories.push(rel(p));else walk(p);}
+        if(ent.name.startsWith('_')){if(canonicalWork)reservedDirectories.push(rel(p));else walk(p);}
         else walk(p,ent.name==='assets');
         continue;
       }
       let item;
       if(ent.name.toLowerCase().endsWith('.json'))jsonFiles.push(p);
       if(ent.name==='accounts.yaml')accountFiles.push(p);
-      if (['index.yaml','node.yaml','node.md'].includes(ent.name)) {
+      if (ent.name==='index.yaml') {
         if (rel(p).split('/').slice(0,-1).some(part=>['evidence','assets','_resources'].includes(part.toLowerCase()))) { issue('LAYOUT',rel(p),'Nodes cannot be inside reserved evidence, assets or _resources directories.'); continue; }
-        if ((item=read(p,ent.name.endsWith('.md')))) {register(item,'node');if(item.meta.schema==='work/node@2'&&ent.name!=='index.yaml')issue('CANONICAL_FORMAT',item.path,'work/node@2 is canonical YAML index.yaml only.');item.children=[];nodes.push(item);}
+        if ((item=read(p))) {register(item,'node');item.children=[];nodes.push(item);}
+      } else if (ent.name==='node.yaml'||ent.name==='node.md') {
+        issue('CANONICAL_FORMAT',rel(p),'Canonical node metadata is index.yaml only.');
       } else if (ent.name === 'resource.yaml') {
         if (!rel(p).startsWith('_resources/')) {issue('LAYOUT',rel(p),'Resources belong under _resources.');continue;}
         if ((item=read(p))) {register(item,'resource');resources.push(item);}
@@ -165,9 +162,8 @@ function validate(root,completions=null,authoredTargets=null) {
   }
   walk(absolute);
   if(completions)for(const id of Object.keys(completions))if(!nodes.some(n=>n.meta.id===id))issue('COMPLETION_TARGET',id,'Completion preview target does not exist.');
-  const nodesByDirectory=new Map();for(const n of nodes){const items=nodesByDirectory.get(n.dir)??[];items.push(n);nodesByDirectory.set(n.dir,items);}for(const [dir,items] of nodesByDirectory)if(items.length>1)issue('NODE_FORMAT_CONFLICT',rel(dir),'A Work folder must contain exactly one node metadata file.');
-  if(workV2){
-    for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work v2 permits only workspace-root _resources typed custody; collocate all other owned YAML records and assets with their node.');
+  if(canonicalWork){
+    for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work permits only workspace-root _resources typed custody; collocate all other owned YAML records and assets with their node.');
     for(const p of jsonFiles)issue('JSON_ARTIFACT',rel(p),'Canonical Work records and results use YAML; JSON files are not accepted inside Work.');
   }
   const stringList = (v,p,label,required=false) => {
@@ -275,7 +271,7 @@ function validate(root,completions=null,authoredTargets=null) {
   const openOnly=n=>openDecision(n)||(POLICY_FOLDER.test(String(n?.path??'').replace(/\\/g,'/'))&&/srs-aggregate/.test(String(n?.meta?.extensions?.work3?.srs?.schema??''))&&Array.isArray(n?.children)&&n.children.every(openOnly));
   const DECLARATIONS=['reconciliation','integrations'];
   const semanticMetadata=meta=>{
-    const out=Object.fromEntries(Object.entries(meta).filter(([k])=>!operational.has(k)&&!(meta.schema==='work/node@2'&&k==='description')));
+    const out=Object.fromEntries(Object.entries(meta).filter(([k])=>!operational.has(k)&&!(meta.schema==='work/node@1'&&k==='description')));
     const work3=out.extensions&&typeof out.extensions==='object'&&out.extensions.work3&&typeof out.extensions.work3==='object'&&!Array.isArray(out.extensions.work3)?out.extensions.work3:null;
     if(work3&&DECLARATIONS.some(key=>key in work3)){
       const rest={...work3};for(const key of DECLARATIONS)delete rest[key];
@@ -302,19 +298,18 @@ function validate(root,completions=null,authoredTargets=null) {
     if(n.meta.brand!==undefined&&n.meta.kind!=='brand')issue('MODULE_SPEC_OWNER',n.path,'brand belongs to the product brand node at brand/index.yaml.');
     if(n.meta.kind==='brand'){
       if(n.path!=='brand/index.yaml')issue('LAYOUT',n.path,'The product brand is one record at the tree root: brand/index.yaml beside features/, with its masters in brand/assets/**.');
-      else if(n.meta.schema!=='work/node@2')issue('BRAND_SCHEMA',n.path,'The brand record is canonical work/node@2.');
+      else if(n.meta.schema!=='work/node@1')issue('BRAND_SCHEMA',n.path,'The brand record is canonical work/node@1.');
       if(n.meta.brand===undefined)issue('BRAND_SPEC',n.path,'A brand node owns the product brand in its brand: key; there is nothing else for it to be.');
       else if(object(n.meta.brand))checkBrand(n);
     }
     if (!n.body && !structured.length) issue('EMPTY_SPEC',n.path,'Node must have concise description text or one structured module specification.');
     n.depIds=stringList(n.meta.dependsOn,n.path,'dependsOn'); n.refIds=stringList(n.meta.refs,n.path,'refs');
     if(n.meta.assertions !== undefined) stringList(n.meta.assertions,n.path,'assertions');
-    if(n.meta.schema==='work/node@2'){
-      if(n.markdown&&n.meta.description!==undefined)issue('DUPLICATE_BODY',n.path,'Markdown nodes use their prose body; do not duplicate it in description metadata.');
+    if(n.meta.schema==='work/node@1'){
       if(n.meta.activity!==undefined&&!['idle','investigating','implementing','verifying'].includes(n.meta.activity))issue('ACTIVITY',n.path,'Unknown activity.');
       if(n.meta.blockers!==undefined)stringList(n.meta.blockers,n.path,'blockers');
       if(n.meta.investigation!==undefined&&(!object(n.meta.investigation)||!/^[a-f0-9]{64}$/.test(n.meta.investigation.contextDigest??'')))issue('INVESTIGATION',n.path,'Investigation needs the exact reviewed contextDigest.');
-      if(n.meta.history!==undefined)issue('CURRENT_ONLY',n.path,'Canonical Work v2 stores current specification and status only; Git retains history.');
+      if(n.meta.history!==undefined)issue('CURRENT_ONLY',n.path,'Canonical Work stores current specification and status only; Git retains history.');
       if(n.meta.ui!==undefined){
         if(!/(?:^|\/)ui(?:\/[^/]+)*\/index\.yaml$/.test(n.path))issue('UI_LAYOUT',n.path,'A UI specification belongs at ui/index.yaml or a recursively nested scope under ui/.');
         const states=new Set((n.meta.ui.states??[]).map(s=>String(s?.name??'').toLowerCase()));for(const required of ['loading','empty','error','interaction'])if(!states.has(required))issue('UI_STATE_COVERAGE',n.path,`UI specification must describe the ${required} state.`);
@@ -348,7 +343,7 @@ function validate(root,completions=null,authoredTargets=null) {
     const accountsPath=path.join(n.dir,'accounts.yaml');
     if(fs.existsSync(accountsPath)){
       ownedAccounts.add(path.resolve(accountsPath));
-      if(n.meta.schema!=='work/node@2'||n.meta.kind!=='uat'||n.meta.uat?.localFiles?.accounts!=='accounts.yaml')issue('ACCOUNTS_OWNER',rel(accountsPath),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
+      if(n.meta.schema!=='work/node@1'||n.meta.kind!=='uat'||n.meta.uat?.localFiles?.accounts!=='accounts.yaml')issue('ACCOUNTS_OWNER',rel(accountsPath),'accounts.yaml is allowed only beside its owning canonical Work UAT index.yaml and must be declared as uat.localFiles.accounts.');
       else try{
         const accounts=parseYaml(fs.readFileSync(accountsPath,'utf8'));
         const validAccount=a=>object(a)&&Object.keys(a).sort().join(',')==='password,role,username'&&text(a.role)&&text(a.username)&&text(a.password);
@@ -358,16 +353,16 @@ function validate(root,completions=null,authoredTargets=null) {
     n.ownedAssets=ownedAssets;
     n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:semanticMetadata(n.meta),body:n.body}));
   }
-  if(workV2)for(const p of accountFiles)if(!ownedAccounts.has(path.resolve(p)))issue('ACCOUNTS_OWNER',rel(p),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
+  if(canonicalWork)for(const p of accountFiles)if(!ownedAccounts.has(path.resolve(p)))issue('ACCOUNTS_OWNER',rel(p),'accounts.yaml is allowed only beside its owning canonical Work UAT index.yaml and must be declared as uat.localFiles.accounts.');
   for (const n of nodes) {
     n.deps=n.depIds.map(id=>resolve(id,n,['node'])).filter(Boolean);
     n.refs=n.refIds.map(id=>resolve(id,n,['node','resource'])).filter(Boolean);
     if (n.children.length) {
       if ('state' in n.meta || 'completion' in n.meta) issue('BRANCH_STATE',n.path,'Branches must not store state or completion.');
-      if(n.meta.schema==='work/node@2'&&n.meta.kind==='implementation'&&path.basename(n.dir)==='implementation'&&n.meta.implementation!==undefined)issue('IMPLEMENTATION_PARENT',n.path,'The implementation parent is thin and derives status from frontend/backend children; it carries no implementation payload.');
+      if(n.meta.schema==='work/node@1'&&n.meta.kind==='implementation'&&path.basename(n.dir)==='implementation'&&n.meta.implementation!==undefined)issue('IMPLEMENTATION_PARENT',n.path,'The implementation parent is thin and derives status from frontend/backend children; it carries no implementation payload.');
     } else {
       if (!metadataSchema.$defs.node.properties.state.enum.includes(n.meta.state)) issue('STATE',n.path,'Leaf state must be one of the states published by work/node@1.');
-      if(n.meta.schema==='work/node@2'&&!['uninvestigate','todo','done'].includes(n.meta.state))issue('STATE',n.path,'Version 2 has exactly uninvestigate, todo and done.');
+      if(n.meta.schema==='work/node@1'&&!['uninvestigate','todo','done'].includes(n.meta.state))issue('STATE',n.path,'Canonical leaf state is uninvestigate, todo or done.');
       if (n.meta.state==='blocked' && !text(n.meta.blocker)) issue('BLOCKER',n.path,'Blocked leaves require a concrete blocker.');
       if (n.meta.state==='suspended' && !text(n.meta.suspensionReason)) issue('SUSPENSION_REASON',n.path,'Authored suspended leaves require a concrete suspensionReason; imported source is not approved or verified completion.');
       if (n.meta.state==='na' && !text(n.meta.naReason)) issue('NA_REASON',n.path,'N/A requires a reason.');
@@ -405,7 +400,7 @@ function validate(root,completions=null,authoredTargets=null) {
           if(n.meta.sourceRefs?.length)issue('SDS_SOURCE_MAPPING',n.path,'SDS is source-independent; sourceRefs and revision proof belong to Implementation.');
           splitSdsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSds,classification});
         }
-      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'New SDS authoring requires a typed source-independent section; cohesive leaves use starci/specification@3.');
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'New SDS authoring requires a typed source-independent section; cohesive leaves use starci/sds@1.');
       if(!n.children.length&&n.meta.state==='done'&&splitSds!==undefined&&splitSds.status!=='accepted')issue('SDS_NOT_ACCEPTED',n.path,'A reviewed SDS leaf must have status accepted before it can complete.');
     }
     const srsMatch = n.path.match(/^(.*(?:^|\/)business\/)srs\/(?:[^/]+\/)*index\.yaml$/);
@@ -414,7 +409,7 @@ function validate(root,completions=null,authoredTargets=null) {
       if(n.meta.kind!=='business')issue('SRS_LAYOUT',n.path,'SRS branches and leaves have kind business.');
       if(n.meta.sourceRefs?.length)issue('SRS_CODE_INPUT',n.path,'SRS is a source-of-truth contract independent of source code; sourceRefs belong to Implementation proof.');
       if(!nodes.some(x=>x.path===businessRoot+'index.yaml')||!nodes.some(x=>x.path===srsRoot)||!nodes.some(x=>x.path===businessRoot+'overview/index.yaml'&&x.meta.kind==='business-overview'))issue('SRS_LAYOUT',n.path,'Nested SRS requires business/index.yaml, business/overview/index.yaml and business/srs/index.yaml.');
-      if(n.meta.business!==undefined)issue('SRS_DUPLICATE',n.path,'Version 2 SRS is the sole detailed payload; do not duplicate it in business.');
+      if(n.meta.business!==undefined)issue('SRS_DUPLICATE',n.path,'The SRS section is the sole detailed payload; do not duplicate it in business.');
       if(n.children.length&&spec!==undefined)issue('SRS_BRANCH_PAYLOAD',n.path,'SRS branches aggregate descendant requirements; only leaves carry specifications.');
       if(splitSrs!==undefined){
         const classification=classifySRSPath(n.path,n.children.length>0);
@@ -425,9 +420,9 @@ function validate(root,completions=null,authoredTargets=null) {
           if(classification.aggregate&&splitSrs?.schema!==SRS_AGGREGATE_SCHEMA)issue('SRS_AGGREGATE',n.path,'SRS parent indexes use starci/srs-aggregate@1 metadata.');
           splitSrsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSrs,classification});
         }
-      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&!['starci/specification@2',SRS_V3_SCHEMA].includes(spec?.schema))issue('SRS_VERSION',n.path,'New SRS authoring requires a typed split section; cohesive leaves use starci/specification@2 or starci/srs@3; uninvestigated placeholders cannot complete.');
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&!['starci/specification@1',SRS_SCHEMA].includes(spec?.schema))issue('SRS_VERSION',n.path,'New SRS authoring requires a typed split section; cohesive leaves use starci/specification@1 or starci/srs@1; uninvestigated placeholders cannot complete.');
       if(!n.children.length&&n.meta.state==='done'&&splitSrs!==undefined&&splitSrs.status!=='accepted')issue('SRS_NOT_ACCEPTED',n.path,'A reviewed SRS section must have status accepted before it can complete.');
-      if(spec?.schema===SRS_V3_SCHEMA){const suffix=n.path.slice((businessRoot+'srs/').length), expected=suffix.startsWith('functional-requirements/')?'functional-requirement':suffix.startsWith('non-functional-requirements/')?'non-functional-requirement':suffix.startsWith('business-rules/')?'business-rule':suffix.startsWith('data/')?'data':suffix.startsWith('customer-journeys/')?'customer-journey':null;if(!expected||spec.nodeType!==expected)issue('SRS_NODE_TYPE',n.path,'SRS@3 nodeType must match its canonical functional-requirements/non-functional-requirements/business-rules/data/customer-journeys folder.');}
+      if(spec?.schema===SRS_SCHEMA){const suffix=n.path.slice((businessRoot+'srs/').length), expected=suffix.startsWith('functional-requirements/')?'functional-requirement':suffix.startsWith('non-functional-requirements/')?'non-functional-requirement':suffix.startsWith('business-rules/')?'business-rule':suffix.startsWith('data/')?'data':suffix.startsWith('customer-journeys/')?'customer-journey':null;if(!expected||spec.nodeType!==expected)issue('SRS_NODE_TYPE',n.path,'SRS nodeType must match its canonical functional-requirements/non-functional-requirements/business-rules/data/customer-journeys folder.');}
     }
     if (spec !== undefined) {
       const review = validateSpecification(spec);
@@ -442,7 +437,7 @@ function validate(root,completions=null,authoredTargets=null) {
           for(const message of validateSDSBindings(spec,{nodes,allowedNodeIds}))issue('SDS_BINDING',n.path,message);
         }
         const businesses = [...n.effectiveRefs,...n.effectiveDeps].flatMap(businessInputs).filter(r=>r.meta.kind==='business'&&r.meta.extensions?.work3?.specification).map(r=>r.meta.extensions.work3.specification);
-        if(spec.schema==='starci/specification@2') for(const business of businesses.filter(b=>b.schema==='starci/specification@2')) {
+        if(spec.schema==='starci/specification@1') for(const business of businesses.filter(b=>b.schema==='starci/specification@1')) {
           for(const field of ['requirements','flows','actors','data','externalInterfaces','acceptance']) for(const input of business[field]??[]) {
             const output=(spec[field]??[]).find(row=>row.id===input.id);
             if(!output||canonicalJSON(output)!==canonicalJSON(input))issue('SPECIFICATION_BUSINESS_DRIFT',n.path,'Architecture must preserve referenced SRS '+field+' item '+input.id+' unchanged; service calls are separate.');
@@ -454,11 +449,11 @@ function validate(root,completions=null,authoredTargets=null) {
           if (spec.status === 'pass' && !matches.length) issue('SPECIFICATION_JOURNEY_UNBOUND', n.path, 'Passing architecture journeys need a referenced business journey.');
         }
       }
-      if(spec?.schema===SRS_V3_SCHEMA&&review.ok){const walk=x=>[x,...x.children.flatMap(walk)],rootPrefix=n.path.split('business/')[0]+'business/',allowed=nodes.filter(item=>item.type==='node'&&item.path.startsWith(rootPrefix));for(const input of [...n.effectiveRefs,...n.effectiveDeps])allowed.push(...(input.type==='node'?walk(input):[input]));for(const message of validateSRSV3Bindings(spec,{nodes,allowedNodeIds:new Set(allowed.map(x=>x.meta.id))}))issue('SRS_BINDING',n.path,message);}
+      if(spec?.schema===SRS_SCHEMA&&review.ok){const walk=x=>[x,...x.children.flatMap(walk)],rootPrefix=n.path.split('business/')[0]+'business/',allowed=nodes.filter(item=>item.type==='node'&&item.path.startsWith(rootPrefix));for(const input of [...n.effectiveRefs,...n.effectiveDeps])allowed.push(...(input.type==='node'?walk(input):[input]));for(const message of validateSRSBindings(spec,{nodes,allowedNodeIds:new Set(allowed.map(x=>x.meta.id))}))issue('SRS_BINDING',n.path,message);}
       if (n.meta.state === 'done' && spec?.status !== 'pass') issue('SPECIFICATION_NOT_ACCEPTED', n.path, 'Draft or blocked specification cannot complete a node.');
       for (const source of Array.isArray(spec?.sources) ? spec.sources : []) {
         if (source?.kind !== 'observed') continue;
-        if (n.meta.schema === 'work/node@2') {
+        if (n.meta.schema === 'work/node@1') {
           const bindings = (Array.isArray(n.meta.sourceRefs) ? n.meta.sourceRefs : []).filter(ref => object(ref) && ref.repository === source.repository && ref.path === source.path);
           if (!bindings.length) issue('SPECIFICATION_SOURCE_UNBOUND', n.path, 'Observed source needs an owning-node sourceRefs entry with the same repository and path.');
           else if (bindings.some(ref => ref.revision !== source.revision)) issue('SPECIFICATION_SOURCE_STALE', n.path, 'Observed source revision must match every owning-node sourceRefs entry for that repository and path.');
@@ -473,8 +468,8 @@ function validate(root,completions=null,authoredTargets=null) {
   for(const finding of validateSRSGraph(splitSrsEntries))issue(finding.code,finding.path,finding.message);
   const businessEntries=nodes.filter(node=>node.meta.kind==='business'||node.meta.kind==='business-overview').map(node=>({nodeId:node.meta.id,path:node.path}));
   for(const finding of validateSDSMap(splitSdsEntries,splitSrsEntries,businessEntries))issue(finding.code,finding.path,finding.message);
-  const srs3=nodes.filter(n=>{const s=n.meta.extensions?.work3?.specification;return s?.schema===SRS_V3_SCHEMA&&validateSpecification(s).ok;});
-  const srsIds=new Map();for(const n of srs3){const spec=n.meta.extensions.work3.specification;if(srsIds.has(spec.id))issue('SRS_ITEM_ID',n.path,`Duplicate SRS item id ${spec.id}.`);else srsIds.set(spec.id,n);}for(const n of srs3){const spec=n.meta.extensions.work3.specification,c=spec.content,declared=(type,id)=>spec.refs.some(r=>r.type===type&&r.itemId===id);const requireRefs=(ids,type,label)=>{for(const id of ids??[])if(!declared(type,id))issue('SRS_GRAPH',n.path,`${label} ${id} needs an explicit typed ${type} ref.`);};
+  const srsNodes=nodes.filter(n=>{const s=n.meta.extensions?.work3?.specification;return s?.schema===SRS_SCHEMA&&validateSpecification(s).ok;});
+  const srsIds=new Map();for(const n of srsNodes){const spec=n.meta.extensions.work3.specification;if(srsIds.has(spec.id))issue('SRS_ITEM_ID',n.path,`Duplicate SRS item id ${spec.id}.`);else srsIds.set(spec.id,n);}for(const n of srsNodes){const spec=n.meta.extensions.work3.specification,c=spec.content,declared=(type,id)=>spec.refs.some(r=>r.type===type&&r.itemId===id);const requireRefs=(ids,type,label)=>{for(const id of ids??[])if(!declared(type,id))issue('SRS_GRAPH',n.path,`${label} ${id} needs an explicit typed ${type} ref.`);};
     if(spec.nodeType==='functional-requirement'){requireRefs(c.businessRuleRefs,'business-rule','FR business rule');requireRefs(c.nfrRefs,'non-functional-requirement','FR NFR');}
     if(spec.nodeType==='business-rule')for(const id of c.appliesTo)if(!spec.refs.some(r=>r.itemId===id&&['functional-requirement','customer-journey'].includes(r.type)))issue('SRS_GRAPH',n.path,`Business rule appliesTo ${id} needs an explicit typed FR/journey ref.`);
     if(spec.nodeType==='data')for(const transition of c.transitions)for(const id of transition.ruleRefs)if(!spec.refs.some(r=>r.type==='business-rule'&&r.itemId===id))issue('SRS_GRAPH',n.path,`Data transition rule ${id} needs an explicit typed business-rule ref.`);
@@ -551,7 +546,7 @@ function validate(root,completions=null,authoredTargets=null) {
   const specificationSeedRefs=node=>{
     const spec=node.meta.extensions?.work3?.specification,split=splitSemanticRefs(node);
     if(split.length)return split;
-    if(spec?.schema===SRS_V3_SCHEMA)return (spec.refs??[]).filter(ref=>text(ref?.nodeId));
+    if(spec?.schema===SRS_SCHEMA)return (spec.refs??[]).filter(ref=>text(ref?.nodeId));
     return [];
   };
   function input(n) {
@@ -597,7 +592,7 @@ function validate(root,completions=null,authoredTargets=null) {
   }
   function sourceIdentity(value,item,owner,assets) {
     if(!object(value)||value.schema!=='starci/source-identity@1'||!Array.isArray(value.repositories)||!value.repositories.length){issue('SOURCE_IDENTITY',item.path,'Versioned nonempty direct source identity required.');return;}
-    if(owner?.meta.schema!=='work/node@2'||owner?.meta.kind!=='implementation')issue('SOURCE_IDENTITY_SCOPE',item.path,'Direct source identity is restricted to current implementation nodes.');
+    if(owner?.meta.schema!=='work/node@1'||owner?.meta.kind!=='implementation')issue('SOURCE_IDENTITY_SCOPE',item.path,'Direct source identity is restricted to current implementation nodes.');
     const seen=new Set();
     const normalized=p=>typeof p==='string'&&p.trim().length>0&&p===p.trim()&&!/[\\\x00-\x1f:]/.test(p)&&!p.startsWith('/')&&p.split('/').every(s=>s&&s!=='.'&&s!=='..');
     for(const r of value.repositories){
@@ -670,12 +665,12 @@ function validate(root,completions=null,authoredTargets=null) {
       const spec=n.meta.extensions?.work3?.specification;
       const splitSrs=n.meta.extensions?.work3?.srs,srsSection=splitSrs===undefined?null:classifySRSPath(n.path,false);
       const splitSds=n.meta.extensions?.work3?.sds,sdsSection=splitSds===undefined?null:classifySDSPath(n.path,false);
-      const supported=n.meta.schema==='work/node@2'&&(
+      const supported=n.meta.schema==='work/node@1'&&(
         (n.meta.kind==='brand'&&object(n.meta.brand))||
         (n.meta.kind==='business-overview'&&object(n.meta.businessOverview))||
-        (n.meta.kind==='business'&&spec?.schema==='starci/specification@2'&&spec.op==='business.decide')||
+        (n.meta.kind==='business'&&spec?.schema==='starci/specification@1'&&spec.op==='business.decide')||
         (n.meta.kind==='architecture'&&spec?.schema===SDS_SCHEMA&&spec.op==='architecture.decide')||
-        (n.meta.kind==='business'&&spec?.schema===SRS_V3_SCHEMA&&spec.op==='business.decide')||
+        (n.meta.kind==='business'&&spec?.schema===SRS_SCHEMA&&spec.op==='business.decide')||
         (n.meta.kind==='business'&&srsSection?.type&&splitSrs?.schema===srsSection.expectedSchema)||
         (n.meta.kind==='architecture'&&sdsSection?.type&&splitSds?.schema===sdsSection.expectedSchema));
       if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to the brand record, current structured Business overview, split source-independent SDS and their readable cohesive formats; other profiles require their existing proof.');
@@ -750,10 +745,10 @@ function validate(root,completions=null,authoredTargets=null) {
       issue('DEPENDENCY_NOT_DONE',n.path,'Prerequisites must be effectively done; N/A is not proof that a prerequisite exists.');
       n.effectiveState='suspended';n.suspensionReasons.push({code:'PREREQUISITE_NOT_DONE',ids:n.blockedBy});
     }
-    if(n.meta.schema==='work/node@2'){
+    if(n.meta.schema==='work/node@1'){
       const hasInvestigation=Boolean(n.meta.investigation);
       const reviewed=!hasInvestigation||n.meta.investigation.contextDigest===n.contextDigest;
-      const unreviewedAncestors=[];for(let a=n.parent;a;a=a.parent)if(a.meta.schema==='work/node@2'&&a.meta.investigation&&a.meta.investigation.contextDigest!==a.contextDigest)unreviewedAncestors.push(a);
+      const unreviewedAncestors=[];for(let a=n.parent;a;a=a.parent)if(a.meta.schema==='work/node@1'&&a.meta.investigation&&a.meta.investigation.contextDigest!==a.contextDigest)unreviewedAncestors.push(a);
       const unreviewedAncestor=unreviewedAncestors.length>0;
       const unreviewedReference=n.effectiveRefs.some(r=>r.type==='node'&&roll(r)==='uninvestigate');
       const unreviewedDependency=n.effectiveDeps.some(d=>roll(d)==='uninvestigate');
@@ -807,7 +802,7 @@ export function impactWorkspace(root,id){
 export function staleWorkspace(root){
   const validation=validateWorkspace(root);
   const staleCodes=new Set(['INPUT_CHANGED','CONTEXT_CHANGED','ANCESTOR_NOT_INVESTIGATED','REFERENCE_NOT_INVESTIGATED','DEPENDENCY_NOT_INVESTIGATED','PREREQUISITE_NOT_DONE','COMPLETION_BLOCKED']);
-  const nodes=validation.nodes.filter(n=>n.schema==='work/node@2'&&(n.effectiveState==='uninvestigate'||n.completion?.inputDigest!==undefined&&n.completion.inputDigest!==n.inputDigest)).map(n=>{
+  const nodes=validation.nodes.filter(n=>n.schema==='work/node@1'&&(n.effectiveState==='uninvestigate'||n.completion?.inputDigest!==undefined&&n.completion.inputDigest!==n.inputDigest)).map(n=>{
     const reasons=n.suspensionReasons??[];
     const hadReceipt=Boolean(n.investigationDigest||n.completion);
     const stale=hadReceipt&&(reasons.some(r=>staleCodes.has(r.code))||Boolean(n.completion&&n.completion.inputDigest!==n.inputDigest));

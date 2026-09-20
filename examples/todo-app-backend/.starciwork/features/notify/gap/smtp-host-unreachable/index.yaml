@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.notify.smtp-host-unreachable
 title: No dev SMTP host is declared or reachable for a live send
 state: todo

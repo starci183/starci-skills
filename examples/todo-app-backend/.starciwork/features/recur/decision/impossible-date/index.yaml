@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.recur.impossible-date
 title: Skip, clamp, or refuse a monthly rule's day that a month does not have
 state: done

@@ -1,4 +1,4 @@
-schema: work/ui-screen
+schema: work/ui-screen@1
 id: ui.recur.schedule
 title: A recurring task's schedule
 state: done

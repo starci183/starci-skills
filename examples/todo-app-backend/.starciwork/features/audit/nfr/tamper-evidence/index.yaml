@@ -1,4 +1,4 @@
-schema: work/non-functional-requirement
+schema: work/non-functional-requirement@1
 id: nfr.audit.tamper-evidence
 title: Any alteration or removal of a stored line is detectable
 quality: integrity

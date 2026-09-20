@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.plan.usage.view
 title: View usage against the cap
 state: todo

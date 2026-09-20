@@ -1,6 +1,6 @@
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: urn:work:metadata:1
-description: Canonical Work metadata is authored as YAML 1.2. Work v2 stores active nodes in
+description: Canonical Work metadata is authored as YAML 1.2. Work stores active nodes in
   index.yaml, keeps source provenance inline, and keeps every structured record in YAML, including a
   collocated disposable UAT accounts.yaml fixture.
 oneOf:
@@ -78,7 +78,7 @@ $defs:
     properties:
       schema:
         const: work/resource@1
-        description: v1 resource format discriminator; canonical Work v2 uses direct provenance.
+        description: Resource format discriminator; canonical Work uses direct provenance.
       id:
         $ref: "#/$defs/id"
         description: Stable graph identifier used by dependencies and digest propagation; example
@@ -1121,8 +1121,7 @@ $defs:
       schema:
         enum:
           - work/node@1
-          - work/node@2
-        description: Format and version discriminator; use work/node@2 for canonical index.yaml nodes.
+        description: Format and version discriminator; canonical index.yaml nodes carry work/node@1.
       id:
         $ref: "#/$defs/id"
         description: Stable graph identifier used by dependencies and digest propagation; example
@@ -1149,7 +1148,7 @@ $defs:
           for defined work, or done with bound proof."
       refs:
         $ref: "#/$defs/ids"
-        description: Other technical node IDs used as context; resource indirection is not canonical Work v2.
+        description: Other technical node IDs used as context; resource indirection is not canonical Work.
       dependsOn:
         $ref: "#/$defs/ids"
         description: Technical prerequisite node IDs whose semantic changes invalidate this node.
@@ -1294,7 +1293,7 @@ $defs:
       - if:
           properties:
             schema:
-              const: work/node@2
+              const: work/node@1
               description: Canonical index.yaml node format discriminator.
           required:
             - schema
@@ -1307,7 +1306,7 @@ $defs:
                 - done
               description: "Authored leaf state: uninvestigate for unconfirmed generated/imported content, todo
                 for defined work, or done with bound proof."
-    description: One Work node. Version 2 is canonical index.yaml; leaves use exactly uninvestigate,
+    description: One Work node. work/node@1 is canonical index.yaml; leaves use exactly uninvestigate,
       todo or done and parents derive state.
   outcome:
     enum:

@@ -209,7 +209,7 @@ executionModes:
           - "description: Purpose / Scope / Done when / Decisions / Unknowns"
           - "extensions.work3.nativeGoal: actual returned current-task goal reference only"
         content:
-          en: "Every authored index.yaml is a work/node@2 record at its catalog-declared path. Capture the
+          en: "Every authored index.yaml is a work/node@1 record at its catalog-declared path. Capture the
             customer-language product overview first in .starciwork/business/index.yaml using
             readable block prose for purpose, customerUnderstanding, desiredOutcome, scope and
             openQuestions; it does not approve inferred module requirements. Write other parent
@@ -495,7 +495,7 @@ executionModes:
           - "description: Pilot boundary / Observed source mapping / Approved intent / Candidate
             scope / Unknowns"
         content:
-          en: "Every authored index.yaml is a work/node@2 record at its catalog-declared path. N is the
+          en: "Every authored index.yaml is a work/node@1 record at its catalog-declared path. N is the
             operations migration-review leaf, with inventory/preservation/import assertions; the
             business parent has no state/completion. Capture the current customer-language product
             overview in .starciwork/business/index.yaml before module SRS import. Every newly

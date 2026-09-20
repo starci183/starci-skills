@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.login.session.single-device
 title: Signing in on a new device ends the old session
 state: todo

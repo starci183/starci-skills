@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.plan.reconciliation
 title: What happens when the webhook never arrives
 state: todo

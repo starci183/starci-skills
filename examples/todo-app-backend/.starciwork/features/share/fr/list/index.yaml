@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.share.list
 title: List a task's collaborators
 state: done

@@ -53,7 +53,7 @@ const brandSpec=({mascot=true}={})=>({
 function tree(t,{brand=brandSpec(),label='tree'}={}){
   const root=temporary(t,label);
   const work=path.join(root,'.starciwork');
-  write(work,'brand/index.yaml',stringifyYaml({schema:'work/node@2',id:'brand',kind:'brand',required:true,state:'todo',
+  write(work,'brand/index.yaml',stringifyYaml({schema:'work/node@1',id:'brand',kind:'brand',required:true,state:'todo',
     rev:brand.rev,description:'Product brand record.',brand}));
   write(work,'brand/assets/mascot.svg','<svg xmlns="http://www.w3.org/2000/svg"/>');
   return {repoRoot:root,work};
@@ -78,7 +78,7 @@ function uiNode(t,{label='ui',assets=null,surfaces=null,artworkSlots=null,markup
   fs.mkdirSync(path.join(root,'assets'),{recursive:true});
   fs.writeFileSync(path.join(root,'assets','dashboard-desktop.png'),capture);
   if(markup!==null)fs.writeFileSync(path.join(root,'assets','dashboard-desktop.html'),markup);
-  const record={schema:'work/node@2',id:'ui',kind:'ui',required:true,state:'todo',description:'Dashboard design record.',
+  const record={schema:'work/node@1',id:'ui',kind:'ui',required:true,state:'todo',description:'Dashboard design record.',
     assets:[{path:'assets/dashboard-desktop.png'}],
     ui:{status:'proposed',intent:'The dashboard main state.',
       surfaces:surfaces??[{name:'Dashboard',route:'/dashboard',purpose:'See the week',actors:['learner']}],

@@ -1,8 +1,8 @@
-# Written by hand: a work/integration's requiresProof.live asks for proof {boundary: live, fakes: []}
+# Written by hand: a work/integration@1's requiresProof.live asks for proof {boundary: live, fakes: []}
 # against the real provider (schemas/work-layout.yaml), which is not an --assert-shaped unit-test
 # command scripts/example-evidence.mjs runs, but a replayable shell script this record's own note
 # already names (scripts/live-proof.sh).
-schema: work/evidence
+schema: work/evidence@1
 record: integration.login.keycloak
 proof:
   boundary: live

@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.login.session.devices
 title: How many devices may hold a live session
 state: done

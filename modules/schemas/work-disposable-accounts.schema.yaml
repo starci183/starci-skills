@@ -13,7 +13,7 @@ required:
   - accounts
 properties:
   schema:
-    const: work/disposable-accounts
+    const: work/disposable-accounts@1
     description: Record family discriminator. Every record names its own family so a file can be validated
       without inferring its meaning from the directory it happens to sit in.
   accounts:

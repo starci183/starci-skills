@@ -44,7 +44,7 @@ function fixture(t) {
   fs.cpSync(new URL('fixtures/nested-business/', import.meta.url), root, {recursive: true});
   t.after(() => { assert.equal(path.dirname(root), os.tmpdir()); assert.ok(path.basename(root).startsWith('starci-sds-')); fs.rmSync(root, {recursive: true, force: true}); });
   const write = (relative, value) => {const file = path.join(root, relative); fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, stringifyYaml(value));};
-  const node = (id, more = {}) => ({schema: 'work/node@2', id, kind: 'architecture', required: true, description: 'Synthetic owned design scope.', ...more});
+  const node = (id, more = {}) => ({schema: 'work/node@1', id, kind: 'architecture', required: true, description: 'Synthetic owned design scope.', ...more});
   write('knowledge/architecture/index.yaml', node('example.architecture', {dependsOn: ['example.business.srs']}));
   write('knowledge/architecture/overview/index.yaml', node('example.architecture.overview', {state: 'todo', description: 'Source-independent example scope overview.'}));
   write('knowledge/architecture/sds/index.yaml', node('example.architecture.sds', {state: 'todo', extensions: {work3: {specification: documentSDS()}}}));

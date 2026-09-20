@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.login.migration-not-applied
 title: No migration has been applied against the dev server
 state: done

@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.recur.occurrence.owned-by-rule-owner
 title: An occurrence belongs to the rule's owner
 state: done

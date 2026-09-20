@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.checkout.second-example-gates
 title: No CI job or host port-registry entry exists for this second example yet
 state: todo

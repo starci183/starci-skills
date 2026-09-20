@@ -1,7 +1,7 @@
 # work-layout.yaml concept 4 (_resources): task fixtures uat.verify's `fixtures` read inspects before
 # seeding prerequisites. Backed by the actual seed scripts under .starcistacks/dev/seeds/, never the
 # outcome the flow is testing.
-schema: work/resource
+schema: work/resource@1
 id: fixture.todo-app.seed
 kind: fixture
 owner: todo-app-backend

@@ -1,7 +1,7 @@
 import { validateJourneys } from './journeys.mjs';
 import { validateSDS, SDS_SCHEMA } from './sds.mjs';
-import { validateSRSV3, SRS_V3_SCHEMA } from './srs-v3.mjs';
-import { validateSRSDetails, validateArchitectureReview } from './v2.mjs';
+import { validateSRS, SRS_SCHEMA } from './srs.mjs';
+import { validateSRSDetails, validateArchitectureReview } from './specification.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { skillRoot } from '../../../engine/runtime-root.mjs';
 import fs from 'node:fs';
@@ -12,7 +12,7 @@ const text = x => typeof x === 'string' && x.trim().length > 0;
 const safePath = x => text(x) && !path.posix.isAbsolute(x) && !path.win32.isAbsolute(x) && !/[\\:\x00-\x1f]/.test(x) && !x.split('/').some(p => !p || p === '.' || p === '..');
 
 export function validateSpecification(spec) {
-  try { return spec?.schema === SRS_V3_SCHEMA ? validateSRSV3(spec) : spec?.schema === SDS_SCHEMA ? validateSDS(spec) : validate(spec); }
+  try { return spec?.schema === SRS_SCHEMA ? validateSRS(spec) : spec?.schema === SDS_SCHEMA ? validateSDS(spec) : validate(spec); }
   catch { return { ok: false, errors: ['Malformed specification; no handoff can be certified.'] }; }
 }
 function validate(spec) {
@@ -24,12 +24,12 @@ function validate(spec) {
     return ok;
   };
   const architecture = spec?.op === 'architecture.decide';
-  const v2 = spec?.schema === contract.currentPayloadSchema;
-  const rowContract = { ...contract.rows, ...(v2 ? contract.v2.rows : {}), ...(architecture ? contract.architectureRows : {}) };
-  if (v2 && !architecture) { delete rowContract.codeImpacts; delete rowContract.serviceImpacts; }
-  if (v2 && architecture) rowContract.security = contract.rows.security;
-  const arrayFields = { ...contract.arrayFields, ...contract.architectureArrays, ...(v2 ? contract.v2.arrayFields : {}) };
-  const required = v2 ? [...contract.v2.required, ...(architecture ? ['codeImpacts','serviceImpacts','architectureReview'] : [])] : contract.required;
+  const cohesive = spec?.schema === contract.currentPayloadSchema;
+  const rowContract = { ...contract.rows, ...(cohesive ? contract.cohesive.rows : {}), ...(architecture ? contract.architectureRows : {}) };
+  if (cohesive && !architecture) { delete rowContract.codeImpacts; delete rowContract.serviceImpacts; }
+  if (cohesive && architecture) rowContract.security = contract.rows.security;
+  const arrayFields = { ...contract.arrayFields, ...contract.architectureArrays, ...(cohesive ? contract.cohesive.arrayFields : {}) };
+  const required = cohesive ? [...contract.cohesive.required, ...(architecture ? ['codeImpacts','serviceImpacts','architectureReview'] : [])] : contract.required;
   if (!shape(spec, [...required, ...(architecture ? Object.keys(contract.architectureRows) : [])], 'specification')) return { ok: false, errors };
   check([contract.payloadSchema, contract.currentPayloadSchema].includes(spec.schema), 'schema');
   check(['business.decide', 'architecture.decide'].includes(spec.op), 'op');
@@ -38,7 +38,7 @@ function validate(spec) {
   const ids = {};
   for (const [section, fields] of Object.entries(rowContract)) {
     const rows = spec[section];
-    const mayBeEmpty = ['decisions','journeyCoverage', ...(v2 ? ['data','externalInterfaces','patternDecisions'] : [])].includes(section);
+    const mayBeEmpty = ['decisions','journeyCoverage', ...(cohesive ? ['data','externalInterfaces','patternDecisions'] : [])].includes(section);
     check(Array.isArray(rows) && (mayBeEmpty || rows.length > 0), section + ': rows required');
     ids[section] = new Set();
     for (const row of Array.isArray(rows) ? rows : []) {
@@ -49,7 +49,7 @@ function validate(spec) {
         if ((arrayFields[section] ?? []).includes(key)) check(Array.isArray(row[key]) && (['steps','alternatives','exceptions','attributes','transitions'].includes(key) || row[key].every(text)), section + '.' + key + ': array required');
         else if (key === 'sequence') check(Number.isInteger(row[key]) && row[key] > 0, 'call sequence');
         else if (key === 'mechanism') check(row[key] && typeof row[key] === 'object' && !Array.isArray(row[key]), 'pattern mechanism');
-        else if (v2 && key === 'branchReview') check(row[key] && typeof row[key] === 'object' && !Array.isArray(row[key]), 'branch review');
+        else if (cohesive && key === 'branchReview') check(row[key] && typeof row[key] === 'object' && !Array.isArray(row[key]), 'branch review');
         else if (key !== 'blocking') check(text(row[key]), section + '.' + key + ': text required');
       }
       for (const [key, value] of Object.entries(row)) check(value !== null && value !== undefined && (typeof value !== 'string' || text(value)), section + '.' + key + ': value required');
@@ -82,14 +82,14 @@ function validate(spec) {
     check(Array.isArray(flow.steps) && flow.steps.length > 0, 'ordered flow steps required');
     const seen = new Set();
     for (const step of Array.isArray(flow.steps) ? flow.steps : []) {
-      const stepFields = v2 ? contract.v2.flowStep : contract.flowStep;
+      const stepFields = cohesive ? contract.cohesive.flowStep : contract.flowStep;
       if (!shape(step, stepFields, flow.id + '.step')) continue;
       check(text(step.id) && !seen.has(step.id), 'flow step id'); seen.add(step.id);
       for (const key of stepFields.filter(k => k !== 'acceptanceIds')) check(text(step[key]), 'step.' + key);
       refs(step.acceptanceIds, 'acceptance', step.id);
     }
     refs(flow.acceptanceIds, 'acceptance', flow.id);
-    if (!v2 || architecture) {
+    if (!cohesive || architecture) {
       check(rows('codeImpacts').some(x => x.flowIds?.includes(flow.id)), 'flow missing code impact: ' + flow.id);
       check(rows('serviceImpacts').some(x => x.flowIds?.includes(flow.id)), 'flow missing service impact: ' + flow.id);
     }
@@ -103,10 +103,10 @@ function validate(spec) {
   for (const row of rows('serviceImpacts')) { refs(row.sourceRefs, 'sources', row.id); refs(row.flowIds, 'flows', row.id); }
   for (const row of rows('security')) {
     refs(row.sourceRefs, 'sources', row.id); refs(row.acceptanceIds, 'acceptance', row.id);
-    if (!v2 || architecture) { refs(row.codeImpactIds, 'codeImpacts', row.id); refs(row.serviceIds, 'serviceImpacts', row.id); }
+    if (!cohesive || architecture) { refs(row.codeImpactIds, 'codeImpacts', row.id); refs(row.serviceIds, 'serviceImpacts', row.id); }
     check(rows('acceptance').some(a => row.acceptanceIds?.includes(a.id) && a.scenario === 'negative'), 'security needs negative acceptance: ' + row.id);
   }
-  for (const row of rows('acceptance')) { refs(row.requirementIds, 'requirements', row.id); refs(row.flowIds, 'flows', row.id); check(['positive','negative','boundary','recovery',...(v2 ? ['alternative'] : [])].includes(row.scenario), 'acceptance scenario'); }
+  for (const row of rows('acceptance')) { refs(row.requirementIds, 'requirements', row.id); refs(row.flowIds, 'flows', row.id); check(['positive','negative','boundary','recovery',...(cohesive ? ['alternative'] : [])].includes(row.scenario), 'acceptance scenario'); }
   for (const row of rows('decisions')) {
     refs(row.sourceRefs, 'sources', row.id); check(typeof row.blocking === 'boolean', 'decision blocking flag');
     check(['accepted','proposed','unknown','deferred'].includes(row.status), 'decision status');
@@ -132,7 +132,7 @@ function validate(spec) {
       const ordered = calls.filter(c => c.flowId === flow.id);
       check(ordered.length > 0 && ordered.every((c,i) => c.sequence === i + 1), 'flow calls require contiguous declared order');
     }
-    if (!v2) for (const pattern of contract.architectureRequiredPatterns) check(rows('patternDecisions').some(p => p.pattern === pattern), 'missing pattern decision: ' + pattern);
+    if (!cohesive) for (const pattern of contract.architectureRequiredPatterns) check(rows('patternDecisions').some(p => p.pattern === pattern), 'missing pattern decision: ' + pattern);
     for (const pattern of rows('patternDecisions')) {
       check(['adopt','preserve','reject','defer'].includes(pattern.decision), 'pattern decision');
       refs(pattern.sourceRefs, 'sources', pattern.id); refs(pattern.serviceIds, 'serviceImpacts', pattern.id); refs(pattern.acceptanceIds, 'acceptance', pattern.id);
@@ -151,10 +151,10 @@ function validate(spec) {
       if (spec.status === 'pass') check(review.applicability !== 'unknown', 'unknown security review cannot pass');
     }
   }
-  const businessV2 = v2 && !architecture;
-  if (shape(spec.handoff, businessV2 ? contract.v2.handoff : contract.handoff, 'handoff')) {
-    if (businessV2) {
-      for (const key of contract.v2.handoff) check(Array.isArray(spec.handoff[key]) && spec.handoff[key].length > 0 && spec.handoff[key].every(text), 'business handoff.' + key);
+  const businessCohesive = cohesive && !architecture;
+  if (shape(spec.handoff, businessCohesive ? contract.cohesive.handoff : contract.handoff, 'handoff')) {
+    if (businessCohesive) {
+      for (const key of contract.cohesive.handoff) check(Array.isArray(spec.handoff[key]) && spec.handoff[key].length > 0 && spec.handoff[key].every(text), 'business handoff.' + key);
     } else {
     check(Array.isArray(spec.handoff.implementationChecks) && spec.handoff.implementationChecks.length > 0, 'implementation check plan required');
     for (const row of spec.handoff.implementationChecks ?? []) {
@@ -166,8 +166,8 @@ function validate(spec) {
     }
     }
   }
-  if (v2) {
-    const helpers = {check, shape, refs, rows, ids, text, contract:contract.v2};
+  if (cohesive) {
+    const helpers = {check, shape, refs, rows, ids, text, contract:contract.cohesive};
     validateSRSDetails(spec, helpers);
     if (architecture) validateArchitectureReview(spec, helpers);
   }

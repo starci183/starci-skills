@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.notify.task-completion-feed
 title: What notify needs from task to notify on completion
 state: todo

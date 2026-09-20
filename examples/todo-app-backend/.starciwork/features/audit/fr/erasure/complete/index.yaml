@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.audit.erasure.complete
 title: Complete an erasure
 state: done

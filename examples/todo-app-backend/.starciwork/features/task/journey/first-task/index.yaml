@@ -1,4 +1,4 @@
-schema: work/customer-journey
+schema: work/customer-journey@1
 id: journey.task.first-task
 title: A new person captures their first task
 state: todo

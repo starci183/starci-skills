@@ -1,6 +1,6 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: starci/srs@3
-title: starci/srs@3
+$id: starci/srs@1
+title: starci/srs@1
 type: object
 additionalProperties: false
 required:
@@ -15,7 +15,7 @@ required:
   - content
 properties:
   schema:
-    const: starci/srs@3
+    const: starci/srs@1
   op:
     const: business.decide
   status:

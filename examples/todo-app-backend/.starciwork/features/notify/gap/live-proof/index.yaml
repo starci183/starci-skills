@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.notify.live-proof
 title: uat.notify.digest-and-unsubscribe's inbox-arrival leg is unproven - no in-app inbox, no reachable SMTP host
 state: todo

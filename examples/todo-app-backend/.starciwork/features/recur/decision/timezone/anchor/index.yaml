@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.recur.timezone.anchor
 title: Does an occurrence's due instant follow a stored UTC offset or the owner's clock
 state: done

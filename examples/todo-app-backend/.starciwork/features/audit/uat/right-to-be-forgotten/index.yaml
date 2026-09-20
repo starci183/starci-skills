@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.audit.right-to-be-forgotten
 title: Sign in, create tasks, request erasure, confirm it held
 state: todo

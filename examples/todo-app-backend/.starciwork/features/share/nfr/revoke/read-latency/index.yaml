@@ -1,4 +1,4 @@
-schema: work/non-functional-requirement
+schema: work/non-functional-requirement@1
 id: nfr.share.revoke.read-latency
 title: Checking a collaborator's live status adds no perceptible cost to a read
 quality: latency

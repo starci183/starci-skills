@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.upload.todo-app-backend.upload
 title: The upload capability and its HTTP door
 state: done

@@ -70,7 +70,7 @@ writes:
       - assertions
       - required
     content:
-      en: "Write only the explicitly authorized end-of-life decision/scope on the work/node@2 record before review; preserve stable
+      en: "Write only the explicitly authorized end-of-life decision/scope on the work/node@1 record before review; preserve stable
         IDs and obligations. Actual removal/retention observations belong in evidence. Graph edits
         apply only to the explicitly selected approved scope: declare real prerequisite node IDs in
         dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new

@@ -3,7 +3,7 @@
 # settled partial-pass, not pass - this file records which run exists and what it proved, it does NOT
 # settle the record as done. The record stays inprogress on gap.share.live-proof, which names the
 # missing invitee-side capability the run's not-run assertions document.
-schema: work/evidence
+schema: work/evidence@1
 record: uat.share.invite-and-collaborate
 recordDigest: f7f5192c6b5570b55889eb6f5fc7ac85875d2f85f4a0f9f492f33af8d3716f1e
 run: runs/20260919T142709Z-5c10a673

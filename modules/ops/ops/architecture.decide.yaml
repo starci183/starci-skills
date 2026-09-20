@@ -92,7 +92,7 @@ writes:
       - required
       - extensions.work3.sds
     content:
-      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path under
+      en: Every authored index.yaml is a work/node@1 record at its catalog-declared path under
         features/<feature>/architecture/. Author
         overview plus typed extensions.work3.sds leaves in flows, components, contracts,
         data, quality, deployment, decisions and verification - each leaf payload carrying its
@@ -266,7 +266,7 @@ proofs:
     requirement:
       en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done. The specification@3 record remains a readable input for existing trees, never new
+        done. The starci/sds@1 record remains a readable input for existing trees, never new
         authoring output.
   - id: implementability
     requirement:

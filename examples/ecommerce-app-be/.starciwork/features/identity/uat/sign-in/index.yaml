@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.identity.sign-in
 title: Register a pair, be refused alike on a wrong one, sign in
 state: done

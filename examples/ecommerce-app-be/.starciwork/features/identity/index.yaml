@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: identity
 title: The person behind a session
 description: Sign-up, sign-in and the session every other service verifies against.

@@ -1,4 +1,4 @@
-schema: work/workspace
+schema: work/workspace@1
 id: ecommerce-app
 project: ecommerce-app
 description: >-

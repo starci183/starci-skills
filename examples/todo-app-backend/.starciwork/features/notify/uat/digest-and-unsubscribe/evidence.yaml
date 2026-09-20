@@ -5,7 +5,7 @@
 # names the unproven inbox-arrival leg: the product has no in-app inbox and this stack has no reachable
 # SMTP host (integration.notify.smtp / gap.notify.smtp-host-unreachable), so the record's steps 3 and 6
 # have no honest surface to read and the owner directive forbids faking the provider leg.
-schema: work/evidence
+schema: work/evidence@1
 record: uat.notify.digest-and-unsubscribe
 recordDigest: 5213e2384e355f91ebab34511023bb54f69f012b29422a8c5651ae7584acd408
 run: runs/20260919T144517Z-5c10a673

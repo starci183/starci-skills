@@ -1,4 +1,4 @@
-schema: work/ui-screen
+schema: work/ui-screen@1
 id: ui.checkout.shop-browse
 title: Shop browse direction
 state: todo

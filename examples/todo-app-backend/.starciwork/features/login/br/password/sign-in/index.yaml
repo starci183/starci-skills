@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.login.password.sign-in
 title: A person signs in with an email and a password
 state: done

@@ -15,7 +15,7 @@ import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inl
  * nothing here is authored, and a derived field typed by hand into a record is exactly the lie this script
  * exists to make impossible (enforced separately by scripts/checks/check-example-derived.mjs).
  *
- * `effectiveState`'s staleness rule is the one core/index.mjs already uses for its canonical work/node@2
+ * `effectiveState`'s staleness rule is the one core/index.mjs already uses for its canonical work/node@1
  * model (validate()'s `roll()`: `n.effectiveState = localInvalid ? 'invalid' : n.stale ? 'suspended' :
  * n.meta.state`) - staleness overrides authored state to `suspended` before anything else is considered.
  * This tree's simpler schema (scripts/checks/check-example-work.mjs's FAMILIES) has no `invalid`/`uninvestigate`
@@ -31,7 +31,7 @@ import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inl
 export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 /** The edge kinds the layout's rules define, in the order a reader should see them. `provenBy` on a
- * work/contract is split into its own two roles because the layout's concept 9/reconciliation model treats
+ * work/contract@1 is split into its own two roles because the layout's concept 9/reconciliation model treats
  * "who proves the provider side" and "who proves the consumer side" as distinct facts, not one bag of ids. */
 const EDGE_KIND_ORDER = ['refs','composes','dependsOn','subscribes','extends','appliesTo',
   'conflictsWith','blockedBy','tension','contractProvider','contractConsumer','provenBy'];
@@ -78,12 +78,12 @@ function collectIdsByTrail(value, trail, out) {
 }
 
 /** The edge kind one collected `{trail, id}` hit belongs to, or null when the layout's rules do not name
- * this field as an edge (an "unclassified" hit - `ac.*`'s `rule`, `work/event`'s `producer`, `work/gap`'s
+ * this field as an edge (an "unclassified" hit - `ac.*`'s `rule`, `work/event@1`'s `producer`, `work/gap@1`'s
  * `closedBy`, a decision's `blocks` - real pointers, just not ones the layout enumerates as a graph edge). */
 function classifyEdge(recordSchema, trail) {
   const field = trail.split('.')[0];
   if (field === 'provenBy') {
-    if (recordSchema === 'work/contract') {
+    if (recordSchema === 'work/contract@1') {
       if (trail === 'provenBy.provider') return 'contractProvider';
       if (trail === 'provenBy.consumer') return 'contractConsumer';
     }
@@ -210,7 +210,7 @@ function unmetBlockers(record, records, canon = id => id) {
 
 /** authored -> suspended (staleness) -> blocked (unmet blockedBy) -> authored, in that order; see the
  * module doc comment for why staleness is checked first. Records with no authored `state` (branches like
- * work/feature, and work/acceptance-criterion leaves, which the layout never gives a lifecycle state) have
+ * work/feature@1, and work/acceptance-criterion leaves, which the layout never gives a lifecycle state) have
  * no effective state either. */
 function effectiveStateOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot, canon = id => id) {
   if (record.state === null || record.state === undefined) return {state: null, reason: null};
@@ -221,7 +221,7 @@ function effectiveStateOf(record, evidenceByDir, appliesToSources, records, work
 }
 
 /**
- * `record`'s `blockedBy` chain, resolved to its roots: a `work/gap`, an open `work/policy-decision`
+ * `record`'s `blockedBy` chain, resolved to its roots: a `work/gap@1`, an open `work/policy-decision@1`
  * (`outcome: open`), or - the real tree has both - a dead end with no further `blockedBy` of its own that is
  * neither, which is reported as-is rather than forced into a shape it is not (a cluster of ordinary records
  * blocking each other is itself a fact worth seeing, not a gap somebody forgot to write). A cycle (this
@@ -231,8 +231,8 @@ function effectiveStateOf(record, evidenceByDir, appliesToSources, records, work
  */
 function resolveBlockers(record, records, canon = id => id) {
   const roots = new Map(); // id -> {id, rootKind, because, cyclic}
-  const rootKindOf = target => target.schema === 'work/gap' ? 'gap'
-    : (target.schema === 'work/policy-decision' && target.data.outcome === 'open') ? 'decision'
+  const rootKindOf = target => target.schema === 'work/gap@1' ? 'gap'
+    : (target.schema === 'work/policy-decision@1' && target.data.outcome === 'open') ? 'decision'
     : 'record';
 
   function walkEdge(rawId, because, visited) {
@@ -309,7 +309,7 @@ export function computeDerived(workRoot) {
   // closedBy is a list of record ids (schemas/work-layout.yaml, concept 7); a bare string is the common
   // one-closer case and is normalised the same way here as scripts/checks/check-example-work.mjs's gate treats it.
   const normalizeClosedBy = v => v == null ? null : Array.isArray(v) ? v : [v];
-  const gaps = [...records.values()].filter(r => r.schema === 'work/gap')
+  const gaps = [...records.values()].filter(r => r.schema === 'work/gap@1')
     .map(r => ({id: r.id, feature: r.feature, state: r.state, closedBy: normalizeClosedBy(r.data.closedBy)}))
     .sort((a, b) => a.id.localeCompare(b.id));
   const unbuiltModuleGaps = gaps.filter(g => g.id.endsWith('.unbuilt-module') && g.state === 'todo').length;

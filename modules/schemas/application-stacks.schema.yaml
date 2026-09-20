@@ -1,5 +1,5 @@
 schema: starci/schema@1
-id: starci/application-stacks
+id: starci/application-stacks@1
 title: Application stack declaration
 description: >-
   Static, repository-owned inventory for reproducible environments. It declares intended topology,

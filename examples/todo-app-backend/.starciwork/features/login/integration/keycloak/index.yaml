@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.login.keycloak
 title: Keycloak issues and validates the person's identity
 state: done

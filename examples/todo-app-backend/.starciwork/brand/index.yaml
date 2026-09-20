@@ -1,4 +1,4 @@
-schema: work/brand
+schema: work/brand@1
 id: brand
 kind: brand
 state: done

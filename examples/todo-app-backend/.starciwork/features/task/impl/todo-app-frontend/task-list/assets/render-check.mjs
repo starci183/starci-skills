@@ -2,8 +2,8 @@
  * Runs the real render checks from scripts/checks/render.mjs over every running-page capture beside this
  * script: `palette-off-brand` and `primary-absent` on the PNG bytes, `entity-list-in-card` on the
  * adjacent HTML markup. The shared `runRenderChecks` entry point cannot be used here as-is because
- * its brand reader expects the kernel's work/node@2 record shape while this example tree's brand is a
- * work/brand record - so this harness feeds the same check functions the same parsed brand document
+ * its brand reader expects the kernel's work/node@1 record shape while this example tree's brand is a
+ * work/brand@1 record - so this harness feeds the same check functions the same parsed brand document
  * directly, with the same starci card classes, and reports the real outcomes unchanged.
  *
  * Usage: node render-check.mjs  (exit 1 when any check fails; skips are reported, never passes)

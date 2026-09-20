@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.upload.intake
 title: Only an allowed shape of file is accepted
 state: done

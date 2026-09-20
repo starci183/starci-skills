@@ -16,7 +16,7 @@ about:
     json-schema: "draft 2020-12 with $schema/$id/$defs — machine-checkable shape (ajv-style consumers)"
     prose-contract: "schema:/purpose:/fields:/rules: YAML — a contract an agent reads and honours; no validator executes it"
   identityRule: >-
-    A governed record names its schema in its own `schema:` field (e.g. schema: work/business-rule,
+    A governed record names its schema in its own `schema:` field (e.g. schema: work/business-rule@1,
     schema: starci/orca-calls@1). The catalog `id` below is that const — the value a record would carry —
     not the file name.
   sourceOnly:
@@ -28,7 +28,7 @@ schemas:
   # WORK TREE — .starciwork record kinds (the product's canonical Work)
   # --------------------------------------------------------------------------
 
-  - id: starci/work-layout@3
+  - id: starci/work-layout@1
     file: modules/schemas/work-layout.yaml
     dialect: prose-contract
     subsystem: work-tree
@@ -52,24 +52,24 @@ schemas:
     dialect: json-schema
     subsystem: work-tree
     governs: >-
-      Work v1 metadata monolith: the versioned record kinds work/workspace@1, work/node@2,
+      Work metadata monolith: the versioned record kinds work/workspace@1, work/node@1,
       work/resource@1, work/evidence@1, work/disposable-accounts@1 plus starci/source-identity@1
       and starci/design-review@1.
     binds: versioned .starciwork records carrying @-suffixed schema ids
     usedBy:
       - engine/index.mjs (metadataSchema — reads modules/schemas/work.schema.yaml)
-      - modules/models/kinds.yaml (its knowledge-schema list names the v1 kinds verbatim)
+      - modules/models/kinds.yaml (its knowledge-schema list names the monolith kinds verbatim)
       - scripts/example/work-example.mjs (projected for readers)
     business:
       question: "Is a versioned Work record still structurally valid?"
-      whenNeeded: Reading trees that carry @-suffixed record kinds, and the auxiliary kinds (source-identity, design-review, evidence-packet) that v2 does not re-issue.
-      whenNot: Not for new v2 records — work/<kind> (unversioned) is governed by its own work-<kind>.schema.yaml. Authoring a NEW record under a v1 @-kind is the misuse mode.
-      selectedBy: Record's own `schema:` const — a work/foo@1 record resolves here, a work/foo record resolves to work-foo.schema.yaml.
-    note: "v1 and v2 coexist by design; v2 dropped the @N suffix on record ids (inferred from consts: work/evidence@1 vs work/evidence)."
+      whenNeeded: Reading trees that carry @-suffixed record kinds, and the auxiliary kinds (source-identity, design-review, evidence-packet) that the per-family files do not re-issue.
+      whenNot: Not for the per-family records — each family's own work-<kind>.schema.yaml is the authority for its kind. Authoring a NEW record under a monolith-only kind is the misuse mode.
+      selectedBy: Record's own `schema:` const — the monolith covers node/workspace/resource plus the auxiliary kinds; family records resolve to work-<kind>.schema.yaml.
+    note: "the monolith and the per-family schemas coexist by design; check each family's own file first."
 
-  # --- Work v2 per-record schemas -------------------------------------------
+  # --- Work per-record schemas ----------------------------------------------
 
-  - id: work/workspace
+  - id: work/workspace@1
     file: modules/schemas/work-workspace.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -82,7 +82,7 @@ schemas:
       whenNot: Never per feature; features do not get their own workspace record.
       selectedBy: prepare-work / storage binding; read by anything resolving 'which product am I in'.
 
-  - id: work/catalog
+  - id: work/catalog@1
     file: modules/schemas/work-catalog.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -95,7 +95,7 @@ schemas:
       whenNot: Never carries `state` — a parent whose progress is computed from leaves; authoring done here is refused.
       selectedBy: Any agent entering a Work tree reads this first.
 
-  - id: work/feature
+  - id: work/feature@1
     file: modules/schemas/work-feature.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -108,7 +108,7 @@ schemas:
       whenNot: A feature is not a unit of work — `state` is refused on purpose; progress derives from leaves.
       selectedBy: feature-scoped workflows; work-catalog entries point here.
 
-  - id: work/brand
+  - id: work/brand@1
     file: modules/schemas/work-brand.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -121,7 +121,7 @@ schemas:
       whenNot: Never duplicated per feature; not a state-carrying leaf.
       selectedBy: Implicit — source-staleness calls it 'implicit brand context' input.
 
-  - id: work/business-rule
+  - id: work/business-rule@1
     file: modules/schemas/work-business-rule.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -135,7 +135,7 @@ schemas:
       whenNot: Not for checkable consequences (those are ac children) nor for implementation claims (impl).
       selectedBy: define-business workflows authoring SRS-side truth.
 
-  - id: work/acceptance-criterion
+  - id: work/acceptance-criterion@1
     file: modules/schemas/work-acceptance-criterion.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -148,7 +148,7 @@ schemas:
       whenNot: Never carries `state` (refused by design) — a criterion that could be 'done' would let a tree report unobserved proof.
       selectedBy: With its parent br — has no identity apart from the rule it accepts.
 
-  - id: work/functional-requirement
+  - id: work/functional-requirement@1
     file: modules/schemas/work-functional-requirement.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -161,7 +161,7 @@ schemas:
       whenNot: Owns no rule (rules are br) and no design (sds); an fr without requiresProof cannot go done.
       selectedBy: define-business; consumed downstream by impl proves-edges and uat.
 
-  - id: work/non-functional-requirement
+  - id: work/non-functional-requirement@1
     file: modules/schemas/work-non-functional-requirement.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -174,7 +174,7 @@ schemas:
       whenNot: Not a place for functional steps or screens.
       selectedBy: define-business / architecture quality lanes.
 
-  - id: work/customer-journey
+  - id: work/customer-journey@1
     file: modules/schemas/work-customer-journey.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -187,7 +187,7 @@ schemas:
       whenNot: Steps never describe what the SYSTEM does — that is uat/sds vocabulary.
       selectedBy: Business analysis; verified by uat flows that walk it.
 
-  - id: work/policy-decision
+  - id: work/policy-decision@1
     file: modules/schemas/work-policy-decision.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -200,7 +200,7 @@ schemas:
       whenNot: Not a defect tracker; not for settled decisions.
       selectedBy: Any lane that hits an unresolved business choice; resolved by owner answer, not by code.
 
-  - id: work/data
+  - id: work/data@1
     file: modules/schemas/work-data.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -213,7 +213,7 @@ schemas:
       whenNot: Not a DDL doc — fields describe shape, invariants describe promises; do not author DDL here.
       selectedBy: define-business; consumed by sds/impl that realise the storage.
 
-  - id: work/sds-component
+  - id: work/sds-component@1
     file: modules/schemas/work-sds-component.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -228,7 +228,7 @@ schemas:
       whenNot: Not for prose architecture essays — a done component must trace to module roots on disk.
       selectedBy: Architecture workflows; implementation sidearms (architecture.decide) revise it.
 
-  - id: work/ui-screen
+  - id: work/ui-screen@1
     file: modules/schemas/work-ui-screen.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -241,7 +241,7 @@ schemas:
       whenNot: Not for interaction flows (journey/uat) — this is per-screen states.
       selectedBy: UI design ops; implementation reads it as binding direction.
 
-  - id: work/implementation
+  - id: work/implementation@1
     file: modules/schemas/work-implementation.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -254,20 +254,20 @@ schemas:
       whenNot: Never without the repository + revision; a claim about source without its commit is a claim about nothing.
       selectedBy: Implementation ops; FE-vs-BE split by the record's own `repository` value.
 
-  - id: work/uat-flow
+  - id: work/uat-flow@1
     file: modules/schemas/work-uat-flow.schema.yaml
     dialect: json-schema
     subsystem: work-tree
     governs: "A walk performed against the RUNNING product — steps a person can follow; `proves` is the authored forward edge to demonstrated records."
     binds: .starciwork/features/<feature>/uat/<name>/index.yaml (+ runs/, captures)
-    usedBy: [scripts/checks/check-work-artifacts.mjs (accounts cross-check vs work/disposable-accounts)]
+    usedBy: [scripts/checks/check-work-artifacts.mjs (accounts cross-check vs work/disposable-accounts@1)]
     business:
       question: "What observable walk proves the product behaves — against a live system, not a unit test?"
       whenNeeded: verify-flows / browser UAT; observes behaviour rather than asserting it.
       whenNot: Never unit/component verification (that is review-code/impl checks); never needs real credentials (see disposable-accounts).
       selectedBy: verify-flows job and UAT fixtures.
 
-  - id: work/disposable-accounts
+  - id: work/disposable-accounts@1
     file: modules/schemas/work-disposable-accounts.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -280,7 +280,7 @@ schemas:
       whenNot: NEVER a real credential — the file is tracked, readable, and outlives its walk; no id and no state (fixture, not work).
       selectedBy: uat-flow record's accounts field; written by whoever authors the flow.
 
-  - id: work/evidence
+  - id: work/evidence@1
     file: modules/schemas/work-evidence.schema.yaml
     dialect: json-schema
     subsystem: work-tree
@@ -390,7 +390,7 @@ schemas:
       whenNot: Layout says nothing about whether a stack ran — no runtime evidence here.
       selectedBy: application-stacks / deploy lanes; checker reads both halves.
 
-  - id: starci/application-stacks
+  - id: starci/application-stacks@1
     file: modules/schemas/application-stacks.schema.yaml
     dialect: json-schema
     subsystem: stacks
@@ -498,27 +498,27 @@ schemas:
     file: modules/schemas/spec/contract.schema.yaml
     dialect: prose-contract
     subsystem: spec
-    governs: "The specification contract meta-record — required sections, row shapes, statuses (draft|blocked|pass), preserved-English rules, and pointers to the current SRS/SDS contracts (srs-sections.schema.yaml, sds-map.schema.yaml, sds.schema.yaml, srs-v3.schema.yaml)."
-    binds: cohesive starci/specification@1|@2 records + the split SRS/SDS layout rules
-    usedBy: [scripts/checks/spec/validate.mjs (loads it as the section contract), work-*/index.yaml extensions.work3.specification|srs|sds payloads]
+    governs: "The specification contract meta-record — required sections, row shapes, statuses (draft|blocked|pass), preserved-English rules, and pointers to the current SRS/SDS contracts (srs-sections.schema.yaml, sds-map.schema.yaml, sds.schema.yaml, srs.schema.yaml)."
+    binds: cohesive starci/specification@1 records + the split SRS/SDS layout rules
+    usedBy: [scripts/checks/spec/validate.mjs (loads it as the section contract; cohesive detail checks live in scripts/checks/spec/specification.mjs), work-*/index.yaml extensions.work3.specification|srs|sds payloads]
     business:
       question: "Which sections must a specification carry, in which language, under which lifecycle?"
       whenNeeded: Authoring or validating any SRS/SDS record; the umbrella contract the section schemas hang under.
       whenNot: Not the section schemas themselves — srs-sections/sds-map own the typed payloads.
       selectedBy: spec validators + decide ops' declared reads (compatibility inputs).
 
-  - id: starci/specification@3
+  - id: starci/sds@1
     file: modules/schemas/spec/sds.schema.yaml
     dialect: json-schema
     subsystem: spec
-    governs: "The source-independent SDS v3 record — purpose, businessRefs, designRefs, views, decisions, checks, references, limitations; op const architecture.decide."
-    binds: SDS records authored under the specification@3 payload (extensions.work3.sds / architecture trees)
-    usedBy: [scripts/checks/spec/sds.mjs (SDS_SCHEMA), contract.schema.yaml architectureV3.schema]
+    governs: "The source-independent SDS record — purpose, businessRefs, designRefs, views, decisions, checks, references, limitations; op const architecture.decide."
+    binds: SDS records authored under the sds@1 payload (extensions.work3.sds / architecture trees)
+    usedBy: [scripts/checks/spec/sds.mjs (SDS_SCHEMA), contract.schema.yaml architecture.schema, tests/sds-payload.spec.mjs]
     business:
       question: "Is this SDS structurally a source-independent design record?"
-      whenNeeded: architecture.decide output validation; compatibility reads of v3 records.
-      whenNot: New authoring uses the component-based sds-map sections over the v3 monolith.
-      selectedBy: The record's own schema const starci/specification@3.
+      whenNeeded: architecture.decide output validation; compatibility reads of existing SDS records.
+      whenNot: New authoring uses the component-based sds-map sections over the cohesive monolith.
+      selectedBy: The record's own schema const starci/sds@1.
 
   - id: starci/sds-map@1
     file: modules/schemas/spec/sds-map.schema.yaml
@@ -546,18 +546,18 @@ schemas:
       whenNot: Aggregate parents hold no specification payload — leaves own the items.
       selectedBy: SRS section files; business.decide lanes.
 
-  - id: starci/srs@3
-    file: modules/schemas/spec/srs-v3.schema.yaml
+  - id: starci/srs@1
+    file: modules/schemas/spec/srs.schema.yaml
     dialect: json-schema
     subsystem: spec
-    governs: "The compatibility SRS v3 record — id, nodeType, name, summary, refs, content; op const business.decide."
-    binds: business/srs v3 leaves (compatibility/recovery only)
-    usedBy: [scripts/checks/spec/srs-v3.mjs (SRS_V3_SCHEMA compat reader), contract.schema.yaml compatibilityBusinessV3.schema]
+    governs: "The compatibility SRS record — id, nodeType, name, summary, refs, content; op const business.decide."
+    binds: business/srs leaves (compatibility/recovery only)
+    usedBy: [scripts/checks/spec/srs.mjs (SRS_SCHEMA compat reader), contract.schema.yaml compatibilityBusiness.schema, tests/srs.spec.mjs]
     business:
-      question: "Is a pre-split SRS v3 record still readable under its original checks?"
-      whenNeeded: Compatibility reads of existing v3 records.
+      question: "Is a pre-split SRS record still readable under its original checks?"
+      whenNeeded: Compatibility reads of existing SRS records.
       whenNot: Never for new authoring — new SRS uses srs-sections.schema.yaml.
-      selectedBy: The record's schema const starci/srs@3.
+      selectedBy: The record's schema const starci/srs@1.
 
   # --------------------------------------------------------------------------
   # PROFILES / REGISTRY — evidence profiles and runtime registry
@@ -576,12 +576,12 @@ schemas:
       whenNot: Distinct from profile-registry (runtime/model profiles) — same word, different axis; do not conflate.
       selectedBy: core validation when a node kind asserts completion.
 
-  - id: starci/profile-registry@3
-    file: modules/schemas/profile-registry-v3.schema.yaml
+  - id: starci/profile-registry@1
+    file: modules/schemas/profile-registry.schema.yaml
     dialect: json-schema
     subsystem: model
     governs: "The model/runtime registry contract — runtimes[], aliases, executionModes{solo,orchestrated}, agentArchitecture, defaults, targets, skills, operators, fallback."
-    binds: "modules/models/registry.yaml (carries schema starci/profile-registry@3)"
+    binds: "modules/models/registry.yaml (carries schema starci/profile-registry@1)"
     usedBy: [scripts/checks/providers.mjs (reads modules/models/registry.yaml targets; Orca admission must use profile resolver output)]
     business:
       question: "Which runtimes/agents exist, what can each run, and what is the fallback order?"
@@ -611,10 +611,10 @@ schemas:
   # --------------------------------------------------------------------------
 
 gaps:
-  - "work-layout@3 shape declares 15 families; only 11 have per-family schemas. work/contract, work/integration, work/gap, work/event have NO work-*.schema.yaml file — check-work-consistency.mjs comments confirm contract+integration 'author requiresProof in both live trees and have no per-family schema file of their own' (gap/event likewise unfiled). Their records are covered only by the layout's shape line and the generic work/ walk in check-work-artifacts.mjs."
+  - "work-layout@1 shape declares 15 families; only 11 have per-family schemas. work/contract@1, work/integration@1, work/gap@1, work/event@1 have NO work-*.schema.yaml file — check-work-consistency.mjs comments confirm contract+integration 'author requiresProof in both live trees and have no per-family schema file of their own' (gap/event likewise unfiled). Their records are covered only by the layout's shape line and the generic work/ walk in check-work-artifacts.mjs."
   - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `api enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
   - "starci/code-pattern-script@1 is emitted by every scripts/checks/code-patterns/*.mjs script and consumed by check-scoped-lint.mjs, but has no schema file — only the aggregate starci/code-pattern-check@1 is schematized."
-  - "Record kinds named in modules/models/kinds.yaml but not backed by a file here: work/node@2, work/resource@1 (inside work.schema.yaml monolith — covered), starci/evidence-packet@1 (no file found — only listed)."
+  - "Record kinds named in modules/models/kinds.yaml but not backed by a file here: work/node@1, work/resource@1 (inside work.schema.yaml monolith — covered), starci/evidence-packet@1 (no file found — only listed)."
 
 coverage:
   tree: "modules/schemas/ — 34 authored files + modules/schemas/spec/ 5 files + index.yaml + relationships.yaml"

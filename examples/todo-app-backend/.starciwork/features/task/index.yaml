@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: task
 title: A task a person creates, completes and deletes
 description: The core of the product. Every record of this feature lives under this directory.

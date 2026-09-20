@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: share
 title: A task shared with other people
 description: An owner invites collaborators onto their own task. A collaborator holds a role - viewer or

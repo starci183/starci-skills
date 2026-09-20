@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.plan.direction-not-drawn
 title: No interface.draw run has produced a direction for plan.usage
 state: done

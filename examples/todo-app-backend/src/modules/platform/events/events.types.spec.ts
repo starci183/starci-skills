@@ -9,7 +9,7 @@ import {
 
 /**
  * The bus spec proves delivery; this spec pins the payload contract itself - the `kind` discriminant
- * every subscriber narrows on and the fields each declared work/event record commits to carrying, so a
+ * every subscriber narrows on and the fields each declared work/event@1 record commits to carrying, so a
  * constructor that silently drops a field fails here even though publish/subscribe still works.
  */
 describe("platform event payloads",

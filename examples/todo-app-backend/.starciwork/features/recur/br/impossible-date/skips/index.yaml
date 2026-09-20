@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.recur.impossible-date.skips
 title: A month without the rule's day produces no occurrence
 state: done

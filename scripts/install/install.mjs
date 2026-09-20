@@ -57,7 +57,7 @@ const MANIFEST = '.starci-skills.json';
 // The durable workflow protocol an installed tree speaks, independent of public semver: named by the
 // engine schema it enrolls workflows into, ranked by that schema's number. The installer accepts only
 // the marker it writes itself - anything older is cleaned by hand, never upgraded by code.
-const INSTALL_PROTOCOL_SCHEMA = 'starci/install-protocol@2';
+const INSTALL_PROTOCOL_SCHEMA = 'starci/install-protocol@1';
 const installProtocol = () => Object.freeze({ schema: INSTALL_PROTOCOL_SCHEMA, engine: requireEngineSchema() });
 const engineRank = (engine) => { const m = /^starci\/engine@(\d+)$/.exec(String(engine ?? '')); return m ? Number(m[1]) : null; };
 // Host-level ignores written into the host repo's own .gitignore: the ledger/runtime state is local
@@ -230,7 +230,7 @@ function writeBootstraps(repo, log, plan) {
 }
 
 /**
- * The only manifest marker this installer accepts: install-protocol@2 naming the engine schema this
+ * The only manifest marker this installer accepts: install-protocol@1 naming the engine schema this
  * package ships. A tree installed by anything else is not upgraded in place - it is cleaned by hand
  * and `init` runs fresh. A malformed marker is refused, never guessed.
  */

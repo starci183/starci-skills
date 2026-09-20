@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: lease
 title: Lease drift feature
 description: Negative-corpus fixture.

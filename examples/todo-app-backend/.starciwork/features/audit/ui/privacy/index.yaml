@@ -1,4 +1,4 @@
-schema: work/ui-screen
+schema: work/ui-screen@1
 id: ui.audit.privacy
 title: The privacy screen - request erasure, export data
 state: done

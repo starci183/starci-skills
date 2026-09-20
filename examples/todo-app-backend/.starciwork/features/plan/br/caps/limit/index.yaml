@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.plan.caps.limit
 title: A free plan holds at most 20 active tasks
 state: done

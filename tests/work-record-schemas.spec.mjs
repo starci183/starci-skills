@@ -58,9 +58,9 @@ function recordFiles() {
 }
 
 // The example tree names 8 families this lane never schema'd (work/critique@1, work/derived@1,
-// work/resource, work/contract, work/gap, work/event, work/integration, starci/uat-run-manifest@1).
+// work/resource@1, work/contract@1, work/gap@1, work/event@1, work/integration@1, starci/uat-run-manifest@1).
 // Writing them is real work the merge deferred - until they exist, asserting coverage asserts a gap.
-test('every record family named in the example has a schema, and every schema is named by the example', {skip:'8 families lack schemas (work/critique@1, work/derived@1, work/resource, work/contract, work/gap, work/event, work/integration, starci/uat-run-manifest@1) - schemas pending'}, () => {
+test('every record family named in the example has a schema, and every schema is named by the example', {skip:'8 families lack schemas (work/critique@1, work/derived@1, work/resource@1, work/contract@1, work/gap@1, work/event@1, work/integration@1, starci/uat-run-manifest@1) - schemas pending'}, () => {
   const files = recordFiles();
   assert.ok(files.length > 0, 'the example tree has no record files; the subject of this spec is missing');
   const named = new Set();
@@ -122,7 +122,7 @@ test('every schema compiles under ajv strict mode and closes its objects', () =>
 
 const base = {
   rule: () => ({
-    schema: 'work/business-rule',
+    schema: 'work/business-rule@1',
     id: 'br.task.title.required',
     title: 'A task without a title does not exist',
     state: 'todo',
@@ -132,7 +132,7 @@ const base = {
     change: {rev: 2, kind: 'breaking', at: '2026-09-18T02:11:00.000Z'}
   }),
   nfr: () => ({
-    schema: 'work/non-functional-requirement',
+    schema: 'work/non-functional-requirement@1',
     id: 'nfr.task.list.latency',
     title: 'A list read feels immediate',
     quality: 'latency',
@@ -142,7 +142,7 @@ const base = {
     appliesTo: ['br.task.list.owned']
   }),
   criterion: () => ({
-    schema: 'work/acceptance-criterion',
+    schema: 'work/acceptance-criterion@1',
     id: 'ac.task.title.required.refuses-empty',
     rule: 'br.task.title.required',
     given: 'A creation request',
@@ -150,7 +150,7 @@ const base = {
     then: ['Creation is refused.']
   }),
   feature: () => ({
-    schema: 'work/feature',
+    schema: 'work/feature@1',
     id: 'task',
     title: 'A task a person creates, completes and deletes',
     description: 'The core of the product.'
@@ -165,51 +165,51 @@ const refuses = (family, record, because) => {
 test('a rule that withdraws a statement without calling the change breaking is refused', () => {
   const editorial = base.rule();
   editorial.change = {rev: 2, kind: 'editorial', at: '2026-09-18T02:11:00.000Z', withdraws: ['A complete task is never reopened.']};
-  refuses('work/business-rule', editorial, 'withdrawing a statement is a breaking change; recording it as editorial under-reports what the product stopped promising');
+  refuses('work/business-rule@1', editorial, 'withdrawing a statement is a breaking change; recording it as editorial under-reports what the product stopped promising');
   const clarifying = base.rule();
   clarifying.change = {rev: 2, kind: 'clarifying', at: '2026-09-18T02:11:00.000Z', withdraws: ['A complete task is never reopened.']};
-  refuses('work/business-rule', clarifying, 'a clarification adds nothing and removes nothing, so it cannot carry a withdrawal');
+  refuses('work/business-rule@1', clarifying, 'a clarification adds nothing and removes nothing, so it cannot carry a withdrawal');
   const breaking = base.rule();
   breaking.change = {rev: 2, kind: 'breaking', at: '2026-09-18T02:11:00.000Z', withdraws: ['A complete task is never reopened.'], reason: 'The owner decided completion is reversible.'};
-  assert.equal(validatorFor('work/business-rule')(breaking), true, 'the same withdrawal recorded as breaking is exactly what the family is for');
+  assert.equal(validatorFor('work/business-rule@1')(breaking), true, 'the same withdrawal recorded as breaking is exactly what the family is for');
 });
 
 test('a non-functional requirement without a measurement is refused', () => {
   const unmeasured = base.nfr();
   delete unmeasured.measurement;
-  refuses('work/non-functional-requirement', unmeasured, 'an NFR with no way to measure it cannot be passed, failed or regressed against');
+  refuses('work/non-functional-requirement@1', unmeasured, 'an NFR with no way to measure it cannot be passed, failed or regressed against');
   for (const missing of ['how', 'threshold', 'environment']) {
     const partial = base.nfr();
     delete partial.measurement[missing];
-    refuses('work/non-functional-requirement', partial, `a measurement missing ${missing} cannot be repeated by a second person`);
+    refuses('work/non-functional-requirement@1', partial, `a measurement missing ${missing} cannot be repeated by a second person`);
   }
 });
 
 test('an acceptance criterion carrying a state is refused', () => {
   const stateful = base.criterion();
   stateful.state = 'done';
-  refuses('work/acceptance-criterion', stateful, 'a criterion is the unit of proof, not a unit of work; a done criterion would let a tree report proof it never observed');
-  assert.equal(validatorFor('work/acceptance-criterion')(base.criterion()), true, 'the same criterion without a state is the normal case');
+  refuses('work/acceptance-criterion@1', stateful, 'a criterion is the unit of proof, not a unit of work; a done criterion would let a tree report proof it never observed');
+  assert.equal(validatorFor('work/acceptance-criterion@1')(base.criterion()), true, 'the same criterion without a state is the normal case');
 });
 
 test('a feature carrying a state is refused', () => {
   const stateful = base.feature();
   stateful.state = 'done';
-  refuses('work/feature', stateful, 'a parent derives from its descendants; a feature that can claim done can report done while its leaves say otherwise');
+  refuses('work/feature@1', stateful, 'a parent derives from its descendants; a feature that can claim done can report done while its leaves say otherwise');
   const catalog = {
-    schema: 'work/catalog',
+    schema: 'work/catalog@1',
     id: 'todo',
     description: 'Product catalog.',
     features: [{id: 'task', directory: 'features/task', description: 'A task.'}],
     state: 'done'
   };
-  refuses('work/catalog', catalog, 'the catalog is a parent for the same reason and refuses a state for the same reason');
+  refuses('work/catalog@1', catalog, 'the catalog is a parent for the same reason and refuses a state for the same reason');
 });
 
 test('no leaf schema accepts a derived state, and none accepts an authored stale flag', () => {
   const leaves = {
-    'work/business-rule': base.rule(),
-    'work/non-functional-requirement': base.nfr()
+    'work/business-rule@1': base.rule(),
+    'work/non-functional-requirement@1': base.nfr()
   };
   for (const [family, record] of Object.entries(leaves)) {
     const derived = {...record, state: 'stale'};
@@ -221,7 +221,7 @@ test('no leaf schema accepts a derived state, and none accepts an authored stale
 
 test('evidence records what was observed, and refuses a pass that contradicts its own assertions', () => {
   const manifest = () => ({
-    schema: 'work/evidence',
+    schema: 'work/evidence@1',
     id: 'proves-title',
     record: 'br.task.title.required',
     recordDigest: 'a'.repeat(64),
@@ -235,35 +235,35 @@ test('evidence records what was observed, and refuses a pass that contradicts it
       capturedAt: '2026-09-18T04:38:00.000Z'
     }
   });
-  assert.equal(validatorFor('work/evidence')(manifest()), true, 'the ordinary manifest shape must validate or every other case here is meaningless');
+  assert.equal(validatorFor('work/evidence@1')(manifest()), true, 'the ordinary manifest shape must validate or every other case here is meaningless');
 
   const undigested = manifest();
   delete undigested.recordDigest;
-  refuses('work/evidence', undigested, 'without the digest of the record it was captured against, expiry can only be noticed by somebody who happens to remember, which is to say not noticed');
+  refuses('work/evidence@1', undigested, 'without the digest of the record it was captured against, expiry can only be noticed by somebody who happens to remember, which is to say not noticed');
 
   const contradictory = manifest();
   contradictory.assertions[0].outcome = 'fail';
-  refuses('work/evidence', contradictory, 'a manifest reporting pass while one of its own assertions failed is the shape a green tree hides a red check in');
+  refuses('work/evidence@1', contradictory, 'a manifest reporting pass while one of its own assertions failed is the shape a green tree hides a red check in');
 
   const failed = manifest();
   failed.outcome = 'fail';
   failed.assertions[0].outcome = 'fail';
-  assert.equal(validatorFor('work/evidence')(failed), true, 'a failed run is still evidence and is kept, because it is how a regression is dated');
+  assert.equal(validatorFor('work/evidence@1')(failed), true, 'a failed run is still evidence and is kept, because it is how a regression is dated');
 
   const marked = manifest();
   marked.stale = true;
-  refuses('work/evidence', marked, 'evidence is marked stale with the reason it expired; a mark with no reason becomes a file nobody can interpret and therefore deletes');
+  refuses('work/evidence@1', marked, 'evidence is marked stale with the reason it expired; a mark with no reason becomes a file nobody can interpret and therefore deletes');
   marked.staleReason = 'Proven against rev 1, whose never-reopen clause rev 2 withdrew.';
-  assert.equal(validatorFor('work/evidence')(marked), true, 'marked with its reason, expired evidence stays as readable history');
+  assert.equal(validatorFor('work/evidence@1')(marked), true, 'marked with its reason, expired evidence stays as readable history');
 
   const unmarked = manifest();
   unmarked.staleReason = 'Proven against rev 1.';
-  refuses('work/evidence', unmarked, 'a reason for expiry without the mark leaves the evidence reading as current');
+  refuses('work/evidence@1', unmarked, 'a reason for expiry without the mark leaves the evidence reading as current');
 });
 
 test('an implementation must say whether its verification was observed or asserted', () => {
   const module = () => ({
-    schema: 'work/implementation',
+    schema: 'work/implementation@1',
     id: 'impl.task.todo-app.ownership',
     title: 'Ownership binding and its guard',
     state: 'done',
@@ -275,18 +275,18 @@ test('an implementation must say whether its verification was observed or assert
     verification: ['npm run test:unit -- src/task/ownership exited 0'],
     verificationSource: 'kernel-observed'
   });
-  assert.equal(validatorFor('work/implementation')(module()), true, 'the ordinary implementation shape must validate');
+  assert.equal(validatorFor('work/implementation@1')(module()), true, 'the ordinary implementation shape must validate');
   const unlabelled = module();
   delete unlabelled.verificationSource;
-  refuses('work/implementation', unlabelled, 'prose the kernel did not produce is a claim, and an unlabelled verification line makes a claim indistinguishable from a run');
+  refuses('work/implementation@1', unlabelled, 'prose the kernel did not produce is a claim, and an unlabelled verification line makes a claim indistinguishable from a run');
   const invented = module();
   invented.verificationSource = 'reviewed';
-  refuses('work/implementation', invented, 'a third source would be a way of describing a claim that is neither observed nor owned');
+  refuses('work/implementation@1', invented, 'a third source would be a way of describing a claim that is neither observed nor owned');
 });
 
 test('a proof demand may not be both required and optional, and must ask for something', () => {
   const requirement = () => ({
-    schema: 'work/functional-requirement',
+    schema: 'work/functional-requirement@1',
     id: 'fr.task.create',
     title: 'Create a task',
     state: 'todo',
@@ -296,14 +296,14 @@ test('a proof demand may not be both required and optional, and must ask for som
     composes: [{rule: 'br.task.title.required', module: 'src/task/create'}],
     requiresProof: {uat: {required: true}}
   });
-  assert.equal(validatorFor('work/functional-requirement')(requirement()), true, 'the ordinary requirement shape must validate');
+  assert.equal(validatorFor('work/functional-requirement@1')(requirement()), true, 'the ordinary requirement shape must validate');
   const both = requirement();
   both.requiresProof.uat = {required: true, optional: true};
-  refuses('work/functional-requirement', both, 'a demand that is both required and optional is a demand nobody decided');
+  refuses('work/functional-requirement@1', both, 'a demand that is both required and optional is a demand nobody decided');
   const empty = requirement();
   empty.requiresProof.uat = {};
-  refuses('work/functional-requirement', empty, 'a kind named with nothing asked of it reads as a bar that has been set and is unmeetable');
+  refuses('work/functional-requirement@1', empty, 'a kind named with nothing asked of it reads as a bar that has been set and is unmeetable');
   const invented = requirement();
   invented.requiresProof.review = {required: true};
-  refuses('work/functional-requirement', invented, 'the kinds are closed so that a weaker bar cannot be invented by choosing a new word for it');
+  refuses('work/functional-requirement@1', invented, 'the kinds are closed so that a weaker bar cannot be invented by choosing a new word for it');
 });

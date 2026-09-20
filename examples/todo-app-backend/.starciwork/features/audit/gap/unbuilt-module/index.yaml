@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.audit.unbuilt-module
 title: No audit module exists under the NestJS layout yet
 state: done

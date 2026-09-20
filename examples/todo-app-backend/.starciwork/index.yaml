@@ -1,4 +1,4 @@
-schema: work/catalog
+schema: work/catalog@1
 id: todo
 description: Product catalog. One entry per feature; every record of a feature lives under its directory.
 features:

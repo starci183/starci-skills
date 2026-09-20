@@ -23,14 +23,14 @@ Raw output from the run this corpus was verified with lives in `_evidence/detect
 | 01-record-fake-provenby | `fr.fake.thing` carries a hand-authored `provenBy` naming a `todo` uat flow; sibling impl evidence settles on a `runs/` dir that does not exist | `check-work-deep.mjs`: `PROVENBY_AUTHORED`, `PROVENBY_TARGET_NOT_DONE` | both refused, exit 1 | **caught** |
 | 01 (residual) | `evidence.yaml`'s `run: runs/20990101T000000Z-ghost` points at a run that was never created | *no check reads `evidence.run` on impl evidence* | base gate passes; deep/consistency only flag the provenBy | **GAP** — dangling `run:` on non-uat-flow evidence is invisible |
 | 02-evidence-stale-after-code-change | impl `done` on evidence whose `codeDigest` predates the current `src/worker/index.ts` | `check-example-work.mjs` trust concept 1: `CODE_DIGEST_STALE` | refused, exit 1 | **caught** |
-| 03-srs-business-contradiction | two `done` business rules declare `conflictsWith` each other, no `work/policy-decision` settles the pair | `check-work-consistency.mjs` concept 3: `CONFLICT_WITHOUT_DECISION` | refused, exit 1 | **caught** |
+| 03-srs-business-contradiction | two `done` business rules declare `conflictsWith` each other, no `work/policy-decision@1` settles the pair | `check-work-consistency.mjs` concept 3: `CONFLICT_WITHOUT_DECISION` | refused, exit 1 | **caught** |
 | 03 (residual) | the same contradiction in prose only, with no `conflictsWith` edge | *no check reads rule semantics* | would pass every gate | **GAP** — undeclared contradictions are undetectable |
 | 04-lease-drift | run B's `run-ledger.json` reuses `task/res-ghost-9` (no run created it) and recreates `task/res-shared-1` already owned by run A | *no check reads cross-run ledger consistency* | 0 refused across all three layers | **GAP** — lease drift between UAT runs is invisible to the suite |
 
 ## Gaps for a later wave (do not fix here)
 
 1. `evidence.run` on implementation evidence is never resolved — a done impl can settle on a run
-   directory that does not exist. Only `work/uat-flow` evidence gets its `run` verified
+   directory that does not exist. Only `work/uat-flow@1` evidence gets its `run` verified
    (check-example-work.mjs concept 12).
 2. Contradictory business rules that never declare `conflictsWith` pass all checks; detection
    would require semantic reading of `statements`.

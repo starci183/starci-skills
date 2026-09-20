@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.recur.todo-app-backend.engine
 title: The rule, occurrence and generation engine
 state: done

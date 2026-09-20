@@ -1,4 +1,4 @@
-schema: starci/kinds@2
+schema: starci/kinds@1
 purpose: |-
   The process is data, not a judgement call. This catalog is the complete, closed list of operation kinds a
   workflow may run, the mandatory lane (an ordered template) every ledger node walks, and the bounded routes
@@ -56,7 +56,7 @@ vocabularies:
   # inbox) and the `features/<feature>/` record trees - so a write outside it fails checks. Layout
   # definitions (`work-layout`, `workspace-routing`) and kernel transport records are never artifact
   # consts, so they are absent here.
-  schemas: [work/workspace@1, work/node@2, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks, starci/knowledge-rule@1, starci/knowledge-source@1]
+  schemas: [work/workspace@1, work/node@1, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks@1, starci/knowledge-rule@1, starci/knowledge-source@1]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
   # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
   # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
@@ -138,7 +138,7 @@ kinds:
     knowledge: [design-patterns, architecture-rules]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Prepare one canonical decision question with distinct typed outcomes, analysis and one recommendation, or answer it from already-decided records. Ordinary reversible technical ambiguity may use a recorded recommendation. Decisive product policy about money, authority or customer data waits for an exact owner answer/receipt and is never inferred from the recommendation.
     reports:
       outcomes: [done, failed]
@@ -169,7 +169,7 @@ kinds:
     knowledge: []
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Settle what the product must do, in the business record, before anything is designed against it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -191,7 +191,7 @@ kinds:
     knowledge: []
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Repair a requirement record a builder found silent, confusing or self-contradictory - edit the requirement, rule or journey itself and bump its rev.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -207,7 +207,7 @@ kinds:
     knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Settle how the product realises a requirement, as a new design decision in the design record.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -223,7 +223,7 @@ kinds:
     knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Repair a design record that a builder found silent or wrong - edit the text and bump its rev.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -243,7 +243,7 @@ kinds:
     knowledge: [grammars/*, ui/*]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -265,7 +265,7 @@ kinds:
     knowledge: [grammars/*, patterns/fe/*, ui/*]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Generate a small representative image-first direction and map every remaining screen/state/component before interface code exists.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -285,7 +285,7 @@ kinds:
     knowledge: [grammars/*, ui/*]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Generate the artwork the approved candidate embeds as real repository assets, at the size and format the design record declares.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -388,7 +388,7 @@ kinds:
     knowledge: [application-stacks]
     checks: []
     stacks: [.stacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/resource@1, starci/application-stacks]
+    carries: [work/resource@1, starci/application-stacks@1]
     purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -408,7 +408,7 @@ kinds:
     knowledge: [grammars/*, ui/*, code-pattern-enforcement]
     checks: [scripts/checks/code-patterns/*.mjs]
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: "Grow the installed grammar by one semantic unit the product needs and no composition of existing contracts renders: implement it in the grammar package with its stories and tests, publish it, bump the consumer, and record it in the canon."
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -506,7 +506,7 @@ kinds:
     knowledge: [application-stacks]
     checks: []
     stacks: [.stacks/**, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2, work/disposable-accounts@1]
+    carries: [work/node@1, work/disposable-accounts@1]
     purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reconciles them against the decided ones as three typed cases (reference, conflict, new), editing no record of another feature and reporting no gap against one; a cut splits a node too big for one operation into child nodes with disjoint write scopes, the seam first, and leaves the node a derived parent whose assertions become the group's acceptance.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -531,7 +531,7 @@ kinds:
     knowledge: [architecture-rules, design-patterns]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Cut one Work node that is too big for a single operation into child nodes with disjoint write scopes - the seam first, then one observable behaviour per child - and leave the node a derived parent whose assertions are the group's acceptance.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -593,7 +593,7 @@ kinds:
     knowledge: [architecture-rules, design-patterns, application-stacks]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Bound the request into a scope - the nodes the workflow walks, their dependencies, and the exclusions the owner approved.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -678,7 +678,7 @@ kinds:
     knowledge: [architecture-rules, design-patterns]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Author or update the product's documentation from the settled records and the delivered code.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -749,7 +749,7 @@ kinds:
     knowledge: []
     checks: [scripts/checks/check-scoped-lint.mjs]
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Retire exactly the selected scope - a scoped metadata decision that preserves live consumers and required evidence, with destructive effects only where separately authorised.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -766,7 +766,7 @@ kinds:
     knowledge: [application-stacks]
     checks: []
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/workspace@1, work/node@2, starci/source-identity@1]
+    carries: [work/workspace@1, work/node@1, starci/source-identity@1]
     purpose: Create or reconstruct one canonical workspace from a purpose or a selected existing source - verified bindings, preserved provenance, validated scope.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -785,7 +785,7 @@ kinds:
     knowledge: [coding-reference]
     checks: [scripts/checks/check-scoped-lint.mjs]
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@2]
+    carries: [work/node@1]
     purpose: Author or revise one selected content unit from its brief, grounded in the settled records and the selected source.
     reports:
       outcomes: [done, partial, failed, ask, blocked]

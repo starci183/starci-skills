@@ -1,4 +1,4 @@
-schema: work/ui-screen
+schema: work/ui-screen@1
 id: ui.plan.usage
 title: The usage screen and its upgrade action
 state: done

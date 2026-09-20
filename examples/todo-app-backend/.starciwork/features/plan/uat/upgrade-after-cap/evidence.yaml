@@ -4,7 +4,7 @@
 # does NOT settle the record as done. The record stays inprogress on gap.plan.live-proof, which names
 # the pending gateway leg (no simulated webhook per the owner directive) and the missing
 # create-refusal feedback surface the run's `no` assertion documents.
-schema: work/evidence
+schema: work/evidence@1
 record: uat.plan.upgrade-after-cap
 recordDigest: 0e1d936406c7fc8df16f48a457db56c69fb3b008296b9b3a5b642ba9697ad5f6
 run: runs/20260919T143402Z-5c10a673

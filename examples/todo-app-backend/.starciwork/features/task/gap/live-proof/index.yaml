@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.task.live-proof
 title: No uat.verify run has produced a live run for task.create
 state: done

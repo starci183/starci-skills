@@ -1,7 +1,7 @@
 # Written by scripts/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
-# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
-schema: work/evidence
+# and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
+schema: work/evidence@1
 record: impl.task.todo-app-backend.reopen-task
 recordDigest: 8c2372e499a3b905209c0b72a70f6999157be44bb0e5bd00e7134c0c1a2d6ae2
 codeDigest:

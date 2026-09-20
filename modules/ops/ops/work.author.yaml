@@ -73,7 +73,7 @@ writes:
       - extensions.work3.checks
       - extensions.work3.resources
     content:
-      en: "Author only the fields that make the work/node@2 node launchable: its testable assertions, the write scope as
+      en: "Author only the fields that make the work/node@1 node launchable: its testable assertions, the write scope as
         real inspected files, one check per assertion with a verbatim runnable command, and the exclusive
         runtime resources those checks need. The authored extensions.work3.checks include the record-class
         validator `starci validate` so wrong path, name or schema fails the node's own checks. Preserve every other authored line, including the node's
@@ -90,7 +90,7 @@ writes:
       - description
       - assertions
     content:
-      en: One todo integration node per integration the feature declares (schema work/node@2, kind integration, state todo, required
+      en: One todo integration node per integration the feature declares (schema work/node@1, kind integration, state todo, required
         true), naming the outside system and the credential by variable name only; the node the tree owes for the
         declaration, whose live proof is another operation's. Never a credential value.
   - id: parts
@@ -108,7 +108,7 @@ writes:
       - extensions.work3.allowlist
       - extensions.work3.checks
     content:
-      en: "Cut mode only. One child node per observable behaviour, written as work/node@2 with kind
+      en: "Cut mode only. One child node per observable behaviour, written as work/node@1 with kind
         implementation, state todo and required true: its description, its assertions, its write scope of at most
         twelve inspected files disjoint from every sibling and from the seam, and one runnable check per
         assertion plus the record-class validator `starci validate` so wrong path, name or schema fails

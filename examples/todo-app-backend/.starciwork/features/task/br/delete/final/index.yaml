@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.task.delete.final
 title: A deleted task does not come back
 state: done

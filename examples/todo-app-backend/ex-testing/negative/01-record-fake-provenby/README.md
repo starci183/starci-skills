@@ -2,7 +2,7 @@
 
 ## The defect
 
-`work/features/fake/impl/fake-be/ghost/index.yaml` is a `work/implementation` that claims
+`work/features/fake/impl/fake-be/ghost/index.yaml` is a `work/implementation@1` that claims
 `state: done` and carries a **hand-written** `provenBy` naming `uat.fake.ghost` — a UAT record
 that exists but is still `todo` (its run never happened). Beside it, `evidence.yaml` settles the
 record on `run: runs/20990101T000000Z-ghost`, a directory that was never created, and the record

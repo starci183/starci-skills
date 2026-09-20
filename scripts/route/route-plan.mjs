@@ -246,15 +246,15 @@ function normalizeTargetVar(spec, args) {
 
 // record schema -> state-variable family (producesVocabulary families).
 const SCHEMA_FAMILY = {
-  'work/business-rule': 'business', 'work/functional-requirement': 'business',
-  'work/non-functional-requirement': 'business', 'work/policy-decision': 'business',
-  'work/customer-journey': 'business', 'work/feature': 'business',
-  'work/sds-component': 'sds', 'work/contract': 'sds', 'work/data': 'sds', 'work/event': 'sds',
-  'work/implementation': 'impl',
-  'work/ui-screen': 'ui', 'work/uat-flow': 'ui',
-  'work/integration': 'integration',
-  'work/brand': 'brand', 'work/scope': 'scope',
-  'work/gap': 'gap',
+  'work/business-rule@1': 'business', 'work/functional-requirement@1': 'business',
+  'work/non-functional-requirement@1': 'business', 'work/policy-decision@1': 'business',
+  'work/customer-journey@1': 'business', 'work/feature@1': 'business',
+  'work/sds-component@1': 'sds', 'work/contract@1': 'sds', 'work/data@1': 'sds', 'work/event@1': 'sds',
+  'work/implementation@1': 'impl',
+  'work/ui-screen@1': 'ui', 'work/uat-flow@1': 'ui',
+  'work/integration@1': 'integration',
+  'work/brand@1': 'brand', 'work/scope@1': 'scope',
+  'work/gap@1': 'gap',
 };
 const SETTLED = new Set(['done']);           // a record whose proof stands
 const UNSETTLED = new Set(['todo', 'inprogress', 'proposed', 'blocked']);
@@ -677,7 +677,7 @@ function ownedDirsForLeg(leg, s0, ops) {
   if (!s0?.recordsById) return null;
   const dirs = [];
   for (const rec of s0.records) {
-    if (rec.schema !== 'work/implementation') continue;
+    if (rec.schema !== 'work/implementation@1') continue;
     for (const d of resolveOwnedDirs(rec.id, { data: s0.recordsById.get(rec.id).data }, s0.recordsById, s0.workspaceDoc, s0.root)) {
       dirs.push(d.rel);
     }

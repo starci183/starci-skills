@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.recur.live-proof
 title: No passing uat.verify run for recur.make-recurring - the product has no occurrence-completion door
 state: todo

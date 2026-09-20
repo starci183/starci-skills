@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.login.todo-app-backend.auth
 title: The auth module
 state: done

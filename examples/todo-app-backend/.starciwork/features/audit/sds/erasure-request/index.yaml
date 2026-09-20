@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.audit.erasure-request
 title: The lifecycle of one request to be forgotten
 state: done

@@ -32,7 +32,7 @@ function sha256File(file) {
 test('generateEvidence: a passing assertion writes outcome: pass with a matching recordDigest and truthful provenance', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  const recordFile = write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: todo\n');
+  const recordFile = write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: todo\n');
 
   const result = generateEvidence({
     workRoot,
@@ -48,7 +48,7 @@ test('generateEvidence: a passing assertion writes outcome: pass with a matching
   assert.equal(result.evidence.provenance.tool, 'scripts/example-evidence.mjs');
 
   const written = parseYaml(fs.readFileSync(result.evidenceFile, 'utf8'));
-  assert.equal(written.schema, 'work/evidence');
+  assert.equal(written.schema, 'work/evidence@1');
   assert.equal(written.record, 'fr.f.thing');
   assert.equal(written.assertions[0].outcome, 'pass');
 });
@@ -56,7 +56,7 @@ test('generateEvidence: a passing assertion writes outcome: pass with a matching
 test('generateEvidence: a failing command is recorded as outcome: fail and the script signals failure, never touching state', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: todo\n');
+  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: todo\n');
 
   const result = generateEvidence({
     workRoot,
@@ -76,7 +76,7 @@ test('generateEvidence: a failing command is recorded as outcome: fail and the s
 test('generateEvidence: assertions carry both command and exit alongside the human observation (concept 2: replayable evidence)', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: todo\n');
+  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: todo\n');
 
   const passCommand = process.platform === 'win32' ? 'exit 0' : 'true';
   const result = generateEvidence({
@@ -92,7 +92,7 @@ test('generateEvidence: computes codeDigest over the sorted bytes of every file 
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
   write(workRoot, 'features/f/impl/thing/index.yaml',
-    'schema: work/implementation\nid: impl.f.thing\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n');
+    'schema: work/implementation@1\nid: impl.f.thing\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n');
   write(root, 'src/f/a.ts', 'export const a = 1;\n');
   write(root, 'src/f/b.ts', 'export const b = 2;\n');
 
@@ -118,7 +118,7 @@ test('generateEvidence: computes codeDigest over the sorted bytes of every file 
 test('generateEvidence: omits codeDigest entirely when the record owns no resolvable directory', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement\nid: fr.f.thing\ntitle: t\nstate: todo\n');
+  write(workRoot, 'features/f/fr/thing/index.yaml', 'schema: work/functional-requirement@1\nid: fr.f.thing\ntitle: t\nstate: todo\n');
 
   const result = generateEvidence({
     workRoot, recordId: 'fr.f.thing', cwd: root,
@@ -130,7 +130,7 @@ test('generateEvidence: omits codeDigest entirely when the record owns no resolv
 test('generateEvidence: refuses when no record with the given id exists under --work', () => {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'index.yaml', 'schema: work/catalog\nid: fixture\nfeatures: []\n');
+  write(workRoot, 'index.yaml', 'schema: work/catalog@1\nid: fixture\nfeatures: []\n');
 
   assert.throws(() => generateEvidence({
     workRoot,

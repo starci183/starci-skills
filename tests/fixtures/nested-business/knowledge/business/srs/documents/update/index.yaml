@@ -1,4 +1,4 @@
-schema: work/node@2
+schema: work/node@1
 required: true
 id: example.business.srs.documents.update
 kind: business
@@ -7,7 +7,7 @@ description: Synthetic FR-KNOW-03 with complete detailed flows; not approved pro
 extensions:
   work3:
     specification:
-      schema: starci/specification@2
+      schema: starci/specification@1
       op: business.decide
       status: draft
       context:

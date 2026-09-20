@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.share.live-proof
 title: The share collaboration loop has no invitee-side product surface for a uat.verify run to walk
 state: todo

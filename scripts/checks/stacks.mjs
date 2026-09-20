@@ -7,7 +7,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 const RESULT='starci/application-stacks-check@1';
 const STACKS_DIR='.starcistacks';
 const MAX_INPUT_BYTES=4*1024*1024;
-const SCHEMA_ID='starci/application-stacks';
+const SCHEMA_ID='starci/application-stacks@1';
 const RUNBOOK_COMMANDS=['prepare','doctor','up','status','logs','down','verification'];
 const PLAINTEXT_SECRET_PATTERN=/\.(key|pem|p12|pfx)$/i;
 const slash=value=>String(value??'').replaceAll('\\','/');

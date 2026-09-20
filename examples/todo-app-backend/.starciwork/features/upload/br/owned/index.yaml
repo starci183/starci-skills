@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.upload.owned
 title: An upload answers only to the person who made it
 state: done

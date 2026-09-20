@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.task.share-edge-hold
 title: br.task.single-owner's done flag is held by an out-of-lane blocker edge
 state: todo

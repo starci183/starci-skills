@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.audit.operator-role
 title: No operator/admin role exists to authorize reading the log
 state: done

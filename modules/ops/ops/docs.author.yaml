@@ -68,7 +68,7 @@ writes:
       - description
       - extensions.work3.docs
     content:
-      en: Write the document's own declaration on the selected node (schema work/node@2 preserved) -
+      en: Write the document's own declaration on the selected node (schema work/node@1 preserved) -
         which documents it owns under
         extensions.work3.docs - plus state/blocker/completion. The document content itself belongs
         to the docs write and observations to evidence; do not widen refs/dependencies/acceptance to

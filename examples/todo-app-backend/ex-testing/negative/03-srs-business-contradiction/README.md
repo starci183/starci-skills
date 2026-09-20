@@ -2,13 +2,13 @@
 
 ## The defect
 
-`work/` holds two `work/business-rule` records, both `state: done`, that assert opposite product
+`work/` holds two `work/business-rule@1` records, both `state: done`, that assert opposite product
 law about pricing:
 
 - `br.pricing.free-for-all` — "the product is free for every account; no cap may limit usage"
 - `br.pricing.cap-required` — "every account has an active-task cap; exceeding it refuses writes"
 
-Each declares `conflictsWith` the other, and **no `work/policy-decision` resolves the pair** — the
+Each declares `conflictsWith` the other, and **no `work/policy-decision@1` resolves the pair** — the
 tree asserts a contradiction as settled fact. This is the "spec sai business" shape: an SRS layer
 that contradicts itself while every record still says `done`.
 

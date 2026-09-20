@@ -10,7 +10,7 @@ export type DisposableAccount = {
   readonly password: string;
 };
 
-/** The shape this harness reads back out of an existing `work/uat-flow` record. */
+/** The shape this harness reads back out of an existing `work/uat-flow@1` record. */
 export type UatFlowRecord = {
   readonly id: string;
   readonly title: string;
@@ -31,8 +31,8 @@ export type FlowLocation = {
 };
 
 /**
- * Every existing `work/uat-flow` record under the backend's `.starciwork`
- * (`grep -rl '^schema: work/uat-flow' examples/todo-app-backend/.starciwork`), so a spec file names its
+ * Every existing `work/uat-flow@1` record under the backend's `.starciwork`
+ * (`grep -rl '^schema: work/uat-flow@1' examples/todo-app-backend/.starciwork`), so a spec file names its
  * own record instead of restating feature/flow path segments inline.
  */
 export const FLOW_LOCATIONS: ReadonlyArray<FlowLocation> = [
@@ -49,12 +49,12 @@ export const FLOW_LOCATIONS: ReadonlyArray<FlowLocation> = [
 export const recordDigest = (feature: string, flow: string): string =>
   crypto.createHash('sha256').update(fs.readFileSync(flowRecordPath(feature, flow))).digest('hex');
 
-/** Reads and parses an existing `work/uat-flow` record; refuses rather than inventing a missing one. */
+/** Reads and parses an existing `work/uat-flow@1` record; refuses rather than inventing a missing one. */
 export const readFlowRecord = (feature: string, flow: string): UatFlowRecord => {
   const file = flowRecordPath(feature, flow);
   const raw = parseYaml(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  if (!raw || raw.schema !== 'work/uat-flow' || typeof raw.id !== 'string') {
-    throw new Error(`${file} is not a work/uat-flow record; refusing to invent one.`);
+  if (!raw || raw.schema !== 'work/uat-flow@1' || typeof raw.id !== 'string') {
+    throw new Error(`${file} is not a work/uat-flow@1 record; refusing to invent one.`);
   }
   return {
     id: raw.id,
@@ -111,8 +111,8 @@ export const readAccounts = (feature: string, flow: string): ReadonlyArray<Dispo
   const file = flowAccountsPath(feature, flow);
   if (!fs.existsSync(file)) return [];
   const raw = parseYaml(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  if (!raw || raw.schema !== 'work/disposable-accounts' || !Array.isArray(raw.accounts)) {
-    throw new Error(`${file} is not a work/disposable-accounts record; refusing to invent one.`);
+  if (!raw || raw.schema !== 'work/disposable-accounts@1' || !Array.isArray(raw.accounts)) {
+    throw new Error(`${file} is not a work/disposable-accounts@1 record; refusing to invent one.`);
   }
   return raw.accounts.map(entry => {
     const role = String((entry as any).role);

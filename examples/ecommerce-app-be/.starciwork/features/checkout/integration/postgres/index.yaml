@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.checkout.postgres
 title: PostgreSQL holds the catalog, cart, order and payment rows
 state: todo

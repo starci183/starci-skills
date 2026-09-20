@@ -135,7 +135,7 @@ export function readWorkTree(root){
   };
   walk(resolved);
   for(const record of records.values())
-    if(record.meta.schema==='work/acceptance-criterion'&&text(record.meta.rule)){
+    if(record.meta.schema==='work/acceptance-criterion@1'&&text(record.meta.rule)){
       const rule=records.get(record.meta.rule.trim());
       if(rule)rule.criteria.set(record.id,normativeDigest(record.meta));
     }
@@ -163,7 +163,7 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
     const was=revOf(baseline)(baseline.records.get(record.id)??null),now=revOf(current)(record);
     return was!==null&&now!==null&&now>was;
   }).map(record=>record.id):[]);
-  const coveredByOwner=record=>record.meta.schema==='work/acceptance-criterion'&&text(record.meta.rule)&&revMoved.has(record.meta.rule.trim());
+  const coveredByOwner=record=>record.meta.schema==='work/acceptance-criterion@1'&&text(record.meta.rule)&&revMoved.has(record.meta.rule.trim());
 
   for(const record of [...current.records.values()].sort((a,b)=>a.id.localeCompare(b.id))){
     const previous=baseline?.records.get(record.id)??null;

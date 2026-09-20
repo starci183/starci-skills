@@ -33,11 +33,11 @@ function write(root, rel, content) {
 }
 
 /** A minimal `.starciwork` tree with a declared backend repository named after `root`'s own basename, so
- * work/implementation and work/business-rule anchor-path checks resolve against real files under `root`. */
+ * work/implementation@1 and work/business-rule@1 anchor-path checks resolve against real files under `root`. */
 function tree(root, extra) {
   const workRoot = path.join(root, '.starciwork');
   const repoName = path.basename(root);
-  write(workRoot, 'workspace.yaml', `schema: work/workspace\nid: fixture\nrepositories:\n  - {role: be, name: ${repoName}}\n`);
+  write(workRoot, 'workspace.yaml', `schema: work/workspace@1\nid: fixture\nrepositories:\n  - {role: be, name: ${repoName}}\n`);
   for (const [rel, content] of Object.entries(extra)) write(workRoot, rel, content);
   return workRoot;
 }
@@ -47,12 +47,12 @@ function findingsOf(critique, kind) { return critique.findings.filter(f => f.kin
 test('section 1: blast radius counts the transitive usedBy set over the blast-kind edges, not blockedBy', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\nmodule: src/a\n',
-    'features/f/fr/b/index.yaml': 'schema: work/functional-requirement\nid: fr.f.b\ntitle: B\nstate: todo\ncomposes:\n  - {rule: br.f.a, module: src/a}\n',
-    'features/f/sds/c/index.yaml': 'schema: work/sds-component\nid: sds.f.c\ntitle: C\nstate: todo\nrefs: [fr.f.b]\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\nmodule: src/a\n',
+    'features/f/fr/b/index.yaml': 'schema: work/functional-requirement@1\nid: fr.f.b\ntitle: B\nstate: todo\ncomposes:\n  - {rule: br.f.a, module: src/a}\n',
+    'features/f/sds/c/index.yaml': 'schema: work/sds-component@1\nid: sds.f.c\ntitle: C\nstate: todo\nrefs: [fr.f.b]\n',
     // A blockedBy edge at d must NOT extend the blast radius - it is an impediment, not a usedBy dependency.
-    'features/f/gap/g/index.yaml': 'schema: work/gap\nid: gap.f.g\ntitle: G\nstate: todo\nstatement: s\n',
-    'features/f/br/d/index.yaml': 'schema: work/business-rule\nid: br.f.d\ntitle: D\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "unrelated impediment"}\n',
+    'features/f/gap/g/index.yaml': 'schema: work/gap@1\nid: gap.f.g\ntitle: G\nstate: todo\nstatement: s\n',
+    'features/f/br/d/index.yaml': 'schema: work/business-rule@1\nid: br.f.d\ntitle: D\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "unrelated impediment"}\n',
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'blast-radius').find(f => f.id === 'blast-radius:br.f.a');
@@ -64,8 +64,8 @@ test('section 1: blast radius counts the transitive usedBy set over the blast-ki
 test('section 1: blast radius follows the proves edge (implementation -> rule), which usedBy does not classify', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
-    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: X\nstate: done\nverificationSource: authored-claim\nbecause: c\nproves: [br.f.a]\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nverificationSource: authored-claim\nbecause: c\nproves: [br.f.a]\n',
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'blast-radius').find(f => f.id === 'blast-radius:br.f.a');
@@ -75,12 +75,12 @@ test('section 1: blast radius follows the proves edge (implementation -> rule), 
 test('section 2: fan-in hotspot is the top decile of usedBy totals, with a cross-feature dependent count', () => {
   const root = freshRoot();
   const extra = {
-    'features/hub/data/shared/index.yaml': 'schema: work/data\nid: data.hub.shared\ntitle: Shared\nstate: done\n',
+    'features/hub/data/shared/index.yaml': 'schema: work/data@1\nid: data.hub.shared\ntitle: Shared\nstate: done\n',
   };
   // Nine referrers spread over two other features, so data.hub.shared is easily the highest fan-in record.
   for (let i = 0; i < 9; i += 1) {
     const feature = i < 5 ? 'a' : 'b';
-    extra[`features/${feature}/fr/r${i}/index.yaml`] = `schema: work/functional-requirement\nid: fr.${feature}.r${i}\ntitle: R\nstate: todo\nrefs: [data.hub.shared]\n`;
+    extra[`features/${feature}/fr/r${i}/index.yaml`] = `schema: work/functional-requirement@1\nid: fr.${feature}.r${i}\ntitle: R\nstate: todo\nrefs: [data.hub.shared]\n`;
   }
   const workRoot = tree(root, extra);
   const critique = computeCritique(workRoot);
@@ -93,8 +93,8 @@ test('section 2: fan-in hotspot is the top decile of usedBy totals, with a cross
 test('section 3: a two-record blockedBy cycle is reported as one ordered ring, not two separate findings', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "waiting on b"}\n',
-    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: B\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "waiting on a"}\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "waiting on b"}\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule@1\nid: br.f.b\ntitle: B\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "waiting on a"}\n',
   });
   const critique = computeCritique(workRoot);
   const cycles = findingsOf(critique, 'blocker-cycle');
@@ -106,9 +106,9 @@ test('section 3: a two-record blockedBy cycle is reported as one ordered ring, n
 test('section 3: candidate anchors already in the tree name a same-feature gap or open decision outside the ring', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "b"}\n',
-    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: B\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "a"}\n',
-    'features/f/gap/g/index.yaml': 'schema: work/gap\nid: gap.f.g\ntitle: G\nstate: todo\nstatement: nothing built yet\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "b"}\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule@1\nid: br.f.b\ntitle: B\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "a"}\n',
+    'features/f/gap/g/index.yaml': 'schema: work/gap@1\nid: gap.f.g\ntitle: G\nstate: todo\nstatement: nothing built yet\n',
   });
   const critique = computeCritique(workRoot);
   const cycle = findingsOf(critique, 'blocker-cycle')[0];
@@ -118,7 +118,7 @@ test('section 3: candidate anchors already in the tree name a same-feature gap o
 test('section 4: a done implementation record whose owners path does not exist on disk is flagged', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/impl/x/index.yaml': `schema: work/implementation\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/does-not-exist.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
+    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/does-not-exist.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'done-without-anchor').find(f => f.records[0] === 'impl.f.x');
@@ -130,7 +130,7 @@ test('section 4: a done implementation record whose owners path DOES exist on di
   const root = freshRoot();
   write(root, 'src/real.ts', '// real file\n');
   const workRoot = tree(root, {
-    'features/f/impl/x/index.yaml': `schema: work/implementation\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
+    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
   });
   const critique = computeCritique(workRoot);
   assert.equal(findingsOf(critique, 'done-without-anchor').filter(f => f.records[0] === 'impl.f.x').length, 0);
@@ -140,8 +140,8 @@ test('section 4: a done implementation record proving a target that is not itsel
   const root = freshRoot();
   write(root, 'src/real.ts', '// real file\n');
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\n',
-    'features/f/impl/x/index.yaml': `schema: work/implementation\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\nproves: [br.f.a]\n`,
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
+    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\nproves: [br.f.a]\n`,
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'done-proves-not-done').find(f => f.records[0] === 'impl.f.x');
@@ -152,7 +152,7 @@ test('section 4: a done implementation record proving a target that is not itsel
 test('section 5: an sds-component with no owners is unbound', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/sds/c/index.yaml': 'schema: work/sds-component\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\n',
+    'features/f/sds/c/index.yaml': 'schema: work/sds-component@1\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\n',
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'unbound-sds').find(f => f.records[0] === 'sds.f.c');
@@ -164,7 +164,7 @@ test('section 5: an sds-component whose owners resolve to a real module director
   const root = freshRoot();
   fs.mkdirSync(path.join(root, 'src', 'mod'), {recursive: true});
   const workRoot = tree(root, {
-    'features/f/sds/c/index.yaml': `schema: work/sds-component\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/mod}\n`,
+    'features/f/sds/c/index.yaml': `schema: work/sds-component@1\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/mod}\n`,
   });
   const critique = computeCritique(workRoot);
   assert.equal(findingsOf(critique, 'unbound-sds').filter(f => f.records[0] === 'sds.f.c').length, 0);
@@ -173,7 +173,7 @@ test('section 5: an sds-component whose owners resolve to a real module director
 test('section 6: a contract whose surface is prose only, with no typed field list, is flagged', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/contract/z/index.yaml': 'schema: work/contract\nid: contract.f.z\ntitle: Z\nstate: todo\nbetween: {provider: f, consumer: g}\nowner: f\nsurface: "f gives g whatever it needs, informally"\n',
+    'features/f/contract/z/index.yaml': 'schema: work/contract@1\nid: contract.f.z\ntitle: Z\nstate: todo\nbetween: {provider: f, consumer: g}\nowner: f\nsurface: "f gives g whatever it needs, informally"\n',
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'untyped-contract').find(f => f.records[0] === 'contract.f.z');
@@ -183,7 +183,7 @@ test('section 6: a contract whose surface is prose only, with no typed field lis
 test('section 6: a contract whose surface is a {name, shape} field list is not flagged', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/contract/z/index.yaml': 'schema: work/contract\nid: contract.f.z\ntitle: Z\nstate: todo\nbetween: {provider: f, consumer: g}\nowner: f\nsurface:\n  - {name: doIt, shape: "(x) -> y"}\n',
+    'features/f/contract/z/index.yaml': 'schema: work/contract@1\nid: contract.f.z\ntitle: Z\nstate: todo\nbetween: {provider: f, consumer: g}\nowner: f\nsurface:\n  - {name: doIt, shape: "(x) -> y"}\n',
   });
   const critique = computeCritique(workRoot);
   assert.equal(findingsOf(critique, 'untyped-contract').filter(f => f.records[0] === 'contract.f.z').length, 0);
@@ -192,9 +192,9 @@ test('section 6: a contract whose surface is a {name, shape} field list is not f
 test('section 7: an open policy-decision reports what it blocks, from both blocks and blockedBy citers', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/decision/d/index.yaml': 'schema: work/policy-decision\nid: decision.f.d\ntitle: D\nstate: todo\noutcome: open\noptions: [{id: x, consequence: c}]\nblocks: [br.f.a]\n',
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\n',
-    'features/f/sds/c/index.yaml': 'schema: work/sds-component\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the decision"}\n',
+    'features/f/decision/d/index.yaml': 'schema: work/policy-decision@1\nid: decision.f.d\ntitle: D\nstate: todo\noutcome: open\noptions: [{id: x, consequence: c}]\nblocks: [br.f.a]\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
+    'features/f/sds/c/index.yaml': 'schema: work/sds-component@1\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the decision"}\n',
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'open-decision').find(f => f.records[0] === 'decision.f.d');
@@ -204,10 +204,10 @@ test('section 7: an open policy-decision reports what it blocks, from both block
 test('section 8: a todo blocked on an *.unbuilt-module gap is leftover; one blocked on an open decision is designed', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/gap/unbuilt-module/index.yaml': 'schema: work/gap\nid: gap.f.unbuilt-module\ntitle: G\nstate: todo\nstatement: no module exists\n',
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\nblockedBy:\n  - {record: gap.f.unbuilt-module, because: "not built"}\n',
-    'features/f/decision/d/index.yaml': 'schema: work/policy-decision\nid: decision.f.d\ntitle: D\nstate: todo\noutcome: open\noptions: [{id: x, consequence: c}]\n',
-    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: B\nstate: todo\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the decision"}\n',
+    'features/f/gap/unbuilt-module/index.yaml': 'schema: work/gap@1\nid: gap.f.unbuilt-module\ntitle: G\nstate: todo\nstatement: no module exists\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\nblockedBy:\n  - {record: gap.f.unbuilt-module, because: "not built"}\n',
+    'features/f/decision/d/index.yaml': 'schema: work/policy-decision@1\nid: decision.f.d\ntitle: D\nstate: todo\noutcome: open\noptions: [{id: x, consequence: c}]\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule@1\nid: br.f.b\ntitle: B\nstate: todo\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the decision"}\n',
   });
   const critique = computeCritique(workRoot);
   assert.ok(findingsOf(critique, 'leftover-todo').some(f => f.records[0] === 'br.f.a'));
@@ -219,10 +219,10 @@ test('section 8: a todo blocked on an *.unbuilt-module gap is leftover; one bloc
 test('section 9: stale evidence with staleSince naming a different record is designed; a bare digest mismatch is bulk-edit', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: done\nverificationSource: authored-claim\nbecause: c\nchange: {rev: 2, kind: breaking, at: 2026-09-18T00:00:00.000Z}\n',
-    'features/f/br/a/evidence.yaml': 'schema: work/evidence\nrecord: br.f.a\nrecordDigest: "deadbeef"\nstale: true\nstaleSince: {record: br.f.a}\noutcome: pass\n',
-    'features/f/sds/c/index.yaml': 'schema: work/sds-component\nid: sds.f.c\ntitle: C\nstate: done\nresponsibility: r\nverificationSource: authored-claim\nbecause: c\n',
-    'features/f/sds/c/evidence.yaml': 'schema: work/evidence\nrecord: sds.f.c\nrecordDigest: "deadbeef"\nstale: true\nstaleSince: {record: br.f.a, rev: 2}\noutcome: pass\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: done\nverificationSource: authored-claim\nbecause: c\nchange: {rev: 2, kind: breaking, at: 2026-09-18T00:00:00.000Z}\n',
+    'features/f/br/a/evidence.yaml': 'schema: work/evidence@1\nrecord: br.f.a\nrecordDigest: "deadbeef"\nstale: true\nstaleSince: {record: br.f.a}\noutcome: pass\n',
+    'features/f/sds/c/index.yaml': 'schema: work/sds-component@1\nid: sds.f.c\ntitle: C\nstate: done\nresponsibility: r\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/sds/c/evidence.yaml': 'schema: work/evidence@1\nrecord: sds.f.c\nrecordDigest: "deadbeef"\nstale: true\nstaleSince: {record: br.f.a, rev: 2}\noutcome: pass\n',
   });
   const critique = computeCritique(workRoot);
   assert.ok(findingsOf(critique, 'stale-evidence-bulk-edit').some(f => f.records[0] === 'br.f.a'));
@@ -235,7 +235,7 @@ test('section 9: stale evidence with staleSince naming a different record is des
 test('gate: computeCritique is a pure, deterministic function of the tree (two runs agree byte-for-byte)', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
   });
   const first = JSON.stringify(computeCritique(workRoot).findings);
   const second = JSON.stringify(computeCritique(workRoot).findings);
@@ -245,7 +245,7 @@ test('gate: computeCritique is a pure, deterministic function of the tree (two r
 test('gate: a stale (or missing) critique output is refused, exactly like the derived index', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
   });
   const missing = runCritique(workRoot, {write: false});
   assert.equal(missing.ok, false);
@@ -254,7 +254,7 @@ test('gate: a stale (or missing) critique output is refused, exactly like the de
   const fresh = runCritique(workRoot, {write: false});
   assert.equal(fresh.ok, true);
 
-  write(workRoot, 'features/f/br/b/index.yaml', 'schema: work/business-rule\nid: br.f.b\ntitle: B\nstate: todo\n');
+  write(workRoot, 'features/f/br/b/index.yaml', 'schema: work/business-rule@1\nid: br.f.b\ntitle: B\nstate: todo\n');
   const stale = runCritique(workRoot, {write: false});
   assert.equal(stale.ok, false);
 });

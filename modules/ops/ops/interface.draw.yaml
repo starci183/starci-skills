@@ -94,7 +94,7 @@ writes:
       - assertions
     content:
       en: >-
-        Write the selected image-first direction in the approved UI node (work/node@2). Keep every required screen and reachable
+        Write the selected image-first direction in the approved UI node (work/node@1). Keep every required screen and reachable
         state, then add `ui.coverage`: scale, representativeScreens and a map of screen/state/viewport to actual
         Grammar components, derivation and optional directionAsset. For a large frontend task select a deliberately
         small critical-screen set covering the highest-risk anatomy and journeys; derive the rest in the map.

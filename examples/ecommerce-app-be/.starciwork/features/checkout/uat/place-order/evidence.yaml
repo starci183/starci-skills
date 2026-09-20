@@ -4,7 +4,7 @@
 # (runs/20260919T142835Z-5c10a673 through runs/20260919T152927Z-5c10a673) are rig-and-spec history -
 # append-only, untouched, and they settle nothing; the last of them remains the honest record of the
 # pre-repair step-7 absence this record's rev-5 change describes.
-schema: work/evidence
+schema: work/evidence@1
 record: uat.checkout.place-order
 recordDigest: 0d35216202eea80d168283cc870d05ac909bf8a05bf83d0c5e810484d42d4363
 run: runs/20260919T155312Z-5c10a673

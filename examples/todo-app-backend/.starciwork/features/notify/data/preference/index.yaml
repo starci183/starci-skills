@@ -1,4 +1,4 @@
-schema: work/data
+schema: work/data@1
 id: data.notify.preference
 title: Preference
 state: done
@@ -14,4 +14,4 @@ refs: [br.notify.unsubscribe.honored]
 module: src/modules/platform/databases/postgresql/primary/entities/notify-preference.entity.ts
 change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "NotifyPreferenceEntity exists exactly to this shape (notify_preferences table, primary key (person_id, channel)); gap.notify.unbuilt-module's blocker is resolved."}
 verificationSource: authored-claim
-because: "work/data's done is an authored claim by nature; NotifyPreferenceEntity's fields and invariants match this record exactly, and the table is exercised live by scripts/live-proof-notify.sh."
+because: "work/data@1's done is an authored claim by nature; NotifyPreferenceEntity's fields and invariants match this record exactly, and the table is exercised live by scripts/live-proof-notify.sh."

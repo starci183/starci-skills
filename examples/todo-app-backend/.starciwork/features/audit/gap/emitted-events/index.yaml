@@ -1,10 +1,10 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.audit.emitted-events
 title: login and task expose no emitted-event contract for audit to subscribe to
 state: todo
 statement: "The contract half of this gap is now declared: contract.audit.emitted-events names the
   five events audit needs emitted - event.login.signed-in, event.login.signed-out,
-  event.task.created, event.task.completed, event.task.deleted - each with its own work/event record
+  event.task.created, event.task.completed, event.task.deleted - each with its own work/event@1 record
   under features/audit/event/**, payloads mirroring the typed classes in
   src/modules/platform/events/events.types.ts field for field, each already listed in
   fr.audit.log.append's and sds.audit.log-chain's subscribes. Audit's subscriber is built against
@@ -27,7 +27,7 @@ change:
   at: 2026-09-18T20:10:00.000Z
   reason: "The brief's own instruction for this gap - build the subscriber against PlatformEventBus
     (already done) and declare exactly which event types audit needs emitted - is delivered: five
-    work/event records and contract.audit.emitted-events are now the named vocabulary, resolving every
+    work/event@1 records and contract.audit.emitted-events are now the named vocabulary, resolving every
     dangling subscribes id in this feature. The gap's state is unchanged and honest: its closable edge
     is a provider-lane record (lane ex-be-task), which stays todo, and login's two emissions still lack
     any provider-side prover at all, which is stated precisely here instead of assumed closed."

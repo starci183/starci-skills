@@ -71,7 +71,7 @@ Every folder owns one `index.yaml`. Parent indexes aggregate scope and immediate
 | Business data | `starci/srs-data-definition@1` |
 | Customer journey | `starci/srs-customer-journey@1` |
 
-The machine-readable contract is `modules/schemas/spec/srs-sections.schema.yaml`. An earlier cohesive `starci/specification@2` leaf remains readable, but new work uses the split tree. Do not use a product-specific schema such as `starci-next/srs@1`.
+The machine-readable contract is `modules/schemas/spec/srs-sections.schema.yaml`. An earlier cohesive `starci/specification@1` leaf remains readable, but new work uses the split tree. Do not use a product-specific schema such as `starci-next/srs@1`.
 
 ## Functional requirements
 
@@ -141,4 +141,4 @@ Run `node bin/starci.mjs validate <work-root>`. The validator checks folder/sche
 
 Draft and blocked payloads cannot earn completed Work. A reviewed SRS seed is authored as `todo` and remains the current product contract for downstream SDS, UI, implementation and UAT. `todo + activity: idle` means defined but not currently being worked; `todo + activity: investigating|implementing|verifying` means in progress. Only final reconciliation may author `done`, after current SRS, SDS, code, test/E2E and UAT evidence bind the same delivery revision and every required assertion passes. Missing, stale or mismatched evidence leaves the record `todo` and the workflow partial or blocked. Reorganizing folders changes semantic ancestry; preserve old proof and establish fresh evidence for changed content.
 
-The compatibility reader also accepts the pre-upstream `starci/srs@3` leaf format for recovery and explicitly authorized conversion. Do not use it for new authoring: new SRS content uses the section schemas published in `modules/schemas/spec/srs-sections.schema.yaml`. Conversion preserves stable IDs and useful evidence but requires a fresh scoped review; it never copies stale `done` state.
+The compatibility reader also accepts the pre-upstream `starci/srs@1` leaf format for recovery and explicitly authorized conversion. Do not use it for new authoring: new SRS content uses the section schemas published in `modules/schemas/spec/srs-sections.schema.yaml`. Conversion preserves stable IDs and useful evidence but requires a fresh scoped review; it never copies stale `done` state.

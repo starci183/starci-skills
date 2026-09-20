@@ -4,7 +4,7 @@
 # actually checks (a `run` field naming runs/<runId>, that run having screens/, videos/ and a result.md
 # whose outcome is pass). Every byte named below was produced by the Playwright harness at
 # examples/todo-app-frontend/uat, which wrote runs/<runId>/ itself; this file only settles which run.
-schema: work/evidence
+schema: work/evidence@1
 record: uat.task.create
 recordDigest: 13376ae19d9698ca10a0d17638482626c150e267adf3074b19cf7d802c9c753a
 run: runs/20260919T112844Z-5c10a673

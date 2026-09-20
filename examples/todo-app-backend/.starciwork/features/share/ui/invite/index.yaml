@@ -1,4 +1,4 @@
-schema: work/ui-screen
+schema: work/ui-screen@1
 id: ui.share.invite
 title: The invitation screen and the collaborator list
 state: done

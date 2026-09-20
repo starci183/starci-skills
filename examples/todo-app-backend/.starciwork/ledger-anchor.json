@@ -1,5 +1,5 @@
 {
-  "schema": "starci/ledger-anchor",
+  "schema": "starci/ledger-anchor@1",
   "ledgerId": "0f9b24c1-f0b9-4e2d-9a5c-3f8e1b6d4a9c",
   "updatedAt": 1789700000000,
   "workflows": {

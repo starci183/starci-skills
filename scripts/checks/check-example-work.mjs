@@ -22,11 +22,11 @@ import {renderProofProblems} from '../example/example-render-proof.mjs';
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
-const EXEMPT = new Set(['work/catalog', 'work/workspace', 'work/brand', 'work/feature', 'work/disposable-accounts']);
+const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
 const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 /** Schemas whose `done` is an authored claim by nature (concept 6); every other schema needs proof or a declaration. */
-const AUTHORED_CLAIM_SCHEMAS = new Set(['work/data', 'work/brand', 'work/policy-decision']);
+const AUTHORED_CLAIM_SCHEMAS = new Set(['work/data@1', 'work/brand@1', 'work/policy-decision@1']);
 const CHANGE_KINDS = new Set(['initial', 'editorial', 'clarifying', 'breaking']);
 const DELIVERY_GUARANTEES = new Set(['at-least-once', 'at-most-once', 'exactly-once']);
 const DELIVERY_ORDERINGS = new Set(['none', 'per-key', 'total']);
@@ -266,8 +266,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       }
     }
     if (data.tension) {
-      if (schema !== 'work/policy-decision') {
-        problems.push(`${rec.shown}: tension is only authored on work/policy-decision, not ${schema}`);
+      if (schema !== 'work/policy-decision@1') {
+        problems.push(`${rec.shown}: tension is only authored on work/policy-decision@1, not ${schema}`);
       } else {
         const ids = Array.isArray(data.tension.records) ? data.tension.records : [];
         if (ids.length < 2) problems.push(`${rec.shown}: tension.records needs at least two record ids`);
@@ -276,9 +276,9 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     }
 
     // ---- concept 2: gap family (closedBy is a list - a bare string is normalised to one) ----
-    if (schema === 'work/gap') {
-      if (!['todo', 'done'].includes(data.state)) problems.push(`${rec.shown}: work/gap state must be todo or done`);
-      if (!data.statement) problems.push(`${rec.shown}: work/gap needs a statement`);
+    if (schema === 'work/gap@1') {
+      if (!['todo', 'done'].includes(data.state)) problems.push(`${rec.shown}: work/gap@1 state must be todo or done`);
+      if (!data.statement) problems.push(`${rec.shown}: work/gap@1 needs a statement`);
       if (data.closedBy != null) {
         const closers = typeof data.closedBy === 'string' ? [data.closedBy] : Array.isArray(data.closedBy) ? data.closedBy : null;
         if (!closers) {
@@ -288,14 +288,14 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
           for (const c of unresolved) problems.push(`${rec.shown}: closedBy names ${c}, which no record owns`);
           if (data.state === 'done' && !unresolved.length) {
             const notDone = closers.filter(c => recOf(c)?.state !== 'done');
-            for (const c of notDone) problems.push(`${rec.shown}: work/gap is done but closedBy's ${c} is ${recOf(c)?.state ?? '(no state)'}, not done - a gap is closed only once every one of its closers is`);
+            for (const c of notDone) problems.push(`${rec.shown}: work/gap@1 is done but closedBy's ${c} is ${recOf(c)?.state ?? '(no state)'}, not done - a gap is closed only once every one of its closers is`);
           }
         }
       }
     }
 
     // ---- concept 4: decision vocabulary ----
-    if (schema === 'work/policy-decision') {
+    if (schema === 'work/policy-decision@1') {
       if (!['open', 'decided'].includes(data.outcome)) {
         problems.push(`${rec.shown}: outcome must be open or decided, not "${data.outcome}" - the chosen option's id belongs in chosen, not invented into outcome`);
       } else if (data.outcome === 'decided') {
@@ -322,15 +322,15 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
 
     // ---- concept 7: appliesTo is outbound, only on business-rule/sds-component ----
     if ('appliesTo' in data) {
-      if (!['work/business-rule', 'work/sds-component'].includes(schema)) {
-        problems.push(`${rec.shown}: appliesTo is only authored on work/business-rule or work/sds-component, not ${schema}`);
+      if (!['work/business-rule@1', 'work/sds-component@1'].includes(schema)) {
+        problems.push(`${rec.shown}: appliesTo is only authored on work/business-rule@1 or work/sds-component@1, not ${schema}`);
       } else {
         for (const target of data.appliesTo) if (!resolveRecordRef(records, target, inline)) problems.push(`${rec.shown}: appliesTo names ${target}, which no record owns`);
       }
     }
 
     // ---- concept 8: events, data extends, timer transitions ----
-    if (schema === 'work/event') {
+    if (schema === 'work/event@1') {
       if (!data.producer || !resolveRecordRef(records, data.producer, inline)) problems.push(`${rec.shown}: event producer "${data.producer}" does not resolve to a record`);
       if (!Array.isArray(data.payload) || !data.payload.length) problems.push(`${rec.shown}: event needs a non-empty payload`);
       const guarantee = data.delivery?.guarantee, ordering = data.delivery?.ordering;
@@ -341,13 +341,13 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       for (const eid of data.subscribes) {
         const target = recOf(eid);
         if (!target) problems.push(`${rec.shown}: subscribes names ${eid}, which no record owns`);
-        else if (target.schema !== 'work/event') problems.push(`${rec.shown}: subscribes names ${eid}, which is a ${target.schema}, not a work/event`);
+        else if (target.schema !== 'work/event@1') problems.push(`${rec.shown}: subscribes names ${eid}, which is a ${target.schema}, not a work/event@1`);
       }
     }
-    if (schema === 'work/data' && data.extends) {
+    if (schema === 'work/data@1' && data.extends) {
       const base = recOf(data.extends);
       if (!base) problems.push(`${rec.shown}: extends names ${data.extends}, which no record owns`);
-      else if (base.schema !== 'work/data') problems.push(`${rec.shown}: extends names ${data.extends}, which is a ${base.schema}, not a work/data`);
+      else if (base.schema !== 'work/data@1') problems.push(`${rec.shown}: extends names ${data.extends}, which is a ${base.schema}, not a work/data@1`);
     }
     if (data.stateMachine?.transitions) {
       for (const t of data.stateMachine.transitions) {
@@ -358,9 +358,9 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     }
 
     // ---- concept 9: implementation owners ----
-    if (schema === 'work/implementation') {
+    if (schema === 'work/implementation@1') {
       if ('directory' in data || 'files' in data || 'targetFiles' in data) {
-        problems.push(`${rec.shown}: work/implementation carries directory/files/targetFiles, which are not part of the contract; use owners: [{role, path}]`);
+        problems.push(`${rec.shown}: work/implementation@1 carries directory/files/targetFiles, which are not part of the contract; use owners: [{role, path}]`);
       }
       if (data.owners) {
         for (const owner of data.owners) {
@@ -368,7 +368,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
         }
       }
     }
-    if (schema === 'work/business-rule' && 'module' in data) {
+    if (schema === 'work/business-rule@1' && 'module' in data) {
       const m = data.module;
       const ok = typeof m === 'string' ? m.length > 0 : Array.isArray(m) && m.length > 0 && m.every(x => typeof x === 'string' && x.length > 0);
       if (!ok) problems.push(`${rec.shown}: business-rule module must be a non-empty string or a non-empty list of strings`);
@@ -403,25 +403,25 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     // ---- trust concept 4: an sds-component binds to a module ----
     // A design component's read-scope boundary is a module boundary: a `done` sds-component must name at
     // least one owners[] directory (checked for existence by the OWNER_PATH_MISSING rule above, since
-    // work/sds-component is not exempted from declaresOwnPaths). A `todo` one with no owners at all is
+    // work/sds-component@1 is not exempted from declaresOwnPaths). A `todo` one with no owners at all is
     // only warned - the module a design targets may not exist yet.
-    if (schema === 'work/sds-component') {
+    if (schema === 'work/sds-component@1') {
       const hasOwners = Array.isArray(data.owners) && data.owners.some(o => o && o.path);
       if (!hasOwners) {
-        const message = `${rec.shown}: work/sds-component ${data.state === 'done' ? 'is done but carries' : 'carries'} no owners naming a module directory - a design component's read-scope boundary is a module boundary, not a prose claim`;
+        const message = `${rec.shown}: work/sds-component@1 ${data.state === 'done' ? 'is done but carries' : 'carries'} no owners naming a module directory - a design component's read-scope boundary is a module boundary, not a prose claim`;
         if (data.state === 'done') problems.push(message); else warnings.push(message);
       }
     }
 
     // ---- trust concept 8: implementation is held until its ui direction is drawn ----
     // docs/kinds.md's `implementation/frontend` lane is "held until the feature's ui node is done" -
-    // drawing precedes implementing. A done work/implementation that names a work/ui-screen in its own
+    // drawing precedes implementing. A done work/implementation@1 that names a work/ui-screen@1 in its own
     // `proves`, or whose `repository` is the workspace's frontend repository, is refused
     // (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen is itself done: the ones it explicitly
     // proves, or - when it proves none by id - every ui-screen its own feature owns (a frontend
     // implementation is for some screen even when it did not name one via proves).
-    if (schema === 'work/implementation' && data.state === 'done') {
-      const provesUi = (Array.isArray(data.proves) ? data.proves : []).filter(pid => recOf(pid)?.schema === 'work/ui-screen');
+    if (schema === 'work/implementation@1' && data.state === 'done') {
+      const provesUi = (Array.isArray(data.proves) ? data.proves : []).filter(pid => recOf(pid)?.schema === 'work/ui-screen@1');
       const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
       const isFrontendRepo = data.repository ? repos.find(r => r?.name === data.repository)?.role === 'fe' : false;
       if (provesUi.length || isFrontendRepo) {
@@ -429,7 +429,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
         if (!relevantUi.length) {
           const feature = path.relative(workRoot, rec.dir).replaceAll('\\', '/').split('/')[1];
           relevantUi = [...records.entries()]
-            .filter(([, r]) => r.schema === 'work/ui-screen' && path.relative(workRoot, r.dir).replaceAll('\\', '/').split('/')[1] === feature)
+            .filter(([, r]) => r.schema === 'work/ui-screen@1' && path.relative(workRoot, r.dir).replaceAll('\\', '/').split('/')[1] === feature)
             .map(([uid]) => uid);
         }
         const notDone = relevantUi.filter(uid => recOf(uid)?.state !== 'done');
@@ -440,7 +440,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     }
 
     // ---- concept 10: a ui record is done only with a generated direction asset and full state coverage ----
-    if (schema === 'work/ui-screen' && data.state === 'done') {
+    if (schema === 'work/ui-screen@1' && data.state === 'done') {
       const assets = Array.isArray(data.assets) ? data.assets : [];
       const hasDirection = assets.some(a => a && typeof a === 'object' && a.generation && a.generation.tool === 'image_gen.imagegen');
       if (!hasDirection) {
@@ -460,16 +460,16 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     if (Array.isArray(data.assets)) {
       for (const a of data.assets) {
         if (!a || typeof a !== 'object' || !a.generation) continue;
-        if (schema === 'work/implementation') {
+        if (schema === 'work/implementation@1') {
           problems.push(`${rec.shown}: implementation asset ${a.path} carries generation - implementation captures are real running-page screenshots and never carry ImageGen generation provenance`);
-        } else if (schema !== 'work/ui-screen') {
-          problems.push(`${rec.shown}: asset ${a.path} carries generation but the owning record is ${schema}, not work/ui-screen - a generated direction asset is ui-owned only`);
+        } else if (schema !== 'work/ui-screen@1') {
+          problems.push(`${rec.shown}: asset ${a.path} carries generation but the owning record is ${schema}, not work/ui-screen@1 - a generated direction asset is ui-owned only`);
         }
       }
     }
 
     // ---- concept 12: a done uat-flow needs a settled run with screens, video and a passing result.md ----
-    if (schema === 'work/uat-flow' && data.state === 'done') {
+    if (schema === 'work/uat-flow@1' && data.state === 'done') {
       const evidenceFile = path.join(rec.dir, 'evidence.yaml');
       if (!fs.existsSync(evidenceFile)) {
         problems.push(`${rec.shown}: state is done but there is no sibling evidence.yaml naming the run it settled on`);
@@ -494,10 +494,10 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       }
     }
 
-    // ---- concept 13: typed _resources use the plain work/resource schema, never an @N suffix ----
+    // ---- concept 13: typed _resources custody uses exactly the work/resource@1 schema ----
     if (rec.file.replaceAll('\\', '/').includes('/_resources/') && /\/resource\.yaml$/.test(rec.file.replaceAll('\\', '/'))) {
-      if (schema !== 'work/resource') {
-        problems.push(`${rec.shown}: _resources custody uses schema work/resource, not "${schema}" - the op text says work/resource@1, but this layout forbids the @N suffix here`);
+      if (schema !== 'work/resource@1') {
+        problems.push(`${rec.shown}: _resources custody uses schema work/resource@1, not "${schema}"`);
       }
     }
   }
@@ -506,13 +506,13 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
   // scripts/checks/render.mjs + scripts/checks/brand.mjs are the canon for "the running page looks like the brand and the
   // grammar" - palette from the captured PNG's own bytes, card anatomy from the markup kept beside it,
   // mascot slots from the ui record's surfaces. Until now nothing ran them against this tree, so a
-  // frontend work/implementation could reach `done` with no capture at all (grit item 55). The rule:
+  // frontend work/implementation@1 could reach `done` with no capture at all (grit item 55). The rule:
   // a done implementation that is frontend (same predicate as IMPL_BEFORE_DIRECTION - proves a
-  // work/ui-screen, or its repository resolves to a `role: fe` workspace entry) must keep real capture
+  // work/ui-screen@1, or its repository resolves to a `role: fe` workspace entry) must keep real capture
   // artifacts in the shape render.mjs reads (PNG + sibling .html under its assets/) and pass the checks.
   // A `skip` on a core check is refused as RENDER_PROOF_INCOMPLETE - an uncheckable claim is not a pass.
   for (const [id, rec] of records) {
-    if (rec.schema !== 'work/implementation' || rec.data?.state !== 'done') continue;
+    if (rec.schema !== 'work/implementation@1' || rec.data?.state !== 'done') continue;
     for (const problem of renderProofProblems({rec, records, workspaceDoc, workRoot})) {
       problems.push(`${rec.shown}: ${problem}`);
     }
@@ -521,18 +521,18 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
   // ---- concept 13 (continued): uat-flow environment/fixtures/accounts refs resolve to a real _resources entry ----
   const resourceKind = (id) => recOf(id)?.data?.kind;
   for (const [id, rec] of records) {
-    if (rec.schema !== 'work/uat-flow') continue;
+    if (rec.schema !== 'work/uat-flow@1') continue;
     const data = rec.data;
     if (data.environment) {
       const target = recOf(data.environment);
-      if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: environment ${data.environment} does not resolve to a work/resource`);
-      else if (resourceKind(data.environment) !== 'environment') problems.push(`${rec.shown}: environment ${data.environment} resolves to a work/resource of kind "${resourceKind(data.environment)}", not environment`);
+      if (!target || target.schema !== 'work/resource@1') problems.push(`${rec.shown}: environment ${data.environment} does not resolve to a work/resource@1`);
+      else if (resourceKind(data.environment) !== 'environment') problems.push(`${rec.shown}: environment ${data.environment} resolves to a work/resource@1 of kind "${resourceKind(data.environment)}", not environment`);
     }
     if (Array.isArray(data.fixtures)) {
       for (const fid of data.fixtures) {
         const target = recOf(fid);
-        if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: fixture ${fid} does not resolve to a work/resource`);
-        else if (resourceKind(fid) !== 'fixture') problems.push(`${rec.shown}: fixture ${fid} resolves to a work/resource of kind "${resourceKind(fid)}", not fixture`);
+        if (!target || target.schema !== 'work/resource@1') problems.push(`${rec.shown}: fixture ${fid} does not resolve to a work/resource@1`);
+        else if (resourceKind(fid) !== 'fixture') problems.push(`${rec.shown}: fixture ${fid} resolves to a work/resource@1 of kind "${resourceKind(fid)}", not fixture`);
       }
     }
     if (typeof data.accounts === 'string') {
@@ -542,8 +542,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
         for (const account of accountsDoc?.accounts ?? []) {
           if (!account?.identity) continue;
           const target = recOf(account.identity);
-          if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource`);
-          else if (resourceKind(account.identity) !== 'identity') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} resolves to a work/resource of kind "${resourceKind(account.identity)}", not identity`);
+          if (!target || target.schema !== 'work/resource@1') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource@1`);
+          else if (resourceKind(account.identity) !== 'identity') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} resolves to a work/resource@1 of kind "${resourceKind(account.identity)}", not identity`);
         }
       }
     }
@@ -551,7 +551,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
 
   // ---- trust concept 5: blockers form a DAG rooted in gaps or open decisions ----
   // `blockedBy` is meant to explain *why* work waits, and the layout says the honest root of a wait is
-  // either a `work/gap` (a named absence) or an open `work/policy-decision` - never a loop back on itself.
+  // either a `work/gap@1` (a named absence) or an open `work/policy-decision@1` - never a loop back on itself.
   // A cycle is a structural impossibility (nothing can wait on something that is waiting on it) and is
   // refused (BLOCKER_CYCLE). A chain that dead-ends at an ordinary record - neither a cycle nor a gap/open-
   // decision root - is not refused: this example tree currently has roughly a dozen such chains across
@@ -600,8 +600,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       const target = records.get(targetId);
       if (!target) { roots.set(targetId, 'missing'); return; } // dangling ref already caught elsewhere
       if (visited.has(targetId)) { roots.set(targetId, 'cyclic'); return; }
-      const isGap = target.schema === 'work/gap';
-      const isOpenDecision = target.schema === 'work/policy-decision' && target.data?.outcome === 'open';
+      const isGap = target.schema === 'work/gap@1';
+      const isOpenDecision = target.schema === 'work/policy-decision@1' && target.data?.outcome === 'open';
       const subEdges = blockedByOf(target);
       if (isGap || isOpenDecision || !subEdges.length) {
         roots.set(targetId, isGap ? 'gap' : isOpenDecision ? 'decision' : 'record');
@@ -628,7 +628,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     if (!blockedByOf(rec).length) continue;
     for (const [rootId, kind] of rootsFrom(id)) {
       if (kind === 'record') {
-        warnings.push(`${rec.shown}: blockedBy chain reaches ${rootId}, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]`);
+        warnings.push(`${rec.shown}: blockedBy chain reaches ${rootId}, which is neither a work/gap@1 nor an open work/policy-decision@1 - the chain's real root is unnamed [BLOCKER_UNROOTED]`);
       }
     }
   }

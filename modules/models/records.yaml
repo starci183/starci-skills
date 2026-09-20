@@ -31,7 +31,7 @@ records:
   record:
     purpose: The authored fields of one Work node - its assertions, its write scope and its checks - which the kernel needs before it can launch that node at all.
     layout: ['**/index.yaml']
-    schema: work/node@2
+    schema: work/node@1
     validator: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     nodeKinds: [implementation, uat, e2e, operations]
     # Derived from nothing: it is the node's own declaration, completed by `work.author` from the tree
@@ -40,7 +40,7 @@ records:
   srs:
     purpose: What the product must do - the requirements, rules, data definitions and journeys of one feature.
     layout: ['features/*/business/**']
-    schema: work/node@2
+    schema: work/node@1
     validator: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     nodeKinds: [business, business-overview, module]
     # The owner's decisions are what a requirement is settled from; nothing else may change one.
@@ -48,14 +48,14 @@ records:
   sds:
     purpose: How the product realises a requirement - flows, components, contracts, data, quality, deployment.
     layout: ['features/*/architecture/**']
-    schema: work/node@2
+    schema: work/node@1
     validator: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     nodeKinds: [architecture]
     reads: [srs, decision]
   decision:
     purpose: One question the owner answered, with the options analysed per side and the one recommendation that was put to them. A business record under business-rules/policy-decisions with the srs-policy-decision section - the shape the tree already holds and the validator's SRS layout accepts.
     layout: ['features/*/business/srs/business-rules/policy-decisions/**']
-    schema: work/node@2
+    schema: work/node@1
     validator: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     nodeKinds: [business]
     # The owner's own. A decision is derived from the question, never from another record.
@@ -63,7 +63,7 @@ records:
   brand:
     purpose: The product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one record every drawing and every build reads.
     layout: [brand/index.yaml, 'brand/**']
-    schema: work/node@2
+    schema: work/node@1
     validator: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, scripts/checks/brand.mjs]
     nodeKinds: [brand]
     # Every token is read out of the real style and token files of the interface, which is why an
@@ -72,7 +72,7 @@ records:
   design:
     purpose: The interface design of one feature - its screens, their states, their contracts and the artwork they embed.
     layout: ['features/*/ui/**']
-    schema: work/node@2
+    schema: work/node@1
     validator: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     nodeKinds: [ui]
     reads: [srs, sds, brand, grammar]
@@ -121,7 +121,7 @@ records:
   integration:
     purpose: An external system a business or design record declares, with the credential the owner provides in a named variable.
     layout: ['features/*/integration/**']
-    schema: work/node@2
+    schema: work/node@1
     validator: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     nodeKinds: [integration]
     reads: [srs, sds]

@@ -1,4 +1,4 @@
-// Version 2 validates scoped SRS coverage and design reasoning, never prose truth.
+// Validates scoped SRS coverage and design reasoning, never prose truth.
 export function validateSRSDetails(spec, {check, shape, refs, rows, ids, text, contract}) {
   const strings = (v, at, nonempty = true) => check(Array.isArray(v) && (!nonempty || v.length > 0) && v.every(text), at + ': text array required');
   if (shape(spec.context, contract.context, 'context')) {

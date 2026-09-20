@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.audit.erasure.right
 title: A person may have what identifies them erased
 state: done

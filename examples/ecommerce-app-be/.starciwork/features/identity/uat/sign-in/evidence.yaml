@@ -5,7 +5,7 @@
 # examples/ecommerce-app-fe/uat, which wrote runs/<runId>/ itself; this file only settles which run.
 # Two earlier run folders beside it (runs/20260919T151633Z-5c10a673 and runs/20260919T151937Z-5c10a673)
 # are failed spec-repair history - append-only, untouched, and they settle nothing.
-schema: work/evidence
+schema: work/evidence@1
 record: uat.identity.sign-in
 recordDigest: 617314a75f0cf5fa89ae6b1d64b4369439019939c0d0a90756af2b9d3afd5a02
 run: runs/20260919T152145Z-5c10a673

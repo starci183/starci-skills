@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.audit.todo-app-backend.log
 title: The log module
 state: done

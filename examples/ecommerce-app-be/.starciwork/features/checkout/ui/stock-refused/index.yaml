@@ -1,4 +1,4 @@
-schema: work/ui-screen
+schema: work/ui-screen@1
 id: ui.checkout.stock-refused
 title: Checkout stock-refusal direction
 state: todo

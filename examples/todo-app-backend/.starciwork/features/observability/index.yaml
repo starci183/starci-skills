@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: observability
 title: Seeing what the api is doing
 description: Probes an orchestrator can trust - liveness, readiness, Prometheus metrics - and one

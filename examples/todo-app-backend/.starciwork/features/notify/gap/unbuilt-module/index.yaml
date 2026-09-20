@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.notify.unbuilt-module
 title: No notify module exists under the NestJS/Next.js layout yet
 state: done

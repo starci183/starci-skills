@@ -71,7 +71,7 @@ writes:
       - dependsOn
       - required
     content:
-      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path under
+      en: Every authored index.yaml is a work/node@1 record at its catalog-declared path under
         features/<feature>/business/. Author
         business/overview/index.yaml with businessOverview for readable purpose, customer
         understanding, outcome, scope and open questions. Author typed extensions.work3.srs leaves
@@ -247,7 +247,7 @@ proofs:
       en: Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps
         and postconditions, and security has observable negative acceptance. Validate nested
         ownership and every split SRS section contract; no code/service inventory is required in
-        Business. Existing specification@2 and srs@3 records are readable inputs, never new output.
+        Business. Existing specification@1 and srs@1 records are readable inputs, never new output.
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the

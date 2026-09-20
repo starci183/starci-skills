@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.plan.no-load-harness
 title: No k6 load-test harness exists to measure the cap check's latency
 state: todo

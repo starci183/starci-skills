@@ -1,4 +1,4 @@
-schema: work/customer-journey
+schema: work/customer-journey@1
 id: journey.share.collaborate-on-a-task
 title: A person invites help onto their task and can take it back
 state: todo

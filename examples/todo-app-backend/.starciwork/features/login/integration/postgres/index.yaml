@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.login.postgres
 title: PostgreSQL holds the session and person rows
 state: done

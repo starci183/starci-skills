@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.checkout.redis
 title: Redis is the identity service's session store
 state: todo

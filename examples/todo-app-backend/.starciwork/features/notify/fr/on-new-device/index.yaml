@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.notify.on-new-device
 title: Notify a person when their session signs in from a new device
 state: todo

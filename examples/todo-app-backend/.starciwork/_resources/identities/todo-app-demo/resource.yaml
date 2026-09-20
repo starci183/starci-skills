@@ -2,7 +2,7 @@
 # resolves before creating a scoped test account. One sealed custody backs every UAT flow's accounts.yaml;
 # accounts.yaml now carries {role, identity} refs into this resource instead of literal passwords (see the
 # uatFlow shape note in work-layout.yaml).
-schema: work/resource
+schema: work/resource@1
 id: identity.todo-app.demo
 kind: identity
 owner: todo-app-backend

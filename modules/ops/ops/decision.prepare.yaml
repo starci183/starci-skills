@@ -46,7 +46,7 @@ writes:
       - extensions.work3.srs
       - refs
     content:
-      en: One policy-decision record draft (work/node@2, kind business, an srs-policy-decision section with decisionStatus
+      en: One policy-decision record draft (work/node@1, kind business, an srs-policy-decision section with decisionStatus
         open, the shape of the existing policy decisions of the tree), state todo, carrying in order the question in one sentence; why it
         matters and what changes until it is answered; the options, numbered, each with what it means
         for the architecture, the user stories, the security and authority, the business rules and the

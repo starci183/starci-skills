@@ -10,7 +10,7 @@ function fixture(t,dirty=false){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-source-identity-'));
  t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-source-identity-'));fs.rmSync(root,{recursive:true,force:true});});
  const put=(p,v)=>{const f=path.join(root,p);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,stringifyYaml(v));};
- const node={schema:'work/node@2',id:'impl',kind:'implementation',required:true,state:'todo',assertions:['test'],description:'Synthetic source identity completion.'};
+ const node={schema:'work/node@1',id:'impl',kind:'implementation',required:true,state:'todo',assertions:['test'],description:'Synthetic source identity completion.'};
  const nodePath='module/implementation/backend/index.yaml',base='module/implementation/backend/evidence/proof/';
  put('workspace.yaml',{schema:'work/workspace@1',id:'synthetic'});put(nodePath,node);
  const inputDigest=validateWorkspace(root).nodes[0].inputDigest;

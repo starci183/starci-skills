@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.task.reopen-not-specified
 title: Nothing names the reopen code as proving the reversible statement
 state: done

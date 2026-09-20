@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.checkout.ecommerce-app-be.order-checkout
 title: The checkout modules of the order service
 state: done

@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.plan.downgrade.policy
 title: What happens when a downgrade leaves a person over the new cap
 state: done

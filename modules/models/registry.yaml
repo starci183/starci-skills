@@ -1,4 +1,4 @@
-schema: starci/profile-registry@3
+schema: starci/profile-registry@1
 runtimes:
   - codex
   - claude

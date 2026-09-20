@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.identity.live-proof
 title: No UAT run has executed the sign-in flow against the running product
 state: done

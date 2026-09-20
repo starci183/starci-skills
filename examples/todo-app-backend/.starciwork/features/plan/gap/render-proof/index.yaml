@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.plan.render-proof
 title: The usage captures fail the canonical render checks - impl.plan.todo-app-frontend.usage cannot claim done
 state: done

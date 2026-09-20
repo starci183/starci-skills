@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: upload
 title: A file attached to a task
 description: Uploading a file - by a short-lived presigned intent or directly - and hanging it on a

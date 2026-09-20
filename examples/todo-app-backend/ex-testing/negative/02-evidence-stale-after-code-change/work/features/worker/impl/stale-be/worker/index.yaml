@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.worker.stale-be.worker
 title: The worker implementation, proven against older bytes
 state: done

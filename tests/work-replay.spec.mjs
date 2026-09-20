@@ -38,16 +38,16 @@ function tree(extra, {beFiles = {}, feFiles = {}} = {}) {
   const backendRoot = path.join(parent, 'app');
   const feRoot = path.join(parent, 'app-fe');
   const workRoot = path.join(backendRoot, '.starciwork');
-  write(workRoot, 'index.yaml', 'schema: work/catalog\nid: fixture\nfeatures: []\n');
-  write(workRoot, 'workspace.yaml', 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-fe}]\n');
+  write(workRoot, 'index.yaml', 'schema: work/catalog@1\nid: fixture\nfeatures: []\n');
+  write(workRoot, 'workspace.yaml', 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-fe}]\n');
   for (const [rel, content] of Object.entries(extra)) write(workRoot, rel, content);
   for (const [rel, content] of Object.entries(beFiles)) write(backendRoot, rel, content);
   for (const [rel, content] of Object.entries(feFiles)) write(feRoot, rel, content);
   return {workRoot, backendRoot, feRoot};
 }
 
-const IMPL = 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: todo\nrepository: app-fe\n';
-const evidence = assertions => `schema: work/evidence\nrecord: impl.f.x\noutcome: pass\nassertions:\n${assertions}`;
+const IMPL = 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: todo\nrepository: app-fe\n';
+const evidence = assertions => `schema: work/evidence@1\nrecord: impl.f.x\noutcome: pass\nassertions:\n${assertions}`;
 
 test('repository-stamped records resolve cwd to the bound sibling repo: `npm run build` is judged by the frontend package.json', () => {
   const {workRoot} = tree({
@@ -73,7 +73,7 @@ test('a dead npm script under a stamped cwd is REFUSE-tier NOT_REPLAYABLE', () =
 });
 
 test('no cwd stamp anywhere falls back to the backend root and downgrades the verdict to SUSPECT + ASSERTION_NO_CWD', () => {
-  const beImpl = 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: todo\n';
+  const beImpl = 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: todo\n';
   const {workRoot, backendRoot} = tree({
     'features/f/impl/x/index.yaml': beImpl,
     'features/f/impl/x/evidence.yaml': evidence('  - {id: a1, command: "node ok.mjs", exit: 0, outcome: pass}\n'),
@@ -87,7 +87,7 @@ test('no cwd stamp anywhere falls back to the backend root and downgrades the ve
 });
 
 test('a path dead under the resolved cwd but present under the evidence dir reports where it resolves', () => {
-  const beImpl = 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: todo\n';
+  const beImpl = 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: todo\n';
   const {workRoot} = tree({
     'features/f/impl/x/index.yaml': beImpl,
     'features/f/impl/x/evidence.yaml': evidence('  - {id: a1, command: "cat assets/run.txt", exit: 0, outcome: pass}\n'),
@@ -103,7 +103,7 @@ test('assertion.cwd stamps win over evidence.cwd, which wins over the record rep
   const {workRoot, feRoot} = tree({
     'features/f/impl/x/index.yaml': IMPL,
     'features/f/impl/x/evidence.yaml':
-      'schema: work/evidence\nrecord: impl.f.x\ncwd: .\noutcome: pass\nassertions:\n  - {id: a1, command: "npm run build", cwd: deep, exit: 0, outcome: pass}\n',
+      'schema: work/evidence@1\nrecord: impl.f.x\ncwd: .\noutcome: pass\nassertions:\n  - {id: a1, command: "npm run build", cwd: deep, exit: 0, outcome: pass}\n',
   }, {feFiles: {'package.json': '{"scripts":{"build":"next build"}}', 'deep/keep.txt': 'x\n'}});
   const {assertions} = collectAssertions(workRoot);
   const spec = assertions[0].spec;
@@ -123,7 +123,7 @@ test('planCommand peels env assignments, strips redirects, and folds cd chains i
 
 test('runAssertion executes for real: pass, fail and timeout are verdicts, and a stripped redirect writes no file', async () => {
   const {workRoot, backendRoot} = tree({
-    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: todo\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation@1\nid: impl.f.x\ntitle: t\nstate: todo\n',
     'features/f/impl/x/evidence.yaml': evidence('  - {id: a1, command: "node -e process.exit(0)", exit: 0, outcome: pass}\n'),
   });
   const {assertions} = collectAssertions(workRoot);

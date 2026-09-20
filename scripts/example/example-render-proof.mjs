@@ -8,16 +8,16 @@ import {readWorkspace, loadRecords} from './example-ownership.mjs';
 /**
  * Grit item 55 (docs/examples/todo-app-grit.md): scripts/checks/render.mjs and scripts/checks/brand.mjs are real - a
  * capture's PNG bytes plus its kept markup are checked against the brand record, palette and component
- * anatomy both - but nothing ever ran them against this example tree, so a frontend work/implementation
+ * anatomy both - but nothing ever ran them against this example tree, so a frontend work/implementation@1
  * record could reach `done` with no capture at all. This module is the mechanical wiring: for every done
  * implementation that is a frontend record (the same predicate concept 8 / IMPL_BEFORE_DIRECTION uses -
- * it proves a work/ui-screen, or its `repository` resolves to a workspace `role: fe` entry), real capture
+ * it proves a work/ui-screen@1, or its `repository` resolves to a workspace `role: fe` entry), real capture
  * artifacts must exist in the shape render.mjs reads (a PNG under the implementation node's assets/,
  * with the kept markup beside it as the same basename .html) and the render/brand checks must pass.
  *
  * The check functions are imported from scripts/checks/render.mjs itself and composed here rather than calling
  * its runRenderChecks: that wrapper reads the brand through readBrandRecord, which requires the canonical
- * `work/node@2` node shape, while this example tree authors the readable `work/brand` schema (see
+ * `work/node@1` node shape, while this example tree authors the readable `work/brand@1` schema (see
  * schemas/work-layout.yaml). The brand's own `brand:` specification - the object every check actually
  * consumes - is read here with the same leniency the rest of the example toolkit applies, so the canon
  * mathematics runs unchanged on this tree's records. Anything the canon cannot run stays unproven: a
@@ -43,14 +43,14 @@ const listOf = value => (Array.isArray(value) ? value : []).filter(item => item 
 const CORE_CHECKS = new Set(['palette-off-brand', 'primary-absent', 'entity-list-in-card']);
 
 /**
- * Whether `rec` (a work/implementation) is a frontend record - exactly the predicate check-example-work.mjs's
- * IMPL_BEFORE_DIRECTION rule uses: it names a work/ui-screen in `proves`, or its `repository` resolves to a
+ * Whether `rec` (a work/implementation@1) is a frontend record - exactly the predicate check-example-work.mjs's
+ * IMPL_BEFORE_DIRECTION rule uses: it names a work/ui-screen@1 in `proves`, or its `repository` resolves to a
  * `role: fe` entry in workspace.yaml. Backend records and records proving no screen are untouched.
  */
 function isFrontendImpl(rec, records, workspaceDoc) {
   const data = rec?.data ?? {};
   const provesUi = (Array.isArray(data.proves) ? data.proves : [])
-    .some(pid => records.get(pid)?.schema === 'work/ui-screen');
+    .some(pid => records.get(pid)?.schema === 'work/ui-screen@1');
   const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
   const isFeRepo = data.repository ? repos.find(r => r?.name === data.repository)?.role === 'fe' : false;
   return provesUi || isFeRepo;
@@ -64,19 +64,19 @@ function isFrontendImpl(rec, records, workspaceDoc) {
 function uiDirsFor(rec, records, workRoot) {
   const proved = (Array.isArray(rec?.data?.proves) ? rec.data.proves : [])
     .map(pid => records.get(pid))
-    .filter(entry => entry?.schema === 'work/ui-screen')
+    .filter(entry => entry?.schema === 'work/ui-screen@1')
     .map(entry => entry.dir);
   if (proved.length) return [...new Set(proved)];
   const feature = slash(path.relative(workRoot, rec.dir)).split('/')[1];
   return [...new Set([...records.values()]
-    .filter(entry => entry.schema === 'work/ui-screen' && slash(path.relative(workRoot, entry.dir)).split('/')[1] === feature)
+    .filter(entry => entry.schema === 'work/ui-screen@1' && slash(path.relative(workRoot, entry.dir)).split('/')[1] === feature)
     .map(entry => entry.dir))];
 }
 
 /**
  * The brand specification this tree declares, from `<workRoot>/brand/index.yaml`'s own `brand:` field.
- * Deliberately not scripts/checks/brand.mjs's readBrandRecord: that reader demands schema `work/node@2`, while the
- * example layout authors `work/brand` - the specification object itself is identical input for the checks.
+ * Deliberately not scripts/checks/brand.mjs's readBrandRecord: that reader demands schema `work/node@1`, while the
+ * example layout authors `work/brand@1` - the specification object itself is identical input for the checks.
  */
 function readExampleBrand(workRoot) {
   const file = path.join(workRoot, 'brand', 'index.yaml');
@@ -115,7 +115,7 @@ function captureCandidates(implDir) {
 }
 
 /**
- * The render/brand proof of one work/implementation record: returns a list of refusal strings (empty when
+ * The render/brand proof of one work/implementation@1 record: returns a list of refusal strings (empty when
  * the proof holds). `rec` is an entry of check-example-work.mjs's records map or example-ownership.mjs's
  * loadRecords - `{schema, data, dir}` is all that is read. The record's own `state` is not consulted here:
  * the caller decides which states the proof is required for (the gate requires it for `done`; the CLI runs
@@ -123,7 +123,7 @@ function captureCandidates(implDir) {
  */
 export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
   const problems = [];
-  if (rec?.schema !== 'work/implementation') return problems;
+  if (rec?.schema !== 'work/implementation@1') return problems;
   if (!isFrontendImpl(rec, records, workspaceDoc)) return problems;
 
   const brand = readExampleBrand(workRoot);

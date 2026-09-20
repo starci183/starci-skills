@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.recur.timezone.owner-local-time
 title: An occurrence's due instant follows the owner's clock, not a fixed offset
 state: done

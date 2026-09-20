@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.fake.thing
 title: The thing the ghost claims to prove
 state: done

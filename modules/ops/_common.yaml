@@ -139,7 +139,7 @@ sections:
         `.starciwork/_resources/<category>/<slug>`. Resolve symlinks and keep writes within the
         authorized roots.
       - Work metadata uses YAML 1.2 in workspace.yaml, index.yaml, resource.yaml and
-        evidence/manifest.yaml. Canonical index.yaml uses work/node@2 metadata and a readable
+        evidence/manifest.yaml. Canonical index.yaml uses work/node@1 metadata and a readable
         description field. Domain JSON required by operator contracts remains in extensions. YAML
         schema consts are defined by the catalog under modules/schemas/ — nothing is exported into
         the work tree. node.yaml and Markdown node files
@@ -149,7 +149,7 @@ sections:
       - "| `.starciwork/workspace.yaml` | `schema: work/workspace@1`, stable `id`; declared
         workspace extensions if needed | Initialize only if this workspace is new; do not replace an
         existing identity. |"
-      - "| `N/index.yaml` metadata | `schema: work/node@2`, stable `id`, `kind`, `required`,
+      - "| `N/index.yaml` metadata | `schema: work/node@1`, stable `id`, `kind`, `required`,
         `dependsOn`, `refs`, `assertions`; leaf `state`, `activity`, `blockers`, `investigation`,
         `completion`, `history` as applicable | Scope/graph fields belong to the selected
         scope/planning change. Consumer ops read them unchanged; `refs` contains resolvable
@@ -212,10 +212,10 @@ sections:
         wrong file name, missing `schema:` const or wrong const fails the run; the layout is never
         adapted to fit an observed file."
       - "Every structured artifact an op writes carries its declared `schema:` const as a record
-        key: node records `work/node@2`, the workspace `work/workspace@1`, resources
+        key: node records `work/node@1`, the workspace `work/workspace@1`, resources
         `work/resource@1`, evidence manifests `work/evidence@1` (emitted by the kernel from the
         op's manifest fields), the workflow goal `starci/goal@1`, intake records
-        `starci/workflow-intake@1`, .starcistacks compose `starci/application-stacks`. Staged handoffs
+        `starci/workflow-intake@1`, .starcistacks compose `starci/application-stacks@1`. Staged handoffs
         carry the request-frozen contract the kernel stores as `starci/staged-job-result@1` /
         `starci/staged-op-response@1`. Repository-side artifacts (source, tests, documents)
         carry no YAML const of their own but land exactly at the declared ceiling path."
@@ -231,7 +231,7 @@ sections:
         ceiling; it never emits checks, contracts, inbox commands or report rows directly —
         those are kernel/api outputs, not op output."
       - "`features/<feature>/` record trees follow the declared shape: `features/index.yaml` the
-        catalog, one `index.yaml` per node folder (`work/node@2`), business overview and split SRS
+        catalog, one `index.yaml` per node folder (`work/node@1`), business overview and split SRS
         leaves whose `extensions.work3.srs` payloads carry their `starci/srs-*@1` section const
         with `starci/srs-aggregate@1` intermediate indexes, architecture overview and SDS leaves
         whose `extensions.work3.sds` payloads carry their `starci/sds-*@1` section const with

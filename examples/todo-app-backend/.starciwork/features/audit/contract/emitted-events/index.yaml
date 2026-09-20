@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.audit.emitted-events
 title: The emitted-event contract audit subscribes to
 state: todo

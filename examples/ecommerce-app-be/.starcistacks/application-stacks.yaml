@@ -1,4 +1,4 @@
-schema: starci/application-stacks
+schema: starci/application-stacks@1
 sources:
   - repository: ecommerce-app-be
 components:

@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.share.completion-guard-for-task
 title: What fr.task.complete may rely on when a task is shared
 state: todo

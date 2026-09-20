@@ -50,7 +50,7 @@ const brandSpec=()=>({
 function tree(t,{brand=brandSpec(),rev='brand-1',mascot='<svg xmlns="http://www.w3.org/2000/svg"/>',label='tree'}={}){
   const root=temporary(t,label);
   const work=path.join(root,'.starciwork');
-  write(work,'brand/index.yaml',stringifyYaml({schema:'work/node@2',id:'brand',kind:'brand',required:true,state:'todo',
+  write(work,'brand/index.yaml',stringifyYaml({schema:'work/node@1',id:'brand',kind:'brand',required:true,state:'todo',
     ...(rev===null?{}:{rev}),description:'Product brand record.',brand}));
   if(mascot!==null)write(work,'brand/assets/mascot.svg',mascot);
   return {repoRoot:root,work,mascotSha:mascot===null?null:crypto.createHash('sha256').update(mascot).digest('hex')};
@@ -306,9 +306,9 @@ test('runBrandChecks reports every check, resolves the record from a repository 
 
   const undigested=temporary(t,'no-record');
   assert.throws(()=>runBrandChecks({tree:undigested}),/No brand record/);
-  write(undigested,'brand/index.yaml',stringifyYaml({schema:'work/node@2',id:'brand',kind:'ui',required:true,state:'todo'}));
+  write(undigested,'brand/index.yaml',stringifyYaml({schema:'work/node@1',id:'brand',kind:'ui',required:true,state:'todo'}));
   assert.throws(()=>runBrandChecks({tree:undigested}),/kind brand/);
-  fs.writeFileSync(path.join(undigested,'brand/index.yaml'),stringifyYaml({schema:'work/node@2',id:'brand',kind:'brand',required:true,state:'todo'}));
+  fs.writeFileSync(path.join(undigested,'brand/index.yaml'),stringifyYaml({schema:'work/node@1',id:'brand',kind:'brand',required:true,state:'todo'}));
   assert.throws(()=>runBrandChecks({tree:undigested}),/no brand specification/);
 });
 

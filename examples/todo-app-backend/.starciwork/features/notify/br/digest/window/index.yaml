@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.notify.digest.window
 title: Several events in a person's quiet window become one message
 state: done

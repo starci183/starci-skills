@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.checkout.live-proof
 title: The order service serves no order-list door, so the place-order walk cannot show the confirmed order listed on the account page
 state: done

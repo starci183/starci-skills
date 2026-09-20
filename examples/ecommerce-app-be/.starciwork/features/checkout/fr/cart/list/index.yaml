@@ -1,4 +1,4 @@
-schema: work/functional-requirement
+schema: work/functional-requirement@1
 id: fr.checkout.cart.list
 title: Read the cart
 state: todo

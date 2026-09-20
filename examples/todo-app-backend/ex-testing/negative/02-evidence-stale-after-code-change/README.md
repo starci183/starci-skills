@@ -2,7 +2,7 @@
 
 ## The defect
 
-`work/` holds a `work/implementation` (`impl.stale.worker`) that is `state: done` on the strength of
+`work/` holds a `work/implementation@1` (`impl.stale.worker`) that is `state: done` on the strength of
 `evidence.yaml` captured at 2026-01-01. The evidence stamps a `codeDigest` over the record's owned
 directory `src/worker/` — but `src/worker/index.ts` on disk today is NOT the bytes that were hashed
 (the digest below belongs to an older file). The code moved after the proof; the record still reads

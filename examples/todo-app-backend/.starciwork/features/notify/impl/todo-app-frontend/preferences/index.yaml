@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.notify.todo-app-frontend.preferences
 title: The notification preferences screen - email digest control and unsubscribe link
 state: done

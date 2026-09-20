@@ -1,4 +1,4 @@
-schema: work/customer-journey
+schema: work/customer-journey@1
 id: journey.plan.hits-the-cap
 title: A free person fills up their list and pays to keep going
 state: todo

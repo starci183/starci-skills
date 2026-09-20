@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.plan.cap-guard-not-wired
 title: Nothing on the create path calls the cap guard yet
 state: done

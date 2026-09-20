@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.audit.erasure.logged
 title: An erasure is itself logged
 state: done

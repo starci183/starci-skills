@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.identity.ecommerce-app-be.identity-account
 title: The account and session modules of the identity service
 state: done

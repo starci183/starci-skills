@@ -1,7 +1,7 @@
 schema: starci/uat-run-manifest@1
 id: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
 nodeId: uat.plan.upgrade-after-cap
-inputDigest: 99c895bc24cb45bd991fb28136f15dd43c7eb36b4d3379ede89fda589c7f2d4d
+inputDigest: 011d608968fe5821fa819e21fab8391a9eb254a4bdbcb4cc983bcfb13cd2b1cd
 outcome: fail
 assertions:
   - id: fr.plan.usage.view

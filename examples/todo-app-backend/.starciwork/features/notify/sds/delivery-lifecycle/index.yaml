@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.notify.delivery-lifecycle
 title: The life of one delivery attempt
 state: done

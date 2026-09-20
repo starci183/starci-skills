@@ -1,4 +1,4 @@
-schema: work/ui-screen
+schema: work/ui-screen@1
 id: ui.checkout.landing-home
 title: Landing home direction
 state: uninvestigate

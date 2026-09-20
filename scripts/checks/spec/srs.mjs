@@ -1,5 +1,5 @@
-// Compatibility reader for pre-upstream leaves. New authoring uses srs-sections.mjs.
-export const SRS_V3_SCHEMA = 'starci/srs@3';
+// Validator for cohesive starci/srs@1 leaves. Split authoring uses srs-sections.mjs.
+export const SRS_SCHEMA = 'starci/srs@1';
 
 const text = value => typeof value === 'string' && value.trim().length > 0;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -30,10 +30,10 @@ const contentFields = {
   'customer-journey': ['actor','goal','context','start','preconditions','stages','significantPaths','end','outcomeCriteria']
 };
 
-export function validateSRSV3(spec) {
+export function validateSRS(spec) {
   const errors = [];
   if (!exact(spec, common, 'SRS', errors)) return {ok:false, errors};
-  if (spec.schema !== SRS_V3_SCHEMA) errors.push('SRS.schema: expected starci/srs@3');
+  if (spec.schema !== SRS_SCHEMA) errors.push('SRS.schema: expected starci/srs@1');
   if (spec.op !== 'business.decide') errors.push('SRS.op: expected business.decide');
   if (!['draft','blocked','pass'].includes(spec.status)) errors.push('SRS.status: unsupported value');
   if (!text(spec.id) || spec.id.includes('#') || !text(spec.name) || !text(spec.summary)) errors.push('SRS: stable id, name and summary required');
@@ -131,8 +131,8 @@ function validateJourney(c, errors) {
   for (const route of c.significantPaths ?? []) if (!exact(route,['condition','branchRef','observableOutcome'],'journey.path',errors) || ![route.condition,route.branchRef,route.observableOutcome].every(text)) errors.push('journey.path: reference FR branch, do not clone it');
 }
 
-export function validateSRSV3Bindings(spec, {nodes, allowedNodeIds}) {
-  return validateTypedBindings(spec, {nodes, allowedNodeIds, schema:SRS_V3_SCHEMA, ownerKind:'business'});
+export function validateSRSBindings(spec, {nodes, allowedNodeIds}) {
+  return validateTypedBindings(spec, {nodes, allowedNodeIds, schema:SRS_SCHEMA, ownerKind:'business'});
 }
 
 export function validateTypedBindings(spec, {nodes, allowedNodeIds, schema, ownerKind}) {
@@ -141,7 +141,7 @@ export function validateTypedBindings(spec, {nodes, allowedNodeIds, schema, owne
     const node = nodes.find(candidate => candidate.meta.id === ref.nodeId);
     const target = node?.meta.extensions?.work3?.specification;
     if (!allowedNodeIds.has(ref.nodeId) || node?.meta.kind !== ownerKind || target?.schema !== schema) errors.push(`Unbound ${schema} owner ${ref.nodeId}`);
-    else { let found=target.id===ref.itemId&&target.nodeType===ref.type; if(schema===SRS_V3_SCHEMA&&ref.type==='flow')found=target.nodeType==='functional-requirement'&&target.content.flowId===ref.itemId; if(ref.type==='acceptance')found=target.nodeType==='functional-requirement'&&target.content.acceptanceCriteria?.some(x=>x.id===ref.itemId); if(ref.type==='branch')found=target.nodeType==='functional-requirement'&&[...target.content.alternativeFlows??[],...target.content.exceptionFlows??[]].some(x=>x.id===ref.itemId); if(!found)errors.push(`Missing/wrong-kind ${ref.type} ${ref.nodeId}#${ref.itemId}`); }
+    else { let found=target.id===ref.itemId&&target.nodeType===ref.type; if(schema===SRS_SCHEMA&&ref.type==='flow')found=target.nodeType==='functional-requirement'&&target.content.flowId===ref.itemId; if(ref.type==='acceptance')found=target.nodeType==='functional-requirement'&&target.content.acceptanceCriteria?.some(x=>x.id===ref.itemId); if(ref.type==='branch')found=target.nodeType==='functional-requirement'&&[...target.content.alternativeFlows??[],...target.content.exceptionFlows??[]].some(x=>x.id===ref.itemId); if(!found)errors.push(`Missing/wrong-kind ${ref.type} ${ref.nodeId}#${ref.itemId}`); }
   }
   return errors;
 }

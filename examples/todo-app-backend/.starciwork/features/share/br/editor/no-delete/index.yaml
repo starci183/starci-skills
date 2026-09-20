@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.share.editor.no-delete
 title: An editor may never delete
 state: done

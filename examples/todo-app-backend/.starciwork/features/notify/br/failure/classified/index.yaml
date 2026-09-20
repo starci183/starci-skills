@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.notify.failure.classified
 title: A mail host outage, a bounce and an unsubscribe are three different outcomes
 state: done

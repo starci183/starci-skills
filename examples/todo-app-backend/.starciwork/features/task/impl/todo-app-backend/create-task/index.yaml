@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.task.todo-app-backend.create-task
 title: The create-task feature
 state: done

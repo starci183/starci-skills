@@ -10,7 +10,7 @@ export type DisposableAccount = {
   readonly password: string;
 };
 
-/** The shape this harness reads back out of an existing `work/uat-flow` record. */
+/** The shape this harness reads back out of an existing `work/uat-flow@1` record. */
 export type UatFlowRecord = {
   readonly id: string;
   readonly title: string;
@@ -28,8 +28,8 @@ export type FlowLocation = {
 };
 
 /**
- * Every existing `work/uat-flow` record under the backend's `.starciwork`
- * (`grep -rl '^schema: work/uat-flow' examples/ecommerce-app-be/.starciwork`), so a spec file names
+ * Every existing `work/uat-flow@1` record under the backend's `.starciwork`
+ * (`grep -rl '^schema: work/uat-flow@1' examples/ecommerce-app-be/.starciwork`), so a spec file names
  * its own record instead of restating feature/flow path segments inline.
  *
  * `uat.smoke.browse` is NOT a uat-flow record: it is this harness's own rig-proof spec. It binds the
@@ -49,15 +49,15 @@ export const recordDigest = (feature: string, flow: string): string =>
   crypto.createHash('sha256').update(fs.readFileSync(flowRecordPath(feature, flow))).digest('hex');
 
 /**
- * Reads and parses an existing `work/uat-flow` record; refuses rather than inventing a missing one.
+ * Reads and parses an existing `work/uat-flow@1` record; refuses rather than inventing a missing one.
  * `steps` are passed through as authored - this product's records write them as ordered
  * `{order, actor, action, expected, checks}` flow objects, not the flat strings todo's records use.
  */
 export const readFlowRecord = (feature: string, flow: string): UatFlowRecord => {
   const file = flowRecordPath(feature, flow);
   const raw = parseYaml(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  if (!raw || raw.schema !== 'work/uat-flow' || typeof raw.id !== 'string') {
-    throw new Error(`${file} is not a work/uat-flow record; refusing to invent one.`);
+  if (!raw || raw.schema !== 'work/uat-flow@1' || typeof raw.id !== 'string') {
+    throw new Error(`${file} is not a work/uat-flow@1 record; refusing to invent one.`);
   }
   return {
     id: raw.id,
@@ -73,7 +73,7 @@ export const readFlowRecord = (feature: string, flow: string): UatFlowRecord => 
 
 /**
  * Reads the record's own scoped test-account roster. Unlike todo's accounts.yaml - which authors
- * `{role, identity}` refs into a shared `work/resource` identity record - this product has no
+ * `{role, identity}` refs into a shared `work/resource@1` identity record - this product has no
  * `_resources` identity records, so its roster carries the literal `{role, username, password}`
  * shape the schema also permits (v7-12 authored it that way deliberately; the passwords are
  * synthetic throwaway pairs for a demo store, never real credentials). The env override path stays
@@ -83,8 +83,8 @@ export const readAccounts = (feature: string, flow: string): ReadonlyArray<Dispo
   const file = flowAccountsPath(feature, flow);
   if (!fs.existsSync(file)) return [];
   const raw = parseYaml(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  if (!raw || raw.schema !== 'work/disposable-accounts' || !Array.isArray(raw.accounts)) {
-    throw new Error(`${file} is not a work/disposable-accounts record; refusing to invent one.`);
+  if (!raw || raw.schema !== 'work/disposable-accounts@1' || !Array.isArray(raw.accounts)) {
+    throw new Error(`${file} is not a work/disposable-accounts@1 record; refusing to invent one.`);
   }
   return raw.accounts.map(entry => ({
     role: String((entry as any).role),

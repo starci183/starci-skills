@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.notify.queue
 title: The queue that holds a delivery between admission and dispatch
 state: done

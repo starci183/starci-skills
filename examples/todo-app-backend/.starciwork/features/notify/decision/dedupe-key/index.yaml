@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.notify.dedupe-key
 title: What the dedupe key is derived from
 state: done

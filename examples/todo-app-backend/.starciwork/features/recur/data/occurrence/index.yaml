@@ -1,4 +1,4 @@
-schema: work/data
+schema: work/data@1
 id: data.recur.occurrence
 title: Occurrence
 state: done

@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.recur.render-proof
 title: The schedule captures fail the canonical render checks - impl.recur.todo-app-frontend.schedule cannot claim done
 state: done

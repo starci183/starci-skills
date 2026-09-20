@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.recur.ending.preserves-history
 title: Ending a rule does not delete what it already made
 state: done

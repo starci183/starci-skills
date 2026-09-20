@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.recur.generation.once
 title: A rule never produces two occurrences for one window
 state: done

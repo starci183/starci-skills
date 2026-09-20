@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.plan.sepay-not-reachable
 title: No live run has completed a checkout against the real SePay sandbox
 state: todo

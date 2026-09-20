@@ -24,7 +24,7 @@ schemaToSchema:
      source: "docs/application-stacks.md"}
 
   # --- work tree: layout delegates each family to its record schema ---------
-  - {from: work-layout, to: work-business-rule, type: delegates, note: "shape.br -> schema work/business-rule", source: "modules/schemas/work-layout.yaml"}
+  - {from: work-layout, to: work-business-rule, type: delegates, note: "shape.br -> schema work/business-rule@1", source: "modules/schemas/work-layout.yaml"}
   - {from: work-layout, to: work-acceptance-criterion, type: delegates, note: "shape.ac -> work/acceptance-criterion, nested under its br", source: "modules/schemas/work-layout.yaml"}
   - {from: work-layout, to: work-functional-requirement, type: delegates, note: "shape.fr", source: "modules/schemas/work-layout.yaml"}
   - {from: work-layout, to: work-non-functional-requirement, type: delegates, note: "shape.nfr", source: "modules/schemas/work-layout.yaml"}
@@ -35,7 +35,7 @@ schemaToSchema:
   - {from: work-layout, to: work-ui-screen, type: delegates, note: "shape.ui + assets; feeds IMPL_BEFORE_DIRECTION", source: "modules/schemas/work-layout.yaml"}
   - {from: work-layout, to: work-implementation, type: delegates, note: "shape.impl, impl/<repository>/<name>", source: "modules/schemas/work-layout.yaml"}
   - {from: work-layout, to: work-uat-flow, type: delegates, note: "shape.uat", source: "modules/schemas/work-layout.yaml"}
-  - {from: work-layout, to: work-disposable-accounts, type: delegates, note: "accounts.yaml carries schema work/disposable-accounts (example tree convention)", source: "modules/schemas/work-layout.yaml:244"}
+  - {from: work-layout, to: work-disposable-accounts, type: delegates, note: "accounts.yaml carries schema work/disposable-accounts@1 (example tree convention)", source: "modules/schemas/work-layout.yaml:244"}
   - {from: work-layout, to: "work/{contract,integration,gap,event}", type: delegates,
      note: "GAP: four families named in shape have NO per-family schema file — see index.yaml gaps[]",
      source: "modules/schemas/work-layout.yaml:57-66"}
@@ -59,8 +59,8 @@ schemaToSchema:
   - {from: work-evidence, to: "(any work record)", type: consumes,
      note: "evidence binds record+source version via recordDigest; expiry computed from it",
      source: "work-evidence.schema.yaml"}
-  - {from: "work-*.schema.yaml (v2 family)", to: work.schema.yaml, type: supersedes,
-     note: "v2 unversioned work/<kind> ids supersede the v1 @N kinds for the covered families; the monolith remains authority for work/node@2, work/resource@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1",
+  - {from: "work-*.schema.yaml (per-record family)", to: work.schema.yaml, type: supersedes,
+     note: "the per-family work/<kind>@1 ids supersede the monolith for the covered families; the monolith remains authority for work/node@1, work/resource@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1",
      source: "work.schema.yaml $defs consts vs work-*.schema.yaml consts"}
 
   # --- kernel chain (the goal is a sqlite row; the plan file is
@@ -82,25 +82,25 @@ schemaToSchema:
   - {from: specification-contract, to: sds-map, type: delegates,
      note: "currentArchitectureMapContract names modules/schemas/spec/sds-map.schema.yaml",
      source: "modules/schemas/spec/contract.schema.yaml"}
-  - {from: specification-contract, to: "sds (specification@3)", type: delegates,
-     note: "architectureV3.schema names modules/schemas/spec/sds.schema.yaml",
+  - {from: specification-contract, to: sds, type: delegates,
+     note: "architecture.schema names modules/schemas/spec/sds.schema.yaml",
      source: "modules/schemas/spec/contract.schema.yaml"}
-  - {from: specification-contract, to: srs-v3, type: delegates,
-     note: "compatibilityBusinessV3.schema names modules/schemas/spec/srs-v3.schema.yaml — compat only",
+  - {from: specification-contract, to: srs, type: delegates,
+     note: "compatibilityBusiness.schema names modules/schemas/spec/srs.schema.yaml — compat only",
      source: "modules/schemas/spec/contract.schema.yaml"}
   - {from: sds-map, to: srs-sections, type: consumes,
      note: "sds sections trace businessRefs back to the SRS items the split-SRS contract defines",
      source: "modules/schemas/spec/sds-map.schema.yaml businessRefs"}
-  - {from: srs-v3, to: srs-sections, type: supersedes,
-     note: "split SRS sections supersede the v3 compatibility record for new authoring",
-     source: "modules/schemas/spec/contract.schema.yaml compatibilityBusinessV3.compatibility"}
+  - {from: srs, to: srs-sections, type: supersedes,
+     note: "split SRS sections supersede the compatibility record for new authoring",
+     source: "modules/schemas/spec/contract.schema.yaml compatibilityBusiness.compatibility"}
 
   # --- providers -------------------------------------------------------------
   - {from: orca-call, to: "modules/host/orca/calls.yaml", type: governs,
      note: "calls.yaml carries schema: starci/orca-calls@1; envelope must emit starci/orca-call-result@1",
      source: "modules/host/orca/calls.yaml; scripts/checks/providers.mjs"}
-  - {from: profile-registry-v3, to: "modules/models/registry.yaml", type: governs,
-     note: "registry.yaml carries schema: starci/profile-registry@3",
+  - {from: profile-registry, to: "modules/models/registry.yaml", type: governs,
+     note: "registry.yaml carries schema: starci/profile-registry@1",
      source: "modules/models/registry.yaml:1"}
 
   # --- knowledge --------------------------------------------------------------
@@ -131,14 +131,14 @@ schemaToSubsystem:
               work-non-functional-requirement, work-customer-journey, work-policy-decision,
               work-data, work-sds-component, work-ui-screen, work-implementation,
               work-uat-flow, work-disposable-accounts, work-evidence]
-    note: "19 files — the largest subsystem. v2 per-record family + v1 monolith + layout."
+    note: "19 files — the largest subsystem. per-record family + monolith + layout."
 
   kernel:           # workflow kernel boundaries
     schemas: [goal-plan]
     note: "the api plan-file contract is the only kernel record schema — the goal itself is a sqlite row + modules/goal/define-goal.yaml."
 
   spec:             # SRS/SDS payload contracts
-    schemas: [specification-contract, sds (specification@3), sds-map, srs-sections, srs-v3]
+    schemas: [specification-contract, sds, sds-map, srs-sections, srs]
     note: "modules/schemas/spec/*.schema.yaml — umbrella contract + split-section maps + two compat monoliths; executables live in scripts/checks/spec/."
 
   gate:             # executable checks / verification reports
@@ -158,7 +158,7 @@ schemaToSubsystem:
     note: "the contract document itself lives at modules/host/orca/calls.yaml and carries the schema const."
 
   model:            # model/runtime registry
-    schemas: [profile-registry-v3]
+    schemas: [profile-registry]
     note: "governs modules/models/registry.yaml; the model-side detail lives in modules/models/."
 
   knowledge:        # authored guidance + examples

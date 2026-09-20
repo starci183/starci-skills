@@ -6,7 +6,7 @@
 schema: work/derived@1
 records:
   br.checkout.cart:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: checkout
     state: todo
     effectiveState: todo
@@ -16,7 +16,7 @@ records:
         - fr.checkout.cart.clear
         - fr.checkout.cart.list
   br.checkout.place-order:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: checkout
     state: done
     effectiveState: done
@@ -29,7 +29,7 @@ records:
       composes:
         - fr.checkout.place-order
   br.identity.account:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: identity
     state: todo
     effectiveState: todo
@@ -39,7 +39,7 @@ records:
       composes:
         - fr.identity.account
   br.identity.sign-in:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: identity
     state: done
     effectiveState: done
@@ -50,17 +50,17 @@ records:
       composes:
         - fr.identity.sign-in
   brand:
-    schema: work/brand
+    schema: work/brand@1
     feature: null
     state: done
     effectiveState: done
   checkout:
-    schema: work/feature
+    schema: work/feature@1
     feature: checkout
     state: null
     effectiveState: null
   contract.checkout.order-for-identity:
-    schema: work/contract
+    schema: work/contract@1
     feature: checkout
     state: done
     effectiveState: done
@@ -68,7 +68,7 @@ records:
       refs:
         - sds.checkout.order-flow
   contract.identity.health:
-    schema: work/contract
+    schema: work/contract@1
     feature: identity
     state: done
     effectiveState: done
@@ -76,12 +76,12 @@ records:
       refs:
         - decision.checkout.ops-doors
   contract.identity.internal.sessions:
-    schema: work/contract
+    schema: work/contract@1
     feature: identity
     state: done
     effectiveState: done
   decision.checkout.ops-doors:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: checkout
     state: done
     effectiveState: done
@@ -89,32 +89,32 @@ records:
       refs:
         - contract.identity.health
   ecommerce:
-    schema: work/catalog
+    schema: work/catalog@1
     feature: null
     state: null
     effectiveState: null
   ecommerce-app:
-    schema: work/workspace
+    schema: work/workspace@1
     feature: null
     state: null
     effectiveState: null
   fr.checkout.cart.add:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: checkout
     state: todo
     effectiveState: todo
   fr.checkout.cart.clear:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: checkout
     state: todo
     effectiveState: todo
   fr.checkout.cart.list:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: checkout
     state: todo
     effectiveState: todo
   fr.checkout.place-order:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: checkout
     state: done
     effectiveState: done
@@ -127,7 +127,7 @@ records:
         - ui.checkout.shop-browse
         - ui.checkout.stock-refused
   fr.identity.account:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: identity
     state: todo
     effectiveState: todo
@@ -135,7 +135,7 @@ records:
       refs:
         - contract.checkout.order-for-identity
   fr.identity.sign-in:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: identity
     state: done
     effectiveState: done
@@ -144,27 +144,27 @@ records:
         - contract.identity.internal.sessions
         - ui.identity.sign-in
   gap.checkout.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: checkout
     state: done
     effectiveState: done
   gap.checkout.second-example-gates:
-    schema: work/gap
+    schema: work/gap@1
     feature: checkout
     state: todo
     effectiveState: todo
   gap.identity.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: identity
     state: done
     effectiveState: done
   identity:
-    schema: work/feature
+    schema: work/feature@1
     feature: identity
     state: null
     effectiveState: null
   impl.checkout.ecommerce-app-be.order-checkout:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: checkout
     state: done
     effectiveState: done
@@ -172,7 +172,7 @@ records:
       refs:
         - decision.checkout.ops-doors
   impl.identity.ecommerce-app-be.identity-account:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: identity
     state: done
     effectiveState: done
@@ -180,7 +180,7 @@ records:
       refs:
         - decision.checkout.ops-doors
   integration.checkout.postgres:
-    schema: work/integration
+    schema: work/integration@1
     feature: checkout
     state: todo
     effectiveState: todo
@@ -188,12 +188,12 @@ records:
       dependsOn:
         - sds.checkout.order-flow
   integration.checkout.redis:
-    schema: work/integration
+    schema: work/integration@1
     feature: checkout
     state: todo
     effectiveState: todo
   sds.checkout.order-flow:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: checkout
     state: done
     effectiveState: done
@@ -202,7 +202,7 @@ records:
         - integration.checkout.postgres
         - integration.checkout.redis
   uat.checkout.place-order:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: checkout
     state: done
     effectiveState: done
@@ -252,7 +252,7 @@ records:
     state: null
     effectiveState: null
   uat.identity.sign-in:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: identity
     state: done
     effectiveState: done
@@ -272,27 +272,27 @@ records:
     state: null
     effectiveState: null
   ui.checkout.cart:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: checkout
     state: todo
     effectiveState: todo
   ui.checkout.landing-home:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: checkout
     state: uninvestigate
     effectiveState: uninvestigate
   ui.checkout.shop-browse:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: checkout
     state: todo
     effectiveState: todo
   ui.checkout.stock-refused:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: checkout
     state: todo
     effectiveState: todo
   ui.identity.sign-in:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: identity
     state: todo
     effectiveState: todo

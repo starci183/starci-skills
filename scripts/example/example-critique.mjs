@@ -91,8 +91,8 @@ function resolveRepositories(workRoot) {
 }
 
 /**
- * Whether `ownerOrModulePath`, authored on `record`, resolves to something real on disk. `work/implementation`
- * names its own `repository`; `work/business-rule` names none (the layout gives it `module` but no sibling
+ * Whether `ownerOrModulePath`, authored on `record`, resolves to something real on disk. `work/implementation@1`
+ * names its own `repository`; `work/business-rule@1` names none (the layout gives it `module` but no sibling
  * `repository` field), so a rule's module is resolved against the backend repository that owns this
  * `.starciwork` tree by default - the same default the layout gives current code in general. Either way, an
  * unresolved *repository name* (declared but not found on disk) is reported distinctly from a resolved
@@ -106,7 +106,7 @@ function resolveAnchor(repos, record, relPath) {
   return {exists: fs.existsSync(abs), note: null, abs};
 }
 
-/** `record.data.module`, normalized to a non-empty list of path strings; work/business-rule's own field may
+/** `record.data.module`, normalized to a non-empty list of path strings; work/business-rule@1's own field may
  * be a bare string or a list (schemas/work-layout.yaml, concept 9). */
 function modulePaths(record) {
   const m = record.data.module;
@@ -115,7 +115,7 @@ function modulePaths(record) {
   return [];
 }
 
-/** `record.data.owners`, the `{role, path}` list work/implementation authors (concept 9); malformed entries
+/** `record.data.owners`, the `{role, path}` list work/implementation@1 authors (concept 9); malformed entries
  * (missing `path`) are skipped rather than crashing a tree that already passed check-example-work.mjs. */
 function ownerPaths(record) {
   const owners = Array.isArray(record.data.owners) ? record.data.owners : [];
@@ -126,7 +126,7 @@ function ownerPaths(record) {
 // Section 1: blast radius per business rule
 // ---------------------------------------------------------------------------------------------------------
 
-/** Reverse edges for `proves` (work/implementation -> business-rule/sds-component/...). Not part of
+/** Reverse edges for `proves` (work/implementation@1 -> business-rule/sds-component/...). Not part of
  * example-derive.mjs's `usedBy` map: `proves` is not one of the layout's declared edge *kinds* there, so the
  * derivation files it under `unclassifiedEdges` rather than inventing a kind meaning it did not ask for.
  * Blast radius needs the reverse of it anyway (an implementation proving a rule is exactly the kind of thing
@@ -166,7 +166,7 @@ function blastRadiusOf(ruleId, derivedRecords, provesUsedBy) {
 function computeBlastRadiusFindings(derived, rawRecords, evidenceByDir) {
   const provesUsedBy = buildProvesUsedBy(rawRecords);
   const findings = [];
-  const rules = [...derived.records.values()].filter(r => r.schema === 'work/business-rule').sort((a, b) => a.id.localeCompare(b.id));
+  const rules = [...derived.records.values()].filter(r => r.schema === 'work/business-rule@1').sort((a, b) => a.id.localeCompare(b.id));
   for (const rule of rules) {
     const affected = [...blastRadiusOf(rule.id, derived.records, provesUsedBy)].sort();
     const staledEvidence = affected.filter(id => evidenceByDir.has(rawRecords.get(id)?.dir)).length;
@@ -335,7 +335,7 @@ function computeBlockerCycleFindings(derived, rawRecords) {
     const features = new Set(scc.map(id => derived.records.get(id)?.feature).filter(Boolean));
     const candidateAnchors = [...rawRecords.values()]
       .filter(r => features.has(r.feature) && !scc.includes(r.id))
-      .filter(r => r.schema === 'work/gap' || (r.schema === 'work/policy-decision' && r.data.outcome === 'open'))
+      .filter(r => r.schema === 'work/gap@1' || (r.schema === 'work/policy-decision@1' && r.data.outcome === 'open'))
       .map(r => r.id).sort();
     findings.push({
       id: `blocker-cycle:${scc[0]}`,
@@ -373,7 +373,7 @@ function computeDoneAnchorFindings(rawRecords, repos) {
         because: `${rec.id} is state: done but ${missing.length} of its ${anchors.length} anchor path(s) do not exist on disk: ${missing.join(', ')} - the record claims proof over code that is not there to have been proven.`,
       });
     }
-    if (rec.schema === 'work/implementation' && Array.isArray(rec.data.proves)) {
+    if (rec.schema === 'work/implementation@1' && Array.isArray(rec.data.proves)) {
       const notDone = rec.data.proves.filter(t => typeof t === 'string' && rawRecords.get(resolveRecordRef(rawRecords, t, inline) ?? t)?.state !== 'done');
       if (notDone.length) {
         findings.push({
@@ -396,7 +396,7 @@ function computeDoneAnchorFindings(rawRecords, repos) {
 function computeUnboundSdsFindings(rawRecords, repos) {
   const findings = [];
   for (const rec of rawRecords.values()) {
-    if (rec.schema !== 'work/sds-component') continue;
+    if (rec.schema !== 'work/sds-component@1') continue;
     const owners = Array.isArray(rec.data.owners) ? rec.data.owners : null;
     if (!owners || !owners.length) {
       findings.push({
@@ -441,7 +441,7 @@ function hasTypedSurface(data) {
 function computeUntypedContractFindings(rawRecords) {
   const findings = [];
   for (const rec of rawRecords.values()) {
-    if (rec.schema !== 'work/contract') continue;
+    if (rec.schema !== 'work/contract@1') continue;
     if (!hasTypedSurface(rec.data)) {
       findings.push({
         id: `untyped-contract:${rec.id}`,
@@ -462,7 +462,7 @@ function computeUntypedContractFindings(rawRecords) {
 function computeOpenDecisionFindings(derived, rawRecords) {
   const findings = [];
   for (const rec of rawRecords.values()) {
-    if (rec.schema !== 'work/policy-decision' || rec.data.outcome !== 'open') continue;
+    if (rec.schema !== 'work/policy-decision@1' || rec.data.outcome !== 'open') continue;
     const blocks = Array.isArray(rec.data.blocks) ? rec.data.blocks : [];
     const blockedByCiters = derived.records.get(rec.id)?.usedBy?.blockedBy ?? [];
     const held = [...new Set([...blocks, ...blockedByCiters])].sort();

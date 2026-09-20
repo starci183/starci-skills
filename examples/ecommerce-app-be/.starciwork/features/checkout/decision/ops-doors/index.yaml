@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.checkout.ops-doors
 title: The order service's /health probe door is exempt from feature-contract coverage
 state: done
@@ -12,7 +12,7 @@ question: >-
   own?
 options:
   - id: contract-per-door
-    summary: Declare each /health as a work/contract surface between the service and its probe.
+    summary: Declare each /health as a work/contract@1 surface between the service and its probe.
     consequence: >-
       Half right. Identity's /health does have a feature consumer - the order service's health
       aggregation calls it through modules/integrations/identity/identity.client.ts

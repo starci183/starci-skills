@@ -1,4 +1,4 @@
-schema: work/catalog
+schema: work/catalog@1
 id: conflict-case
 description: Negative-corpus fixture tree - two done business rules that exclude each other.
 features:

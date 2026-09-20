@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.task.todo-app-backend.delete-task
 title: The delete-task feature
 state: done

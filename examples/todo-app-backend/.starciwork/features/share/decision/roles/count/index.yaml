@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.share.roles.count
 title: Why exactly two roles, viewer and editor
 state: done

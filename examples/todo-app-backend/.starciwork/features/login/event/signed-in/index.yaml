@@ -1,4 +1,4 @@
-schema: work/event
+schema: work/event@1
 id: event.login.signed-in
 title: A person signed in
 state: todo

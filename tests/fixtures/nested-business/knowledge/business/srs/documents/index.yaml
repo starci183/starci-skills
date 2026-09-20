@@ -1,4 +1,4 @@
-schema: work/node@2
+schema: work/node@1
 required: true
 id: example.business.srs.documents
 kind: business

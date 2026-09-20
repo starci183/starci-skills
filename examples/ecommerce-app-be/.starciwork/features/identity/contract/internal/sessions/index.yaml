@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.identity.internal.sessions
 title: How a caller turns a bearer token into a person, and retires it
 state: done

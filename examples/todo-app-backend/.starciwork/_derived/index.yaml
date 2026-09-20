@@ -6,12 +6,12 @@
 schema: work/derived@1
 records:
   audit:
-    schema: work/feature
+    schema: work/feature@1
     feature: audit
     state: null
     effectiveState: null
   br.audit.append-only:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: audit
     state: done
     effectiveState: suspended
@@ -28,7 +28,7 @@ records:
       tension:
         - decision.audit.erasure-method
   br.audit.erasure.logged:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: audit
     state: done
     effectiveState: suspended
@@ -41,7 +41,7 @@ records:
         - fr.audit.erasure.complete
         - fr.audit.erasure.request
   br.audit.erasure.right:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: audit
     state: done
     effectiveState: suspended
@@ -57,7 +57,7 @@ records:
       tension:
         - decision.audit.erasure-method
   br.audit.retention:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: audit
     state: done
     effectiveState: suspended
@@ -73,7 +73,7 @@ records:
       tension:
         - decision.audit.erasure-method
   br.login.password.sign-in:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: login
     state: done
     effectiveState: done
@@ -85,7 +85,7 @@ records:
       composes:
         - fr.login.sign-in
   br.login.session.restores:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: login
     state: done
     effectiveState: done
@@ -97,7 +97,7 @@ records:
         - fr.login.sign-in
         - fr.login.sign-out
   br.login.session.single-device:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: login
     state: todo
     effectiveState: blocked
@@ -114,7 +114,7 @@ records:
           identity and session.mjs's accept()/actorOf() take no device argument - there is no device
           field to evict a prior session against yet.
   br.notify.delivery.once:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: notify
     state: done
     effectiveState: suspended
@@ -132,7 +132,7 @@ records:
         - fr.notify.on-completion
         - fr.notify.on-new-device
   br.notify.digest.window:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: notify
     state: done
     effectiveState: suspended
@@ -147,7 +147,7 @@ records:
         - fr.notify.on-completion
         - fr.notify.on-new-device
   br.notify.failure.classified:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: notify
     state: done
     effectiveState: suspended
@@ -158,7 +158,7 @@ records:
         - integration.notify.smtp
         - sds.notify.delivery-lifecycle
   br.notify.unsubscribe.honored:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: notify
     state: done
     effectiveState: suspended
@@ -171,7 +171,7 @@ records:
       composes:
         - fr.notify.unsubscribe
   br.observability.access-log-shape:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: observability
     state: done
     effectiveState: done
@@ -179,7 +179,7 @@ records:
       composes:
         - fr.observability.request-logging
   br.observability.probe-answers:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: observability
     state: done
     effectiveState: done
@@ -187,7 +187,7 @@ records:
       composes:
         - fr.observability.probes
   br.plan.active-scope:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: plan
     state: done
     effectiveState: done
@@ -196,7 +196,7 @@ records:
         - fr.plan.usage.view
         - sds.plan.cap-guard
   br.plan.caps.limit:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: plan
     state: done
     effectiveState: done
@@ -213,7 +213,7 @@ records:
         - fr.plan.upgrade
         - fr.task.create
   br.plan.downgrade.freeze:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: plan
     state: done
     effectiveState: done
@@ -224,7 +224,7 @@ records:
       composes:
         - fr.plan.downgrade
   br.plan.lapse.reverts-on-read:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: plan
     state: done
     effectiveState: done
@@ -233,7 +233,7 @@ records:
         - data.plan.subscription
         - sds.plan.subscription-lifecycle
   br.plan.payment.idempotent:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: plan
     state: done
     effectiveState: done
@@ -245,7 +245,7 @@ records:
       composes:
         - fr.plan.reconcile
   br.recur.ending.preserves-history:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: recur
     state: done
     effectiveState: suspended
@@ -258,7 +258,7 @@ records:
       composes:
         - fr.recur.end-rule
   br.recur.generation.once:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: recur
     state: done
     effectiveState: suspended
@@ -269,7 +269,7 @@ records:
         - nfr.recur.generation.timeliness
         - sds.recur.occurrence-lifecycle
   br.recur.impossible-date.skips:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: recur
     state: done
     effectiveState: suspended
@@ -282,7 +282,7 @@ records:
         - fr.recur.make-recurring
         - fr.recur.see-upcoming
   br.recur.occurrence.owned-by-rule-owner:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: recur
     state: done
     effectiveState: suspended
@@ -294,7 +294,7 @@ records:
       composes:
         - fr.recur.edit-rule
   br.recur.timezone.owner-local-time:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: recur
     state: done
     effectiveState: suspended
@@ -306,7 +306,7 @@ records:
       composes:
         - fr.recur.make-recurring
   br.share.editor.no-delete:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: share
     state: done
     effectiveState: suspended
@@ -315,7 +315,7 @@ records:
       refs:
         - contract.share.completion-guard-for-task
   br.share.invite.expiry:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: share
     state: done
     effectiveState: suspended
@@ -330,7 +330,7 @@ records:
         - fr.share.invite
         - fr.share.list
   br.share.revoke.on-read:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: share
     state: done
     effectiveState: suspended
@@ -346,7 +346,7 @@ records:
         - fr.share.list
         - fr.share.revoke
   br.share.role.permissions:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: share
     state: done
     effectiveState: suspended
@@ -362,7 +362,7 @@ records:
         - fr.share.invite
         - fr.task.complete
   br.task.complete.once:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: task
     state: done
     effectiveState: suspended
@@ -375,7 +375,7 @@ records:
         - fr.task.complete
         - fr.task.reopen
   br.task.delete.final:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: task
     state: done
     effectiveState: suspended
@@ -389,7 +389,7 @@ records:
       tension:
         - decision.audit.deleted-task-target
   br.task.list.owned:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: task
     state: done
     effectiveState: suspended
@@ -402,7 +402,7 @@ records:
       composes:
         - fr.task.list
   br.task.single-owner:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: task
     state: todo
     effectiveState: suspended
@@ -431,7 +431,7 @@ records:
           accepted-editor complete arm, and contract.share.completion-guard-for-task's
           provider/consumer proof is still todo. The gap names that absence."
   br.task.title.required:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: task
     state: done
     effectiveState: suspended
@@ -440,7 +440,7 @@ records:
       composes:
         - fr.task.create
   br.upload.intake:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: upload
     state: done
     effectiveState: done
@@ -448,7 +448,7 @@ records:
       composes:
         - fr.upload.intake
   br.upload.lifecycle:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: upload
     state: done
     effectiveState: done
@@ -460,7 +460,7 @@ records:
         - fr.upload.intake
         - fr.upload.manage
   br.upload.owned:
-    schema: work/business-rule
+    schema: work/business-rule@1
     feature: upload
     state: done
     effectiveState: done
@@ -472,17 +472,17 @@ records:
         - fr.upload.attach
         - fr.upload.manage
   brand:
-    schema: work/brand
+    schema: work/brand@1
     feature: null
     state: done
     effectiveState: done
   contract.audit.emitted-events:
-    schema: work/contract
+    schema: work/contract@1
     feature: audit
     state: todo
     effectiveState: todo
   contract.login.identity-for-task:
-    schema: work/contract
+    schema: work/contract@1
     feature: login
     state: todo
     effectiveState: todo
@@ -490,7 +490,7 @@ records:
       dependsOn:
         - sds.audit.log-chain
   contract.notify.new-device-signal:
-    schema: work/contract
+    schema: work/contract@1
     feature: notify
     state: todo
     effectiveState: blocked
@@ -508,7 +508,7 @@ records:
           record cannot move to done without a change in features/login, which this lane does not
           own."
   contract.notify.task-completion-feed:
-    schema: work/contract
+    schema: work/contract@1
     feature: notify
     state: todo
     effectiveState: todo
@@ -516,7 +516,7 @@ records:
       refs:
         - fr.notify.on-completion
   contract.plan.create-precondition:
-    schema: work/contract
+    schema: work/contract@1
     feature: plan
     state: done
     effectiveState: suspended
@@ -527,7 +527,7 @@ records:
       dependsOn:
         - sds.plan.cap-guard
   contract.share.completion-guard-for-task:
-    schema: work/contract
+    schema: work/contract@1
     feature: share
     state: todo
     effectiveState: blocked
@@ -545,7 +545,7 @@ records:
           accepted-editor complete arm, and contract.share.completion-guard-for-task's
           provider/consumer proof is still todo. The gap names that absence."
   contract.task.list-for-dashboard:
-    schema: work/contract
+    schema: work/contract@1
     feature: task
     state: todo
     effectiveState: todo
@@ -553,12 +553,12 @@ records:
       refs:
         - fr.task.list
   data.audit.erasure-request:
-    schema: work/data
+    schema: work/data@1
     feature: audit
     state: done
     effectiveState: done
   data.audit.log-line:
-    schema: work/data
+    schema: work/data@1
     feature: audit
     state: done
     effectiveState: done
@@ -566,7 +566,7 @@ records:
       tension:
         - decision.audit.deleted-task-target
   data.login.person:
-    schema: work/data
+    schema: work/data@1
     feature: login
     state: done
     effectiveState: done
@@ -574,27 +574,27 @@ records:
       refs:
         - integration.login.postgres
   data.notify.delivery-attempt:
-    schema: work/data
+    schema: work/data@1
     feature: notify
     state: done
     effectiveState: done
   data.notify.notification:
-    schema: work/data
+    schema: work/data@1
     feature: notify
     state: done
     effectiveState: done
   data.notify.preference:
-    schema: work/data
+    schema: work/data@1
     feature: notify
     state: done
     effectiveState: done
   data.plan.payment-intent:
-    schema: work/data
+    schema: work/data@1
     feature: plan
     state: done
     effectiveState: done
   data.plan.plan:
-    schema: work/data
+    schema: work/data@1
     feature: plan
     state: done
     effectiveState: done
@@ -602,7 +602,7 @@ records:
       refs:
         - data.plan.subscription
   data.plan.subscription:
-    schema: work/data
+    schema: work/data@1
     feature: plan
     state: done
     effectiveState: done
@@ -610,7 +610,7 @@ records:
       refs:
         - data.plan.payment-intent
   data.recur.occurrence:
-    schema: work/data
+    schema: work/data@1
     feature: recur
     state: done
     effectiveState: done
@@ -618,7 +618,7 @@ records:
       refs:
         - fr.recur.see-upcoming
   data.recur.rule:
-    schema: work/data
+    schema: work/data@1
     feature: recur
     state: done
     effectiveState: done
@@ -629,17 +629,17 @@ records:
         - fr.recur.make-recurring
         - fr.recur.see-upcoming
   data.share.collaborator:
-    schema: work/data
+    schema: work/data@1
     feature: share
     state: done
     effectiveState: done
   data.share.invitation:
-    schema: work/data
+    schema: work/data@1
     feature: share
     state: done
     effectiveState: done
   data.task.task:
-    schema: work/data
+    schema: work/data@1
     feature: task
     state: done
     effectiveState: done
@@ -647,12 +647,12 @@ records:
       extends:
         - data.recur.occurrence
   data.upload.upload:
-    schema: work/data
+    schema: work/data@1
     feature: upload
     state: done
     effectiveState: done
   decision.audit.deleted-task-target:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: audit
     state: done
     effectiveState: done
@@ -660,7 +660,7 @@ records:
       refs:
         - data.audit.log-line
   decision.audit.erasure-method:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: audit
     state: done
     effectiveState: done
@@ -668,32 +668,32 @@ records:
       refs:
         - br.audit.erasure.right
   decision.audit.operator-role:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: audit
     state: done
     effectiveState: done
   decision.login.session.devices:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: login
     state: done
     effectiveState: done
   decision.notify.dedupe-key:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: notify
     state: done
     effectiveState: done
   decision.notify.digest-window:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: notify
     state: done
     effectiveState: done
   decision.notify.ordering:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: notify
     state: done
     effectiveState: done
   decision.plan.downgrade.policy:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: plan
     state: done
     effectiveState: done
@@ -703,42 +703,42 @@ records:
         - fr.plan.downgrade
         - sds.plan.subscription-lifecycle
   decision.recur.generation.backfill:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: recur
     state: done
     effectiveState: done
   decision.recur.impossible-date:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: recur
     state: done
     effectiveState: done
   decision.recur.occurrence.identity:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: recur
     state: done
     effectiveState: done
   decision.recur.timezone.anchor:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: recur
     state: done
     effectiveState: done
   decision.recur.timezone.dst:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: recur
     state: done
     effectiveState: done
   decision.share.invite.expiry-window:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: share
     state: done
     effectiveState: done
   decision.share.roles.count:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: share
     state: done
     effectiveState: done
   decision.task.list.scope:
-    schema: work/policy-decision
+    schema: work/policy-decision@1
     feature: task
     state: done
     effectiveState: done
@@ -746,12 +746,12 @@ records:
       refs:
         - fr.task.list
   environment.todo-app.dev:
-    schema: work/resource
+    schema: work/resource@1
     feature: null
     state: null
     effectiveState: null
   event.login.new-device-signin:
-    schema: work/event
+    schema: work/event@1
     feature: login
     state: todo
     effectiveState: blocked
@@ -766,7 +766,7 @@ records:
           what is missing is the field: no deviceId exists to put in this payload until a device
           field is added to the session/person shape."
   event.login.signed-in:
-    schema: work/event
+    schema: work/event@1
     feature: login
     state: todo
     effectiveState: todo
@@ -775,7 +775,7 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
   event.login.signed-out:
-    schema: work/event
+    schema: work/event@1
     feature: login
     state: todo
     effectiveState: todo
@@ -784,7 +784,7 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
   event.task.completed:
-    schema: work/event
+    schema: work/event@1
     feature: task
     state: done
     effectiveState: suspended
@@ -795,7 +795,7 @@ records:
         - fr.notify.on-completion
         - sds.audit.log-chain
   event.task.created:
-    schema: work/event
+    schema: work/event@1
     feature: task
     state: done
     effectiveState: done
@@ -804,7 +804,7 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
   event.task.deleted:
-    schema: work/event
+    schema: work/event@1
     feature: task
     state: done
     effectiveState: suspended
@@ -816,17 +816,17 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
   fixture.todo-app.seed:
-    schema: work/resource
+    schema: work/resource@1
     feature: null
     state: null
     effectiveState: null
   fr.audit.erasure.complete:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: audit
     state: done
     effectiveState: done
   fr.audit.erasure.request:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: audit
     state: done
     effectiveState: done
@@ -834,7 +834,7 @@ records:
       refs:
         - ui.audit.privacy
   fr.audit.export:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: audit
     state: done
     effectiveState: done
@@ -842,18 +842,18 @@ records:
       refs:
         - ui.audit.privacy
   fr.audit.log.append:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: audit
     state: done
     effectiveState: done
   fr.audit.log.read:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: audit
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   fr.login.sign-in:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: login
     state: done
     effectiveState: done
@@ -863,7 +863,7 @@ records:
         - event.login.signed-in
         - ui.login.sign-in
   fr.login.sign-out:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: login
     state: todo
     effectiveState: todo
@@ -871,12 +871,12 @@ records:
       refs:
         - event.login.signed-out
   fr.notify.digest:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: notify
     state: done
     effectiveState: done
   fr.notify.on-completion:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: notify
     state: done
     effectiveState: done
@@ -884,7 +884,7 @@ records:
       refs:
         - contract.notify.task-completion-feed
   fr.notify.on-new-device:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: notify
     state: todo
     effectiveState: blocked
@@ -902,7 +902,7 @@ records:
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
   fr.notify.unsubscribe:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: notify
     state: done
     effectiveState: done
@@ -910,17 +910,17 @@ records:
       refs:
         - ui.notify.preferences
   fr.observability.probes:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: observability
     state: done
     effectiveState: done
   fr.observability.request-logging:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: observability
     state: done
     effectiveState: done
   fr.plan.downgrade:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: plan
     state: todo
     effectiveState: blocked
@@ -931,7 +931,7 @@ records:
         because: The screen exists and is render-proven, but this record requires live uat proof and
           uat.verify has not run the downgrade surface against the running product yet.
   fr.plan.reconcile:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: plan
     state: todo
     effectiveState: blocked
@@ -959,7 +959,7 @@ records:
           and refuses any transaction status outside pending|paid|failed rather than casting one
           into a subscription activation.
   fr.plan.upgrade:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: plan
     state: todo
     effectiveState: blocked
@@ -979,7 +979,7 @@ records:
           (gap.plan.sepay-not-reachable), and the owner directive forbids simulating the signed
           webhook.
   fr.plan.usage.view:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: plan
     state: todo
     effectiveState: blocked
@@ -998,7 +998,7 @@ records:
           create-refusal feedback on /tasks), so the required live uat proof is exercised yet
           unsettled and stays open with the gap.
   fr.recur.edit-rule:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: recur
     state: todo
     effectiveState: blocked
@@ -1016,7 +1016,7 @@ records:
           (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks the edit ->
           occurrences-reflect-edit leg) but has no passing run captured as evidence here yet.
   fr.recur.end-rule:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: recur
     state: todo
     effectiveState: blocked
@@ -1040,7 +1040,7 @@ records:
           now names the real spec (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks end ->
           no-new-occurrences) but has no passing run captured as evidence here yet.
   fr.recur.make-recurring:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: recur
     state: todo
     effectiveState: blocked
@@ -1063,7 +1063,7 @@ records:
           (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks makeRecurring -> occurrences
           against the assembled stack) but has no passing run captured as evidence here yet."
   fr.recur.see-upcoming:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: recur
     state: todo
     effectiveState: blocked
@@ -1086,12 +1086,12 @@ records:
           (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts reads upcoming occurrences before
           and after ending) but has no passing run captured as evidence here yet.
   fr.share.accept:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: share
     state: done
     effectiveState: done
   fr.share.invite:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: share
     state: done
     effectiveState: done
@@ -1099,7 +1099,7 @@ records:
       refs:
         - ui.share.invite
   fr.share.list:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: share
     state: done
     effectiveState: done
@@ -1107,12 +1107,12 @@ records:
       refs:
         - ui.share.invite
   fr.share.revoke:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: share
     state: done
     effectiveState: done
   fr.task.complete:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: task
     state: todo
     effectiveState: blocked
@@ -1131,7 +1131,7 @@ records:
           accepted-editor complete arm, and contract.share.completion-guard-for-task's
           provider/consumer proof is still todo. The gap names that absence."
   fr.task.create:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: task
     state: done
     effectiveState: suspended
@@ -1143,7 +1143,7 @@ records:
       appliesTo:
         - sds.plan.cap-guard
   fr.task.delete:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: task
     state: todo
     effectiveState: blocked
@@ -1159,42 +1159,42 @@ records:
           accepted-editor complete arm, and contract.share.completion-guard-for-task's
           provider/consumer proof is still todo. The gap names that absence."
   fr.task.list:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: task
     state: todo
     effectiveState: todo
   fr.task.reopen:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: task
     state: todo
     effectiveState: todo
   fr.upload.attach:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: upload
     state: done
     effectiveState: done
   fr.upload.intake:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: upload
     state: done
     effectiveState: done
   fr.upload.manage:
-    schema: work/functional-requirement
+    schema: work/functional-requirement@1
     feature: upload
     state: done
     effectiveState: done
   gap.audit.direction-not-drawn:
-    schema: work/gap
+    schema: work/gap@1
     feature: audit
     state: done
     effectiveState: done
   gap.audit.emitted-events:
-    schema: work/gap
+    schema: work/gap@1
     feature: audit
     state: todo
     effectiveState: todo
   gap.audit.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: audit
     state: todo
     effectiveState: todo
@@ -1203,22 +1203,22 @@ records:
         - journey.audit.right-to-be-forgotten
         - uat.audit.right-to-be-forgotten
   gap.audit.operator-role:
-    schema: work/gap
+    schema: work/gap@1
     feature: audit
     state: done
     effectiveState: done
   gap.audit.render-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: audit
     state: done
     effectiveState: done
   gap.audit.unbuilt-module:
-    schema: work/gap
+    schema: work/gap@1
     feature: audit
     state: done
     effectiveState: done
   gap.login.device-field:
-    schema: work/gap
+    schema: work/gap@1
     feature: login
     state: todo
     effectiveState: todo
@@ -1228,27 +1228,27 @@ records:
         - contract.notify.new-device-signal
         - event.login.new-device-signin
   gap.login.direction-not-drawn:
-    schema: work/gap
+    schema: work/gap@1
     feature: login
     state: done
     effectiveState: done
   gap.login.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: login
     state: done
     effectiveState: done
   gap.login.migration-not-applied:
-    schema: work/gap
+    schema: work/gap@1
     feature: login
     state: done
     effectiveState: done
   gap.notify.direction-not-drawn:
-    schema: work/gap
+    schema: work/gap@1
     feature: notify
     state: done
     effectiveState: done
   gap.notify.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: notify
     state: todo
     effectiveState: todo
@@ -1256,7 +1256,7 @@ records:
       blockedBy:
         - uat.notify.digest-and-unsubscribe
   gap.notify.new-device-event:
-    schema: work/gap
+    schema: work/gap@1
     feature: notify
     state: todo
     effectiveState: todo
@@ -1264,12 +1264,12 @@ records:
       blockedBy:
         - fr.notify.on-new-device
   gap.notify.render-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: notify
     state: done
     effectiveState: done
   gap.notify.smtp-host-unreachable:
-    schema: work/gap
+    schema: work/gap@1
     feature: notify
     state: todo
     effectiveState: todo
@@ -1277,27 +1277,27 @@ records:
       blockedBy:
         - integration.notify.smtp
   gap.notify.task-completion-event:
-    schema: work/gap
+    schema: work/gap@1
     feature: notify
     state: todo
     effectiveState: todo
   gap.notify.unbuilt-module:
-    schema: work/gap
+    schema: work/gap@1
     feature: notify
     state: done
     effectiveState: done
   gap.plan.cap-guard-not-wired:
-    schema: work/gap
+    schema: work/gap@1
     feature: plan
     state: done
     effectiveState: done
   gap.plan.direction-not-drawn:
-    schema: work/gap
+    schema: work/gap@1
     feature: plan
     state: done
     effectiveState: done
   gap.plan.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: plan
     state: todo
     effectiveState: todo
@@ -1309,7 +1309,7 @@ records:
         - fr.plan.usage.view
         - uat.plan.upgrade-after-cap
   gap.plan.no-load-harness:
-    schema: work/gap
+    schema: work/gap@1
     feature: plan
     state: todo
     effectiveState: todo
@@ -1317,12 +1317,12 @@ records:
       blockedBy:
         - nfr.plan.cap-check.latency
   gap.plan.render-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: plan
     state: done
     effectiveState: done
   gap.plan.sepay-not-reachable:
-    schema: work/gap
+    schema: work/gap@1
     feature: plan
     state: todo
     effectiveState: todo
@@ -1330,17 +1330,17 @@ records:
       blockedBy:
         - integration.plan.sepay
   gap.plan.unbuilt-module:
-    schema: work/gap
+    schema: work/gap@1
     feature: plan
     state: done
     effectiveState: done
   gap.recur.direction-not-drawn:
-    schema: work/gap
+    schema: work/gap@1
     feature: recur
     state: done
     effectiveState: done
   gap.recur.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: recur
     state: todo
     effectiveState: todo
@@ -1352,27 +1352,27 @@ records:
         - fr.recur.see-upcoming
         - uat.recur.make-recurring
   gap.recur.render-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: recur
     state: done
     effectiveState: done
   gap.recur.unbuilt-module:
-    schema: work/gap
+    schema: work/gap@1
     feature: recur
     state: done
     effectiveState: done
   gap.share.direction-not-drawn:
-    schema: work/gap
+    schema: work/gap@1
     feature: share
     state: done
     effectiveState: done
   gap.share.frontend-unbuilt:
-    schema: work/gap
+    schema: work/gap@1
     feature: share
     state: done
     effectiveState: done
   gap.share.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: share
     state: todo
     effectiveState: todo
@@ -1381,7 +1381,7 @@ records:
         - journey.share.collaborate-on-a-task
         - uat.share.invite-and-collaborate
   gap.share.load-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: share
     state: todo
     effectiveState: todo
@@ -1389,32 +1389,32 @@ records:
       blockedBy:
         - nfr.share.revoke.read-latency
   gap.share.render-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: share
     state: done
     effectiveState: done
   gap.share.unbuilt-module:
-    schema: work/gap
+    schema: work/gap@1
     feature: share
     state: done
     effectiveState: done
   gap.task.collaborator-completion:
-    schema: work/gap
+    schema: work/gap@1
     feature: task
     state: done
     effectiveState: done
   gap.task.direction-not-drawn:
-    schema: work/gap
+    schema: work/gap@1
     feature: task
     state: done
     effectiveState: done
   gap.task.live-proof:
-    schema: work/gap
+    schema: work/gap@1
     feature: task
     state: done
     effectiveState: done
   gap.task.no-load-harness:
-    schema: work/gap
+    schema: work/gap@1
     feature: task
     state: todo
     effectiveState: todo
@@ -1422,17 +1422,17 @@ records:
       blockedBy:
         - nfr.task.list.latency
   gap.task.reopen-not-specified:
-    schema: work/gap
+    schema: work/gap@1
     feature: task
     state: done
     effectiveState: done
   gap.task.share-edge-hold:
-    schema: work/gap
+    schema: work/gap@1
     feature: task
     state: todo
     effectiveState: todo
   gap.task.single-owner-editor-arm:
-    schema: work/gap
+    schema: work/gap@1
     feature: task
     state: todo
     effectiveState: todo
@@ -1440,156 +1440,156 @@ records:
       blockedBy:
         - br.task.single-owner
   identity.todo-app.demo:
-    schema: work/resource
+    schema: work/resource@1
     feature: null
     state: null
     effectiveState: null
   impl.audit.todo-app-backend.erasure:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: audit
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.audit.todo-app-backend.log:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: audit
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.audit.todo-app-backend.operator-read:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: audit
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.audit.todo-app-frontend.privacy:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: audit
     state: done
     effectiveState: done
   impl.login.todo-app-backend.auth:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: login
     state: done
     effectiveState: done
   impl.login.todo-app-frontend.sign-in:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: login
     state: done
     effectiveState: done
   impl.notify.todo-app-backend.pipeline:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: notify
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.notify.todo-app-frontend.preferences:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: notify
     state: done
     effectiveState: done
   impl.observability.todo-app-backend.observability:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: observability
     state: done
     effectiveState: done
   impl.plan.todo-app-backend.plan:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: plan
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.plan.todo-app-frontend.usage:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: plan
     state: done
     effectiveState: done
   impl.recur.todo-app-backend.engine:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: recur
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.recur.todo-app-frontend.schedule:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: recur
     state: done
     effectiveState: done
   impl.share.todo-app-backend.access:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: share
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.share.todo-app-backend.invitations:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: share
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.share.todo-app-frontend.invite-screen:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: share
     state: done
     effectiveState: done
   impl.task.todo-app-backend.complete-task:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.create-task:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.delete-task:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.list:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.ownership:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.platform-database:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: done
   impl.task.todo-app-backend.platform-events:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: done
   impl.task.todo-app-backend.reopen-task:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   impl.task.todo-app-frontend.task-list:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: task
     state: done
     effectiveState: done
   impl.upload.todo-app-backend.upload:
-    schema: work/implementation
+    schema: work/implementation@1
     feature: upload
     state: done
     effectiveState: done
   integration.login.keycloak:
-    schema: work/integration
+    schema: work/integration@1
     feature: login
     state: done
     effectiveState: done
@@ -1597,7 +1597,7 @@ records:
       dependsOn:
         - sds.login.session-store
   integration.login.postgres:
-    schema: work/integration
+    schema: work/integration@1
     feature: login
     state: done
     effectiveState: done
@@ -1610,7 +1610,7 @@ records:
         - sds.task.completion-state
         - sds.task.ownership-guard
   integration.notify.queue:
-    schema: work/integration
+    schema: work/integration@1
     feature: notify
     state: done
     effectiveState: done
@@ -1618,7 +1618,7 @@ records:
       dependsOn:
         - sds.notify.delivery-lifecycle
   integration.notify.smtp:
-    schema: work/integration
+    schema: work/integration@1
     feature: notify
     state: todo
     effectiveState: blocked
@@ -1634,7 +1634,7 @@ records:
           transiently for exactly that reason. No fake run counts as this integration's proof - a
           run against a fake would only prove it against the fake, per the common brief's own rule.
   integration.plan.sepay:
-    schema: work/integration
+    schema: work/integration@1
     feature: plan
     state: inprogress
     effectiveState: blocked
@@ -1665,7 +1665,7 @@ records:
           and refuses any transaction status outside pending|paid|failed rather than casting one
           into a subscription activation.
   integration.recur.scheduler:
-    schema: work/integration
+    schema: work/integration@1
     feature: recur
     state: done
     effectiveState: done
@@ -1676,7 +1676,7 @@ records:
         - sds.recur.generation-engine
         - sds.recur.occurrence-lifecycle
   journey.audit.right-to-be-forgotten:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: audit
     state: todo
     effectiveState: blocked
@@ -1689,12 +1689,12 @@ records:
           remains is requiresProof.uat: no uat.verify run has walked this journey against the
           running product yet - the same absence gap.audit.live-proof names."
   journey.login.first-sign-in:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: login
     state: done
     effectiveState: done
   journey.notify.told-about-completion:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: notify
     state: todo
     effectiveState: blocked
@@ -1707,7 +1707,7 @@ records:
           accepted-editor complete arm, and contract.share.completion-guard-for-task's
           provider/consumer proof is still todo. The gap names that absence."
   journey.plan.hits-the-cap:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: plan
     state: todo
     effectiveState: blocked
@@ -1721,7 +1721,7 @@ records:
           (gap.plan.sepay-not-reachable), and the owner directive forbids simulating the signed
           webhook.
   journey.recur.first-recurring-task:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: recur
     state: todo
     effectiveState: blocked
@@ -1739,7 +1739,7 @@ records:
           (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks makeRecurring -> occurrences
           against the assembled stack) but has no passing run captured as evidence here yet."
   journey.share.collaborate-on-a-task:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: share
     state: todo
     effectiveState: blocked
@@ -1752,37 +1752,37 @@ records:
           uat.verify run has walked this journey - uat.share.invite-and-collaborate - against a live
           product yet; that is the real remaining root, not the frs themselves.
   journey.task.first-task:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: task
     state: todo
     effectiveState: todo
   journey.upload.attach-a-file:
-    schema: work/customer-journey
+    schema: work/customer-journey@1
     feature: upload
     state: done
     effectiveState: done
   login:
-    schema: work/feature
+    schema: work/feature@1
     feature: login
     state: null
     effectiveState: null
   nfr.audit.retention:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: audit
     state: done
     effectiveState: done
   nfr.audit.tamper-evidence:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: audit
     state: done
     effectiveState: done
   nfr.login.sign-in-timing:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: login
     state: done
     effectiveState: done
   nfr.notify.delivery.guarantee:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: notify
     state: todo
     effectiveState: blocked
@@ -1794,12 +1794,12 @@ records:
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
   nfr.notify.delivery.latency:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: notify
     state: todo
     effectiveState: todo
   nfr.plan.cap-check.latency:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: plan
     state: todo
     effectiveState: blocked
@@ -1810,12 +1810,12 @@ records:
         because: No scripts/load/create.js or k6 installation exists in this repository to run the
           measurement this record specifies.
   nfr.recur.generation.timeliness:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: recur
     state: todo
     effectiveState: todo
   nfr.share.revoke.read-latency:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: share
     state: todo
     effectiveState: blocked
@@ -1828,7 +1828,7 @@ records:
           and a curl-based live-proof script, neither of which say anything about latency under
           load.
   nfr.task.list.latency:
-    schema: work/non-functional-requirement
+    schema: work/non-functional-requirement@1
     feature: task
     state: todo
     effectiveState: blocked
@@ -1839,33 +1839,33 @@ records:
         because: No scripts/load/list.js or k6 installation exists in this repository to run the measurement
           this record specifies.
   notify:
-    schema: work/feature
+    schema: work/feature@1
     feature: notify
     state: null
     effectiveState: null
   observability:
-    schema: work/feature
+    schema: work/feature@1
     feature: observability
     state: null
     effectiveState: null
   plan:
-    schema: work/feature
+    schema: work/feature@1
     feature: plan
     state: null
     effectiveState: null
   recur:
-    schema: work/feature
+    schema: work/feature@1
     feature: recur
     state: null
     effectiveState: null
   sds.audit.erasure-request:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: audit
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   sds.audit.log-chain:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: audit
     state: done
     effectiveState: suspended
@@ -1874,7 +1874,7 @@ records:
       dependsOn:
         - sds.audit.erasure-request
   sds.login.session-store:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: login
     state: done
     effectiveState: done
@@ -1883,7 +1883,7 @@ records:
         - br.plan.lapse.reverts-on-read
         - integration.login.postgres
   sds.notify.delivery-lifecycle:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: notify
     state: done
     effectiveState: suspended
@@ -1892,7 +1892,7 @@ records:
       refs:
         - integration.notify.queue
   sds.plan.cap-guard:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: plan
     state: done
     effectiveState: done
@@ -1900,7 +1900,7 @@ records:
       refs:
         - contract.plan.create-precondition
   sds.plan.reconciliation:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: plan
     state: todo
     effectiveState: blocked
@@ -1924,7 +1924,7 @@ records:
           and refuses any transaction status outside pending|paid|failed rather than casting one
           into a subscription activation.
   sds.plan.subscription-lifecycle:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: plan
     state: done
     effectiveState: done
@@ -1940,7 +1940,7 @@ records:
         - sds.plan.cap-guard
         - sds.plan.reconciliation
   sds.recur.generation-engine:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: recur
     state: done
     effectiveState: suspended
@@ -1949,19 +1949,19 @@ records:
       refs:
         - integration.recur.scheduler
   sds.recur.occurrence-lifecycle:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: recur
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   sds.share.invitation-lifecycle:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: share
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   sds.task.completion-state:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: task
     state: done
     effectiveState: suspended
@@ -1970,33 +1970,33 @@ records:
       refs:
         - data.recur.occurrence
   sds.task.ownership-guard:
-    schema: work/sds-component
+    schema: work/sds-component@1
     feature: task
     state: done
     effectiveState: suspended
     suspensionReason: code-digest-mismatch
   share:
-    schema: work/feature
+    schema: work/feature@1
     feature: share
     state: null
     effectiveState: null
   task:
-    schema: work/feature
+    schema: work/feature@1
     feature: task
     state: null
     effectiveState: null
   todo:
-    schema: work/catalog
+    schema: work/catalog@1
     feature: null
     state: null
     effectiveState: null
   todo-app:
-    schema: work/workspace
+    schema: work/workspace@1
     feature: null
     state: null
     effectiveState: null
   uat.audit.right-to-be-forgotten:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: audit
     state: todo
     effectiveState: blocked
@@ -2008,7 +2008,7 @@ records:
           uat/right-to-be-forgotten/runs/** exists with screens, video and a passing result.md, only
           this designed flow shape.
   uat.login.sign-in:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: login
     state: done
     effectiveState: done
@@ -2053,7 +2053,7 @@ records:
     state: null
     effectiveState: null
   uat.notify.digest-and-unsubscribe:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: notify
     state: inprogress
     effectiveState: blocked
@@ -2115,7 +2115,7 @@ records:
     state: null
     effectiveState: null
   uat.plan.upgrade-after-cap:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: plan
     state: inprogress
     effectiveState: blocked
@@ -2134,7 +2134,7 @@ records:
     state: null
     effectiveState: null
   uat.recur.make-recurring:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: recur
     state: todo
     effectiveState: blocked
@@ -2165,7 +2165,7 @@ records:
     state: null
     effectiveState: null
   uat.share.invite-and-collaborate:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: share
     state: inprogress
     effectiveState: blocked
@@ -2189,7 +2189,7 @@ records:
     state: null
     effectiveState: null
   uat.task.create:
-    schema: work/uat-flow
+    schema: work/uat-flow@1
     feature: task
     state: done
     effectiveState: done
@@ -2214,22 +2214,22 @@ records:
     state: null
     effectiveState: null
   ui.audit.privacy:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: audit
     state: done
     effectiveState: done
   ui.login.sign-in:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: login
     state: done
     effectiveState: done
   ui.notify.preferences:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: notify
     state: done
     effectiveState: done
   ui.plan.usage:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: plan
     state: done
     effectiveState: done
@@ -2237,22 +2237,22 @@ records:
       refs:
         - fr.plan.usage.view
   ui.recur.schedule:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: recur
     state: done
     effectiveState: done
   ui.share.invite:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: share
     state: done
     effectiveState: done
   ui.task.list:
-    schema: work/ui-screen
+    schema: work/ui-screen@1
     feature: task
     state: done
     effectiveState: done
   upload:
-    schema: work/feature
+    schema: work/feature@1
     feature: upload
     state: null
     effectiveState: null

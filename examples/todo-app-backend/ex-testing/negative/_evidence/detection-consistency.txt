@@ -11,7 +11,7 @@ INFO    (single tree): parity skipped, comparing conventions needs both example 
 5 record(s) across 1 tree(s): 0 refused, 1 suspect, 1 info
 exit=0
 === 03-srs-business-contradiction ===
-REFUSE  examples/todo-app-backend/ex-testing/negative/03-srs-business-contradiction/work/features/pricing/br/cap-required/index.yaml: br.pricing.cap-required (done) and br.pricing.free-for-all (done) each declare the other impossible - "br.pricing.free-for-all says no cap may exist; this rule makes the cap universal." - and no work/policy-decision naming both sides settles it; two done records cannot both be true of the same product [CONFLICT_WITHOUT_DECISION]
+REFUSE  examples/todo-app-backend/ex-testing/negative/03-srs-business-contradiction/work/features/pricing/br/cap-required/index.yaml: br.pricing.cap-required (done) and br.pricing.free-for-all (done) each declare the other impossible - "br.pricing.free-for-all says no cap may exist; this rule makes the cap universal." - and no work/policy-decision@1 naming both sides settles it; two done records cannot both be true of the same product [CONFLICT_WITHOUT_DECISION]
 INFO    (single tree): parity skipped, comparing conventions needs both example trees [PARITY_SKIPPED]
 
 5 record(s) across 1 tree(s): 1 refused, 0 suspect, 1 info

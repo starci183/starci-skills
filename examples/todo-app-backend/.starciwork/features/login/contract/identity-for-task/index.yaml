@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.login.identity-for-task
 title: How task learns who the actor is
 state: todo

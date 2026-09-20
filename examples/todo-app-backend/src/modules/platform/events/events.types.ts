@@ -1,5 +1,5 @@
 /**
- * One typed class per work/event record declared under features/{login,task}/event/**, with fields
+ * One typed class per work/event@1 record declared under features/{login,task}/event/**, with fields
  * mirroring each record's `payload` exactly. A feature that needs a domain signal from task or login
  * subscribes to these through the PlatformEventBus port instead of importing task/login code directly.
  *

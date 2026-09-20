@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.recur.generation-engine
 title: How a rule's due dates are computed and resolved to instants
 state: done

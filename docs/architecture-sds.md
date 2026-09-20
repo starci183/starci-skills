@@ -68,7 +68,7 @@ state/completion. Detailed leaves use `extensions.work3.sds`:
 The overview leaf carries `starci/sds-overview@1`: accepted SRS IDs, goals, scope, actors, system
 context, quality strategy, constraints, topology references, implementation handoff and design
 decisions. The machine-readable contract is `modules/schemas/spec/sds-map.schema.yaml`. Earlier
-source-independent `starci/specification@3` remains readable; it is not the new authoring format.
+source-independent `starci/sds@1` remains readable; it is not the new authoring format.
 
 ## Flows and components
 

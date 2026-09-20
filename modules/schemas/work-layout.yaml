@@ -1,4 +1,4 @@
-schema: starci/work-layout@3
+schema: starci/work-layout@1
 format: YAML 1.2
 node: index.yaml
 identity: stable metadata id; folder path is not identity
@@ -13,36 +13,36 @@ shape:
     scripts/checks/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
     silently."
-  br: features/<feature>/br/<name>/index.yaml, schema work/business-rule. May carry appliesTo, module
+  br: features/<feature>/br/<name>/index.yaml, schema work/business-rule@1. May carry appliesTo, module
     (a string or list of module-root directory paths - never individual files, see the owners note under
     implementation below) and blockedBy.
-  ac: "features/<feature>/br/<rule>/ac/<name>/index.yaml, schema work/acceptance-criterion. Nested one
+  ac: "features/<feature>/br/<rule>/ac/<name>/index.yaml, schema work/acceptance-criterion@1. Nested one
     level under the br it accepts rather than living in its own sibling family folder - an acceptance
     criterion has no identity apart from the rule it accepts. Authors rule (the owning br's id), given,
     when, then and carries no lifecycle state of its own (see rules, below, on which nodes author state)."
-  fr: features/<feature>/fr/<name>/index.yaml, schema work/functional-requirement
-  nfr: features/<feature>/nfr/<name>/index.yaml, schema work/non-functional-requirement
-  data: features/<feature>/data/<name>/index.yaml, schema work/data
-  journey: features/<feature>/journey/<name>/index.yaml, schema work/customer-journey
-  decision: features/<feature>/decision/<name>/index.yaml, schema work/policy-decision
-  sds: "features/<feature>/sds/<name>/index.yaml, schema work/sds-component - a logical component of the
+  fr: features/<feature>/fr/<name>/index.yaml, schema work/functional-requirement@1
+  nfr: features/<feature>/nfr/<name>/index.yaml, schema work/non-functional-requirement@1
+  data: features/<feature>/data/<name>/index.yaml, schema work/data@1
+  journey: features/<feature>/journey/<name>/index.yaml, schema work/customer-journey@1
+  decision: features/<feature>/decision/<name>/index.yaml, schema work/policy-decision@1
+  sds: "features/<feature>/sds/<name>/index.yaml, schema work/sds-component@1 - a logical component of the
     architecture map, tracing SRS paths through entry points, contracts, data, quality controls,
     deployment and verification. A done sds-component must carry owners: [{role, path}] naming at least
     one module-root directory that exists on disk (the read-scope boundary a design component describes
     is a module boundary, not a prose claim); a todo one without owners is warned, not refused, since the
     module a design targets may not exist yet."
-  ui: "features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen. Per
-    docs/kinds.md's lane order, drawing precedes implementing: a done work/implementation that names a
+  ui: "features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen@1. Per
+    docs/kinds.md's lane order, drawing precedes implementing: a done work/implementation@1 that names a
     ui-screen in its own proves, or whose repository is the workspace's frontend repository, is refused
     (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen - the ones it proves, or, when it proves none
     by id, every ui-screen its own feature owns - is itself done."
-  impl: "features/<feature>/impl/<repository>/<name>/index.yaml, schema work/implementation, one flat
+  impl: "features/<feature>/impl/<repository>/<name>/index.yaml, schema work/implementation@1, one flat
     family folder per feature split by the repository the code lives in (<repository> is the exact value
     the record's own `repository` field names, e.g. impl/todo-app-backend/<name> beside
     impl/todo-app-frontend/<name> in a two-repository product) - never an `implementation/` singular
     parent with `frontend/`/`backend/` children, which no example tree or gate ever used. `owners: [{role,
     path}]` names one or more module-root directories, never individual files: `path` (and
-    `work/business-rule.module`, and `work/sds-component.owners[].path` above) is the directory a reader
+    `work/business-rule@1.module`, and `work/sds-component@1.owners[].path` above) is the directory a reader
     would call the module's root - `src/modules/domain/task`, not
     `src/modules/domain/task/ownership.guard.ts` - so a file inside it moving during a refactor is not, by
     itself, a broken reference. A done implementation's every owner directory must exist on disk
@@ -51,16 +51,16 @@ shape:
     proof cannot outrun what it proves."
   uat: features/<feature>/uat/<name>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,
     assets/,runs/<runId>/**} - see uatFlow/uatRun below for the exact shape.
-  contract: features/<feature>/contract/<name>/index.yaml, schema work/contract - a synchronous
+  contract: features/<feature>/contract/<name>/index.yaml, schema work/contract@1 - a synchronous
     request/response surface between a provider feature and a consumer feature; provenBy.provider/consumer
     each name the implementation(s) that proved their half.
-  integration: features/<feature>/integration/<name>/index.yaml, schema work/integration - the one node a
+  integration: features/<feature>/integration/<name>/index.yaml, schema work/integration@1 - the one node a
     declared extensions.work3.integrations edge owes, proven only against the real external provider.
-  gap: "features/<feature>/gap/<name>/index.yaml, schema work/gap. closedBy is a list of record ids (a
+  gap: "features/<feature>/gap/<name>/index.yaml, schema work/gap@1. closedBy is a list of record ids (a
     bare string is accepted and normalised to a one-element list, for the many gaps that only ever needed
     one) - a gap reaches done only once every id in closedBy is itself done, because a gap whose statement
     named two missing things is not honestly closed by building one of them."
-  event: features/<feature>/event/<name>/index.yaml, schema work/event
+  event: features/<feature>/event/<name>/index.yaml, schema work/event@1
   assets: <node>/assets/**/<file-in-original-format> - payload organization beside a record's own
     index.yaml, never a Work node in its own right and never given an index.yaml.
   runs: <uat-node>/runs/<runId>/** - append-only UAT evidence; see uatRun below for the exact file set.
@@ -73,7 +73,7 @@ shape:
   uatFlow: "features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}.
     The flow's index.yaml declares entry, actor, an ordered steps[] (each an action, its expected
     business outcome and the observed-feedback checks that apply to it), fixtures, effects and
-    cleanup, in uat.verify's own shape. accounts.yaml keeps its work/disposable-accounts schema and
+    cleanup, in uat.verify's own shape. accounts.yaml keeps its work/disposable-accounts@1 schema and
     stays local/synthetic, and each entry names {role, identity} (an _resources identity id);
     a literal password is refused."
   uatRun: "features/<feature>/uat/<flow>/runs/<runId>/{manifest.yaml,run-ledger.json,flows.json,
@@ -112,12 +112,11 @@ shape:
     with a matching markup reference kept beside each capture. These assets never carry a
     generation record - that is what tells a capture and a direction apart regardless of prose
     provenance (see scripts/checks/render.mjs's capture-identity rule) - and a generation-bearing asset
-    never sits outside a work/ui-screen record's own assets/."
+    never sits outside a work/ui-screen@1 record's own assets/."
   featureCatalog: features/index.yaml
   feature: features/<feature>/index.yaml
   resources: ".starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml, schema
-    work/resource (plain - the @N suffix is refused on this family even where op text still writes
-    work/resource@1). uat.verify's reads.environment/reads.accounts/reads.fixtures and
+    work/resource@1. uat.verify's reads.environment/reads.accounts/reads.fixtures and
     writes.resources resolve here: an environment resource names target/origins, owner,
     configuration revision, probes and allowedEffects; an identity resource names its provider,
     disposability and a custody ref into the repository's sealed secrets (never a secret value
@@ -174,10 +173,10 @@ rules:
     empty template folders.
   - Split by independently owned questions and acceptance boundaries, not workflow stages. Names and
     depth stay flexible.
-  - "Canonical index.yaml uses work/node@2 metadata. New Business has a readable businessOverview
+  - "Canonical index.yaml uses work/node@1 metadata. New Business has a readable businessOverview
     and a filesystem-split SRS under functional-requirements, non-functional-requirements,
     business-rules, data and customer-journeys. Detailed leaves carry extensions.work3.srs with a
-    starci/srs-* section schema. The cohesive starci/specification@2 remains readable; it is not a
+    starci/srs-* section schema. The cohesive starci/specification@1 remains readable; it is not a
     second copy of the split SRS."
   - Business/index.yaml aggregates overview/index.yaml and srs/index.yaml. Each FR leaf owns its actors,
     trigger, main/alternative/exception flows, postconditions, refs and acceptance in the same file.
@@ -243,8 +242,8 @@ rules:
     a violation). Central schemas stay in .claude.
   - Repository and environment provenance is written directly in sourceRefs or the owning module
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
-  - "UAT accounts.yaml uses schema work/disposable-accounts (the example tree's own convention; the
-    work/disposable-accounts@1 shape in work.schema.yaml embedded a literal username/password
+  - "UAT accounts.yaml uses schema work/disposable-accounts@1 (the example tree's own convention; the
+    work.schema.yaml monolith shape embedded a literal username/password
     pair per entry, which is refused now that _resources/identities/** exists). Each entry is
     {role, identity: <_resources identity resource id>} - a sealed ref, never a synthetic password
     written into the flow's own tree. Images and video remain original binary assets."
@@ -257,8 +256,8 @@ rules:
     markup reference and never a generation record. uat.verify's run is the append-only
     uat/<flow>/runs/<runId>/ evidence file set the op's writes.evidence names, settled on by the
     flow's sibling evidence.yaml (`run: runs/<runId>`). A generation-bearing asset outside a
-    work/ui-screen record, or one inside a work/implementation record, is refused; a work/ui-screen
-    or work/uat-flow record claims `done` only once its own direction asset or settled run actually
+    work/ui-screen@1 record, or one inside a work/implementation@1 record, is refused; a work/ui-screen@1
+    or work/uat-flow@1 record claims `done` only once its own direction asset or settled run actually
     exists, never by authored claim - both stay `todo` behind a `gap.<feature>.direction-not-drawn`
     or `gap.<feature>.live-proof` record until the op that produces that output actually runs."
   - "Workflow run state lives in .starciwork/runtime.sqlite and never enters canonical Work hashes; a write
@@ -317,12 +316,12 @@ rules:
   - "Blockers form a DAG, and a cycle in it is refused outright (BLOCKER_CYCLE): nothing can honestly wait
     on something that is itself waiting on it, so a `blockedBy` chain that reaches back to a record already
     on its own walk is a structural impossibility, not a fact about the work. A chain's real root - the
-    reason nothing further needs authoring - is a `work/gap` or an open `work/policy-decision`
+    reason nothing further needs authoring - is a `work/gap@1` or an open `work/policy-decision@1`
     (`outcome: open`); a chain that dead-ends at an ordinary record instead (neither cyclic nor gap/open-
     decision rooted) is warned rather than refused (BLOCKER_UNROOTED), because forcing a gap to be authored
     for every such dead end in one pass would be a larger sweep than any single change should make - the
     warning names the actual unrooted target so the fact stays visible until a gap is written for it."
-  - "Known absences are records, not restated prose. `work/gap` lives at
+  - "Known absences are records, not restated prose. `work/gap@1` lives at
     `features/<feature>/gap/<name>/index.yaml`, id `gap.<feature>.<name>`, and carries `state: todo|done`
     and a plain `statement` of the fact that is missing - an event nobody emits yet, a field no data
     record declares, a module that has not been written under the stack the project is moving to. An
@@ -335,10 +334,10 @@ rules:
     The gate resolves `record` and, when `rev` is cited, refuses a mismatch against the target's current
     `change.rev`. Three or more records that are each individually true and jointly unsatisfiable are not
     a chain of pairwise conflicts; they are a set only the settling decision can resolve, so `tension:
-    {records: [<id>, <id>, ...], statement: <sentence>}` is authored on the `work/policy-decision` record
+    {records: [<id>, <id>, ...], statement: <sentence>}` is authored on the `work/policy-decision@1` record
     that owns settling them, and refused anywhere else. The gate requires every id in `records` to resolve
     and at least two of them."
-  - "A decision's vocabulary is closed. `work/policy-decision` authors `outcome: open | decided`,
+  - "A decision's vocabulary is closed. `work/policy-decision@1` authors `outcome: open | decided`,
     `options: [{id, consequence, summary?}]`, `chosen?: <option id>` (required exactly when
     `outcome: decided`, and refused unless it names an id present in `options`), and an optional
     `blocks: [<record id>]` naming what the decision's settling unblocks. A decision does not invent its
@@ -351,14 +350,14 @@ rules:
     statement>], reason?}` records one authored edit; `withdraws` names statements this rev removes
     verbatim and `retains` names statements an editorial pass keeps verbatim, so a change that removes
     half a sentence is not forced to withdraw the whole thing to be honest about what moved. On
-    `work/evidence`, `stale?: true`, `staleSince?: {record: <id>, rev?: <n>}` and `staleReason?` say a
+    `work/evidence@1`, `stale?: true`, `staleSince?: {record: <id>, rev?: <n>}` and `staleReason?` say a
     passed run no longer speaks for the record beside it. The digest that decides this is the kernel's
     own: sha256 of the record's `index.yaml` file bytes — the digest `engine/index.mjs`
     exposes — computed for reconciliation. An `evidence.yaml` whose `recordDigest`
     does not equal that digest, computed now, must carry `stale: true`; the gate refuses one that does
     not. Staleness is never cleared by editing `recordDigest` to match - only a fresh run, which is a
     kernel act, clears it."
-  - "`work/evidence`'s `provenance.actor` names who ran the assertions, and the value is a claim that must
+  - "`work/evidence@1`'s `provenance.actor` names who ran the assertions, and the value is a claim that must
     be true, not a label of convenience. `starci-kernel` means a live kernel workflow's own
     `ctx.work.api.markDone` write settled the record, re-running the checks itself. `example-evidence`
     means `scripts/example/example-evidence.mjs` produced the file by actually running the given commands outside
@@ -367,41 +366,41 @@ rules:
     person or a kernel operation does that."
   - "Done means proven or says so. A record with `state: done` needs a sibling `evidence.yaml`, or an
     authored `verificationSource: authored-claim` with a `because:` sentence saying why no run proves it.
-    `work/data`, `work/brand` and `work/policy-decision` are authored claims by nature - a data shape, a
+    `work/data@1`, `work/brand@1` and `work/policy-decision@1` are authored claims by nature - a data shape, a
     brand token or a settled decision is true because it was written down and agreed, not because a test
     ran - so the gate treats every `done` record of those three schemas as satisfying this rule without
     the declaration being repeated on each one. Every other schema needs the evidence file or the explicit
     declaration; the gate refuses a `done` record of any other schema that has neither. Business and
     architecture delivery leaves are not authored-claim exceptions: their final done requires current
     reconciliation evidence covering SRS, SDS, code, test/E2E and UAT at the same delivery revision."
-  - "A rule may constrain a record it does not own. `work/business-rule` and `work/sds-component` may
+  - "A rule may constrain a record it does not own. `work/business-rule@1` and `work/sds-component@1` may
     carry `appliesTo: [<record id>]`, an outbound edge naming a record - owned by any feature - that the
     rule's or component's requirement reaches even though the rule does not own it and does not edit it.
     The gate only resolves the ids; it does not require the target to acknowledge the edge back. The
     derived consequence is one sentence: a `done` record that acquires an `appliesTo` edge newer than its
     proof reads as `effectiveState: suspended` until it is re-proven against the new constraint, the same
     way a changed input suspends a record that read it. `appliesTo` is refused on any other schema -
-    `work/data` in particular does not carry it, because a data record's relationship to the rules it
+    `work/data@1` in particular does not carry it, because a data record's relationship to the rules it
     embodies is `refs`, an inbound reading, not an outbound constraint on a record it does not own."
-  - "Events are a family; data may extend data; time may trigger. `work/event` lives at
+  - "Events are a family; data may extend data; time may trigger. `work/event@1` lives at
     `features/<feature>/event/<name>/index.yaml`, id `event.<feature>.<name>`, and authors `producer: <record
     id>` (the record whose flow raises it), `payload: [{name, type, note?}]` and `delivery: {guarantee:
     at-least-once|at-most-once|exactly-once, ordering: none|per-key|total}`. A consumer declares
-    `subscribes: [<event id>]`, each id resolving to a `work/event` record; `work/contract` remains for a
+    `subscribes: [<event id>]`, each id resolving to a `work/event@1` record; `work/contract@1` remains for a
     synchronous request/response surface and is not overloaded to describe a fire-and-forget signal. On
-    `work/data`, `extends?: <data id>` names a base data record this one specializes, with `adds: [<field
+    `work/data@1`, `extends?: <data id>` names a base data record this one specializes, with `adds: [<field
     definition>, ...]` listing only the fields the base does not already declare - the shared fields are
     inherited, not repeated as a fresh disagreement about the base's shape. On `stateMachine.transitions[]`,
     `on` may be the plain string it always was, or `{timer: <duration or plain-language description>}` when
     what actually fires the transition is a clock, not an event - a digest window closing, a scheduled
     tick - and the gate accepts either shape."
-  - "Implementation names owners, plural. `work/implementation` authors `owners: [{role, path}]` - each
+  - "Implementation names owners, plural. `work/implementation@1` authors `owners: [{role, path}]` - each
     entry the path of one real or intended artifact and the role it plays (`module`, `route`, `entry`,
     `block`, or another short word naming the kind of unit) - because one screen or one flow can span more
     than one owned artifact (a route adapter, a feature entry, a connected block and its pure twin) and a
-    single `directory`/`files` pair cannot name more than one shape at a time. `work/business-rule.module`
+    single `directory`/`files` pair cannot name more than one shape at a time. `work/business-rule@1.module`
     may be a plain string, for the ordinary one-module case, or a list of strings when the rule's module
-    genuinely spans more than one path. The gate refuses `directory`/`files` on `work/implementation` —
+    genuinely spans more than one path. The gate refuses `directory`/`files` on `work/implementation@1` —
     `owners` carries that shape instead — and the gate refuses an `owners` entry missing either `role` or
     `path`."
   - "Two topologies host the same record tree. In a multi-repository product, `.starciwork` lives in the

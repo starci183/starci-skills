@@ -1,4 +1,4 @@
-schema: work/integration
+schema: work/integration@1
 id: integration.notify.smtp
 title: The SMTP host that carries a notification out of the product
 state: todo

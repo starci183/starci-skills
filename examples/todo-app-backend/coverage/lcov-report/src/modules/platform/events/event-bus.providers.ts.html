@@ -214,7 +214,7 @@ export type PlatformEventHandler = (event: PlatformEvent) =&gt; void;
  * reach. RxJS is already a transitive dependency of @nestjs/common, so it is enough to give every feature
  * a synchronous, typed publish/subscribe port without adding a new package. `Subject` is deliberately not
  * a `ReplaySubject`: a consumer that registers after an event fired does not retroactively see it, which
- * matches the at-least-once/per-key delivery every declared work/event record already commits to only
+ * matches the at-least-once/per-key delivery every declared work/event@1 record already commits to only
  * within a live process, not as a durable log.
  *
  * This is the port every consumer subscribes through, and the only way any feature may learn that

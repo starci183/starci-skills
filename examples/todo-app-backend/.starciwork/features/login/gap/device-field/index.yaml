@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.login.device-field
 title: No device field exists on a session or person
 state: todo

@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.plan.todo-app-backend.plan
 title: The plan module - cap guard, subscription lifecycle, payments and reconciliation
 state: done

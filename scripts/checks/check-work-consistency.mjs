@@ -38,15 +38,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
  * sds-component); contract and integration author it in both live trees and have no per-family schema file
  * of their own, so the trees are the evidence for their inclusion.
  *
- * The exclusion matters more than the inclusion. `work/business-rule.schema.yaml` is `additionalProperties:
+ * The exclusion matters more than the inclusion. `work/business-rule@1.schema.yaml` is `additionalProperties:
  * false` and lists no `requiresProof`, and no business-rule in either tree carries one - so "a done record
  * with no declared proof bar is thin" applied to every schema would refuse 114 records that are structurally
  * incapable of satisfying it. Records whose proof contract is the outbound `proves` edge instead
  * (implementation, uat-flow, ui-screen) are equally exempt, for the same reason.
  */
 export const PROOF_DEMAND_SCHEMAS = new Set([
-  'work/functional-requirement', 'work/non-functional-requirement', 'work/customer-journey',
-  'work/sds-component', 'work/contract', 'work/integration',
+  'work/functional-requirement@1', 'work/non-functional-requirement@1', 'work/customer-journey@1',
+  'work/sds-component@1', 'work/contract@1', 'work/integration@1',
 ]);
 
 /**
@@ -61,11 +61,11 @@ export const PROOF_DEMAND_SCHEMAS = new Set([
  * tree), so demanding a prover record there would refuse a shape the trees agree on.
  */
 const PROVER_PAIRING = {
-  'work/functional-requirement': {kind: 'uat', proverSchema: 'work/uat-flow'},
-  'work/sds-component': {kind: 'implementation', proverSchema: 'work/implementation'},
+  'work/functional-requirement@1': {kind: 'uat', proverSchema: 'work/uat-flow@1'},
+  'work/sds-component@1': {kind: 'implementation', proverSchema: 'work/implementation@1'},
 };
 
-const schemaFileFor = schema => path.join(root, 'modules', 'schemas', `work-${String(schema).split('/')[1] ?? ''}.schema.yaml`);
+const schemaFileFor = schema => path.join(root, 'modules', 'schemas', `work-${String(schema).split('/')[1]?.replace(/@\d+$/, '') ?? ''}.schema.yaml`);
 const stateEnumCache = new Map();
 
 /** The `state` values the record's OWN family schema allows, read from `schemas/work-<family>.schema.yaml`'s
@@ -129,7 +129,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
   // while the rule's own half of the pair was never resolved. Both directions are checked here, because
   // the asymmetry can be either side forgetting the other.
   for (const [id, rec] of records) {
-    if (rec.schema !== 'work/business-rule') continue;
+    if (rec.schema !== 'work/business-rule@1') continue;
     const named = isList(rec.data.acceptanceCriteria);
     const acRoot = path.join(rec.dir, 'ac');
     const criterionDirs = fs.existsSync(acRoot)
@@ -177,7 +177,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
     }
   }
   for (const [criterionId, rec] of records) {
-    if (rec.schema !== 'work/acceptance-criterion') continue;
+    if (rec.schema !== 'work/acceptance-criterion@1') continue;
     const owner = records.get(rec.data.rule);
     if (!owner) continue; // a dangling `rule` ref is refused by check-example-work.mjs's ref resolution
     const dirName = path.basename(rec.dir);
@@ -224,7 +224,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
       suspect(file, 'PROOF_COVERAGE_THIN',
         `${id} is done and declares no requiresProof at all, so nothing says what would have to be observed before it counted as proven`);
     }
-    if (rec.schema === 'work/functional-requirement' && demand) {
+    if (rec.schema === 'work/functional-requirement@1' && demand) {
       const composes = isList(data.composes);
       const unit = demand.unit;
       if (composes.length && !unit) {
@@ -247,7 +247,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
           `${id} is done and its requiresProof.${pairing.kind} demands a ${pairing.proverSchema.split('/')[1]}, but no ${pairing.proverSchema} record in this tree names ${id} in its proves - the demand is stated and unclaimed`);
       }
     }
-    if (rec.schema === 'work/customer-journey') {
+    if (rec.schema === 'work/customer-journey@1') {
       const route = isList(data.requirements);
       const unresolved = route.filter(stepId => records.get(canon(stepId))?.data?.state !== 'done');
       if (data.state === 'done' && unresolved.length) {
@@ -259,11 +259,11 @@ export function checkConsistencyTree(workRoot, records, sink) {
 
   // ---- concept 3: a contradiction between two records needs a third to settle it ----
   // conflictsWith says "these two cannot both be true". The layout's answer to that is a
-  // work/policy-decision naming both sides (schemas list tension.records for exactly this). Two done records
+  // work/policy-decision@1 naming both sides (schemas list tension.records for exactly this). Two done records
   // that contradict each other with no decision are a tree asserting a contradiction; the same pair with a
   // todo side is only an honest outstanding conflict, so it is warned, not refused.
   const decisionResolverOf = (leftId, rightId) => [...records.values()].find(candidate => {
-    if (candidate.schema !== 'work/policy-decision') return false;
+    if (candidate.schema !== 'work/policy-decision@1') return false;
     if (candidate.data.outcome !== 'decided') return false;
     const names = [];
     const collect = node => {
@@ -288,7 +288,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
       if (resolver) continue;
       const message = `${id} (${rec.data.state}) and ${otherId} (${other.data.state}) each declare the other impossible - `
         + `"${String(edge.because ?? other.data.conflictsWith?.find(e => e?.record === id || (typeof e?.record === 'string' && canon(e.record) === id))?.because ?? '(no because recorded)').slice(0, 160)}" `
-        + '- and no work/policy-decision naming both sides settles it';
+        + '- and no work/policy-decision@1 naming both sides settles it';
       const file = shownFile(rec);
       if (bothDone) refuse(file, 'CONFLICT_WITHOUT_DECISION', `${message}; two done records cannot both be true of the same product`);
       else suspect(file, 'CONFLICT_WITHOUT_DECISION', `${message}; neither side is done yet, so this is an open conflict rather than a contradiction`);
@@ -316,7 +316,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
   // naming nothing that filled it - and the mirror image, a gap still `todo` whose named closers are all
   // done, which is either a stale gap or an overclaimed closer.
   for (const [id, rec] of records) {
-    if (rec.schema !== 'work/gap') continue;
+    if (rec.schema !== 'work/gap@1') continue;
     const closers = isList(rec.data.closedBy);
     const file = shownFile(rec);
     if (rec.data.state === 'done' && !closers.length) {
@@ -330,7 +330,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
   }
 
   // ---- concept 6: the catalog and the feature node under it ----
-  // The catalog is the tree's table of contents and the work/feature node is the same feature described a
+  // The catalog is the tree's table of contents and the work/feature@1 node is the same feature described a
   // second time. Two copies of one fact is where drift lives: check-work-deep.mjs's CATALOG_DRIFT compares
   // directory names to entries, so it stays silent about an entry whose feature directory exists but holds
   // no feature record, and about a record whose title no longer says what the catalog says it says.
@@ -339,7 +339,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
   try { catalog = parseYaml(fs.readFileSync(catalogFile, 'utf8')); } catch { catalog = null; }
   const catalogShown = path.relative(root, catalogFile).replaceAll('\\', '/');
   if (!catalog?.features) {
-    refuse(catalogShown, 'CATALOG_DIRTY', 'no readable work/catalog features list at the tree root, so nothing here can be reconciled with it');
+    refuse(catalogShown, 'CATALOG_DIRTY', 'no readable work/catalog@1 features list at the tree root, so nothing here can be reconciled with it');
   } else {
     for (const entry of catalog.features) {
       const entryId = String(entry?.id ?? '');
@@ -348,8 +348,8 @@ export function checkConsistencyTree(workRoot, records, sink) {
       const featureShown = path.relative(root, featureFile).replaceAll('\\', '/');
       let feature = null;
       try { feature = fs.existsSync(featureFile) ? parseYaml(fs.readFileSync(featureFile, 'utf8')) : null; } catch { feature = null; }
-      if (!feature || feature.schema !== 'work/feature') {
-        refuse(entryShown, 'CATALOG_DIRTY', `entry points at ${featureShown}, which is ${feature ? `a ${feature.schema}` : 'absent'} - every catalog entry needs a work/feature node beside it`);
+      if (!feature || feature.schema !== 'work/feature@1') {
+        refuse(entryShown, 'CATALOG_DIRTY', `entry points at ${featureShown}, which is ${feature ? `a ${feature.schema}` : 'absent'} - every catalog entry needs a work/feature@1 node beside it`);
         continue;
       }
       if (feature.id !== entryId) refuse(entryShown, 'CATALOG_DIRTY', `entry id is ${entryId} but the feature record beside it is ${feature.id}`);
@@ -416,7 +416,7 @@ export function checkTreeParity(perTree, sink) {
     return;
   }
   /** Field names outside the current contract: check-example-work.mjs's concept 9 refuses them on
-   * work/implementation, so a tree authoring them anywhere else is worth naming in the same breath as
+   * work/implementation@1, so a tree authoring them anywhere else is worth naming in the same breath as
    * the divergence. */
   const NON_CONTRACT_PATH_FIELDS = new Set(['directory', 'files', 'targetFiles']);
   const fieldsByTree = perTree.map(entry => {

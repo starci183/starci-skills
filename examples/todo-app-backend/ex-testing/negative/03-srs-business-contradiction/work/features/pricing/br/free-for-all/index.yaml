@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.pricing.free-for-all
 title: The product is free for every account
 state: done

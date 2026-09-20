@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.checkout.order-flow
 title: Cart to confirmed order, across the two services
 state: done

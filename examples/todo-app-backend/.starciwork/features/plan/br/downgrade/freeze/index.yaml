@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.plan.downgrade.freeze
 title: A downgrade is accepted immediately and freezes creation if it leaves the person over the cap
 state: done

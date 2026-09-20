@@ -1,4 +1,4 @@
-schema: work/sds-component
+schema: work/sds-component@1
 id: sds.task.completion-state
 title: How completion is stored and undone
 state: done

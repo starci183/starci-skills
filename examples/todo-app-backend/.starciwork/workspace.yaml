@@ -1,4 +1,4 @@
-schema: work/workspace
+schema: work/workspace@1
 id: todo-app
 project: todo-app
 description: A todo application, written out as the readable example of the Work layout.

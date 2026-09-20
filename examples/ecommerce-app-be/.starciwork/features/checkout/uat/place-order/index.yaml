@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.checkout.place-order
 title: Browse, confirm an order, replay it, and hit both refusals
 state: done

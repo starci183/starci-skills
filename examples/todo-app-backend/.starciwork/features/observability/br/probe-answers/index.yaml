@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.observability.probe-answers
 title: A probe's answer reflects the dependency it names
 state: done

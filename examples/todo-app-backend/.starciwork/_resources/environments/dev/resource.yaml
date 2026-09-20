@@ -1,9 +1,9 @@
 # work-layout.yaml concept 4 (_resources): typed custody for uat.verify's `environment` read.
 # The op text (ops/uat.verify/operator.yaml, reads.environment) names the path as
 # .starciwork/_resources/environments/<environment>/resource.yaml with schema work/resource@1; the
-# layout's owner forbids the @N suffix on this family, so this file is authored as plain work/resource
+# layout's owner forbids the @N suffix on this family, so this file is authored as plain work/resource@1
 # and the mapping note in work-layout.yaml records the discrepancy rather than silently picking one.
-schema: work/resource
+schema: work/resource@1
 id: environment.todo-app.dev
 kind: environment
 owner: todo-app-backend

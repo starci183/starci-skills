@@ -1,4 +1,4 @@
-schema: work/data
+schema: work/data@1
 id: data.notify.notification
 title: Notification
 state: done
@@ -17,4 +17,4 @@ refs: [br.notify.delivery.once, br.notify.digest.window]
 module: src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts
 change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "NotifyNotificationEntity exists exactly to this shape (notify_notifications table, migration 1758210000000-create-notify-tables.ts); gap.notify.unbuilt-module's blocker is resolved."}
 verificationSource: authored-claim
-because: "work/data's done is an authored claim by nature (schemas/work-layout.yaml); NotifyNotificationEntity's fields and invariants match this record exactly, and the table is exercised live by scripts/live-proof-notify.sh."
+because: "work/data@1's done is an authored claim by nature (schemas/work-layout.yaml); NotifyNotificationEntity's fields and invariants match this record exactly, and the table is exercised live by scripts/live-proof-notify.sh."

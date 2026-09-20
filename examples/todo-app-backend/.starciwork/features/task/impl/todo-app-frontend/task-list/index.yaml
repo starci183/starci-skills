@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.task.todo-app-frontend.task-list
 title: The list screen and the create form
 state: done

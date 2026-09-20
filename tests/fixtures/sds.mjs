@@ -2,7 +2,7 @@
 export function documentSDS() {
   const business = 'example.business.srs.documents.update';
   return {
-    schema: 'starci/specification@3', op: 'architecture.decide', status: 'draft',
+    schema: 'starci/sds@1', op: 'architecture.decide', status: 'draft',
     purpose: 'Design document replacement without coupling the design to source layout.',
     businessRefs: [{nodeId: business, requirementIds: ['FR-KNOW-03'], flowIds: ['FLOW-UPDATE'], acceptanceIds: ['AC-SAVED']}],
     designRefs: [],

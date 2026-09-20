@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.audit.operator-role
 title: Who is an operator, and where does their role claim come from
 state: done

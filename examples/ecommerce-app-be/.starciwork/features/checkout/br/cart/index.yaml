@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.checkout.cart
 title: A cart is the person's own accumulating list of product lines
 state: todo

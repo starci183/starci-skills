@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.audit.append-only
 title: A log line is never altered
 state: done

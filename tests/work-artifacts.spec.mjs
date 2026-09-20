@@ -37,7 +37,7 @@ function write(root, rel, content) {
 function tree(extra = {}) {
   const root = freshDir();
   const workRoot = path.join(root, '.starciwork');
-  write(workRoot, 'index.yaml', 'schema: work/catalog\nid: fixture\nfeatures: []\n');
+  write(workRoot, 'index.yaml', 'schema: work/catalog@1\nid: fixture\nfeatures: []\n');
   for (const [rel, content] of Object.entries(extra)) write(workRoot, rel, content);
   return workRoot;
 }
@@ -48,7 +48,7 @@ function findingsFor(extra) {
   return out;
 }
 
-const UI_RECORD = (assets) => ({'features/f/ui/one/index.yaml': `schema: work/ui-screen\nid: ui.f.one\ntitle: t\nstate: done\nui:\n  assets:\n${assets}`});
+const UI_RECORD = (assets) => ({'features/f/ui/one/index.yaml': `schema: work/ui-screen@1\nid: ui.f.one\ntitle: t\nstate: done\nui:\n  assets:\n${assets}`});
 
 test('ASSET_MISSING: a declared ui asset whose PNG is not on disk is refused; real bytes are accepted', () => {
   const missing = findingsFor(UI_RECORD('    - {path: assets/one.png, role: direction}\n'));
@@ -125,8 +125,8 @@ test('RUN_MEDIA_FAKE: a stub video is refused in the settled run and only suspec
   const stub = Buffer.concat([EBML, Buffer.alloc(64)]);
   const flow = 'features/f/uat/flow/index.yaml';
   const settled = findingsFor({
-    [flow]: 'schema: work/uat-flow\nid: uat.f.flow\ntitle: t\nstate: done\n',
-    'features/f/uat/flow/evidence.yaml': 'schema: work/evidence\nrecord: uat.f.flow\nrun: runs/r1\n',
+    [flow]: 'schema: work/uat-flow@1\nid: uat.f.flow\ntitle: t\nstate: done\n',
+    'features/f/uat/flow/evidence.yaml': 'schema: work/evidence@1\nrecord: uat.f.flow\nrun: runs/r1\n',
     'features/f/uat/flow/runs/r1/videos/walk.webm': stub,
   });
   assert.ok(settled.refuse.some(line => line.includes('[RUN_MEDIA_FAKE]') && line.includes('settled')), settled.refuse.join('\n'));
@@ -136,7 +136,7 @@ test('RUN_MEDIA_FAKE: a stub video is refused in the settled run and only suspec
 
   // the same bytes under a run no evidence file settles on: reported, not refused
   const unsettled = findingsFor({
-    [flow]: 'schema: work/uat-flow\nid: uat.f.flow\ntitle: t\nstate: todo\n',
+    [flow]: 'schema: work/uat-flow@1\nid: uat.f.flow\ntitle: t\nstate: todo\n',
     'features/f/uat/flow/runs/r1/manifest.yaml': 'schema: starci/uat-run-manifest@1\nid: uat.f.flow.runs.r1\nassets: []\n',
     'features/f/uat/flow/runs/r1/videos/walk.webm': stub,
   });
@@ -146,7 +146,7 @@ test('RUN_MEDIA_FAKE: a stub video is refused in the settled run and only suspec
 
 test('a run manifest that lists an asset the run folder does not hold is refused', () => {
   const found = findingsFor({
-    'features/f/uat/flow/index.yaml': 'schema: work/uat-flow\nid: uat.f.flow\ntitle: t\nstate: todo\n',
+    'features/f/uat/flow/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.flow\ntitle: t\nstate: todo\n',
     'features/f/uat/flow/runs/r1/manifest.yaml': 'schema: starci/uat-run-manifest@1\nid: uat.f.flow.runs.r1\nassets:\n  - {path: videos/walk.webm, sha256: deadbeef}\n',
   });
   assert.ok(found.refuse.some(line => line.includes('[ASSET_MISSING]') && line.includes('videos/walk.webm') && line.includes('manifest.yaml')), found.refuse.join('\n'));
@@ -155,13 +155,13 @@ test('a run manifest that lists an asset the run folder does not hold is refused
 test('RECEIPT_ORPHAN: a receipt binds the artifact it copied, and the tool output name must fit it', () => {
   const bytes = pngBytes();
   const orphan = findingsFor({
-    'features/f/ui/one/index.yaml': 'schema: work/ui-screen\nid: ui.f.one\ntitle: t\nstate: done\n',
+    'features/f/ui/one/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.one\ntitle: t\nstate: done\n',
     'features/f/ui/one/assets/generation-receipts.yaml': 'schema: starci/generation-receipts@1\ncalls:\n  - {stage: final, toolOutputBasename: exec-1.png, artifact: assets/one.png, sha256: ' + sha256(bytes) + '}\n',
   });
   assert.ok(orphan.refuse.some(line => line.includes('[ASSET_MISSING]') && line.includes('assets/one.png')), orphan.refuse.join('\n'));
 
   const renamed = findingsFor({
-    'features/f/ui/one/index.yaml': 'schema: work/ui-screen\nid: ui.f.one\ntitle: t\nstate: done\n',
+    'features/f/ui/one/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.one\ntitle: t\nstate: done\n',
     'features/f/ui/one/assets/one.webm': Buffer.concat([EBML, Buffer.alloc(20_000)]),
     'features/f/ui/one/assets/generation-receipts.yaml': 'schema: starci/generation-receipts@1\ncalls:\n  - {stage: final, toolOutputBasename: exec-1.png, artifact: assets/one.webm}\n',
   });
@@ -169,34 +169,34 @@ test('RECEIPT_ORPHAN: a receipt binds the artifact it copied, and the tool outpu
 });
 
 test('RESOURCE_FILE_MISSING: the accounts.yaml a uat-flow declares must be there, not read if existsSync', () => {
-  const missing = findingsFor({'features/f/uat/flow/index.yaml': 'schema: work/uat-flow\nid: uat.f.flow\ntitle: t\nstate: todo\naccounts: accounts.yaml\n'});
+  const missing = findingsFor({'features/f/uat/flow/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.flow\ntitle: t\nstate: todo\naccounts: accounts.yaml\n'});
   assert.ok(missing.refuse.some(line => line.includes('[RESOURCE_FILE_MISSING]') && line.includes('accounts.yaml')), missing.refuse.join('\n'));
 
   const present = findingsFor({
-    'features/f/uat/flow/index.yaml': 'schema: work/uat-flow\nid: uat.f.flow\ntitle: t\nstate: todo\naccounts: accounts.yaml\n',
-    'features/f/uat/flow/accounts.yaml': 'schema: work/disposable-accounts\ndisposable: true\naccounts: []\n',
+    'features/f/uat/flow/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.flow\ntitle: t\nstate: todo\naccounts: accounts.yaml\n',
+    'features/f/uat/flow/accounts.yaml': 'schema: work/disposable-accounts@1\ndisposable: true\naccounts: []\n',
   });
   assert.equal(present.refuse.filter(line => line.includes('[RESOURCE_FILE_MISSING]')).join('\n'), '');
 });
 
 test('EVIDENCE_ARTIFACT_GHOST: an evidence run that is not a directory on disk is refused', () => {
   const found = findingsFor({
-    'features/f/uat/flow/index.yaml': 'schema: work/uat-flow\nid: uat.f.flow\ntitle: t\nstate: done\n',
-    'features/f/uat/flow/evidence.yaml': 'schema: work/evidence\nrecord: uat.f.flow\nrun: runs/never-ran\n',
+    'features/f/uat/flow/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.flow\ntitle: t\nstate: done\n',
+    'features/f/uat/flow/evidence.yaml': 'schema: work/evidence@1\nrecord: uat.f.flow\nrun: runs/never-ran\n',
   });
   assert.ok(found.refuse.some(line => line.includes('[EVIDENCE_ARTIFACT_GHOST]') && line.includes('runs/never-ran')), found.refuse.join('\n'));
 });
 
 test('FEATURE_DONE_INCOMPLETE: a done feature over todo members is refused; todo members alone are not', () => {
   const doneParent = findingsFor({
-    'features/f/index.yaml': 'schema: work/feature\nid: f\ntitle: t\nstate: done\n',
-    'features/f/ui/one/index.yaml': 'schema: work/ui-screen\nid: ui.f.one\ntitle: t\nstate: todo\n',
+    'features/f/index.yaml': 'schema: work/feature@1\nid: f\ntitle: t\nstate: done\n',
+    'features/f/ui/one/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.one\ntitle: t\nstate: todo\n',
   });
   assert.ok(doneParent.refuse.some(line => line.includes('[FEATURE_DONE_INCOMPLETE]') && line.includes('ui.f.one=todo')), doneParent.refuse.join('\n'));
 
   const todoParent = findingsFor({
-    'features/f/index.yaml': 'schema: work/feature\nid: f\ntitle: t\nstate: todo\n',
-    'features/f/ui/one/index.yaml': 'schema: work/ui-screen\nid: ui.f.one\ntitle: t\nstate: todo\n',
+    'features/f/index.yaml': 'schema: work/feature@1\nid: f\ntitle: t\nstate: todo\n',
+    'features/f/ui/one/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.one\ntitle: t\nstate: todo\n',
   });
   assert.equal(todoParent.refuse.filter(line => line.includes('[FEATURE_DONE_INCOMPLETE]')).join('\n'), '');
 });
@@ -212,7 +212,7 @@ test('a superseded direction is checked for its path only - its digest describes
   const found = findingsFor({
     ...UI_RECORD('    - {path: assets/one.png, role: direction}\n'),
     'features/f/ui/one/assets/one.png': bytes,
-    'features/f/ui/one/index.yaml': 'schema: work/ui-screen\nid: ui.f.one\ntitle: t\nstate: done\nui:\n  assets:\n    - {path: assets/one.png, role: direction}\n  supersededDirection:\n    revision: 7\n    path: examples/definitely-not-a-real-fixture/one.png\n    sha256: ' + sha256(bytes) + '\n',
+    'features/f/ui/one/index.yaml': 'schema: work/ui-screen@1\nid: ui.f.one\ntitle: t\nstate: done\nui:\n  assets:\n    - {path: assets/one.png, role: direction}\n  supersededDirection:\n    revision: 7\n    path: examples/definitely-not-a-real-fixture/one.png\n    sha256: ' + sha256(bytes) + '\n',
   });
   assert.ok(found.refuse.some(line => line.includes('[ASSET_MISSING]') && line.includes('supersededDirection')), found.refuse.join('\n'));
   assert.equal(found.refuse.filter(line => line.includes('[ASSET_DIGEST]')).join('\n'), '');

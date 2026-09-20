@@ -9,8 +9,8 @@
 #   capabilities.yaml  — starci/model-capability-policy@1 (contract)
 #   qualifications.yaml — empty measured-qualification store seed
 #   runtimes.yaml      — agent quota-window runtime pools + allocation + roleOfKind
-#   registry.yaml      — starci/profile-registry@3 (aliases, targets, operators, supervisors)
-#   kinds.yaml         — starci/kinds@2 operation catalog (kernel-agent legality graph, modules/goal/legality.yaml)
+#   registry.yaml      — starci/profile-registry@1 (aliases, targets, operators, supervisors)
+#   kinds.yaml         — starci/kinds@1 operation catalog (kernel-agent legality graph, modules/goal/legality.yaml)
 #   records.yaml       — starci/records@1 record catalog (contract data, read directly)
 #   agents/            — starci/agent-card@1 agent cards
 #   profiles/          — per-runtime launch facts

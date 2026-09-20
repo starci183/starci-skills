@@ -1,4 +1,4 @@
-schema: work/non-functional-requirement
+schema: work/non-functional-requirement@1
 id: nfr.notify.delivery.latency
 title: A digested message goes out promptly after its window closes
 quality: latency

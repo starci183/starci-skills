@@ -1,4 +1,4 @@
-schema: starci/goal-plan-schema@2
+schema: starci/goal-plan-schema@1
 describes: starci/goal-plan@1
 module: scripts/kernel/api.mjs
 purpose: |-

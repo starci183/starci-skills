@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.recur.unbuilt-module
 title: No recur module exists under the NestJS/Next.js layout yet
 state: done

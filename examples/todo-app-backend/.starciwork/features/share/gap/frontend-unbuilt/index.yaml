@@ -1,4 +1,4 @@
-schema: work/gap
+schema: work/gap@1
 id: gap.share.frontend-unbuilt
 title: No share invite screen exists under the Next.js layout yet
 state: done

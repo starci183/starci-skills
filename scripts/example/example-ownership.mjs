@@ -9,8 +9,8 @@ import {parseYaml} from '../../engine/yaml.mjs';
  * once here rather than three times with three chances to disagree. Used by scripts/checks/check-example-work.mjs,
  * scripts/example/example-evidence.mjs and scripts/example/example-derive.mjs.
  *
- * Design note (owner, 2026-09-18): `work/implementation.owners[].path`, `work/sds-component.owners[].path`
- * and `work/business-rule.module` are directories - module roots - never individual files (see
+ * Design note (owner, 2026-09-18): `work/implementation@1.owners[].path`, `work/sds-component@1.owners[].path`
+ * and `work/business-rule@1.module` are directories - module roots - never individual files (see
  * schemas/work-layout.yaml's `impl` shape entry). Some example records authored before this note name a
  * `/**` glob or a literal file (`src/modules/domain/task/ownership.guard.ts`); `moduleRootOf` normalises
  * both down to the directory a reader would call the module's root (`src/modules/domain/task`), so a file
@@ -48,7 +48,7 @@ export function isWorkRecordSchema(schema, workspaceDoc) {
 }
 
 /**
- * The real directory `repositoryName` (a `work/implementation.repository` / logical workspace name) names,
+ * The real directory `repositoryName` (a `work/implementation@1.repository` / logical workspace name) names,
  * resolved against `workspace.yaml`'s `repositories: [{role, name}]`. The backend role always resolves to
  * the repository that owns this `.starciwork` (its parent directory); any other role is a sibling
  * directory beside it, named for the workspace entry - the two-repository topology
@@ -81,7 +81,7 @@ export function declaresOwnPaths(data) {
  * Every `{rel, abs}` directory `record` (an entry from check-example-work.mjs's own `records` map, or the
  * lightweight equivalent `loadRecords` below builds) owns, resolved to an absolute path under the right
  * repository: directly from its own `owners`/`module`, or - only when it declares neither - from every
- * `work/implementation` whose `proves` names this record's id (the layout's resolution for a specification
+ * `work/implementation@1` whose `proves` names this record's id (the layout's resolution for a specification
  * that owns no code itself but is demonstrated by an implementation that does). Deduplicated by `abs`.
  * `recordsById` maps id -> {schema, data} (or richer; only those two fields are read).
  */
@@ -100,7 +100,7 @@ export function resolveOwnedDirs(id, record, recordsById, workspaceDoc, workRoot
     // record carrying the criterion, so canonicalize each entry before comparing.
     const inline = indexInlineCriteria(recordsById);
     for (const [otherId, other] of recordsById) {
-      if (other.schema !== 'work/implementation') continue;
+      if (other.schema !== 'work/implementation@1') continue;
       const proves = Array.isArray(other.data.proves) ? other.data.proves : [];
       if (proves.some(p => resolveRecordRef(recordsById, p, inline) === id)) add(other.data, otherId);
     }

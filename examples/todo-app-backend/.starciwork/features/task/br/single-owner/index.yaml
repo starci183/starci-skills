@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.task.single-owner
 title: A task has exactly one owner
 state: todo

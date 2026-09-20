@@ -1,4 +1,4 @@
-schema: work/catalog
+schema: work/catalog@1
 id: stale-case
 description: Negative-corpus fixture tree - one record whose evidence predates its code.
 features:

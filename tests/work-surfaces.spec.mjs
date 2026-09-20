@@ -38,7 +38,7 @@ function makeFixture() {
 
   write(workRoot, 'workspace.yaml', 'repositories:\n  - {role: be, name: be}\n  - {role: fe, name: fe}\n');
   write(workRoot, 'features/f/contract/orders/index.yaml', [
-    'schema: work/contract',
+    'schema: work/contract@1',
     'id: contract.f.orders',
     'state: done',
     'surface:',
@@ -47,7 +47,7 @@ function makeFixture() {
     '',
   ].join('\n'));
   write(workRoot, 'features/f/contract/ghost/index.yaml', [
-    'schema: work/contract',
+    'schema: work/contract@1',
     'id: contract.f.ghost',
     'state: done',
     'surface:',
@@ -56,9 +56,9 @@ function makeFixture() {
     '',
   ].join('\n'));
   write(workRoot, 'features/f/fr/orders/index.yaml',
-    'schema: work/functional-requirement\nid: fr.f.orders\nstate: done\nmodule: src/features/f\n');
+    'schema: work/functional-requirement@1\nid: fr.f.orders\nstate: done\nmodule: src/features/f\n');
   write(workRoot, 'features/f/impl/be/orders/index.yaml', [
-    'schema: work/implementation',
+    'schema: work/implementation@1',
     'id: impl.f.be.orders',
     'state: done',
     'repository: be',
@@ -66,11 +66,11 @@ function makeFixture() {
     '',
   ].join('\n'));
   write(workRoot, 'features/f/event/done-thing/index.yaml',
-    'schema: work/event\nid: event.f.done-thing\nstate: done\n');
+    'schema: work/event@1\nid: event.f.done-thing\nstate: done\n');
   write(workRoot, 'features/f/event/never/index.yaml',
-    'schema: work/event\nid: event.f.never\nstate: done\n');
+    'schema: work/event@1\nid: event.f.never\nstate: done\n');
   write(workRoot, 'features/f/ui/orders/index.yaml', [
-    'schema: work/ui-screen',
+    'schema: work/ui-screen@1',
     'id: ui.f.orders',
     'state: done',
     'ui:',
@@ -79,7 +79,7 @@ function makeFixture() {
     '',
   ].join('\n'));
   write(workRoot, 'features/f/ui/ghost/index.yaml', [
-    'schema: work/ui-screen',
+    'schema: work/ui-screen@1',
     'id: ui.f.ghost',
     'state: done',
     'ui:',

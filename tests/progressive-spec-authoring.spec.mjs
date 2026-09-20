@@ -34,7 +34,7 @@ test('SRS and SDS ops seed only the selected decision-complete slice and refine 
 
 test('Work lifecycle keeps the closed state enum and represents progress through activity',()=>{
   const schema=parseYaml(read('modules/schemas/work.schema.yaml'));
-  const v2State=schema.$defs.node.allOf.find(rule=>rule?.if?.properties?.schema?.const==='work/node@2')
+  const v2State=schema.$defs.node.allOf.find(rule=>rule?.if?.properties?.schema?.const==='work/node@1')
     .then.properties.state.enum;
   assert.deepEqual(v2State,['uninvestigate','todo','done']);
   assert.deepEqual(schema.$defs.node.properties.activity.enum,['idle','investigating','implementing','verifying']);

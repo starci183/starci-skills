@@ -15,7 +15,7 @@ import {spawnSync} from 'node:child_process';
  */
 export const VERIFY_PROOF='starci/verify-proof@1';
 /** The proof of a sealed candidate: planned only from a verifier-owned oracle manifest. */
-export const CANDIDATE_PROOF='starci/verify-proof@2';
+export const CANDIDATE_PROOF='starci/verify-proof@1';
 export const PROOF_VERDICTS=['pass','fail','inconclusive','unavailable'];
 /** What a proof is worth per operation kind. `fail-before` demands the contrast; `checks-only` accepts the re-run. */
 export const PROOF_POLICY={'backend.implement':'fail-before','interface.implement':'fail-before',default:'checks-only'};

@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: recur
 title: A task that comes back
 description: A person makes a task recurring on a schedule - every weekday, every month on a given day,

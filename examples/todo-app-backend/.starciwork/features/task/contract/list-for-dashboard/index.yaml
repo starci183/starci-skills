@@ -1,4 +1,4 @@
-schema: work/contract
+schema: work/contract@1
 id: contract.task.list-for-dashboard
 title: What a dashboard may read about a person's tasks
 state: todo

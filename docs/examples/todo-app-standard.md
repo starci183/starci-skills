@@ -162,8 +162,8 @@ named by `gap.task.no-load-harness`.
 | What proof exists that a `done` record actually works? | Its sibling `evidence.yaml` — `outcome`, `assertions[].observation`, `provenance` |
 | Is that proof still trustworthy? | `evidence.yaml`'s `stale` flag and `staleReason`/`staleSince` |
 | What breaks if I change X? | `X`'s inbound edges: other records' `refs`, `dependsOn`, `blockedBy`, `appliesTo`, `subscribes`, `composes` naming X, each carrying the digest of the slice it bound |
-| Which rules conflict? | `conflictsWith` (pairwise) or a `work/policy-decision`'s `tension.records` (three or more, jointly unsatisfiable) |
-| Which decisions are still open? | `work/policy-decision` records with `outcome: open` |
+| Which rules conflict? | `conflictsWith` (pairwise) or a `work/policy-decision@1`'s `tension.records` (three or more, jointly unsatisfiable) |
+| Which decisions are still open? | `work/policy-decision@1` records with `outcome: open` |
 | What does the frontend need to build for this feature? | `impl.<feature>.todo-app-frontend.<name>` records and the `ui.<feature>.<screen>` they `prove` |
 | What real files implement a rule? | The `br`'s `module` field, and the `impl` record whose `proves` names that rule, whose `owners[].path` names the files |
 | What external systems does this feature depend on? | `extensions.work3.integrations` on the owning SRS/SDS record, resolved to one `integration.<feature>.<id>` node each |
@@ -171,12 +171,12 @@ named by `gap.task.no-load-harness`.
 
 ## 5. From record to code
 
-**Owners and modules name real files.** A `work/business-rule`'s `module` is a plain string or list of
+**Owners and modules name real files.** A `work/business-rule@1`'s `module` is a plain string or list of
 strings naming the source path(s) that carry it — `br.task.complete.once`'s `module:
 [src/modules/bussiness/task]`. A
-`work/implementation`'s `owners` is a list of `{role, path}` pairs, one entry per real artifact a screen or
+`work/implementation@1`'s `owners` is a list of `{role, path}` pairs, one entry per real artifact a screen or
 flow spans — never a single `directory`/`files` pair, which `scripts/checks/check-example-work.mjs` refuses outright
-("work/implementation carries directory/files/targetFiles; use owners: [{role, path}] instead").
+("work/implementation@1 carries directory/files/targetFiles; use owners: [{role, path}] instead").
 
 **Test names quote acceptance criteria and business rules verbatim.** In
 `examples/todo-app-backend/src/modules/bussiness/task/create-task.handler.spec.ts`:
@@ -252,7 +252,7 @@ secret is ever written into the tracked tree.
 | Command | What it refuses |
 | --- | --- |
 | `node scripts/checks/check-example-yaml.mjs examples` | Any `.yaml`/`.yml` under `examples` the runtime's own strict loader cannot parse — a permissive parser accepting silently-invented keys is exactly the bug this gate exists to catch |
-| `node scripts/checks/check-example-work.mjs` | An id that doesn't match its directory place; a `ref`/`blockedBy`/`conflictsWith`/`appliesTo`/`subscribes`/`extends` pointing at an id nothing owns; a stale `blockedBy` (target already `done` at or past the cited rev); `blockedBy` authored as prose instead of `{record, rev?, because}`; a `work/gap` missing `state`/`statement`; a `work/policy-decision` with an invented `outcome` or a `chosen` not in `options`, or a `targetModule`; an unclosed `change.kind`; a `done` record with no evidence and no authored-claim declaration; `appliesTo` on the wrong schema or pointing nowhere; a malformed `work/event` or a `subscribes`/`extends` pointing at the wrong schema; `work/implementation` using `directory`/`files` instead of `owners`; and an `evidence.yaml` whose `recordDigest` no longer matches its sibling's current bytes without `stale: true` |
+| `node scripts/checks/check-example-work.mjs` | An id that doesn't match its directory place; a `ref`/`blockedBy`/`conflictsWith`/`appliesTo`/`subscribes`/`extends` pointing at an id nothing owns; a stale `blockedBy` (target already `done` at or past the cited rev); `blockedBy` authored as prose instead of `{record, rev?, because}`; a `work/gap@1` missing `state`/`statement`; a `work/policy-decision@1` with an invented `outcome` or a `chosen` not in `options`, or a `targetModule`; an unclosed `change.kind`; a `done` record with no evidence and no authored-claim declaration; `appliesTo` on the wrong schema or pointing nowhere; a malformed `work/event@1` or a `subscribes`/`extends` pointing at the wrong schema; `work/implementation@1` using `directory`/`files` instead of `owners`; and an `evidence.yaml` whose `recordDigest` no longer matches its sibling's current bytes without `stale: true` |
 | `node scripts/checks/architecture.mjs <repo-root> [--config architecture.json]` | Backend/frontend dependency direction crossing a resolved responsibility boundary (app→feature→module, component/hook/module tiers), thin-app violations, undeclared package exports, unresolved internal imports (errors, not violations) |
 | `node scripts/checks/check-stales.mjs --work <work-root> --repo <id>=<git-root>` | Nothing on its own — it is a read-only freshness *report* comparing canonical Work against bound source evidence; it does not repair or gate by itself |
 | `npm test` (backend, jest) / `npm run test:unit` (frontend, vitest) | Any spec whose assertions do not hold against current source |
@@ -264,7 +264,7 @@ Read from `features/share/` — fully specified, with its remaining `todo` recor
 than design:
 
 - A feature entry in the catalog: `features/index.yaml`'s `features[]` list (`{id, directory, description}`).
-- A `features/<feature>/index.yaml` with `schema: work/feature`, a title and a description.
+- A `features/<feature>/index.yaml` with `schema: work/feature@1`, a title and a description.
 - One `br/<name>/index.yaml` per rule, each with `statements`, `acceptance`, a `module`, and a
   `change: {rev: 1, kind: initial, at}`. This example authors criteria inline in `acceptance`; the schema
   also permits nested `ac/<name>/index.yaml` sub-records under the `br/` when a team wants them separate.
@@ -289,7 +289,7 @@ than design:
   `verification`/`verificationSource` or a sibling `evidence.yaml`.
 - Tests whose names quote the exact `fr`/`ac`/`br` id and wording they exercise, colocated with the source
   they test (`*.spec.ts` beside the implementation file, per `docs/backend-source-pattern.md`).
-- `uat/<flow>/index.yaml` with `accounts.yaml` (`work/disposable-accounts`, synthetic values only), plain
+- `uat/<flow>/index.yaml` with `accounts.yaml` (`work/disposable-accounts@1`, synthetic values only), plain
   `steps`, and `proves`.
 - Evidence: generated or captured by a real run, never hand-edited into a pass. A `done` record either gets a
   sibling `evidence.yaml` produced by an actual run (`scripts/example/example-evidence.mjs` for

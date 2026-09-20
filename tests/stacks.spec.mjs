@@ -14,7 +14,7 @@ const RUNBOOK=(extra=[])=>[
   '| verification | curl health |',...extra,''
 ].join('\n');
 
-const manifestFor=()=>({schema:'starci/application-stacks',
+const manifestFor=()=>({schema:'starci/application-stacks@1',
   components:{api:{role:'service',image:'example/api',compose:'infra/compose/api.yaml'},
     db:{role:'stateful',image:'postgres:16',compose:'infra/compose/db.yaml'},
     mail:{role:'gateway',required:false}},

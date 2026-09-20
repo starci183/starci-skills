@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.plan.upgrade-after-cap
 title: Hit the cap, get refused, upgrade, create past it
 state: inprogress

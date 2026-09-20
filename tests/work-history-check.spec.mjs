@@ -41,15 +41,15 @@ function write(root, rel, content) {
   return file;
 }
 
-const catalog = 'schema: work/catalog\nid: fixture\nfeatures: []\n';
+const catalog = 'schema: work/catalog@1\nid: fixture\nfeatures: []\n';
 
 /** rev 1 of a business rule: one clause, one trigger, a change record that says it is the first revision. */
-const revOne = 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\n'
+const revOne = 'schema: work/business-rule@1\nid: br.f.a\ntitle: t\nstate: todo\n'
   + 'trigger: The owner opens the list.\nstatements:\n  - A completed task is never reopened.\n'
   + 'change: {rev: 1, kind: initial, at: 2026-09-18T00:00:00.000Z}\n';
 
 /** rev 2 of the same rule, withdrawing that clause verbatim and replacing it. */
-const revTwoWithdrawal = 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\n'
+const revTwoWithdrawal = 'schema: work/business-rule@1\nid: br.f.a\ntitle: t\nstate: todo\n'
   + 'trigger: The owner opens the list.\nstatements:\n  - The owner may reopen a completed task.\n'
   + 'change:\n  rev: 2\n  kind: breaking\n  at: 2026-09-19T00:00:00.000Z\n'
   + '  withdraws: ["A completed task is never reopened."]\n';
@@ -104,7 +104,7 @@ test('a comment-only edit is not a revision: identical parsed content moves no f
 });
 
 test('a record that never authored a change block is counted once per tree, not suspected per edit', () => {
-  const bare = 'schema: work/business-rule\nid: br.f.b\ntitle: t\nstate: todo\nstatements:\n'
+  const bare = 'schema: work/business-rule@1\nid: br.f.b\ntitle: t\nstate: todo\nstatements:\n'
     + '  - The list is scoped to the owner.\n';
   const moved = findings([
     {files: {'features/f/br/b/index.yaml': bare}, commit: 'written'},
@@ -170,7 +170,7 @@ test('a withdrawal quoting a fragment of a longer clause is a suspicion, not a r
 test('a withdrawal quoting prose the record only carried in a blocker reason is a suspicion', () => {
   const withProse = revOne.replace('change: {rev: 1',
     'blockedBy:\n  - {record: br.f.b, because: "the module is not built yet"}\nchange: {rev: 1');
-  const other = 'schema: work/business-rule\nid: br.f.b\ntitle: t\nstate: todo\ntrigger: nobody\n'
+  const other = 'schema: work/business-rule@1\nid: br.f.b\ntitle: t\nstate: todo\ntrigger: nobody\n'
     + 'statements: []\n';
   const quotedProse = revTwoWithdrawal.replace('withdraws: ["A completed task is never reopened."]',
     'withdraws: ["the module is not built yet"]');
@@ -204,7 +204,7 @@ test('CHANGE_KIND_SUSPECT: a declared editorial that moved normative content whi
 });
 
 test('UNTRACKED_RECORD: a record file never committed is counted, never judged', () => {
-  const never = 'schema: work/business-rule\nid: br.f.c\ntitle: t\nstate: todo\n'
+  const never = 'schema: work/business-rule@1\nid: br.f.c\ntitle: t\nstate: todo\n'
     + 'trigger: The owner deletes a task.\nstatements:\n  - A deleted task is gone.\n'
     + 'change: {rev: 3, kind: breaking, at: 2026-09-19T00:00:00.000Z}\n';
   const found = findings([

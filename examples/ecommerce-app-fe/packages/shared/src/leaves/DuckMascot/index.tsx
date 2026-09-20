@@ -1,5 +1,5 @@
 /**
- * The brand mascot: a friendly duck (work/brand rev 1, `mascot.kind: duck`, `character: friendly`).
+ * The brand mascot: a friendly duck (work/brand@1 rev 1, `mascot.kind: duck`, `character: friendly`).
  *
  * Placement is the record's, not the component's: `mayAppearIn` is empty states, welcome surfaces
  * and the auth illustration; `neverIn` is danger contexts - so callers mount this mark on welcome

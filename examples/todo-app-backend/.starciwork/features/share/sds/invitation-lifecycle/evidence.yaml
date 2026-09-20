@@ -1,7 +1,7 @@
 # Written by scripts/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
-# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
-schema: work/evidence
+# and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
+schema: work/evidence@1
 record: sds.share.invitation-lifecycle
 recordDigest: 31473a0d1220044d684af7d14ee3f4aa1b7a660ae5a1de8f212c8050058ce98a
 codeDigest:

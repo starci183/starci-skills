@@ -319,7 +319,7 @@ function uiRouteClaims(records) {
   const claims = [];
   const indexFileOf = rec => path.join(rec.dir, 'index.yaml');
   for (const [id, rec] of records) {
-    if (rec.schema !== 'work/ui-screen') continue;
+    if (rec.schema !== 'work/ui-screen@1') continue;
     for (const s of rec.data?.ui?.surfaces ?? []) {
       const raw = s?.route ?? s?.entry;
       if (typeof raw !== 'string' || !raw.trim()) continue;
@@ -361,7 +361,7 @@ const normMethod = m => String(m).toUpperCase();
 const servedKey = r => `${normMethod(r.method)} ${normRoute(r.path)}`;
 const declaredKey = d => `${normMethod(d.method)} ${normRoute(d.path)}`;
 
-/** The work/event id an event class maps to: its `kind` discriminant when it carries one (the
+/** The work/event@1 id an event class maps to: its `kind` discriminant when it carries one (the
  * honest binding), else the id-shaped guess - `TaskDeletedEvent` keeps the feature segment,
  * `SignedInEvent` drops it, so both mappings are tried before anything is suspected. */
 const eventClassNamesOf = id => {
@@ -398,7 +398,7 @@ export function checkWorkSurfaces(workRoot, out) {
   const ownedDirs = [];
   const provedIds = new Set(); // record ids some impl's `proves` claims to implement
   for (const [id, rec] of records) {
-    if (rec.schema === 'work/implementation') {
+    if (rec.schema === 'work/implementation@1') {
       for (const t of rec.data?.proves ?? []) if (typeof t === 'string') provedIds.add(canon(t));
     }
     for (const d of resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot)) {
@@ -407,7 +407,7 @@ export function checkWorkSurfaces(workRoot, out) {
   }
   const ownerOf = file => ownedDirs.filter(d => file.startsWith(d.abs))
     .sort((a, b) => b.abs.length - a.abs.length)[0] ?? null;
-  const implIds = new Set([...records].filter(([, r]) => r.schema === 'work/implementation').map(([id]) => id));
+  const implIds = new Set([...records].filter(([, r]) => r.schema === 'work/implementation@1').map(([id]) => id));
   const implNamed = name => [...implIds].find(id => id.split('.').pop() === name) ?? null;
 
   // ---------- HTTP ----------
@@ -421,7 +421,7 @@ export function checkWorkSurfaces(workRoot, out) {
   const integrationEndpoints = [];   // {method, path, id, state, file}
   for (const [id, rec] of records) {
     const file = indexFile(rec);
-    if (rec.schema === 'work/contract') {
+    if (rec.schema === 'work/contract@1') {
       for (const d of declaredHttpOf(rec.data)) declaredHttp.push({...d, id, state: rec.data?.state, file});
       for (const name of declaredGqlOf(rec.data, true)) {
         declaredGql.push({name, id, state: rec.data?.state, file});
@@ -429,7 +429,7 @@ export function checkWorkSurfaces(workRoot, out) {
       for (const name of declaredGqlOf(rec.data, false)) contractClaimedOps.add(name);
       for (const eid of declaredEventIdsOf(rec.data)) declaredContractEvents.push({id: eid, by: id, file});
     }
-    if (rec.schema === 'work/integration') {
+    if (rec.schema === 'work/integration@1') {
       for (const e of Array.isArray(rec.data?.endpoints) ? rec.data.endpoints : []) {
         const method = String(e?.method ?? '').toUpperCase();
         if (HTTP_METHODS.has(method) && typeof e?.path === 'string' && e.path.startsWith('/')) {
@@ -488,7 +488,7 @@ export function checkWorkSurfaces(workRoot, out) {
   const opNames = new Set(ops.map(o => o.name));
   const sdsNamedOps = new Set();
   for (const [, rec] of records) {
-    if (rec.schema === 'work/sds-component') for (const n of gqlNamesMentioned(rec.data)) sdsNamedOps.add(n);
+    if (rec.schema === 'work/sds-component@1') for (const n of gqlNamesMentioned(rec.data)) sdsNamedOps.add(n);
   }
   const contractNamedOps = contractClaimedOps;
 
@@ -553,7 +553,7 @@ export function checkWorkSurfaces(workRoot, out) {
   }
 
   // ---------- events ----------
-  const eventRecs = [...records].filter(([, r]) => r.schema === 'work/event');
+  const eventRecs = [...records].filter(([, r]) => r.schema === 'work/event@1');
   const codeByRepo = beRoots.map(r => ({repo: r, ...eventSurface(r)}));
   const allClasses = new Map();   // className -> {file, kind, repo}
   const allEmitted = new Map();   // className -> {file, repo}
@@ -587,17 +587,17 @@ export function checkWorkSurfaces(workRoot, out) {
   for (const [cls, site] of allEmitted) {
     if (recordOfClass.has(cls)) continue;
     suspect(site.file, 'EVENT_UNDECLARED',
-      `${cls} is constructed under src/ but no work/event record maps to it ` +
+      `${cls} is constructed under src/ but no work/event@1 record maps to it ` +
       '- an emitted signal the tree does not name');
   }
   for (const [cls, v] of allClasses) {
     if (allEmitted.has(cls) || recordOfClass.has(cls)) continue;
     suspect(v.file, 'EVENT_CLASS_ORPHAN',
-      `${cls} is declared under src/ but is neither published nor claimed by a work/event record - dead vocabulary`);
+      `${cls} is declared under src/ but is neither published nor claimed by a work/event@1 record - dead vocabulary`);
   }
   for (const e of declaredContractEvents) {
     if (!records.has(canon(e.id))) {
-      suspect(e.file, 'CONTRACT_EVENT_GHOST', `${e.by}'s surface names ${e.id}, which no work/event record owns`);
+      suspect(e.file, 'CONTRACT_EVENT_GHOST', `${e.by}'s surface names ${e.id}, which no work/event@1 record owns`);
     }
   }
 
@@ -623,7 +623,7 @@ export function checkWorkSurfaces(workRoot, out) {
       const feature = owner?.feature ?? (bussiness && subscribesByFeature.has(bussiness) ? bussiness : null);
       for (const cls of sub.classes.filter(c => !recordOfClass.has(c))) {
         suspect(sub.file, 'SUBSCRIPTION_UNDECLARED',
-          `${path.basename(sub.file)} handles ${cls}, which maps to no work/event record`);
+          `${path.basename(sub.file)} handles ${cls}, which maps to no work/event@1 record`);
       }
       if (!feature) continue;
       if (!wiredByFeature.has(feature)) wiredByFeature.set(feature, {files: [], ids: new Set()});
@@ -683,7 +683,7 @@ export function checkWorkSurfaces(workRoot, out) {
   }
   const doneRecs = eventRecs.filter(([, r]) => r.data?.state === 'done').length;
   if (eventRecs.length) {
-    out.map.push(`${eventRecs.length} work/event record(s) (${doneRecs} done), ${emittedRecordIds.size} ` +
+    out.map.push(`${eventRecs.length} work/event@1 record(s) (${doneRecs} done), ${emittedRecordIds.size} ` +
       `emitted, ${subscribesByFeature.size} feature(s) declaring subscribes`);
   }
   out.map.push(`${records.size} record(s) total; ${declaredHttp.length} contract http declaration(s), ` +

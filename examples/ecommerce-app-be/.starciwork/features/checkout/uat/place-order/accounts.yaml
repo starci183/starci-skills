@@ -1,4 +1,4 @@
-schema: work/disposable-accounts
+schema: work/disposable-accounts@1
 disposable: true
 accounts:
   - {role: person, username: "uat-buyer@ecommerce.dev", password: "uat-only-throwaway-pair"}

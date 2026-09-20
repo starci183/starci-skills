@@ -292,7 +292,7 @@ export function readBrandRecord(tree){
   if(!file)throw Error(`No brand record: expected ${candidates.map(candidate=>slash(path.relative(root,candidate))).join(' or ')}.`);
   const source=readText(file);
   const record=parseYaml(source);
-  if(record?.schema!=='work/node@2'||record?.kind!=='brand')throw Error('A brand record must be a work/node@2 node of kind brand.');
+  if(record?.schema!=='work/node@1'||record?.kind!=='brand')throw Error('A brand record must be a work/node@1 node of kind brand.');
   if(!record.brand||typeof record.brand!=='object'||Array.isArray(record.brand))throw Error('The brand record carries no brand specification.');
   const declared=record.rev??record.revision??record.brand.rev;
   return {file,dir:path.dirname(file),record,brand:record.brand,

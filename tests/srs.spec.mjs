@@ -11,7 +11,7 @@ import {validateSpecification} from '../scripts/checks/spec/validate.mjs';
 const example=new URL('fixtures/nested-business/',import.meta.url);
 const leaf='knowledge/business/srs/documents/update/index.yaml';
 const sample=()=>parseYaml(fs.readFileSync(new URL(leaf,example),'utf8')).extensions.work3.specification;
-function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-srs-v2-'));fs.cpSync(example,root,{recursive:true});t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return {root,run:()=>validateWorkspace(root),write:(p,m)=>{const file=path.join(root,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(m));},mutate:(p,fn)=>{const file=path.join(root,p),m=parseYaml(fs.readFileSync(file,'utf8'));fn(m);fs.writeFileSync(file,stringifyYaml(m));}};}
+function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-srs-'));fs.cpSync(example,root,{recursive:true});t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return {root,run:()=>validateWorkspace(root),write:(p,m)=>{const file=path.join(root,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(m));},mutate:(p,fn)=>{const file=path.join(root,p),m=parseYaml(fs.readFileSync(file,'utf8'));fn(m);fs.writeFileSync(file,stringifyYaml(m));}};}
 const valid=s=>assert.deepEqual(validateSpecification(s),{ok:true,errors:[]});
 
 test('v2 Business is a detailed SRS without architecture tables; draft is not accepted',()=>{const s=sample();valid(s);assert.equal(s.codeImpacts,undefined);assert.equal(s.serviceImpacts,undefined);s.status='pass';assert.equal(validateSpecification(s).ok,false);});
@@ -36,7 +36,7 @@ test('v2 rejects missing FR flow, actors, joins and title-only alternative/excep
 test('recursive SRS discovers a new nested folder without a registry and changes parent inputs',t=>{
   const f=fixture(t),before=f.run();assert.equal(before.ok,true,JSON.stringify(before.errors));
   const rootDigest=before.nodes.find(n=>n.id==='example.business.srs').inputDigest;
-  const base={schema:'work/node@2',kind:'business',required:true,description:'New synthetic cohesive scope'};
+  const base={schema:'work/node@1',kind:'business',required:true,description:'New synthetic cohesive scope'};
   f.write('knowledge/business/srs/A/index.yaml',{...base,id:'example.A'});
   f.write('knowledge/business/srs/A/B/index.yaml',{...base,id:'example.B',state:'uninvestigate'});
   const result=f.run();assert.equal(result.ok,true,JSON.stringify(result.errors));assert.ok(result.nodes.some(n=>n.id==='example.B'));
@@ -71,7 +71,7 @@ test('architecture v2 permits no named patterns, but rejects unreasoned or unres
   s.patternDecisions=[{id:'saga',pattern:'Saga',decision:'adopt',problem:'Synthetic',rationale:'Synthetic',simplerAlternative:'Local transaction',tradeoffs:'Synthetic',mechanism:{},sourceRefs:['example-intent'],serviceIds:['service'],acceptanceIds:['AC-SAVED']}];assert.equal(validateSpecification(s).ok,false);
 });
 test('architecture resolves nested Business dependencies and refuses rewritten user flows',t=>{
-  const f=fixture(t);f.write('knowledge/architecture/index.yaml',{schema:'work/node@2',id:'example.architecture',kind:'architecture',required:true,state:'todo',description:'Synthetic design',dependsOn:['example.business.srs'],extensions:{work3:{specification:architecture()}}});
+  const f=fixture(t);f.write('knowledge/architecture/index.yaml',{schema:'work/node@1',id:'example.architecture',kind:'architecture',required:true,state:'todo',description:'Synthetic design',dependsOn:['example.business.srs'],extensions:{work3:{specification:architecture()}}});
   assert.equal(f.run().ok,true,JSON.stringify(f.run().errors));
   f.mutate('knowledge/architecture/index.yaml',m=>{m.extensions.work3.specification.flows[0].steps[0].request='Different user behavior';});
   assert.ok(f.run().errors.some(e=>e.code==='SPECIFICATION_BUSINESS_DRIFT'));

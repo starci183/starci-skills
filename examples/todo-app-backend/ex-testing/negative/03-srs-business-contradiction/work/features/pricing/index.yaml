@@ -1,4 +1,4 @@
-schema: work/feature
+schema: work/feature@1
 id: pricing
 title: Pricing rules
 description: Negative-corpus fixture.

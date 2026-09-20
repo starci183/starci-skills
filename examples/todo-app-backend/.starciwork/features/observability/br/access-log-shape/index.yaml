@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.observability.access-log-shape
 title: The access line is structured, correlated and secret-free
 state: done

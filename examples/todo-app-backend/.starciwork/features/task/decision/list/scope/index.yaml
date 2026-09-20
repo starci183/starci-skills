@@ -1,4 +1,4 @@
-schema: work/policy-decision
+schema: work/policy-decision@1
 id: decision.task.list.scope
 title: Does an organization owner see the tasks of its members
 state: done

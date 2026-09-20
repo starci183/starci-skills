@@ -1,4 +1,4 @@
-schema: work/event
+schema: work/event@1
 id: event.task.deleted
 title: A task was deleted
 state: done

@@ -1,4 +1,4 @@
-schema: work/implementation
+schema: work/implementation@1
 id: impl.audit.todo-app-backend.operator-read
 title: The fail-closed operator check and the filtered whole-chain read
 repository: todo-app-backend

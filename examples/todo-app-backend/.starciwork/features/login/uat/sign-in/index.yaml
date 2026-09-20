@@ -1,4 +1,4 @@
-schema: work/uat-flow
+schema: work/uat-flow@1
 id: uat.login.sign-in
 title: Sign in, close the browser, come back
 state: done

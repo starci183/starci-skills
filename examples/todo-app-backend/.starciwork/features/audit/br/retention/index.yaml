@@ -1,4 +1,4 @@
-schema: work/business-rule
+schema: work/business-rule@1
 id: br.audit.retention
 title: A log line is kept for 400 days
 state: done
