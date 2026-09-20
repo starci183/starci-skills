@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// spawn.mjs — spawn one agent terminal. Provider flags are injected from the
+// spawn.mjs — spawn one agent terminal. Agent flags are injected from the
 // adapter card — callers NEVER type --yolo/--dangerously-skip-permissions.
 //
-//   node scripts/agent/spawn.mjs --provider <devin|qwen|claude|codex>
+//   node scripts/agent/spawn.mjs --agent <devin|qwen|claude|codex>
 //     --worktree <path> --title <t> [--prompt <text> | --prompt-file <f>]
 //     [--command <override>] [--kernel] [--dispatch-id <id>]
 //
@@ -13,11 +13,11 @@ import { arg, flag } from '../api/orca/lib.mjs';
 import { spawnAgent } from './lib.mjs';
 
 const argv = process.argv.slice(2);
-const provider = arg(argv, 'provider');
-if (!provider) { console.error('use: spawn.mjs --provider <name> [--worktree p] [--title t] [--prompt|--prompt-file] [--kernel] [--command cmd]'); process.exit(2); }
+const agent = arg(argv, 'agent');
+if (!agent) { console.error('use: spawn.mjs --agent <name> [--worktree p] [--title t] [--prompt|--prompt-file] [--kernel] [--command cmd]'); process.exit(2); }
 
 const out = spawnAgent({
-  provider,
+  provider: agent,
   worktree: arg(argv, 'worktree'),
   title: arg(argv, 'title'),
   prompt: arg(argv, 'prompt'),

@@ -7,8 +7,7 @@
 # normalized `*.schema.yaml` names.
 #
 # There is no compiled JSON projection — the authored YAML under
-# modules/schemas/ is the only authority; consumers resolve `.json` names to
-# these files through the readDistJson compatibility bridge.
+# modules/schemas/ is the only authority; consumers read these files directly.
 
 about:
   kind: schema-catalog
@@ -325,7 +324,7 @@ schemas:
       question: "Which long-lived Kernel owns this workflow, and which operation agents did that Kernel dispatch?"
       whenNeeded: Inspecting, rendering or auditing a workflow's agent tree independently of Orca tab/pane layout.
       whenNot: Never infer ownership from paneKey, parentPaneKey, terminal titles or tab order; those are presentation/runtime hints only.
-      selectedBy: Workflow id; the command reads persisted workflow/job hierarchy metadata and derives legacy provider metadata from the selected profile.
+      selectedBy: Workflow id; the command reads persisted workflow/job hierarchy metadata and derives missing provider metadata from the selected profile.
 
   - id: starci/source-staleness-report@1
     file: modules/schemas/source-staleness.schema.yaml

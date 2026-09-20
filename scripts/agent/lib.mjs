@@ -1,6 +1,6 @@
 // scripts/agent/lib.mjs — semantic agent lifecycle over the Orca API layer.
 // Provider differences are DATA (modules/models/agents/<name>.yaml); this
-// module is the only mechanism. Callers pass --provider and get the card's
+// module is the only mechanism. Callers pass --agent and get the card's
 // command prefix (credential refresh, env strip), command requirements
 // (--yolo, --permission-mode dangerous, …) and readiness/submission patterns
 // injected automatically — forgetting a bypass flag is structurally

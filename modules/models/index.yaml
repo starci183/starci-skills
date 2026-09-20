@@ -28,8 +28,8 @@ schema: starci/module-models-index@1
 # - profile: a StarCi routing/capability target such as codex-agent
 # - runtimePool: one quota/capacity window from runtimes.yaml
 # An agent and provider may currently carry the same string, but the fields are
-# not interchangeable. Only legacy `kernel.provider` aliases `kernel.agent`;
-# model-routing `provider` remains quota authority.
+# not interchangeable: `agent` names the execution adapter while model-routing
+# `provider` remains quota authority.
 glossary:
   launcher: human chat surface invoking entry skills
   host: Orca execution environment
@@ -38,7 +38,6 @@ glossary:
   model: concrete model id
   profile: StarCi routing and capability target
   runtimePool: quota and capacity window
-  deprecatedCompatibilityAlias: {kernel.provider: kernel.agent}
 
 pools:
   # runtimes.yaml runtimes.* — quota/capacity pools the allocator serves;

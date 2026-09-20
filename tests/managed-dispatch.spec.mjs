@@ -117,13 +117,13 @@ test('kernel pin precedence: config selects the agent/model for a dedicated Orca
   assert.match(plan.command??'',/model_reasoning_effort/);
 });
 
-test('kernel pin precedence: --provider flag beats the config pin',t=>{
+test('kernel pin precedence: --agent flag beats the config pin',t=>{
   const fx=fixture(t);fx.writeConfig(); // example pins codex
   const workflowId=defineGoal(fx);
-  const r=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--provider','devin','--plan','--json');
+  const r=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--agent','devin','--plan','--json');
   assert.equal(r.status,0,r.stderr);
   const plan=json(r.stdout);
-  assert.equal(plan.agent,'devin','an explicit --provider compatibility flag is the operator override');
+  assert.equal(plan.agent,'devin','an explicit --agent flag is the operator override');
   assert.equal(plan.routedBy,'override');
   assert.equal(plan.launch,'terminal');
 });

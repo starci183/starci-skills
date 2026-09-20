@@ -115,7 +115,7 @@ const assessLineFor = (data, repoPath) => {
 
 // Owner config surface for the plan table: <skillRoot>/config.yaml (gitignored,
 // seeded from config.example.yaml by the installer) decides the kernel seat
-// before route-model does — precedence: --agent (legacy --provider) flag >
+// before route-model does — precedence: --agent flag >
 // config.yaml kernel pin > route-model. The plan shows the pin so the owner
 // sees the config effect before ok; the kernel itself resolves it at
 // start-workflow time. A missing or unparsable file is reported, never fatal.
@@ -127,7 +127,7 @@ function ownerConfigSummary() {
     return {
       file: path.relative(skillRoot, file),
       kernel: {
-        agent: c?.kernel?.agent ?? c?.kernel?.provider ?? null,
+        agent: c?.kernel?.agent ?? null,
         model: c?.kernel?.model ?? null,
         effort: c?.kernel?.effort ?? c?.effort ?? null,
       },
@@ -168,7 +168,7 @@ if (planOnly) {
     assessNote: assess.available ? undefined : assess.note,
     willWrite,
     config: ownerConfigSummary(),
-    kernelRoute: 'precedence: --agent (legacy --provider) flag > config.yaml kernel pin > route-model',
+    kernelRoute: 'precedence: --agent flag > config.yaml kernel pin > route-model',
     ledger: ledgerFileFor(repo),
   };
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }

@@ -35,7 +35,7 @@ Required keys:
 
 Optional keys:
 
-- `kernel` — `{agent?, model?, effort?}` route pin for the `[Kernel]` seat; `provider?` is accepted only as a deprecated alias for `agent`; null means routing decides
+- `kernel` — `{agent?, model?, effort?}` route pin for the `[Kernel]` seat; null means routing decides
 - `budgets` — `{maxOps?, perOpMs?, dailyTokens?}` owner ceilings; positive integers or null
 - `allocation.mode` — `adaptive`; fresh quota, current admitted load, recent service and task/model suitability
   are recomputed before every future assignment
@@ -75,9 +75,6 @@ identity.
 | `runtimePool` | Capacity pool selected by the allocator | `codex-agent` |
 
 An `agent` and `provider` may currently carry the same string, but their fields
-are not interchangeable. Only the historical `kernel.provider` key aliases
-`kernel.agent`; routing records continue to use `provider` for quota authority.
+are not interchangeable. Routing records use `provider` for quota authority.
 
-Existing ignored files without `allocation` resolve to `{mode:"adaptive", preferredProvider:null}` in memory.
-An earlier ordered `providers` array remains readable for compatibility: its first item becomes
-`preferredProvider`, while later items no longer define a chain. The loader never rewrites either form.
+Files without `allocation` resolve to `{mode:"adaptive", preferredProvider:null}` in memory.

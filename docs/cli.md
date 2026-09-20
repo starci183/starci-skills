@@ -53,7 +53,7 @@ node scripts/route/build-ops-registry.mjs [--check]                 # regenerate
 ## Agent lifecycle (`node scripts/agent/*`)
 
 ```sh
-node scripts/agent/spawn.mjs --provider <devin|qwen|claude|codex> --worktree <path> --title <t> \
+node scripts/agent/spawn.mjs --agent <devin|qwen|claude|codex> --worktree <path> --title <t> \
   [--prompt <text> | --prompt-file <f>] [--command <override>] [--kernel] [--json]
 node scripts/agent/send.mjs ...    # deliver a follow-up to a live agent terminal
 node scripts/agent/health.mjs ...  # readiness/activity probe

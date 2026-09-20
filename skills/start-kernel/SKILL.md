@@ -45,8 +45,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
 
    Orca is always the execution host. `route-model` may select the Kernel
    agent/model under kind `model.manageWorkflow` when the owner did not pin
-   them. The legacy `--provider <agent>` flag is only an explicit owner agent
-   override; `provider` is otherwise deprecated at the Kernel boundary.
+   them. `--agent <name>` is the explicit owner override.
 6. Report the spawned `[Kernel]` terminal id and attested agent/model. If an
    explicit agent/model pin is unavailable or the terminal does not render the
    requested model, report the typed failure; never substitute Devin.

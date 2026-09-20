@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 // send.mjs — deliver a prompt to a live agent terminal and confirm consumption.
-//   node scripts/agent/send.mjs --terminal <h> --provider <p>
+//   node scripts/agent/send.mjs --terminal <h> --agent <a>
 //     (--text <t> | --text-file <f>) [--worktree <path>] [--dispatch-id <id>] [--no-await]
-// --provider loads the adapter card for delivery mode + submission patterns.
+// --agent loads the adapter card for delivery mode + submission patterns.
 import { arg, flag } from '../api/orca/lib.mjs';
 import { loadAdapter, deliverPrompt, awaitSubmission, awaitAttestation, cleanupDeliveryArtifact } from './lib.mjs';
 import fs from 'node:fs';
 
 const argv = process.argv.slice(2);
 const terminal = arg(argv, 'terminal');
-const provider = arg(argv, 'provider');
+const agent = arg(argv, 'agent');
 const text = arg(argv, 'text-file') ? fs.readFileSync(arg(argv, 'text-file'), 'utf8') : arg(argv, 'text');
-if (!terminal || !provider || text == null) {
-  console.error('use: send.mjs --terminal <h> --provider <p> (--text|--text-file) [--worktree] [--no-await]');
+if (!terminal || !agent || text == null) {
+  console.error('use: send.mjs --terminal <h> --agent <a> (--text|--text-file) [--worktree] [--no-await]');
   process.exit(2);
 }
-const { card, error } = loadAdapter(provider);
+const { card, error } = loadAdapter(agent);
 if (error) { console.error(JSON.stringify({ ok: false, step: 'adapter', error })); process.exit(1); }
 
 const send = deliverPrompt({ handle: terminal, adapter: card, prompt: text, worktree: arg(argv, 'worktree'), dispatchId: arg(argv, 'dispatch-id') ?? 'send' });

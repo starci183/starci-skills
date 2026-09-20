@@ -48,4 +48,4 @@ rules:
   - A managed worker-start owns its Dispatch lifecycle; the runtime MUST NOT dispatch the same Task a second time.
   - A command-terminal worker still receives a Run, Task and Dispatch; its terminal handle is retained for cleanup while its Dispatch id keys reports and contracts.
   - agent, provider, model, profile and runtimePool are separate fields and MUST NOT be used as aliases for one another.
-  - The hierarchy command is read-only and may derive missing provider metadata for legacy jobs from their persisted profile.
+  - The hierarchy command is read-only and may derive missing provider metadata for earlier jobs from their persisted profile.

@@ -17,7 +17,7 @@
 // runtimePool to its agent via modules/models/profiles/<target>.yaml. Router
 // refusal or exhaustion is a typed failure, never an implicit Devin kernel.
 // Spawn flags come from the agent's adapter card
-// modules/models/agents/<provider>.yaml, not a hardcoded map.
+// modules/models/agents/<agent>.yaml, not a hardcoded map.
 //
 // Every kernel is a dedicated Orca command terminal. It is not an operation
 // worker and boot never creates an orchestration Run/Task/Dispatch. The
@@ -39,14 +39,7 @@ const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..
 const sourceRoot = path.dirname(skillRoot);
 const arg = (n, d = null) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 ? process.argv[i + 1] : d; };
 const repo = path.resolve(arg('repo', process.cwd()));
-const canonicalAgentOverride = arg('agent');
-const legacyProviderOverride = arg('provider');
-if (canonicalAgentOverride && legacyProviderOverride && canonicalAgentOverride !== legacyProviderOverride) {
-  throw new Error(`Conflicting Kernel overrides: --agent ${canonicalAgentOverride} and deprecated --provider ${legacyProviderOverride}.`);
-}
-// `--provider` used to name the execution adapter. Keep it as an input-only
-// compatibility alias while every emitted field uses the canonical `agent`.
-const agentOverride = canonicalAgentOverride ?? legacyProviderOverride;
+const agentOverride = arg('agent');
 const goalId = arg('goal'); // explicit <workflow_id> — per modules/kernel/start-workflow.yaml
 const asJson = process.argv.includes('--json');
 const planOnly = process.argv.includes('--plan');
