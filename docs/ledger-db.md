@@ -24,10 +24,14 @@ to continue, to be audited and to be archived:
 `.starciwork/_local/` is not a runtime-state location: dispatch artifacts are
 delivered then removed (or written to the OS temp dir), never parked there.
 
-The only writer is `scripts/kernel/api.mjs`. The kernel agent never opens this
-file; every state operation is one api verb inside one `BEGIN IMMEDIATE`
-transaction that also appends one hash-chained `events` row
-(`modules/kernel/api.yaml`).
+The kernel agent's only writer is `scripts/kernel/api.mjs` — the [Kernel] never
+opens this file; every state operation is one api verb inside one
+`BEGIN IMMEDIATE` transaction that also appends one hash-chained `events` row
+(`modules/kernel/api.yaml`). Two boot-path scripts write it too:
+`scripts/goal/define-goal.mjs` (workflows/goals/inbox at goal intake) and
+`scripts/kernel/start-workflow.mjs` (the kernel `signals` singleton, the
+`kernel-*` job row, the inbox claim, the queued→running phase). The
+ledger-facing store vocabulary lives in `engine/ledger-db.mjs`.
 
 ## 2. Why (recorded so it is not re-argued)
 
@@ -69,21 +73,61 @@ moves with the bytes, so renaming the repo cannot re-key the ledger.
 
 Full DDL: `engine/schema.sql`. Orientation only:
 
-| Table(s) | Role | Writers (via api.mjs) |
+| Table(s) | Role | Writers |
 | --- | --- | --- |
-| `meta` | Ledger identity + open-mode facts; seeded once | create/migrate |
-| `workflows` | One row per workflow: registration, bound generation, phase | `retire` |
-| `goals`, `inbox` | Approved goal revisions; the queue kernels claim from | `define-goal`, `retire` |
-| `jobs` | The queue itself — one row per op attempt, `pending→running→done/failed/blocked` | `enqueue`, `dispatch`, `settle` |
-| `leases`, `budget_reservations` | Capacity fences taken atomically at dispatch, released at settle | `dispatch`, `settle` |
-| `contracts`, `reports` | The dispatch packet out; the verdict report in (`UNIQUE(workflow_id, dispatch_id)`) | `dispatch`, `settle` |
-| `incidents` | Fingerprinted escalations — same {kind, op} is one incident | `incident` |
-| `events` | Hash-chained audit log — every write appends exactly one row | every write verb |
-| `state_snapshots` | Continuation snapshots; compacted by retention | plan/settle flow |
-| `signals` | Kernel liveness singleton — one kernel per workflow, enforced in data | `start-workflow`, `retire` |
+| `meta` | Ledger identity + open-mode facts; seeded once | `engine/ledger-db.mjs` create/migrate + `journal_mode` upsert on open |
+| `workflows` | One row per workflow: registration, bound generation, phase | `ensureWorkflow` (engine), `define-goal` (phase `queued`), `start-workflow` (phase `running`), `api retire` (phase `finished`) |
+| `goals` | Approved goal revisions, append-only per `(workflow_id, revision)` | `define-goal` INSERT; `api plan` UPDATEs `json.derivedPlan` |
+| `inbox` | The queue kernels claim from: pending → claimed/done | `define-goal` INSERT; `start-workflow` claims (`status='claimed'`); `api retire` closes |
+| `jobs` | The queue itself — one row per op attempt or kernel seat | `api enqueue`/`route`/`dispatch`/`settle`; `start-workflow` kernel row; engine `enqueueJob`/`reserveTwoPhase`/`releaseTwoPhase` |
+| `events` | Hash-chained audit log — every write appends exactly one row | `ledger.appendEvent` inside every write verb's transaction |
+| `incidents` | Fingerprinted escalations | `api incident`; `dispatch` rejection path files `infra-provider` incidents |
+| `signals` | Kernel liveness singleton — one kernel per workflow, enforced in data | `start-workflow` (`scope='kernel', key=<workflow_id>` reserve→confirm→release) |
+| `contracts` | Op IPC, kernel → worker — see §4a | `api dispatch` (`fileContract`, INSERT OR REPLACE before `jobs`→`running`); read by `api op-contract` |
+| `reports` | Op IPC, worker → kernel — see §4a | `api report` (INSERT OR REPLACE, `consumed_at` reset NULL); `consumed_at` stamped by `api consume-report` and by `settle` |
+| `checks` | Kernel's re-run results per op attempt — see §4a | `api check` (INSERT OR REPLACE) |
+| `state_snapshots` | Continuation snapshots; compacted by retention | **no production INSERT** — only `compactSnapshots`/`retireWorkflow` mutate it; the checkpoint writer is missing |
+| `resources` (ledger), `leases` | Repo-scoped capacity fences | `api dispatch` → `reserveOpLeases` seeds `path:*` capacity-1 resources and takes leases via `reserveTwoPhase`; `api settle`/dispatch-reject release them |
+| `budgets`, `budget_reservations` (ledger) | Repo-local spend limits | **no writer or reader** — declared-ahead for the admission layer |
+| `runtime_loads` | Supervisor's provider-load view | **no writer** — `loads.mjs`/supervisor retired; live load is probed via `scripts/api/quota` |
+| `inputs` | Owner-named input bytes, digest-bound | `ledger.inputs.put` exists on the handle but **no script calls it** |
+| `migrations` | ledger-migrate import provenance | **vestigial** — the writer retired with `scripts/ledger/ledger-migrate.mjs` |
 
 `machine.sqlite` (`engine/machine.sql`) holds `ai/*` provider quota and machine
 budgets only, reconciled by TTL.
+
+## 4a. Op IPC — contracts out, reports in, checks beside
+
+The dispatch↔worker exchange is durable rows, not files. Files under
+`.starciwork/_local/` are scratch; the ledger is the record
+(`modules/kernel/api.yaml` — the op lifecycle is `enqueue → route → dispatch →
+api report → api consume-report → api check → api settle`).
+
+- **`contracts`** — kernel → worker. `api dispatch` writes one row per
+  `(workflow_id, op_id, attempt)` — the rendered prompt plus the packet JSON
+  (`fileContract`, INSERT OR REPLACE) inside the same transaction that flips
+  the job to `running`, on both the terminal and the managed-worker path.
+  `dispatch_id` is the worker's handle (terminal handle or managed Dispatch
+  id). **The contract is the dispatch authority, never the terminal prompt** —
+  the prompt only delivers it. The worker reads it back with `api op-contract`
+  (`--job`, or `--workflow` + `--op` + optional `--attempt`; latest attempt by
+  default).
+- **`reports`** — worker → kernel. The worker files `api report` with an
+  outcome from `done|partial|failed|ask|blocked`; `UNIQUE(workflow_id,
+  dispatch_id)` + `INSERT OR REPLACE` makes a re-filed report idempotent and
+  resets `consumed_at` to NULL. `dispatch_id` is the worker's handle, falling
+  back to the job id when none was bound. `consumed_at` is stamped by
+  `api consume-report` (which appends a `report-consumed` event) and again by
+  `settle` when it integrates the verdict — the durable worker→kernel signal
+  is spent exactly once; a paused op's own report is consumed so it is never
+  read as its answer.
+- **`checks`** — the kernel's re-run results for the same
+  `(workflow_id, op_id, attempt)` key (`api check --checks <json> |
+  --checks-file <path>`). Filed between `consume-report` and `settle`, which
+  then releases the leases and closes the worker.
+
+`retireWorkflow` drops all three tables' rows with the rest of the workflow's
+record.
 
 ## 5. Identity fence and anchor
 

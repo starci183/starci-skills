@@ -86,7 +86,12 @@ boundary:
     its own bookkeeping. The ledger (via api calls) plus each job's declared
     artifacts are the only durable surface; dispatch-time prompt artifacts
     are api-owned and live outside _local (delivered, then deleted — or the
-    os tmpdir). (Observed: prompt delivery wrote files under _local.)
+    os tmpdir). The op IPC is durable the same way: the contract, the report
+    and the re-run checks are the contracts/reports/checks ROWS transacted
+    through `api dispatch` / `api op-contract` / `api report` /
+    `api consume-report` / `api check` — files under _local are scratch only,
+    never the durable record. (Observed: prompt delivery wrote files under
+    _local.)
   persistAsYouThink: >-
     Agent memory is not durable. Survey findings, the derived plan, the
     slice table and model/routing reasoning are persisted into the ledger
@@ -115,9 +120,9 @@ tick:
     - survey    # api survey --workflow — the tick opens on the ledger, never on memory
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
     - enqueue   # api enqueue --workflow --op --paths — a pending job row per planned op the queue lacks
-    - drive     # loop{ status -> dispatch -> wait -> settle -> retry|incident } until the frontier empties
+    - drive     # loop{ status -> route -> dispatch -> wait -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
     - retire    # api retire --workflow — every job settled AND the final verify passed
-  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, plan, enqueue, dispatch, settle, incident, retire"
+  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, plan, enqueue, route, dispatch, op-contract, report, consume-report, check, settle, incident, retire"
 
   survey:
     rule: >-
@@ -169,11 +174,15 @@ tick:
     dispatch:
       rule: >-
         For each ELIGIBLE pending job — owned_paths disjoint from every
-        in-flight job's read/write set AND capacity free — `api dispatch
-        --job <id> --spawn` reserves the durable lease, renders the packet
-        and lands the `[Op]` terminal itself. The kernel picks WHICH jobs;
-        the api owns the mechanics (modules/kernel/dispatch.yaml
-        spawnMechanics). Without --spawn it is a dry-run packet preview.
+        in-flight job's read/write set AND capacity free — the kernel first
+        calls `api route --job <id>` (the model decision is resolved and
+        persisted on the job payload: model/modelId/effort/routeChain), then
+        `api dispatch --job <id> --spawn` reserves the durable lease, writes
+        the contracts row (the rendered packet — the worker's dispatch
+        authority, read back via `api op-contract`) and lands the `[Op]`
+        terminal itself. The kernel picks WHICH jobs; the api owns the
+        mechanics (modules/kernel/dispatch.yaml spawnMechanics). Without
+        --spawn it is a dry-run packet preview.
       eligibility: >-
         Dispatch planning's three levels, enforced inside the api's refusals:
         file (no write/write or write/read overlap with anything in flight),
@@ -186,11 +195,17 @@ tick:
       route: >-
         The op id was route-op's pick during plan (scripts/route/route-op.mjs
         — pick + reasons + citations, never a whole-contract read). The
-        packet's constraints.model resolves through route-model inside the
-        api (modules/models/selection.yaml — eligibility first, budget orders
-        the eligible; budget never makes a model eligible). A verify job is
-        allocated AWAY from the runtime that implemented its slice
-        (the api's verify-avoidance rule).
+        packet's constraints.model is decided by `api route --job <id>
+        [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]` BEFORE
+        dispatch: it resolves through the pool selection
+        (modules/models/runtimes.yaml + selection rules — eligibility first,
+        capacity/quota/incidents order the eligible; budget never makes a
+        model eligible) and PERSISTS {model, modelId, effort, routeChain,
+        routeRejected, difficulty} onto the job payload plus a
+        'route-decided' event. Dispatch then launches exactly what route
+        persisted — the kernel never picks a model ad hoc and dispatch never
+        re-decides. A verify job is allocated AWAY from the runtime that
+        implemented its slice (the api's verify-avoidance rule).
       oneOpOneAgent: >-
         One pending job = one dispatch = one ephemeral [Op] agent; a job
         holding a lease is never re-dispatched and a settled job is never
@@ -203,12 +218,13 @@ tick:
       rule: >-
         Between dispatch and the next report the kernel WAITS — it polls
         `api status` on a cadence and reads the op terminal for liveness; it
-        does not poll for work to invent. The marker+report discipline is
-        unchanged: the report FILE is the verdict, the done-marker/Orca
-        message is only the wake-up (modules/kernel/verdict-contract.yaml
-        envelope; the marker/report convention — a done-marker file beside
-        the report, e.g. <artifact-dir>/<job>.done + <job>-REPORT.md, with
-        state_snapshots rows as the ledger-side signal).
+        does not poll for work to invent. The report discipline is durable:
+        the worker files its answer through `api report --job <id> --outcome
+        <done|partial|failed|ask|blocked> --report <file>` — an upsert keyed
+        UNIQUE(workflow_id, dispatch_id) on the reports row, which IS the
+        verdict of record (modules/kernel/verdict-contract.yaml envelope).
+        The done-marker/Orca message is only the wake-up and a file under
+        .starciwork/_local is scratch, never the durable record.
       boundary: >-
         Waiting is itself supervised — a kernel whose event log is silent
         past the health window is restarted (failureHandling.kernelDeath).
@@ -216,29 +232,40 @@ tick:
         section.
     settle:
       rule: >-
-        A landed report settles through `api settle --job <id> --verdict <v>
-        --report <path>` — the api validates the envelope, binds the exact
-        durable identity {workflow_id, op_id, attempt, generation,
-        lease_token}, releases the lease and records the verdict. A refused
-        settle is a routed verdict, never silent loss (api.yaml refuses).
+        A landed report settles in order: the kernel reads the reports row
+        the worker filed, integrates it via `api consume-report --job <id>`
+        (consumed_at set — the kernel's durable acknowledgement), re-runs
+        the op's declared checks itself and records the results via `api
+        check --job <id> --checks '<json>'`, and only then `api settle
+        --job <id> --verdict <v> --report <path>` — the api validates the
+        envelope, binds the exact durable identity {workflow_id, op_id,
+        attempt, generation, lease_token}, releases the lease and records
+        the verdict. Consumption is enforced: settle sets the report's
+        consumed_at if the kernel did not already mark it — a report is
+        never settled unconsumed, and a dispatch with no filed report has
+        nothing to settle. A refused settle is a routed verdict,
+        never silent loss (api.yaml refuses).
       neverTrust: >-
         `done` is never taken on trust — the op's own checks are re-run and
-        the changed files are computed from git, not read from the report
-        (the api's settle re-proof: changedFiles, attributedFiles,
+        the re-run results recorded on the checks row via `api check` before
+        settle; the changed files are computed from git, not read from the
+        report (the api's settle re-proof: changedFiles, attributedFiles,
         validateAccepted, recordVerdict). Evidence is bytes
         on disk, never words in a summary (verdict-contract.yaml).
       durableHalf: >-
-        The settle is a ledger transaction: the durable job completes, its
-        machine lease refs release and the worker terminal is closed
+        The settle is a ledger transaction: the durable job completes, the
+        consumed report stands integrated, its machine lease refs release
+        and the worker terminal is closed
         (scripts/agent/lib.mjs — a settled op leaves no live terminal). A
         report that cannot bind the exact identity is refused
         ('stale-settlement' fence), not partially accepted.
       prototypeNote: >-
-        The marker/report convention: the done-marker file is the wake-up,
-        the report file is the verdict — e.g. a `<job>.done` marker beside
-        the job's `<job>-REPORT.md` under its declared artifact dir (or a
-        state_snapshots row when the signal is ledger-only). File first,
-        signal second.
+        The marker/report convention survives as the WAKE-UP only: a
+        `<job>.done` marker beside the job's `<job>-REPORT.md` under its
+        declared artifact dir is scratch signal, never the durable record —
+        the durable report is the reports row written by `api report`, and
+        the durable contract is the contracts row written by dispatch.
+        Row first, file second, signal third.
     repair:
       onFail: >-
         verdict fail -> retry inside the route's limit: `api enqueue` the

@@ -83,9 +83,10 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
     const job=ledger.db.prepare('SELECT attempt,generation,status,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
     const inbox=ledger.db.prepare("SELECT status FROM inbox WHERE workflow_id=? AND kind='goal'").get(workflowId);
     const kinds=ledger.db.prepare("SELECT kind FROM events WHERE workflow_id=? ORDER BY seq").all(workflowId).map(row=>row.kind);
-    assert.deepEqual({...workflow},{generation:0,phase:'queued'});
+    assert.deepEqual({...workflow},{generation:0,phase:'running'});
     assert.deepEqual({...job},{attempt:2,generation:0,status:'running',worker_id:restartOut.terminal});
     assert.equal(inbox.status,'claimed');
     assert.ok(kinds.includes('kernel-stale-cleared'));assert.ok(kinds.includes('kernel-restarted'));
+    assert.ok(kinds.includes('phase-transition'),'the kernel claim must durably record queued->running');
   }finally{ledger.close();}
 });

@@ -669,7 +669,18 @@ try {
       ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,?,'kernel','kernel',?,'running',?,?,?)")
         .run(`kernel-${workflowId}`, workflowId, null, generation, payload, workerId, now, now);
     }
-    ledger.db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(now, workflowId);
+    // Phase transition — the canonical write (api.mjs dispatch carries the
+    // same update as a safety net). Guarded on phase='queued' so a kernel
+    // restart is idempotent and a finished/archived workflow is never
+    // regressed; the event is appended only when the row actually moved.
+    const transitioned = ledger.db.prepare("UPDATE workflows SET phase='running',updated_at=? WHERE workflow_id=? AND phase='queued'")
+      .run(now, workflowId);
+    if (transitioned.changes > 0) {
+      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation,
+        kind: 'phase-transition', payload: { from: 'queued', to: 'running' }, createdAt: now });
+    } else {
+      ledger.db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(now, workflowId);
+    }
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: replaced ? 'kernel-restarted' : 'kernel-booted',
       payload: { terminal: handle, dispatch: dispatchId, run: managedLaunch?.runId ?? null, task: managedLaunch?.taskId ?? null,

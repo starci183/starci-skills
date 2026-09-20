@@ -42,10 +42,12 @@ about:
     the kernel to believe it — and when the agent says 'something here is
     wrong', where does that doubt go?"
   businessAnswer: >-
-    One typed report, file first and signal second, bound to the exact
-    dispatch that produced it. The agent claims an outcome; the kernel
-    re-proves it. Doubt is a first-class field, not a side-channel: suspicion
-    text becomes a backward edge to the boundary that owns the wrongness.
+    One typed report — filed as a durable reports row via `api report`,
+    signal second — bound to the exact dispatch that produced it. The agent
+    claims an outcome; the kernel consumes it (`api consume-report`) and
+    re-proves it (`api check`) before `api settle`. Doubt is a first-class
+    field, not a side-channel: suspicion text becomes a backward edge to the
+    boundary that owns the wrongness.
   sources:
     - scripts/kernel/api.mjs
     - modules/models/kinds.yaml
@@ -129,8 +131,13 @@ returns:
       work-correction policy — never relabel a wrong flow as debt).
 
 # ============================================================================
-# 2 — THE REPORT ENVELOPE. starci/op-report@1 (validated by api settle).
-#    The file is the source of truth; the Orca message is the wake-up signal.
+# 2 — THE REPORT ENVELOPE. starci/op-report@1 (validated when the worker
+#    files `api report`; re-validated at `api settle`). The reports ROW is
+#    the durable verdict, the file is the bound artifact, the Orca message
+#    is the wake-up signal. Worker files -> kernel consumes
+#    (`api consume-report`) -> kernel re-runs checks (`api check`) ->
+#    `api settle`. Consumption is enforced: settle marks consumed_at if the
+#    kernel did not — a report is never settled unconsumed.
 # ============================================================================
 envelope:
   schema: starci/op-report@1        # workflow-level: starci/workflow-report@1
@@ -148,7 +155,12 @@ envelope:
   binding: >-
     Identity fields (run, task, dispatch, from) bind the report to the exact
     dispatch; UNIQUE(workflow_id, dispatch_id) on the reports table means one
-    dispatch produces exactly one report (engine/ledger-db.mjs / engine/schema.sql reports DDL).
+    dispatch produces exactly one report (engine/ledger-db.mjs /
+    engine/schema.sql reports DDL). Filing is `api report --job <id>
+    --outcome <o> --report <file>` — an upsert on that key, so a re-filed
+    report replaces itself rather than doubling; consumed_at marks the
+    report the kernel already integrated (`api consume-report`), and files
+    under .starciwork/_local are scratch only — never the durable record.
 
 # ============================================================================
 # 3 — WHAT THE SPINE ACCEPTS. Layers, in order; a report is judged at each.
@@ -164,10 +176,19 @@ accepts:
       fence' / 'does not bind the exact durable job' (the api's
       exact-identity fence). A duplicate terminal settle is recovered, not
       double-counted.
+  - layer: kernel-consumed
+    rule: >-
+      `api consume-report` marks the reports row integrated (consumed_at)
+      BEFORE the checks re-run; `api settle` enforces consumption — it sets
+      consumed_at itself if the kernel did not — so a report is never
+      settled unconsumed and consumption is never a side-effect of last
+      words.
   - layer: kernel-reproduced
     rule: >-
       `done` is accepted only after the kernel re-runs the op's checks itself
-      and computes the changed files from git; acceptance writes the verdict
+      — the re-run results are recorded on the checks row via `api check`
+      (keyed workflow_id/op_id/attempt, one row per attempt) — and computes
+      the changed files from git; acceptance writes the verdict
       record (the api's settle re-proof runs the declared check commands).
   - layer: boundary-correct
     rule: >-

@@ -67,11 +67,14 @@ spawn:
     Source SKILL.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
     mutation goes through node scripts/kernel/api.mjs <cmd>
-    (survey/status/plan/enqueue/dispatch/settle/incident/retire) — never
+    (survey/status/plan/enqueue/route/dispatch/consume-report/check/settle/
+    incident/retire — plus the worker-side op IPC op-contract/report) — never
     direct sqlite writes, never self-spawned op terminals, never direct
-    orca/git/provider-CLI calls, never .starciwork/_local/ writes; dispatch
-    goes through api dispatch; findings/plans persist via api plan|incident
-    before dispatch (kernel-prompt.md BOUNDARY).
+    orca/git/provider-CLI calls, never .starciwork/_local/ writes (report/
+    contract/check truth is the ledger rows via the api verbs; _local is
+    scratch only); `api route` persists the model decision before every
+    dispatch; dispatch goes through api dispatch; findings/plans persist via
+    api plan|incident before dispatch (kernel-prompt.md BOUNDARY).
 
 records:
   jobs_row: {kind: 'kernel', workflow_id, status: 'running', worker_id: <terminal handle>}

@@ -9,6 +9,13 @@
 # Ops are ephemeral [Op] agents spawned per job by `api dispatch`
 # (dispatch.yaml). The kernel reasons; the api transacts.
 #
+# The op IPC is durable: contracts out (dispatch writes the contracts row,
+# the worker reads it back via `api op-contract`), reports in (the worker
+# files `api report`; the kernel integrates it via `api consume-report`),
+# checks beside them (`api check` records the kernel's re-run). Report and
+# contract truth lives in runtime.sqlite through these verbs — files under
+# .starciwork/_local are scratch only, never the durable record.
+#
 # Sources (all under .claude/, relative to the skill root):
 #   scripts/kernel/api.mjs      — the executable half; this file is its contract
 #   engine/ledger-db.mjs        — the tables named below (DDL: engine/schema.sql)
@@ -32,11 +39,18 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    Eight verbs. Reads return projections (survey, status); writes are single
-    ledger transactions that each append one hash-chained event (plan,
-    enqueue, dispatch, settle, incident, retire). Every command prints one
-    JSON object to stdout; a refusal exits non-zero with {ok:false, reason} —
-    a refusal is a fact for the driver loop, never a crash to route around.
+    Thirteen verbs. Reads return projections (survey, status, op-contract);
+    the op IPC is durable rows (dispatch writes contracts, report files
+    reports, consume-report integrates, check records re-runs); the rest are
+    single ledger transactions that each append one hash-chained event (plan,
+    enqueue, route, dispatch, settle, incident, retire). Every command prints
+    one JSON object to stdout; a refusal exits non-zero with {ok:false,
+    reason} — a refusal is a fact for the driver loop, never a crash to route
+    around. The op lifecycle is fixed: enqueue -> route (model decision
+    persisted) -> dispatch (contract row written, leases held) -> worker
+    files `api report` -> kernel `api consume-report` -> kernel re-runs
+    checks -> `api check` -> `api settle` (consumption enforced — settle
+    marks the report consumed if the kernel did not).
   sources:
     - scripts/kernel/api.mjs
     - engine/ledger-db.mjs
@@ -60,14 +74,15 @@ conventions:
     rather than partial-match (the api's exact-identity settle fence;
     engine/ledger-db.mjs leases_match_job RAISE(ABORT,'lease-identity-drift'))
   neverDoes:
-    - 'never picks the next op or the model — the kernel reasons, route-model resolves'
+    - 'never picks the next op or the model ad hoc — the kernel reasons, `api route` resolves and persists the decision on the job payload before every dispatch'
     - 'never answers an ask or revises a goal — intent is the owners (provision.ask)'
     - 'never deletes history — retire preserves goals/jobs/reports/events'
     - 'never spawns outside dispatch --spawn — one job, one terminal, one agent'
     # Boundary rules the KERNEL agent is held to (modules/kernel/kernel-prompt.md
     # BOUNDARY; driver-loop.yaml boundary). The api is the only door:
     - 'kernel never calls orca, git, or a provider CLI directly — host mechanics are api internals + scripts/agent/lib.mjs; the kernel sees receipts, not terminals'
-    - 'kernel never writes .starciwork/_local/ — the ledger via api calls plus each job''s declared artifacts are the only durable surface'
+    - 'kernel never writes .starciwork/_local/ — the ledger via api calls plus each job''s declared artifacts are the only durable surface; report/contract truth is the reports/contracts/checks rows, _local files are scratch only'
+    - 'kernel never settles a report it has not consumed — `api consume-report` before `api settle`; consumption is the kernel''s durable acknowledgement and settle enforces it (marks consumed_at) at the latest'
     - 'kernel never holds durable state only in memory — survey findings, the derived plan, the slice table and routing reasoning persist via plan/incident into events/state_snapshots BEFORE dispatch'
     - 'kernel never reuses an op terminal — settle closes the worker terminal; a retry is a new job row at attempt+1'
 
@@ -108,7 +123,7 @@ commands:
       ok: true
       phase: '<workflows.phase>'
       counts: '{pending, running, answering, done, blocked, cancelled, failed}'
-      pending: '[{job_id, op_id, attempt, owned_paths}] — the dispatch candidates'
+      pending: '[{job_id, op_id, attempt, owned_paths}] — the dispatch candidates (status queued; pending is the legacy alias)'
       leases: '[{job_id, resource_key, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
     refuses:
       - unknown-workflow
@@ -159,9 +174,10 @@ commands:
     reads: 'workflows.phase; existing jobs for {workflow_id, op_id}; the brief modules/ops/ops/<opId>.yaml must exist'
     writes: >-
       jobs row {job_id, workflow_id, op_id, attempt=max(prior attempts)+1
-      (1 on first enqueue), generation, kind:'operation', status:'pending',
-      payload_json:{owned_paths:[--paths]}} + events 'job-enqueued'
-    returns: '{ok:true, job:{job_id, op_id, attempt, status:pending}}'
+      (1 on first enqueue), generation, kind:'operation', status:'queued'
+      ('pending' remains accepted as the legacy alias — admission bridges it
+      forward), payload_json:{owned_paths:[--paths]}} + events 'job-enqueued'
+    returns: '{ok:true, job:{job_id, op_id, attempt, status:queued}}'
     refuses:
       - unknown-workflow: 'no workflows row'
       - workflow-finished: 'a finished phase takes no new work (retire below)'
@@ -171,23 +187,60 @@ commands:
     usedBy: 'tick.enqueue — one row per planned op the queue lacks; retries enqueue attempt+1'
 
   # --------------------------------------------------------------------------
-  # DISPATCH — packet + lease + (with --spawn) the [Op] terminal.
+  # ROUTE — the model decision, persisted BEFORE dispatch. The kernel calls
+  # this once per job before `dispatch`; it never picks a model ad hoc.
+  # --------------------------------------------------------------------------
+
+  route:
+    args: '--job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]'
+    reads: >-
+      the job row + its payload (payload.difficulty is the fallback when
+      --difficulty is absent); the workflow goal's routing_bias {prefer[],
+      avoid[]} — flag entries lead the merged list; modules/models/runtimes.yaml
+      pool cards (maxParallel, provider); live running counts; provider quota
+      probes; open incidents that name the provider
+    writes: >-
+      jobs.payload_json gains {model, modelId, effort, routeChain,
+      routeRejected, difficulty} — the PERSISTED route dispatch then launches
+      exactly (dispatch reads payload.model/modelId/effort, never re-decides);
+      events 'route-decided' {kind, difficulty, bias, ...decided}
+    returns: '{ok:true, jobId, kind, difficulty, bias, decision:{model, modelId, effort, routeChain, routeRejected}}'
+    refuses:
+      - job-unknown: 'no jobs row for --job'
+      - job-settled: 'a settled job takes no route — the decision was already spent'
+      - job-no-op: 'the job carries no op identity to route for'
+      - route-refused: 'selectPool returned no decision — capacity, eligibility or quota; a wait reason, not a failure'
+    usedBy: >-
+      drive.dispatch — `api route` runs BEFORE every `api dispatch`: the model
+      decision is a ledger fact (payload + route-decided event), never an ad
+      hoc kernel pick and never a dispatch-time surprise
+  # --------------------------------------------------------------------------
+  # DISPATCH — packet + contract row + lease + (with --spawn) the [Op]
+  # terminal.
   # --------------------------------------------------------------------------
 
   dispatch:
-    args: '--job <job_id> [--spawn] [--model <target>]'
+    args: '--job <job_id> [--spawn] [--model <target>] [--worktree <sel>] [--lease-ttl <ms>]'
     reads: >-
-      the job row + its workflow; resources/leases/budgets for admission;
-      the op brief modules/ops/ops/<op>.yaml; the model resolution through
-      route-model (modules/models/selection.yaml — eligibility first, budget
-      orders the eligible)
+      the job row + its workflow — including the PERSISTED `api route`
+      decision on jobs.payload_json (model/modelId/effort; dispatch launches
+      what route wrote, it does not re-decide); resources/leases/budgets for
+      admission; the op brief modules/ops/ops/<op>.yaml; the model resolution
+      through route-model (modules/models/selection.yaml — eligibility first,
+      budget orders the eligible)
     writes: >-
-      jobs.status pending->running with lease_token + worker_id; leases +
-      budget_reservations rows taken atomically (the api's admission —
-      reserve, ttlMs 10min, engine/constants.mjs); contracts row = the
-      rendered packet markdown; events 'operation-launch-intent' then
-      'operation-launched' — and only after attestation below does the job
-      stand running (intent -> observed -> running)
+      admission FIRST, launch second: one `path:<owned_path>` lease row per
+      owned_path (capacity-1 exclusive write fences, reserveTwoPhase — job
+      queued->leased with its fencing token, ttl bounds a crashed worker's
+      fence while settle releases early) + budget_reservations taken
+      atomically; contracts row = the rendered packet markdown keyed
+      (workflow_id,op_id,attempt) with the dispatch_id — the worker's
+      dispatch authority, read back via `api op-contract`, written BEFORE the
+      job may stand running; workflows.phase queued->running with a
+      'phase-transition' event; jobs.status ->running with lease_token +
+      worker_id only after attestation below (intent -> observed -> running);
+      events 'operation-launch-intent'/'op-dispatched'. A dispatch-rejected
+      launch claims nothing — no contract row, no leases, no running phase.
     packet: >-
       the dispatch.yaml packet, fields unchanged — {op, brief,
       context:{records, owned_paths}, constraints:{model, budget, lease},
@@ -225,37 +278,110 @@ commands:
     usedBy: 'drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free'
 
   # --------------------------------------------------------------------------
-  # SETTLE — marker+report is the verdict; the api re-proves before recording.
+  # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
+  # checks beside. These rows (engine/schema.sql reports/contracts/checks)
+  # are the truth; .starciwork/_local files are scratch, never the record.
+  # --------------------------------------------------------------------------
+
+  op-contract:
+    args: '--job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]'
+    reads: 'the contracts row for the job''s {workflow_id,op_id,attempt} — the rendered packet markdown dispatch wrote'
+    writes: 'nothing — pure read of the worker''s dispatch authority'
+    returns: 'the stored contract markdown on stdout (machine form {ok:true, contract:{workflow_id, op_id, attempt, dispatch_id, markdown, context}} with --json)'
+    refuses:
+      - contract-missing: 'no contracts row for the job''s attempt — the job was never dispatched'
+      - job-unknown
+    usedBy: 'the [Op] worker — it reads its contract from the ledger row, not from the terminal prompt text'
+
+  report:
+    args: '--job <job_id> --outcome <done|partial|failed|ask|blocked> --report <file>'
+    reads: 'the job row (identity + dispatch_id); the report file (starci/op-report@1 envelope)'
+    writes: >-
+      reports row UPSERT keyed UNIQUE(workflow_id, dispatch_id) — one
+      dispatch, one durable report; the row carries outcome + report_json +
+      from_terminal and binds the same dispatch_id the contracts row was
+      written for; consumed_at stays NULL until `api consume-report` (or
+      `api settle`). events 'report-filed'. The file stays the artifact the
+      row binds — the ROW is the record.
+    returns: '{ok:true, report_id, job_id, outcome}'
+    refuses:
+      - report-missing: 'report file unreadable'
+      - report-invalid: 'fails starci/op-report@1 — outcome payload, identity binding, check entries'
+      - outcome-enum: 'outcome outside done|partial|failed|ask|blocked'
+      - job-unknown / not-in-flight
+    usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
+
+  consume-report:
+    args: '--job <job_id>'
+    reads: 'the reports row for the job''s dispatch_id'
+    writes: >-
+      reports.consumed_at = now — the kernel has read and integrated the
+      report into its view of the frontier. The kernel consumes BEFORE it
+      re-runs checks and settles; `api settle` enforces consumption at the
+      latest by marking the row itself — a report that never gets consumed
+      is a dispatch that never settled.
+    returns: '{ok:true, report_id, consumed_at}'
+    refuses:
+      - report-missing: 'the worker has not filed — nothing to consume'
+      - job-unknown
+    usedBy: 'drive.settle — the kernel reads the filed report, integrates it, consumes it, THEN re-runs checks'
+
+  check:
+    args: '--job <job_id> (--checks <json> | --checks-file <path>)'
+    reads: 'the job row; the op''s declared checks (the re-run results being recorded)'
+    writes: >-
+      checks row UPSERT keyed PK(workflow_id,op_id,attempt) — the kernel''s
+      INDEPENDENT re-run of the op''s declared checks, one row per attempt,
+      a re-run replaces itself rather than doubling; events
+      'checks-recorded'. `done` is never taken on trust: these are the
+      results the kernel observed, not the worker''s claims.
+    returns: '{ok:true, job_id, checks:<n>}'
+    refuses:
+      - job-unknown
+      - checks-invalid: 'the --checks payload is not the check-result shape'
+    usedBy: 'drive.settle — after consume-report and before settle; the re-run record a `pass` verdict stands on'
+
+  # --------------------------------------------------------------------------
+  # SETTLE — the report row is the verdict; the api re-proves before
+  # recording. Consumption is enforced — a report never settles unconsumed.
   # --------------------------------------------------------------------------
 
   settle:
     args: '--job <job_id> --verdict <pass|fail|blocked> --report <path>'
-    reads: 'the job row (complete identity + lease_token); the report file; the ops declared checks'
+    reads: >-
+      the job row (complete identity + lease_token); the reports row for the
+      job''s dispatch_id — the kernel consumed it earlier via
+      `api consume-report`; the report file; the ops declared checks; the
+      checks row the kernel''s re-run recorded
     writes: >-
-      reports row (UNIQUE(workflow_id, dispatch_id) — one dispatch, one
-      report); jobs.status -> done|failed|blocked + result_json; lease and
-      budget_reservation rows released — a settle frees the slot; the
-      worker terminal is closed via scripts/agent/lib.mjs — a settled op
-      leaves no live terminal for anyone to reuse; events
-      'operation-settled' {verdict}
+      jobs.status -> done|failed|blocked + result_json; the reports row''s
+      consumed_at is set — consumption the kernel did not mark via
+      `api consume-report` is enforced by settle itself, so a report is
+      never settled unconsumed; lease and budget_reservation rows released —
+      a
+      settle frees the slot; the worker terminal is closed via
+      scripts/agent/lib.mjs — a settled op leaves no live terminal for
+      anyone to reuse; events 'operation-settled' {verdict}
     validates: >-
-      The report FILE is the source of truth; the done-marker/message is
-      only the wake-up (modules/kernel/verdict-contract.yaml envelope).
-      validateReport runs starci/op-report@1: outcome's payload present,
-      files inside the job's owned_paths, identity binds {workflow_id,
-      op_id, attempt, generation, lease_token} exactly. `pass` records only
-      after the declared checks re-ran green and changed files computed
-      from git — evidence is bytes on disk, never words in a summary
+      The reports ROW is the durable verdict — filed by `api report`,
+      integrated by `api consume-report`; the done-marker/message is only
+      the wake-up and the file is the bound artifact
+      (modules/kernel/verdict-contract.yaml envelope). validateReport runs
+      starci/op-report@1: outcome's payload present, files inside the job's
+      owned_paths, identity binds {workflow_id, op_id, attempt, generation,
+      lease_token} exactly. `pass` records only after the declared checks
+      re-ran green (`api check` row) and changed files computed from git —
+      evidence is bytes on disk, never words in a summary
       (verdict-contract.yaml accepts).
     returns: '{ok:true, verdict, job:{job_id, status}, report_id}'
     refuses:
-      - report-missing: 'report path unreadable'
+      - report-missing: 'no reports row for this dispatch AND report path unreadable'
       - report-invalid: 'fails starci/op-report@1 validation — outcome payload, signal match, check entries'
       - out-of-scope-files: 'report.files outside the jobs owned_paths — named per file'
       - stale-settlement: 'lease_token no longer binds the durable job — the settlement fence'
       - verdict-enum: 'verdict outside pass|fail|blocked'
       - not-in-flight: 'job already settled — a duplicate settle is refused, never double-counted'
-    usedBy: 'drive.settle — a refused settle is a routed verdict (usually retry), never silent loss'
+    usedBy: 'drive.settle — last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 
   # --------------------------------------------------------------------------
   # INCIDENT — the fingerprinted escalation record.
@@ -304,12 +430,13 @@ commands:
 # ============================================================================
 tableMap:
   workflows:  {read: [survey, status, plan, enqueue, incident, retire], write: [retire]}
-  goals:      {read: [survey, plan], write: []}
-  jobs:       {read: [survey, status, enqueue, dispatch, settle, retire], write: [enqueue, dispatch, settle]}
+  goals:      {read: [survey, plan, route], write: []}
+  jobs:       {read: [survey, status, enqueue, route, dispatch, op-contract, report, consume-report, check, settle, retire], write: [enqueue, route, dispatch, settle]}
   inbox:      {read: [survey], write: [retire]}
   signals:    {read: [survey], write: [retire]}
   leases:     {read: [status, dispatch], write: [dispatch, settle]}
-  incidents:  {read: [survey], write: [incident]}
-  events:     {read: [survey], write: [plan, enqueue, dispatch, settle, incident, retire]}
-  reports:    {read: [], write: [settle]}
-  contracts:  {read: [], write: [dispatch]}
+  incidents:  {read: [survey, route], write: [incident]}
+  events:     {read: [survey], write: [plan, enqueue, route, dispatch, settle, incident, retire]}
+  reports:    {read: [consume-report, settle], write: [report, consume-report]}
+  contracts:  {read: [op-contract], write: [dispatch]}
+  checks:     {read: [settle], write: [check]}

@@ -89,6 +89,10 @@ CREATE TABLE goals(
 -- Retention (journal.mjs RETENTION, ported whole): the bound (wf,gen,goal) keeps
 -- ONE state body + its transition/bind rows + only the latest save row; retired
 -- generations keep nothing. Compacted on every open and every save.
+-- OBSERVED: no production INSERT exists — only retention (compactSnapshots) and
+-- retireWorkflow mutate this table; tests seed rows directly. The save/bind/
+-- transition checkpoint writer (and the writeAnchor caller that pairs with it)
+-- is a real hole, not declared-ahead IPC.
 -- ----------------------------------------------------------------------------
 CREATE TABLE state_snapshots(
   snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT, checkpoint_id TEXT NOT NULL UNIQUE,
@@ -153,6 +157,11 @@ CREATE INDEX jobs_op ON jobs(workflow_id,op_id,attempt);
 -- ai/* and machine:* capacities live in machine.sqlite, never here.
 -- What a row lets the kernel decide: whether a reservation can be admitted —
 -- reserveTwoPhase refuses when SUM(live lease units) + needed > capacity.
+-- OBSERVED: the production writer is api.mjs reserveOpLeases, which seeds one
+-- `path:<normalized owned_path>` row per op write path at capacity 1
+-- (OR IGNORE — an operator-declared capacity is never overwritten).
+-- machine.setCapacity writes machine.sqlite's own resources table, not this
+-- one.
 -- ----------------------------------------------------------------------------
 CREATE TABLE resources(resource_key TEXT PRIMARY KEY, capacity INTEGER NOT NULL CHECK(capacity>=0));
 
@@ -166,6 +175,11 @@ CREATE TABLE resources(resource_key TEXT PRIMARY KEY, capacity INTEGER NOT NULL 
 -- operation's reservation is still exactly what it was admitted with
 -- (engine.mjs intent-v1 exact-binding check), and what a release must also
 -- release on the machine side (machine_ref).
+-- writtenBy: reserveTwoPhase inside api.mjs reserveOpLeases — `api dispatch
+-- --spawn` takes `path:*` unit leases (fencing token = jobs.lease_token)
+-- BEFORE anything launches; a refused reservation is a dispatch-rejected.
+-- settle and dispatch-rejected delete the job's rows; expires_at bounds a
+-- crashed worker's fence.
 -- ----------------------------------------------------------------------------
 CREATE TABLE leases(
   resource_key TEXT NOT NULL, job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,
@@ -202,6 +216,9 @@ CREATE TRIGGER leases_match_job_update BEFORE UPDATE ON leases BEGIN
 -- declared budget, and what returns to the pool on release (reserved back,
 -- optionally consumed into used on completion). NOTE: machine budgets
 -- (scope_key machine:*) live in machine.sqlite; these are the repo-local ones.
+-- OBSERVED: no writer or reader exists in current code — reserveTwoPhase
+-- admits on resources + machine needs only. Declared-ahead for the admission
+-- layer; empty until it lands.
 -- ----------------------------------------------------------------------------
 CREATE TABLE budgets(scope_key TEXT PRIMARY KEY, limit_value INTEGER NOT NULL CHECK(limit_value>=0),
   used_value INTEGER NOT NULL DEFAULT 0 CHECK(used_value>=0), reserved_value INTEGER NOT NULL DEFAULT 0 CHECK(reserved_value>=0));
@@ -209,11 +226,13 @@ CREATE TABLE budget_reservations(scope_key TEXT NOT NULL REFERENCES budgets(scop
   units INTEGER NOT NULL CHECK(units>0), PRIMARY KEY(scope_key,job_id));
 
 -- ----------------------------------------------------------------------------
--- incidents — imported history only in 1.0.4. OBSERVED: no current kernel code
--- writes this table (engine.incident() keeps retry budgets in workflow STATE,
--- `state.engine.incidents`, not here — kernel/engine.mjs:656). The table exists
--- for ledger-migrate imports from the retired journal and is dropped by
--- retireWorkflow. Treat it as a migration landing zone until a writer returns.
+-- incidents — the fingerprinted escalation record. writtenBy:
+-- scripts/kernel/api.mjs — the `incident` verb (cmdIncident) and the
+-- dispatch-rejected path (rejectDispatch files a typed infra-provider incident
+-- on attestation failures). Per-retry counters still live in workflow state,
+-- not here; retireWorkflow drops the rows. (An earlier OBSERVED note recorded
+-- "no current kernel code writes this table" — true before api.mjs existed,
+-- corrected now.)
 -- ----------------------------------------------------------------------------
 CREATE TABLE incidents(incident_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT, attempts INTEGER NOT NULL DEFAULT 0,
   model_calls INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0, elapsed_ms INTEGER NOT NULL DEFAULT 0,
@@ -227,6 +246,10 @@ CREATE TABLE incidents(incident_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL R
 -- so it is never read as its answer (owner.mjs).
 -- What a row lets the kernel decide: the operation's typed outcome
 -- (done|partial|failed|ask|blocked) and whether it was already consumed.
+-- writtenBy: `api report` (cmdReport — INSERT OR REPLACE, consumed_at reset
+-- NULL on a re-file; dispatch_id is the worker's handle, falling back to the
+-- job id). consumed_at is stamped by `api consume-report` and again by
+-- `settle` when it integrates the verdict (the durable signal is spent once).
 -- ----------------------------------------------------------------------------
 CREATE TABLE reports(
   report_id INTEGER PRIMARY KEY AUTOINCREMENT, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),
@@ -240,6 +263,10 @@ CREATE TABLE reports(
 -- (workflow_id,op_id,attempt) makes an attempt's contract exactly one row.
 -- What a row lets the kernel decide: what an operation was actually asked to do
 -- — the contract is the dispatch authority, never the terminal prompt.
+-- writtenBy: `api dispatch` (fileContract — INSERT OR REPLACE of the rendered
+-- prompt + packet markdown, written BEFORE jobs flips to 'running' on both the
+-- terminal and the managed-worker path; dispatch_id is the worker's handle).
+-- The worker reads it back with `api op-contract`.
 -- ----------------------------------------------------------------------------
 CREATE TABLE contracts(
   workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT NOT NULL, attempt INTEGER NOT NULL,
@@ -252,6 +279,8 @@ CREATE TABLE contracts(
 -- What a row lets the kernel decide: what independent verification an accepted
 -- slice passed — written by the operation that re-ran the checks, read on
 -- continuation/review.
+-- writtenBy: `api check` (cmdCheck — INSERT OR REPLACE of the kernel's re-run
+-- results for the attempt, filed between consume-report and settle).
 -- ----------------------------------------------------------------------------
 CREATE TABLE checks(
   workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT NOT NULL, attempt INTEGER NOT NULL,
@@ -278,6 +307,9 @@ CREATE TABLE inbox(
 -- and which dispatch/terminal a launch reserved ('launch').
 -- OBSERVED: expires_at exists but no reader filters on it in a SELECT — expiry
 -- is evaluated in JS after the row is read (continuation.mjs/launch.mjs).
+-- writtenBy: scripts/kernel/start-workflow.mjs — the only current writer; it
+-- keys the kernel singleton as scope='kernel', key=<workflow_id> (the inverse
+-- of the scoping described above) and never writes 'stop'/'launch' keys.
 -- ----------------------------------------------------------------------------
 CREATE TABLE signals(
   scope TEXT NOT NULL, key TEXT NOT NULL,
@@ -290,6 +322,10 @@ CREATE TABLE signals(
 -- JSON; unprefixed rows carry runtime entries (loads.mjs::readRows/writeRuntimes
 -- split on the prefix). What a row lets the kernel decide: which provider has
 -- headroom for the next admission.
+-- OBSERVED: no writer or reader — loads.mjs and the supervisor it served are
+-- retired, and live provider load is probed instead (scripts/api/quota +
+-- modules/models/runtimes.yaml in api.mjs `route`). Vestigial unless a
+-- supervisor returns.
 -- ----------------------------------------------------------------------------
 CREATE TABLE runtime_loads(runtime TEXT PRIMARY KEY, loads_json TEXT NOT NULL, at INTEGER NOT NULL);
 
@@ -300,6 +336,8 @@ CREATE TABLE runtime_loads(runtime TEXT PRIMARY KEY, loads_json TEXT NOT NULL, a
 -- are the record; an op binds them by sha256 through the ref scheme
 -- `ledger://inputs/<workflow_id>/<key>#sha256=<hex>` — never by path. origin is
 -- provenance only. readInput refuses `input-digest-mismatch` on tampered bytes.
+-- OBSERVED: the handle writer exists (openLedger().inputs.put) but no script
+-- calls it — the goal-time freeze is declared-ahead, caller missing.
 -- ----------------------------------------------------------------------------
 CREATE TABLE inputs(
   workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,      -- '<index>-<basename>' as today
@@ -313,5 +351,8 @@ CREATE TABLE inputs(
 -- '<inputsDir>', '<dir>#anchor', '<_local family>'). What a row lets the kernel
 -- decide: whether a second migrate run is a no-op (source already recorded) and
 -- which `_local` families were reported `deleted-not-imported` (§13).
+-- OBSERVED: vestigial — the only writer was scripts/ledger/ledger-migrate.mjs,
+-- retired with the journal reader it served; the table stays as the import
+-- provenance it already holds.
 -- ----------------------------------------------------------------------------
 CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);

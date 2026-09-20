@@ -131,6 +131,15 @@ failure means the job is **not** running — the reservation is settled and the
 terminal closed (`spawn-failed`), never a ghost lease. `settle` closes the
 worker terminal via the card's `release` block.
 
+The host launch is only the delivery half of the op lifecycle; the durable
+record is the ledger's op IPC (docs/ledger-db.md §4a): `api dispatch` writes
+the `contracts` row — the contract is the dispatch authority, the terminal
+prompt or orchestration preamble only delivers it — the worker reads it via
+`api op-contract` and files its outcome with `api report`; the kernel marks it
+integrated with `api consume-report`, records its re-run via `api check`, and
+`api settle` releases the leases, closes the seat and consumes the job's
+report row (`reports.consumed_at`) as part of recording the verdict.
+
 ## Managed-agent dispatch (`kind: native-managed-agent`)
 
 Claude and Codex are **native managed agents**: the host starts a supervised

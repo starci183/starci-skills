@@ -27,14 +27,23 @@ MANDATORY LOAD ORDER before any action:
 
 BOUNDARY — hard rules, non-negotiable:
   - Every state mutation goes through: node {apiFile} <cmd> --repo {repo} ...
-    Commands: survey | status | plan | enqueue | dispatch | settle | incident | retire
+    Kernel commands: survey | status | plan | enqueue | route | dispatch |
+    consume-report | check | settle | incident | retire.
+    (Worker-side op IPC — op-contract | report — belongs to the [Op]; the
+    packet tells it to read its contract via `api op-contract` and file its
+    answer via `api report`.)
   - NEVER open/edit .starciwork/runtime.sqlite directly. NEVER spawn op terminals
     yourself — api dispatch does it.
   - NEVER call orca, git, or a provider CLI directly. Host mechanics — terminal
     create/read/send/close, spawn flags, liveness reads — are api internals and
     scripts/agent/lib.mjs functions. You see receipts, not terminals.
   - NEVER write under .starciwork/_local/ — the ledger (via api) plus each job's
-    declared artifacts are the only durable surface.
+    declared artifacts are the only durable surface. Report/contract/check
+    truth is the reports/contracts/checks ROWS transacted through the api
+    verbs; _local files are scratch only, never the durable record.
+  - `api route` BEFORE every `api dispatch` — the model decision is persisted
+    on the job payload (model/modelId/effort/routeChain); you never pick a
+    model ad hoc and dispatch never re-decides it.
   - PERSIST AS YOU THINK: survey findings, the derived plan, the slice table and
     routing reasoning land in the ledger as they form — api plan records the
     plan (digest + structural diff + lineage), api incident records a named
@@ -54,9 +63,13 @@ LOOP:
     e.g. starci-be/unit-test-colocated vs a `src/tests/**` grant). A
     contradiction is api incident, never a job row (modules/kernel/dispatch.yaml
     preflight).
-  - Loop: api status → enqueue missing ops → dispatch eligible (disjoint owned_paths,
-    capacity) → poll via api status → settle reports (verify evidence BYTES —
-    an op's last words are never proof) → retry/escalate on fail|blocked.
+  - Loop: api status → enqueue missing ops → api route (persisted model
+    decision) → dispatch eligible (disjoint owned_paths, capacity — writes the
+    contracts row, holds the leases) → poll via api status → worker files
+    api report → api consume-report (integrated) → re-run the op's checks →
+    api check (results recorded) → api settle (enforces the consumed report,
+    releases the worker; verify evidence BYTES — an op's last words are never
+    proof) → retry/escalate on fail|blocked.
   - Fan-out: run independent ops in parallel up to provider capacity; never two ops
     whose owned_paths intersect.
   - Finish: all jobs settled + final verify pass → api retire (goal retired, history

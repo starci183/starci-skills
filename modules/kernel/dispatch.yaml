@@ -11,7 +11,11 @@
 # named beside it. The packet is the whole world the op knows: its brief,
 # the records it may read, the paths it may write, the model and budget it
 # was allocated, and the lease token that binds everything it does back to
-# one durable job identity.
+# one durable job identity. The rendered packet is durable too — dispatch
+# writes it as the contracts row (workflow_id,op_id,attempt), which the
+# worker reads back via `api op-contract`; the terminal text is only the
+# delivery, the row is the dispatch authority. The answer travels the same
+# channel back: `api report` files the durable reports row.
 #
 # Sources (all under .claude/, relative to the skill root):
 #   scripts/kernel/api.mjs   — the dispatch command: packet build, lease,
@@ -104,7 +108,9 @@ fields:
       manifest (operator contract + business analysis + route: block); the
       api renders it into the task text the agent receives
       (scripts/kernel/api.mjs buildPacket/buildPrompt; the rendered markdown
-      is stored in the contracts table, keyed by workflow/op/attempt).
+      is stored in the contracts table, keyed by workflow/op/attempt — the
+      worker reads it back via `api op-contract --job <id>`; the row, not
+      the prompt text, is the dispatch authority).
     enforcedBy: >-
       The agent reads the brief; it does not renegotiate it. Reads/writes the
       brief declares become the packet's context. A brief that cannot produce
@@ -151,12 +157,15 @@ fields:
 
   constraints.model:
     meaning: >-
-      The allocated runtime/model for this dispatch — an output of
-      route-model, never an agent choice. Selection rules live in
-      modules/models/selection.yaml (eligibility by risk/qualityFloor,
-      probation gates, highKinds that may never run on probation);
-      the api resolves it inside dispatch (scripts/route/route-model.mjs):
-      eligibility first, budget orders the eligible, cooling/capacity park.
+      The allocated runtime/model for this dispatch — the persisted output
+      of `api route --job <id>` (run BEFORE dispatch; it writes
+      {model, modelId, effort, routeChain} onto the job payload and a
+      'route-decided' event), never an agent choice and never an ad hoc
+      kernel pick. Selection rules live in modules/models/selection.yaml
+      (eligibility by risk/qualityFloor, probation gates, highKinds that may
+      never run on probation) over the pool cards in
+      modules/models/runtimes.yaml: eligibility first, budget orders the
+      eligible, cooling/capacity park. Dispatch launches what route wrote.
     enforcedBy: >-
       Eligibility is evaluated against the ROLE's pinned model
       (the api's reserve admittedModel; kindRole in
@@ -207,12 +216,17 @@ fields:
     meaning: "what the [Op] owes the kernel when it dies — the verdict contract"
     enforcedBy: "modules/kernel/verdict-contract.yaml — accepted/rejected shapes, evidence byte checks, suspicion mapping"
     timing: >-
-      File first, signal second: the report file is the source of truth, the
-      Orca message only the wake-up (modules/kernel/verdict-contract.yaml
-      envelope). The op's terminal dies when its verdict settles — `api
-      settle` closes the worker terminal (scripts/agent/lib.mjs); the api's
-      sweep closes tabs nobody reads, keeping owner-open ask tabs
-      (sweep interval in engine/constants.mjs).
+      Row first, file second, signal third: the op files its answer through
+      `api report --job <id> --outcome <done|partial|failed|ask|blocked>
+      --report <file>` — the reports row (UNIQUE(workflow_id, dispatch_id))
+      is the durable verdict, the report file is the bound artifact, the
+      Orca message only the wake-up; anything under .starciwork/_local is
+      scratch, never the record (modules/kernel/verdict-contract.yaml
+      envelope). The kernel then consumes the row (`api consume-report`),
+      re-runs the checks (`api check`) and settles. The op's terminal dies
+      when its verdict settles — `api settle` closes the worker terminal
+      (scripts/agent/lib.mjs); the api's sweep closes tabs nobody reads,
+      keeping owner-open ask tabs (sweep interval in engine/constants.mjs).
 
 # ============================================================================
 # PATH-LEGALITY PREFLIGHT — owned_paths are checked against the target repo's
