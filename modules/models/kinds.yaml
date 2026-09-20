@@ -332,6 +332,57 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, srs-gap, sds-gap, environment, authority]
+  backend.scaffold:
+    family: build
+    role: implement
+    operator: backend.scaffold
+    readOnly: false
+    # Greenfield: there is no owning code to read - the reads are the settled design that decides
+    # the stack/layout and the conventions the new tree must satisfy from its first commit.
+    reads: [srs, sds, decision]
+    writes: [code]
+    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement, application-stacks]
+    checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
+    stacks: [modules/schemas/workspace-routing.yaml]
+    carries: []
+    purpose: Create one new backend source tree - toolchain, house layout, runnable skeleton - proven green.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [sds-gap, environment, authority]
+  interface.scaffold:
+    family: build
+    role: implement
+    operator: interface.scaffold
+    readOnly: false
+    # Greenfield interface: grammar and brand are required inputs because the first markup is
+    # written in the installed grammar with settled tokens - a scaffold cannot invent either.
+    reads: [srs, sds, design, brand, grammar]
+    writes: [code, asset]
+    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement]
+    checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
+    stacks: [modules/schemas/workspace-routing.yaml]
+    carries: []
+    purpose: Create one new interface source tree - grammar-written shell with tokens wired - proven by build plus captured first render.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [sds-gap, brand-gap, grammar-gap, environment, authority]
+  package.scaffold:
+    family: build
+    role: implement
+    operator: package.scaffold
+    readOnly: false
+    # A new package reads the host repo's existing conventions (sibling manifests, kits) but no
+    # owning code exists yet - `code` here means the host repo, not the package's own source.
+    reads: [sds, decision, code]
+    writes: [code]
+    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement]
+    checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs]
+    stacks: [modules/schemas/workspace-routing.yaml]
+    carries: []
+    purpose: Create one new package/module tree - manifest, exports, harness - proven by build plus a real consumer import.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [sds-gap, environment, authority]
   runtime.operate:
     family: build
     role: implement

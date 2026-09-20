@@ -1,0 +1,193 @@
+# modules/ops/ops/interface.scaffold.yaml — greenfield frontend source creation.
+# Creates a NEW interface source tree: framework scaffold written in the installed
+# grammar, brand tokens wired, first route/shell rendering — proven by build +
+# capture, not just written. Distinct from interface.implement (fills an
+# existing tree) and interface.draw (decides the drawing, not the source).
+
+id: interface.scaffold
+goal:
+  en: Create one new interface source tree in the bound repository and prove it renders —
+    build green plus a captured first shell.
+nodeKinds:
+  - implementation
+completionProfile: implementation
+sideEffects:
+  - owned source edits
+  - new source tree creation inside the bound repository at the declared path
+  - scoped local commits when authorized
+  - toolchain install/build and a local render probe in the declared sandbox
+  - no deployment, no publication, no design decisions
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the selected implementation node this scaffold realises: declared source path,
+        framework/design refs, assertions. No selected node is a scope/graph gap — report it."
+  - id: architecture
+    path: .starciwork/<business>/architecture/**/index.yaml
+    purpose:
+      en: "REQUIRED for greenfield. Framework choice, app shell shape, routing root and data
+        boundaries come from the settled SDS — never guessed. Missing decisions report sds-gap."
+  - id: grammar
+    path: knowledge/grammars/* + grammar package (repository:<repo-id> binding)
+    purpose:
+      en: "REQUIRED. The markup is written in the installed grammar, not in ad-hoc JSX/HTML.
+        Resolve the bound grammar package and its version before writing any component; a missing
+        or unbound grammar reports grammar-gap."
+  - id: brand
+    path: .starciwork/<business>/brand/**/index.yaml (settled tokens inside)
+    purpose:
+      en: Read settled brand tokens the scaffold wires into the theme layer. Absent brand decisions
+        report brand-gap rather than shipping placeholder styling as settled.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve the actual checkout, HEAD and dirty state; the declared app path may be empty —
+        that is the greenfield case.
+  - id: conventions
+    path: knowledge/patterns/fe/* + knowledge/ui/* + knowledge/code-pattern-enforcement.yaml
+    purpose:
+      en: House FE rules the new tree conforms to from its first commit — lint kits, source layout,
+        naming, boundary contracts.
+  - id: profile
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve the request-bound profile; capabilities are the intersection of actual tools and
+        profile policy.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - activity
+      - codeRefs
+      - evidence
+    content:
+      en: Record the realised source root, scaffolded paths and evidence the checks produced.
+  - id: source
+    path: repository:<repo-id>/<declared-source-root>/**
+    fields:
+      - manifest
+      - toolchainConfig
+      - layout
+      - themeWiring
+      - firstShell
+      - harness
+    content:
+      en: "The new tree only: manifest, framework/toolchain configs, declared layout, grammar-based
+        theme/token wiring, the minimal first shell (root route renders), and its test/build
+        harness."
+  - id: evidence
+    path: E/result.json + E/effects.json + E/verification.json + E/artifacts + captured first render
+    fields:
+      - request
+      - scope
+      - criteria
+      - status
+      - outputs
+      - observations
+      - effects
+      - evidenceRefs
+      - codeRefs
+      - remaining
+      - recovery
+    content:
+      en: Includes the captured first-shell render (image bytes under the node's evidence assets) —
+        a scaffold claim without a capture is unproven.
+steps:
+  - reads: [target, architecture, grammar, brand]
+    writes: [evidence]
+    action:
+      en: Resolve what the new app must be — framework, shell shape, grammar version, token source.
+        Undecided inputs are named gaps, never improvised.
+  - reads: [repo, conventions]
+    writes: [evidence]
+    action:
+      en: Resolve the real checkout, confirm the declared app path is empty-or-absent, read the house
+        FE layout and lint contracts.
+  - reads: [architecture, grammar, brand]
+    writes: [source]
+    action:
+      en: Write manifest + toolchain configs, then the declared layout, then grammar-based theme
+        wiring, then the minimal first shell. No screens or behaviour beyond what the shell proves.
+  - reads: [repo]
+    writes: [source, evidence]
+    action:
+      en: Install, build, lint and run the harness for real; serve the shell locally and capture the
+        first render. The capture is evidence, recorded under the node's assets.
+  - reads: [target]
+    writes: [node, evidence]
+    action:
+      en: Record the realised source root and codeRefs on the node; return the evidence bundle with
+        the capture.
+proofs:
+  - id: scaffold-runs
+    requirement:
+      en: The declared toolchain commands ran against the new tree and real output is recorded.
+  - id: renders
+    requirement:
+      en: The first shell rendered and the capture bytes exist in evidence — build-green alone does
+        not prove an interface scaffold.
+  - id: grammar-conforms
+    requirement:
+      en: Written markup uses the installed grammar's units; no ad-hoc markup bypassed it.
+  - id: scope
+    requirement:
+      en: Every created file lives under the declared source root.
+blockers:
+  - code: SDS_MISSING
+    condition:
+      en: No settled architecture names the framework, shell shape or routing root.
+  - code: GRAMMAR_UNBOUND
+    condition:
+      en: No bound grammar package resolves — markup cannot be written without it.
+  - code: BRAND_MISSING
+    condition:
+      en: Theme wiring is required but no settled brand tokens exist.
+  - code: TOOLCHAIN_UNAVAILABLE
+    condition:
+      en: The declared toolchain cannot install, build or render in the available environment.
+  - code: OUTSIDE_SCOPE
+    condition:
+      en: The required tree would write outside the declared source root.
+placeholders:
+  repo-id: Observed selected repository identity
+  bound-paths: Inspected relevant source read set
+  declared-source-root: The exact path the node/design declares for the new app tree
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+business:
+  question: >-
+    "For a greenfield frontend: what exact app tree do the settled design, grammar and
+    brand require, and does the scaffolded shell actually render?"
+  whenNeeded:
+    - A workflow needs a new interface app where no source tree exists yet.
+    - Grammar-conformant skeleton + theme wiring must be proven before implement ops build screens.
+  whenNot:
+    - Not for building settled screens in an existing tree — interface.implement.
+    - Not for deciding what the product looks like — interface.draw / brand.decide.
+  consumes:
+    - The selected implementation node; settled architecture; installed grammar; brand tokens;
+      the bound (possibly empty) repository; house FE conventions.
+  produces:
+    - A buildable, renderable interface skeleton under the declared source root plus its evidence
+      bundle including the first-shell capture.
+  failureModes:
+    - SDS_MISSING, GRAMMAR_UNBOUND, BRAND_MISSING, TOOLCHAIN_UNAVAILABLE, OUTSIDE_SCOPE.
+
+route:
+  nodeKinds: [implementation]
+  phase: [implement]
+  intent: [scaffold, greenfield, new-source, frontend, interface, bootstrap, init]
+  prerequisites: ["architecture.decide done", "grammar bound", "repository bound"]
+  riskHints: [source-edits, new-tree]

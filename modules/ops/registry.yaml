@@ -27,7 +27,7 @@ coarsePhases:
   verify: post-implementation
   release: post-implementation
   operate: cross-cutting
-count: 30
+count: 33
 ops:
   - id: architecture.decide
     family: architecture
@@ -116,6 +116,51 @@ ops:
       - and prove it with unit + backend E2E + quality gates (incl.'
     whenNeeded: When an accepted SRS/SDS slice needs backend code created, refined or defect-repaired
       (primary mode).
+  - id: backend.scaffold
+    family: backend
+    goal: Create one new backend source tree in the bound repository and prove its declared toolchain
+      contract on the actual scaffold.
+    nodeKinds:
+      - implementation
+    completionProfile: implementation
+    sideEffects:
+      count: 5
+      summary: owned source edits
+    reads:
+      - target
+      - architecture
+      - business
+      - repo
+      - conventions
+      - stacks
+      - profile
+    writes:
+      - node
+      - source
+      - evidence
+    route:
+      nodeKinds:
+        - implementation
+      phase:
+        - implement
+      intent:
+        - scaffold
+        - greenfield
+        - new-source
+        - backend
+        - bootstrap
+        - init
+      prerequisites:
+        - architecture.decide done
+        - repository bound
+      riskHints:
+        - source-edits
+        - new-tree
+    lifecyclePosition: implement
+    kindInferred: scaffold
+    businessQuestion: '"For a greenfield backend: what exact source tree does the settled design
+      require, and does the scaffolded toolchain actually run green?"'
+    whenNeeded: A workflow needs a new backend service/app where no source tree exists yet.
   - id: brand.decide
     family: brand
     goal: Settle one product's visual identity in the single brand record - colour tokens traced to the
@@ -680,6 +725,53 @@ ops:
       handoff (flows.json)?"'
     whenNeeded: For selected frontend creation, refinement or defect repair once draws/design exist (or
       in a no-draw scope with source-derived mapping).
+  - id: interface.scaffold
+    family: interface
+    goal: Create one new interface source tree in the bound repository and prove it renders — build
+      green plus a captured first shell.
+    nodeKinds:
+      - implementation
+    completionProfile: implementation
+    sideEffects:
+      count: 5
+      summary: owned source edits
+    reads:
+      - target
+      - architecture
+      - grammar
+      - brand
+      - repo
+      - conventions
+      - profile
+    writes:
+      - node
+      - source
+      - evidence
+    route:
+      nodeKinds:
+        - implementation
+      phase:
+        - implement
+      intent:
+        - scaffold
+        - greenfield
+        - new-source
+        - frontend
+        - interface
+        - bootstrap
+        - init
+      prerequisites:
+        - architecture.decide done
+        - grammar bound
+        - repository bound
+      riskHints:
+        - source-edits
+        - new-tree
+    lifecyclePosition: implement
+    kindInferred: scaffold
+    businessQuestion: '"For a greenfield frontend: what exact app tree do the settled design, grammar
+      and brand require, and does the scaffolded shell actually render?"'
+    whenNeeded: A workflow needs a new interface app where no source tree exists yet.
   - id: knowledge.repair
     family: knowledge
     goal: Repair one challenged canonical instruction/rule and affected references from concrete
@@ -721,6 +813,52 @@ ops:
     businessQuestion: '"What is the smallest canonical repair to a challenged instruction or rule - and
       its affected references - grounded in applicability evidence?"'
     whenNeeded: When concrete evidence challenges a canonical knowledge file/rule or a skill instruction.
+  - id: package.scaffold
+    family: package
+    goal: Create one new package or library module at the declared path and prove its public contract
+      surface — the package builds and a real consumer import resolves.
+    nodeKinds:
+      - implementation
+    completionProfile: implementation
+    sideEffects:
+      count: 5
+      summary: owned source edits
+    reads:
+      - target
+      - architecture
+      - repo
+      - conventions
+      - profile
+    writes:
+      - node
+      - source
+      - evidence
+    route:
+      nodeKinds:
+        - implementation
+      phase:
+        - implement
+      intent:
+        - scaffold
+        - greenfield
+        - new-source
+        - package
+        - library
+        - module
+        - bootstrap
+        - init
+      prerequisites:
+        - architecture.decide done
+        - repository bound
+      riskHints:
+        - source-edits
+        - new-tree
+    lifecyclePosition: implement
+    kindInferred: scaffold
+    businessQuestion: '"For a new package/module: what exact boundary does the settled design declare,
+      and does a real consumer resolve its public surface?"'
+    whenNeeded: A workflow needs a new reusable package/module inside a bound repo (packages/* shape) or
+      a fresh bound repo.
   - id: perf.verify
     family: perf
     goal: Run or observe the declared performance measurements against the running product the

@@ -1,0 +1,188 @@
+# modules/ops/ops/backend.scaffold.yaml — greenfield backend source creation.
+# Creates a NEW backend source tree where none exists: toolchain, house layout,
+# first runnable skeleton, lint+test harness — proven green, not just written.
+# Distinct from backend.implement, which fills behaviour into an existing tree.
+
+id: backend.scaffold
+goal:
+  en: Create one new backend source tree in the bound repository and prove its declared
+    toolchain contract on the actual scaffold.
+nodeKinds:
+  - implementation
+completionProfile: implementation
+sideEffects:
+  - owned source edits
+  - new source tree creation inside the bound repository at the declared path
+  - scoped local commits when authorized
+  - toolchain install/build in the declared sandbox
+  - no production deployment, no package publication, no external service registration
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the selected implementation node this scaffold realises: declared source path,
+        stack decision refs, assertions and validator freshness. A scaffold with no selected node
+        is a scope/graph gap: report it; do not invent the node or its path."
+  - id: architecture
+    path: .starciwork/<business>/architecture/**/index.yaml
+    purpose:
+      en: "REQUIRED for greenfield. The stack, layout, naming, ports and module boundaries are
+        decided by the SDS, never by the scaffold agent. If no settled architecture names the
+        stack and tree shape, report sds-gap — do not guess a framework."
+  - id: business
+    path: .starciwork/<business>/business/**/index.yaml
+    purpose:
+      en: Read accepted requirements the new service must satisfy at skeleton level (entry points,
+        health surface, declared acceptance IDs). Intent governs what the skeleton proves.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve the actual repository resource, checkout root, HEAD and dirty state. The target
+        path may be empty or absent — that is the greenfield case. An unbound or unexpected-dirty
+        repository is reported, never worked around.
+  - id: conventions
+    path: knowledge/patterns/be/* + knowledge/architecture-rules.yaml + knowledge/code-pattern-enforcement.yaml
+    purpose:
+      en: Read the house rules the new tree must conform to from its first commit — lint kits,
+        layout contract, naming. A scaffold that violates day-one rules creates refactor debt.
+  - id: stacks
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
+    purpose:
+      en: When the new service is declared in .starcistacks, reconcile component identity, compose
+        files and runbook location before writing the tree.
+  - id: profile
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound profile. Capabilities are the intersection of
+        actual tools, selected profile policy and op permissions.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - activity
+      - codeRefs
+      - evidence
+    content:
+      en: Record the realised source root, exact scaffolded paths and the evidence the checks produced.
+  - id: source
+    path: repository:<repo-id>/<declared-source-root>/**
+    fields:
+      - manifest
+      - toolchainConfig
+      - layout
+      - skeleton
+      - harness
+    content:
+      en: "The new tree only: package manifest, toolchain configs (lint/typecheck/test/build),
+        the declared directory layout, the minimal runnable skeleton (entrypoint + health surface)
+        and its harness. Nothing outside the declared source root."
+  - id: evidence
+    path: E/result.json + E/effects.json + E/verification.json + E/artifacts
+    fields:
+      - request
+      - scope
+      - criteria
+      - status
+      - outputs
+      - observations
+      - effects
+      - evidenceRefs
+      - codeRefs
+      - remaining
+      - recovery
+steps:
+  - reads: [target, architecture, business]
+    writes: [evidence]
+    action:
+      en: Resolve what the new source must be — stack, tree shape, entry points and the skeleton-level
+        acceptance the records declare. Every layout decision traces to a settled record; anything
+        undecided is a named gap, not a choice.
+  - reads: [repo, conventions, stacks]
+    writes: [evidence]
+    action:
+      en: Resolve the real checkout, confirm the declared source root is empty-or-absent, read the
+        house lint/layout contracts the tree must satisfy, and reconcile any .starcistacks component
+        that names this service.
+  - reads: [architecture, conventions]
+    writes: [source]
+    action:
+      en: Write the manifest and toolchain configs first (package.json/tsconfig/eslint/test runner
+        per house kits), then the declared layout, then the minimal skeleton — entrypoint plus the
+        health surface the records require. No business behaviour beyond what the skeleton proves.
+  - reads: [repo]
+    writes: [source, evidence]
+    action:
+      en: Install, build, lint and test for real in the declared sandbox. The scaffold's own checks
+        (scoped lint + house pattern checks) run against the new tree before evidence is written.
+  - reads: [target]
+    writes: [node, evidence]
+    action:
+      en: Record the realised source root and codeRefs on the node, then return the evidence bundle —
+        exact files created, commands run, observed outputs, remaining gaps.
+proofs:
+  - id: scaffold-runs
+    requirement:
+      en: The declared toolchain commands (install/build/test) were executed against the new tree
+        and their real output is recorded — a written tree that was never run is not a scaffold.
+  - id: layout-conforms
+    requirement:
+      en: The new tree passes the house checks that apply to it — scoped lint and pattern checks —
+        from its first commit.
+  - id: scope
+    requirement:
+      en: Every created file lives under the declared source root; nothing outside it was written.
+blockers:
+  - code: SDS_MISSING
+    condition:
+      en: No settled architecture names the stack, layout or entry points the scaffold must realise.
+  - code: REPO_UNBOUND
+    condition:
+      en: No bound repository checkout exists to receive the new tree.
+  - code: TOOLCHAIN_UNAVAILABLE
+    condition:
+      en: The declared toolchain cannot install or run in the available environment.
+  - code: OUTSIDE_SCOPE
+    condition:
+      en: The required tree would write outside the declared source root or conflict with retained work.
+placeholders:
+  repo-id: Observed selected repository identity; use an existing resource ID only when actually bound
+  bound-paths: Inspected relevant source read set
+  declared-source-root: The exact path the node/design declares for the new tree
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+business:
+  question: >-
+    "For a greenfield backend: what exact source tree does the settled design require,
+    and does the scaffolded toolchain actually run green?"
+  whenNeeded:
+    - A workflow needs a new backend service/app where no source tree exists yet.
+    - Repo init + house-rules-conformant skeleton must be proven before implement ops fill it.
+  whenNot:
+    - Not for adding behaviour to an existing tree — that is backend.implement.
+    - Not a repo/workspace binding operation — the repository must already be bound
+      (workspace.manage owns binding).
+  consumes:
+    - The selected implementation node; settled architecture (stack, layout); business acceptance
+      at skeleton level; the bound (possibly empty) repository; house conventions.
+  produces:
+    - A runnable, lint-clean backend skeleton under the declared source root plus its evidence bundle.
+  failureModes:
+    - SDS_MISSING, REPO_UNBOUND, TOOLCHAIN_UNAVAILABLE, OUTSIDE_SCOPE (declared blockers).
+
+route:
+  nodeKinds: [implementation]
+  phase: [implement]
+  intent: [scaffold, greenfield, new-source, backend, bootstrap, init]
+  prerequisites: ["architecture.decide done", "repository bound"]
+  riskHints: [source-edits, new-tree]

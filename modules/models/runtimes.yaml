@@ -121,7 +121,10 @@ roleOfKind:
   request.analyze: plan
   task.execute: plan
   backend.implement: implement
+  backend.scaffold: implement
   interface.implement: implement
+  interface.scaffold: implement
+  package.scaffold: implement
   scope.define: decide
   code.refactor: implement
   test.author: implement
