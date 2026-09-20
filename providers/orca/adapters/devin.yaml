@@ -36,8 +36,7 @@ readiness:
   intervalMs: 5000
 delivery:
   mode: file-reference-above-inline-limit
-  maxInlineChars: 3000
-  fileDirectory: .starciwork/_local/runtime
+  maxInlineChars: 16384
   fileName: orca-dispatch-<dispatch>.md
   prompt: 'Read <file> completely. It is your dispatched Task preamble and operation contract. Follow it exactly and report worker_done exactly once as specified.'
 submission:

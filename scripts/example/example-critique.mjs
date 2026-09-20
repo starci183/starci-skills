@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {parseYaml, stringifyYaml} from '../../core/yaml.mjs';
+import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk} from '../checks/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
 import {indexInlineCriteria, resolveRecordRef} from './example-ownership.mjs';

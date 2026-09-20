@@ -1,5 +1,0 @@
-# Lane E2E-06 — ecommerce TestingInfraModule + exemplar (CRITICAL PATH)
-
-SCOPE (exclusive): `D:/Repositories/starci-academy-backend/.claude/D:/Repositories/starci-academy-backend/.claude/examples/ecommerce-app-be/test/e2e/` (create it) + `D:/Repositories/starci-academy-backend/.claude/D:/Repositories/starci-academy-backend/.claude/examples/ecommerce-app-be/package.json` (scripts only) + `D:/Repositories/starci-academy-backend/.claude/D:/Repositories/starci-academy-backend/.claude/examples/ecommerce-app-be/docker-compose*.y*ml` if needed for the stack.
-
-Same contract as E2E-00 but for a 2-service monorepo: postgres + redis + identity app + order app (identity must be up before order — dependency ordering in readiness). Compose stack under `test/e2e/stack/`. Exemplar: `identity/sign-up-sign-in.e2e-spec.ts`. Port whatever reusable logic exists in `D:/Repositories/starci-academy-backend/.claude/D:/Repositories/starci-academy-backend/.claude/examples/todo-app-backend/test/e2e/` — do NOT edit todo files, copy+adapt into your scope.

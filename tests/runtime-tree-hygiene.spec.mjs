@@ -37,7 +37,7 @@ test('the runtime tree carries no fixture leftovers',()=>{
 });
 
 test('the runtime directory is refused as a Work root',async()=>{
-  const {ledgerFileFor,isRuntimeRoot}=await import('../kernel/ledger-db.mjs');
+  const {ledgerFileFor,isRuntimeRoot}=await import('../engine/ledger-db.mjs');
   assert.equal(isRuntimeRoot(runtimeRoot),true,'this checkout is a runtime');
   assert.throws(()=>ledgerFileFor(runtimeRoot),/ledger-root-is-runtime/);
   // The Work root of a project still resolves normally: the refusal is about identity, not about paths.

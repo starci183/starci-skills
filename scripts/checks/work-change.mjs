@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {parseYaml} from '../../core/yaml.mjs';
-import {canonicalJSON,sha256} from '../../core/index.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
+import {canonicalJSON,sha256} from '../../engine/index.mjs';
 
 /**
  * The change record: the part of the Work model that decides how far an edit travels.

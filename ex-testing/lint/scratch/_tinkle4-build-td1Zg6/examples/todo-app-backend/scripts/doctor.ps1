@@ -1,4 +1,0 @@
-param([ValidateSet('dev','vps')][string]$Environment='dev',[string]$KeyFile='')
-$root=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path;$envDir=Join-Path $root ".stacks/$Environment";$cipher=Join-Path $envDir 'secrets.yaml.enc';$plain=Join-Path $envDir 'secrets.yaml';if(-not$KeyFile){$KeyFile=Join-Path $HOME ".config/starci/application-stacks/tiny-stateful/$Environment.agekey"}
-$errors=@();if(-not(Test-Path $cipher)){$errors+='ciphertext missing'};if(-not(Test-Path $KeyFile)){$errors+='caller-owned age key missing'};if(-not(Test-Path $plain)){$errors+='materialized secret missing; run prepare'}
-docker compose -f (Join-Path $envDir 'compose.yaml') config --quiet;if($LASTEXITCODE){$errors+='compose config invalid'};if($errors.Count){$errors|ForEach-Object{Write-Error $_};exit 1};Write-Host "$Environment stack preparation is structurally ready; no live endpoint was tested."

@@ -1,3 +1,0 @@
-MATCH ac.identity.sign-in.known-pair-issues-a-session-token: still pass (npx jest -t ac.identity.sign-in.known-pair-issues-a-session-token --runInBand)
-MATCH ac.identity.sign-in.wrong-pair-is-refused-alike: still pass (npx jest -t ac.identity.sign-in.wrong-pair-is-refused-alike --runInBand)
-br.identity.sign-in: verified - every assertion replayed with a matching outcome

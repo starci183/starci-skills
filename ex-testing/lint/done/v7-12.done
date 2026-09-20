@@ -1,1 +1,0 @@
-v7-12 done: ec has no uat/ suite in ecommerce-app-fe and had zero uat records. Authored uat.identity.sign-in + uat.checkout.place-order (todo, blockedBy gap.*.live-proof, both authored) so the absence is named in-tree. Gate: 134 refused / 4 warned — all pre-existing todo-tree items, zero new.

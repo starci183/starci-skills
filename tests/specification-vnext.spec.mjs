@@ -1,13 +1,13 @@
 // Regression coverage for pre-upstream SRS@3 and specification@3 compatibility; not authoring authority.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateSpecification} from '../specifications/validate.mjs';
-import {documentSRSV3} from '../fixtures/srs-v3.mjs';
-import {validateSRSV3Bindings} from '../specifications/srs-v3.mjs';
-import {documentSDS} from '../fixtures/sds.mjs';
-import {validateWorkspace,previewCompletion,authoredWorkspace} from '../core/index.mjs';
-import {writeSRSV3Workspace} from '../fixtures/srs-v3-workspace.mjs';
-import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
+import {validateSpecification} from '../scripts/checks/spec/validate.mjs';
+import {documentSRSV3} from './fixtures/srs-v3.mjs';
+import {validateSRSV3Bindings} from '../scripts/checks/spec/srs-v3.mjs';
+import {documentSDS} from './fixtures/sds.mjs';
+import {validateWorkspace,previewCompletion,authoredWorkspace} from '../engine/index.mjs';
+import {writeSRSV3Workspace} from './fixtures/srs-v3-workspace.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,7 +37,7 @@ test('accepted status, acceptance joins and ref vocabularies fail closed',()=>{
 });
 
 test('published JSON Schema accepts every SRS v3 node type and rejects representative wrong types',()=>{
- const validate=schemaValidator('../specifications/srs-v3.schema.yaml'),srs=Object.values(documentSRSV3());for(const spec of srs){assert.equal(validate(spec),true,`${spec.id}: ${JSON.stringify(validate.errors)}`);const bad=structuredClone(spec);bad.refs='not-an-array';assert.equal(validate(bad),false,spec.id);}
+ const validate=schemaValidator('../modules/schemas/spec/srs-v3.schema.yaml'),srs=Object.values(documentSRSV3());for(const spec of srs){assert.equal(validate(spec),true,`${spec.id}: ${JSON.stringify(validate.errors)}`);const bad=structuredClone(spec);bad.refs='not-an-array';assert.equal(validate(bad),false,spec.id);}
  for(const [spec,field,badValue] of [[srs[0],'actors','text'],[srs[1],'scope',[]],[srs[2],'appliesTo','text'],[srs[3],'transitions','text'],[srs[4],'stages','text']]){const bad=structuredClone(spec);bad.content[field]=badValue;assert.equal(validate(bad),false,`${spec.nodeType}.${field}`);}
 });
 

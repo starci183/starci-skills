@@ -1,4 +1,0 @@
-$ npx jest src/modules/bussiness/audit --runInBand -t "nfr.audit.retention"
-(cwd D:\Repositories\starci-academy-backend\.claude\examples\todo-app-backend)
-exit 0
-

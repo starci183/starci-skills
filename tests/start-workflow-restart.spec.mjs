@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor} from '../kernel/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');

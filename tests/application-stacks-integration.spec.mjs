@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
-import {parseYaml} from '../core/yaml.mjs';
-import {payloadFiles} from '../bin/starci-skills.mjs';
+import {parseYaml} from '../engine/yaml.mjs';
+import {payloadFiles} from '../scripts/install/install.mjs';
+import {checkApplicationStacks} from '../scripts/checks/stacks.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 
@@ -20,7 +20,7 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
       assert.ok(contract.steps[0].reads.includes('application-stacks'),id);
     }
   }
-  for(const file of ['scripts/checks/stacks.mjs','schemas/application-stacks.schema.yaml','knowledge/application-stacks.yaml',
+  for(const file of ['scripts/checks/stacks.mjs','modules/schemas/application-stacks.schema.yaml','knowledge/application-stacks.yaml',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
     ...['gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
@@ -31,7 +31,7 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
   assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&file.endsWith('.mjs')),false);
 });
 
-test('stacks CLI refuses missing or malformed evidence without echoing file contents or mutation',t=>{
+test('stacks check refuses missing or malformed evidence without echoing file contents or mutation',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-cli-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-cli-'));fs.rmSync(directory,{recursive:true,force:true});});
   fs.mkdirSync(path.join(directory,'.starcistacks'));
@@ -39,13 +39,12 @@ test('stacks CLI refuses missing or malformed evidence without echoing file cont
   const model=path.join(directory,'rendered.json'),sentinel='synthetic-secret-never-echo';
   fs.writeFileSync(model,'{"token":"'+sentinel+'",BROKEN');
   const before=fs.readFileSync(model);
-  const result=spawnSync(process.execPath,[path.join(root,'cli/main.mjs'),'stacks','check',directory,'--environment','dev','--deployment-model',model],{encoding:'utf8'});
-  assert.equal(result.status,1);
-  assert.equal(JSON.parse(result.stdout).ok,false);
-  assert.equal((result.stdout+result.stderr).includes(sentinel),false);
+  const result=checkApplicationStacks({repoRoot:directory,environment:'dev',deploymentModelFile:model});
+  assert.equal(result.ok,false);
+  assert.equal(JSON.stringify(result).includes(sentinel),false);
   assert.deepEqual(fs.readFileSync(model),before);
-  const missing=spawnSync(process.execPath,[path.join(root,'cli/main.mjs'),'stacks','check',directory],{encoding:'utf8'});
-  assert.equal(missing.status,1);assert.match(missing.stderr,/requires/);
+  const missing=checkApplicationStacks({repoRoot:directory});
+  assert.equal(missing.ok,false);
 });
 
 test('runtime packaging excludes accidental generated example plaintext and ciphertext',t=>{

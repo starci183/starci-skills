@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {parseYaml} from '../../core/yaml.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
 
 /**
  * The example tree is the readable statement of the layout, so it is checked with the runtime's own loader

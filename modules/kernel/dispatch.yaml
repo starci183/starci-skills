@@ -1,6 +1,6 @@
 # ============================================================================
-# TINKLE-9 / WAVE2-w1 — modules/kernel/dispatch.yaml
-# Brief: ex-testing/briefs/tinkle/tinkle-9.md + ex-testing/briefs/wave2/w1.md.
+# modules/kernel/dispatch.yaml — the spawn contract
+# (origin: tinkle-9 / wave2-w1 lane briefs — the retired prototype tree).
 #
 # THE SPAWN CONTRACT — the packet each ephemeral [Op] agent is launched with.
 # The packet now flows through `api dispatch`: the [Kernel] agent calls
@@ -15,29 +15,29 @@
 #
 # Sources (all under .claude/, relative to the skill root):
 #   scripts/kernel/api.mjs   — the dispatch command: packet build, lease,
-#                              terminal spawn (contract: modules/kernel/api.yaml)
-#   kernel/engine.mjs        — opIdentity, reserveOperation (intent-v1),
-#                              reservationPhase, beginLaunchIntent, launched,
-#                              settled, settleStoppedOperation, beginCandidate,
-#                              freezeCandidate
-#   kernel/ledger-db.mjs     — jobs/leases tables; leases_match_job trigger
-#                              ('lease-identity-drift' RAISE(ABORT))
-#   kernel/admission.mjs     — reserve/renew/expire; isLeaseDrift guard
-#   kernel/dispatcher.mjs    — planDispatch file/lease/group rules, opScopes,
-#                              writerKeys, verifyAvoids
-#   kernel/continuation.mjs  — lease-identity-drift / dispatch-identity-drift /
-#                              writer-identity-drift resume checks
-#   kernel/reports.mjs       — starci/op-report@1, OUTCOMES, validateReport
-#   kernel/verify.mjs        — changedFiles (git-computed), validateAccepted
-#   kernel/supervisor.mjs    — terminal-create/-read/-send launch sequence,
-#                              LAUNCH_WINDOW_MS via launch.mjs
-#   kernel/launch.mjs        — startup phases, launch window
-#   model/kinds.yaml         — role per kind (kindRole), routes
+#                              admission reserve/renew/expire + drift guard,
+#                              planDispatch-style file/lease/group rules,
+#                              identity-drift resume checks, terminal spawn
+#                              + post-spawn attestation (contract:
+#                              modules/kernel/api.yaml)
+#   scripts/agent/lib.mjs    — spawnAgent: terminal-create/-read/-send launch
+#                              sequence, adapter-card flag injection,
+#                              terminal close on settle/failure
+#   engine/ledger-db.mjs     — jobs/leases tables; leases_match_job trigger
+#                              ('lease-identity-drift' RAISE(ABORT));
+#                              DDL source: engine/schema.sql
+#   engine/constants.mjs     — launch window, TTL and limit constants
+#   modules/kernel/verdict-contract.yaml — starci/op-report@1, OUTCOMES,
+#                              validateReport semantics the api's settle runs
+#   modules/models/kinds.yaml — role per kind (kindRole), routes
 #   modules/models/selection.yaml — model eligibility (route-model)
 #   modules/ops/ops/<id>.yaml — the brief the packet names
 #   scripts/checks/check-work-deep.mjs      — DEP_STALE
 #   scripts/checks/check-work-artifacts.mjs — artifact byte checks
-#   ex-testing/FLEET-STARCI.md, watchdog*.sh — observed spawn practice
+#   modules/models/code-patterns.yaml       — layout/lint ruleIds the
+#                              path-legality preflight enforces (e.g.
+#                              starci-be/unit-test-colocated)
+#   observed spawn practice: the retired fleet prototype's watchdog/notes
 # ============================================================================
 
 schema: starci/module-kernel-dispatch@1
@@ -56,9 +56,8 @@ about:
     record evidence for another job.
   sources:
     - scripts/kernel/api.mjs
-    - kernel/engine.mjs
-    - kernel/ledger-db.mjs
-    - kernel/dispatcher.mjs
+    - scripts/agent/lib.mjs
+    - engine/ledger-db.mjs
 
 # ============================================================================
 # THE PACKET — the contract shape from the brief, annotated.
@@ -87,42 +86,43 @@ fields:
   op:
     meaning: >-
       The operation id is shorthand for the FULL durable identity:
-      {workflowId, opId, attempt, generation} (kernel/engine.mjs opIdentity).
+      {workflowId, opId, attempt, generation} (the api's durable identity —
+      the jobs row in engine/ledger-db.mjs).
       Each dispatch attempt owns a distinct durable job row — jobId
       `operation-<digest>` re-keyed on dispatchAttempt when a predecessor was
-      cancelled before ever launching (reserveOperation re-key loop +
+      cancelled before ever launching (the api's reserve re-key loop +
       'operation-job-rekeyed' event).
     enforcedBy: >-
-      The jobs table row (kernel/ledger-db.mjs) plus the resume-time drift
-      checks in kernel/continuation.mjs: dispatch-identity-drift,
+      The jobs table row (engine/ledger-db.mjs) plus the api's resume-time
+      drift checks: dispatch-identity-drift,
       task-identity-drift, lease-identity-drift — state, op lease and durable
       job must share the complete identity or the resume refuses.
 
   brief:
     meaning: >-
       The op's authored contract: modules/ops/ops/<id>.yaml is the canonical
-      manifest (operator.yaml port + business analysis + route: block); the
-      runtime renders it into the task text the agent receives
-      (kernel/kernel.mjs renderContract; the rendered markdown is stored in
-      the contracts table, keyed by workflow/op/attempt).
+      manifest (operator contract + business analysis + route: block); the
+      api renders it into the task text the agent receives
+      (scripts/kernel/api.mjs buildPacket/buildPrompt; the rendered markdown
+      is stored in the contracts table, keyed by workflow/op/attempt).
     enforcedBy: >-
       The agent reads the brief; it does not renegotiate it. Reads/writes the
       brief declares become the packet's context. A brief that cannot produce
       every criterion assigned returns blocked with the exact gap
-      (ops/task.execute/operator.yaml outcome requirement).
+      (modules/ops/ops/task.execute.yaml outcome requirement).
 
   context.records:
     meaning: >-
       The closed READ set: the .starciwork records (and resolved references)
-      this op may consult. In planDispatch terms these are the op's `reads` —
-      resolvedReferences and binding inputPaths resolved through the loaded
-      Work tree (kernel/dispatcher.mjs opScopes, refToPath, nodePathOf).
+      this op may consult. In dispatch-planning terms these are the op's
+      `reads` — resolved references and binding inputPaths resolved through
+      the loaded Work tree by the api before launch.
     enforcedBy: >-
       Read sets matter at the file level: an op must never READ a path another
-      in-flight op is rewriting — firstConflict checks my reads against their
-      writes both directions (dispatcher.mjs). The one deliberate exception:
+      in-flight op is rewriting — the api's conflict check compares my reads
+      against their writes both directions. The one deliberate exception:
       two provision.ask ops may share a feature's decision folder — each
-      writes a new slug of its own (firstConflict isAsk exception).
+      writes a new slug of its own (the isAsk exception).
 
   context.owned_paths:
     meaning: >-
@@ -131,16 +131,19 @@ fields:
       (modules/goal/legality.yaml splitRules; goal-plan.json makes disjoint
       path-prefix allowlists a schema constraint on independent ops).
     enforcedBy: >-
-      Three independent walls, so a slip is caught at plan time, at report
-      time and at effect time:
-      (1) PLAN — planDispatch refuses launch when my writes meet another
-          in-flight write or read scope (firstConflict);
-      (2) REPORT — validateReport rejects report.files outside the allowlist
-          (kernel/reports.mjs, 'File outside the allowlist');
-      (3) EFFECT — freezeDetectionCandidate seals only what the declared
+      Four independent walls, so a slip is caught before enqueue, at plan
+      time, at report time and at effect time:
+      (0) PREFLIGHT — owned_paths must satisfy the target repo's layout/lint
+          contracts; contradictions -> incident, never dispatch (the
+          `preflight` section below);
+      (1) PLAN — the api's dispatch planning refuses launch when my writes
+          meet another in-flight write or read scope;
+      (2) REPORT — the api's validateReport rejects report.files outside the
+          allowlist ('File outside the allowlist';
+          modules/kernel/verdict-contract.yaml);
+      (3) EFFECT — the candidate seal covers only what the declared
           scope covers; outside-allowlist / canonical-drift / baseline-touched
-          reasons keep the writer fence (kernel/engine.mjs freezeCandidate;
-          settleStoppedOperation seal reasons).
+          reasons keep the writer fence (the api's settle-time seal reasons).
       And over time: a done record whose deps moved since baseline refuses
       DEP_STALE — writing a path re-arms the re-verification debt of every
       record that owns it (scripts/checks/check-work-deep.mjs DEP_STALE;
@@ -152,14 +155,15 @@ fields:
       route-model, never an agent choice. Selection rules live in
       modules/models/selection.yaml (eligibility by risk/qualityFloor,
       probation gates, highKinds that may never run on probation);
-      the durable executor is eligibleModelSelection (kernel/engine.mjs):
+      the api resolves it inside dispatch (scripts/route/route-model.mjs):
       eligibility first, budget orders the eligible, cooling/capacity park.
     enforcedBy: >-
       Eligibility is evaluated against the ROLE's pinned model
-      (kernel/engine.mjs reserveOperation admittedModel; kindRole in
-      common.mjs); a verify op additionally avoids the implementing runtime
-      (dispatcher.mjs verifyAvoids). A model NAME is an availability fact,
-      never proof of capability (selection.yaml, capabilities.json rule).
+      (the api's reserve admittedModel; kindRole in
+      modules/models/kinds.yaml); a verify op additionally avoids the
+      implementing runtime (the api's verify-avoidance). A model NAME is an
+      availability fact, never proof of capability (selection.yaml,
+      capabilities.yaml rule).
 
   constraints.budget:
     meaning: >-
@@ -168,15 +172,15 @@ fields:
       family ceiling — the widest real runtime of the family, not the sum),
       the canonical writer fence(s) (canonical-writer:* per repo root or
       runtime-projection:* per managed file), and declared machine locks
-      (machine:* from the op's checks) — assembled in reserveOperation.
+      (machine:* from the op's checks) — assembled by the api's reserve.
     enforcedBy: >-
-      admission.reserve takes all of them atomically with a TTL
-      (kernel/admission.mjs; engine.mjs ttlMs 10*60*1000); pulse() renews the
-      leases of live ops and expires the dead ones (engine.mjs pulse;
-      admission.expire moves an unproved timed-out worker to effect_unknown
-      and DELIBERATELY retains its lease — uncertainty never becomes free
-      capacity). Leases mirror machine-DB reservations through machine_ref;
-      releasing drops both (engine.mjs machineRefs/releaseRefs).
+      The api's admission takes all of them atomically with a TTL
+      (ttlMs 10*60*1000, engine/constants.mjs); the lease pulse renews the
+      leases of live ops and expires the dead ones — an unproved timed-out
+      worker moves to effect_unknown and DELIBERATELY retains its lease:
+      uncertainty never becomes free capacity. Leases mirror machine-DB
+      reservations through machine_ref (engine/machine.sql); releasing
+      drops both.
 
   constraints.lease:
     meaning: >-
@@ -191,24 +195,48 @@ fields:
       The leases_match_job BEFORE INSERT/UPDATE triggers RAISE(ABORT,
       'lease-identity-drift') when a lease row does not match its job's
       {workflow_id, op_id, attempt, generation, lease_token}
-      (kernel/ledger-db.mjs ~273-284); admission wraps that as a typed
-      {ok:false, reason:'lease-identity-drift'} (kernel/admission.mjs
-      isLeaseDrift/driftGuard). At resume, continuation.mjs issues the same
-      checks as findings (lease-identity-drift, writer-identity-drift). A
-      reservation whose durable status or resource binding no longer matches
-      exactly is phase 'unknown' — it stops the launch, it is never guessed
-      past (engine.mjs reservationPhase; staleLeaseProof proves a lease field
-      stale from the journal's own rows before it is cleared).
+      (engine/ledger-db.mjs / engine/schema.sql); the api wraps that as a
+      typed {ok:false, reason:'lease-identity-drift'}. At resume the api
+      issues the same checks as findings (lease-identity-drift,
+      writer-identity-drift). A reservation whose durable status or resource
+      binding no longer matches exactly is phase 'unknown' — it stops the
+      launch, it is never guessed past (a lease field proven stale from the
+      ledger's own rows is cleared, never assumed).
 
   returns:
     meaning: "what the [Op] owes the kernel when it dies — the verdict contract"
     enforcedBy: "modules/kernel/verdict-contract.yaml — accepted/rejected shapes, evidence byte checks, suspicion mapping"
     timing: >-
       File first, signal second: the report file is the source of truth, the
-      Orca message only the wake-up (kernel/reports.mjs head). The op's
-      terminal dies when its verdict settles (w1 operating model); the
-      kernel's sweep closes tabs nobody reads (kernel/terminals.mjs
-      sweepStaleTerminals, SWEEP_MS=5min, keepsAskTab for owner-open asks).
+      Orca message only the wake-up (modules/kernel/verdict-contract.yaml
+      envelope). The op's terminal dies when its verdict settles — `api
+      settle` closes the worker terminal (scripts/agent/lib.mjs); the api's
+      sweep closes tabs nobody reads, keeping owner-open ask tabs
+      (sweep interval in engine/constants.mjs).
+
+# ============================================================================
+# PATH-LEGALITY PREFLIGHT — owned_paths are checked against the target repo's
+#    own layout/lint contracts BEFORE enqueue, not discovered at settle.
+# ============================================================================
+preflight:
+  rule: >-
+    owned_paths must satisfy the target repo's layout/lint contracts;
+    contradictions -> api incident, never dispatch.
+  detail: >-
+    Before `api enqueue`, the kernel checks each candidate owned_paths grant
+    against the target repo's declared layout and lint rules — the
+    applicability/ruleIds tables in modules/models/code-patterns.yaml and
+    the check surface under scripts/checks/ that enforces them
+    (code-patterns/*, check-scoped-lint). A grant that contradicts a layout
+    rule — observed: `src/tests/**` claimed while the repo profile enforces
+    starci-be/unit-test-colocated — is `api incident --kind
+    path-illegality`, never a job row that dispatches and settles red.
+    Disjointness between sibling ops is a different wall (fields
+    .owned_paths above); this one is grant-vs-repo-legality. Where the
+    context pack or a machine check exposes the repo's layout contract,
+    cite it; the obligation stands regardless — the defect this prevents is
+    a conflict only caught at settle.
+  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/code-patterns/*; api.yaml enqueue/dispatch refuses path-illegal"
 
 # ============================================================================
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.
@@ -222,33 +250,36 @@ spawnMechanics:
     reserved and nothing launches.
   sequence: >-
     Inside the api call: reserve (durable lease, intent-v1) ->
-    beginLaunchIntent (operation-launch-intent event) -> Orca
+    launch-intent event -> spawnAgent (scripts/agent/lib.mjs) runs the Orca
     terminal-create titled `[Op] <op-or-task>` + terminal-read readiness +
-    terminal-send of the rendered packet -> operation-launch-observed/
-    launched (job -> running, worker_id = dispatch) -> wait for verdict.
+    terminal-send of the rendered packet -> post-spawn ATTESTATION
+    (api.yaml dispatch.attestation — first model activity, known-failure
+    signatures; failure = dispatch-rejected, job not running, terminal
+    closed, slot released) -> launched (job -> running, worker_id =
+    dispatch) -> wait for verdict.
     Command flags and readiness patterns come from the provider adapter card
     providers/orca/adapters/<provider>.yaml; a managed-agent profile refuses
     --spawn (providers/orca/index.yaml managedFallback — worker-start path).
-    The supervisor's own kernel launch shows the same primitive sequence
-    (kernel/supervisor.mjs startKernel: terminal-create -> terminal-read ->
-    terminal-send -> bindStartupTerminal).
+    The kernel's own launch shows the same primitive sequence
+    (scripts/kernel/start-workflow.mjs: terminal-create -> terminal-read ->
+    terminal-send -> bind the startup terminal).
   naming: >-
     `[Kernel] <project>` for the coordinator terminal, `[Op] <op-or-task>`
     for workers — Orca titles are the fleet's address book; a terminal
-    nobody reads is closed (kernel/terminals.mjs sweepStaleTerminals;
-    ex-testing/FLEET-STARCI.md naming rule).
+    nobody reads is closed (scripts/agent/lib.mjs terminal close; the
+    retired fleet prototype's naming rule).
   launchWindow: >-
     A launch that never acquires is reclaimed after LAUNCH_WINDOW_MS=10min —
     the reservation's phases (launching / launching-child / launching-native)
     bound how long an unacquired launch may stand before the next round calls
-    it dead (kernel/launch.mjs startupRowHolds; supervisor.mjs reserveAndStart).
+    it dead (engine/constants.mjs; scripts/kernel/start-workflow.mjs).
   oneOpOneAgent: >-
     One operation = one agent = one Dispatch = one terminal. An operation is
     never split among several agents, and a failed agent is never silently
     continued — the attempt is settled and a NEW dispatch carries a fresh
     attempt number (driver-loop.yaml failureHandling.respawnPolicy).
   prototypePractice: >-
-    Observed spawn lines (fleet prototype, FLEET-STARCI.md ops notes):
+    Observed spawn lines (the retired fleet prototype's ops notes):
     `devin --permission-mode dangerous -- "<prompt>"` with the trust prompt
     answered once at spawn; `qwen -i "<prompt>" --yolo`. Verify the spawn
     actually landed with terminal-read --screen — a long typed command can
@@ -259,7 +290,7 @@ spawnMechanics:
 # ============================================================================
 nonGoals:
   - "no goal-identity authority — the op cannot revise the goal; suspicion travels back as a report field (verdict-contract.yaml)"
-  - "no other op's write scope — planDispatch proved disjointness before this packet existed; an op that needs a foreign path reports blocker shared-change"
-  - "no credential values — custody asks go through provision.ask and the owner's Orca GUI; an agent never sees a secret (ops/provision.ask/operator.yaml)"
+  - "no other op's write scope — dispatch planning proved disjointness before this packet existed; an op that needs a foreign path reports blocker shared-change"
+  - "no credential values — custody asks go through provision.ask and the owner's Orca GUI; an agent never sees a secret (modules/ops/ops/provision.ask.yaml)"
   - "no model/provider override — the agent runs what constraints.model names; provider calls come only from the loaded provider contracts, never inferred (SKILL.md provider rule)"
   - "no second dispatch of the same op — one lease, one agent, one verdict (oneOpOneAgent above)"

@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {createRequire} from 'node:module';
 import Ajv2020 from 'ajv/dist/2020.js';
-import {parseYaml} from '../core/yaml.mjs';
+import {parseYaml} from '../engine/yaml.mjs';
 import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
 import {checkArchitecture} from '../scripts/checks/architecture/index.mjs';
 
@@ -108,7 +108,7 @@ export function defineGrammarRuleConformance(value){const rules=[...value.inheri
 export function assertPresentationState(value){if(value!=='ready')throw new TypeError('invalid');}`;
   f.write('node_modules/@starci/grammar/dist/common.js',source);
   let report=await f.check({architectureConfig:null});assert.equal(report.status,'clean',JSON.stringify(report.issues));
-  const validate=new Ajv2020({strict:true}).compile(parseYaml(fs.readFileSync(new URL('../schemas/code-pattern-check.schema.yaml',import.meta.url),'utf8')));
+  const validate=new Ajv2020({strict:true}).compile(parseYaml(fs.readFileSync(new URL('../modules/schemas/code-pattern-check.schema.yaml',import.meta.url),'utf8')));
   assert.equal(validate(report),true,JSON.stringify(validate.errors));
   const proof=report.machineResults.find(item=>item.obligation==='GRAMMAR').execution;
   assert.equal(proof.engine,'node-esm-import');assert.equal(proof.vectors.requiredRules,1);assert.ok(proof.package.inputDigest);

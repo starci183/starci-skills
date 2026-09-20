@@ -5,10 +5,10 @@ schema: starci/module-ops-registry@1
 generatedBy: scripts/route/build-ops-registry.mjs
 origin:
   canonicalRegistry: .claude/modules/ops/registry.yaml (this generated file)
-  commonDocument: .claude/legacy/ops/common.yaml
+  commonDocument: .claude/modules/ops/_common.yaml
   perOpSources: "modules/ops/ops/<id>.yaml (authored operator contract + business: block + route: block)"
-  note: modules/ops is the authored operator source; legacy/ops/ keeps the retired pre-module engines
-    and sources.
+  note: modules/ops is the authored operator source; _common.yaml keeps the shared pre-module policy
+    prose.
 stages:
   intake: classify the request into typed intake/scope facts; zero effects
   scope: bound the work — scope record, workspace bootstrap, launchable nodes
@@ -27,7 +27,7 @@ coarsePhases:
   verify: post-implementation
   release: post-implementation
   operate: cross-cutting
-count: 31
+count: 30
 ops:
   - id: architecture.decide
     family: architecture
@@ -401,38 +401,6 @@ ops:
     businessQuestion: '"Does the delivered slice prove every assertion through its public API on a real
       stack the suite starts itself - one scenario per assertion, declared checks run verbatim?"'
     whenNeeded: Post-implementation API-level proof of a delivered backend slice.
-  - id: ex-test.probe
-    family: ex-test
-    goal: Canary op — proves the dispatch loop end-to-end with the smallest possible real work.
-    nodeKinds:
-      - probe
-    completionProfile: probe
-    sideEffects:
-      count: 2
-      summary: one file write inside ex-testing/probe/
-    reads:
-      - contract
-    writes:
-      - artifact
-      - report
-      - marker
-    route:
-      nodeKinds:
-        - probe
-      phase:
-        - operate
-        - cross-cutting
-      intent:
-        - probe
-        - smoke-test
-        - canary
-      riskHints:
-        - trivial
-    lifecyclePosition: operate | cross-cutting
-    kindInferred: probe
-    businessQuestion: Did the dispatched agent read its contract, produce exactly the declared artifact,
-      and settle honestly?
-    whenNeeded: kernel/Orca dispatch smoke tests
   - id: goal.revise
     family: goal
     goal: Produce goal v(n+1) from the frozen goal v(n) and the requested change - explicit diff, rev
@@ -1314,10 +1282,4 @@ ops:
       with verified repo bindings; import: reconstructed from inspected source with preserved
       provenance?"'
     whenNeeded: "[object Object]"
-engines:
-  basic-ops.mjs: shared operator plumbing helpers used by the contracts below
-  contracts.mjs: builds the typed request/response contract each op executes under
-  generate.mjs: emits per-op generated artifacts (not routing)
-  role-authority.mjs: maps an op to the roles/models allowed to run it
-  select.mjs: picks an executionModes sub-contract for ops that declare modes
-  validate.mjs: validates operator.yaml shape against the op contract schema
+engines: {}

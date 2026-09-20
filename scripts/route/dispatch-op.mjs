@@ -29,9 +29,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../core/yaml.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
 import { spawnAgent, buildSpawnCommand } from '../agent/lib.mjs';
+import { buildContext, renderPromptReads } from '../context/pack.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -107,17 +108,18 @@ function resolveModel(target, modelsDir) {
   };
 }
 
-function buildPrompt(packet) {
-  // Compact prompt the shell agent receives. The LOAD ORDER is mandatory —
+function buildPrompt(packet, context) {
+  // Compact prompt the shell agent receives. The READ ORDER is mandatory —
   // an agent that acts without reading its contract is the failure mode this
   // packet exists to prevent (fleet wave lessons, 2026-09-20: agents that
   // skipped reads forgot yolo flags, missed context, and never persisted).
+  // The list is not hardcoded: scripts/context/pack.mjs resolves it as a
+  // function — SKILL.md + brief + verdict contract + every concrete file the
+  // brief's own reads declare + the packet contract — so a brief edit never
+  // leaves the prompt stale.
   const lines = [
     `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel.`,
-    `MANDATORY LOAD ORDER — read before any action:`,
-    `  1. SKILL.md (repo root) — the runtime's load order`,
-    `  2. ${packet.brief} — your contract. It declares your reads, writes, steps, proofs and blockers.`,
-    `  3. ${VERDICT_CONTRACT} — what your return must look like`,
+    ...renderPromptReads(context),
     `brief: ${packet.brief}  (your contract — never renegotiate it)`,
     `records: ${packet.context.records.join(', ') || '(none bound)'}`,
     `owned_paths: ${[...new Set(packet.context.owned_paths.map(p => p.path))].join(', ') || '(per brief write-ceiling)'}`,
@@ -146,6 +148,13 @@ function main() {
 
   const owned = resolveOwnedPaths(args.records, args.state);
   const contractPresent = fs.existsSync(path.join(skillRoot, VERDICT_CONTRACT));
+  // Context cutting is a function (scripts/context/pack.mjs): the mandatory
+  // read set is resolved, not asserted — the prompt below enumerates the real
+  // file list, and the packet carries it for the receipt.
+  const ctx = buildContext({
+    op: args.op, records: args.records, stateDir: args.state,
+    skillRoot, briefDoc: opDoc, ownedPaths: owned.ownedPaths,
+  });
 
   const packet = {
     op: args.op,
@@ -153,6 +162,7 @@ function main() {
     context: {
       records: args.records,
       owned_paths: owned.ownedPaths,
+      mandatoryReads: ctx.mandatory?.map(m => m.path) ?? [],
       ...(owned.missing ? { recordsNotFound: owned.missing } : {}),
       ...(owned.note ? { note: owned.note } : {}),
       ...(owned.error ? { error: owned.error } : {}),
@@ -166,7 +176,7 @@ function main() {
     returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
   };
 
-  const prompt = buildPrompt(packet);
+  const prompt = buildPrompt(packet, ctx);
   const title = `[Op] ${args.op}`;
   const worktree = args.worktree ?? 'active';
 
@@ -202,6 +212,12 @@ function main() {
       ...(contractPresent ? {} : { assumption: `${VERDICT_CONTRACT} not landed yet (tinkle-9 in flight) — packet coded against brief spec ex-testing/briefs/tinkle/tinkle-9.md` }),
     },
     opContext: { riskHints: opDoc?.route?.riskHints ?? [], goal: opDoc?.goal?.en ?? opDoc?.goal ?? null },
+    contextPack: ctx.error ? { error: ctx.error } : {
+      mandatoryReads: ctx.mandatory.length,
+      declaredReads: ctx.declaredReads.length,
+      ownedFiles: ctx.ownedFiles.length, truncated: ctx.truncated,
+      missing: ctx.missing,
+    },
   };
 
   if (args.spawn) {

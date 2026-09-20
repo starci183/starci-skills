@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
-import {parseYaml} from '../core/yaml.mjs';
+import {parseYaml} from '../engine/yaml.mjs';
 
 /**
  * One schema per Work record family, checked against the tree that is the readable statement of the shape.
@@ -21,7 +21,7 @@ import {parseYaml} from '../core/yaml.mjs';
  * to the presence of a keyword.
  */
 const root = path.resolve(import.meta.dirname, '..');
-const schemaDir = path.join(root, 'schemas');
+const schemaDir = path.join(root, 'modules', 'schemas');
 const workRoot = path.join(root, 'examples', 'todo-app-backend', '.starciwork');
 
 const ajv = new Ajv2020({strict: true, allErrors: true});

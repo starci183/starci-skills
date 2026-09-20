@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {parseYaml} from '../../core/yaml.mjs';
-import {skillRoot} from '../../core/runtime-root.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
+import {skillRoot} from '../../engine/runtime-root.mjs';
 
 /**
  * The brand is proven, not stated. A brand record says what the product's colour, mascot and icon law is;

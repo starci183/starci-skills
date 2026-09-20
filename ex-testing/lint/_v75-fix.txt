@@ -1,7 +1,0 @@
-directions.md: 18 link prefixes rewritten; 18 relative links checked, all resolve on disk.
-direction-check.yaml: fake id removed, 2 references repointed at assets/directions.md.
-examples/ecommerce-app-be/.starciwork/features/checkout/ui/cart/assets/generation-receipts.yaml: removed "id: ui.checkout.cart.assets" (schema kept: schema: starci/generation-receipts@1).
-examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/generation-receipts.yaml: removed "id: ui.checkout.landing-home.assets" (schema kept: schema: starci/generation-receipts@1).
-examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/generation-receipts.yaml: removed "id: ui.checkout.shop-browse.assets" (schema kept: schema: starci/generation-receipts@1).
-examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/generation-receipts.yaml: removed "id: ui.checkout.stock-refused.assets" (schema kept: schema: starci/generation-receipts@1).
-examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/assets/generation-receipts.yaml: removed "id: ui.identity.sign-in.assets" (schema kept: schema: starci/generation-receipts@1).

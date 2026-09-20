@@ -1,13 +1,28 @@
 # Architecture check
 
-`starci architecture check <repo-root>` is a read-only TypeScript dependency and source-shape check. It resolves the checked repository's manifests, `tsconfig` aliases, relative paths, workspace/file packages, declared exports, re-export barrels, static `import()` calls, and string-literal `require()` calls. It reports architectural evidence; it does not promote current code into the standard.
+`scripts/checks/architecture.mjs` (`checkArchitecture`) is a read-only
+TypeScript dependency and source-shape check. It resolves the checked
+repository's manifests, `tsconfig` aliases, relative paths, workspace/file
+packages, declared exports, re-export barrels, static `import()` calls, and
+string-literal `require()` calls. It reports architectural evidence; it does
+not promote current code into the standard.
 
-```text
-starci architecture check .
-starci architecture check . --config architecture.json
+It runs inside the aggregate scoped-lint gate as the `architecture` machine
+kind:
+
+```sh
+node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo-root> \
+  [--architecture-config architecture.json] (--all | -- <files...>)
 ```
 
-The command writes one `starci/architecture-check@1` JSON object. Exit code `0` means `ok: true`; exit code `1` means the record contains violations or errors. Each finding identifies a repository-relative path, one-based location, stable rule id, message, and, for resolved dependency failures, the target and dependency chain.
+and programmatically via `checkArchitecture({ repositoryRoot, configFile })`
+from `scripts/checks/architecture.mjs`.
+
+The check produces one `starci/architecture-check@1` JSON object. Exit code
+`0` means `ok: true`; exit code `1` means the record contains violations or
+errors. Each finding identifies a repository-relative path, one-based
+location, stable rule id, message, and, for resolved dependency failures, the
+target and dependency chain.
 
 ## Responsibility model
 

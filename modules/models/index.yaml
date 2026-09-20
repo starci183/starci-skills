@@ -5,17 +5,18 @@
 # modules/models/runtimes.yaml runtimes AND every key of
 # modules/models/registry.yaml targets has a profile here.
 #
-# Canonical model data (ported from the retired model/ tree, now legacy/model):
-#   capabilities.yaml  — starci/model-capability-policy@1 (kernel/model-policy.mjs)
+# Canonical model data (ported from the retired model/ tree):
+#   capabilities.yaml  — starci/model-capability-policy@1 (contract; ported from retired kernel/model-policy.mjs)
 #   qualifications.yaml — empty measured-qualification store seed
 #   runtimes.yaml      — provider-window pools + allocation + roleOfKind
 #   registry.yaml      — starci/profile-registry@3 (aliases, targets, operators, supervisors)
-#   kinds.yaml         — starci/kinds@2 operation catalog (kernel/graph.mjs)
-#   records.yaml       — starci/records@1 record catalog (kernel/io.mjs)
-#   hosts.yaml         — starci/hosts@1 host descriptors (hosts/index.mjs)
+#   kinds.yaml         — starci/kinds@2 operation catalog (kernel-agent legality graph, modules/goal/legality.yaml)
+#   records.yaml       — starci/records@1 record catalog (contract data, read directly)
+#   hosts.yaml         — starci/hosts@1 host descriptors (RETIRED — delete-manifest; host facts live in providers/orca/adapters/ + runtimes.yaml)
 #   code-patterns.yaml — starci/code-pattern-profile@1 (scripts/checks/check-scoped-lint.mjs)
 #   claude/codex/qwen/devin.yaml — starci/execution-profiles@1 per-runtime profiles
-#   index.mjs          — the module's single public API (ported from model/index.mjs)
+#                      (RETIRED — delete-manifest; per-runtime launch facts live in profiles/ + providers/orca/adapters/)
+#   index.mjs          — RETIRED — delete-manifest; new-arch scripts read the YAML directly via engine/yaml.mjs
 
 schema: starci/module-models-index@1
 
@@ -37,8 +38,8 @@ exceptionTargets:
 notTargets:
   # things an agent might mistake for operation targets — they are not
   - {name: "supervisor chains (planCoordinator, workflowMonitor)", source: registry.json supervisors, note: "persistent coordinator seats, not operation pools"}
-  - {name: "nonOperation model functions (assessGoal, planOp, decide, validateOp, critiqueGoal, ...)", source: "model-functions.md + model-policy.mjs MODEL_KINDS", note: "separately typed Fable/Astra + Opus/Sol pools; never consume operation probation budget"}
-  - {name: "HEADLESS_PROVIDERS entries", source: model-functions.md, note: "headless command identities for model functions; a missing entry is a failed launch, never a substitute model"}
+  - {name: "nonOperation model functions (assessGoal, planOp, decide, validateOp, critiqueGoal, ...)", source: "retired model-policy.mjs MODEL_KINDS", note: "separately typed Fable/Astra + Opus/Sol pools; never consume operation probation budget"}
+  - {name: "HEADLESS_PROVIDERS entries", source: "retired model-functions doc", note: "headless command identities for model functions; a missing entry is a failed launch, never a substitute model"}
 
 selection: selection.yaml   # the eligibility/probation/ordering rules —
                           # start here for "may this model take this job"

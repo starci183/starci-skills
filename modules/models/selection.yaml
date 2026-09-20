@@ -1,12 +1,13 @@
 # selection.yaml — how the runtime decides WHICH model may take WHICH workload.
 #
-# Declarative port of kernel/model-policy.mjs. Every rule names the mjs
-# function it comes from; where the mjs is the ONLY source of a rule it is cited
-# as `source: model-policy.mjs::<fn>`. Allocation-order facts that live in
+# Declarative port of the retired kernel/model-policy.mjs (this file is now
+# the source of truth). Historical citations `model-policy.mjs::<fn>` name the
+# retired implementation a rule was ported from; they are provenance, not a
+# live import. Allocation-order facts that live in
 # modules/models/runtimes.yaml and registry.yaml are in `allocationFacts` and cite
 # those files instead.
 #
-# The one-sentence business rule (capabilities.json): a model NAME is an
+# The one-sentence business rule (capabilities.yaml): a model NAME is an
 # availability fact, never proof of capability. A model job is eligible only
 # through a measured qualification record or a narrowly scoped probation with
 # strict machine gates and independent review. Budget orders eligible candidates;
@@ -14,13 +15,13 @@
 
 schema: starci/module-model-selection@1
 sources:
-  - kernel/model-policy.mjs
+  - modules/models/selection.yaml  # this file is now the contract
   - modules/models/runtimes.yaml
   - modules/models/registry.yaml
   - modules/models/capabilities.yaml
   - modules/models/qualifications.yaml
-  - docs/model-catalog.md
-  - docs/model-functions.md
+  # retired sources: kernel/model-policy.mjs, docs/model-catalog.md,
+  # docs/model-functions.md (old engine — kept as provenance only)
 
 # ---------------------------------------------------------------------------
 # 1. Vocabularies and ladders
@@ -40,9 +41,11 @@ closedSets:
   highKinds:                 # HIGH_KINDS — never probation-eligible, force elevation
     - integration.verify
     - release.deliver
-    - deployment.operate
-    - data.correct
-    - production.deploy
+    # Reconciled against modules/models/kinds.yaml in the M2 wave: the former
+    # entries deployment.operate, data.correct and production.deploy named kinds
+    # the operation-kind catalog does not declare - stale vocabulary removed,
+    # not an eligibility change (an elevation check on a nonexistent kind could
+    # never fire either way).
   kernelFunctionKinds:       # MODEL_KINDS + 'judge' — the kernel's own model calls,
     - model.assessGoal       # NOT operation work. They draw per-call scope but never
     - model.planOp           # consume the workflow's probation budget.

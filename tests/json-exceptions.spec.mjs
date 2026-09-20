@@ -8,11 +8,10 @@ import { pathToFileURL } from 'node:url';
 
 const skillRoot = path.resolve(import.meta.dirname, '..');
 const checkerFile = path.join(skillRoot, 'scripts', 'checks', 'check-json-exceptions.mjs');
-const allowlistFile = path.join(skillRoot, 'schemas', 'json-exceptions.yaml');
-const offenderFixture = path.join(skillRoot, 'legacy', 'builders', 'tests', 'fixtures', 'yaml-dist', 'json-exceptions-offender');
+const allowlistFile = path.join(skillRoot, 'modules', 'schemas', 'json-exceptions.yaml');
 
 assert.equal(fs.existsSync(checkerFile), true, 'scripts/checks/check-json-exceptions.mjs is required');
-assert.equal(fs.existsSync(allowlistFile), true, 'schemas/json-exceptions.yaml is required');
+assert.equal(fs.existsSync(allowlistFile), true, 'modules/schemas/json-exceptions.yaml is required');
 
 function disposable(t, prefix) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -32,7 +31,20 @@ async function loadChecker() {
 test('authored JSON outside allowlist fails the exceptions checker', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-ex-');
-  fs.cpSync(offenderFixture, dir, { recursive: true });
+  // Synthesized offender tree (the legacy/builders copy fixture is gone): one allowlisted manifest,
+  // one authored JSON the allowlist does not name.
+  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'schemas', 'json-exceptions.yaml'),
+    `schema: starci/json-exceptions@1
+exceptions:
+  - path: package.json
+    reason: npm package manifest for the disposable offender fixture
+`,
+  );
+  fs.writeFileSync(path.join(dir, 'package.json'), '{}\n');
+  fs.mkdirSync(path.join(dir, 'workflows'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'workflows', 'catalog.json'), '{}\n');
 
   const result = checkJsonExceptions({
     root: dir,

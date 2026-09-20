@@ -14,13 +14,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml, stringifyYaml } from '../../core/yaml.mjs';
+import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
-// Engines in legacy/ops/*.mjs stay executable elsewhere; the registry only names their
-// role so an agent knows the catalog is declarative and where the machinery is.
-// Source: legacy/ops/*.mjs file headers + tinkle-1 brief.
+// The registry only names machinery roles so an agent knows the catalog is
+// declarative; the engines map covers the retired pre-module sources for history.
 const ENGINES = {
   'basic-ops.mjs': 'shared operator plumbing helpers used by the contracts below',
   'contracts.mjs': 'builds the typed request/response contract each op executes under',
@@ -141,9 +140,9 @@ function main() {
     generatedBy: 'scripts/route/build-ops-registry.mjs',
     origin: {
       canonicalRegistry: '.claude/modules/ops/registry.yaml (this generated file)',
-      commonDocument: '.claude/legacy/ops/common.yaml',
+      commonDocument: '.claude/modules/ops/_common.yaml',
       perOpSources: 'modules/ops/ops/<id>.yaml (authored operator contract + business: block + route: block)',
-      note: 'modules/ops is the authored operator source; legacy/ops/ keeps the retired pre-module engines and sources.',
+      note: 'modules/ops is the authored operator source; _common.yaml keeps the shared pre-module policy prose.',
     },
     stages: STAGES,
     coarsePhases: COARSE,

@@ -31,13 +31,13 @@ reads:
       en: Select exactly one named operation, its target, scope and criteria before any effect. No mode
         default or automatic chain.
   - id: matrix
-    path: selected complete-job matrix request + workflows/jobs.json
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
     purpose:
       en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
@@ -173,13 +173,13 @@ executionModes:
           en: Read explicit task location/repository selection and existing portable identity. A directory
             name, cwd or similar remote is only a hint when identity is unresolved.
       - id: matrix
-        path: selected complete-job matrix request + workflows/jobs.json
+        path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
         purpose:
           en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
             input bindings, requested output JSON shapes and required criteria. Standalone execution
             needs no fabricated matrix request. A template is not authority for extra effects.
       - id: profile
-        path: model/registry.json + selected runtime execution profile + actual host tools/model
+        path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
         purpose:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
@@ -446,7 +446,7 @@ executionModes:
             secrets or creating accounts.
       - id: application-stacks
         path: knowledge/application-stacks.json + docs/application-stacks.md +
-          docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+          docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
         purpose:
           en: When the imported source contains application deployment, .starcistacks compose material or
             bootstrap/recovery declarations, load the whole-application dev/VPS contract and its
@@ -456,13 +456,13 @@ executionModes:
             to accepted deployment authority. This conditional read grants no extra deployment or
             source scope.
       - id: matrix
-        path: selected complete-job matrix request + workflows/jobs.json
+        path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
         purpose:
           en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
             input bindings, requested output JSON shapes and required criteria. Standalone execution
             needs no fabricated matrix request. A template is not authority for extra effects.
       - id: profile
-        path: model/registry.json + selected runtime execution profile + actual host tools/model
+        path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
         purpose:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not

@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {documentSDS} from '../fixtures/sds.mjs';
-import {validateSpecification} from '../specifications/validate.mjs';
-import {validateWorkspace} from '../core/index.mjs';
-import {parseYaml, stringifyYaml} from '../core/yaml.mjs';
+import {documentSDS} from './fixtures/sds.mjs';
+import {validateSpecification} from '../scripts/checks/spec/validate.mjs';
+import {validateWorkspace} from '../engine/index.mjs';
+import {parseYaml, stringifyYaml} from '../engine/yaml.mjs';
 
 test('source-independent SDS validates without code, symbols, copied SRS or a named pattern', () => {
   assert.deepEqual(validateSpecification(documentSDS()), {ok: true, errors: []});

@@ -23,7 +23,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -91,13 +91,13 @@ reads:
         unbounded retry is outside this op; discover an unknown external outcome by read-only correlation
         before repeating an attempt.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles, and the actual host network and tool availability the live call needs. Capabilities are the
         intersection of actual tools, selected profile policy, op permissions and existing task authority.
   - id: workflow
-    path: selected workflow request + workflows/contracts.json + this op authority.json
+    path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
     purpose:
       en: When selected inside the named workflow, read the exact request, strict response contract and
         primary/secondary authority JSON. Standalone op execution does not invent a workflow request.
@@ -154,7 +154,7 @@ writes:
       - outputs
       - artifacts
     content:
-      en: Only for the selected named workflow, emit the response defined by workflows/contracts.json. Return
+      en: Only for the selected named workflow, emit the response defined by modules/kernel/verdict-contract.yaml. Return
         outputs.results for every input assertion with the provider it reached, the observed response
         identity and the run output reference. A failed or blocked response preserves evidence with outputs
         null, and a blocked one names the exact missing credential variable.

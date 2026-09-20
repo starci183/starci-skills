@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {scanCanonicalWork,SourceStalenessInputError} from '../../kernel/source-staleness.mjs';
+import {scanCanonicalWork,SourceStalenessInputError} from './source-staleness.mjs';
 
 const HELP=`Usage: node scripts/checks/check-stales.mjs --work <canonical-work-root> --repo <id>=<git-root> [--repo ...] [--target <work-node-id> ...]
 

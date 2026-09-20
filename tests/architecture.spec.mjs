@@ -4,12 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
 import { checkArchitecture } from '../scripts/checks/architecture.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
-const runtimeRoot = path.resolve(import.meta.dirname, '..');
 
 function fixture(t, kind, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), `starci-architecture-${kind}-`));
@@ -252,7 +250,7 @@ test('production loader reports missing target TypeScript without borrowing Star
   assert.match(result.errors[0].message, /checked repository/);
 });
 
-test('CLI emits one actionable JSON record and uses target-local TypeScript', t => {
+test('check emits one actionable JSON record and uses target-local TypeScript', t => {
   const root = fixture(t, 'backend', {
     'src/modules/value.ts': 'export const value=1\n',
     'src/features/feature.ts': 'import { value } from "@modules/value"; export const feature=value\n',
@@ -261,13 +259,9 @@ test('CLI emits one actionable JSON record and uses target-local TypeScript', t 
   fs.mkdirSync(targetModules);
   const installedTypeScript = path.dirname(require.resolve('typescript/package.json'));
   fs.cpSync(installedTypeScript, path.join(targetModules, 'typescript'), { recursive: true });
-  const cli = path.join(runtimeRoot, 'cli/main.mjs');
-  const run = spawnSync(process.execPath, [cli, 'architecture', 'check', root, '--config', 'architecture.json'], { encoding: 'utf8', windowsHide: true });
-  assert.equal(run.status, 0, run.stderr || run.stdout);
-  assert.equal(run.stderr, '');
-  const result = JSON.parse(run.stdout);
+  const result = checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json' });
   assert.equal(result.schema, 'starci/architecture-check@1');
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.ok(path.resolve(result.compiler.resolved).startsWith(path.resolve(targetModules)));
 });
 

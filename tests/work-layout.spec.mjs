@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
-import {parseYaml,stringifyYaml} from '../core/yaml.mjs';import {sha256,validateWorkspace} from '../core/index.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';import {sha256,validateWorkspace} from '../engine/index.mjs';
 test('a direct business correction invalidates prior semantic proof',t=>{
   const f=fixture(t);f.node('module/business',{schema:'work/node@2'});f.done('module/business');
   const before=validateWorkspace(f.root),id='module.business';

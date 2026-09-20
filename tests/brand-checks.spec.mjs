@@ -4,9 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
-import {stringifyYaml} from '../core/yaml.mjs';
+import {stringifyYaml} from '../engine/yaml.mjs';
 import {
   BRAND_CHECKS,CHECK_IDS,MIN_PRIMARY_DANGER_DELTA,TOKEN_TOLERANCE,
   checkContrastAa,checkIconSetOnly,checkMascotAssetsPresent,checkPrimaryDangerDistinct,checkTokensInGrammar,checkTokensMatchSource,
@@ -14,7 +12,6 @@ import {
   readBrandRecord,runBrandChecks
 } from '../scripts/checks/brand.mjs';
 
-const cli=fileURLToPath(new URL('../cli/main.mjs',import.meta.url));
 const ACCENT='#7547ff';
 const ACCENT_OKLCH='oklch(56.50% 0.2534 286.60)';
 const DANGER='#b3261e';
@@ -324,35 +321,26 @@ test('a record with no declared rev is identified by the digest of its own bytes
   assert.notEqual(readBrandRecord(work).rev,identity.rev);
 });
 
-test('the CLI prints one line per check and exits 1 when a check fails',t=>{
+test('the brand check formats one line per check and fails when a check fails',t=>{
   const {work}=tree(t,{label:'cli'});
   const clean=frontend(t,{bad:false,label:'fe-cli'});
   const offending=frontend(t,{label:'fe-cli-bad'});
-  const run=(...args)=>spawnSync(process.execPath,[cli,'brand',...args],{encoding:'utf8',windowsHide:true});
 
-  const text=run('check',work,'--source',clean);
-  assert.equal(text.status,0,text.stderr||text.stdout);
-  for(const id of CHECK_IDS)assert.match(text.stdout,new RegExp(`\\[pass\\] ${id}:`),id);
+  const text=formatBrandChecks(runBrandChecks({tree:work,sourceRoot:clean}));
+  for(const id of CHECK_IDS)assert.match(text,new RegExp(`\\[pass\\] ${id}:`),id);
 
-  const json=run('check',work,'--source',clean,'--json');
-  assert.equal(json.status,0,json.stderr);
-  const parsed=JSON.parse(json.stdout);
+  const parsed=runBrandChecks({tree:work,sourceRoot:clean});
   assert.equal(parsed.schema,BRAND_CHECKS);
   assert.equal(parsed.ok,true);
   assert.equal(parsed.brand.family,'starci');
 
-  const failed=run('check',work,'--source',offending,'--json');
-  assert.equal(failed.status,1);
-  assert.equal(JSON.parse(failed.stdout).checks.find(entry=>entry.id==='icon-set-only').outcome,'fail');
+  const failed=runBrandChecks({tree:work,sourceRoot:offending});
+  assert.equal(failed.ok,false);
+  assert.equal(failed.checks.find(entry=>entry.id==='icon-set-only').outcome,'fail');
 
-  const alone=run('check',work);
-  assert.equal(alone.status,0,alone.stderr);
-  assert.match(alone.stdout,/\[skip\] tokens-match-source/);
+  const alone=formatBrandChecks(runBrandChecks({tree:work}));
+  assert.match(alone,/\[skip\] tokens-match-source/);
 
-  assert.equal(run('check').status,1);
-  assert.equal(run('inspect',work).status,1);
-  assert.equal(run('check',work,'--source').status,1);
-  const missing=run('check',path.join(work,'nowhere'));
-  assert.equal(missing.status,1);
-  assert.match(missing.stderr,/^starci: /);
+  assert.throws(()=>runBrandChecks({}),/needs a Work tree/);
+  assert.throws(()=>runBrandChecks({tree:path.join(work,'nowhere')}),'a missing tree cannot be checked');
 });

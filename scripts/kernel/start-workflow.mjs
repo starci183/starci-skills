@@ -4,23 +4,27 @@
 // [Kernel] agent terminal bound to that workflow_id. One kernel per workflow —
 // enforced by a signals singleton row, never by politeness.
 //
-// The kernel host is chosen by the same routing machinery as ops: without
-// --provider this script asks scripts/route/route-model.mjs for the
-// model.manageWorkflow kernelFunctionKind (risk high) and maps the picked
-// target to its provider via modules/models/profiles/<target>.yaml. Router
-// refusal or failure is a typed fallback to provider devin (routedBy:
-// fallback); --provider is an explicit operator override (routedBy:
-// override). Spawn flags come from the provider's adapter card
-// providers/orca/adapters/<provider>.yaml, not a hardcoded map.
+// The kernel host is chosen by layered routing: explicit --provider >
+// config.yaml kernel.provider/kernel.model > route-model. Without --provider
+// this script first reads the owner config <skillRoot>/config.yaml
+// (gitignored, seeded from config.example.yaml by the installer): a kernel
+// provider or model pin decides the seat outright (routedBy: config). With no
+// pin it asks scripts/route/route-model.mjs for the model.manageWorkflow
+// kernelFunctionKind (risk high) and maps the picked target to its provider
+// via modules/models/profiles/<target>.yaml. Router refusal or failure is a
+// typed fallback to provider devin (routedBy: fallback); --provider is an
+// explicit operator override (routedBy: override). Spawn flags come from the
+// provider's adapter card providers/orca/adapters/<provider>.yaml, not a
+// hardcoded map.
 //
 //   node scripts/kernel/start-workflow.mjs --repo <path> [--goal <workflow_id>] [--provider <name>] [--plan] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../kernel/ledger-db.mjs';
-import { parseYaml } from '../../core/yaml.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 
@@ -36,13 +40,75 @@ const planOnly = process.argv.includes('--plan');
 const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
 const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
 
-// Which provider hosts the kernel. Default: route-model resolves the
-// kernelFunctionKind model.manageWorkflow — the same selection.yaml machinery
-// ops route through, not a hardcoded map. pick.target is a pool target
-// (qwen-agent …); its model profile declares the provider. Router refusal
-// ('no eligible model', exit 1) or failure is a typed fallback to devin.
-function resolveKernelRoute() {
+// Owner config: <skillRoot>/config.yaml — the per-project config seeded from
+// config.example.yaml by the installer (gitignored). engine/config.mjs is the
+// canonical loader once it exports an owner-config reader; until then the
+// yaml is parsed directly with the same parser the rest of this file uses.
+// A missing or unparsable file is never fatal — routing falls through to
+// route-model exactly as before.
+async function readOwnerConfig() {
+  const file = path.join(skillRoot, 'config.yaml');
+  if (!fs.existsSync(file)) return { file, config: null, error: null };
+  const engineLoader = path.join(skillRoot, 'engine', 'config.mjs');
+  let engineError = null;
+  if (fs.existsSync(engineLoader)) {
+    try {
+      const mod = await import(pathToFileURL(engineLoader).href);
+      for (const name of ['loadOwnerConfig', 'readOwnerConfig'])
+        if (typeof mod[name] === 'function')
+          return { file, config: mod[name](skillRoot) ?? null, error: null };
+    } catch (e) { engineError = `engine/config.mjs: ${e.message}`; }
+  }
+  try {
+    const config = parseYaml(fs.readFileSync(file, 'utf8')) ?? null;
+    return { file, config, error: null, ...(engineError ? { engineError } : {}) };
+  } catch (e) { return { file, config: null, error: `config.yaml unparsable: ${e.message}`, ...(engineError ? { engineError } : {}) }; }
+}
+
+// kernel.model resolves its provider through the runtime pools: a model id a
+// pool pins (runtimes.*.models[role]) or the pool target itself names the
+// provider. runtimes.yaml is the single capacity/model-pin authority.
+function providerForModel(model) {
+  const file = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
+  let doc = null;
+  try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; }
+  for (const [id, rt] of Object.entries(doc?.runtimes ?? {})) {
+    if (id === model || rt?.target === model) return rt?.provider ?? null;
+    if (Object.values(rt?.models ?? {}).includes(model)) return rt?.provider ?? null;
+  }
+  return null;
+}
+
+// Which provider hosts the kernel. Precedence: --provider flag > config.yaml
+// kernel.provider/kernel.model pin > route-model (the selection.yaml machinery
+// ops route through, resolving kernelFunctionKind model.manageWorkflow —
+// pick.target is a pool target whose model profile declares the provider).
+// Router refusal ('no eligible model', exit 1) or failure is a typed fallback
+// to devin.
+async function resolveKernelRoute() {
   if (providerOverride) return { provider: providerOverride, routedBy: 'override' };
+  const owner = await readOwnerConfig();
+  const kc = owner.config?.kernel;
+  const cfgProvider = typeof kc?.provider === 'string' && kc.provider.trim() ? kc.provider.trim() : null;
+  const cfgModel = typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
+  const cfgEffort = (typeof kc?.effort === 'string' && kc.effort.trim() ? kc.effort.trim() : null)
+    ?? (typeof owner.config?.effort === 'string' && owner.config.effort.trim() ? owner.config.effort.trim() : null);
+  const config = owner.config || owner.error ? {
+    file: owner.config ? path.relative(skillRoot, owner.file) : null,
+    provider: cfgProvider, model: cfgModel, effort: cfgEffort,
+    budgets: owner.config?.budgets ?? null,
+    ...(owner.error ? { error: owner.error } : {}),
+    ...(owner.engineError ? { engineLoader: owner.engineError } : {}),
+  } : null;
+  // config.yaml pin: provider decides directly; a bare model pin resolves its
+  // provider through runtimes.yaml. An unknown model id warns and falls through.
+  if (cfgProvider)
+    return { provider: cfgProvider, routedBy: 'config', model: cfgModel, effort: cfgEffort, config };
+  if (cfgModel) {
+    const provider = providerForModel(cfgModel);
+    if (provider) return { provider, routedBy: 'config', model: cfgModel, effort: cfgEffort, config };
+    if (config) config.modelWarning = `kernel.model '${cfgModel}' is not pinned by any runtimes.yaml pool — ignored`;
+  }
   const r = spawnSync(process.execPath,
     [ROUTE_MODEL, '--kind', KERNEL_ROUTE.kind, '--risk', KERNEL_ROUTE.risk, '--json'],
     { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
@@ -51,7 +117,7 @@ function resolveKernelRoute() {
   const pick = result?.pick ?? null;
   if (r.error || r.status !== 0 || !pick?.target) {
     return {
-      provider: 'devin', routedBy: 'fallback',
+      provider: 'devin', routedBy: 'fallback', effort: cfgEffort, config,
       routeError: r.error?.message ?? (r.status === 0 ? 'route-model returned no pick' : result?.rule ?? `route-model exited ${r.status}`),
     };
   }
@@ -59,10 +125,10 @@ function resolveKernelRoute() {
   let provider = null;
   try { provider = parseYaml(fs.readFileSync(profileFile, 'utf8'))?.provider ?? null; } catch { /* unreadable profile */ }
   if (!provider) {
-    return { provider: 'devin', routedBy: 'fallback', routeError: `profile for ${pick.target} declares no provider` };
+    return { provider: 'devin', routedBy: 'fallback', effort: cfgEffort, config, routeError: `profile for ${pick.target} declares no provider` };
   }
   return {
-    provider, routedBy: 'route-model',
+    provider, routedBy: 'route-model', effort: cfgEffort, config,
     route: { kind: KERNEL_ROUTE.kind, risk: KERNEL_ROUTE.risk, target: pick.target, model: pick.model ?? null, mode: pick.mode ?? null, rule: result.rule ?? null },
   };
 }
@@ -103,7 +169,7 @@ function projectContext() {
 
 const context = projectContext();
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
-const promptTemplate = fs.readFileSync(path.join(skillRoot, 'scripts', 'kernel', 'kernel-prompt.md'), 'utf8');
+const promptTemplate = fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
 const renderKernelPrompt = ({ workflowId, inboxId, goalRevision }) => promptTemplate
   .replaceAll('{workflowId}', workflowId)
   .replaceAll('{inboxId}', String(inboxId))
@@ -154,13 +220,16 @@ try {
     const signal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
     const health = signalHealth(signal);
     const chain = (() => { try { return JSON.parse(g?.json || '{}').opChain?.legs?.map(l => l.op) ?? null; } catch { return null; } })();
-    const route = resolveKernelRoute();
+    const route = await resolveKernelRoute();
     const cmd = buildSpawnCommand({ provider: route.provider, kernel: true });
     const out = {
       plan: true, workflowId: target, title: wf?.title, phase: wf?.phase,
       goalRevision: g?.revision ?? null, goalIdentity: g?.goal_identity ?? null,
       opChain: chain, inbox: inbox?.status ?? 'none',
       provider: route.provider, routedBy: route.routedBy,
+      ...(route.model ? { model: route.model } : {}),
+      ...(route.effort ? { effort: route.effort } : {}),
+      config: route.config ?? (route.routedBy === 'override' ? { file: 'not consulted — --provider flag wins' } : { file: null }),
       ...(route.route ? { route: route.route } : {}),
       ...(route.routeError ? { routeError: route.routeError } : {}),
       sourceHost: sourceRoot, projectBinding: context?.file ?? null,
@@ -174,10 +243,15 @@ try {
       ...(cmd.error ? { commandError: cmd.error } : {}),
     };
     const routeLine = `  provider: ${route.provider} (routedBy: ${route.routedBy}`
+      + (route.routedBy === 'config' ? ` — ${route.config?.file} kernel.${route.config?.provider ? 'provider' : 'model'} pin` : '')
       + (route.route ? ` — ${route.route.target} ${route.route.model ?? ''} [${route.route.mode}]` : '')
       + (route.routeError ? ` — ${route.routeError}` : '') + ')';
+    const budgets = route.config?.budgets;
+    const budgetLine = budgets && Object.values(budgets).some(v => v != null)
+      ? `\n  budgets (config.yaml): ${['maxOps', 'perOpMs', 'dailyTokens'].map(k => `${k}=${budgets[k] ?? 'unbounded'}`).join('  ')}`
+      : '';
     console.log(asJson ? JSON.stringify(out, null, 2)
-      : `PLAN — start workflow ${target}\n  title: ${wf?.title}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${chain ? chain.join(' → ') : 'kernel derives at boot'}\n  kernel: ${out.kernel}\n${routeLine}\n  command: ${out.command}\n  command source: ${out.commandSource}`);
+      : `PLAN — start workflow ${target}\n  title: ${wf?.title}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${chain ? chain.join(' → ') : 'kernel derives at boot'}\n  kernel: ${out.kernel}\n${routeLine}\n  config: ${out.config.file ?? 'absent — routing falls to route-model'}${route.config?.modelWarning ? ` (${route.config.modelWarning})` : ''}${route.effort ? `  effort=${route.effort}` : ''}${budgetLine}\n  command: ${out.command}\n  command source: ${out.commandSource}`);
     process.exit(0);
   }
 
@@ -255,7 +329,7 @@ try {
   // 3. Spawn the [Kernel] terminal — host routed (or overridden), command
   // and flags from the provider's adapter card via the agent spawn pipeline
   // (create → readiness → deliver → submission, all card-driven).
-  const route = resolveKernelRoute();
+  const route = await resolveKernelRoute();
   const title = `[Kernel] ${workflowId}`;
   const goal = ledger.db.prepare('SELECT revision FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
   const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0 });
@@ -282,8 +356,9 @@ try {
 
   ledger.transaction(() => {
     ledger.db.prepare("UPDATE signals SET holder_pid=?,value_json=?,at=?,expires_at=NULL WHERE scope='kernel' AND key=? AND token=?")
-      .run(process.pid, JSON.stringify({ terminal: handle, provider: route.provider, routedBy: route.routedBy }), now, workflowId, token);
-    const payload = JSON.stringify({ inbox_id: claim.inbox_id, goal_revision: goal?.revision ?? 0 });
+      .run(process.pid, JSON.stringify({ terminal: handle, provider: route.provider, routedBy: route.routedBy, model: route.model ?? null, effort: route.effort ?? null }), now, workflowId, token);
+    const payload = JSON.stringify({ inbox_id: claim.inbox_id, goal_revision: goal?.revision ?? 0,
+      route: { provider: route.provider, routedBy: route.routedBy, model: route.model ?? null, effort: route.effort ?? null } });
     if (previousJob) {
       ledger.db.prepare("UPDATE jobs SET attempt=?,generation=?,payload_json=?,status='running',worker_id=?,result_json=NULL,updated_at=? WHERE job_id=?")
         .run(attempt, generation, payload, handle, now, `kernel-${workflowId}`);
@@ -294,12 +369,13 @@ try {
     ledger.db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(now, workflowId);
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: replaced ? 'kernel-restarted' : 'kernel-booted',
-      payload: { terminal: handle, provider: route.provider, routedBy: route.routedBy, inboxId: claim.inbox_id, attempt,
+      payload: { terminal: handle, provider: route.provider, routedBy: route.routedBy, model: route.model ?? null, effort: route.effort ?? null, inboxId: claim.inbox_id, attempt,
         sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}) },
       createdAt: now });
   });
 
   const out = { ok: true, workflowId, kernel: token, terminal: handle, provider: route.provider, routedBy: route.routedBy,
+    ...(route.model ? { model: route.model } : {}), ...(route.effort ? { effort: route.effort } : {}),
     replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true };
   console.log(asJson ? JSON.stringify(out, null, 2) : `[Kernel] ${workflowId} booted on ${route.provider} (${handle}, routedBy: ${route.routedBy}) — inbox ${claim.inbox_id} claimed`);
 } finally { ledger.close(); }

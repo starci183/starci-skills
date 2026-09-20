@@ -9,19 +9,19 @@
 # request touches, and the extend-vs-add decision falls out of the GAP.
 #
 # Sources:
-#   kernel/ledger.mjs        — loadLedger, inScope, nodeAllowlist,
+#   engine/ledger-db.mjs        — loadLedger, inScope, nodeAllowlist,
 #                                    executableCandidates, decisionCandidates,
 #                                    disjoint — the ownership lookup over .starciwork
-#   kernel/intake.mjs        — extensions.work3.reconciliation: the typed
+#   the kernel agent        — extensions.work3.reconciliation: the typed
 #                                    {case: reference|conflict|new, record, ...}
 #                                    rows an intake writes against decided records
 #   scripts/checks/check-work-deep.mjs    — DEP_STALE: a done record whose referenced
 #                                    deps moved since baseline ("its proof was
 #                                    captured against older premises");
 #                                    normDigest excludes volatile lifecycle fields
-#   docs/work-ledger.md      — ownership model: one index.yaml per scope
+#   docs/ledger-db.md      — ownership model: one index.yaml per scope
 #                                    folder, only leaves author state
-#   docs/work-verification.md — source drift vs evidence invalidation vs
+#   docs/verify-proof.md — source drift vs evidence invalidation vs
 #                                    unavailable input; stale evidence re-proves,
 #                                    never asserts fresh
 #   modules/ops/ops/work.author.yaml, scope.define.yaml — the record-authoring ops
@@ -46,8 +46,8 @@ about:
     chain proposed against an unmeasured S₀ plans work that may already be
     done, or misses the surface it is about to break.
   sources:
-    - kernel/ledger.mjs
-    - kernel/intake.mjs
+    - engine/ledger-db.mjs
+    - the kernel agent
     - scripts/checks/check-work-deep.mjs
 
 # ----------------------------------------------------------------------------
@@ -72,7 +72,7 @@ survey:
     reads, hands, detail} — `reference` what a decided record already holds
     (cite by id), `conflict` what cannot hold together with it (a todo
     decision record with both sides + one recommendation), `new` what no
-    decided record covers (kernel/intake.mjs). The survey is not a memo;
+    decided record covers (the kernel agent). The survey is not a memo;
     it is typed rows the chain reads.
   output: >-
     S₀ = the existing-surface map: {record-id -> {owns: paths, state, evidence,
@@ -99,7 +99,7 @@ decision:
     records: "a `reference` reconciliation row to X (read it, don't touch it); the boundary is the new work"
     why: >-
       No record of another feature is edited and none is reported against
-      (kernel/intake.mjs). The seam between old and new is where the
+      (the kernel agent). The seam between old and new is where the
       risk lives — that is what the integration leg proves.
 
   - when: "X missing — no record owns the paths and the source has nothing"

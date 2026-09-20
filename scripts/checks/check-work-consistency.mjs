@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {parseYaml} from '../../core/yaml.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 
@@ -65,7 +65,7 @@ const PROVER_PAIRING = {
   'work/sds-component': {kind: 'implementation', proverSchema: 'work/implementation'},
 };
 
-const schemaFileFor = schema => path.join(root, 'schemas', `work-${String(schema).split('/')[1] ?? ''}.schema.yaml`);
+const schemaFileFor = schema => path.join(root, 'modules', 'schemas', `work-${String(schema).split('/')[1] ?? ''}.schema.yaml`);
 const stateEnumCache = new Map();
 
 /** The `state` values the record's OWN family schema allows, read from `schemas/work-<family>.schema.yaml`'s

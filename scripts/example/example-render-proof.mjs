@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {parseYaml} from '../../core/yaml.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from '../checks/render.mjs';
 import {readWorkspace, loadRecords} from './example-ownership.mjs';
 

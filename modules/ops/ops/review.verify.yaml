@@ -18,7 +18,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -39,13 +39,13 @@ reads:
       en: Select exactly one named operation, its target, scope and criteria before any effect. No mode
         default or automatic chain.
   - id: matrix
-    path: selected complete-job matrix request + workflows/jobs.json
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
     purpose:
       en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
@@ -163,7 +163,7 @@ executionModes:
       dispatch: never
     reads:
       - id: application-stacks
-        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
         purpose:
           en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
             load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -193,13 +193,13 @@ executionModes:
             scope may authorize normal tests; do not impose a new blanket E2E approval. Shared
             destructive tests still need scoped authority.
       - id: matrix
-        path: selected complete-job matrix request + workflows/jobs.json
+        path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
         purpose:
           en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
             input bindings, requested output JSON shapes and required criteria. Standalone execution
             needs no fabricated matrix request. A template is not authority for extra effects.
       - id: profile
-        path: model/registry.json + selected runtime execution profile + actual host tools/model
+        path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
         purpose:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
@@ -352,13 +352,13 @@ executionModes:
           en: Read original assets, assertion observations, completion digests, commit lineage and
             test/runtime revisions; chat summaries are navigation hints, not acceptance proof.
       - id: matrix
-        path: selected complete-job matrix request + workflows/jobs.json
+        path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
         purpose:
           en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
             input bindings, requested output JSON shapes and required criteria. Standalone execution
             needs no fabricated matrix request. A template is not authority for extra effects.
       - id: profile
-        path: model/registry.json + selected runtime execution profile + actual host tools/model
+        path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
         purpose:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
@@ -536,13 +536,13 @@ executionModes:
           en: Read original current requirement/code/evidence, not a summarized pass. Task messages may locate
             proof but cannot replace it.
       - id: matrix
-        path: selected complete-job matrix request + workflows/jobs.json
+        path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
         purpose:
           en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
             input bindings, requested output JSON shapes and required criteria. Standalone execution
             needs no fabricated matrix request. A template is not authority for extra effects.
       - id: profile
-        path: model/registry.json + selected runtime execution profile + actual host tools/model
+        path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
         purpose:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
@@ -722,13 +722,13 @@ executionModes:
           en: Read actual accepted design/state/viewport expectations and relevant installed UI proof rules;
             do not require a nonexistent universal design grammar.
       - id: matrix
-        path: selected complete-job matrix request + workflows/jobs.json
+        path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
         purpose:
           en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
             input bindings, requested output JSON shapes and required criteria. Standalone execution
             needs no fabricated matrix request. A template is not authority for extra effects.
       - id: profile
-        path: model/registry.json + selected runtime execution profile + actual host tools/model
+        path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
         purpose:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
@@ -897,7 +897,7 @@ executionModes:
       dispatch: never
     reads:
       - id: application-stacks
-        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
         purpose:
           en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
             load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -952,13 +952,13 @@ executionModes:
           en: Read real suite command/cases, API schema/auth/error/transaction expectations and selected
             required assertions. Missing suite is a source-owner gap, not fabricated passing cases.
       - id: matrix
-        path: selected complete-job matrix request + workflows/jobs.json
+        path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
         purpose:
           en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
             input bindings, requested output JSON shapes and required criteria. Standalone execution
             needs no fabricated matrix request. A template is not authority for extra effects.
       - id: profile
-        path: model/registry.json + selected runtime execution profile + actual host tools/model
+        path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
         purpose:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
@@ -1182,7 +1182,7 @@ executionModes:
         purpose:
           en: Identify exact repositories, projects, Work root and optional stack profiles. Select only required checks; do not infer deployment or repair authority.
       - id: policy
-        path: knowledge/coding-reference.json + docs/code-pattern-enforcement.md + model/code-patterns.json + docs/architecture-check.md + docs/application-stacks.md
+        path: knowledge/coding-reference.json + docs/code-pattern-enforcement.md + modules/models/code-patterns.yaml + docs/architecture-check.md + docs/application-stacks.md
         purpose:
           en: Read the applicable FE/BE responsibility boundaries and static-check limits for mono or separate repositories, accepted Work ownership and selected Docker/native stack declarations.
       - id: inputs

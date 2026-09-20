@@ -2,16 +2,16 @@ schema: starci/orca-provider@1
 provider: orca
 executable: orca
 files:
-  capabilities: capabilities.json
-  api: api.json
-  calls: calls.json
-  recipes: recipes.json
-  validation: validation.json
+  capabilities: capabilities.yaml
+  api: api.yaml
+  calls: calls.yaml
+  recipes: recipes.yaml
+  validation: validation.yaml
   adapters:
-    codex: adapters/codex.json
-    claude: adapters/claude.json
-    qwen: adapters/qwen.json
-    devin: adapters/devin.json
+    codex: adapters/codex.yaml
+    claude: adapters/claude.yaml
+    qwen: adapters/qwen.yaml
+    devin: adapters/devin.yaml
 purpose: |-
   Canonical Orca API call templates for StarCi orchestrated execution. These calls are the
   only supported construction path; prompts may fill placeholders but may not invent a
@@ -69,11 +69,11 @@ workflowKernel:
 operationAgent:
   role: one-supervised-native-agent-per-operation-attempt
   canonicalLauncher:
-    module: hosts/orca/launch.mjs
-    command: start-op
+    module: scripts/kernel/api.mjs
+    command: dispatch
     authority: exclusive-effectful-construction-path
-    calls: calls.json
-    runner: hosts/orca/calls.mjs
+    calls: calls.yaml
+    runner: scripts/agent/lib.mjs
     companions:
       settle: Stop, release and verify one Dispatch; returns a typed settlement.
       sweep: The kernel closes dead terminals in its worktree after every settlement and before the final report; live workers, the kernel's own terminal and unknown terminals are kept.

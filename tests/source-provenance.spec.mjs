@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {validateWorkspace} from '../core/index.mjs';
-import {stringifyYaml} from '../core/yaml.mjs';
-import {validateSpecification} from '../specifications/validate.mjs';
+import {validateWorkspace} from '../engine/index.mjs';
+import {stringifyYaml} from '../engine/yaml.mjs';
+import {validateSpecification} from '../scripts/checks/spec/validate.mjs';
 
 function fixture(t) {
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-source-provenance-'));

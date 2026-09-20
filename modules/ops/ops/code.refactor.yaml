@@ -65,7 +65,7 @@ reads:
         repository only; conventions never authorize behavior changes.
   - id: machines
     path: scripts/checks/check-scoped-lint.mjs + scripts/checks/code-patterns/*.mjs + scripts/checks/architecture/*.mjs +
-      model/code-patterns.json + docs/architecture-check.md
+      modules/models/code-patterns.yaml + docs/architecture-check.md
     purpose:
       en: When the slice lives in a checked FE/BE repository, read the sealed architecture and
         code-pattern machines' supported arguments, report schema, exit codes and coverage limits.
@@ -73,13 +73,13 @@ reads:
         pattern regression introduced by a pure refactor is a failure, not a refactor outcome. This
         read grants no fix-flag or repair authority.
   - id: matrix
-    path: selected complete-job matrix request + workflows/jobs.json
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
     purpose:
       en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability

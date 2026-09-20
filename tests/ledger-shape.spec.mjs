@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {openLedger} from '../kernel/ledger-db.mjs';
+import {openLedger} from '../engine/ledger-db.mjs';
 
 /**
  * `workflows` is the parent of the ledger. Everything that belongs to a workflow hangs off it by

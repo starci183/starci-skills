@@ -51,8 +51,10 @@ orchestration:
   owner: source-host
   defaultOperationTarget: qwen-agent
   workspaceRouting: .workspaces/projects/<project>/work.json
-  approvalPolicy: approvals/policy.json
-  approvalMode: accepted-brief-then-auto
+  # Owner ruling: the only owner gates are the entry skills' exact-`ok`
+  # (define-goal, start-kernel) plus settle-time evidence verdicts — there is no
+  # separate approvals engine or policy file (approvals/ is retired).
+  approvalMode: entry-skill-owner-ok
   dispatch: The current user-designated coordinator remains the coordinator, including when it is an external
     Codex or Claude chat driving Orca. It creates an isolated child worktree for each ready workflow and starts
     the deterministic workflow kernel there; no replacement Coordinator or state-owning Workflow Manager agent

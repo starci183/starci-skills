@@ -119,8 +119,9 @@ runtimes:
       write: swe-2-max
 roleOfKind:
   request.analyze: plan
+  task.execute: plan
   backend.implement: implement
-  frontend.implement: implement
+  interface.implement: implement
   scope.define: decide
   code.refactor: implement
   test.author: implement
@@ -151,3 +152,7 @@ roleOfKind:
   work.author: plan
   implementation.plan: plan
   workspace.manage: plan
+  # ex-test.probe is deliberately absent: an internal dispatch-loop canary
+  # (lifecycle: internal-canary), delete-scheduled with the ex-testing harness -
+  # not workflow vocabulary and never an allocation target. See the note at the
+  # head of kinds.yaml's `kinds:` map.

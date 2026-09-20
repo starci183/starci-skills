@@ -65,7 +65,7 @@ reads:
         When source exists, read its manifests, active family/root and selected current UI context without editing
         product code. Greenfield work records source not-yet-created honestly.
   - id: profile
-    path: model/registry.json + model/hosts.json + selected runtime + actual host tools
+    path: modules/models/registry.yaml + modules/models/runtimes.yaml + selected runtime + actual host tools
     purpose:
       en: >-
         Prove this host exposes built-in `image_gen.imagegen` before planning effects. Record the tool actually
@@ -77,11 +77,11 @@ reads:
         Re-open the image and prompt bytes created earlier in this same operation for visual review, coverage
         binding and final hash verification. These bytes remain direction, not implementation render evidence.
   - id: workflow
-    path: selected workflow request + workflows/contracts.json + this op authority.json
+    path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
     purpose:
       en: Read the exact request, outputs and authority when this operation belongs to a named workflow.
   - id: matrix
-    path: selected complete-job matrix request + workflows/jobs.json
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
     purpose:
       en: Read the request-bound cell only when a job matrix selected it; do not fabricate a matrix handoff.
 writes:

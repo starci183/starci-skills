@@ -34,18 +34,20 @@ test('actual npm tarball installs a runnable source command without development 
   const packed=npm(['pack','--ignore-scripts','--json','--pack-destination',temporary],source);
   assert.equal(packed.status,0,packed.stderr??String(packed.error));
   const receipt=JSON.parse(packed.stdout)[0];
-  assert.equal(receipt.files.some(file=>file.path.startsWith('.dist')),false,'no compiled bundle is shipped');
-  assert.ok(receipt.files.some(file=>file.path==='cli/main.mjs'));
-  assert.ok(receipt.files.some(file=>file.path==='scripts/checks/stacks.mjs'));
+  const shipped=new Set(receipt.files.map(file=>file.path));
+  assert.equal([...shipped].some(file=>file.startsWith('.dist')),false,'no compiled bundle is shipped');
+  for(const file of ['bin/starci.mjs','scripts/install/install.mjs','scripts/kernel/api.mjs','engine/ledger-db.mjs','scripts/checks/stacks.mjs'])
+    assert.ok(shipped.has(file),`npm tarball must ship ${file}`);
+  for(const dead of ['cli/','hosts/','execution/','workflows/','contracts/','approvals/','specifications/','upgrades/','legacy/','fixtures/'])
+    assert.equal([...shipped].some(file=>file.startsWith(dead)),false,`npm tarball must not ship ${dead}`);
   fs.writeFileSync(path.join(target,'package.json'),'{}\n');
   const installed=npm(['install','--ignore-scripts','--omit=dev','--no-audit','--no-fund','--package-lock=false',path.join(temporary,receipt.filename)],target);
   assert.equal(installed.status,0,installed.stderr??String(installed.error));
   const deployed=path.join(target,'node_modules/starci');
   assert.equal(fs.existsSync(path.join(deployed,'node_modules/yaml')),false);
-  const probe=spawnSync(process.execPath,[path.join(deployed,'bin/starci.mjs'),'stacks','check',target,'--environment','dev','--deployment-model',path.join(target,'missing.json')],{cwd:target,encoding:'utf8',windowsHide:true});
-  assert.equal(probe.status,1,probe.stderr);
-  const result=JSON.parse(probe.stdout);
-  assert.equal(result.ok,false);
-  assert.equal(result.schema,'starci/application-stacks-check@1');
+  // The entry dispatcher must load and answer a read-only verb with no dev dependencies installed.
+  const probe=spawnSync(process.execPath,[path.join(deployed,'bin/starci.mjs'),'version'],{cwd:target,encoding:'utf8',windowsHide:true});
+  assert.equal(probe.status,0,probe.stderr);
+  assert.ok(probe.stdout.trim().length>0,'version prints the installed package version');
   assert.doesNotMatch(probe.stderr,/ERR_MODULE_NOT_FOUND|Cannot find/);
 });

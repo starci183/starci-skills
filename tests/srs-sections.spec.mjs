@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
-import {validateWorkspace} from '../core/index.mjs';
-import {SRS_SECTION_CONTRACT} from '../specifications/srs-sections.mjs';
+import {stringifyYaml,parseYaml} from '../engine/yaml.mjs';
+import {validateWorkspace} from '../engine/index.mjs';
+import {SRS_SECTION_CONTRACT} from '../scripts/checks/spec/srs-sections.mjs';
 
 test('canonical SRS authoring publishes English prose and token policy',()=>{assert.equal(SRS_SECTION_CONTRACT.proseLanguage,'en');assert.deepEqual(SRS_SECTION_CONTRACT.preserveEnglish,['yaml-schema-keys','stable-ids-and-refs','enum-literals','protocol-identifiers','api-fields','variables','types','operation-names','source-symbols']);});
 

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
-import {validateWorkspace} from '../core/index.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
+import {validateWorkspace} from '../engine/index.mjs';
 
 const review=(inputDigest)=>({inputDigest,review:{schema:'starci/design-review@1',reviewer:'Synthetic reviewer',authority:'Runtime split-freshness regression only.',reviewedAt:'2026-09-10T00:00:00Z',observations:[{id:'design-reviewed',outcome:'pass',observation:'The synthetic target design is internally reviewed; no product or implementation claim is made.'}],limitations:['Synthetic runtime regression only.']}});
 const sourceIdentity={schema:'starci/source-identity@1',repositories:[{repository:'be',origin:'https://example.invalid/nivo.git',state:'committed',commit:'a'.repeat(40),coverage:{kind:'scoped',paths:['src/synthetic.ts'],dependencyCoverage:'Synthetic leaf only.',limitations:['No product source was inspected or executed.']}}]};

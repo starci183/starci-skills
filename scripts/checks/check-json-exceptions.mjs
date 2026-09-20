@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fail if any authored *.json under the skill root is outside
- * schemas/json-exceptions.yaml. Inventory-only migration helper.
+ * modules/schemas/json-exceptions.yaml. Inventory-only migration helper.
  *
  * Usage:
  *   node scripts/checks/check-json-exceptions.mjs
@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../core/yaml.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ignoreLockfiles = process.argv.includes('--ignore-lockfiles');
@@ -58,7 +58,7 @@ function loadAllowlist(allowlistFile) {
   }
   const doc = parseYaml(fs.readFileSync(allowlistFile, 'utf8'));
   if (!doc || typeof doc !== 'object' || !Array.isArray(doc.exceptions)) {
-    throw Error('schemas/json-exceptions.yaml must define exceptions[]');
+    throw Error('modules/schemas/json-exceptions.yaml must define exceptions[]');
   }
   const paths = [];
   for (const entry of doc.exceptions) {
@@ -127,7 +127,7 @@ export function checkJsonExceptions({
   ignoreLockfiles: ignoreLocks = ignoreLockfiles,
 } = {}) {
   const skillRoot = optionRoot ?? skillRootOption ?? root;
-  const listFile = allowlistFile ?? path.join(skillRoot, 'schemas', 'json-exceptions.yaml');
+  const listFile = allowlistFile ?? path.join(skillRoot, 'modules', 'schemas', 'json-exceptions.yaml');
   const allowlist = loadAllowlist(listFile);
   const allow = new Set(allowlist);
   const found = [];
@@ -173,7 +173,7 @@ function main() {
   }
   if (result.offenders.length) {
     process.stderr.write(
-      `Authored JSON outside schemas/json-exceptions.yaml (${result.offenders.length}):\n` +
+      `Authored JSON outside modules/schemas/json-exceptions.yaml (${result.offenders.length}):\n` +
         result.offenders.map(p => `  ${p}`).join('\n') +
         '\n'
     );

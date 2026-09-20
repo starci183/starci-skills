@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {parseYaml} from '../../core/yaml.mjs';
-import {readDistJson} from '../../core/runtime-root.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
+import {readDistJson} from '../../engine/runtime-root.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -20,10 +20,6 @@ export function readExample(name) {
     return /\.ya?ml$/i.test(file) ? parseYaml(text) : JSON.parse(text);
   }
   throw Error(`Missing example ${name}`);
-}
-
-export function readWorkflow(name) {
-  return readPublicJson('workflows', name.endsWith('.json') ? name : `${name}.json`);
 }
 
 /** Canonical model record: `modules/models/<name>.yaml` — there is no compiled form. */

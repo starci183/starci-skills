@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {parseYaml} from '../../core/yaml.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
 
 const RESULT='starci/application-stacks-check@1';
 const STACKS_DIR='.starcistacks';
@@ -18,9 +18,7 @@ const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const sensitive=/pass(word)?|secret|token|credential|private[_-]?key|api[_-]?key/i;
 const nonempty=value=>typeof value==='string'&&Boolean(value.trim());
 const moduleDir=path.dirname(fileURLToPath(import.meta.url));
-const compiledSchema=path.resolve(moduleDir,'../../schemas/application-stacks.schema.json');
-const sourceSchema=path.resolve(moduleDir,'../../schemas/application-stacks.schema.yaml');
-const manifestSchema=fs.existsSync(compiledSchema)?JSON.parse(fs.readFileSync(compiledSchema,'utf8')):parseYaml(fs.readFileSync(sourceSchema,'utf8'));
+const manifestSchema=parseYaml(fs.readFileSync(path.resolve(moduleDir,'../../modules/schemas/application-stacks.schema.yaml'),'utf8'));
 
 function regular(file,{root=null}={}){
   try{

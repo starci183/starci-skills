@@ -1,1 +1,0 @@
-{"name":"@starci/docs-site","version":"1.0.0","private":true,"type":"module","scripts":{"build":"node ../skills/scripts/generate-data.mjs && node build.mjs"}}

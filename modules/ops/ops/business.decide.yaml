@@ -38,18 +38,18 @@ reads:
       en: Classify each statement as intent, observed fact, example, proposal, unknown or contradiction,
         with source citation/revision. Existing behavior does not authorize a new rule.
   - id: specification
-    path: business.decide/specification.json + specifications/contract.json
+    path: modules/ops/ops/business.decide.yaml + modules/schemas/spec/contract.schema.yaml
     purpose:
       en: Read the JSON field contract and this operator procedure before authoring the .starciwork
         payload.
   - id: matrix
-    path: selected complete-job matrix request + workflows/jobs.json
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
     purpose:
       en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability

@@ -1,8 +1,5 @@
 dist/
-/.dist/
-/.dist.staging/
-/.dist.previous/
-
+/.dist*/
 
 # Local tools and scratch are not distributable skill sources.
 /.venv/
@@ -11,6 +8,16 @@ dist/
 
 # Actual local Git checkouts are not product completion storage.
 worktrees/
+
+# Runtime state: the installed product writes .starciwork/runtime.sqlite and
+# ledger artifacts into the CONSUMER repo — consumers must ignore .starciwork/
+# (the installer prints these lines). This repo ignores its own scratch too.
+/.starciwork/
+/.starci-wk-spec-*/
+
+# Per-project config is seeded from config.example.yaml and stays untracked.
+/config.yaml
+/config.json
 
 # Preserve this ignore after retirement: never accidentally track old personal settings.
 resources/settings.json
@@ -21,8 +28,6 @@ node_modules/
 __pycache__/
 /scheduled_tasks.lock
 
-# Local language, model and reasoning preferences
-/config.json
-/sites/docs/.next/
-/sites/docs/out/
-/sites/docs/pages/
+# ex-testing/ is deleted in the cut; keep the ignore so resurrected scratch
+# never gets committed.
+/ex-testing/

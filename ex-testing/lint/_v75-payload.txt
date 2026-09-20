@@ -1,8 +1,0 @@
-direction-check.yaml: result=pass selectedDirections=5 totalPngs=12 siblingPrompts=12 checks=5
-   ui.checkout.cart: pass
-   ui.checkout.landing-home: pass
-   ui.checkout.shop-browse: pass
-   ui.checkout.stock-refused: pass
-   ui.identity.sign-in: pass
-generation-receipts hashes: 55 match, 0 mismatch, 0 file-missing
-on disk under those 5 ui assets/ dirs: 12 .png, 12 .prompt.txt (claimed 12 pngs / 12 prompts)

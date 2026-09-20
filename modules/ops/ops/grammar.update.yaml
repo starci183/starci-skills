@@ -59,7 +59,7 @@ reads:
         after it exists. Reading the consumer is for the version binding and the import surface only; product
         screens are not this operation's to change.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles, and confirm the actual host can run the grammar repository's gates and reach its package

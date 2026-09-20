@@ -24,7 +24,7 @@ reads:
         criteria from the request. Ask only material missing choices while continuing independent
         inspection; vague scope is not permission for arbitrary scope, deployment or data mutation.
   - id: intake
-    path: selected request.analyze intake record + workflows/catalog.json selection when present
+    path: selected request.analyze intake record + modules/goal/archetypes.yaml selection when present
     purpose:
       en: Read the workflow selection and scope statement the intake produced when one exists. An
         absent intake record is not a gap - the request itself is the input; a present one is
@@ -43,7 +43,7 @@ reads:
         inspected paths. If there is no source task, record not applicable. A path that was not
         opened is never written into the scope.
   - id: profile
-    path: model/registry.json + actual host tools/model
+    path: modules/models/registry.yaml + actual host tools/model
     purpose:
       en: Resolve the working runtime profile against actual available tools. Do not switch
         providers, invent tools or dispatch agents solely from a profile.

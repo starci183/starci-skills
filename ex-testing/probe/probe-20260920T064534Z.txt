@@ -1,3 +1,0 @@
-2026-09-20T06:48:57Z
-probe-ok
-This file is the canary artifact written by op ex-test.probe to prove the dispatch loop end-to-end.

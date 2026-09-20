@@ -1,3 +1,0 @@
-starci: Missing .dist runtime contracts. Run `node scripts/ensure-build.mjs` from the skill directory and retry.
-
-exit: 1

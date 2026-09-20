@@ -1,6 +1,0 @@
-REFUSE  examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/index.yaml: ui.checkout.landing-home carries state "uninvestigate", which schemas/work-ui-screen.schema.yaml declares no such value (its enum is [todo, done]) - the record matches neither the done rules nor the todo ones [STATE_VOCABULARY_UNKNOWN]
-SUSPECT examples/ecommerce-app-be/.starciwork/index.yaml (feature entry checkout): the catalog describes the feature as "Cart, stock, payment and the confirmed order - the first thing that needs a second service." while the feature node titles it "Buying what is in the cart" - two different sentences about one feature [CATALOG_TITLE_DRIFT]
-SUSPECT examples/ecommerce-app-be/.starciwork/index.yaml (feature entry identity): the catalog describes the feature as "The person behind a session. Skeleton seeded beside checkout; its full design is a later pass." while the feature node titles it "The person behind a session" - one is the other truncated [CATALOG_TITLE_DRIFT]
-INFO    (single tree): parity skipped, comparing conventions needs both example trees [PARITY_SKIPPED]
-
-34 record(s) across 1 tree(s): 1 refused, 2 suspect, 1 info

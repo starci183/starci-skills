@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateSDSMap,classifySDSPath,SDS_MAP_CONTRACT} from '../specifications/sds-map.mjs';
+import {validateSDSMap,classifySDSPath,SDS_MAP_CONTRACT} from '../scripts/checks/spec/sds-map.mjs';
 
 const entry=(path,type,payload)=>({path,nodeId:payload.id,workRefs:[],payload,classification:{aggregate:false,type}});
 test('canonical SDS authoring publishes English prose and token policy',()=>{assert.equal(SDS_MAP_CONTRACT.proseLanguage,'en');assert.deepEqual(SDS_MAP_CONTRACT.preserveEnglish,['yaml-schema-keys','stable-ids-and-refs','enum-literals','protocol-identifiers','api-fields','variables','types','operation-names','source-symbols']);});

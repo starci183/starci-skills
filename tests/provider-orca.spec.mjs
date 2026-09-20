@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readPublicJson} from './helpers/read-public.mjs';
-import {loadProviderContract,validateProviderContracts} from '../providers/validate.mjs';
+import {loadProviderContract,validateProviderContracts} from '../scripts/checks/providers.mjs';
 
 test('Orca provider contract fixes hierarchy names and exact native API calls',()=>{
   const contract=readPublicJson('providers/orca/index.json');
@@ -21,8 +21,8 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.match(contract.workflowKernel.calls.attestWorktree.cli,/worktree show/);
   assert.match(contract.workflowKernel.calls.waitOperationBoundary.cli,/orchestration check --wait/);
   assert.match(contract.workflowKernel.calls.answerOperation.cli,/terminal send .*--enter/);
-  assert.equal(contract.operationAgent.canonicalLauncher.module,'hosts/orca/launch.mjs');
-  assert.equal(contract.operationAgent.canonicalLauncher.command,'start-op');
+  assert.equal(contract.operationAgent.canonicalLauncher.module,'scripts/kernel/api.mjs');
+  assert.equal(contract.operationAgent.canonicalLauncher.command,'dispatch');
   assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
   assert.equal(contract.operationAgent.qwen38Flash.launch,'command-terminal');
   assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen');

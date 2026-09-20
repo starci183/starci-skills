@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {parseYaml, stringifyYaml} from '../../core/yaml.mjs';
+import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from './example-ownership.mjs';
 
 /**

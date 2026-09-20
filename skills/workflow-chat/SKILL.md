@@ -1,131 +1,106 @@
 ---
 name: workflow-chat
 description: >-
-  Monitor exactly one workflow-kernel workflow from a plain chat (Claude Code or Codex): turn the
-  owner's prompt into a goal with `workflow-goal`, show the critique and the definition of done,
-  approve only on the owner's word, start the kernel detached on the headless host adapter, and
-  relay its questions, its host-unsupported operations and its final report. Use when a chat
-  outside Orca is asked to run, drive, watch or resume a workflow, or when the user says
-  "$workflow-chat". Not for Orca sessions, where the kernel is supervised without a monitor.
+  Monitor exactly one workflow's long-lived [Kernel] agent from a plain chat: the goal lands through
+  the define-goal skill, the kernel boots through the start-kernel skill onto an Orca terminal, and
+  this chat relays the kernel's questions and open incidents to the owner verbatim and the owner's
+  words back into the kernel terminal — never deciding, approving or mutating itself. Use when a chat
+  is asked to run, drive, watch or resume a workflow, or when the user says "$workflow-chat".
 ---
 
 # Workflow chat
 
-One chat monitors one workflow. The kernel is the same program Orca runs and its store is the same
-directory (`<repo>/.starciwork/_local/workflows/<id>`), so this skill adds no second mechanism: the
-chat speaks to the kernel only through the launcher's commands and reads only the files the kernel
-writes. The chat is a monitor, never an agent layer above the kernel and never an operation.
+One chat monitors one workflow. The workflow's brain is ONE long-lived `[Kernel] <workflow_id>`
+agent running on an Orca terminal; its durable state is the ledger at
+`<repo>/.starciwork/runtime.sqlite`, mutated only through `scripts/kernel/api.mjs`. The chat adds
+no second mechanism and no second mutation surface: it reads ledger projections through the api and
+speaks to the kernel through its terminal. The chat is a monitor, never an agent layer above the
+kernel and never an operation.
 
-## Resolve the launcher once
+## Resolve once
 
-- `<skill root>` is the `.claude` directory that holds the `SKILL.md` you were sent to; `<repo>` is the
-  repository worktree the job is about, on the branch the owner wants the work cut from.
-- Every command below is run from `<repo>` in this form - `bin/starci.mjs` is the one command entry of the
-  runtime, so you never name a module path - and `--host` is what lets a repository that shares another
-  repository's Work tree resolve its ledger (without it the ledger is looked for in `<repo>/.claude`, which
-  is not where a frontend's Work lives):
+- `<skill root>` is the `.claude` directory that holds the `SKILL.md` you were sent to; `<repo>` is
+  the repository that owns the workflow's `.starciwork/runtime.sqlite` (the project ledger owner —
+  `define-goal` printed it as `LEDGER`).
+- Every runtime call goes through the runtime's own scripts, run from anywhere:
 
   ```
-  node <skill root>/bin/starci.mjs <command> --host <skill root> ...
+  node <skill root>/scripts/kernel/api.mjs <command> --repo <repo> ...
+  node <skill root>/scripts/api/orca/terminal-read.mjs --terminal <handle> [--screen]
+  node <skill root>/scripts/api/orca/terminal-send.mjs --terminal <handle> --text "..." --enter
+  node <skill root>/scripts/api/orca/terminal-show.mjs --terminal <handle>
+  node <skill root>/scripts/api/orca/terminal-list.mjs [--worktree <sel>]
   ```
 
-  The launcher and the kernel execute from source directly; there is no build step to run first.
-- Keep the workflow id from the `workflow-goal` record (`id`, `dir`); every later command names it with
-  `--id`, and `dir` is where every file you read lives.
+  The scripts call the host CLI themselves; there is no build step and you never invoke `orca`
+  directly.
+- Keep the `workflowId` from goal intake and the `[Kernel]` terminal handle from boot; every later
+  step names one of them.
 
-## 1. The owner's prompt is the goal
+## 1. The owner's prompt becomes the goal — through the entry skill
 
-- Run `workflow-goal --job "<the owner's prompt, verbatim>" [--scope f1,f2] [--lane [<name>]]`. Do not
-  reword, shrink or pre-critique the prompt: the runtime critiques the goal itself and the owner
-  approves the critique together with the goal.
-- Pass `--scope` only when the owner named features. Pass `--lane` when the owner asked for a worktree
-  of its own or when this worktree already carries a live workflow, because two workflows never share
-  a worktree; a lane the host refuses is printed as the refusal came, never worked around.
+- Follow the `define-goal` skill verbatim: cold-scan assess, planner preview table, then **stop**.
+  The goal persists only after the owner replies exactly `ok`, `OK`, or `oK`. Keep the printed
+  `workflowId`.
+- Never reword or shrink the owner's prompt, and never persist a goal on your own judgement — the
+  approval is the only human gate and it belongs to the owner.
 
-## 2. Show the goal, then stop
+## 2. Boot the kernel — through the entry skill
 
-- Read `<dir>/goal.md` and print, verbatim and in this order: the critique section (its verdict, required
-  changes, question and prerequisites), `Needs you first`, `Definition of done`, and the runtime
-  allocation proposal. Link the file so the owner can read the whole page.
-- Stop there. The approval is the only human gate of a workflow, so the chat waits for the owner's
-  word and does nothing else with this workflow until it comes.
+- Follow the `start-kernel` skill verbatim: `--plan` preview (goal revision, inbox status, routed
+  provider, or "already live"), the owner's exact `ok`, then boot. Keep the `[Kernel]` terminal
+  handle the result prints — it is your relay channel for the rest of the workflow's life.
+- A live kernel refuses a second boot; a dead one is rebound as a replacement (kernel attempt+1,
+  same workflow) — re-running the boot is the resume path, never a duplicate.
 
-## 3. Approve on the owner's word only
+## 3. Poll and relay
 
-- On the owner's yes: `workflow-approve --id <id> [--allocation <runtime>=<slots>,...]`. Pass the
-  allocation the owner chose; without one the kernel records the proposal from `goal.md`.
-- Add `--accept-critique "<reason>"` only when the critique answered `refuse` and the owner said in
-  words that they override it; quote their reason. A `revise` verdict needs no flag, because its
-  required changes are part of what the owner just approved.
-- Never approve, override a critique or choose an allocation on your own judgement.
-- If the owner explicitly clarifies or extends an already approved goal, keep its workflow id. Run
-  `workflow-stop --id <id>` and wait for the controller to exit, then use
-  `workflow-amend --id <id> --amendment <record.yaml>` only with a `starci/workflow-amendment@1`
-  record bound to the current frozen goal identity. The record must quote the actual owner grant and its
-  honest source identity separately from this chat's `apply-same-id` coordinator decision, and must bound
-  every added effect. Never manufacture an owner receipt, call the amendment digest an approval, reopen an
-  accepted operation or clear an unknown effect. Read the refreshed continuation brief and reconcile its
-  boundary findings before resuming.
+- Every few minutes run `api.mjs status --workflow <id>` for the cheap projection (phase, job
+  counts, pending inbox rows), and `api.mjs survey --workflow <id>` when you need the detail —
+  open jobs, live signals, the events tail, open incidents.
+- Read the kernel's own words with `terminal-read --terminal <kernel handle> --screen`: what it is
+  doing, what it is asking. Relay every owner-bound item — a question the kernel poses, an open
+  `incident`, a pending `inbox` row that needs the owner — verbatim, then say what answering it
+  takes.
+- An `incident` is the kernel's escalation record (plan divergence, retry budget exhausted, an op
+  death it cannot reconcile): relay its kind and detail, never adjudicate it yourself.
 
-## 4. Start the kernel detached
+## 4. Owner answers go into the kernel terminal
 
-- Start `workflow-run --id <id> --host-adapter headless` as a detached background process with its
-  output appended to `<dir>/kernel.log`, or start `workflow-supervise --host <skill root>` detached with
-  `STARCI_HOST=headless` in its environment, which starts and restarts the kernel of every approved
-  workflow of the repository on that host.
-- Never run the kernel or an operation in the chat's foreground: an operation is a separate model
-  process that runs for minutes, and a chat that waits on it cannot relay anything.
+- `terminal-send --terminal <kernel handle> --text "<the owner's words, verbatim>" --enter`. The
+  kernel agent folds them into its loop and records what it decides through `api.mjs` — an answer
+  is never delivered by you editing the ledger, a report or a record.
+- Never pick an option, approve, or settle a question on your own judgement. If the kernel reports
+  an operation the host cannot serve — a host-unsupported dispatch refusal such as a managed-agent
+  spawn that needs an Orca orchestration task — relay it to the owner as "this needs the Orca host";
+  the refusal names the missing capability and there is nothing to arrange locally.
 
-## 5. Poll and relay
+## 5. Kernel health and finish
 
-- Every few minutes run `workflow-status --id <id>` and read the lines of `<dir>/events.jsonl` after
-  the last `seq` you relayed. Up to one wait tick (15 min) of `silentMs` is normal; past the health
-  window (25 min) the supervisor restarts the kernel, and without a supervisor you start
-  `workflow-run --id <id> --host-adapter headless` again, which resumes the same workflow.
-- Relay every `Needs you` item and every `ask` question verbatim (kind, op or node, detail, options),
-  then say what answering it takes.
-  - A `decision` item wants the owner's pick, which you pass on with
-    `workflow-answer --id <id> --op <op> --choice <n> [--note "..."]` - the option number the owner named
-    and their own words, never a choice of yours. `--op` is **the op the item names**, and it is one of
-    two things. An `decision.prepare` (or `provision.ask` for a provision) op prepared the question (a business rule, a design choice, an authority, a
-    credential the environment lacks), and the answer reaches every paused requester in its next contract.
-    Or the item is a **reconciliation conflict**: the intake found the new feature cannot hold together
-    with what a decided record settled and wrote the decision record under its own feature, so `--op` is
-    the intake op's id and the answer is recorded on that decision record. Never re-run the intake to
-    settle a conflict; the owner's answer is what settles it.
-  - `## Provisional decisions (n)` is **not** something the workflow is waiting on. The owner is stopped for
-    exactly two things - something only they can provide (a credential, an account on an outside system, a
-    real dataset, a legal authority) and an effect nobody can undo (a message to real customers, a payment,
-    a deletion of real data, a publish); every other open question is taken on the runtime's own
-    recommendation so the work continues, and a workflow can finish `done` still owing the owner a page of
-    them. Relay each one as "here is what the runtime decided for you, and here is how to change it", with
-    the same `workflow-answer --id <id> --op <ask op> --choice <n>`, and say the part that matters: **the
-    same option confirms what was built, a different one reopens every node that was built on it.** The
-    owner may also answer by typing the number in the operation's own terminal while its ask op is open.
-    Credential input belongs to the workflow: Orca gets the kernel-owned researched GUI; headless hosts
-    retain the hidden `identity fill` prompt. Missing official-documentation research returns to the owning
-    operation before owner input. Never ask for credential values in chat or open substitute input terminals.
-    When authorized to improve the runtime from feedback, update it, restart and observe a blind workflow
-    test from canonical goal/Work without passing this chat's context or manual hints to product operations.
-  - A `ledger` item wants an allowlist or checks authored on the named node; a `dynamic-op` item wants
-    `workflow-approve --id <id> --allow-dynamic N`; a `merge` item wants the owner to merge the lane
-    branch into the base worktree; `authority`, `environment` and every other kind want the owner's
-    decision, which lands in a Work record, in the goal's wording or on the machine, never in your hands.
-    After the owner acted, `workflow-approve --id <id>` re-admits what was blocked.
-- Relay an operation reported `host-unsupported` as "this needs the Orca host". Its `host` needUser item
-  names the capability the operation's kind needs and this host does not offer - a capability declared in
-  `model/hosts.yaml`, so the item says which host has it and which does not, and there is nothing to
-  arrange locally. The same workflow can be resumed in Orca with `workflow-run --id <id>` there, because
-  the store is shared.
-- Report `finished` with its outcome and the path `<dir>/final-report.json`; a `blocked` finish with
-  green gates is the owner's open questions, not a defect.
+- `terminal-show --terminal <kernel handle>` is the liveness check: `connected` + `writable`. A dead
+  or exited kernel terminal means re-run `start-kernel` on the same goal — the durable
+  plan/jobs/events survive agent churn, so nothing is lost.
+- `[Op] <op>` terminals belong to `api dispatch` alone: it spawns one ephemeral agent per job and
+  `api settle` records the verdict and closes the worker. Never read, send to, spawn or close an op
+  terminal from the chat.
+- When the owner says stop, send that to the kernel terminal — every api write is a single
+  transaction, so a kernel that stands down (or whose terminal is closed) leaves no half-write; the
+  claimed goal waits in the `inbox` until a replacement kernel is booted.
+- `phase=finished` in `api.mjs status` means the kernel called `retire`: the goal is retired and the
+  history preserved. Report the outcome and the settled/failed job counts; a finish with open
+  incidents is the owner's open questions, not a defect.
 
 ## Never
 
-- Edit the Work tree or product code by hand, answer an operation's question by editing a record, or
-  do an operation's work inline: the operations do the work and the kernel commits it.
-- Write `state.json`, `goal.json`, `events.jsonl` or anything under `<dir>`: the kernel holds the
-  state in memory and saves over the file at every tick. A live kernel is driven only through
-  `workflow-approve` (queued in its inbox) and `stop.flag` (`workflow-stop --id <id>`).
-- Run a second workflow in this chat. A second goal is a second workflow: open a new chat for it and
-  give it `--lane`, so the two never share a worktree.
+- Write `.starciwork/runtime.sqlite`, `state.json`, or anything under `.starciwork/_local` — the
+  kernel mutates the ledger only through `scripts/kernel/api.mjs`, the chat mutates nothing at all,
+  and `_local` holds no runtime state. A live kernel is driven through its `inbox` rows and its
+  terminal.
+- Never approve — the exact-`ok` gate in `define-goal`/`start-kernel` fires only on the owner's
+  literal word; a relayed "looks fine to me" is not approval unless the owner typed it.
+- Spawn a second kernel or a second workflow in this chat. A second goal is a second workflow: open
+  a new chat for it.
+- Run an operation's work inline, edit product code to "help", or answer an op's question by writing
+  files — ops do the work; the kernel settles truth from evidence on disk.
+- Call `orca` directly or hand the kernel direct-ledger or op-level instructions — the api owns all
+  host mechanics.

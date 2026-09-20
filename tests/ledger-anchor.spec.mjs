@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {openLedger,inspectLedger,ledgerIdOf,anchorFileFor,readAnchor,writeAnchor,verifyAnchor} from '../kernel/ledger-db.mjs';
+import {openLedger,inspectLedger,ledgerIdOf,anchorFileFor,readAnchor,writeAnchor,verifyAnchor} from '../engine/ledger-db.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 
 /**

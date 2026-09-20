@@ -4,8 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
-import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {checkApplicationStacks} from '../scripts/checks/stacks.mjs';
 
 const RUNBOOK=(extra=[])=>[
@@ -192,20 +191,20 @@ test('rejects primitive, oversized, and unknown manifest shapes without throwing
 
 test('executes from a relocated installed payload using its authored schema YAML',async t=>{
   const f=fixture(t),payload=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stack-runtime-'));t.after(()=>fs.rmSync(payload,{recursive:true,force:true}));
-  const dist=path.join(payload,'payload');fs.mkdirSync(path.join(dist,'scripts','checks'),{recursive:true});fs.mkdirSync(path.join(dist,'core'),{recursive:true});fs.mkdirSync(path.join(dist,'schemas'),{recursive:true});
-  fs.copyFileSync(new URL('../scripts/checks/stacks.mjs',import.meta.url),path.join(dist,'scripts','checks','stacks.mjs'));fs.copyFileSync(new URL('../core/yaml.mjs',import.meta.url),path.join(dist,'core','yaml.mjs'));
-  fs.copyFileSync(new URL('../schemas/application-stacks.schema.yaml',import.meta.url),path.join(dist,'schemas','application-stacks.schema.yaml'));
+  const dist=path.join(payload,'payload');fs.mkdirSync(path.join(dist,'scripts','checks'),{recursive:true});fs.mkdirSync(path.join(dist,'engine'),{recursive:true});fs.mkdirSync(path.join(dist,'modules','schemas'),{recursive:true});
+  fs.copyFileSync(new URL('../scripts/checks/stacks.mjs',import.meta.url),path.join(dist,'scripts','checks','stacks.mjs'));fs.copyFileSync(new URL('../engine/yaml.mjs',import.meta.url),path.join(dist,'engine','yaml.mjs'));
+  fs.copyFileSync(new URL('../modules/schemas/application-stacks.schema.yaml',import.meta.url),path.join(dist,'modules','schemas','application-stacks.schema.yaml'));
   const {pathToFileURL}=await import('node:url');
   const relocated=await import(`${pathToFileURL(path.join(dist,'scripts','checks','stacks.mjs')).href}?relocated=${Date.now()}`);
   const result=relocated.checkApplicationStacks({repoRoot:f.root,environment:'dev',deploymentModelFile:f.modelFile});assert.equal(result.ok,true,result.errors.map(x=>x.code).join(','));
 });
 
-test('the stacks CLI runs the same check and never echoes secret material on malformed input',t=>{
+test('the stacks check reports malformed input and never echoes secret material',t=>{
   const f=fixture(t),sentinel='synthetic-secret-never-echo';
   fs.writeFileSync(f.modelFile,'{"token":"'+sentinel+'",BROKEN');
   const before=fs.readFileSync(f.modelFile);
-  const run=spawnSync(process.execPath,[fileURLToPath(new URL('../cli/main.mjs',import.meta.url)),'stacks','check',f.root,'--environment','dev','--deployment-model',f.modelFile],{encoding:'utf8',windowsHide:true});
-  assert.equal(run.status,1);assert.equal(JSON.parse(run.stdout).ok,false);assert.equal((run.stdout+run.stderr).includes(sentinel),false);assert.deepEqual(fs.readFileSync(f.modelFile),before);
+  const result=checkApplicationStacks({repoRoot:f.root,environment:'dev',deploymentModelFile:f.modelFile});
+  assert.equal(result.ok,false);assert.equal(JSON.stringify(result).includes(sentinel),false);assert.deepEqual(fs.readFileSync(f.modelFile),before);
 });
 
 test('a legacy .stacks-only tree without .starcistacks fires STACKS_LEGACY_DIRECTORY instead of crashing or being accepted silently',t=>{

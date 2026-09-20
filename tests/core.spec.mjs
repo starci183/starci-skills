@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {canonicalJSON,sha256,validateWorkspace,impactWorkspace} from '../core/index.mjs';
+import {canonicalJSON,sha256,validateWorkspace,impactWorkspace} from '../engine/index.mjs';
 
 function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'work-core-test-'));

@@ -38,7 +38,7 @@ reads:
         marking belongs to the kernel's invalidation machinery; this op names the changed sections,
         it does not rewrite the derivations.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
@@ -67,7 +67,7 @@ writes:
     content:
       en: Write goal v(n+1) whole - goal.json carries schema starci/workflow-goal@1, goal.md its human
         rendering - the only _local/workflows/<workflow>/ files this op writes; the kernel's run
-        state (checks/, contracts/, inbox/, reports/) is never op output - rev bumped by exactly
+        state (runtime.sqlite goals/jobs/inbox/reports/events rows) is never op output - rev bumped by exactly
         one, derivedFrom naming the previous rev
         and its digest, done still a checkable metrics block. Every changed section is carried at
         its new value; sections the revision did not touch are carried byte-identical. A direct edit

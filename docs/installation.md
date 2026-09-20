@@ -2,22 +2,70 @@
 
 ## Requirements and trust
 
-Use Node.js 20+ and npm. The runtime includes its YAML parser and does not require a separate dependency install to run the CLI. Development builds require dev dependencies. Review the downloaded archive before executing its CLI; `npx` executes package code. Pin a reviewed version instead of assuming `latest` is safe.
-
-This release is not published as `starci` yet. The commands below use the local release archive. Replace the archive path with your actual file; `--dir` always means the **host**, not automatically the backend or frontend.
+Node.js 20+ and npm. The runtime ships sources only — it bundles its own YAML
+parser (`engine/yaml.mjs`) and needs no dependency install to run. Review the
+downloaded archive before executing it; `npx` executes package code. Pin a
+reviewed version instead of assuming `latest` is safe.
 
 ```sh
-npx --yes --package=./starci-5.0.0-plus.tgz starci init --dir /absolute/host
-npx --yes --package=./starci-5.0.0-plus.tgz starci doctor --dir /absolute/host --quick
+npx --yes --package=<reviewed-archive>.tgz starci init --dir /absolute/host
+npx --yes --package=<reviewed-archive>.tgz starci doctor --dir /absolute/host --quick
 ```
 
-The installer copies its declared **source** payload to `/absolute/host/.claude`, verifies the installed source runtime, then records `.starci-skills.json` only if verification succeeds. It installs the managed entry in both `AGENTS.md` and `CLAUDE.md`, and creates local config only if absent. Installed `.claude/.gitignore` includes `/config.json` (older installs may still list retired build-staging entries). It preserves custom instructions. Conflicting bootstrap protocols fail before runtime writes. `init` refuses an unmanaged `.claude` by default. It does not run Git commands, create project records, install global skills, or change FE sources. See [runtime distribution](runtime-distribution.md).
+`--dir` always means the **host** — the directory that will own `.claude/` —
+not automatically a project backend or frontend.
 
-`--no-bootstrap` deliberately leaves host entry files untouched; you must provide the runtime path to the agent yourself. Do not use `--force` as routine setup: it can replace locally edited runtime files. Back up and inspect before explicitly opting in.
+## What `init` does
+
+The installer (`bin/starci.mjs` → `scripts/install/install.mjs`) copies the
+declared **source** payload — `skills/`, `modules/`, `engine/`, `providers/`,
+`scripts/`, `knowledge/`, `docs/`, `init/AGENTS.md` — into `/absolute/host/.claude`,
+then:
+
+1. Writes the managed agent bootstrap into the host's entry files. There is
+   **one** template — `init/AGENTS.md`; every supported host file (AGENTS.md,
+   CLAUDE.md, DEVIN.md) receives the same entry between the
+   `starci:prompt-entry` markers. Locally written instructions outside the
+   markers are preserved.
+2. Installs the user-facing skills (`skills/define-goal`, `start-kernel`,
+   `computer-use`, `orca-cli`, `orchestration`, `workflow-chat`) so the host's
+   agent surfaces them (for example `.devin/skills/` is install output —
+   `skills/` in this tree is the canonical source).
+3. Seeds an **untracked** `config.yaml` from `config.example.yaml` — the
+   per-project owner config: kernel model, effort, budgets. `route-model` and
+   `start-workflow` read it: owner config overrides the route-model default,
+   and an explicit `--provider` flag overrides both. The installed
+   `.claude/.gitignore` carries `/config.yaml`; the file is never shipped or
+   committed.
+4. Verifies the installed source tree (doctor contract checks), and only then
+   records the install manifest `.starci-skills.json` with the version and
+   file hashes. A failed copy or verify records nothing.
+
+`init` refuses an unmanaged `.claude` by default. `--no-bootstrap` leaves host
+entry files untouched (you then owe the agent the runtime path yourself).
+`--force` can replace locally edited runtime files — back up and inspect
+before opting in. The installer does not run git commands, create project
+records, or touch product sources. See [runtime distribution](runtime-distribution.md).
+
+## Git hygiene in bound repositories
+
+`.starciwork/` is runtime + product-record state owned by the project's
+backend repository. Keep the ledger out of git — add to the backend's
+`.gitignore`:
+
+```text
+/.starciwork/runtime.sqlite
+/.starciwork/_local/
+```
+
+Commit durable records (goals, SRS/SDS, evidence your policy keeps); never
+commit `config.yaml` or secrets.
 
 ## Bind a project
 
-Create or approve a registry entry at `<host>/.workspaces/projects/demo/work.json`. Synthetic example; replace paths and remotes with verified real repositories:
+Create or approve a registry entry at `<host>/.workspaces/projects/<name>/work.json`
+(contract: `modules/schemas/workspace-routing.yaml`). Synthetic example —
+replace paths and remotes with verified real repositories:
 
 ```json
 {
@@ -42,44 +90,41 @@ Create or approve a registry entry at `<host>/.workspaces/projects/demo/work.jso
 }
 ```
 
-`be` and `fe` deliver the product; `grammar` is optional and delivers the language the interface is drawn in - the
-published package the frontend imports and the canon that names its units. It owns no `.starciwork` and takes no
-Work node; it is what a reported `grammar-gap` is grown in. Omit it and the grammar of this product is out of the
-workflow's reach: a gap becomes a question for the user instead of a guessed repository.
+`be` and `fe` deliver the product; `grammar` is optional and delivers the
+language the interface is drawn in. Omit it and a grammar gap becomes a
+question for the owner instead of a guessed repository. All relative paths
+resolve from the host. The ledger lives at
+`<backend>/.starciwork/runtime.sqlite` — see [architecture](architecture.md)
+and [source layout](source-layout.md).
 
-All relative repository paths resolve from the host. The authoritative contract is [workspace routing](../schemas/workspace-routing.json). Existing different registry layouts need inspection and explicit mapping, not blind replacement with this example.
-
-To create only a new metadata root after selecting the backend:
-
-```sh
-node /absolute/host/.claude/bin/starci.mjs workspace init /absolute/demo-backend/.starciwork --id demo
-node /absolute/host/.claude/bin/starci.mjs validate /absolute/demo-backend/.starciwork
-```
-
-First run `starci storage <backend>`: legacy names require a coordinated migration before new planning, and mixed trees require explicit reconciliation. Initialization creates workspace metadata, not business nodes or a completed plan. Normal project work then uses `prepare-work` as needed. The command refuses legacy destinations or a parallel canonical tree beside legacy storage; it never migrates data automatically.
-
-Open the coding agent at the host. If a task opens in FE or another repository, explicitly provide the absolute host, `.claude/SKILL.md` path and selected project binding. A sibling host's bootstrap is not automatically in that task's directory ancestry. Both host files point to the same runtime; there is no second `.chatgpt` runtime.
+Open the coding agent at the host. If a task opens in the frontend or another
+repository, explicitly provide the absolute host, the `.claude/SKILL.md` path
+and the selected project binding — a sibling host's bootstrap is not
+automatically in that task's directory ancestry.
 
 ## Update
 
 ```sh
-npx --yes --package=./starci-5.0.0-plus.tgz starci update --dir /absolute/host
-npx --yes --package=./starci-5.0.0-plus.tgz starci doctor --dir /absolute/host
+npx --yes --package=<reviewed-archive>.tgz starci update --dir /absolute/host
+npx --yes --package=<reviewed-archive>.tgz starci doctor --dir /absolute/host
 ```
 
-Updates replace unchanged installer-owned runtime files, verify the installed source tree, then record the new version only after a successful check. Locally changed or unowned content is preserved and reported. Inspect that report: a successful copy is not proof a mixed/custom installation is compatible. Major upgrades require `--upgrade-major`. Keep a backup or Git checkpoint of runtime and host instructions before upgrading. Existing business data, active plans, receipts, local settings and Git metadata are not migration targets.
-
-The ownership manifest retains the historical filename `.starci-skills.json` for installer compatibility; this is not the public command name.
+Updates replace unchanged installer-owned files, verify the installed tree,
+then record the new version only after a successful check. Locally changed or
+unowned content is preserved and reported — inspect that report; a successful
+copy is not proof a mixed installation is compatible. Major upgrades require
+`--upgrade-major`. Existing ledgers, goals, reports, receipts and local
+settings are not migration targets.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| Public `npx starci` cannot find this release | Use the reviewed `.tgz`; it is not published yet. |
-| Agent asks for retired `INDEX.md` | Read actual host entry; run `node .claude/scripts/checks/check-entry.mjs /absolute/host`. Do not recreate a retired entry. |
+| `npx starci` cannot find the release | Use the reviewed `.tgz` path; it may not be published. |
+| Bootstrap entry missing or stale | Re-run `init`; the managed block is regenerated from `init/AGENTS.md`. |
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
-| No project binding | Supply backend/FE paths and verified remotes. Do not initialize inside FE. |
-| Invalid metadata or evidence | Run `starci validate <explicit-root>` and repair the specific proof. Do not weaken schemas to claim completion. |
-| Runtime sources inconsistent | Run `starci doctor --dir <host> --quick`; report errors before workflow execution. |
-| Interrupted init/update (no new version recorded) | Re-run `init`/`update` from the same reviewed package, then `doctor --quick`. See [runtime distribution](runtime-distribution.md). |
-| Runtime has local changes after update | Review kept files and run doctor. Never erase them just to remove a warning. |
+| `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |
+| No project binding | Supply backend/frontend paths and verified remotes in `work.json`. Do not initialize `.starciwork` inside the frontend. |
+| Runtime sources inconsistent | `starci doctor --dir <host> --quick`; report errors before running workflows. |
+| Interrupted init/update | Re-run from the same reviewed package, then `doctor --quick`. See [runtime distribution](runtime-distribution.md). |
+| Local changes reported after update | Review kept files and run doctor; never erase them just to silence a warning. |

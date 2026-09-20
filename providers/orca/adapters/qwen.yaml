@@ -27,8 +27,7 @@ readiness:
   intervalMs: 5000
 delivery:
   mode: file-reference-above-inline-limit
-  maxInlineChars: 3000
-  fileDirectory: .starciwork/_local/runtime
+  maxInlineChars: 4096
   fileName: orca-dispatch-<dispatch>.md
   prompt: '@<file> This file is your dispatched Task preamble and operation contract. Read it completely and follow every instruction in it exactly; report worker_done exactly once as it says.'
   reason: Qwen Code 0.23.3 crashes (V8 native stack) when a multi-kilobyte preamble is pasted through terminal send; a short @file reference delivers the same text through Qwen's own file reader.

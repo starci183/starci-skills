@@ -1,6 +1,0 @@
-5c10a673 merge: reconcile lane checks with the grown example tree — path fixes, retains field, honest skips naming the Work-model gaps
- checks/work-change.mjs             |  2 +-
- tests/work-change.spec.mjs         | 14 +++++++++-----
- tests/work-record-schemas.spec.mjs | 15 +++++++++------
- tests/work-status.spec.mjs         |  8 ++++++--
- 4 files changed, 25 insertions(+), 14 deletions(-)

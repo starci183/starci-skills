@@ -1,1 +1,0 @@
-{"ok":false,"files":77,"stale":["knowledge/application-stacks.json","knowledge/grammars/common/DNA.json","knowledge/grammars/INDEX.json","knowledge/ui/proof/anatomy-source.json","knowledge/ui/proof/INDEX.json"],"counts":{"stems":77,"yaml":76,"jsonFallback":1,"rules":323,"examples":4}}

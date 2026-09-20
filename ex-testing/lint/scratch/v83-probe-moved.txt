@@ -1,8 +1,0 @@
-=== raw bulk log (tree pathspec, --first-parent --name-status -z) ===
-"\u001f59a431c4f6e9671d003dc54ca7efe5585f691d90\u0000\nD\u0000.starciwork/features/f/br/a/index.yaml\u0000A\u0000.starciwork/features/f/br/kept/index.yaml\u0000\u001f4fb412613553784215b111e60be093693dee2646\u0000\nA\u0000.starciwork/features/f/br/a/index.yaml\u0000A\u0000.starciwork/index.yaml\u0000"
-
-=== raw follow log (path pathspec, --follow --name-status -z) ===
-"\u001f59a431c4f6e9671d003dc54ca7efe5585f691d90\u0000\nA\u0000.starciwork/features/f/br/kept/index.yaml\u0000"
-
-=== follow without --name-status ===
-"59a431c rev 2, moved directory\n\nA\t.starciwork/features/f/br/kept/index.yaml\n"

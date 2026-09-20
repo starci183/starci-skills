@@ -4,9 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {encodePng,screen,crc32} from './helpers/png.mjs';
 import {
   CHECK_IDS,MIN_BUCKET_SHARE,PALETTE_TOLERANCE,RENDER_CHECKS,
@@ -14,7 +13,6 @@ import {
   formatRenderChecks,renderChecksFor,runRenderChecks,scanMarkup,uiDirOf
 } from '../scripts/checks/render.mjs';
 
-const cli=fileURLToPath(new URL('../cli/main.mjs',import.meta.url));
 const grammarRoot=fileURLToPath(new URL('../knowledge/grammars',import.meta.url));
 const ACCENT='#7547ff';
 const DANGER='#b3261e';
@@ -407,36 +405,27 @@ test('frontend implementation audits real captures from its implementation owner
   assert.equal(result.ok,true,JSON.stringify(result.checks));assert.deepEqual(result.checks.filter(item=>item.outcome==='pass').map(item=>item.id).sort(),CHECK_IDS.slice().sort());
 });
 
-test('the CLI prints one line per check and exits 1 when a check fails or the input is broken',t=>{
+test('the render check formats one line per check and fails when a check fails or the input is broken',t=>{
   const {work}=tree(t,{label:'cli'});
   const clean=uiNode(t,{label:'cli-clean',markup:SECTION_LIST,artworkSlots:[MASCOT_SLOT]});
   const broken=uiNode(t,{label:'cli-broken',markup:CARD_LIST,capture:OFF_BRAND()});
-  const run=(...args)=>spawnSync(process.execPath,[cli,'render',...args],{encoding:'utf8',windowsHide:true});
 
-  const text=run('check',clean,'--brand',work);
-  assert.equal(text.status,0,text.stderr||text.stdout);
-  for(const id of CHECK_IDS)assert.match(text.stdout,new RegExp(`\\[pass\\] ${id}:`),id);
+  const text=formatRenderChecks(runRenderChecks({uiDir:clean,brandTree:work}));
+  for(const id of CHECK_IDS)assert.match(text,new RegExp(`\\[pass\\] ${id}:`),id);
 
-  const json=run('check',clean,'--brand',work,'--json');
-  assert.equal(json.status,0,json.stderr);
-  const parsed=JSON.parse(json.stdout);
+  const parsed=runRenderChecks({uiDir:clean,brandTree:work});
   assert.equal(parsed.schema,RENDER_CHECKS);
   assert.equal(parsed.ok,true);
   assert.equal(parsed.brand.family,'starci');
 
-  const failed=run('check',broken,'--brand',work,'--json');
-  assert.equal(failed.status,1);
-  assert.deepEqual(JSON.parse(failed.stdout).checks.filter(entry=>entry.outcome==='fail').map(entry=>entry.id).sort(),
+  const failed=runRenderChecks({uiDir:broken,brandTree:work});
+  assert.equal(failed.ok,false);
+  assert.deepEqual(failed.checks.filter(entry=>entry.outcome==='fail').map(entry=>entry.id).sort(),
     ['entity-list-in-card','mascot-slot-missing','palette-off-brand','primary-absent']);
 
-  assert.equal(run('check',clean,'--brand',work,'--family','starci').status,0);
-  assert.equal(run('check').status,1);
-  assert.equal(run('inspect',clean,'--brand',work).status,1);
-  assert.equal(run('check',clean).status,1,'the brand tree is not optional: nothing binds the palette without it');
-  assert.equal(run('check',clean,'--brand').status,1);
-  assert.equal(run('check',clean,'--brand',work,'--family').status,1);
-  const missing=run('check',path.join(clean,'nowhere'),'--brand',work);
-  assert.equal(missing.status,1);
-  assert.match(missing.stderr,/^starci: /);
+  assert.equal(runRenderChecks({uiDir:clean,brandTree:work,family:'starci'}).ok,true);
+  assert.throws(()=>runRenderChecks({}),/ui node directory/);
+  assert.throws(()=>runRenderChecks({uiDir:clean}),/Work tree/,'the brand tree is not optional: nothing binds the palette without it');
+  assert.throws(()=>runRenderChecks({uiDir:path.join(clean,'nowhere'),brandTree:work}),'a missing ui dir cannot be checked');
   assert.ok(zlib&&t);
 });

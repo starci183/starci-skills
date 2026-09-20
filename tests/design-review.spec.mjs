@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {validateWorkspace, previewCompletion} from '../core/index.mjs';
-import {parseYaml, stringifyYaml} from '../core/yaml.mjs';
-import {documentSDS} from '../fixtures/sds.mjs';
+import {validateWorkspace, previewCompletion} from '../engine/index.mjs';
+import {parseYaml, stringifyYaml} from '../engine/yaml.mjs';
+import {documentSDS} from './fixtures/sds.mjs';
 
 function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-design-review-'));

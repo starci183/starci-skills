@@ -1,5 +1,5 @@
-import fs from 'node:fs';import path from 'node:path';import {stringifyYaml} from '../../core/yaml.mjs';import {validateWorkspace} from '../../core/index.mjs';
-import { skillRoot } from '../../core/runtime-root.mjs';
+import fs from 'node:fs';import path from 'node:path';import {stringifyYaml} from '../../engine/yaml.mjs';import {validateWorkspace} from '../../engine/index.mjs';
+import { skillRoot } from '../../engine/runtime-root.mjs';
 export function makeExample(root){
  if(fs.existsSync(root))throw Error('Example destination must be new');
  const write=(p,v)=>{const file=path.join(root,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,typeof v==='string'?v:stringifyYaml(v));};

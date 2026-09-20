@@ -1,6 +1,0 @@
-services:
-  redis:
-    # Resolved shared-port arithmetic: 6379 + offset 69 = 6448 (metadata.json is the projection).
-    image: redis:7
-    ports:
-      - "6448:6379"

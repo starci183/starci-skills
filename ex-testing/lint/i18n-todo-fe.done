@@ -1,4 +1,0 @@
-v3-4 todo-fe i18n + dark/light theme: done
-date: 2026-09-19T12:54:24+07:00
-verify: tsc --noEmit (0), next build (0), vitest 101/101, eslint [lang]+pages (0), smoke curls all expected
-structure: FE-CONVENTION twins - page.tsx thin shells, components/pages/* index+component, Layout fixed name

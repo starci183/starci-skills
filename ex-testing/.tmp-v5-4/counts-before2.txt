@@ -1,6 +1,0 @@
-todo-be VULNERABILITY: 3 (via sonarqube-todo-app-backend-token.key)
-todo-be BUG: 0 (via sonarqube-todo-app-backend-token.key)
-todo-be CODE_SMELL: 36 (via sonarqube-todo-app-backend-token.key)
-ec-be VULNERABILITY: 5 (via sonarqube-ecommerce-app-be-token.key)
-ec-be BUG: 0 (via sonarqube-ecommerce-app-be-token.key)
-ec-be CODE_SMELL: 15 (via sonarqube-ecommerce-app-be-token.key)

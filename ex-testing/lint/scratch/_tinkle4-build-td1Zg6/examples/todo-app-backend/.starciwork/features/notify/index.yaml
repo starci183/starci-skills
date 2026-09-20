@@ -1,6 +1,0 @@
-schema: work/feature
-id: notify
-title: Telling a person something happened, outside the product
-description: The asynchronous, partially-external corner. Something happens inside the product and a
-  person is told about it by a channel they are not currently looking at - email now, others later.
-  Every record of this feature lives under this directory.

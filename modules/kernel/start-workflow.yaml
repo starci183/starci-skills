@@ -60,14 +60,18 @@ spawn:
     (claude --dangerously-skip-permissions, codex --full-auto). The
     PROVIDER_CMD map is the fallback when the card carries no command fields.
   prompt: >-
-    kernel packet: resolved Source host, project binding, BE/FE roots, ledger and
+    kernel packet: rendered from modules/kernel/kernel-prompt.md (contract
+    data — the template lives in modules/, not scripts/): resolved Source
+    host, project binding, BE/FE roots, ledger and
     absolute API path + {workflow_id, goal_revision} + mandatory load order —
     Source SKILL.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
     mutation goes through node scripts/kernel/api.mjs <cmd>
     (survey/status/plan/enqueue/dispatch/settle/incident/retire) — never
-    direct sqlite writes, never self-spawned op terminals; dispatch goes
-    through api dispatch.
+    direct sqlite writes, never self-spawned op terminals, never direct
+    orca/git/provider-CLI calls, never .starciwork/_local/ writes; dispatch
+    goes through api dispatch; findings/plans persist via api plan|incident
+    before dispatch (kernel-prompt.md BOUNDARY).
 
 records:
   jobs_row: {kind: 'kernel', workflow_id, status: 'running', worker_id: <terminal handle>}

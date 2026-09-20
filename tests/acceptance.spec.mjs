@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { validateWorkspace } from '../core/index.mjs';
-import { base, node, resource, complete, mutateJSON, mutateNode, imageAsset, COMMIT } from '../fixtures/build-workspace.mjs';
+import { validateWorkspace } from '../engine/index.mjs';
+import { base, node, resource, complete, mutateJSON, mutateNode, imageAsset, COMMIT } from './fixtures/build-workspace.mjs';
 
 function temporary(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'work-v3-acceptance-'));

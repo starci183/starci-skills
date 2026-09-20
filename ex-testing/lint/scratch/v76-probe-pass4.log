@@ -1,2 +1,0 @@
-[1] exit=0  16 matched 5s features/audit/data/log-line :: data.audit.log-line
-probe complete: 1 command runs this pass, 152 total cached

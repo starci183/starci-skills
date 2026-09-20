@@ -20,7 +20,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../kernel/ledger-db.mjs';
+import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Source = the repository containing this .claude; the project registry lives
@@ -111,6 +112,30 @@ const assessLineFor = (data, repoPath) => {
   return JSON.stringify(data).slice(0, 160);
 };
 
+// Owner config surface for the plan table: <skillRoot>/config.yaml (gitignored,
+// seeded from config.example.yaml by the installer) decides the kernel seat
+// before route-model does — precedence: --provider flag > config.yaml kernel
+// pin > route-model. The plan shows the pin so the owner sees the config
+// effect before ok; the kernel itself resolves it at start-workflow time.
+// engine/config.mjs is the canonical loader once it exists; a missing or
+// unparsable file is reported, never fatal.
+function ownerConfigSummary() {
+  const file = path.join(skillRoot, 'config.yaml');
+  if (!fs.existsSync(file)) return { file: null };
+  try {
+    const c = parseYaml(fs.readFileSync(file, 'utf8')) ?? {};
+    return {
+      file: path.relative(skillRoot, file),
+      kernel: {
+        provider: c?.kernel?.provider ?? null,
+        model: c?.kernel?.model ?? null,
+        effort: c?.kernel?.effort ?? c?.effort ?? null,
+      },
+      budgets: c?.budgets ?? null,
+    };
+  } catch (e) { return { file: path.relative(skillRoot, file), error: `config.yaml unparsable: ${e.message}` }; }
+}
+
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'goal';
 const workflowId = `wf-${slug(title || text)}-${Date.now().toString(36)}`;
 const goalIdentity = crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
@@ -142,6 +167,8 @@ if (planOnly) {
     assess: assess.available ? assess.data : null,
     assessNote: assess.available ? undefined : assess.note,
     willWrite,
+    config: ownerConfigSummary(),
+    kernelRoute: 'precedence: --provider flag > config.yaml kernel pin > route-model',
     ledger: ledgerFileFor(repo),
   };
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
@@ -162,6 +189,12 @@ if (planOnly) {
   } else {
     lines.push('  underivable (kernel will derive at boot)');
   }
+  const cfg = out.config;
+  lines.push(cfg.file
+    ? `CONFIG: ${cfg.file} — kernel pin provider=${cfg.kernel?.provider ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'} effort=${cfg.kernel?.effort ?? '(default)'}`
+      + (cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : '')
+      + (cfg.error ? ` (${cfg.error})` : '')
+    : 'CONFIG: no config.yaml — kernel route falls to --provider flag or route-model');
   lines.push('WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
   lines.push(`ledger: ${out.ledger}`, 're-run without --plan to persist');
   console.log(lines.join('\n'));

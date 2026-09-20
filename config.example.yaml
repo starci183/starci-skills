@@ -1,6 +1,29 @@
+# config.example.yaml — seed for the per-project owner config.
+# The installer copies this file to the gitignored `config.yaml` next to it;
+# owners edit that copy. Everything below is read at runtime — no key here is
+# decorative. Kernel route precedence: explicit `--provider` flag >
+# `kernel.provider`/`kernel.model` below > the route-model default.
 language: vi
 model: null
 effort: medium
+# kernel — the long-lived [Kernel] agent's route pin. All three keys are
+# optional; null means "no owner pin, let routing decide".
+#   provider: a runtime provider id (claude|codex|qwen|devin). When set, the
+#     kernel spawns on that provider (routedBy: config) and route-model is not
+#     consulted for the kernel seat.
+#   model: a model id declared by a modules/models/runtimes.yaml pool (e.g.
+#     claude-opus-5). When set without provider, the pool that carries the
+#     model supplies the provider. An unknown id is ignored with a warning.
+#   effort: effort for the kernel seat (same vocabulary as `effort` above);
+#     recorded on the kernel job and shown in plans. null inherits `effort`.
+kernel: {provider: null, model: null, effort: null}
+# budgets — owner-declared ceilings surfaced by every plan before `ok`, so the
+# envelope the owner approves shows the caps the kernel was configured with.
+# Null = unbounded. These are caps, not targets.
+budgets:
+  maxOps: null       # max concurrent dispatched ops the kernel may hold open
+  perOpMs: null      # per-op wall-clock ceiling in milliseconds
+  dailyTokens: null  # daily token ceiling across kernel + ops
 # Adaptive mode combines fresh quota, live reservations and task/model suitability. Set preferredProvider to a
 # provider id such as codex or devin for a bounded owner bias; it is not a fallback chain. Devin also requires
 # an explicit workflow allocation such as `devin-agent=2@implement+verify+write` before it has any capacity.

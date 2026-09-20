@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
-import {validateWorkspace} from '../core/index.mjs';
-import {validateSpecification} from '../specifications/validate.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
+import {validateWorkspace} from '../engine/index.mjs';
+import {validateSpecification} from '../scripts/checks/spec/validate.mjs';
 // examples/nested-business was deleted (owner ruling: examples/ keeps only the todo-app repositories);
 // tests/fixtures/nested-business/ reconstructs the deleted example's knowledge/business SRS tree.
 const example=new URL('fixtures/nested-business/',import.meta.url);

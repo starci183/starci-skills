@@ -11,15 +11,16 @@
 #
 # Sources (all under .claude/, relative to the skill root):
 #   scripts/kernel/api.mjs      — the executable half; this file is its contract
-#   kernel/ledger-db.mjs        — the tables named below (LEDGER_DDL)
-#   kernel/engine.mjs           — reserveOperation/settled/incident semantics the
-#                                 api wraps (identity fence, lease release)
-#   kernel/dispatcher.mjs       — planDispatch disjointness the api refuses on
-#   kernel/admission.mjs        — reserve/renew/expire, driftGuard
+#   engine/ledger-db.mjs        — the tables named below (DDL: engine/schema.sql)
+#   scripts/agent/lib.mjs       — spawnAgent + terminal lifecycle the api drives;
+#                                 the kernel never calls Orca itself
 #   modules/kernel/driver-loop.yaml    — the caller's tick
-#   modules/kernel/dispatch.yaml       — the packet `dispatch` builds
+#   modules/kernel/dispatch.yaml       — the packet `dispatch` builds + the
+#                                        path-legality preflight before enqueue
 #   modules/kernel/verdict-contract.yaml — what `settle` validates
-#   schemas/goal-plan.yaml      — the plan --file shape (starci/goal-plan@1)
+#   modules/kernel/kernel-prompt.md    — the spawned kernel's boundary contract
+#   modules/schemas/goal-plan.yaml     — the plan --file shape:
+#                                        {legs:[{op, paths?, notes?}]}
 # ============================================================================
 
 schema: starci/module-kernel-api@1
@@ -38,31 +39,37 @@ about:
     a refusal is a fact for the driver loop, never a crash to route around.
   sources:
     - scripts/kernel/api.mjs
-    - kernel/ledger-db.mjs
-    - kernel/engine.mjs
+    - engine/ledger-db.mjs
+    - scripts/agent/lib.mjs
 
 # ============================================================================
 # CONVENTIONS — true of every command below.
 # ============================================================================
 conventions:
   invoke: 'node scripts/kernel/api.mjs <command> [--repo <path>] [--json]'
-  ledger: '.starciwork/runtime.sqlite under the bound repo (kernel/ledger-db.mjs ledgerFileFor)'
+  ledger: '.starciwork/runtime.sqlite under the bound repo (engine/ledger-db.mjs ledgerFileFor)'
   stdout: 'one JSON object — {ok:true, ...} on success, {ok:false, reason:<kebab-string>} on refusal; callers match on the reason string, it is the contract'
   exitCode: '0 ok / 1 refusal / 2 usage error'
   writes: >-
     every mutation runs inside BEGIN IMMEDIATE and appends its event —
-    events is hash-chained (kernel/ledger-db.mjs EVENTS_DIGEST_TRIGGER), so a
+    events is hash-chained (engine/ledger-db.mjs EVENTS_DIGEST_TRIGGER), so a
     half-write or a silent edit is impossible
   identity: >-
     a job's durable identity is {workflow_id, op_id, attempt, generation} +
     lease_token; a command that cannot bind the COMPLETE identity refuses
-    rather than partial-match (kernel/engine.mjs settled `exact` fence;
-    ledger-db.mjs leases_match_job RAISE(ABORT,'lease-identity-drift'))
+    rather than partial-match (the api's exact-identity settle fence;
+    engine/ledger-db.mjs leases_match_job RAISE(ABORT,'lease-identity-drift'))
   neverDoes:
     - 'never picks the next op or the model — the kernel reasons, route-model resolves'
     - 'never answers an ask or revises a goal — intent is the owners (provision.ask)'
     - 'never deletes history — retire preserves goals/jobs/reports/events'
     - 'never spawns outside dispatch --spawn — one job, one terminal, one agent'
+    # Boundary rules the KERNEL agent is held to (modules/kernel/kernel-prompt.md
+    # BOUNDARY; driver-loop.yaml boundary). The api is the only door:
+    - 'kernel never calls orca, git, or a provider CLI directly — host mechanics are api internals + scripts/agent/lib.mjs; the kernel sees receipts, not terminals'
+    - 'kernel never writes .starciwork/_local/ — the ledger via api calls plus each job''s declared artifacts are the only durable surface'
+    - 'kernel never holds durable state only in memory — survey findings, the derived plan, the slice table and routing reasoning persist via plan/incident into events/state_snapshots BEFORE dispatch'
+    - 'kernel never reuses an op terminal — settle closes the worker terminal; a retry is a new job row at attempt+1'
 
 # ============================================================================
 # COMMANDS
@@ -112,17 +119,26 @@ commands:
   # --------------------------------------------------------------------------
 
   plan:
-    args: '--workflow <id> --file <plan.json>'
+    args: >-
+      --workflow <id> --file <plan.json> [--replanned-from <plan-digest|event-seq>]
+      [--blocker <kind>] [--path-delta <s>] [--routing-reason <s>]
+    fileShape: '{legs: [{op, paths?, notes?}]} — modules/schemas/goal-plan.yaml'
     reads: 'latest goals row — the approved opChain is goals.json.opChain (define-goal.yaml: advisory, re-derived at boot, never trusted blindly)'
     writes: >-
       one events row kind 'plan-derived' {payload: {goal_revision, plan_digest,
-      diff}} — the file stays the artifact; the ledger stores its digest and
-      its diff, not a copy
+      diff, lineage}} — the file stays the artifact; the ledger stores its digest
+      and its diff, not a copy. `lineage` = {replannedFrom, blocker, pathDelta,
+      routingReason}: which prior plan-derived event/digest this supersedes, the
+      typed blocker or trigger that forced the re-plan, the owned_paths delta vs
+      the prior legs, and why the legs routed as they did. A first plan may omit
+      it; a RE-PLAN (a prior plan-derived event exists) may not — re-planning
+      without provenance is a quiet rewrite (driver-loop.yaml replanTriggers.lineage).
     diff: >-
       STRUCTURAL only — the derived op ids + dependsOn edges vs the approved
       opChain legs. Added/removed/re-rooted legs are divergence; leg order
       and allowlist wording inside the approved shape are not
-      (schemas/goal-plan.yaml rules: acyclic dependsOn, disjoint allowlists).
+      (modules/schemas/goal-plan.yaml rules: acyclic dependsOn, disjoint
+      allowlists).
     returns:
       ok: true
       goalRevision: '<revision the plan was derived against>'
@@ -130,6 +146,7 @@ commands:
       divergent: 'true|false — structural divergence: the driver escalates and dispatches nothing on it'
     refuses:
       - plan-unreadable: 'file missing, unparseable, or fails goal-plan rules — the refusal names the rule'
+      - plan-lineage-missing: 'a prior plan-derived event exists but no lineage was given — a re-plan must say what it supersedes and why'
       - unknown-workflow
     usedBy: 'tick.plan — divergence -> api incident --kind plan-divergence, never a quiet re-plan (driver-loop.yaml)'
 
@@ -166,28 +183,45 @@ commands:
       orders the eligible)
     writes: >-
       jobs.status pending->running with lease_token + worker_id; leases +
-      budget_reservations rows taken atomically (kernel/admission.mjs
-      reserve, ttlMs 10min); contracts row = the rendered packet markdown;
-      events 'operation-launch-intent' then 'operation-launched'
-      (engine.mjs reserveOperation/beginLaunchIntent/launched semantics)
+      budget_reservations rows taken atomically (the api's admission —
+      reserve, ttlMs 10min, engine/constants.mjs); contracts row = the
+      rendered packet markdown; events 'operation-launch-intent' then
+      'operation-launched' — and only after attestation below does the job
+      stand running (intent -> observed -> running)
     packet: >-
       the dispatch.yaml packet, fields unchanged — {op, brief,
       context:{records, owned_paths}, constraints:{model, budget, lease},
       returns:{verdict, evidence, suspicion}}
     spawn: >-
-      with --spawn the api runs the Orca sequence itself: terminal create
-      titled `[Op] <op-id>` -> readiness read -> send the rendered packet —
-      command, flags and readiness patterns from the provider adapter card
-      providers/orca/adapters/<provider>.yaml. The kernel agent never calls
-      orca directly. Without --spawn: dry-run — the packet prints, nothing
-      is reserved and nothing launches.
+      with --spawn the api runs the Orca sequence itself — through
+      scripts/agent/lib.mjs spawnAgent, so the provider adapter card's
+      command flags are auto-injected and can never be forgotten:
+      terminal create titled `[Op] <op-id>` -> readiness read -> send the
+      rendered packet — command, flags and readiness patterns from the
+      provider adapter card providers/orca/adapters/<provider>.yaml. The
+      kernel agent never calls orca directly. Without --spawn: dry-run —
+      the packet prints, nothing is reserved and nothing launches.
+    attestation: >-
+      spawn success is not launch success. Before the job may stand
+      'running' the api attests the launch: the terminal handle is bound,
+      the rendered packet visibly landed, and FIRST MODEL ACTIVITY is
+      observed inside the launch window — against the adapter card's
+      readiness patterns + knownFailures signatures. An auth failure or
+      known-crash signature (e.g. '401 Invalid API-key'), a terminal that
+      dies, or a prompt that never lands is `dispatch-rejected`: the job
+      stays NOT running, the terminal is closed (scripts/agent/lib.mjs),
+      and the lease + budget reservations are released — a dead launch is a
+      routed refusal, never a running ghost. (Observed: a job marked
+      running although its spawned terminal died at '401 Invalid API-key'.)
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
       - not-pending: 'job already running/settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - contested-lease: 'an in-flight job holds a capacity-1 resource this op needs (canonical-writer:*, runtime-projection:*, machine:*)'
-      - path-collision: 'owned_paths overlap an in-flight jobs read/write set (dispatcher.mjs firstConflict)'
+      - path-collision: 'owned_paths overlap an in-flight jobs read/write set (the api''s dispatch-planning conflict check)'
+      - path-illegal: 'owned_paths contradict the target repo''s layout/lint contracts — preflight says incident, never dispatch (dispatch.yaml preflight)'
       - managed-agent-spawn: '--spawn on a managed-agent profile — that path is orca orchestration worker-start (providers/orca/index.yaml managedFallback)'
       - spawn-failed: 'create/read/send sequence did not land — the reservation is settled, never left leasing a ghost'
+      - dispatch-rejected: 'post-spawn attestation failed — auth/known-failure signature or dead terminal; job NOT running, terminal closed, slot released'
     usedBy: 'drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free'
 
   # --------------------------------------------------------------------------
@@ -200,16 +234,19 @@ commands:
     writes: >-
       reports row (UNIQUE(workflow_id, dispatch_id) — one dispatch, one
       report); jobs.status -> done|failed|blocked + result_json; lease and
-      budget_reservation rows released — a settle frees the slot; events
+      budget_reservation rows released — a settle frees the slot; the
+      worker terminal is closed via scripts/agent/lib.mjs — a settled op
+      leaves no live terminal for anyone to reuse; events
       'operation-settled' {verdict}
     validates: >-
       The report FILE is the source of truth; the done-marker/message is
-      only the wake-up (kernel/reports.mjs head). validateReport runs
-      starci/op-report@1: outcome's payload present, files inside the job's
-      owned_paths, identity binds {workflow_id, op_id, attempt, generation,
-      lease_token} exactly. `pass` records only after the declared checks
-      re-ran green and changed files computed from git — evidence is bytes
-      on disk, never words in a summary (verdict-contract.yaml accepts).
+      only the wake-up (modules/kernel/verdict-contract.yaml envelope).
+      validateReport runs starci/op-report@1: outcome's payload present,
+      files inside the job's owned_paths, identity binds {workflow_id,
+      op_id, attempt, generation, lease_token} exactly. `pass` records only
+      after the declared checks re-ran green and changed files computed
+      from git — evidence is bytes on disk, never words in a summary
+      (verdict-contract.yaml accepts).
     returns: '{ok:true, verdict, job:{job_id, status}, report_id}'
     refuses:
       - report-missing: 'report path unreadable'
@@ -230,8 +267,8 @@ commands:
     writes: >-
       incidents row upserted {incident_id, workflow_id, op_id, attempts+1,
       status:'open', last_progress:detail} + events 'incident' {kind,
-      fingerprint} — identical evidence is not progress
-      (kernel/engine.mjs incident; scheduler.mjs progressExhausted)
+      fingerprint} — identical evidence is not progress (the api's
+      fingerprint upsert is the exhaustion detector)
     returns: '{ok:true, incident_id, attempts, exhausted:true|false}'
     refuses:
       - unknown-workflow: 'no workflows row'

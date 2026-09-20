@@ -24,9 +24,10 @@ import { fileURLToPath } from 'node:url';
 import {
   openLedger, ledgerFileFor, machineFileFor, openMachine,
   newToken, SETTLED_JOB_STATUSES,
-} from '../../kernel/ledger-db.mjs';
-import { parseYaml } from '../../core/yaml.mjs';
-import { spawnAgent } from '../agent/lib.mjs';
+} from '../../engine/ledger-db.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { spawnAgent, buildSpawnCommand } from '../agent/lib.mjs';
+import { terminalClose } from '../api/orca/terminal-close.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -273,9 +274,16 @@ function cmdDispatch(ledger, args, repo) {
   const prompt = buildPrompt(packet, jobId);
   const worktree = args.worktree ?? repo;
   const title = `[Op] ${op}`;
+  // The composed command is what a spawn would actually run — card env prefix
+  // + credential strip + requirements (the --yolo/dangerous flags). Dry-run
+  // prints it so reviewers see the injected flags, not just the profile body.
+  const spawnCmd = model.kind === 'command-terminal'
+    ? buildSpawnCommand({ provider: model.provider, command: model.command })
+    : null;
+  const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
     ? [
-      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', model.command, '--json'] },
+      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', composedCommand ?? '<command>', '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle>', '--screen', '--json'], note: 'readiness — verify the prompt landed before sending' },
       { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle>', '--text', '<prompt>', '--enter', '--json'] },
     ]
@@ -284,6 +292,9 @@ function cmdDispatch(ledger, args, repo) {
   if (!args.spawn) {
     const out = {
       ok: true, spawned: false, jobId, packet, prompt,
+      spawnCommand: spawnCmd
+        ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null, ...(spawnCmd.error ? { error: spawnCmd.error } : {}) }
+        : { command: null, error: `${model.target} is launch kind '${model.kind}' — composed by 'orca orchestration worker-start', not terminal create` },
       orca: { worktree, title, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
     };
@@ -291,6 +302,8 @@ function cmdDispatch(ledger, args, repo) {
       `PACKET job=${jobId} op=${op} model=${model.target} (${model.kind})`,
       `  brief: ${packet.brief}${briefExists ? '' : ' — MISSING ON DISK'}`,
       `  owned_paths: ${packet.context.owned_paths.map((p) => p.path).join(', ') || '(none)'}`,
+      `  spawn command: ${out.spawnCommand.command ?? `(none — ${out.spawnCommand.error})`}`,
+      ...(out.spawnCommand.commandSource ? [`  command source: ${out.spawnCommand.commandSource}`] : []),
       '  orca commands:', ...out.orca.commands.map((c) => `    $ ${c.cli}`),
       '  (dry run — pass --spawn to launch)',
     ].join('\n'), args.json);
@@ -304,16 +317,40 @@ function cmdDispatch(ledger, args, repo) {
   // spawnAgent assembles the command: the profile's launch.orca.command carries
   // model+tuning flags; the provider adapter card injects its credential/env
   // prefix (devin ACP strip, qwen key unset) and requirements automatically.
+  // The pipeline runs create → readiness → deliver → submission → attestation;
+  // an attestation rejection means the terminal died after consuming the
+  // prompt (observed: qwen 401 Invalid API-key) — spawnAgent already closed it.
   const spawned = spawnAgent({
     provider: model.provider, worktree, title, prompt,
     command: model.command, dispatchId: jobId,
   });
   const handle = spawned.terminal ?? null;
-  const spawn = { step: spawned.step, error: spawned.error, command: spawned.command, handle };
+  const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle };
   spawn.ok = spawned.ok === true;
   if (!spawn.ok) {
-    const out = { ok: false, jobId, packet, spawn: { ...spawn, reason: spawned.error ?? `spawn failed at ${spawned.step}` } };
-    emit(out, `spawn FAILED for ${jobId}: ${out.spawn.reason}`, args.json);
+    // dispatch-rejected: the job must NEVER sit 'running' on a dead spawn.
+    // Job → failed with a typed result, lease rows released, one event — and
+    // for attestation rejections a typed infra-provider incident so survey
+    // sees it without parsing events. Terminal is already closed by spawnAgent.
+    const reason = spawned.signal ?? spawned.error ?? `spawn failed at ${spawned.step}`;
+    ledger.transaction(() => {
+      const now = Date.now();
+      const leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
+      db.prepare("UPDATE jobs SET status='failed', result_json=?, worker_id=NULL, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?")
+        .run(JSON.stringify({ reason: 'dispatch-rejected', step: spawned.step, signal: spawned.signal ?? null, detail: spawned.error ?? null, provider: model.provider, at: now }), now, jobId);
+      ledger.appendEvent({
+        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+        kind: 'dispatch-rejected',
+        payload: { op, step: spawned.step, signal: spawned.signal ?? null, error: spawned.error ?? null, provider: model.provider, model: model.target, terminal: handle, leasesReleased },
+      });
+      if (spawned.step === 'attestation') {
+        db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
+          .run(`inc-${newToken().slice(0, 12)}`, job.workflow_id, op,
+            `[infra-provider] ${JSON.stringify({ provider: model.provider, signal: spawned.signal ?? spawned.error ?? null, jobId })}`, now);
+      }
+    });
+    const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, spawn: { ...spawn, reason } };
+    emit(out, `dispatch REJECTED for ${jobId} (${spawned.step}): ${reason} — job status=failed, terminal closed`, args.json);
     process.exit(1);
   }
 
@@ -373,9 +410,18 @@ function cmdSettle(ledger, args, repo) {
     } catch { /* ledger settle stands; machine TTLs expire on their own */ }
   }
 
+  // The settled op's Orca terminal is released with its leases — worker_id is
+  // the handle (observed defect: settled op terminals stayed alive). Runs
+  // after the settled state is written; a close failure never un-settles.
+  let terminalClosed = null;
+  if (job.worker_id) {
+    const closed = terminalClose({ terminal: job.worker_id });
+    terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.error ? { error: closed.error } : {}) };
+  }
+
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, report: reportAbs, leasesReleased: released, machineRefsReleased: machineReleased };
-  emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released})`, args.json);
+  const out = { ok: true, jobId, verdict, status, report: reportAbs, leasesReleased: released, machineRefsReleased: machineReleased, terminalClosed };
+  emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''})`, args.json);
 }
 
 /* -------------------------------------------------------------- incident */

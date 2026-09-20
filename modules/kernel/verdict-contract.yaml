@@ -1,6 +1,6 @@
 # ============================================================================
-# TINKLE-9 / WAVE2-w1 — modules/kernel/verdict-contract.yaml
-# Brief: ex-testing/briefs/tinkle/tinkle-9.md + ex-testing/briefs/wave2/w1.md.
+# modules/kernel/verdict-contract.yaml — the op's return contract
+# (origin: tinkle-9 / wave2-w1 lane briefs — the retired prototype tree).
 #
 # The output schema of an ephemeral [Op] agent: the verdict enum and its
 # semantics, the evidence paths a verdict must stand on (and the byte-level
@@ -10,24 +10,23 @@
 #
 # Two layers, kept distinct everywhere below:
 #   REPORT outcome — what the agent claims: done|partial|failed|ask|blocked
-#                    (kernel/reports.mjs OUTCOMES; schema starci/op-report@1)
+#                    (the envelope below; schema starci/op-report@1)
 #   KERNEL verdict — what the kernel judges: pass (reproduced) / fail
 #                    (couldn't reproduce, or red proof) / blocked (owner or
 #                    boundary needed) — this is the `returns.verdict` of
 #                    dispatch.yaml and the input to driver-loop.yaml's table.
 #
 # Sources (all under .claude/, relative to the skill root):
-#   kernel/reports.mjs    — OP_REPORT/WORKFLOW_REPORT schemas, OUTCOMES,
-#                           BLOCKER_KINDS, SIGNALS, buildReport, validateReport
-#   kernel/verify.mjs     — changedFiles, attributedFiles, machineVerify,
-#                           validateAccepted, recordVerdict, treeVerdictFor
-#   kernel/engine.mjs     — settled(), settleStoppedOperation (last-words and
-#                           stopped-attempt rules), incident budgets
-#   kernel/terminals.mjs  — writeLastWordsReport ('done' never honoured),
-#                           infrastructureCause
-#   kernel/goal.mjs       — reviseGoal, validateGoalRevision,
-#                           propagateInvalidation, adoptReportRev
-#   model/kinds.yaml      — routes: (the outcome->route table)
+#   scripts/kernel/api.mjs    — settle: the report validation, identity fence,
+#                               git-computed changed files, check re-runs and
+#                               incident budgets this contract names
+#   scripts/agent/lib.mjs     — terminal lifecycle + last-words recovery
+#                               ('done' never honoured from last words)
+#   engine/ledger-db.mjs      — reports/jobs tables; leases_match_job trigger
+#                               (DDL: engine/schema.sql)
+#   modules/ops/ops/goal.revise.yaml — the backward-edge target: revision
+#                               rules, decision log, rev consistency
+#   modules/models/kinds.yaml — routes: (the outcome->route table)
 #   scripts/checks/check-work-artifacts.mjs — ASSET_MISSING/EMPTY/MAGIC/
 #                           STAMP/DIGEST, RUN_MEDIA_FAKE, RECEIPT_ORPHAN
 #   scripts/checks/check-work-deep.mjs      — DEP_STALE / NORM_UNRECORDED
@@ -48,9 +47,9 @@ about:
     re-proves it. Doubt is a first-class field, not a side-channel: suspicion
     text becomes a backward edge to the boundary that owns the wrongness.
   sources:
-    - kernel/reports.mjs
-    - kernel/verify.mjs
-    - model/kinds.yaml
+    - scripts/kernel/api.mjs
+    - modules/models/kinds.yaml
+    - engine/ledger-db.mjs
 
 # ============================================================================
 # 1 — THE AGENT'S OUTPUT. The packet's `returns` block, spelled out.
@@ -64,8 +63,8 @@ returns:
         Owes: at least one check that actually ran and exited 0, no open
         items, every claimed file inside the allowlist. The kernel still
         re-runs the checks itself; 'pass' is accepted only when the kernel
-        could reproduce it (kernel/reports.mjs validateReport done-rules;
-        kernel/kernel.mjs 'done is never taken on trust').
+        could reproduce it (the api's validateReport done-rules;
+        'done is never taken on trust').
       fail: >-
         The work ran and is red — maps to outcome `failed` (a failing check
         or an honest summary required), or `partial` (unfinished, open items
@@ -88,7 +87,7 @@ returns:
       The paths the verdict stands on — report.files plus the artifacts the
       op's brief declared (E/result.json, E/effects.json, E/manifest.yaml,
       captures, recordings, sonar exports — whatever the op's writes: block
-      names, e.g. ops/task.execute/operator.yaml writes.evidence).
+      names, e.g. modules/ops/ops/task.execute.yaml writes.evidence).
     mustPass: >-
       Artifact-BYTE checks, not existence-by-name:
       - declared bytes exist and are non-empty      -> ASSET_MISSING / ASSET_EMPTY
@@ -99,11 +98,11 @@ returns:
       (all: scripts/checks/check-work-artifacts.mjs; DEP_STALE /
       NORM_UNRECORDED baseline semantics: scripts/checks/check-work-deep.mjs).
     kernelSide: >-
-      The file LIST is never taken from the report: the kernel computes
-      changed files from git (kernel/verify.mjs changedFiles), attributes
-      them (attributedFiles), freezes the candidate and compares bytes
-      (engine.mjs freezeCandidate -> detection candidate seal). A claim of
-      bytes that differ on disk is ASSET_DIGEST — rejected.
+      The file LIST is never taken from the report: the api computes
+      changed files from git, attributes them, seals the candidate and
+      compares bytes (scripts/kernel/api.mjs settle — the candidate-seal
+      step). A claim of bytes that differ on disk is ASSET_DIGEST —
+      rejected.
 
   suspicion:
     meaning: >-
@@ -121,16 +120,16 @@ returns:
       - scope-expansion         -> re-run scope.define; provision.ask if the
         widening needs owner consent (AUTHORITY_WIDENING).
       - identity-wrong          -> provision.ask ALWAYS; the driver never
-        self-decides (validateGoalRevision rejects identity change;
-        amendments bind baseGoalIdentity — kernel/goal.mjs).
+        self-decides (identity-changing revisions are rejected;
+        amendments bind baseGoalIdentity — modules/ops/ops/goal.revise.yaml).
     neverQuietly: >-
       The suspicion is reported, not patched: the op's allowlist does not
       cover the record it doubts, so it cannot and may not edit it
-      (legality.yaml backwardEdges.neverQuietly; CLAUDE.md work-correction
-      policy — never relabel a wrong flow as debt).
+      (legality.yaml backwardEdges.neverQuietly; init/CLAUDE.md
+      work-correction policy — never relabel a wrong flow as debt).
 
 # ============================================================================
-# 2 — THE REPORT ENVELOPE. starci/op-report@1 (kernel/reports.mjs).
+# 2 — THE REPORT ENVELOPE. starci/op-report@1 (validated by api settle).
 #    The file is the source of truth; the Orca message is the wake-up signal.
 # ============================================================================
 envelope:
@@ -149,7 +148,7 @@ envelope:
   binding: >-
     Identity fields (run, task, dispatch, from) bind the report to the exact
     dispatch; UNIQUE(workflow_id, dispatch_id) on the reports table means one
-    dispatch produces exactly one report (kernel/ledger-db.mjs reports DDL).
+    dispatch produces exactly one report (engine/ledger-db.mjs / engine/schema.sql reports DDL).
 
 # ============================================================================
 # 3 — WHAT THE SPINE ACCEPTS. Layers, in order; a report is judged at each.
@@ -157,32 +156,32 @@ envelope:
 accepts:
   - layer: schema-valid
     rule: "validateReport passes: known schema, known outcome, outcome's required payload present, signal matches outcome, files inside the allowlist"
-    citation: "kernel/reports.mjs validateReport"
+    citation: "scripts/kernel/api.mjs settle validation"
   - layer: identity-bound
     rule: >-
       The settle binds the exact durable job — workflowId, opId, attempt,
       generation AND leaseToken all match, else 'stale operation settlement
-      fence' / 'does not bind the exact durable job' (kernel/engine.mjs
-      settled). A duplicate terminal settle is recovered, not double-counted.
+      fence' / 'does not bind the exact durable job' (the api's
+      exact-identity fence). A duplicate terminal settle is recovered, not
+      double-counted.
   - layer: kernel-reproduced
     rule: >-
       `done` is accepted only after the kernel re-runs the op's checks itself
       and computes the changed files from git; acceptance writes the verdict
-      record (kernel/verify.mjs validateAccepted, recordVerdict,
-      treeVerdictFor; machineVerify runs the declared check commands).
+      record (the api's settle re-proof runs the declared check commands).
   - layer: boundary-correct
     rule: >-
       A blocked verdict is accepted only with a typed blocker in BLOCKER_KINDS
-      — the kind IS the route key (model/kinds.yaml routes match on
+      — the kind IS the route key (modules/models/kinds.yaml routes match on
       blocker/outcome/verdict). An environment blocker carrying a credential
       replacement request must name the failing check with observed evidence
       (validateReport credentialRequest rules).
   - layer: rev-consistent
     rule: >-
       A report belongs to the goalRev that produced it; adoption into a new
-      rev happens only when the digests are identical (kernel/goal.mjs
-      adoptReportRev). Evidence derived from a section that was revised is
-      stale until re-proven (propagateInvalidation).
+      rev happens only when the digests are identical
+      (modules/ops/ops/goal.revise.yaml). Evidence derived from a section
+      that was revised is stale until re-proven (propagate-invalidation).
 
 # ============================================================================
 # 4 — WHAT THE SPINE REJECTS. Every rejection keeps the fence — a rejected
@@ -191,23 +190,23 @@ accepts:
 rejects:
   - id: done-without-proof
     rule: "'done' with zero checks, a failing check, or open items -> invalid; report failed or partial instead"
-    citation: "kernel/reports.mjs validateReport"
+    citation: "scripts/kernel/api.mjs settle validation"
   - id: done-from-last-words
     rule: >-
       A dead worker's recovered last words are honoured for partial/failed/
       ask/blocked — never for done: 'done' owes checks no lost worker ran.
       Falls back to outcome failed so the ordinary acceptance path judges it
-      (kernel/terminals.mjs writeLastWordsReport).
+      (the api's last-words recovery via scripts/agent/lib.mjs).
   - id: out-of-scope-files
     rule: "report.files outside the allowlist -> rejected, per-file named"
-    citation: "kernel/reports.mjs validateReport allowlist check"
+    citation: "scripts/kernel/api.mjs settle validation allowlist check"
   - id: stale-lease-settle
     rule: >-
       A settlement whose leaseToken no longer matches the durable job is
       refused ('stale operation settlement fence'); a lease row that cannot
       match the job's identity cannot be written at all ('lease-identity-drift'
       trigger). An agent cannot graft evidence onto another job.
-    citation: "kernel/engine.mjs settled; kernel/ledger-db.mjs leases_match_job; kernel/admission.mjs driftGuard"
+    citation: "the api's exact-identity settle fence; engine/ledger-db.mjs leases_match_job; the api's typed lease-drift refusal"
   - id: unverifiable-evidence
     rule: >-
       Declared bytes missing/empty/wrong-magic/wrong-digest refuse the run
@@ -221,13 +220,13 @@ rejects:
       `effectState: none` permits the fallback path; 'released'/'already_
       released' prove cleanup while identity_unproven/no_owned_resource is
       reported cleanup.complete:false (SKILL.md lifecycle correction;
-      kernel/engine.mjs settleStoppedOperation requires the settlement to
+      the api's settle requires the settlement to
       name THIS exact dispatch with effectState none).
   - id: invented-answer
     rule: >-
       An ask the kernel cannot answer from the offered options goes to the
       user — the kernel never invents an answer it was not offered
-      (model/kinds.yaml question-needs-the-user).
+      (modules/models/kinds.yaml question-needs-the-user).
   - id: quiet-fix
     rule: >-
       A report that silently absorbed a spec conflict instead of raising
@@ -236,11 +235,11 @@ rejects:
 
 # ============================================================================
 # 5 — ROUTING AFTER THE VERDICT. One line per landing zone; full table in
-#    driver-loop.yaml verdictTable and model/kinds.yaml routes.
+#    driver-loop.yaml verdictTable and modules/models/kinds.yaml routes.
 # ============================================================================
 routingSummary:
   pass:     "settle -> mark produces: variables -> next leg (driver-loop.yaml tick.pick)"
   fail:     "retry inside route limits (failed->same x3, partial->same x5, rejected->same x2, repairs x3, gaps x2) -> then needUser"
   blocked:  "typed blocker -> owning route; environment/authority/ask -> needUser; owner-bound -> provision.ask"
   suspicion: "free text -> backward edge: revise route / scope.define+provision.ask / provision.ask-always (identity)"
-  citation: "model/kinds.yaml routes; modules/goal/legality.yaml; kernel/reports.mjs"
+  citation: "modules/models/kinds.yaml routes; modules/goal/legality.yaml; scripts/kernel/api.mjs settle"

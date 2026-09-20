@@ -1,6 +1,0 @@
-
-Test Suites: 117 skipped, 0 of 117 total
-Tests:       701 skipped, 701 total
-Snapshots:   0 total
-Time:        18.564 s, estimated 20 s
-Ran all test suites with tests matching "ac.recur.generation.once.is-idempotent-on-rerun".

@@ -1,3 +1,0 @@
-bulk tree log ms= 314 bytes= 56550
-ls-tree ms= 88 bytes= 107481
-status ms= 66 bytes= 4085

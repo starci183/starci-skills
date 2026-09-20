@@ -1,5 +1,11 @@
 # Source subjects and configuration inputs
 
+This document describes the input-scope rules of the aggregate gate,
+`scripts/checks/check-scoped-lint.mjs` (`node scripts/checks/check-scoped-lint.mjs
+--profile <nest|next> --root <repo> [--architecture-config <file>] (--all | --
+<files...>)`), and how its `architecture` machine kind
+(`scripts/checks/architecture.mjs`) selects subjects.
+
 The aggregate gate retains two inventories with different responsibilities:
 
 - Source subjects are the union of the profile's source globs and the canonical

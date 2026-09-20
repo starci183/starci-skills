@@ -1,6 +1,6 @@
 # Profile: devin-agent — the Cognition Devin command-terminal pool.
-# Business frame: the owner-gated executor. Installed but CLOSED by default
-# (maxParallel 0) — it only runs when a workflow is explicitly granted slots.
+# Business frame: the owner-gated executor. Owner-assigned capacity: 10 parallel
+# lanes under explicit-workflow-quota authority.
 # Orca-only; there is no headless path.
 
 target: devin-agent           # registry.json + runtimes.json
@@ -19,7 +19,7 @@ identity:
     infer it. modelPolicy: "pin-swe-2-max-and-attest-the-devin-cli-runtime-before-dispatch".
 
 capacity:
-  maxParallel: 0              # runtimes.json — deliberately closed at rest
+  maxParallel: 10             # runtimes.yaml — owner-assigned capacity
   capacityAuthority: explicit-workflow-quota   # only a granted workflow quota opens slots
   quotaTelemetry: launch-status                # quota is observed through launch status
   roles: [implement, verify, write]            # NO decide, NO plan
@@ -51,8 +51,8 @@ position:
   hardTier: second in default/implement/write; last in verify
   chainSecond: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.retire, task.execute, uat.verify, workspace.manage, review.verify]
   note: >-
-    It is second in most execution chains but maxParallel 0 means "in the chain"
-    is not "available" — the allocator skips it until a workflow quota exists.
+    It is second in most execution chains; slots are owner-granted capacity, so
+    quota grants, not position, decide availability.
 
 business:
   question: >-
@@ -65,11 +65,11 @@ business:
   whenNot:
     - Anywhere outside Orca — executionHosts is [orca]; a headless-host workflow cannot serve it.
     - decide/plan/manager/planner/validator/ImageGen roles — none exist (model-catalog.md lists these exclusions verbatim).
-    - "By default at all: maxParallel 0 means absence of granted quota is the normal state, not an outage."
+    - Beyond its owner-assigned cap: absence of granted quota, not the pool itself, is the gate.
   pickedBy: >-
     Allocator by role + tier + quota; the explicit-workflow-quota gate sits before
     eligibility — capacity is an owner decision, not a scheduler guess.
   failureModes:
-    - "Reading chain-second position as readiness: without granted quota it admits nothing."
+    - "Reading chain-second position as unbounded capacity: the quota gate still bounds admission."
     - Trusting `auth status` for login state — the adapter checks `devin models list` because auth status can pass while logged out.
     - "INFERRED: expecting cloud handoff/subagent behavior — both are forbidden; the op's boundary is the worktree."

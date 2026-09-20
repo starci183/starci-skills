@@ -6,21 +6,21 @@
 # pattern the analyzer recognises plus the op chain that pattern usually
 # implies. Every chain below is a starting hypothesis that MUST be confirmed
 # against the actual route blocks (modules/ops/ops/*.yaml `route:`), the lane
-# table (model/kinds.yaml `lanes:`), the node's prerequisites, and the scope
+# table (modules/models/kinds.yaml `lanes:`), the node's prerequisites, and the scope
 # ownership of the tree it lands in. A prior that the sources do not support is
 # discarded, not forced.
 #
 # Sources:
 #   modules/ops/ops/*.yaml        — route blocks (nodeKinds, phase, intent, prerequisites, riskHints)
 #   modules/ops/registry.yaml     — generated stage index: intake > scope > decide > direct > implement > verify > release > operate
-#   model/kinds.yaml              — lanes (nodeKind -> ordered steps), routes, kind catalog
-#   kernel/sync.mjs         — designGate, cutOpFor (fan-out + seam-first)
-#   kernel/ledger.mjs       — disjoint(allowlist) path-prefix coverage
-#   kernel/common.mjs       — allowlistsOverlap
-#   docs/op-granularity.md  — seam-first cut, one behaviour per child, serial fallback
-#   docs/work-ledger.md     — .starciwork ownership: one index.yaml per scope folder
-#   docs/work-verification.md — verify is read-only; layers of proof
-#   models/functions.mjs    — PLAN_OP_KINDS (plan-ledger kinds may only write code/runtime/evidence/asset or nothing)
+#   modules/models/kinds.yaml              — lanes (nodeKind -> ordered steps), routes, kind catalog
+#   the kernel agent         — designGate, cutOpFor (fan-out + seam-first)
+#   engine/ledger-db.mjs       — disjoint(allowlist) path-prefix coverage
+#   modules/goal/legality.yaml       — allowlistsOverlap
+#   modules/kernel/dispatch.yaml  — seam-first cut, one behaviour per child, serial fallback
+#   docs/ledger-db.md     — .starciwork ownership: one index.yaml per scope folder
+#   docs/verify-proof.md — verify is read-only; layers of proof
+#   modules/models/kinds.yaml    — PLAN_OP_KINDS (plan-ledger kinds may only write code/runtime/evidence/asset or nothing)
 #
 # Convention: "leg" = one operation in the proposed chain. For each leg the
 # entry says why it is there — or, in the exclusions list, why it is NOT.
@@ -61,7 +61,7 @@ about:
   sources:
     - modules/ops/registry.yaml
     - modules/ops/ops/*.yaml (route:)
-    - model/kinds.yaml
+    - modules/models/kinds.yaml
     - modules/goal/anatomy.yaml (decomposition)
     - modules/goal/existing.yaml (SURVEY / extend-vs-add)
 
@@ -72,7 +72,7 @@ legRationale:
   intake: >-
     request.analyze is external (chat-side) — it is how the request arrives
     analysed, not a dispatched op. Listed for completeness; the kernel never
-    schedules it (model/kinds.yaml `external: true`).
+    schedules it (modules/models/kinds.yaml `external: true`).
   scopeDefine: >-
     scope.define turns the analysis into a bounded scope statement
     (prerequisite: "request analyzed"). Without it nothing downstream has a
@@ -83,21 +83,21 @@ legRationale:
     requires "business.decide done (accepted SRS)".
   draw: >-
     interface.draw is the `direct`-phase leg that produces the ui design record
-    the frontend lane's designGate waits on (kernel/sync.mjs). Route
+    the frontend lane's designGate waits on (the kernel agent). Route
     prerequisites: business + architecture + brand decisions.
   implement: >-
-    interface.implement (operator) / frontend.implement (kind) and
+    interface.implement (operator and kind) and
     backend.implement are the build legs — source-edits risk, disjoint
     allowlists, lane-ordered before their proofs.
   workAuthor: >-
     work.author authors or remaps Work records (prerequisite: "scope defined").
     On a refactor it re-anchors the record's source mapping to the moved code —
-    without it the evidence pins the old identity (docs/work-verification.md
+    without it the evidence pins the old identity (docs/verify-proof.md
     currentCodeMap / sourceIdentity).
   verify: >-
     uat.verify / e2e.verify / integration.verify / review.verify / perf.verify
     are proof legs. They report findings and never repair
-    (docs/work-verification.md); their repairs route through lanes/routes.
+    (docs/verify-proof.md); their repairs route through lanes/routes.
   ask: >-
     provision.ask (stop kinds) / decision.prepare (provisional) are the owner
     legs — see anatomy.yaml questions.
@@ -131,10 +131,10 @@ archetypes:
       - {op: provision.ask,     why: "no owner-only input declared in the prompt — opened only if a critique/question raises one"}
     laneMapping: >-
       On a Work ledger this maps to lanes design/ui (interface.draw >
-      interface.asset) then implementation/frontend (frontend.implement >
+      interface.asset) then implementation/frontend (interface.implement >
       uat.verify > [security.verify, perf.verify iff goal.requires*]).
       review.verify is not a lane step here — it is kernel-planned at the
-      module tier (model/kinds.yaml). (inferred from lanes + KERNEL_PLANNED)
+      module tier (modules/models/kinds.yaml). (inferred from lanes + KERNEL_PLANNED)
     workedExample:
       prompt: "code fe the course-enrolment screen for the academy app"
       signalMatch: "'code fe' + a named screen -> feature-build-with-ui"
@@ -169,7 +169,7 @@ archetypes:
     laneMapping: >-
       Lanes implementation/backend: backend.implement > e2e.verify >
       [security.verify, perf.verify iff declared] > review.verify
-      (model/kinds.yaml).
+      (modules/models/kinds.yaml).
     workedExample:
       prompt: "implement the enrolment-eligibility check API"
       signalMatch: "API/endpoint, no UI -> feature-build-backend"
@@ -195,7 +195,7 @@ archetypes:
       - {op: scope.define,    why: "scope is the named code already; only needed if the refactor's boundary is ambiguous (then it becomes scope-expansion)"}
       - {op: business.decide / architecture.decide, why: "no requirement or design change — a refactor realises the SAME records"}
     noLaneNote: >-
-      code.refactor belongs to no lane and no route in model/kinds.yaml — it is
+      code.refactor belongs to no lane and no route in modules/models/kinds.yaml — it is
       created by request/route, not scheduled from a node. Its
       regression-coverage prerequisite is enforced by the test-gap route
       (blocker test-gap -> test.author, limit 2). (inferred from kinds.yaml
@@ -235,12 +235,12 @@ archetypes:
       blocked/environment -> environment-needs-the-user (needUser), and the
       credential ask only settles 'verified' AFTER integration.verify reports
       done+pass (verifyAcceptedIntegrationOwnerRequests,
-      kernel/owner-requests.mjs). "Settles inprogress if custody missing"
+      the kernel agent). "Settles inprogress if custody missing"
       = the op stays live, waiting on the owner; it never fakes the proof.
     exclusions:
       - {op: interface.draw, why: "unless the integration also ships UI — then this archetype COMPOSES with feature-build-with-ui (priors compose; the union is confirmed leg by leg)"}
       - {op: uat.verify,     why: "only if a frontend lane exists — the integration proof itself is integration.verify, not a UI walk"}
-    laneMapping: "Lane integration: a single step integration.verify (model/kinds.yaml). The feature's own implementation/e2e lane still runs beside it."
+    laneMapping: "Lane integration: a single step integration.verify (modules/models/kinds.yaml). The feature's own implementation/e2e lane still runs beside it."
     workedExample:
       prompt: "integrate VNPay for course payments"
       signalMatch: "'integrate' + named external payments provider -> external-integration"
@@ -327,13 +327,13 @@ archetypes:
       - {op: scope.define,    leg: scopeDefine, note: "bounds ALL siblings before any is built — the disjointness is checked against this scope"}
       - {op: business.decide / architecture.decide, leg: decide, note: "shared records settle ONCE before the split — the seam children read them"}
       - {op: implementation.plan, leg: decide, note: "the seam cut: one child owns what all others would touch, runs ALONE and first (allocation.fanOut seamFirst)"}
-      - {op: <sibling builds>, leg: implement, note: "each sibling gets its own op chain, own agent, own worktree — docs/op-granularity.md + lanes.mjs worktree isolation"}
+      - {op: <sibling builds>, leg: implement, note: "each sibling gets its own op chain, own agent, own worktree — modules/kernel/dispatch.yaml + the kernel agent worktree isolation"}
       - {op: integration.verify, leg: verify, note: "the JOIN at the parent — one proof the siblings compose, run on the parent after all children done"}
       - {op: review.verify,      leg: verify, note: "parent-tier read of the assembled group"}
     joinRule: >-
       The parent keeps the join operations. Sibling chains never verify each
       other — groupAssertions at the parent, proven once on a different runtime
-      from the children (docs/op-granularity.md).
+      from the children (modules/kernel/dispatch.yaml).
     serialFallback: >-
       If the scopes cannot be made disjoint — a path every sibling must touch,
       a seam that cannot be isolated — the goal does NOT fan out. It runs
@@ -362,7 +362,7 @@ composition:
     reconciliation screen" is external-integration + feature-build-with-ui,
     not a new archetype.
   confirmationChecklist: >-
-    For every proposed leg, confirm: (1) a kind exists in model/kinds.yaml,
+    For every proposed leg, confirm: (1) a kind exists in modules/models/kinds.yaml,
     (2) its route: block prerequisites are met by earlier legs or existing
     records, (3) its nodeKinds match the node it serves, (4) its phase is not
     after a leg that produces its input, (5) on a plan ledger it is a
@@ -373,6 +373,6 @@ composition:
     (provision.ask / decision.prepare per stop kind) or a scope-expansion
     re-run of scope.define (legality.yaml ambiguity rules).
   sources:
-    - model/kinds.yaml
+    - modules/models/kinds.yaml
     - modules/ops/ops/*.yaml
-    - models/functions.mjs
+    - modules/models/kinds.yaml

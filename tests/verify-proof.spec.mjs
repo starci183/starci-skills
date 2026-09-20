@@ -243,7 +243,8 @@ test('an empty plan is checks-only and runs nothing',()=>{
   assert.equal(proofFinding(result),null);
 });
 
-test('the module is listed as a runtime module',()=>{
-  const listed=fs.readFileSync(new URL('../legacy/builders/runtime-modules.txt',import.meta.url),'utf8');
-  assert.match(listed,/^scripts\/checks\/proof\.mjs$/m);
+test('the module ships inside the packaged scripts tree',()=>{
+  assert.equal(fs.existsSync(new URL('../scripts/checks/proof.mjs',import.meta.url)),true,'scripts/checks/proof.mjs is the checked module');
+  const files=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8')).files;
+  assert.ok(files.some(entry=>entry==='scripts'||entry==='scripts/'),'package.json files[] ships the scripts tree');
 });

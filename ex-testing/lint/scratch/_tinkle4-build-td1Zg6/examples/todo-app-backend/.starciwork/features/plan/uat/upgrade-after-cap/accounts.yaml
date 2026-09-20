@@ -1,4 +1,0 @@
-schema: work/disposable-accounts
-disposable: true
-accounts:
-  - {role: owner-at-cap, identity: identity.todo-app.demo}

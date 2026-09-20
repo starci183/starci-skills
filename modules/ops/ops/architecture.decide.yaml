@@ -25,7 +25,7 @@ reads:
         and recovery using primary sources where needed. Record decisions in the existing design;
         pattern names and source observations are not behavioral proof or authority for code edits.
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -55,7 +55,7 @@ reads:
         using primary documentation where necessary; do not present a design as deployed-source
         observation.
   - id: specification
-    path: architecture.decide/specification.json + specifications/sds-map.json +
+    path: modules/ops/ops/architecture.decide.yaml + modules/schemas/spec/sds-map.schema.yaml +
       docs/architecture-sds.md
     purpose:
       en: Read the JSON field contract and this operator procedure before authoring the .starciwork
@@ -66,13 +66,13 @@ reads:
       en: Inspect only surfaces material to the selected design so targets and migration are feasible.
         The survey informs but never overrides accepted SRS or supplies completion proof.
   - id: matrix
-    path: selected complete-job matrix request + workflows/jobs.json
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
     purpose:
       en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
@@ -132,7 +132,7 @@ steps:
       - node
     action:
       en: "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read
-        specifications/sds-map.json and docs/architecture-sds.md. Survey relevant source,
+        modules/schemas/spec/sds-map.schema.yaml and docs/architecture-sds.md. Survey relevant source,
         configuration and installed APIs; then independently record retain, extend, correct, replace
         or add decisions with rationale, impact and migration. Prescribe logical responsibilities,
         interfaces, state and failure behavior. Repository/file/symbol/call mappings and actual

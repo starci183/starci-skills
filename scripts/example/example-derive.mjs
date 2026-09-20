@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {parseYaml, stringifyYaml} from '../../core/yaml.mjs';
+import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk as walkAll} from '../checks/check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from './example-ownership.mjs';
 

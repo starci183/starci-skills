@@ -25,7 +25,7 @@ reads:
         request. Ask only material missing choices while continuing independent inspection; vague
         scope is not permission for arbitrary deployment/data mutation.
   - id: catalog
-    path: workflows/catalog.json + ops/registry.yaml canonical op list + model/kinds.yaml
+    path: modules/goal/archetypes.yaml + modules/ops/registry.yaml canonical op list + modules/models/kinds.yaml
     purpose:
       en: Read the closed list of workflows, canonical op kinds and operation kinds the selection
         must come from. The selected workflow names real catalog ids and the staged plan names real
@@ -37,7 +37,7 @@ reads:
         instructions, owning source, callers, scripts and relevant tests - enough to ground the
         scope statement in real paths. If there is no source task, record not applicable.
   - id: profile
-    path: model/registry.json + actual host tools/model
+    path: modules/models/registry.yaml + actual host tools/model
     purpose:
       en: Resolve the working profile against actual available tools. Do not switch providers,
         invent tools or dispatch agents solely from a profile.
@@ -58,7 +58,7 @@ writes:
         exclusions for scope.define to bound), the acceptance criteria and the unresolved questions.
         No guessed defaults; an unanswerable question is carried in open, not answered. The intake
         file is the only _local/workflows/<workflow>/ file this op writes; the kernel's run state
-        (goal.json, checks/, contracts/, inbox/, reports/) is never op output.
+        (runtime.sqlite goals/jobs/inbox/reports/events rows) is never op output.
   - id: evidence
     path: E/intake.json + E/result.json + E/artifacts
     fields:

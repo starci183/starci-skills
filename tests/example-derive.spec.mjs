@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import {computeDerived, buildYamlDocument, runDerive} from '../scripts/example/example-derive.mjs';
 import {checkExampleDerived} from '../scripts/checks/check-example-derived.mjs';
 import {resolveOwnedDirs, hashOwnedDirs} from '../scripts/example/example-ownership.mjs';
-import {parseYaml} from '../core/yaml.mjs';
+import {parseYaml} from '../engine/yaml.mjs';
 
 /**
  * One fixture tree per derived field this lane was asked to prove, plus the two refusal gates

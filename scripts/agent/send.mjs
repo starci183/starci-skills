@@ -4,7 +4,7 @@
 //     (--text <t> | --text-file <f>) [--worktree <path>] [--dispatch-id <id>] [--no-await]
 // --provider loads the adapter card for delivery mode + submission patterns.
 import { arg, flag } from '../api/orca/lib.mjs';
-import { loadAdapter, deliverPrompt, awaitSubmission } from './lib.mjs';
+import { loadAdapter, deliverPrompt, awaitSubmission, awaitAttestation, cleanupDeliveryArtifact } from './lib.mjs';
 import fs from 'node:fs';
 
 const argv = process.argv.slice(2);
@@ -25,6 +25,12 @@ if (send.ok && !flag(argv, 'no-await')) {
   out.step = 'submission';
   out.ok = sub.ok;
   out.error = sub.reason;
+  if (sub.ok) {
+    // Same death-watch as spawnAgent — a consumed prompt is not a live agent.
+    const att = awaitAttestation(terminal, card);
+    if (!att.ok) { out.step = 'attestation'; out.ok = false; out.error = att.signal; out.signal = att.signal; }
+  }
+  cleanupDeliveryArtifact(send.artifact);
 }
 console.log(JSON.stringify(out, null, 2));
 process.exit(out.ok ? 0 : 1);

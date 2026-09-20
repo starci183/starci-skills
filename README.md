@@ -1,258 +1,142 @@
 # StarCi
 
-**One complete delivery plan. Small, bounded workflows. Evidence before completion.**
+**A kernel-agent workflow runtime for AI-assisted delivery — one durable goal, one kernel agent, one ledger.**
 
-StarCi is a local supervised delivery system and CLI for AI-assisted project delivery: business requirements, architecture, interface design, backend/frontend implementation, review and UAT. It keeps the full outcome in view while each workflow performs only its approved segment.
-
-Turn a feature request into a traceable route from business decisions to architecture, implementation and verified user flows—without treating a short coding session as a finished product.
+StarCi turns an owner's request into a durable goal with a queued chain of operations, then runs it
+under supervision: a long-lived `[Kernel]` agent owns the workflow and mutates state only through a
+single API gate, while one ephemeral `[Op]` agent executes each job. Every decision, dispatch,
+verdict and incident lands in a sqlite ledger (`.starciwork/runtime.sqlite`) — evidence before
+completion, always.
 
 StarCi provides:
 
-- **A complete Plan:** the requested outcome, dependencies, coverage, checkpoints and completion criteria stay together, even when execution spans many sessions.
-- **Bounded workflows:** each segment has a concrete goal, permitted changes, expected output and verification criteria.
-- **Persistent project knowledge:** requirements, specifications and evidence live beside the backend source and are shared with the frontend.
-- **Evidence-backed status:** missing artifacts, changed inputs and unmet dependencies prevent stale work from being reported as done.
-- **One local StarCi installation:** host `AGENTS.md` and `CLAUDE.md` point agents to the same `SKILL.md`, workflow contracts and knowledge library.
+- **A durable goal and plan:** `define-goal` assesses the request, writes the goal and enqueues the
+  op chain in the ledger — the plan survives sessions, restarts and context loss.
+- **A kernel agent per workflow:** `start-kernel` claims a queued goal and boots one long-lived
+  `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
+  through `node scripts/kernel/api.mjs <survey|status|plan|enqueue|dispatch|settle|incident|retire>`.
+- **Ephemeral op agents:** `api dispatch` spawns one short-lived `[Op]` agent per job through the
+  provider adapter cards (`providers/`). Adapter flags are injected by the spawner — the kernel
+  cannot forget them; `settle` records the verdict and closes the worker.
+- **Contracts as data:** goals, kernel loop, op manifests, model routing and quality gates are YAML
+  under `modules/` — mechanism code stays under `engine/` and `scripts/`.
+- **Machine checks:** `scripts/checks/` holds the deterministic gates (architecture, brand,
+  staleness, proof bundles, example evidence) that ops must pass before a job settles.
 
-StarCi is a local supervised delivery system. Its deterministic kernel owns workflow state, authority, evidence and effects; bounded model functions choose only kernel-offered actions, and operation agents execute one approved contract at a time. Provider access comes from configured local agent hosts rather than a StarCi API key.
+**Requirements:** Node.js 22.13+ (unflagged `node:sqlite`) and a coding agent host. Provider access
+comes from locally configured agent CLIs (Devin, Claude Code, Codex, Orca) — StarCi has no API key
+of its own.
 
-**StarCi `1.0.0-alpha.1`** (see `VERSION`): open source under MIT, not yet published to npm · **Requirements:** Node.js 22.13+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
+**Status:** `1.0.4`, MIT, not yet published to npm. Use the source or a reviewed archive.
 
-**Alpha status:** this tree is the canonical distless layout — the runtime reads `kernel/`, `modules/`, `schemas/*.yaml`, `scripts/{checks,route,example,work,ledger,config,goal,kernel}/` and `docs/` sources directly; there is no `.dist` build. Drafts and experiments live under [.experiments/](.experiments/README.md) and are not part of the official contract until promoted (see [.experiments/OPENSOURCE-GOAL.md](.experiments/OPENSOURCE-GOAL.md) for the 1.0.0 release bar). The operating model is one long-lived `[Kernel]` agent per project dispatching one ephemeral `[Op]` agent per operation; chat is the trigger only.
+[Install](#install) · [How it runs](#how-it-runs) · [Configuration](#configuration) ·
+[Layout](#layout) · [Documentation](#documentation)
 
-[Quick start](#quick-start) · [First project](#first-project) · [Execution modes](#execution-modes) · [CLI](#cli) · [Documentation](#documentation)
+## Install
 
-## Quick start
-
-### Install from this repository
-
-Clone the repository into a tooling directory, separate from the host you want to initialize:
+From a clone of this repository:
 
 ```sh
 git clone https://github.com/starci183/starci-skills.git
 cd starci-skills
 npm ci
-node bin/starci.mjs init --dir /absolute/path/to/agent-host
-node bin/starci.mjs doctor --dir /absolute/path/to/agent-host --quick
+node bin/starci.mjs init --dir /absolute/path/to/host
+node bin/starci.mjs doctor --dir /absolute/path/to/host
 ```
 
-Replace `/absolute/path/to/agent-host` with your host directory. On Windows, for example:
+Once published, the equivalent is `npx starci init --dir /absolute/path/to/host`. The same installer
+is reachable directly at `node scripts/install/install.mjs init --dir <host>`.
 
-```powershell
-node bin/starci.mjs init --dir "D:/Projects/agent-host"
-node bin/starci.mjs doctor --dir "D:/Projects/agent-host" --quick
-```
+The installer:
 
-Start with an empty test host. The installer writes the canonical **source** tree into `.claude` — no build step, the runtime reads it directly — then verifies the install and records the install manifest only after that check succeeds. It adds managed bootstrap sections to `AGENTS.md` and `CLAUDE.md`, preserves custom instructions and refuses conflicting bootstrap protocols. It does **not** install global skills, create your business requirements or change frontend source. See [runtime distribution](docs/runtime-distribution.md).
+1. Copies the declared payload (`package.json` `files[]`) into `<host>/.claude` — the runtime reads
+   source directly, there is no build step.
+2. Writes the `AGENTS.md` bootstrap pointing agents at `.claude/SKILL.md` (other host bootstrap
+   names are opt-in).
+3. Installs the two entry skills — `define-goal` and `start-kernel` — into the host's skills
+   directories (`.devin/skills/`, `.agents/skills/`, best-effort).
+4. Seeds an untracked `config.yaml` from `config.example.yaml` and records an install manifest.
+5. Prints the consumer `.gitignore` lines — `.starciwork/` (runtime state) and `config.yaml`
+   (local config) must never be committed by the host project.
 
-### Install an archive with npx
-
-If you have a reviewed StarCi archive, run from the directory containing it:
-
-```sh
-npx --yes --package=./starci-reviewed.tgz starci init --dir /absolute/path/to/host
-npx --yes --package=./starci-reviewed.tgz starci doctor --dir /absolute/path/to/host --quick
-```
-
-No global installation is required. `npx` executes package code: inspect the archive and choose the target deliberately. Maintainers can create an archive with `npm pack`; see [release verification](docs/releasing.md).
-
-After StarCi is published, the equivalent registry command will be:
-
-```sh
-npx starci init --dir /absolute/path/to/host
-```
-
-That registry command is a future release instruction, **not the current quick start**. See [installation](docs/installation.md) for update, doctor and project binding.
-
-## One host, multiple sources
+## How it runs
 
 ```text
-host/
-├── AGENTS.md               Codex bootstrap
-├── CLAUDE.md               Claude Code bootstrap
-├── .claude/                one shared StarCi runtime
-└── .workspaces/            project → source bindings
-
-project-backend/
-├── .starciwork/            shared BE + FE requirements, specifications, evidence
-│   └── _local/             excluded Plan/run/approval state, drafts and staging
-│       └── plans/          one four-file bundle per full Plan
-└── ...                     backend source
-
-project-frontend/
-└── ...                     frontend source only
+owner prompt
+  └─ define-goal        → goal + op chain queued in .starciwork/runtime.sqlite
+       └─ start-kernel  → claims the goal, boots the long-lived [Kernel] agent
+            └─ api.mjs  → survey → plan → enqueue → dispatch → settle → retire
+                 └─ dispatch spawns one ephemeral [Op] agent per job
+                      (adapter card injects the provider CLI flags)
 ```
 
-The host may also be a backend when explicitly bound as one. Neither entering the frontend nor starting a frontend task creates another workspace. `.starciwork/_local` is local execution state, **not disposable while a plan is unfinished**. It is excluded from canonical Work hashes and validation, not a source of accepted evidence. The separate `.starcitemp` directory is retired; new creation there is rejected. Existing old storage needs coordinated [migration](docs/migration.md), never an installer cleanup or an approval rewrite.
+- The kernel agent reasons; `api.mjs` is the only mutation surface. It owns host mechanics —
+  terminals, prompt delivery, worker lifecycle — so the kernel never calls a provider CLI directly.
+- Dispatch attests the spawn before a job is marked `running`; `settle` requires a verdict plus
+  evidence and closes the worker terminal; `incident` records failures without losing the ledger.
+- Re-plans persist lineage (`replannedFrom`, blocker, path delta, routing reason) — the ledger is
+  the audit trail, not the chat log.
 
-## First project
+## Configuration
 
-Install at the host, then open your coding agent there and ask:
+`config.yaml` (untracked, seeded from `config.example.yaml`) holds per-project settings: kernel
+model, effort and budgets. Resolution order: explicit `--provider` flag > owner `config.yaml` >
+`scripts/route/route-model.mjs` defaults. See [config format](docs/config-format.md).
 
-> Read `.claude/SKILL.md`. Bind project `demo` to the backend and frontend paths I provide. Plan the complete delivery of this feature, including business, architecture, BE, FE and UAT coverage. Show the first workflow goal and wait for my approval.
-
-Supply actual repository paths/remotes and the desired product outcome. Binding and initialization are separate: `starci init` installs the runtime, not your business specification. [Installation](docs/installation.md#bind-a-project) includes a concrete binding shape.
-
-For example, give the agent a product outcome and an explicit boundary:
-
-> Plan a customer-support module that answers from approved knowledge and routes unresolved questions to a human. Include business, architecture, backend, frontend and UAT in one delivery Plan. For now, execute only Business and Architecture after I approve their goals. Do not implement or deploy anything yet.
-
-The expected output is a full delivery Plan, followed by short workflow-sized goals—not a business-only Plan that forgets implementation. Unresolved later choices stay attached to the affected future workflow. The agent should not invent requirements just because source code is missing.
-
-## How delivery works
+## Layout
 
 ```text
-Complete Plan: outcome + scope + dependencies + coverage + terminal criteria
-  └─ Bounded workflow: goal → authorization → execution → evidence → acceptance
-       └─ Next eligible workflow in the same Plan
+SKILL.md            the one skill every agent loads first
+modules/            contracts as data — goal, kernel, ops, models, quality, schemas
+engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config, constants
+scripts/            executables — kernel/api.mjs, kernel/start-workflow.mjs, goal/, route/,
+                    agent/, checks/, context/, example/, install/
+bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal
+providers/          provider facts + adapter cards (data only)
+skills/             user-facing skills — define-goal, start-kernel, computer-use, orca-cli,
+                    orchestration, workflow-chat
+init/               AGENTS.md bootstrap template
+knowledge/          authored YAML doctrine the checks and skills cite
+docs/               documentation
+examples/           reference projects with recorded .starciwork evidence
+tests/              node:test specs — npm test
+packages/           vendored toolkits (eslint configs, grammar, e2e-kit, fe-kit, heroicons)
 ```
-
-A typical new feature covers business → architecture → backend → frontend, with design and browser UAT included in the frontend workflow. An existing feature can reuse valid outputs; a design-only request does not authorize implementation. Publication and deployment require separate authority.
-
-| Stage | What it establishes |
-| --- | --- |
-| Business | Readable overview plus nested SRS: actors, rules, FR/NFR, detailed happy/alternative/exception flows and acceptance. |
-| Architecture | Source-independent SDS derived from accepted SRS: responsibilities, connection/data contracts and context-driven design/risk decisions; named patterns are optional. |
-| Backend | Approved code changes with unit, backend E2E and API evidence before frontend handoff. |
-| Frontend | Bound design creation/reuse, implementation and browser UAT; not just a screenshot or a build. |
-| Review / standalone UAT | Explicit verification scope and actual results; unit tests are not browser UAT. |
-| Publish / deploy | Separately authorized delivery effects, not an automatic consequence of finishing code. |
-
-Finishing one workflow does not finish the Plan. Passing metadata validation does not prove the product works. A `done` claim must have current evidence for its selected scope, and downstream status can become stale when upstream inputs change.
-
-See [Business overview and nested SRS](docs/business-srs.md) for the split functional, non-functional, business-rule, policy-decision, data and customer-journey section contracts. See [Architecture SDS](docs/architecture-sds.md) for the sectioned source-independent design. Legacy and pre-upstream compatibility specifications remain readable; new authoring uses `specifications/srs-sections.json` and `specifications/sds-map.json`, and migration requires current review.
-
-`examples/command-receipt-srs-sds/` is retained only as a Business regression fixture for the pre-upstream `starci/srs@3` compatibility reader. Do not copy it as the current authoring template.
-
-See [Expandable Work tree](docs/work-tree.md) for recursive Business, Architecture,
-UI, BE/FE and UAT scopes, collocated images/videos, `interface.draw` ownership and
-editing completed work. Screens and assets are not limited to a fixed template.
-
-Read the [complete knowledge-document update example](docs/examples/knowledge-update-delivery.md)
-for one feature across SRS, SDS, UI, backend including real backend E2E,
-frontend and browser UAT. It explicitly separates planned checks from actual
-results; it is not an accepted product change or a passing test report.
-
-## Execution modes
-
-| Mode | Use it for | Boundary |
-| --- | --- | --- |
-| `manual` (default) | Step-by-step work with user checkpoints. | Present the workflow goal before effects and actual results before acceptance. Planning alone does not authorize future work. |
-| `auto` (explicit opt-in) | An approved sequence of eligible workflows in the full Plan. | Requires a scoped delegation, time budget and risk assessment. Stops for missing authority, unresolved choices, failed evidence or budget expiry. |
-| Single workflow | Clear bounded UI, backend or other work fitting one workflow. | Goal brief and detailed goal, scope approval, implementation and verification; no Plan wrapper. |
-| Small-change direct route (`flash` keyword optional) | A small, clear, cohesive, reversible and low-risk local fix. | Execute and run focused checks without Plan/workflow ceremony. Higher impact selects a bounded workflow, or a Plan when scope is large, unclear or spans workflows. |
-
-Auto identifies the initial ASAP chain and later checkpoint. It is not limited to two workflows, does not turn a waiting stage into completion and does not create a background scheduler. No mode permits inventing approvals, silently changing business policy or granting itself publication authority.
-
-User-facing language and execution preferences live in the installed `.claude/config.json`; defaults are Vietnamese (`vi`), inherited model and `medium` effort. Runtime contracts, knowledge and all canonical SRS/SDS content remain English. The configured locale affects conversation and presentation only. Installation does not change the current agent's model or enable auto.
-
-## Workflow kernel
-
-Beside the Plan route above, StarCi includes the **workflow kernel**: one ordinary process that owns a whole job — it freezes the approved goal, allocates an eligible provider per ready operation, launches operation agents, re-runs their checks itself, commits, runs the gates and writes the final report. A bounded manager model orders only executable actions supplied by the kernel and never runs the loop. StarCi runs on the Orca IDE or on a plain Claude Code / Codex chat.
-
-The runtime is laid out by concept, one folder per concern:
-
-| folder | holds |
-| --- | --- |
-| `modules/` | the declared data the runtime runs on — record kinds, operation manifests (`modules/ops/ops/*.yaml`), model selection rules, hosts, runtimes, the generated registry; pure YAML, no code |
-| `kernel/` | the control loop, split by the reason each file exists |
-| `hosts/` | the host model as data, and the two adapters behind one call surface |
-| `models/` | the model functions and their headless providers |
-| `scripts/checks/` | machine checks over bytes — the brand record, a drawing's capture and markup, a proof bundle |
-| `scripts/route/` | deterministic selection — `route-op.mjs`/`route-model.mjs` resolve the `route:` keys and rules declared in `modules/` |
-| `scripts/example/` | example-tree derivation, critique, evidence capture/verify and render-proof tools |
-| `scripts/work/` | Plan bundle create/render (`plan.mjs`), goal presentation (`present-goal.mjs`) and work-tree path remap |
-| `scripts/ledger/` | `ledger-migrate.mjs` — fold `_local` + retired journal into `runtime.sqlite` |
-| `scripts/config/` | `config.mjs` — local `config.json`/`config.example.yaml` loading and validation |
-| `scripts/goal/`, `scripts/kernel/` | lifecycle entry points (`define-goal`, `start-workflow`) |
-| `legacy/` | superseded trees (the old `ops/` operator dirs and `model/` catalog) kept for recovery; nothing live reads it |
-
-**One command line.** Everything is `node <host>/.claude/bin/starci.mjs <command>`; no instruction ever names a module path inside the runtime.
-
-```sh
-node /absolute/path/to/host/.claude/bin/starci.mjs --help
-```
-
-**Two proofs it works.** A feature added to a product that already decided others is reconciled rather than appended — every decided record it touches is cited, or becomes a conflict the owner decides, or is declared as new work — and `tests/reconciliation.spec.mjs` holds each rule. Image-first design binds a small representative critical-screen set to exact ImageGen prompts/tool provenance and a complete coverage map; actual Grammar implementation captures and browser UAT remain distinct downstream proof. `tests/frontend-workflow.spec.mjs` and `tests/render-checks.spec.mjs` hold that boundary.
-
-The design is [docs/5-plus.md](docs/5-plus.md); the kernel in detail is [docs/workflow-kernel.md](docs/workflow-kernel.md); running one from a chat is [docs/workflow-chat.md](docs/workflow-chat.md).
 
 ## CLI
 
-Once installed, invoke the pinned local runtime without fetching npm again:
-
 ```sh
-node /absolute/path/to/host/.claude/bin/starci.mjs --help
-node /absolute/path/to/host/.claude/bin/starci.mjs workflows
-node /absolute/path/to/host/.claude/bin/starci.mjs workflow implement-frontend
-node /absolute/path/to/host/.claude/bin/starci.mjs storage /absolute/path/to/backend
-node /absolute/path/to/host/.claude/bin/starci.mjs validate /absolute/path/to/backend/.starciwork
-node /absolute/path/to/host/.claude/bin/starci.mjs tree /absolute/path/to/backend/.starciwork
+node bin/starci.mjs --help
+node bin/starci.mjs init --dir <host>      # install
+node bin/starci.mjs update --dir <host>    # update an install
+node bin/starci.mjs doctor --dir <host>    # verify an install (runs its own specs)
+node bin/starci.mjs api <verb>             # kernel api gate
+node bin/starci.mjs start                  # start-workflow
+node bin/starci.mjs goal                   # define-goal
 ```
 
-Public branding and command: **StarCi / `starci`**, not `work`. Internal `work/*` schema identifiers remain versioned wire contracts; changing a directory name does not change their meaning.
-
-`init --dir <host>` installs StarCi. `workspace init <root> --id <id>` initializes project metadata. Workflow inspection commands do not execute a Plan. See the [CLI reference](docs/cli.md) for the distinction and all commands.
-
-## Updating and migrating
-
-Use `starci update --dir <host>` from a reviewed tree, then run `doctor`. Update verifies the installed source tree before recording the new version; a failed verification does not claim success. Do not use `--force` as a routine update strategy: review local changes and back up first. A runtime update does not migrate product data. Interrupted install recovery is in [runtime distribution](docs/runtime-distribution.md).
-
-For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp` state belongs inside `.starciwork/_local`. Stop concurrent writers, back up, preserve receipt bytes, migrate bindings and validate before resuming. Renaming a directory does not transfer an old approval to a new absolute path. Follow the [migration guide](docs/migration.md); do not delete unfinished plans as temporary junk.
-
-## Troubleshooting
-
-| Problem | Next step |
-| --- | --- |
-| The agent does not find StarCi from a frontend task | Supply the absolute host, `.claude/SKILL.md` path and selected project binding. A sibling host is not a parent directory. |
-| An old instruction requests `.claude/INDEX.md` | Read the current bootstrap and run `node .claude/scripts/checks/check-entry.mjs /absolute/host`. Do not recreate the retired file. |
-| Storage reports `migration-required` or `conflict` | Inspect existing trees and coordinate migration; do not create an empty replacement workspace. |
-| Validation rejects a specification or completion | Fix the named metadata/evidence defect. Do not loosen the schema or edit sealed proof just to get a pass. |
-| A task pauses in auto | Check scope, authorization, dependencies, evidence and remaining time; auto does not override those gates. |
+Inside an install the same entry is `<host>/.claude/bin/starci.mjs`. Checks and tools are invoked
+directly, e.g. `node .claude/scripts/checks/check-stales.mjs` — there is no wrapper command layer.
 
 ## Documentation
 
-- [Install, update, bind and troubleshoot](docs/installation.md)
-- [Source install and recovery](docs/runtime-distribution.md)
-- [Architecture and delivery lifecycle](docs/architecture.md)
-- [Directory rename and legacy compatibility](docs/migration.md)
-- [CLI reference](docs/cli.md)
-- [Skill design and compatibility](docs/skill-design.md)
-- [Author knowledge YAML](docs/knowledge-yaml.md)
+- [Installation, update and binding](docs/installation.md)
+- [Architecture: kernel agent, api gate, op agents, ledger](docs/architecture.md)
+- [Ledger schema and access rules](docs/ledger-db.md)
+- [Writing an op manifest](docs/ops.md)
+- [Provider adapter cards](docs/providers.md)
+- [CLI and script reference](docs/cli.md)
 - [Build, test, package and release](docs/releasing.md)
-- [The 5-plus design: one flow, declared inputs and outputs, the owner decides](docs/5-plus.md)
-- [The workflow kernel](docs/workflow-kernel.md) · [operation kinds, lanes and routes](docs/kinds.md) · [running a workflow from a chat](docs/workflow-chat.md)
-- [What an operator of an installed runtime must do after an update](upgrades/index.yaml)
-- [The todo-app standard: how to read `examples/todo-app-backend` and `examples/todo-app-frontend`](docs/examples/todo-app-standard.md)
-- [Todo-app grit ledger: where the runtime lied, blocked legitimate code, or had no home for a real need](legacy/docs/examples/todo-app-grit.md)
+- [The todo-app standard example](docs/examples/todo-app-standard.md)
 
-Agent instructions live in [SKILL.md](SKILL.md); humans do not need to preload the entire knowledge catalog. Runtime maintenance rules live in [UPDATE.yaml](UPDATE.yaml). [README.yaml](README.yaml) is a machine-readable summary, not the user guide.
-
-## Canonical sources — no `.dist`
-
-Development references under `knowledge/` are authored primarily as YAML (`schema: starci/knowledge-source@1` and example manifests). Multi-file TypeScript examples live beside their `index.yaml`. The YAML is what agents read — names such as `knowledge/coding-reference.yaml` are the canonical references used by operators and `SKILL.md`.
-
-Declarative sources use YAML; duplicate JSON/YAML authority is rejected. Only explicitly allowlisted, format-required JSON remains. There is no `.dist` tree and no build step: runtime CLI, contracts, knowledge and documentation resolve the source files in this repository directly. See [knowledge YAML authoring](docs/knowledge-yaml.md) and [runtime distribution](docs/runtime-distribution.md).
-
-Browser workflows require a working browser runner, not bundled browser binaries. Follow [browser setup](docs/browser-testing.md). Business/Architecture and backend-only workflows do not require a browser installation.
+Agent-facing instructions live in [SKILL.md](SKILL.md); humans only need this page and `docs/`.
 
 ## Contributing
 
-Read [UPDATE.yaml](UPDATE.yaml) before changing runtime contracts. Update each contract and its consumers together, preserve unrelated edits and add regression tests for both valid behavior and rejected unsafe cases.
-
-```sh
-npm ci
-npm test
-node scripts/checks/check-example-yaml.mjs
-node scripts/checks/check-example-work.mjs
-```
-
-For documentation sites, install their build dependencies and follow [the release guide](docs/releasing.md). Verify the packaged runtime in an isolated host before distribution. Never include project records, local configuration, credentials, `worktrees/` or site caches in a package.
-
-## Limits
-
-StarCi verifies contract shape, bound inputs, evidence bytes and completion dependencies. It does not prove that an agent's written observation is truthful, replace human acceptance, provide a security sandbox, or ship your project's tools/accounts. Browser UAT needs an available browser tool and a runnable application. Deployment and real-data changes require their own authorization. Host bootstraps are local coding-agent integration, not a claim of compatibility with every chat UI or hosted skills API.
+See [CONTRIBUTING.md](CONTRIBUTING.md): `npm ci`, `npm test` (`node --test tests/*.spec.mjs`),
+evidence is re-recorded — never hand-edited.
 
 ## License
 
-MIT. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).
+MIT — [LICENSE](LICENSE). `engine/yaml.mjs` is a vendored bundle of the `yaml` package; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

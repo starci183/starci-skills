@@ -16,7 +16,7 @@ identity:
   modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # qwen.json
 
 capacity:
-  maxParallel: 4              # runtimes.json
+  maxParallel: 10             # runtimes.yaml
   roles: [implement, verify, write]   # NO decide, NO plan
   models:
     implement: qwen3.8-flash

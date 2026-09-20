@@ -25,14 +25,104 @@
 // Prints: picked target (+model for the role), the rule that fired, the ordered
 // fallback chain, and per-candidate rejection reasons. Exit 1 on refusal
 // ('no eligible model' — a typed exclusion, never a silent swap).
+//
+// Owner config: <skillRoot>/config.yaml (gitignored, seeded from
+// config.example.yaml by the installer) is consulted for what it owns —
+// models.nonOperation pools bind kernel-function kinds to a configured pool,
+// allocation.preferredProvider is a bounded owner bias (never a fallback
+// chain), and effort is surfaced for the caller. A missing config changes
+// nothing: routing is identical to the pre-config behavior.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../core/yaml.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
+
+// --- owner config (config.yaml) --------------------------------------------------
+// engine/config.mjs (the engine/ tree's canonical loader) is preferred once it
+// exists and exports an owner-config reader; until then the yaml is parsed
+// directly. A missing or unparsable file is never fatal — callers degrade to
+// "no config" and route exactly as before.
+async function readOwnerConfig() {
+  const file = path.join(skillRoot, 'config.yaml');
+  if (!fs.existsSync(file)) return { file, config: null, error: null };
+  const engineLoader = path.join(skillRoot, 'engine', 'config.mjs');
+  let engineError = null;
+  if (fs.existsSync(engineLoader)) {
+    try {
+      const mod = await import(pathToFileURL(engineLoader).href);
+      for (const name of ['loadOwnerConfig', 'readOwnerConfig'])
+        if (typeof mod[name] === 'function')
+          return { file, config: mod[name](skillRoot) ?? null, error: null };
+    } catch (e) { engineError = `engine/config.mjs: ${e.message}`; }
+    // No usable export (or the import failed) — the direct yaml read below is
+    // the fallback; an engine error is annotated, never fatal.
+  }
+  try {
+    const config = parseYaml(fs.readFileSync(file, 'utf8')) ?? null;
+    return { file, config, error: null, ...(engineError ? { engineError } : {}) };
+  } catch (e) { return { file, config: null, error: `config.yaml unparsable: ${e.message}`, ...(engineError ? { engineError } : {}) }; }
+}
+
+// Which config.yaml models.nonOperation role serves each kernel-function kind —
+// the same map models/functions.mjs resolves through nonOperationModels().
+// Kernel kinds without an entry (screen classification, owner presentation)
+// have no configured pool and keep the runtimes.yaml preference order.
+const KERNEL_FUNCTION_ROLE = {
+  'model.assessGoal': 'planner',
+  'model.planOp': 'planner',
+  'model.decide': 'kernelManager',
+  'model.manageWorkflow': 'kernelManager',
+  'model.validateOp': 'validator',
+  'model.critiqueGoal': 'validator',
+  'judge': 'validator',
+};
+
+// --- provider preflight + capacity drift (adapter-card facts) ---------------------
+// A preflight is whatever the provider's adapter card declares must hold before
+// a dispatch can be trusted: credentialRefresh env repair (qwen's stale-key
+// unset), a commandPrefix auth probe (devin's `devin models list` check), the
+// readiness screen, and post-submission attestation. An explicit `preflight:`
+// key on the runtimes.yaml entry or the adapter card wins outright — it is the
+// data hook this layer reports; execution stays in scripts/agent/lib.mjs.
+const adapterCache = new Map();
+function adapterCardFor(provider) {
+  if (!provider) return null;
+  if (!adapterCache.has(provider))
+    adapterCache.set(provider, readYaml(path.join(skillRoot, 'providers', 'orca', 'adapters', `${provider}.yaml`)));
+  return adapterCache.get(provider);
+}
+function preflightFor(runtime) {
+  const card = adapterCardFor(runtime?.provider);
+  const declared = runtime?.preflight ?? card?.preflight ?? null;
+  if (declared) return { probes: ['declared-preflight'], declared };
+  const probes = [];
+  if (card?.credentialRefresh) probes.push('credential-refresh');
+  if (card?.commandPrefix) probes.push('auth-probe');
+  if (Array.isArray(card?.environmentStrip) && card.environmentStrip.length) probes.push('env-strip');
+  if (card?.readiness) probes.push(typeof card.readiness === 'string' ? card.readiness : 'readiness-screen');
+  if (card?.attestation || Array.isArray(card?.knownFailures)) probes.push('post-submit-attestation');
+  if (!card) probes.push('no-adapter-card');
+  return { probes, declared: null };
+}
+
+// runtimes.yaml is the single capacity authority — model profiles repeat
+// capacity.maxParallel as a cached copy and it has drifted before (qwen 4 vs
+// the intended 10; devin 0 vs 10). Drift is reported, never silently
+// reconciled: the runtimes.yaml value always wins.
+function capacityDrift(candidates, runtimes) {
+  const out = [];
+  for (const c of candidates) {
+    const declared = runtimes?.runtimes?.[c.id]?.maxParallel;
+    const cached = c.profileMaxParallel;
+    if (cached != null && declared != null && Number(cached) !== Number(declared))
+      out.push({ target: c.id, profileMaxParallel: Number(cached), runtimesMaxParallel: Number(declared) });
+  }
+  return out;
+}
 
 function parseArgs(argv) {
   const a = { tools: [] };
@@ -178,6 +268,7 @@ function loadCandidates(modelsDir) {
       provider: profile?.provider ?? pool.provider,
       roles: profile?.capacity?.roles ?? pool.roles ?? [],
       models: profile?.capacity?.models ?? {},
+      profileMaxParallel: profile?.capacity?.maxParallel ?? null, // stale-prone copy — drift-checked vs runtimes.yaml
       profile: pool.profile ?? `profiles/${pool.target}.yaml`,
     });
   }
@@ -233,13 +324,18 @@ function planEvidenceNote(evidence, qr) {
   return null;
 }
 
-function planCandidates(chain, runtimes, w, rules, evidenceByRuntime) {
+function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, profileCap = {}) {
   const probationReasons = probationAdmissionReasons(w, rules);
   return chain.map(id => {
     const rt = runtimes?.runtimes?.[id] ?? null;
     if (!rt) return { id, target: id, status: 'rejected', structural: true, reasons: ['no runtimes.yaml entry for this pool'] };
     const model = (w.role && rt.models?.[w.role]) || rt.target || id;
-    const base = { id, target: rt.target ?? id, provider: rt.provider ?? null, model, maxParallel: rt.maxParallel ?? null };
+    const pf = preflightFor(rt);
+    const base = { id, target: rt.target ?? id, provider: rt.provider ?? null, model, maxParallel: rt.maxParallel ?? null,
+      preflight: pf.probes, ...(pf.declared ? { preflightDeclared: pf.declared } : {}) };
+    const pc = profileCap[id];
+    if (pc != null && rt.maxParallel != null && Number(pc) !== Number(rt.maxParallel))
+      base.capacityDrift = `profile pins maxParallel ${pc}; runtimes.yaml declares ${rt.maxParallel} (runtimes.yaml wins)`;
     if (w.role && rt.roles?.length && !rt.roles.includes(w.role))
       return { ...base, status: 'rejected', structural: true, reasons: [`pool does not serve role '${w.role}'`] };
     const evidence = evidenceByRuntime[id];
@@ -251,9 +347,9 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime) {
   });
 }
 
-function runPlan(args, rules, runtimes, w, evidenceByRuntime) {
+function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profileCap = {}) {
   const { chain, source } = planChain(runtimes, args.difficulty, w.role);
-  const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime);
+  const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, profileCap);
   // Pickable = not structurally off the chain, and any rejection rests only on
   // absent/stale evidence (annotation, not a real disqualification) — the point
   // of plan mode is "who takes this once qualification exists". Probation
@@ -261,7 +357,9 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime) {
   const pickable = evaluated.filter(c => !c.structural
     && (c.status !== 'rejected' || c.qr.every(r => PLAN_EVIDENCE_ABSENT.has(r))));
   const statusRank = { qualified: 0, 'probation-only': 1, rejected: 2 };
-  const ordered = [...pickable].sort((a, b) => statusRank[a.status] - statusRank[b.status] || chain.indexOf(a.id) - chain.indexOf(b.id));
+  const bias = c => (owner.preferredProvider && c.provider === owner.preferredProvider ? 0 : 1);
+  const ordered = [...pickable].sort((a, b) => statusRank[a.status] - statusRank[b.status]
+    || bias(a) - bias(b) || chain.indexOf(a.id) - chain.indexOf(b.id));
   const primary = ordered[0] ?? null;
   const fallbacks = ordered.slice(1);
   const reasonFor = c => c.status === 'qualified'
@@ -271,17 +369,29 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime) {
       : `what-if pick: ${c.note ?? 'no usable qualification evidence'} — launch still requires measured qualification (probation cannot satisfy this workload)`;
   const estimate = { difficulty: args.difficulty, coldMinutes: PLAN_COLD_MINUTES[args.difficulty] };
 
+  const configLine = {
+    file: owner.config ? path.relative(skillRoot, owner.file) : null,
+    ...(owner.error ? { error: owner.error } : {}),
+    ...(owner.engineError ? { engineLoader: owner.engineError } : {}),
+    effort: owner.effort ?? null,
+    preferredProvider: owner.preferredProvider ?? null,
+    ...(w.modelFunction ? { kernelRole: owner.cfgRole ?? null, pool: owner.cfgPoolName ?? null, members: owner.cfgMembers ?? null } : {}),
+  };
   if (args.json) {
     console.log(JSON.stringify({
       plan: true,
       difficulty: args.difficulty,
       workload: w,
+      config: configLine,
       tier: { source, chain },
       candidates: evaluated.map(c => ({
         target: c.target, provider: c.provider, model: c.model,
         maxParallel: c.maxParallel, status: c.status,
+        preflight: c.preflight, ...(c.preflightDeclared ? { preflightDeclared: c.preflightDeclared } : {}),
+        ...(c.capacityDrift ? { capacityDrift: c.capacityDrift } : {}),
         ...(c.note ? { evidence: c.note } : {}), ...(c.reasons?.length ? { reasons: c.reasons } : {}),
       })),
+      ...(owner.drift?.length ? { capacityDrift: owner.drift } : {}),
       pick: primary
         ? { primary: { target: primary.target, model: primary.model, status: primary.status }, reason: reasonFor(primary),
             fallbacks: fallbacks.map(c => ({ target: c.target, model: c.model, status: c.status })) }
@@ -292,16 +402,24 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime) {
     console.log(`plan what-if: kind=${w.kind} role=${w.role ?? '(none)'} difficulty=${args.difficulty}`);
     console.log(`workload: risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
       (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
+    console.log(`config: ${configLine.file ?? 'absent'}` +
+      (configLine.effort ? `  effort=${configLine.effort}` : '') +
+      (configLine.preferredProvider ? `  preferredProvider=${configLine.preferredProvider}` : '') +
+      (configLine.pool ? `  ${configLine.kernelRole} pool '${configLine.pool}' -> [${(configLine.members ?? []).join(', ')}]` : '') +
+      (configLine.error ? `  (${configLine.error})` : ''));
     console.log(`chain: ${source}  ->  [${chain.join(', ') || '(empty)'}]`);
     console.log('candidates:');
     evaluated.forEach((c, i) => {
       const spec = c.provider !== undefined
-        ? `provider=${c.provider ?? '(none)'}  model=${c.model ?? '(none)'}  maxParallel=${c.maxParallel ?? '(none)'}`
+        ? `provider=${c.provider ?? '(none)'}  model=${c.model ?? '(none)'}  maxParallel=${c.maxParallel ?? '(none)'}  preflight=[${(c.preflight ?? []).join(',')}]`
         : '';
       console.log(`  ${i + 1}. ${c.target}  ${spec}  status=${c.status}` +
         (c.note ? `  (${c.note})` : ''));
+      if (c.capacityDrift) console.log(`     capacity drift: ${c.capacityDrift}`);
       if (args.verbose && c.reasons?.length) console.log(`     reasons: ${c.reasons.join('; ')}`);
     });
+    for (const d of owner.drift ?? [])
+      console.log(`capacity drift: ${d.target} profile pins maxParallel ${d.profileMaxParallel}; runtimes.yaml declares ${d.runtimesMaxParallel} (runtimes.yaml wins)`);
     if (primary) {
       console.log(`primary: ${primary.target} (${reasonFor(primary)})`);
       console.log(`fallbacks: [${fallbacks.map(c => `${c.target} (${c.status})`).join(', ')}]`);
@@ -316,7 +434,7 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime) {
 
 // --- main -------------------------------------------------------------------------
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.kind) { console.error('--kind is required'); process.exit(2); }
   const modelsDir = path.resolve(args.modelsDir ?? path.join(skillRoot, 'modules', 'models'));
@@ -338,24 +456,55 @@ function main() {
     // own kind→role map), falling back to kinds.yaml like the live path.
     ? deriveWorkload({ ...args, role: args.role ?? runtimes?.roleOfKind?.[args.kind] ?? kindEntry?.role }, rules, kindEntry, declaredChecks)
     : deriveWorkload(args, rules, kindEntry, declaredChecks);
+
+  // Owner config (config.yaml): models.nonOperation pools bind kernel-function
+  // kinds to a configured pool, allocation.preferredProvider is a bounded owner
+  // bias over order (never a fallback chain — it permutes, it does not shrink
+  // eligibility), effort is surfaced for the caller. Absent file → no effect.
+  const ownerFile = await readOwnerConfig();
+  const ownerCfg = ownerFile.config;
+  const cfgRole = KERNEL_FUNCTION_ROLE[args.kind] ?? null;
+  const cfgPoolName = cfgRole ? ownerCfg?.models?.nonOperation?.[cfgRole] : null;
+  const cfgPool = cfgPoolName ? ownerCfg?.models?.pools?.[cfgPoolName] : null;
+  const cfgMembers = Array.isArray(cfgPool) ? cfgPool.filter(s => typeof s === 'string' && s.trim()) : null;
+  const preferredProvider = typeof ownerCfg?.allocation?.preferredProvider === 'string'
+    && ownerCfg.allocation.preferredProvider.trim() ? ownerCfg.allocation.preferredProvider.trim() : null;
+  const effort = (w.modelFunction ? ownerCfg?.kernel?.effort ?? ownerCfg?.effort : ownerCfg?.effort) ?? null;
+  const owner = { file: ownerFile.file, config: ownerCfg, error: ownerFile.error,
+    engineError: ownerFile.engineError ?? null,
+    cfgRole, cfgPoolName, cfgMembers, preferredProvider, effort };
+
+  const candidates = loadCandidates(modelsDir);
+  owner.drift = capacityDrift(candidates, runtimes);
+  const profileCap = Object.fromEntries(candidates.map(c => [c.id, c.profileMaxParallel]));
   if (args.plan) {
     if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard>'); process.exit(2); }
-    runPlan(args, rules, runtimes, w, evidenceByRuntime);
+    runPlan(args, rules, runtimes, w, evidenceByRuntime, owner, profileCap);
     return;
   }
-  const candidates = loadCandidates(modelsDir);
-  const { order, source: orderSource } = candidateOrder(args.kind, w.role, registry, runtimes);
+
+  // Kernel functions route inside the configured non-operation pool when the
+  // owner config declares one (models.nonOperation.<role> → pools.<name>) —
+  // the same binding models/functions.mjs resolves via nonOperationModels().
+  let { order, source: orderSource } = candidateOrder(args.kind, w.role, registry, runtimes);
+  if (w.modelFunction && cfgMembers?.length) {
+    order = cfgMembers;
+    orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;
+  }
   const ordered = [...candidates].sort((a, b) => {
+    const pa = preferredProvider && a.provider === preferredProvider ? 0 : 1;
+    const pb = preferredProvider && b.provider === preferredProvider ? 0 : 1;
     const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.id.localeCompare(b.id);
+    return pa - pb || (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.id.localeCompare(b.id);
   });
 
-  const chainDeclared = orderSource.startsWith('registry.yaml');
+  const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml');
   const evaluated = ordered.map(c => {
-    // A declared operator chain is a closed set: pools absent from it are not
-    // on the op's launch path at all (interface.draw → [codex-agent] only).
+    // A declared operator chain — or a configured non-operation pool — is a
+    // closed set: pools absent from it are not on the launch path at all
+    // (interface.draw → [codex-agent] only; kernelManager → its pool only).
     if (chainDeclared && !order.includes(c.id))
-      return { c, eligible: false, mode: null, reasons: [`pool is not on the declared chain for ${args.kind}`] };
+      return { c, eligible: false, mode: null, reasons: [`pool is not on the declared chain for ${args.kind} (${orderSource})`] };
     if (w.role && c.roles.length && !c.roles.includes(w.role))
       return { c, eligible: false, mode: null, reasons: [`pool does not serve role '${w.role}'`] };
     const qr = qualificationReasons({ provider: c.provider, model: c.models[w.role] ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
@@ -381,6 +530,15 @@ function main() {
   const modelFor = c => (w.role && c.models[w.role]) || c.target;
   const result = {
     workload: w,
+    config: {
+      file: ownerCfg ? path.relative(skillRoot, owner.file) : null,
+      ...(owner.error ? { error: owner.error } : {}),
+      ...(owner.engineError ? { engineLoader: owner.engineError } : {}),
+      effort: effort ?? null,
+      preferredProvider,
+      ...(w.modelFunction ? { kernelRole: cfgRole, pool: cfgPoolName ?? null, members: cfgMembers ?? null } : {}),
+    },
+    ...(owner.drift.length ? { capacityDrift: owner.drift } : {}),
     assumptions: {
       approved: w.approved, scope: w.scope, noExternalEffects: w.noExternalEffects,
       strictMachineGates: w.strictMachineGates, freshIndependentReview: w.freshIndependentReview,
@@ -401,6 +559,13 @@ function main() {
     console.log(`workload: kind=${w.kind} role=${w.role ?? '(none)'} risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
       (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
     console.log(`assumed: approved=${w.approved} local noExternalEffects=${w.noExternalEffects} strictMachineGates=${w.strictMachineGates} freshIndependentReview=${w.freshIndependentReview}`);
+    console.log(`config: ${result.config.file ?? 'absent'}` +
+      (result.config.effort ? `  effort=${result.config.effort}` : '') +
+      (preferredProvider ? `  preferredProvider=${preferredProvider} (bias, not a chain)` : '') +
+      (result.config.pool ? `  ${result.config.kernelRole} pool '${result.config.pool}' -> [${(result.config.members ?? []).join(', ')}]` : '') +
+      (owner.error ? `  (${owner.error})` : ''));
+    for (const d of owner.drift)
+      console.log(`capacity drift: ${d.target} profile pins maxParallel ${d.profileMaxParallel}; runtimes.yaml declares ${d.runtimesMaxParallel} (runtimes.yaml wins)`);
     if (pick) {
       console.log(`PICK ${pick.c.target}  model=${modelFor(pick.c)}  mode=${pick.mode}`);
       console.log(`  rule: ${rule}`);
@@ -419,4 +584,4 @@ function main() {
   if (!pick) process.exit(1);
 }
 
-main();
+await main();

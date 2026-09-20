@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {parseYaml} from '../../core/yaml.mjs';
+import {parseYaml} from '../../engine/yaml.mjs';
 
 /**
  * The layout check reads a `.starciwork` tree and reports where the directories and the ids disagree with

@@ -1,9 +1,0 @@
-MISS  packages/grammar/src/core/primitive/GrammarRoot/index.tsx:11 does not contain "data-grammar-family" (found at :8)
-MISS  packages/grammar/src/common/spacing.ts:1 does not contain "COMMON_SPACING_SCALE" (found at :2)
-MISS  packages/grammar/src/common/conformance.ts:26 does not contain "unknown" (found at :32)
-MISS  packages/grammar/src/core/dna.ts:116 does not contain "STARCI_CORE_TOKEN_NAMES" (found at :95)
-MISS  packages/grammar/src/core/dna.ts:158 does not contain "STARCI_CORE_TOKEN_DEFAULTS" (found at :162)
-MISS  packages/grammar/src/core/branch/SurfaceCard/classNames.ts:31 does not contain "framelessSurfaceClassName" (found at :35)
-
-6 citation(s) to fix of 30
-emitted classes: 135; with no rule in any shipped sheet: starci-core-rank-artwork starci-core-surface-card--fill

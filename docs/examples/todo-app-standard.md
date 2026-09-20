@@ -207,7 +207,7 @@ screenshots both live under the owning node's `assets/**`, in original formats, 
 design from real capture and naming the actual capture environment. This example tree currently has no
 `ui/**/assets/` or `uat/**/assets/` directories on disk (its `ui.task.list` and `ui.share.invite` records
 carry no asset references at all) — the mechanism is real in the schema and in the runtime's `interface.draw`/
-`uat.verify` operation kinds (`docs/kinds.md`), but this particular example has not exercised it yet.
+`uat.verify` operation kinds (`modules/models/kinds.yaml`), but this particular example has not exercised it yet.
 
 ## 6. Running it
 
@@ -312,9 +312,7 @@ not built":
   ui, impl, uat, contract, integration, gap, event`) — instead places every record in a flat family folder
   directly under `features/<feature>/` (`features/task/br/...`, `features/task/sds/...`, with no
   `business/`/`architecture/` segment anywhere). Neither the schema file nor any other schema in `schemas/`
-  documents this flat shape; `docs/examples/knowledge-update-delivery.md`, a separate synthetic worked
-  example, uses yet a third, nested `business/`/`architecture/` layout consistent with the *schema*, not with
-  the checked-in example. Three sources — the schema, one doc example, and the actual checked example plus
+  documents this flat shape. Two sources — the schema and the actual checked example plus
   its own gate script — currently describe or use two different, mutually exclusive directory shapes for the
   same concept.
 
@@ -405,4 +403,4 @@ not built":
   are documented to use.** `ui.task.list` and `ui.share.invite` carry no `assets` and no `ui/**/assets/`
   directory exists anywhere in this tree, so section 5's description of how design drawings and UAT captures
   attach to a `ui`/`uat` node is drawn from the schema and the runtime's operation-kind documentation
-  (`docs/kinds.md`), not from anything this example currently demonstrates end to end.
+  (`modules/models/kinds.yaml`), not from anything this example currently demonstrates end to end.

@@ -24,7 +24,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -109,19 +109,19 @@ reads:
       en: Read exact target/origins, owner, configuration revision, declared probes and allowed effects;
         validate live observations without inferring identity from hostname alone.
   - id: workflow
-    path: selected workflow request + workflows/contracts.json + this op authority.json
+    path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
     purpose:
       en: When selected inside the named workflow, read the exact request, strict response contract and
         primary/secondary authority JSON. Standalone op execution does not invent a workflow
         request.
   - id: matrix
-    path: selected complete-job matrix request + workflows/jobs.json
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
     purpose:
       en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
@@ -208,7 +208,7 @@ writes:
       - outputs
       - artifacts
     content:
-      en: Only for the selected named workflow, emit the response defined by workflows/contracts.json.
+      en: Only for the selected named workflow, emit the response defined by modules/kernel/verdict-contract.yaml.
         Return outputs.flows in the original journey order, preserving business actions/expectations
         and adding actual sourcePaths; return full codeRefs including accepted backend support
         commits and the verified rendered runtime. These outputs become UAT inputs unchanged. A
@@ -225,7 +225,7 @@ writes:
         id/title/entry/actor/preconditions, ordered steps {id,action,expected,uxChecks}, cleanup
         obligations and actual sourcePaths; full codeRefs and observed runtime. Resolve actions and
         expected results from accepted business scope without weakening them. This is input for
-        uat.verify, not a UAT pass. Use workflows/contracts.json output shape; missing accepted
+        uat.verify, not a UAT pass. Use modules/kernel/verdict-contract.yaml output shape; missing accepted
         behavior blocks readiness. Include the complete asset manifest; pending decorative artwork
         stays explicitly deferred. Validate with the selected execution profile and complete input
         draw IDs."
