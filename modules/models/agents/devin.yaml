@@ -1,4 +1,4 @@
-schema: starci/orca-agent-adapter@1
+schema: starci/agent-card@1
 agent: devin
 kind: command-terminal-agent
 model: devin-agent

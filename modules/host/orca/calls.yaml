@@ -2,10 +2,11 @@ schema: starci/orca-calls@1
 provider: orca
 api: api.json
 purpose: |-
-  One typed contract per Orca call that StarCi may issue. The runner in hosts/orca/calls.mjs
-  builds argv only from these entries, verifies each command and flag against the live
-  agent-context before the first effect, and converts every exit code and receipt into a typed
-  result envelope. An Orca failure is a classified result, never an untyped exception.
+  One typed contract per Orca call that StarCi may issue. The wrappers in scripts/api/orca/ —
+  one .mjs file per verb over the shared lib.mjs — build argv only from these entries, verify
+  each command and flag against the live agent-context before the first effect, and convert
+  every exit code and receipt into a typed result envelope. An Orca failure is a classified
+  result, never an untyped exception.
 liveSchema:
   call: agent-context
   schemaVersion: 1
@@ -291,6 +292,13 @@ calls:
     kind: read
     flags: ["worktree", "include-visual-layouts"]
     receipt: [result.terminals]
+  terminal-show:
+    command: terminal show
+    kind: read
+    flags: [terminal]
+    required: [terminal]
+    receipt: [result.terminal]
+    note: Health probe — connected/writable/exitCause is how dispatch and restart decide a terminal is live.
   terminal-read:
     command: terminal read
     kind: read
@@ -327,7 +335,7 @@ calls:
     command: terminal close
     kind: mutation
     replay: none
-    flags: [terminal]
+    flags: [terminal, tab]
     required: [terminal]
     receipt: [result]
     note: Containment only. The launcher closes the exact residual agent terminal that a fenced attempt itself created when worker-stop cannot confirm the stop; it never closes a Monitor, Coordinator, setup or user terminal.

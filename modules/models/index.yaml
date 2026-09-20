@@ -12,10 +12,11 @@
 #   registry.yaml      — starci/profile-registry@3 (aliases, targets, operators, supervisors)
 #   kinds.yaml         — starci/kinds@2 operation catalog (kernel-agent legality graph, modules/goal/legality.yaml)
 #   records.yaml       — starci/records@1 record catalog (contract data, read directly)
-#   hosts.yaml         — starci/hosts@1 host descriptors (RETIRED — delete-manifest; host facts live in providers/orca/adapters/ + runtimes.yaml)
+#   hosts.yaml         — starci/hosts@1 host descriptors (RETIRED — delete-manifest; host facts live in modules/models/agents/ + runtimes.yaml)
+#   agents/            — starci/agent-card@1 agent cards (was providers/orca/adapters/)
 #   code-patterns.yaml — starci/code-pattern-profile@1 (scripts/checks/check-scoped-lint.mjs)
 #   claude/codex/qwen/devin.yaml — starci/execution-profiles@1 per-runtime profiles
-#                      (RETIRED — delete-manifest; per-runtime launch facts live in profiles/ + providers/orca/adapters/)
+#                      (RETIRED — delete-manifest; per-runtime launch facts live in profiles/ + modules/models/agents/)
 #   index.mjs          — RETIRED — delete-manifest; new-arch scripts read the YAML directly via engine/yaml.mjs
 
 schema: starci/module-models-index@1

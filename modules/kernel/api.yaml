@@ -198,7 +198,7 @@ commands:
       command flags are auto-injected and can never be forgotten:
       terminal create titled `[Op] <op-id>` -> readiness read -> send the
       rendered packet — command, flags and readiness patterns from the
-      provider adapter card providers/orca/adapters/<provider>.yaml. The
+      provider adapter card modules/models/agents/<provider>.yaml. The
       kernel agent never calls orca directly. Without --spawn: dry-run —
       the packet prints, nothing is reserved and nothing launches.
     attestation: >-
@@ -219,7 +219,7 @@ commands:
       - contested-lease: 'an in-flight job holds a capacity-1 resource this op needs (canonical-writer:*, runtime-projection:*, machine:*)'
       - path-collision: 'owned_paths overlap an in-flight jobs read/write set (the api''s dispatch-planning conflict check)'
       - path-illegal: 'owned_paths contradict the target repo''s layout/lint contracts — preflight says incident, never dispatch (dispatch.yaml preflight)'
-      - managed-agent-spawn: '--spawn on a managed-agent profile — that path is orca orchestration worker-start (providers/orca/index.yaml managedFallback)'
+      - managed-agent-spawn: '--spawn on a managed-agent profile — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
       - spawn-failed: 'create/read/send sequence did not land — the reservation is settled, never left leasing a ghost'
       - dispatch-rejected: 'post-spawn attestation failed — auth/known-failure signature or dead terminal; job NOT running, terminal closed, slot released'
     usedBy: 'drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free'

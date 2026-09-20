@@ -2,7 +2,7 @@ schema: starci/codex-provider@1
 provider: codex
 purpose: Canonical Codex execution forms and agent API calls for StarCi.
 files:
-  capabilities: capabilities.json
+  capabilities: ../../models/agents/codex.yaml
   api: api.json
   recipes: recipes.json
   validation: validation.json

@@ -7,11 +7,12 @@ files:
   calls: calls.yaml
   recipes: recipes.yaml
   validation: validation.yaml
-  adapters:
-    codex: adapters/codex.yaml
-    claude: adapters/claude.yaml
-    qwen: adapters/qwen.yaml
-    devin: adapters/devin.yaml
+  envelopes: envelopes.yaml
+  agents:
+    codex: ../../models/agents/codex.yaml
+    claude: ../../models/agents/claude.yaml
+    qwen: ../../models/agents/qwen.yaml
+    devin: ../../models/agents/devin.yaml
 purpose: |-
   Canonical Orca API call templates for StarCi orchestrated execution. These calls are the
   only supported construction path; prompts may fill placeholders but may not invent a

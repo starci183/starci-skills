@@ -1,4 +1,4 @@
-schema: starci/orca-agent-adapter@1
+schema: starci/agent-card@1
 agent: qwen
 kind: command-terminal-agent
 model: qwen3.8-flash

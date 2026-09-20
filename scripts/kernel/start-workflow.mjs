@@ -14,7 +14,7 @@
 // via modules/models/profiles/<target>.yaml. Router refusal or failure is a
 // typed fallback to provider devin (routedBy: fallback); --provider is an
 // explicit operator override (routedBy: override). Spawn flags come from the
-// provider's adapter card providers/orca/adapters/<provider>.yaml, not a
+// provider's adapter card modules/models/agents/<provider>.yaml, not a
 // hardcoded map.
 //
 //   node scripts/kernel/start-workflow.mjs --repo <path> [--goal <workflow_id>] [--provider <name>] [--plan] [--json]

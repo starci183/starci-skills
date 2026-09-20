@@ -1,4 +1,4 @@
-schema: starci/orca-agent-adapter@1
+schema: starci/agent-card@1
 agent: codex
 kind: native-managed-agent
 start:
@@ -25,3 +25,20 @@ verifiedAgainst: 'codex v0.155.1'
 forbidden:
   - shell-only-role
   - unsupervised-dispatch-inject-as-success
+capabilities:
+  schema: starci/codex-capabilities@1
+  hostModes:
+    solo: supported
+    orchestrated: bootstrap-only-to-orca
+  solo:
+    controlPlane: current-chat
+    operationIsolation: collaboration-subagent
+    maximumConcurrentOperationAgents: 3
+    childWorktrees: forbidden
+  orca:
+    nativeManagedAgent: supported
+    agentId: codex
+    roles:
+      - plan-coordinator
+      - workflow-coordinator
+      - operation-fallback

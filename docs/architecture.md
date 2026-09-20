@@ -29,8 +29,8 @@ routes, never a crash. The full contract (arguments, reads/writes, refusal
 strings) is `modules/kernel/api.yaml`.
 
 `dispatch --spawn` is the only place an agent terminal is born: the api —
-through `scripts/agent/lib.mjs` and the provider adapter card
-(`providers/orca/adapters/<provider>.yaml`) — creates the terminal, attests
+through `scripts/agent/lib.mjs` and the agent card
+(`modules/models/agents/<agent>.yaml`) — creates the terminal, attests
 readiness, delivers the packet and attests submission. Provider flags
 (`--yolo`, `--permission-mode dangerous`, …) are injected from the card; no
 caller assembles a provider command by hand.
@@ -84,7 +84,7 @@ committed per project policy; secrets never are.
 | Operation contracts | `modules/ops/ops/*.yaml` ([ops-source-ownership](ops-source-ownership.md)) |
 | Model routing | `modules/models/selection.yaml`, `scripts/route/route-model.mjs` |
 | Ledger schema | `engine/schema.sql` |
-| Provider facts | `providers/**` (data only; [providers](providers.md)) |
+| Host contract and agent cards | `modules/host/**`, `modules/models/agents/**` (data only; [host contract](host-contract.md)) |
 | Owner configuration | `config.yaml` (seeded from `config.example.yaml`; [config-format](config-format.md)) |
 
 ## Evidence boundaries

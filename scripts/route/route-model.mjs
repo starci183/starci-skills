@@ -92,7 +92,7 @@ const adapterCache = new Map();
 function adapterCardFor(provider) {
   if (!provider) return null;
   if (!adapterCache.has(provider))
-    adapterCache.set(provider, readYaml(path.join(skillRoot, 'providers', 'orca', 'adapters', `${provider}.yaml`)));
+    adapterCache.set(provider, readYaml(path.join(skillRoot, 'modules', 'models', 'agents', `${provider}.yaml`)));
   return adapterCache.get(provider);
 }
 function preflightFor(runtime) {

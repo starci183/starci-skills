@@ -15,7 +15,7 @@
 #
 # What was NOT merged (see `retired:` at the bottom): the eleven schema files
 # bound only to delete-scheduled machinery, plus orca-call.schema.yaml, which
-# R2 ruled belongs beside providers/orca/, not in this tree.
+# R2 ruled belongs beside the Orca host contract (now modules/host/orca/), not in this tree.
 
 about:
   kind: schema-catalog
@@ -341,12 +341,12 @@ schemas:
   # --------------------------------------------------------------------------
 
   - id: starci/orca-calls@1 (emits starci/orca-call-result@1)
-    file: providers/orca/orca-call.schema.yaml
+    file: modules/host/orca/orca-call.schema.yaml
     dialect: json-schema
-    subsystem: providers
-    relocation: "PENDING the providers lane — R2 §2: this contract belongs beside providers/orca/ (it governs providers/orca/calls.yaml), not in modules/schemas/. The entry stays listed so the id keeps a catalog home until that move lands."
+    subsystem: host
+    relocation: "R2 §2: this contract belongs beside modules/host/orca/ (it governs modules/host/orca/calls.yaml), not in modules/schemas/. The entry stays listed so the id keeps a catalog home until that move lands."
     governs: "The complete Orca public-command contract — provider orca, api, liveSchema{call:agent-context,schemaVersion:1,compare:[command,flags],onMismatch:stop-before-effects-and-request-runtime-contract-upgrade}, envelope, defaults, idempotency, calls, forbiddenCalls, recoveries."
-    binds: providers/orca/calls.yaml (the governed instance)
+    binds: modules/host/orca/calls.yaml (the governed instance)
     usedBy: [scripts/api/orca/ (call sites need calls.schema==='starci/orca-calls@1'; live agent-context compare), scripts/checks/providers.mjs (envelope must emit starci/orca-call-result@1)]
     business:
       question: "Which Orca commands may the runtime issue, with what envelope, and what happens when live Orca disagrees?"
@@ -641,4 +641,4 @@ coverage:
   authoredFiles: 38            # 33 top-level + 5 under spec/ — was 45 at root + 5 in specifications/
   projection: retired          # the compiled projection was deleted in the distless wave; sources are read directly
   historicalSnapshot: "2026-09-19, before retirement: 44 projected sources (all but json-exceptions.yaml), 23 fresh, 4 stale-content (application-stacks, source-layout, stacks-layout, work-layout), 17 pending (every work-*.schema.yaml)"
-  verification: "M2 merge: every KEEP/MOVE verdict of R2-REPORT §2 copied; 11 files retired (see retired:); orca-call.schema.yaml pending relocation to providers/orca/"
+  verification: "M2 merge: every KEEP/MOVE verdict of R2-REPORT §2 copied; 11 files retired (see retired:); orca-call.schema.yaml pending relocation to modules/host/orca/"

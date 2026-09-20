@@ -645,7 +645,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
  * hardcoded read of the real file) purely so a fixture can exercise both a mismatched and a matching
  * shape.families without touching the real schema file.
  */
-export function checkFamiliesDrift(problems, schemaPath = path.join(root, 'schemas', 'work-layout.yaml')) {
+export function checkFamiliesDrift(problems, schemaPath = path.join(root, 'modules', 'schemas', 'work-layout.yaml')) {
   let doc;
   try {
     doc = parseYaml(fs.readFileSync(schemaPath, 'utf8'));

@@ -18,7 +18,7 @@ not automatically a project backend or frontend.
 ## What `init` does
 
 The installer (`bin/starci.mjs` → `scripts/install/install.mjs`) copies the
-declared **source** payload — `skills/`, `modules/`, `engine/`, `providers/`,
+declared **source** payload — `skills/`, `modules/`, `engine/`,
 `scripts/`, `knowledge/`, `docs/`, `init/AGENTS.md` — into `/absolute/host/.claude`,
 then:
 

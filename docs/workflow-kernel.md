@@ -58,7 +58,7 @@ exits 1 with `{ok:false, reason}` where the reason string is the contract.
 `dispatch` reserves the lease + budget atomically, renders the packet and —
 with `--spawn` — runs the terminal sequence itself through
 `scripts/agent/lib.mjs` (readiness attested, packet delivered, submission
-attested; provider flags injected from `providers/orca/adapters/<provider>.yaml`).
+attested; agent flags injected from `modules/models/agents/<agent>.yaml`).
 The packet is a bounded grant: one op, its brief (`modules/ops/ops/<op>.yaml`),
 a closed read set, a closed write set (`owned_paths`), one model, one budget,
 one lease token. Without `--spawn` it is a dry-run — the packet prints and

@@ -352,9 +352,9 @@ function writeBootstraps(repo, log, plan) {
 
 // Even --no-bootstrap must not leave host instructions pointing at removed runtime paths. The retired
 // set names paths the old engines owned inside .claude that no longer exist there; `scripts/`,
-// `modules/`, `engine/`, `providers/`, `skills/`, `docs/`, `examples/`, `tests/`, `knowledge/`,
+// `modules/`, `engine/`, `skills/`, `docs/`, `examples/`, `tests/`, `knowledge/`,
 // `packages/`, `init/`, `bin/` are all still live and deliberately absent from the pattern.
-const RETIRED_HOST_REFERENCE = /\.claude\/(?:workflows|hosts|cli|execution|contracts|approvals|specifications|schemas|kernel|sqlite|upgrades|models?|core|fixtures|legacy|ops|v3|alias|operators|profiles|checks|readiness|resources|templates)\/|\.claude\/(?:INDEX(?:\.vi)?\.md|INDEX\.yaml|routing\.json)\b|\.claude\/skills\/starci-(?:lite|goal|migrate|business|architecture|build|redesign-fe|visual|content|uat|fix|data|runtime|release|maintain)\/|session-open\.mjs|plan-chain\.mjs|validated request\.json/;
+const RETIRED_HOST_REFERENCE = /\.claude\/(?:workflows|hosts|cli|execution|contracts|approvals|specifications|schemas|kernel|sqlite|upgrades|models?|core|fixtures|legacy|ops|v3|alias|operators|profiles|checks|readiness|resources|templates|providers)\/|\.claude\/(?:INDEX(?:\.vi)?\.md|INDEX\.yaml|routing\.json)\b|\.claude\/skills\/starci-(?:lite|goal|migrate|business|architecture|build|redesign-fe|visual|content|uat|fix|data|runtime|release|maintain)\/|session-open\.mjs|plan-chain\.mjs|validated request\.json/;
 function checkRetiredHostReferences(repo, plan) {
   for (const name of HOST_BOOTSTRAP_NAMES) {
     const file = path.join(repo, name);
@@ -400,7 +400,7 @@ function checkMajorUpgrade(manifest, opts) {
 // Upgrade ownership only: these names are not executable legacy routing. A root belongs here as soon
 // as the installer owns files under it, live or retired: it is what lets an update delete an installed
 // file the new payload no longer ships, having first proved the file is unchanged since we wrote it.
-// Live roots (`bin`, `init`, `skills`, `modules`, `engine`, `providers`, `knowledge`, `examples`,
+// Live roots (`bin`, `init`, `skills`, `modules`, `engine`, `knowledge`, `examples`,
 // `tests`, `scripts`, `packages`) sit beside every retired root (`workflows`, `hosts`, `execution`,
 // `cli`, `contracts`, `approvals`, `specifications`, `schemas`, `sqlite`, `kernel`, `core`, `models`,
 // `fixtures`, `legacy`…) for exactly the same reason. `docs` stays in PRESERVED_DOCUMENTATION_ROOTS

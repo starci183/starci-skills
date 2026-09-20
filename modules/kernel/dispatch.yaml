@@ -258,8 +258,8 @@ spawnMechanics:
     closed, slot released) -> launched (job -> running, worker_id =
     dispatch) -> wait for verdict.
     Command flags and readiness patterns come from the provider adapter card
-    providers/orca/adapters/<provider>.yaml; a managed-agent profile refuses
-    --spawn (providers/orca/index.yaml managedFallback — worker-start path).
+    modules/models/agents/<provider>.yaml; a managed-agent profile refuses
+    --spawn (modules/host/orca/index.yaml managedFallback — worker-start path).
     The kernel's own launch shows the same primitive sequence
     (scripts/kernel/start-workflow.mjs: terminal-create -> terminal-read ->
     terminal-send -> bind the startup terminal).

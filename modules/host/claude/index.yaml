@@ -2,7 +2,7 @@ schema: starci/claude-provider@1
 provider: claude
 purpose: Canonical Claude execution forms and agent API calls for StarCi.
 files:
-  capabilities: capabilities.json
+  capabilities: ../../models/agents/claude.yaml
   api: api.json
   recipes: recipes.json
   validation: validation.json

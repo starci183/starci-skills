@@ -1,4 +1,4 @@
-schema: starci/orca-agent-adapter@1
+schema: starci/agent-card@1
 agent: claude
 kind: native-managed-agent
 start:
@@ -24,3 +24,20 @@ verifiedAgainst: 'claude CLI (installed)'
 forbidden:
   - shell-only-role
   - unsupervised-dispatch-inject-as-success
+capabilities:
+  schema: starci/claude-capabilities@1
+  hostModes:
+    solo: supported
+    orchestrated: bootstrap-only-to-orca
+  solo:
+    controlPlane: current-chat
+    operationIsolation: Task-subagent
+    maximumConcurrentOperationAgents: 3
+    childWorktrees: forbidden
+  orca:
+    nativeManagedAgent: supported
+    agentId: claude
+    roles:
+      - plan-coordinator
+      - workflow-coordinator
+      - operation-fallback

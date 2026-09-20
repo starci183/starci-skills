@@ -6,132 +6,122 @@ import {fileURLToPath} from 'node:url';
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
-// Distless: provider contracts are authored YAML; references keep their historical `.json` names,
-// resolved here to the `.yaml` source with the same stem.
-const sourceYaml=(...parts)=>parseYaml(fs.readFileSync(path.join(skillRoot,...parts),'utf8'));
-const readProviderRef=reference=>{
-  if(typeof reference!=='string'||!reference.endsWith('.json')||reference.includes('..'))throw Error(`Invalid provider reference: ${reference}`);
-  return sourceYaml('providers',...reference.replace(/\.json$/i,'.yaml').split('/'));
-};
 
-/** Load the compiled provider catalog and every contract referenced by one provider. */
+// The provider contract tree after the providers/ retirement:
+//   modules/models/agents/<agent>.yaml  — agent cards (schema starci/agent-card@1;
+//     the old providers/orca/adapters/<agent>.yaml card is now the document's top
+//     level, claude/codex add a `capabilities:` key)
+//   modules/host/orca/<doc>.yaml        — the Orca host contract docs (index, api,
+//     calls, capabilities, recipes, validation, envelopes — the last was
+//     providers/common/envelopes.yaml)
+//   modules/models/profiles/<target>.yaml — profiles whose launch.orca.adapter
+//     names an agent card
+// providers/catalog.yaml, providers/validate.mjs and providers/README.md are gone.
+const AGENTS_DIR=path.join(skillRoot,'modules','models','agents');
+const HOSTS_DIR=path.join(skillRoot,'modules','host');
+const PROFILES_DIR=path.join(skillRoot,'modules','models','profiles');
+const REGISTRY_FILE=path.join(skillRoot,'modules','models','registry.yaml');
+const AGENT_CARD_SCHEMA='starci/agent-card@1';
+
+const yamlFilesIn=dir=>fs.existsSync(dir)
+  ?fs.readdirSync(dir).filter(name=>name.endsWith('.yaml')||name.endsWith('.yml')).sort()
+  :[];
+
+const readYamlFile=file=>parseYaml(fs.readFileSync(file,'utf8'));
+
+/** Read one agent card by name (`qwen` -> modules/models/agents/qwen.yaml). */
+export function loadAgentCard(agent){
+  if(typeof agent!=='string'||!agent||agent.includes('..')||agent.includes('/')||agent.includes('\\'))
+    throw Error(`Invalid agent name: ${agent}`);
+  const file=path.join(AGENTS_DIR,`${agent}.yaml`);
+  if(!fs.existsSync(file))throw Error(`Unknown agent: ${agent} (no card at modules/models/agents/${agent}.yaml)`);
+  return readYamlFile(file);
+}
+
+/**
+ * Load one provider's contract docs from the new tree. Host documents come from
+ * `modules/host/<provider>/*.yaml` keyed by file stem (`index`, `api`, `calls`,
+ * `envelopes`, ...); `adapters` holds the agent cards that provider can launch —
+ * for the Orca host that is every card in modules/models/agents/, for any other
+ * provider the `<provider>.yaml` card when one exists.
+ */
 export function loadProviderContract(provider){
-  const catalog=sourceYaml('providers','catalog.yaml');
-  const entry=catalog?.providers?.[provider];
-  if(!plain(entry))throw Error(`Unknown provider: ${provider}`);
-  const loaded={catalog};
-  for(const [name,reference] of Object.entries(entry)){
-    if(name==='adapters'){
-      loaded.adapters={};
-      for(const [adapter,adapterReference] of Object.entries(reference))loaded.adapters[adapter]=readProviderRef(adapterReference);
-    }else loaded[name]=readProviderRef(reference);
+  if(typeof provider!=='string'||!provider||provider.includes('..')||provider.includes('/')||provider.includes('\\'))
+    throw Error(`Invalid provider name: ${provider}`);
+  const hostDir=path.join(skillRoot,'modules','host',provider);
+  const loaded={};
+  for(const name of yamlFilesIn(hostDir))loaded[path.basename(name).replace(/\.ya?ml$/i,'')]=readYamlFile(path.join(hostDir,name));
+  loaded.adapters={};
+  const cardNames=provider==='orca'?yamlFilesIn(AGENTS_DIR).map(name=>name.replace(/\.ya?ml$/i,'')):[provider];
+  for(const agent of cardNames){
+    const file=path.join(AGENTS_DIR,`${agent}.yaml`);
+    if(fs.existsSync(file))loaded.adapters[agent]=readYamlFile(file);
   }
+  if(!Object.keys(loaded).some(key=>key!=='adapters')&&!Object.keys(loaded.adapters).length)
+    throw Error(`Unknown provider: ${provider} (no modules/host/${provider}/ docs and no agent card)`);
   return loaded;
 }
 
-/** Validate the executable provider tree before an operation launch is planned. */
+/** Validate the provider contract tree before an operation launch is planned. */
 export function validateProviderContracts(){
   const errors=[];
-  const catalog=sourceYaml('providers','catalog.yaml');
-  add(errors,catalog?.schema==='starci/provider-catalog@1','Unsupported provider catalog');
-  add(errors,catalog?.selection?.orchestrated==='orca','Orchestrated mode must resolve to Orca');
-  add(errors,Array.isArray(catalog?.selection?.solo)&&['codex','claude','orca'].every(value=>catalog.selection.solo.includes(value)),'Solo provider selection is incomplete');
-  let orca,codex,claude;
-  try{orca=loadProviderContract('orca');codex=loadProviderContract('codex');claude=loadProviderContract('claude');}
-  catch(error){errors.push(error.message);return {ok:false,errors};}
 
-  add(errors,orca.index?.schema==='starci/orca-provider@1','Missing Orca provider index');
-  add(errors,orca.index?.names?.workflowWorktree==='[Workflow] <Workflow>','Invalid Orca workflow worktree name');
-  add(errors,orca.index?.names?.workflowKernel==='[Kernel] <Workflow>','Invalid Orca workflow kernel name');
-  add(errors,orca.index?.names?.operationAgent==='[Op] <operation> - <scope>','Invalid Orca operation name');
-  // 5.0 has a kernel and operation agents; a provider contract that still declares a supervisor layer is stale.
-  add(errors,!orca.index?.planCoordinator&&!orca.index?.workflowMonitor,'Orca provider index still declares a retired supervisor layer');
-  add(errors,plain(orca.index?.workflowKernel?.calls?.waitOperationBoundary)&&orca.index.workflowKernel.role==='one-local-process-per-workflow-in-the-workflow-worktree','Orca workflow kernel contract is invalid');
-  add(errors,orca.index?.environmentBinding?.currentRuntime==='omit---on','Current Orca runtime must omit --on');
-  add(errors,orca.index?.environmentBinding?.namedRuntimeAuthority==='live-runtime-inventory-only','Named Orca runtime must come from live inventory');
-  add(errors,orca.index?.operationAgent?.admission?.expectedOperation==='approved-goal-operation','Orca operation admission must bind an operation of the approved goal');
-  add(errors,orca.index?.operationAgent?.admission?.providerSelection==='profiles-registry-resolver-output','Orca operation admission must use the profile resolver');
-  add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.api==='orchestration.worker-show','Orca provider attestation must use worker-show');
-  add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.beforeEffectAcceptance==='required','Orca provider attestation must precede effect acceptance');
-  add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.canonicalizeTitle?.renameApi==='terminal.rename'&&orca.index?.operationAgent?.admission?.afterWorkerStart?.canonicalizeTitle?.verifyApi==='orchestration.worker-show','Orca operation title canonicalization sequence is invalid');
-  add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.runtimeTitleDrift?.whenImmutableIdentityRemainsExact==='recanonicalize-without-fencing'&&orca.index?.operationAgent?.admission?.afterWorkerStart?.runtimeTitleDrift?.effectDecision==='never-reject-solely-for-title-drift','Orca runtime title-drift policy is invalid');
-  add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.onlyTrigger==='active implementation secondary_request','Architecture sidearm trigger is too broad');
-  add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.exactReason==='sds-technical-gap','Architecture sidearm reason is invalid');
-  add(errors,orca.index?.operationAgent?.canonicalLauncher?.module==='scripts/kernel/api.mjs'&&orca.index?.operationAgent?.canonicalLauncher?.command==='dispatch'&&orca.index?.operationAgent?.canonicalLauncher?.authority==='exclusive-effectful-construction-path','Orca operation launcher contract is invalid');
-  add(errors,/terminal send/.test(orca.index?.routing?.kernelToOperation?.cli||'')&&orca.index?.routing?.kernelToOperation?.forbiddenType==='status'&&orca.index?.routing?.kernelToOperation?.proveDeliveryFrom==='terminal-screen-not-send-receipt','Kernel-to-operation control must be a proven terminal send, never a status message');
-  add(errors,orca.index?.routing?.operationToKernel?.authority==='report-file-then-signal'&&orca.index?.routing?.operationToKernel?.onceOnly===true,'An operation must answer exactly once, in its report file');
-  add(errors,orca.index?.routing?.operationToOperation==='forbidden','An operation must never control another operation');
-  const commands=orca.api?.publicCommands;
-  add(errors,Array.isArray(commands)&&commands.length===orca.api?.snapshot?.observedCommandCount,'Orca API inventory count mismatch');
-  add(errors,Array.isArray(commands)&&new Set(commands).size===commands.length,'Orca API inventory contains duplicates');
-  const publicCommands=new Set(commands||[]);
-  for(const [role,allowlist] of Object.entries(orca.api?.starciOrchestrationAllowlist||{})){
-    add(errors,Array.isArray(allowlist),`Invalid Orca ${role} allowlist`);
-    for(const command of allowlist||[])add(errors,publicCommands.has(command),`Unknown Orca command in ${role} allowlist: ${command}`);
+  // 1. Every agent card parses, carries the agent-card schema id and attests an
+  //    `agent` identity equal to its file stem.
+  add(errors,fs.existsSync(AGENTS_DIR),'Agent card directory is missing: modules/models/agents/');
+  const cardNames=yamlFilesIn(AGENTS_DIR).map(name=>name.replace(/\.ya?ml$/i,''));
+  add(errors,cardNames.length>0,'No agent cards under modules/models/agents/');
+  const cards={};
+  for(const agent of cardNames){
+    const rel=`modules/models/agents/${agent}.yaml`;
+    let card=null;
+    try{card=readYamlFile(path.join(AGENTS_DIR,`${agent}.yaml`));}
+    catch(error){errors.push(`Agent card ${rel} does not parse: ${error.message}`);continue;}
+    cards[agent]=card;
+    add(errors,card?.schema===AGENT_CARD_SCHEMA,`Agent card ${rel} must declare schema: ${AGENT_CARD_SCHEMA}`);
+    add(errors,card?.agent===agent,`Agent card ${rel} agent field must equal its file stem '${agent}'`);
   }
-  const calls=orca.calls;
-  add(errors,calls?.schema==='starci/orca-calls@1','Missing Orca calls contract');
-  add(errors,calls?.envelope?.schema==='starci/orca-call-result@1','Orca calls contract must emit starci/orca-call-result@1');
-  add(errors,calls?.idempotency?.flag==='retry-request','Orca mutations must carry retry-request on unknown results');
-  const forbiddenCommands=new Set([...(calls?.forbiddenCalls||[]),...(orca.api?.forbiddenForStarciOrchestration||[])]);
-  for(const [name,call] of Object.entries(calls?.calls||{})){
-    add(errors,publicCommands.has(call?.command),`Orca call ${name} names an unknown command: ${call?.command}`);
-    add(errors,!forbiddenCommands.has(call?.command),`Orca call ${name} names a forbidden command: ${call?.command}`);
-    add(errors,['read','mutation'].includes(call?.kind),`Orca call ${name} has an invalid kind`);
-  }
-  for(const required of ['run-show','task-create','worker-start','worker-show','worker-stop','worker-release','worker-list','terminal-rename','check','send','worktree-set','worktree-show'])add(errors,plain(calls?.calls?.[required]),`Orca calls contract is missing ${required}`);
-  add(errors,(calls?.calls?.['worker-start']?.forbidden||[]).includes('terminal')&&(calls?.calls?.['worker-start']?.forbidden||[]).includes('on'),'worker-start must forbid --terminal and --on');
-  add(errors,Array.isArray(calls?.calls?.['worker-start']?.classify)&&calls.calls['worker-start'].classify.length>0,'worker-start must declare failure classification');
-  const qwen=orca.adapters?.qwen;
-  add(errors,qwen?.agent==='qwen','Missing Orca Qwen adapter');
-  add(errors,qwen?.kind==='command-terminal-agent','Qwen adapter must launch a command terminal');
-  add(errors,qwen?.model==='qwen3.8-flash'&&qwen?.modelMarker==='qwen3.8-flash','Qwen adapter must attest Qwen 3.8 Flash from the rendered footer');
-  add(errors,typeof qwen?.credentialRefresh?.envKey==='string'&&/^[A-Z0-9_]+$/.test(qwen.credentialRefresh.envKey)&&typeof qwen?.credentialRefresh?.win32==='string'&&typeof qwen?.credentialRefresh?.posix==='string'&&!/sk-|Bearer|=\S{20,}/.test(qwen.credentialRefresh.win32+qwen.credentialRefresh.posix),'Qwen credential refresh must name only the variable and never carry a value');
-  add(errors,typeof qwen?.readiness?.screenPattern==='string'&&qwen?.readiness?.timeoutMs>=30000,'Qwen readiness contract is invalid');
-  add(errors,typeof qwen?.submission?.stagedPattern==='string'&&typeof qwen?.submission?.activityPattern==='string'&&qwen?.submission?.maxEnter===2,'Qwen submission contract is invalid');
-  add(errors,qwen?.start?.length===6&&qwen.start[0]?.api==='terminal.create'&&qwen.start[1]?.api==='terminal.read'&&qwen.start[2]?.api==='orchestration.dispatch'&&qwen.start[2]?.binding==='return-preamble'&&qwen.start[3]?.api==='terminal.send'&&qwen.start[4]?.api==='terminal.read'&&qwen.start[5]?.api==='orchestration.dispatch-show','Qwen adapter start sequence is invalid');
-  add(errors,qwen?.forbidden?.includes('qwen-agent-tool')&&qwen?.forbidden?.includes('dispatch-inject')&&qwen?.forbidden?.includes('reuse-existing-terminal'),'Qwen adapter does not forbid nested agents, inject or terminal reuse');
-  add(errors,orca.index?.operationAgent?.qwen38Flash?.launch==='command-terminal','Orca index must launch Qwen as a command terminal');
-  add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.model,'Orca index and Qwen adapter identities disagree');
-  const devin=orca.adapters?.devin;
-  add(errors,devin?.agent==='devin'&&devin?.kind==='command-terminal-agent','Missing Orca Devin command-terminal adapter');
-  add(errors,devin?.model==='devin-agent'&&devin?.modelAuthority==='configured-logical-runtime','Devin must not infer the account-selected underlying model');
-  add(errors,typeof devin?.commandPrefix?.win32==='string'&&typeof devin?.commandPrefix?.posix==='string'&&!/cog_|Bearer|DEVIN_API_KEY=/.test(devin.commandPrefix.win32+devin.commandPrefix.posix),'Devin auth preflight must use stored CLI credentials and never embed a token');
-  add(errors,typeof devin?.readiness?.screenPattern==='string'&&typeof devin?.readiness?.identityPattern==='string'&&devin?.readiness?.timeoutMs>=30000,'Devin readiness contract is invalid');
-  add(errors,devin?.forbidden?.includes('provider-native-subagent')&&devin?.forbidden?.includes('cloud-handoff')&&devin?.forbidden?.includes('inferred-underlying-model'),'Devin adapter must forbid nested/cloud handoff and inferred model identity');
-  add(errors,orca.index?.operationAgent?.devin?.launch==='command-terminal'&&orca.index?.operationAgent?.devin?.capacityAuthority==='explicit-workflow-quota'&&orca.index?.operationAgent?.devin?.quotaTelemetry==='launch-status','Orca index must keep Devin closed until explicit workflow capacity exists');
-  add(errors,orca.index?.operationAgent?.devin?.agent===devin?.agent&&orca.index?.operationAgent?.devin?.model===devin?.model,'Orca index and Devin adapter identities disagree');
-  for(const [name,target] of Object.entries(sourceYaml('modules','models','registry.yaml').targets||{})){
-    if(target?.orcaLaunch?.kind!=='command-terminal')continue;
-    const adapterName=target.orcaLaunch.adapter,adapter=orca.adapters?.[adapterName];
-    add(errors,typeof adapterName==='string'&&plain(adapter),`Command terminal ${name} must name a declared Orca adapter`);
-    add(errors,target.orcaLaunch.nestedAgents==='forbidden',`Command terminal ${name} must forbid provider-native nested agents`);
-    if(adapterName==='devin'){
-      add(errors,target.orcaLaunch.capacityGate==='explicit-workflow-quota',`Command terminal ${name} must require explicit workflow capacity`);
-      add(errors,Array.isArray(target.executionHosts)&&target.executionHosts.length===1&&target.executionHosts[0]==='orca',`Command terminal ${name} must be confined to the Orca host`);
+
+  // 2. Every host contract document under modules/host/<provider>/ parses —
+  //    orca is required (the orchestrated host); claude/codex host docs validate
+  //    the same way when present.
+  add(errors,fs.existsSync(HOSTS_DIR),'Host contract directory is missing: modules/host/');
+  const hosts=fs.existsSync(HOSTS_DIR)
+    ?fs.readdirSync(HOSTS_DIR,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort()
+    :[];
+  add(errors,hosts.includes('orca'),'Orca host contract directory is missing: modules/host/orca/');
+  for(const host of hosts){
+    const docs=yamlFilesIn(path.join(HOSTS_DIR,host));
+    add(errors,docs.length>0,`No host contract documents under modules/host/${host}/`);
+    for(const name of docs){
+      try{readYamlFile(path.join(HOSTS_DIR,host,name));}
+      catch(error){errors.push(`Host document modules/host/${host}/${name} does not parse: ${error.message}`);}
     }
-    for(const required of adapter?.commandRequirements??[])add(errors,typeof required==='string'&&(target.orcaLaunch.command||'').includes(required),`Command terminal ${name} is missing required command fragment: ${required}`);
-  }
-  const workerStartTemplates=[
-    orca.index?.operationAgent?.managedFallback?.calls?.startAgent?.cli,
-    codex.index?.orcaManagedForm?.start?.cli,
-    claude.index?.orcaManagedForm?.start?.cli
-  ];
-  for(const cli of workerStartTemplates){
-    add(errors,typeof cli==='string'&&!/--on\s+(?:windows|macos|linux)(?:\s|$)/i.test(cli),'Worker-start template contains a literal environment label');
   }
 
-  add(errors,codex.api?.schema==='starci/codex-api@1','Missing Codex provider API');
-  const codexCalls=Object.values(codex.api?.collaborationApi||{}).map(value=>value?.call);
-  for(const call of ['collaboration.spawn_agent','collaboration.followup_task','collaboration.send_message','collaboration.interrupt_agent','collaboration.list_agents','collaboration.wait_agent'])add(errors,codexCalls.includes(call),`Missing Codex collaboration API: ${call}`);
-  add(errors,codex.index?.modes?.orchestratedHost?.supported===false,'Codex must not host orchestrated mode');
-  add(errors,codex.index?.orcaManagedForm?.environmentBinding?.currentRuntime==='omit---on','Codex Orca form must omit --on for the current runtime');
+  // 3. Every adapter reference resolves to a real agent card — model profiles
+  //    (launch.orca.adapter) and the registry's orcaLaunch.adapter alike.
+  const profileFiles=yamlFilesIn(PROFILES_DIR);
+  for(const name of profileFiles){
+    const rel=`modules/models/profiles/${name}`;
+    let profile=null;
+    try{profile=readYamlFile(path.join(PROFILES_DIR,name));}
+    catch(error){errors.push(`Model profile ${rel} does not parse: ${error.message}`);continue;}
+    const adapter=profile?.launch?.orca?.adapter;
+    if(adapter!==undefined)
+      add(errors,typeof adapter==='string'&&Object.hasOwn(cards,adapter),`Profile ${rel} names unknown agent card: ${adapter}`);
+    if(profile?.launch?.orca?.kind==='command-terminal')
+      add(errors,typeof adapter==='string'&&adapter.length>0,`Command-terminal profile ${rel} must declare launch.orca.adapter`);
+  }
+  let registry=null;
+  try{registry=fs.existsSync(REGISTRY_FILE)?readYamlFile(REGISTRY_FILE):null;}
+  catch(error){errors.push(`modules/models/registry.yaml does not parse: ${error.message}`);}
+  for(const [name,target] of Object.entries(registry?.targets||{})){
+    const adapter=target?.orcaLaunch?.adapter;
+    if(adapter!==undefined)
+      add(errors,typeof adapter==='string'&&Object.hasOwn(cards,adapter),`Registry target ${name} names unknown agent card: ${adapter}`);
+  }
 
-  add(errors,claude.api?.schema==='starci/claude-api@1','Missing Claude provider API');
-  add(errors,claude.api?.subagentApi?.task?.call==='Task','Claude operation API must be Task');
-  add(errors,claude.api?.unavailableAssumptions?.Agent===false&&claude.api?.unavailableAssumptions?.AgentOutput===false,'Claude invented-agent guards are missing');
-  add(errors,claude.index?.modes?.orchestratedHost?.supported===false,'Claude must not host orchestrated mode');
-  add(errors,claude.index?.orcaManagedForm?.environmentBinding?.currentRuntime==='omit---on','Claude Orca form must omit --on for the current runtime');
   return {ok:errors.length===0,errors};
 }
 
@@ -143,7 +133,7 @@ export function requireProviderContracts(){
 
 /** Checks entry: `node scripts/checks/providers.mjs` prints the validation report as JSON. */
 export function providersMain(argv=[]){
-  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/providers-check-help@1',help:'Usage: node scripts/checks/providers.mjs\n\nValidates the executable provider tree (providers/ + modules/models/registry.yaml). Prints deterministic JSON. Exit 0 is valid, 1 reports contract errors.'}};
+  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/providers-check-help@1',help:'Usage: node scripts/checks/providers.mjs\n\nValidates the provider contract tree (modules/models/agents/*.yaml agent cards, modules/host/<provider>/*.yaml host documents, and the adapter references in modules/models/profiles/*.yaml and registry.yaml). Prints deterministic JSON. Exit 0 is valid, 1 reports contract errors.'}};
   const result=validateProviderContracts();
   return {exitCode:result.ok?0:1,report:{schema:'starci/providers-check-report@1',...result}};
 }

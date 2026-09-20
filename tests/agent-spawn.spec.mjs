@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {buildSpawnCommand,loadAdapter} from '../scripts/agent/lib.mjs';
 
 // Lane m13: pure command assembly — no real orca spawn. The contract under
-// test: provider differences are DATA (providers/orca/adapters/<name>.yaml) and
+// test: agent differences are DATA (modules/models/agents/<name>.yaml) and
 // the card's bypass flags (qwen --yolo, devin --permission-mode dangerous) can
-// never be forgotten because no caller assembles a provider command by hand.
+// never be forgotten because no caller assembles an agent command by hand.
 
 test('qwen op command carries the credential-refresh prefix and --yolo',()=>{
   const r=buildSpawnCommand({provider:'qwen'});
@@ -13,7 +13,7 @@ test('qwen op command carries the credential-refresh prefix and --yolo',()=>{
   // The env-key name is platform-proof: win32 says Remove-Item Env:NAME, posix says unset NAME.
   assert.match(r.command,/BAILIAN_TOKEN_PLAN_API_KEY/,'credentialRefresh prefix missing — a stale key 401s qwen');
   assert.match(r.command,/--yolo\b/,'qwen without --yolo stalls on per-kind permission menus');
-  assert.equal(r.commandSource,'providers/orca/adapters/qwen.yaml');
+  assert.equal(r.commandSource,'modules/models/agents/qwen.yaml');
 });
 
 test('devin kernel command uses kernelCommandRequirements (dangerous)',()=>{
@@ -43,13 +43,13 @@ test('an explicit command override still gets the card prefix (ACP strip)',()=>{
 test('unknown provider returns a typed error, never a partial command',()=>{
   const r=buildSpawnCommand({provider:'no-such-agent'});
   assert.equal(typeof r.error,'string');
-  assert.match(r.error,/no adapter card/);
+  assert.match(r.error,/no (?:adapter|agent) card/);
   assert.equal(r.command,undefined);
 });
 
 test('loadAdapter names the card file it parsed',()=>{
   const r=loadAdapter('qwen');
   assert.ok(!r.error,r.error);
-  assert.equal(r.file,'providers/orca/adapters/qwen.yaml');
+  assert.equal(r.file,'modules/models/agents/qwen.yaml');
   assert.equal(r.card.kind,'command-terminal-agent');
 });

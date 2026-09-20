@@ -112,9 +112,9 @@ schemaToSchema:
      source: "modules/schemas/spec/contract.schema.yaml compatibilityBusinessV3.legacy"}
 
   # --- providers -------------------------------------------------------------
-  - {from: orca-call, to: "providers/orca/calls.yaml", type: governs,
-     note: "calls.yaml carries schema: starci/orca-calls@1; envelope must emit starci/orca-call-result@1. The schema file itself relocates beside providers/orca/ (R2 §2) — pending the providers lane.",
-     source: "providers/orca/calls.yaml; scripts/checks/providers.mjs"}
+  - {from: orca-call, to: "modules/host/orca/calls.yaml", type: governs,
+     note: "calls.yaml carries schema: starci/orca-calls@1; envelope must emit starci/orca-call-result@1. The schema file itself relocates beside modules/host/orca/ (R2 §2) — pending the providers lane.",
+     source: "modules/host/orca/calls.yaml; scripts/checks/providers.mjs"}
   - {from: profile-registry-v3, to: "modules/models/registry.yaml", type: governs,
      note: "registry.yaml carries schema: starci/profile-registry@3",
      source: "modules/models/registry.yaml:1"}
@@ -169,9 +169,9 @@ schemaToSubsystem:
     schemas: [stacks-layout, application-stacks]
     note: "tree half + content half of one stack contract."
 
-  providers:        # host/provider call contracts
+  host:             # host call contracts
     schemas: [orca-call]
-    note: "relocates beside providers/orca/ (R2 §2) — pending the providers lane; cataloged here until then."
+    note: "relocates beside modules/host/orca/ (R2 §2); cataloged here until then."
 
   model:            # model/runtime registry
     schemas: [profile-registry-v3]

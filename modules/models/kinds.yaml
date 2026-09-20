@@ -33,7 +33,7 @@ vocabularies:
   # runs only on a host that declares it: the Orca IDE declares `design-tool` (the drawing tooling behind
   # `interface.draw`), a plain chat host driving the kernel through its session -
   # declares nothing. A kind without `needs` runs on every host. Keep this list in step with the
-  # capabilities declared in `providers/orca/adapters/*.yaml` and the plain-chat monitor `skills/workflow-chat/`.
+  # capabilities declared in `modules/models/agents/*.yaml` and the plain-chat monitor `skills/workflow-chat/`.
   capabilities: [design-tool]
   # What an operation is handed beside its records, declared per kind as `knowledge`, `checks` and `stacks`
   # ref lists and resolved by the kernel to concrete paths and digests - never a repo dump. `knowledge`

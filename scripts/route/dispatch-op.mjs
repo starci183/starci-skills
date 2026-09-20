@@ -14,11 +14,11 @@
 //
 // Spawn path reconciled with the REAL orca CLI (verified live, 2026-09):
 //   orca terminal create --worktree <selector> --title "[Op] <id>" --command "<text>" --json
-//     -> result.terminal.handle   (providers/orca/calls.yaml terminal-create)
+//     -> result.terminal.handle   (modules/host/orca/calls.yaml terminal-create)
 //   orca terminal send --terminal <handle> --text "<prompt>" --enter --json
 //   Command-terminal launch only (qwen/devin profiles); managed-agent profiles
 //   (claude/codex) launch through `orca orchestration worker-start` and refuse
-//   --spawn here — see providers/orca/index.yaml managedFallback.
+//   --spawn here — see modules/host/orca/index.yaml managedFallback.
 //
 // CLI:
 //   node scripts/route/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
@@ -197,7 +197,7 @@ function main() {
     ]
     : [
       { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<operation-task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--model', '<resolved-model-id>', '--json'],
-        note: `${model.target} launches as a managed agent (profile launch.orca.kind=${model.kind}) — providers/orca/index.yaml managedFallback; needs an orchestration Task id, not terminal create` },
+        note: `${model.target} launches as a managed agent (profile launch.orca.kind=${model.kind}) — modules/host/orca/index.yaml managedFallback; needs an orchestration Task id, not terminal create` },
     ];
 
   const result = {

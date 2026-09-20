@@ -59,9 +59,9 @@ node scripts/agent/health.mjs ...  # readiness/activity probe
 node scripts/agent/kill.mjs ...    # close a worker terminal
 ```
 
-Provider flags always come from the adapter card
-(`providers/orca/adapters/<provider>.yaml`); callers never type
-`--yolo`/`--dangerously-skip-permissions` themselves. See [providers](providers.md).
+Agent flags always come from the agent card
+(`modules/models/agents/<agent>.yaml`); callers never type
+`--yolo`/`--dangerously-skip-permissions` themselves. See [host contract](host-contract.md).
 
 ## Checks (`node scripts/checks/*`)
 

@@ -1,20 +1,46 @@
-# Providers — adapter cards
+# Host contract — Orca calls and agent cards
 
-Everything StarCi knows about a coding-agent provider is **data** under
-`providers/`; the mechanism (`scripts/agent/lib.mjs`) is provider-blind. The
-contract an op or kernel is spawned through is the **adapter card**:
-`providers/orca/adapters/<provider>.yaml` (schema
-`starci/orca-agent-adapter@1`). Shipped cards: `devin`, `qwen`, `claude`,
-`codex`.
+Everything StarCi knows about driving a coding agent on the Orca host is
+**data** under `modules/`; the mechanism (`scripts/agent/lib.mjs`,
+`scripts/api/orca/`) is agent-blind. There is no `providers/` registry: the
+host contract and the per-agent cards are two ordinary module trees.
 
-The invariant: **no caller ever assembles a provider command by hand.**
+## `modules/host/orca/` — the typed host contract
+
+`modules/host/orca/` is the typed contract behind every
+`scripts/api/orca/` wrapper and every orchestrated call StarCi issues:
+
+| Document | Contents |
+| --- | --- |
+| `index.yaml` | Hierarchy names (`[Kernel] <Workflow>`, `[Op] <operation> - <scope>`), environment binding, kernel and operation-agent call templates, routing rules, forbidden calls |
+| `api.yaml` | The observed `orca agent-context` public-command inventory and the StarCi orchestration allowlist |
+| `calls.yaml` | One typed entry per Orca call (`command`, `kind`, `flags`, `required`, `receipt`) plus the result-envelope and idempotency rules |
+| `capabilities.yaml` | Supported host modes, roles and agent forms |
+| `recipes.yaml` | Lifecycle sequences built from the typed calls |
+| `validation.yaml` | Live-discovery and preflight contract — compare against `orca agent-context --json` and fail closed on mismatch |
+| `envelopes.yaml` | The operation-input / report envelopes exchanged with agents |
+
+`calls.yaml` is an **enforced** contract, not documentation:
+`tests/provider-orca.spec.mjs` proves every `scripts/api/orca/terminal-*.mjs`
+wrapper's verb and `--flag` set is declared by a `calls:` entry, and every
+entry names a real, allowed command from `api.yaml`.
+
+## `modules/models/agents/` — per-agent spawn cards
+
+The contract an op or kernel is spawned through is the **agent card**:
+`modules/models/agents/<agent>.yaml` (schema `starci/agent-card@1`) — the
+old Orca adapter-card fields at top level plus an optional `capabilities:`
+key for agent-specific provider facts. Shipped cards: `devin`, `qwen`,
+`claude`, `codex`.
+
+The invariant: **no caller ever assembles an agent command by hand.**
 `--yolo`, `--dangerously-skip-permissions`, credential prefixes and env strips
 live only in the card, so they can never be forgotten.
 
 ## Card anatomy
 
 ```yaml
-schema: starci/orca-agent-adapter@1
+schema: starci/agent-card@1
 agent: devin                     # binary/identity name
 kind: command-terminal-agent     # how the host drives it
 model: devin-agent               # logical model label (never inferred)
@@ -74,11 +100,14 @@ knownFailures:                   # observed signals → meaning → action, date
 verifiedAt: 2026-09-20           # when this card was last proven live
 verifiedAgainst: 'devin CLI v3000.10.27'
 
-forbidden:                       # things this provider must never be asked for
+forbidden:                       # things this agent must never be asked for
   - provider-native-subagent
   - reuse-existing-terminal
   - unsupervised-retain-as-success
   - inferred-underlying-model
+
+capabilities:                    # optional — agent-specific provider facts
+  …
 ```
 
 ## How `scripts/agent` consumes a card
@@ -88,7 +117,7 @@ mechanism (`spawnAgent({provider, worktree, title, prompt|promptFile, command,
 kernel})`):
 
 ```text
-loadAdapter(provider)            → parse providers/orca/adapters/<provider>.yaml
+loadAdapter(provider)            → parse modules/models/agents/<agent>.yaml
 buildSpawnCommand(...)           → credentialRefresh[plat] + commandPrefix[plat]
                                    + command | commandRequirements
                                    (kernel → kernelCommandRequirements;
@@ -106,19 +135,9 @@ failure means the job is **not** running — the reservation is settled and the
 terminal closed (`spawn-failed`), never a ghost lease. `settle` closes the
 worker terminal via the card's `release` block.
 
-## The wider provider tree
+## Checklist for a new agent card
 
-The adapter card is the spawn contract; sibling files are provider facts used
-for validation and routing: `providers/catalog.yaml` (host-mode router +
-contract references), `providers/<name>/{index,capabilities,api,recipes,validation}.yaml`,
-`providers/common/envelopes.yaml`, and `providers/validate.mjs` (fail-closed
-cross-contract validation). Provider facts are data only — resolve live
-command signatures from the provider's own runtime output immediately before
-effects and fail closed on mismatch.
-
-## Checklist for a new provider
-
-1. Add `providers/orca/adapters/<name>.yaml` with every field above — a card
+1. Add `modules/models/agents/<name>.yaml` with every field above — a card
    without `commandRequirements` (or `terminalFallback`) yields no command and
    refuses.
 2. Prove `readiness` and `submission` patterns against the real TUI; record
@@ -128,3 +147,6 @@ effects and fail closed on mismatch.
    kernel lane genuinely needs them — and justify in `kernelPermissionReason`.
 4. Declare the `forbidden` list honestly; `spawnAgent` and the kernel packet
    enforce it.
+5. If the card drives Orca calls the wrappers do not cover yet, extend
+   `modules/host/orca/calls.yaml` in the same change — the parity spec fails
+   on any wrapper flag the contract does not declare.

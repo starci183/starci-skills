@@ -51,7 +51,7 @@ spawn:
     (routedBy: override).
   command: >-
     spawn flags from the provider adapter card
-    providers/orca/adapters/<provider>.yaml — commandPrefix/credentialRefresh
+    modules/models/agents/<provider>.yaml — commandPrefix/credentialRefresh
     [platform] + kernelCommandRequirements when declared (Devin uses dangerous
     mode only for its dedicated kernel terminal so API commands cannot stall),
     otherwise commandRequirements (qwen --yolo + credential refresh, Devin

@@ -62,5 +62,5 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
 - No runtime state under `.starciwork/_local/`: the durable ledger is
   `<repo>/.starciwork/runtime.sqlite` only, and dispatch artifacts are
   delivered then removed (or staged in the OS temp dir) — never left there.
-- Spawn flags come from `.claude/providers/orca/adapters/<provider>.yaml` —
+- Spawn flags come from `.claude/modules/models/agents/<agent>.yaml` —
   never improvise flags.

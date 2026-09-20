@@ -12,12 +12,12 @@ liveDiscovery:
 preflight:
   - orca status --json
   - orca agent-context --json
-  - node hosts/orca/launch.mjs verify
+  - node scripts/checks/providers.mjs
   - orca skills get orca-cli --json
   - orca skills get orchestration --json
 callContract:
   file: calls.json
-  runner: hosts/orca/calls.mjs
+  runner: scripts/api/orca/*.mjs (one wrapper per verb over shared lib.mjs)
   envelope: starci/orca-call-result@1
   rules:
     - Every argv StarCi issues is built from calls.json; prose templates in index.json are documentation of the same calls, never a second construction path.
@@ -71,8 +71,8 @@ receipts:
       - terminal-rename-to-canonical-op-name
       - record-ui-defect-if-terminal-is-no-longer-writable
 dispatchAssertions:
-  - The workflow kernel invokes hosts/orca/launch.mjs start-op; it never composes task-create, worker-start, candidate fallback or terminal naming calls itself.
-  - One start-op invocation owns the whole attempt: it tries the allocated candidate when the kernel supplies one, otherwise it walks the resolved chain, and the kernel never re-invokes start-op for the same attempt to obtain a fallback.
+  - The workflow kernel invokes scripts/kernel/api.mjs dispatch; it never composes task-create, worker-start, candidate fallback or terminal naming calls itself.
+  - One dispatch invocation owns the whole attempt: it tries the allocated candidate when the kernel supplies one, otherwise it walks the resolved chain, and the kernel never re-invokes dispatch for the same attempt to obtain a fallback.
   - A runtime that cannot launch is released, classified and cooled down by the runtime allocator, which then names another runtime; there is no supervisor to replace and no layer to recover.
   - The workflow worktree is attested with worktree show to be the exact filesystem path the kernel runs in before any operation Task is created.
   - A worktree whose resolved path is null, stale or different stops dispatch; orchestration Task membership alone never substitutes for Orca worktree identity.

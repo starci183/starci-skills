@@ -16,7 +16,7 @@ StarCi provides:
   `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
   through `node scripts/kernel/api.mjs <survey|status|plan|enqueue|dispatch|settle|incident|retire>`.
 - **Ephemeral op agents:** `api dispatch` spawns one short-lived `[Op]` agent per job through the
-  provider adapter cards (`providers/`). Adapter flags are injected by the spawner — the kernel
+  per-agent cards (`modules/models/agents/`). Adapter flags are injected by the spawner — the kernel
   cannot forget them; `settle` records the verdict and closes the worker.
 - **Contracts as data:** goals, kernel loop, op manifests, model routing and quality gates are YAML
   under `modules/` — mechanism code stays under `engine/` and `scripts/`.
@@ -92,7 +92,7 @@ engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config
 scripts/            executables — kernel/api.mjs, kernel/start-workflow.mjs, goal/, route/,
                     agent/, checks/, context/, example/, install/
 bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal
-providers/          provider facts + adapter cards (data only)
+modules/host/       per-host contracts — orca call surface (data only)
 skills/             user-facing skills — define-goal, start-kernel, computer-use, orca-cli,
                     orchestration, workflow-chat
 init/               AGENTS.md bootstrap template
@@ -124,7 +124,7 @@ directly, e.g. `node .claude/scripts/checks/check-stales.mjs` — there is no wr
 - [Architecture: kernel agent, api gate, op agents, ledger](docs/architecture.md)
 - [Ledger schema and access rules](docs/ledger-db.md)
 - [Writing an op manifest](docs/ops.md)
-- [Provider adapter cards](docs/providers.md)
+- [Host contracts and agent cards](docs/host-contract.md)
 - [CLI and script reference](docs/cli.md)
 - [Build, test, package and release](docs/releasing.md)
 - [The todo-app standard example](docs/examples/todo-app-standard.md)
