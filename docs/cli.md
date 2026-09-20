@@ -20,8 +20,9 @@ workflow command line — the kernel agent drives work through
 
 Flags: `--no-bootstrap` leaves host entry files untouched; `--force` permits
 overwriting locally changed runtime files (review and back up first);
-`--upgrade-major` opts into an incompatible major update; `--quick` limits
-doctor to its selected checks.
+`--quick` limits doctor to its selected checks. An install recorded under a
+different protocol is not upgraded in place — remove `.claude` by hand and
+re-run `init`.
 
 ## Goal and kernel lifecycle (`node scripts/*`)
 
@@ -31,11 +32,11 @@ node scripts/goal/define-goal.mjs --repo <path> --text "<owner prompt>" [--title
 node scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>"   # resolve via .workspaces
 
 # Claim a queued goal and spawn the ONE long-lived [Kernel] agent
-node scripts/kernel/start-workflow.mjs --repo <path> --goal <workflow_id> [--provider <name>]
-# without --goal: claims the oldest pending inbox goal
+node scripts/kernel/start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>]
+# without --goal: claims the earliest pending inbox goal
 
-# The kernel's only ledger gate — eight verbs
-node scripts/kernel/api.mjs <survey|status|plan|enqueue|dispatch|settle|incident|retire> --repo <path> [...]
+# The kernel's only ledger gate — thirteen verbs
+node scripts/kernel/api.mjs <survey|status|hierarchy|plan|enqueue|route|dispatch|op-contract|report|consume-report|check|settle|incident|finish> --repo <path> [...]
 ```
 
 See [workflow-kernel](workflow-kernel.md) for the loop these calls serve.
@@ -74,8 +75,7 @@ node scripts/checks/check-stales.mjs --work <work-root> --repo <id>=<git-root> [
 node scripts/checks/acceptance.mjs ...                     # evidence-packet verdicts
 node scripts/checks/proof.mjs ...                          # proof verification
 node scripts/checks/check-entry.mjs <host>                 # installed-entry sanity
-node scripts/checks/work-layout.mjs ...                    # .starciwork layout conformance
-node scripts/checks/stacks.mjs ...                         # whole-app stack conformance
+scripts/checks/stacks.mjs                                  # whole-app stack conformance (library: checkApplicationStacks)
 ```
 
 Every check prints a typed JSON report (`starci/<name>-report@1`-style schema)

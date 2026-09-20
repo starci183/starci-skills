@@ -16,7 +16,7 @@ provenance:
     - https://docs.nestjs.com/techniques/validation
   limitations: Adopted Nest/TypeScript profile, not universal framework law. Historical Academy examples contain
     debt and do not override these revised rules. Existing profile-specific lint/source needs an authorized
-    coherent migration; runtime installation neither migrates product source nor refreshes proof. Static
+    coherent update; runtime installation neither modifies product source nor refreshes proof. Static
     checks do not establish behavior.
 rules:
   - id: BE-FOLDER-1
@@ -82,7 +82,7 @@ rules:
     kind: mandatory
     requirement: Domain error codes/types belong to the owning capability. Platform exceptions own generic error
       representation and transport mapping infrastructure; transport adapters own protocol response
-      projection. Existing centralized Academy errors are a legacy profile whose lint must be migrated
+      projection. Existing centralized Academy errors are an existing profile whose lint must be updated
       coherently before moving classes. Do not copy feature policy into a generic error module.
     rationale: Error mapping must not reverse dependencies or couple domain policy to HTTP/GraphQL.
     verification:

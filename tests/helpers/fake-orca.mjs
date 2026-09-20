@@ -6,7 +6,8 @@
 //
 // Every invocation appends {argv} to STARCI_FAKE_ORCA_LOG (JSONL) — the specs
 // prove no terminal/worker leaks from that call log. Mutable state lives in
-// STARCI_FAKE_ORCA_STATE (sends counter, last started worker agent/model).
+// STARCI_FAKE_ORCA_STATE (sends counter, terminal command/model, and last
+// started operation-worker agent/model).
 //
 // Env knobs:
 //   STARCI_FAKE_ORCA_MODE  'healthy' (default): terminal read shows the qwen
@@ -16,7 +17,9 @@
 //                          worker-start fails at stage 'auth'.
 //   STARCI_FAKE_ORCA_DEAD  comma-separated provider ids whose `account list`
 //                          rateLimits entry reads dead/not-authenticated —
-//                          drives the kernel-pin dead-probe fallthrough spec.
+//                          drives the kernel-pin fail-closed spec.
+//   STARCI_FAKE_ORCA_EFFECTIVE_MODEL overrides the model rendered by the
+//                          terminal for requested/effective mismatch coverage.
 export const FAKE_ORCA = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
 import fs from 'node:fs';
 const argv = process.argv.slice(2);
@@ -24,23 +27,32 @@ const log = process.env.STARCI_FAKE_ORCA_LOG;
 const stateFile = process.env.STARCI_FAKE_ORCA_STATE;
 const mode = process.env.STARCI_FAKE_ORCA_MODE || 'healthy';
 const deadProviders = new Set((process.env.STARCI_FAKE_ORCA_DEAD || '').split(',').map(s => s.trim()).filter(Boolean));
+const effectiveModelOverride = process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || null;
 if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
 const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : { sends: 0 };
 const save = () => { if (stateFile) fs.writeFileSync(stateFile, JSON.stringify(state)); };
 const arg = n => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : null; };
 const out = o => console.log(JSON.stringify(o));
 const fail = (o, code) => { console.log(JSON.stringify(o)); process.exit(code ?? 1); };
-// qwen card: readiness.screenPattern 'Type your message', identity 'qwen3.8-flash',
-// submission.activityPattern 'Thinking|esc to cancel|tokens'.
-const PROMPT = 'qwen3.8-flash\nType your message\n> ';
-const DEAD = 'qwen3.8-flash\nType your message\n\nERROR 401 Invalid API-key — key rejected upstream\n';
-const LIVE = 'Thinking hard\nesc to cancel\ntokens 96\n';
+const commandModel = command => {
+  const match = String(command || '').match(/(?:^|\s)(?:-m|--model)\s+["']?([^\s"']+)/i);
+  return match?.[1] ?? null;
+};
+const renderedModel = () => effectiveModelOverride || state.terminalModel || 'gpt-5.6-sol';
+const isQwen = () => /(?:^|\s)qwen(?:\.exe)?(?:\s|$)/i.test(String(state.terminalCommand || ''));
+const PROMPT = () => (isQwen() ? 'Qwen\nmodel: ' + renderedModel() + '\nType your message\n> ' : 'Codex\nmodel: ' + renderedModel() + '\nEnter a prompt\n> ');
+const DEAD = () => (isQwen() ? 'Qwen\nmodel: ' + renderedModel() + '\nType your message' : 'Codex\nmodel: ' + renderedModel() + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
+const LIVE = () => (isQwen() ? 'Qwen' : 'Codex') + '\nmodel: ' + renderedModel() + '\nThinking hard\nesc to interrupt\ntokens 96\n';
 const verb = argv.slice(0, 2).join(' ');
-if (verb === 'terminal create')
+if (verb === 'terminal create') {
+  state.terminalCommand = arg('command');
+  state.terminalModel = commandModel(state.terminalCommand);
+  save();
   out({ ok: true, result: { terminal: { handle: 'fake-terminal-1', title: arg('title'), connected: true, writable: true } } });
+}
 else if (verb === 'terminal read')
   out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-    screen: mode === 'auth' ? DEAD : (state.sends > 0 ? LIVE : PROMPT) } } });
+    screen: mode === 'auth' ? DEAD() : (state.sends > 0 ? LIVE() : PROMPT()) } } });
 else if (verb === 'terminal send') { state.sends += 1; save(); out({ ok: true, result: { sent: true } }); }
 else if (verb === 'terminal close') out({ ok: true, result: { closed: arg('terminal') } });
 else if (verb === 'terminal show')
@@ -48,8 +60,11 @@ else if (verb === 'terminal show')
 else if (verb === 'terminal rename')
   out({ ok: true, result: { terminal: { handle: arg('terminal'), title: arg('title') } } });
 // ---- orchestration verbs (managed-agent lifecycle) ----
-else if (verb === 'orchestration run-create')
+else if (verb === 'orchestration run-create') {
+  if (mode === 'run-create-error')
+    fail({ ok: false, error: { code: 'run_context_missing', message: 'No launcher context is bound' } });
   out({ ok: true, result: { run: { id: 'run-fake-1', objective: arg('objective') } } });
+}
 else if (verb === 'orchestration run-use')
   out({ ok: true, result: { run: { id: arg('id') } } });
 else if (verb === 'orchestration run-show')

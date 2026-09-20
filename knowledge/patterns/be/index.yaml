@@ -21,7 +21,7 @@ provenance:
   limitations: Historical reference-source observations preserved at the extraction commit; not a fresh audit of
     current repository conformance. Counts and file totals cited in rationale or cases are provenance from
     that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and
-    lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does
+    lint/test setup; verify reference conformance within approved .starciwork scope. Target existing code does
     not override the reference. Current business requirements and architecture belong to .starciwork; code
     patterns do not approve them.
 topics:

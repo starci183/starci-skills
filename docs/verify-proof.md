@@ -3,7 +3,7 @@
 `machineVerify` re-runs the checks an operation declares and refuses a `done` the kernel cannot reproduce.
 That settles one thing only: the checks pass at the operation's head. It does not show the behavior changed.
 An operation that writes `assert.equal(typeof double,'function')` and wires it into its check list is green
-forever, on the old code as well as the new. The missing half of the proof is the contrast: the spec the
+forever, on the pre-change code as well as the new. The missing half of the proof is the contrast: the spec the
 operation added must **fail before the change and pass after it**.
 
 `scripts/checks/proof.mjs` supplies that half. It never edits the operation's worktree, never commits, and
@@ -27,7 +27,7 @@ recorded rather than assumed.
 
 1. `git worktree add --detach <tmp> <baseHead>` into a fresh `mkdtemp` directory, so the base is a real
    checkout of the commit the operation started from, beside the live worktree rather than inside it.
-2. Only the changed **spec** files are copied into it - the new tests, the old code. Nothing else from the
+2. Only the changed **spec** files are copied into it - the new tests against the pre-change code. Nothing else from the
    operation's work crosses over; a spec that no longer exists is recorded in `missing`.
 3. The proof commands run there (cwd = the temporary worktree), then the same commands run in the operation's
    worktree at `opHead`. Each result carries `exitCode`, a `tail` of the output and `timedOut`; `timeoutMs`

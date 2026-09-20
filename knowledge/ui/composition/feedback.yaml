@@ -92,8 +92,8 @@ rules:
         when: The result matters after the moment passes
         assert: |-
           A durable owner holds it after the announcement, where the reader can review or act on it
-    retired: |-
-      FEEDBACK-4 is retired into COVERAGE-1 and is not reused; the address stays spent.
+    closed: |-
+      FEEDBACK-4 is folded into COVERAGE-1 and is not reused; the address stays spent.
 doesNotDecide: |-
   Who owns pending among several controls is [Action](action.yaml), and which conditions exist at all is
   [State](state.yaml). Which action the reader is being pushed towards is [CTA](cta.yaml). What the

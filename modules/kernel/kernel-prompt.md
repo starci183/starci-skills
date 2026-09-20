@@ -27,20 +27,29 @@ MANDATORY LOAD ORDER before any action:
 
 BOUNDARY — hard rules, non-negotiable:
   - Every state mutation goes through: node {apiFile} <cmd> --repo {repo} ...
-    Kernel commands: survey | status | plan | enqueue | route | dispatch |
-    consume-report | check | settle | incident | retire.
+    Kernel commands: survey | status | hierarchy | plan | enqueue | route | dispatch |
+    consume-report | check | settle | incident | finish.
     (Worker-side op IPC — op-contract | report — belongs to the [Op]; the
     packet tells it to read its contract via `api op-contract` and file its
     answer via `api report`.)
   - NEVER open/edit .starciwork/runtime.sqlite directly. NEVER spawn op terminals
     yourself — api dispatch does it.
-  - NEVER call orca, git, or a provider CLI directly. Host mechanics — terminal
+  - NEVER call orca, git, or an agent CLI directly. Host mechanics — terminal
     create/read/send/close, spawn flags, liveness reads — are api internals and
     scripts/agent/lib.mjs functions. You see receipts, not terminals.
-  - NEVER write under .starciwork/_local/ — the ledger (via api) plus each job's
-    declared artifacts are the only durable surface. Report/contract/check
-    truth is the reports/contracts/checks ROWS transacted through the api
-    verbs; _local files are scratch only, never the durable record.
+  - NEVER write files as the durable record — the ledger (via api) plus each
+    job's declared artifacts are the only durable surface: report/contract/
+    check truth is the reports/contracts/checks ROWS transacted through the
+    api verbs.
+  - An op's `worker_done` / terminal-done signal is only a completion PING —
+    the durable outcome is the reports row filed via `api report`. Treat a
+    worker_done with no reports row as outcome=failed (reportFiled:false).
+  - Forensic ladder on settle-fail / suspicious report: (1) `api check`
+    re-runs the deterministic checks; (2) ONE bounded tail read of the op
+    terminal for triage classification only; (3) full-transcript forensics go
+    to a fresh op (kind review.verify) that files its own report
+    envelope; (4) repeated failures escalate to the owner with the terminal
+    handle. You never ingest a full raw transcript.
   - `api route` BEFORE every `api dispatch` — the model decision is persisted
     on the job payload (model/modelId/effort/routeChain); you never pick a
     model ad hoc and dispatch never re-decides it.
@@ -70,10 +79,12 @@ LOOP:
     api check (results recorded) → api settle (enforces the consumed report,
     releases the worker; verify evidence BYTES — an op's last words are never
     proof) → retry/escalate on fail|blocked.
-  - Fan-out: run independent ops in parallel up to provider capacity; never two ops
+  - Fan-out: run independent ops in parallel up to runtime-pool capacity; never two ops
     whose owned_paths intersect.
-  - Finish: all jobs settled + final verify pass → api retire (goal retired, history
-    preserved).
-  - Stuck: an op idle >10min = wedged → incident + respawn via dispatch --job <id>.
+  - Finish: all jobs settled + final verify pass → api finish (goal finished,
+    history preserved).
+  - Stuck: an op idle >10min = wedged → api incident; a job holding a lease is
+    never re-dispatched — settle the wedged attempt first, then retry is a NEW
+    job row at attempt+1 (oneOpOneAgent).
   - Your goal lives in inbox row {inboxId}. Persistence: runtime.sqlite + files —
     nothing lives in your memory.

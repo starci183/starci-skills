@@ -51,7 +51,7 @@ Swarm schedules service tasks and supports rolling updates, but dependency order
 
 An update binds the accepted release, rendered stack digest, image digests, secret versions, current schema, backup receipt, and rollout policy. `deploy.update_config` and `deploy.rollback_config` define order, parallelism, delay, monitoring, failure action, and failure ratio where supported. The adapter observes actual service update state and tasks instead of treating configuration presence as success.
 
-`docker service update --rollback` or stack redeployment can restore a previous service specification, but cannot undo database effects or recreate a removed secret. Application rollback selects a previous accepted release and verifies schema compatibility. Data restore is a separate, higher-impact action with an explicit loss window and cutover.
+`docker service update --rollback` or stack redeployment can restore a previous service specification, but cannot undo database effects or recreate a removed secret. Application rollback selects a previous accepted release and verifies schema compatibility. Data restore is a separate, higher-impact action with an explicit loss window and activation authority.
 
 ## Secrets, Raft, and rotation
 
@@ -59,17 +59,17 @@ The repository stores only SOPS ciphertext and policy. Each VPS secret maps its 
 
 Preparation decrypts through trusted custody and creates the exact Swarm secret on a manager, preferably by stdin, without shell tracing or value output. Services receive only declared grants, normally under `/run/secrets/<target>`. Swarm encrypts secrets in transit and in manager Raft logs, and exposes them only to authorized running tasks.
 
-Swarm secrets cannot be updated in place. Rotation creates a new versioned runtime name, updates the service grant, waits for all intended tasks and application checks, then removes the old secret only after no service references it. Reusing a name or deleting the old version before convergence is refused.
+Swarm secrets cannot be updated in place. Rotation creates a new versioned runtime name, updates the service grant, waits for all intended tasks and application checks, then removes the earlier secret only after no service references it. Reusing a name or deleting the earlier version before convergence is refused.
 
 Raft encryption does not remove the need to protect manager access and backups. Autolock is a deliberate owner policy, not an automatic hardening toggle. When enabled, manager restart requires the unlock key. The recovery plan stores that key outside the repository, rehearses unlock after reboot, preserves the previous key briefly during rotation as Docker advises, and binds swarm-state backup to the matching unlock custody.
 
 ## Migrations, backup, and restore
 
-Before migration, bind the release, current schema fingerprint, pending migrations, and a verified backup. Acquire the application's exclusion lock. Prefer expand/contract: run backward-compatible expansion, verify new code while the old schema remains usable, and schedule destructive contraction separately.
+Before migration, bind the release, current schema fingerprint, pending migrations, and a verified backup. Acquire the application's exclusion lock. Prefer expand/contract: run backward-compatible expansion, verify new code while the existing schema remains usable, and schedule destructive contraction separately.
 
 Every persistent data class declares a service-appropriate consistent backup. Swarm Raft backup preserves orchestration state and keys; it is not an application database backup. Application backups are encrypted, hashed, versioned, retained by policy, and stored outside the VPS failure domain. Acceptance requires an isolated restore with semantic assertions.
 
-A failed migration stops readiness and does not trigger blind rollback after unknown schema effects. Restore stages into isolation and requires explicit cutover authority.
+A failed migration stops readiness and does not trigger blind rollback after unknown schema effects. Restore stages into isolation and requires explicit activation authority.
 
 ## Status, logs, and doctor
 
@@ -101,9 +101,9 @@ Evidence records the OS image, architecture, Docker version, Swarm identity/topo
 
 ## Static check
 
-```text
-starci stacks check <repo> --environment vps --deployment-model <docker-stack-config.yaml>
-```
+The check is `checkApplicationStacks` in `scripts/checks/stacks.mjs` — invoked
+with `{repoRoot: <repo>, environment: 'vps', deploymentModelFile: <docker-stack-config.yaml>}`
+(the stack render produced by `docker stack config`).
 
 The `starci/application-stacks-check@1` result checks the manifest and caller-supplied rendered model, including `runtime: docker-swarm`, ownership closure, lifecycle declarations, versioned external Swarm secret mappings, and service grants. It does not call Docker or the VPS, authenticate rendering provenance, query a swarm, create or inspect secrets, inspect registry manifests, or prove convergence, migration, backup, restore, autolock recovery, TLS, or rollback behavior.
 

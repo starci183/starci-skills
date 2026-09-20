@@ -13,7 +13,7 @@ host contract and the per-agent cards are two ordinary module trees.
 | Document | Contents |
 | --- | --- |
 | `index.yaml` | Hierarchy names (`[Kernel] <Workflow>`, `[Op] <operation> - <scope>`), environment binding, kernel and operation-agent call templates, routing rules, forbidden calls |
-| `api.yaml` | The observed `orca agent-context` public-command inventory and the StarCi orchestration allowlist |
+| `api.yaml` | The `orca agent-context` public-command inventory and the StarCi orchestration allowlist |
 | `calls.yaml` | One typed entry per Orca call (`command`, `kind`, `flags`, `required`, `receipt`) plus the result-envelope and idempotency rules |
 | `capabilities.yaml` | Supported host modes, roles and agent forms |
 | `recipes.yaml` | Lifecycle sequences built from the typed calls |
@@ -29,8 +29,8 @@ entry names a real, allowed command from `api.yaml`.
 
 The contract an op or kernel is spawned through is the **agent card**:
 `modules/models/agents/<agent>.yaml` (schema `starci/agent-card@1`) — the
-old Orca adapter-card fields at top level plus an optional `capabilities:`
-key for agent-specific provider facts. Shipped cards: `devin`, `qwen`,
+Orca adapter-card fields at top level plus an optional `capabilities:`
+key for agent-specific facts. Shipped cards: `devin`, `qwen`,
 `claude`, `codex`.
 
 The invariant: **no caller ever assembles an agent command by hand.**
@@ -67,7 +67,7 @@ readiness:                       # proof the TUI is at a prompt before send
 delivery:                        # how the prompt reaches the agent
   mode: file-reference-above-inline-limit
   maxInlineChars: 3000           # longer prompts are written to a file and referenced
-  fileDirectory: .starciwork/_local/runtime   # delivered, then removed
+  # fileDirectory unset → a fresh os.tmpdir staging dir; delivered, then removed
   fileName: orca-dispatch-<dispatch>.md
   prompt: 'Read <file> completely. …'
 
@@ -102,7 +102,7 @@ forbidden:                       # things this agent must never be asked for
   - unsupervised-retain-as-success
   - inferred-underlying-model
 
-capabilities:                    # optional — agent-specific provider facts
+capabilities:                    # optional — agent-specific facts
   …
 ```
 
@@ -143,21 +143,24 @@ report row (`reports.consumed_at`) as part of recording the verdict.
 ## Managed-agent dispatch (`kind: native-managed-agent`)
 
 Claude and Codex are **native managed agents**: the host starts a supervised
-worker — no terminal is created and no provider command is assembled. The
+worker — no terminal is created and no agent command is assembled. The
 launch sequence (typed calls from `calls.yaml`, wrappers under
 `scripts/api/orca/`):
 
 ```text
-run-create(objective = workflow title)          → runId
+run-create(objective = workflow id + title,
+           from = Kernel terminal)              → runId
 task-create(run, spec = prompt/packet,
-            displayName '[Kernel] <Workflow>'
-            | '[Op] <operation> - <scope>')     → taskId
-worker-start(task, worktree, agent = provider,
-             model, effort, run)                → dispatchId
-dispatch --return-preamble(task, to = dispatch) → preamble (prompt delivery)
+            displayName '[Op] <operation>')     → taskId
+worker-start(task, worktree, agent, model,
+             effort, run, from = Kernel)        → dispatchId + prompt delivery
+dispatch-show(task)                             → exact agent terminal
 worker-show(dispatch)                           → attestation: worker ready AND
                                                   effective agent/model match
 ```
+
+`worker-start` owns Task dispatch/injection. Calling `orchestration dispatch`
+again is a double-dispatch defect, not prompt-delivery verification.
 
 Attestation is required before the seat is accepted — a worker whose
 `startOptions.launch.effective` mismatches the resolved agent/model is fenced:
@@ -166,15 +169,18 @@ beside it. On success the job's `worker_id` is the **Dispatch id**, and
 `settle` releases it with `worker-stop` + `worker-release` (the
 `settle-dispatch` recovery in `calls.yaml`).
 
-The kernel seat follows the same rule. `start-workflow.mjs` resolves the
-provider by precedence `--provider` > `config.yaml kernel.{provider,model,
-effort}` > route-model, then reads the provider's card: `native-managed-agent`
-launches the orchestration sequence above (the bound run/task/dispatch ids
-persist in the kernel job payload); `command-terminal-agent` keeps the
-terminal pipeline. A config pin whose provider probes `dead` in
-`account list` (not authenticated) is ignored with a printed warning and
-routing falls through to the next eligible pool — an unauthed pin never fails
-the workflow.
+The Kernel seat is different: `start-workflow.mjs` always launches one
+dedicated attested Orca terminal and does not create a Run at boot. The first
+operation lazily creates the workflow Run with that terminal as coordinator.
+An explicit Kernel agent/model pin fails closed when unavailable; it is never
+silently substituted.
+
+Command-terminal operation agents still join the same semantic hierarchy:
+the api creates the Task, creates and attests the exact terminal, calls
+`dispatch --return-preamble` once, and sends that preamble. Their terminal
+handle remains `worker_id` for cleanup while the Orca Dispatch id keys
+contracts/reports. `api hierarchy` projects all launch kinds uniformly as
+`workflow → Kernel → Op`.
 
 ## Checklist for a new agent card
 

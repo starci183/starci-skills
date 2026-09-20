@@ -255,7 +255,7 @@ rules:
         when: "A feature exposes authentication state"
         write: "Export feature-owned AuthMode/AuthFailure/view types, not GraphQL response envelopes."
       - id: case-3
-        when: "Legacy wire types are handwritten from introspection"
+        when: "Wire types are handwritten from introspection"
         write: "Record the exact schema source/revision and run a schema-drift contract check."
       - id: case-4
         when: "A pure visual needs a provider choice"

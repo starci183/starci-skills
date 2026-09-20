@@ -29,7 +29,7 @@ for(const [name,mutate,code] of [
  ['credential origin',f=>f.source.repositories[0].origin='https://secret@example.test/repo.git','SOURCE_ORIGIN'],
  ['wrong commit',f=>f.source.repositories[0].commit='HEAD','SOURCE_STATE'],
  ['unknown version',f=>f.source.schema='starci/source-identity@99','SOURCE_IDENTITY'],
- ['mixed legacy',f=>f.node.completion.codeRefs=[{repository:'backend',commit:'a'.repeat(40)}],'SOURCE_IDENTITY_MIXED'],
+ ['mixed codeRefs',f=>f.node.completion.codeRefs=[{repository:'backend',commit:'a'.repeat(40)}],'SOURCE_IDENTITY_MIXED'],
  ['wrong profile',f=>f.node.kind='operations','SOURCE_IDENTITY_SCOPE'],
  ['scoped without limitations',f=>Object.assign(f.source.repositories[0].coverage,{kind:'scoped',paths:['src']}),'SOURCE_COVERAGE'],
  ['undeclared extra',f=>f.source.repositories[0].fake=true,'UNKNOWN_FIELD'],
@@ -41,6 +41,6 @@ for(const [name,mutate,code] of [
  ['snapshot traversal',f=>f.source.repositories[0].snapshot.artifact='../snapshot.txt','SOURCE_STATE'],
 ])test(`rejects ${name}`,t=>{const f=fixture(t,true);mutate(f);assert.ok(f.check().errors.some(e=>e.code===code));});
 test('source proof cannot bypass stale input or failed tests',t=>{const f=fixture(t);f.node.description='Changed requirement';assert.ok(f.check().errors.some(e=>e.code==='STALE_COMPLETION'));f.evidence.outcome='fail';assert.ok(f.check().errors.some(e=>e.code==='EVIDENCE_NOT_PASS'));});
-test('legacy codeRefs still require repository resources, never reinterpreted as direct identity',t=>{const f=fixture(t);delete f.node.completion.sourceIdentity;delete f.evidence.sourceIdentity;f.node.completion.codeRefs=[{repository:'backend',commit:'a'.repeat(40)}];f.evidence.codeRefs=structuredClone(f.node.completion.codeRefs);assert.ok(f.check().errors.some(e=>e.code==='MISSING_REF'));});
+test('resource-bound codeRefs still require repository resources, never reinterpreted as direct identity',t=>{const f=fixture(t);delete f.node.completion.sourceIdentity;delete f.evidence.sourceIdentity;f.node.completion.codeRefs=[{repository:'backend',commit:'a'.repeat(40)}];f.evidence.codeRefs=structuredClone(f.node.completion.codeRefs);assert.ok(f.check().errors.some(e=>e.code==='MISSING_REF'));});
 test('scoped snapshot states dependency boundaries and cannot silently claim full-tree coverage',t=>{const f=fixture(t,true);Object.assign(f.source.repositories[0].coverage,{kind:'scoped',paths:['src/domain','package-lock.json'],dependencyCoverage:'Includes domain dependencies only.',limitations:['Not registered application E2E.']});f.evidence.sourceIdentity=structuredClone(f.source);assert.deepEqual(f.check().errors,[]);f.source.repositories[0].coverage.kind='full-tree';assert.ok(f.check().errors.some(e=>e.code==='SOURCE_COVERAGE'));});
 test('malformed direct identity yields diagnostics rather than validator crash',t=>{const f=fixture(t);for(const value of [null,{},[],{schema:'starci/source-identity@1',repositories:[null]},{schema:'starci/source-identity@1',repositories:[{state:'dirty',snapshot:null}]}]){f.node.completion.sourceIdentity=value;const r=f.check();assert.equal(r.ok,false);assert.ok(!r.errors.some(e=>e.code==='MALFORMED_WORKSPACE'));}});

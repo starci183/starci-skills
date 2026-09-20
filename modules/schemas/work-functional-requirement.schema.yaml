@@ -108,7 +108,7 @@ properties:
       record, because that is `provenBy`, which the kernel computes rather than an author copying it. A
       second copy of either fact here would be a second source of truth, and two copies that disagree leave
       no answer to which is right. At most one directory is allowed, because a record has one current answer
-      to what was last observed of it; a superseded manifest stays where it is, marked stale.
+      to what was last observed of it; a replaced manifest stays where it is, marked stale.
   requiresProof:
     $ref: "#/$defs/requiresProof"
   provenBy:

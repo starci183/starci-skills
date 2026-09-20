@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // route-model.mjs — resolve which model target may take a workload, by EXECUTING
-// the declarative rules in modules/models/selection.yaml (the source of truth;
-// a port of kernel/model-policy.mjs). Ordering facts come from the files
+// the declarative rules in modules/models/selection.yaml (the source of truth).
+// Ordering facts come from the files
 // selection.yaml cites: modules/models/runtimes.yaml (preference/tiers) and
 // modules/models/qualifications.yaml (the shipped evidence store — empty means
 // no measured qualification, so eligible routes are probation or refusal).
@@ -17,7 +17,8 @@
 //       [--no-review]           no fresh independent review planned
 //       [--no-checks]           op declares no machine checks
 //       [--difficulty <easy|medium|hard|insane>]   (with --plan) which allocation
-//                               tier to preview; legacy S|M|L|XL spellings accepted
+//                               tier to preview; alias spellings (s|m|l|xl,
+//                               'high') are normalized
 //       [--prefer <pool>[,<pool>...]] [--avoid <pool>[,<pool>...]]
 //                               bounded pool bias over the walked chain (prefer
 //                               hoists, avoid removes; never bypasses eligibility)
@@ -48,10 +49,10 @@ const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
 
 // --- owner config (config.yaml) --------------------------------------------------
-// engine/config.mjs (the engine/ tree's canonical loader) is preferred once it
-// exists and exports an owner-config reader; until then the yaml is parsed
-// directly. A missing or unparsable file is never fatal — callers degrade to
-// "no config" and route exactly as before.
+// engine/config.mjs's owner-config reader (readOwnerConfig/loadOwnerConfig) is
+// preferred when present; otherwise the yaml is parsed directly. A missing or
+// unparsable file is never fatal — callers degrade to "no config" and route
+// exactly as before.
 async function readOwnerConfig() {
   const file = path.join(skillRoot, 'config.yaml');
   if (!fs.existsSync(file)) return { file, config: null, error: null };
@@ -74,7 +75,7 @@ async function readOwnerConfig() {
 }
 
 // Which config.yaml models.nonOperation role serves each kernel-function kind —
-// the same map models/functions.mjs resolves through nonOperationModels().
+// the same map engine/config.mjs resolves through nonOperationModels().
 // Kernel kinds without an entry (screen classification, owner presentation)
 // have no configured pool and keep the runtimes.yaml preference order.
 const KERNEL_FUNCTION_ROLE = {
@@ -116,9 +117,8 @@ function preflightFor(runtime) {
 }
 
 // runtimes.yaml is the single capacity authority — model profiles repeat
-// capacity.maxParallel as a cached copy and it has drifted before (qwen 4 vs
-// the intended 10; devin 0 vs 10). Drift is reported, never silently
-// reconciled: the runtimes.yaml value always wins.
+// capacity.maxParallel as a cached copy that can drift. Drift is reported,
+// never silently reconciled: the runtimes.yaml value always wins.
 function capacityDrift(candidates, runtimes) {
   const out = [];
   for (const c of candidates) {
@@ -182,11 +182,8 @@ function loadRules(modelsDir) {
     floorDefault: doc.ladders.qualityFloor.default,
     highKinds: new Set(doc.closedSets.highKinds),
     kernelKinds: new Set(doc.closedSets.kernelFunctionKinds),
-    roles: doc.closedSets.roles,
     probationFloorBan: ['high', 'critical'],   // selection.yaml probation.recordGates
-    probationRiskMax: 'medium',                // workload.risk <= medium
     fallbackAdvanceWhen: doc.fallback?.advanceOnlyWhen ?? [],
-    decisionFlow: doc.decisionFlow ?? {},
   };
 }
 
@@ -506,7 +503,7 @@ async function main() {
 
   // Kernel functions route inside the configured non-operation pool when the
   // owner config declares one (models.nonOperation.<role> → pools.<name>) —
-  // the same binding models/functions.mjs resolves via nonOperationModels().
+  // the same binding engine/config.mjs resolves via nonOperationModels().
   let { order, source: orderSource } = candidateOrder(args.kind, w.role, registry, runtimes);
   if (w.modelFunction && cfgMembers?.length) {
     order = cfgMembers;

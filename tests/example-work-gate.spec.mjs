@@ -344,7 +344,7 @@ test('concept 5: change.kind is a closed enum; a stale recordDigest must carry s
   checkWorkTree(workRoot, problems2);
   assert.equal(problems2.filter(p => p.includes('recordDigest')).length, 0, problems2.join('\n'));
 
-  // and the real digest algorithm must be exactly sha256 of the record file's bytes (kernel/reconciliation.mjs's recordDigests/nodeFileOf)
+  // and the digest algorithm must be exactly sha256 of the record file's bytes (work-layout contract)
   const recordFile = path.join(workRoot, 'features/f/br/a/index.yaml');
   const digest = crypto.createHash('sha256').update(fs.readFileSync(recordFile)).digest('hex');
   fs.writeFileSync(path.join(workRoot, 'features/f/br/a/evidence.yaml'),
@@ -428,11 +428,11 @@ test('concept 8: event needs a resolving producer, non-empty payload and a close
   assert.equal(goodTimer.length, 0, goodTimer.join('\n'));
 });
 
-test('concept 9: work/implementation refuses legacy directory/files/targetFiles and needs role+path on every owner; business-rule.module accepts a string or a list', () => {
-  const legacy = refusalsFor({
+test('concept 9: work/implementation refuses directory/files/targetFiles and needs role+path on every owner; business-rule.module accepts a string or a list', () => {
+  const refused = refusalsFor({
     'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: todo\nrepository: r\ndirectory: src/f\nfiles: [a.ts]\n',
   });
-  assert.ok(legacy.some(p => p.includes('legacy directory/files/targetFiles')), legacy.join('\n'));
+  assert.ok(refused.some(p => p.includes('directory/files/targetFiles')), refused.join('\n'));
 
   const missingRole = refusalsFor({
     'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: todo\nrepository: r\nowners:\n  - {path: src/f/a.ts}\n',

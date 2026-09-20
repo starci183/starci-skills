@@ -134,7 +134,7 @@ observations:
       transaction/eager-relation rules and handler-twin checks cannot be assumed active.
       Existing non-CQRS handlers and inline suppressions are residuals, not reusable patterns.
       At that scan the FE public entry was @starci/grammar/common; product-shells was an unresolved
-      legacy exception, and the installed FE Grammar-boundary module had no active rules. These are
+      exception, and the installed FE Grammar-boundary module had no active rules. These are
       historical source observations; the adopted layout now places product shells in features/layouts
       and current script coverage is declared in model/code-patterns.yaml.
 

@@ -1,5 +1,5 @@
 schema: starci/orca-recipes@1
-api: api.json
+api: api.yaml
 recipes:
   bootstrap-plan-coordinator:
     mode: orchestrated
@@ -165,7 +165,7 @@ recipes:
     signal: 'Agent connection lost: agent child exited'
     note: 'A dead child never drains queued sends. The fresh lane must survey the tree for partial work — markers, not memory, carry state.'
 cliGotchas:
-  - 'orca terminal create flag is --title, not --name (a rejected --name cost a whole respawn wave, 2026-09-20).'
+  - 'orca terminal create flag is --title, not --name.'
   - 'orca worktree rm removes the worktree from Orca AND git — it deletes files on disk; never use it to "unregister" a path that must be kept.'
   - 'terminal read --screen shows tail only; idle detection uses lastOutputAt freshness, not scrollback.'
 forbiddenSequences:

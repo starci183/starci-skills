@@ -1,6 +1,6 @@
-# modules/ops/ops/brand.decide.yaml - TINKLE-1 pure-yaml port of .claude/ops/brand.decide/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/brand.decide.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: brand.decide
 goal:
@@ -60,7 +60,7 @@ reads:
         asset before producing any new one; an asset whose rights or origin are unknown is reported, not
         adopted.
   - id: knowledge
-    path: knowledge/INDEX.json + applicable UI presentation/composition and installed family topics
+    path: knowledge/index.yaml + applicable UI presentation/composition and installed family topics
     purpose:
       en: Read the applicable presentation, composition and family topics before mapping a decision onto a
         token name, a contrast floor or an icon rule. Knowledge explains ownership and composition; the
@@ -266,7 +266,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "What is this product's single settled visual identity - colors traced to
@@ -293,7 +293,7 @@ business:
     - BRAND_SOURCE_MISSING (blocked/environment), BRAND_TOKEN_UNTRACEABLE (ask), BRAND_DECISION_UNRULED (ask), DECLARED_DEPENDENCY_UNMET.
     - done cannot be earned on unrun checks - brand-check + token-trace must actually execute.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

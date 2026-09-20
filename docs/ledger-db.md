@@ -21,8 +21,7 @@ to continue, to be audited and to be archived:
                                               ledgers. Nothing else lives here.
 ```
 
-`.starciwork/_local/` is not a runtime-state location: dispatch artifacts are
-delivered then removed (or written to the OS temp dir), never parked there.
+Dispatch artifacts stage in the OS temp dir and are removed once delivered.
 
 The kernel agent's only writer is `scripts/kernel/api.mjs` — the [Kernel] never
 opens this file; every state operation is one api verb inside one
@@ -36,7 +35,7 @@ ledger-facing store vocabulary lives in `engine/ledger-db.mjs`.
 ## 2. Why (recorded so it is not re-argued)
 
 - One transaction commits state snapshot + audit event + job/lease change.
-  `lease-identity-drift`, orphan reservations and unreconciled pending jobs
+  `lease-identity-drift`, orphan reservations and unreconciled unsettled jobs
   become **impossible to persist**, not merely detectable: `leases.job_id` →
   `jobs`, and the `leases_match_job` trigger raises on identity drift.
 - Archive = copy one file. Inspect = `SELECT`.
@@ -76,9 +75,9 @@ Full DDL: `engine/schema.sql`. Orientation only:
 | Table(s) | Role | Writers |
 | --- | --- | --- |
 | `meta` | Ledger identity + open-mode facts; seeded once | `engine/ledger-db.mjs` create/migrate + `journal_mode` upsert on open |
-| `workflows` | One row per workflow: registration, bound generation, phase | `ensureWorkflow` (engine), `define-goal` (phase `queued`), `start-workflow` (phase `running`), `api retire` (phase `finished`) |
+| `workflows` | One row per workflow: registration, bound generation, phase | `ensureWorkflow` (engine), `define-goal` (phase `queued`), `start-workflow` (phase `running`), `api finish` (phase `finished`) |
 | `goals` | Approved goal revisions, append-only per `(workflow_id, revision)` | `define-goal` INSERT; `api plan` UPDATEs `json.derivedPlan` |
-| `inbox` | The queue kernels claim from: pending → claimed/done | `define-goal` INSERT; `start-workflow` claims (`status='claimed'`); `api retire` closes |
+| `inbox` | The queue kernels claim from: pending → claimed/done | `define-goal` INSERT; `start-workflow` claims (`status='claimed'`); `api finish` closes |
 | `jobs` | The queue itself — one row per op attempt or kernel seat | `api enqueue`/`route`/`dispatch`/`settle`; `start-workflow` kernel row; engine `enqueueJob`/`reserveTwoPhase`/`releaseTwoPhase` |
 | `events` | Hash-chained audit log — every write appends exactly one row | `ledger.appendEvent` inside every write verb's transaction |
 | `incidents` | Fingerprinted escalations | `api incident`; `dispatch` rejection path files `infra-provider` incidents |
@@ -86,22 +85,20 @@ Full DDL: `engine/schema.sql`. Orientation only:
 | `contracts` | Op IPC, kernel → worker — see §4a | `api dispatch` (`fileContract`, INSERT OR REPLACE before `jobs`→`running`); read by `api op-contract` |
 | `reports` | Op IPC, worker → kernel — see §4a | `api report` (INSERT OR REPLACE, `consumed_at` reset NULL); `consumed_at` stamped by `api consume-report` and by `settle` |
 | `checks` | Kernel's re-run results per op attempt — see §4a | `api check` (INSERT OR REPLACE) |
-| `state_snapshots` | Continuation snapshots; compacted by retention | **no production INSERT** — only `compactSnapshots`/`retireWorkflow` mutate it; the checkpoint writer is missing |
+| `state_snapshots` | Continuation snapshots; compacted by retention | **no production INSERT** — only `compactSnapshots`/`finishWorkflow` mutate it; the checkpoint writer is missing |
 | `resources` (ledger), `leases` | Repo-scoped capacity fences | `api dispatch` → `reserveOpLeases` seeds `path:*` capacity-1 resources and takes leases via `reserveTwoPhase`; `api settle`/dispatch-reject release them |
-| `budgets`, `budget_reservations` (ledger) | Repo-local spend limits | **no writer or reader** — declared-ahead for the admission layer |
-| `runtime_loads` | Supervisor's provider-load view | **no writer** — `loads.mjs`/supervisor retired; live load is probed via `scripts/api/quota` |
+| `budgets`, `budget_reservations` (ledger) | Repo-local spend limits | **no writer or reader** — reserved for the admission layer |
 | `inputs` | Owner-named input bytes, digest-bound | `ledger.inputs.put` exists on the handle but **no script calls it** |
-| `migrations` | ledger-migrate import provenance | **vestigial** — the writer retired with `scripts/ledger/ledger-migrate.mjs` |
 
 `machine.sqlite` (`engine/machine.sql`) holds `ai/*` provider quota and machine
 budgets only, reconciled by TTL.
 
 ## 4a. Op IPC — contracts out, reports in, checks beside
 
-The dispatch↔worker exchange is durable rows, not files. Files under
-`.starciwork/_local/` are scratch; the ledger is the record
-(`modules/kernel/api.yaml` — the op lifecycle is `enqueue → route → dispatch →
-api report → api consume-report → api check → api settle`).
+The dispatch↔worker exchange is durable rows, not files — the ledger is the
+only record (`modules/kernel/api.yaml` — the op lifecycle is `enqueue →
+route → dispatch → api report → api consume-report → api check →
+api settle`).
 
 - **`contracts`** — kernel → worker. `api dispatch` writes one row per
   `(workflow_id, op_id, attempt)` — the rendered prompt plus the packet JSON
@@ -126,7 +123,7 @@ api report → api consume-report → api check → api settle`).
   --checks-file <path>`). Filed between `consume-report` and `settle`, which
   then releases the leases and closes the worker.
 
-`retireWorkflow` drops all three tables' rows with the rest of the workflow's
+`finishWorkflow` drops all three tables' rows with the rest of the workflow's
 record.
 
 ## 5. Identity fence and anchor
@@ -149,8 +146,12 @@ anchor with no ledger refuses `ledger-missing`, and a `ledgerId` mismatch is
 ## 6. Refusal discipline
 
 Every api write names its refusal strings (`modules/kernel/api.yaml`):
-`unknown-workflow`, `already-queued`, `empty-paths`, `not-pending`,
-`contested-lease`, `path-collision`, `spawn-failed`, `report-invalid`,
-`out-of-scope-files`, `stale-settlement`, `jobs-unsettled`, `verify-open`,
-`plan-divergence` (via `incident`). A refusal is a typed fact for the driver
-loop — never an exception to route around, never a silent loss.
+`workflow-unknown`, `workflow-finished`, `already-queued`, `empty-paths`,
+`empty-field`, `unknown-op`, `job-unknown`, `job-no-op`, `job-settled`,
+`contested-lease`, `path-collision`, `path-illegal`, `contract-missing`,
+`route-refused`, `spawn-failed`, `dispatch-rejected`, `managed-agent`,
+`plan-file-missing`, `plan-file-invalid`, `plan-lineage-missing`,
+`report-missing`, `report-invalid`, `outcome-mismatch`,
+`verdict-outcome-mismatch`, `checks-file-missing`, `checks-invalid`. A
+refusal is a typed fact for the driver loop — never an exception to route
+around, never a silent loss.

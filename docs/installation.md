@@ -34,7 +34,7 @@ then:
 3. Seeds an **untracked** `config.yaml` from `config.example.yaml` — the
    per-project owner config: kernel model, effort, budgets. `route-model` and
    `start-workflow` read it: owner config overrides the route-model default,
-   and an explicit `--provider` flag overrides both. The installed
+   and an explicit `--agent` flag overrides both. The installed
    `.claude/.gitignore` carries `/config.yaml`; the file is never shipped or
    committed.
 4. Verifies the installed source tree (doctor contract checks), and only then
@@ -55,7 +55,8 @@ backend repository. Keep the ledger out of git — add to the backend's
 
 ```text
 /.starciwork/runtime.sqlite
-/.starciwork/_local/
+/.starciwork/runtime.sqlite-wal
+/.starciwork/runtime.sqlite-shm
 ```
 
 Commit durable records (goals, SRS/SDS, evidence your policy keeps); never
@@ -112,9 +113,10 @@ npx --yes --package=<reviewed-archive>.tgz starci doctor --dir /absolute/host
 Updates replace unchanged installer-owned files, verify the installed tree,
 then record the new version only after a successful check. Locally changed or
 unowned content is preserved and reported — inspect that report; a successful
-copy is not proof a mixed installation is compatible. Major upgrades require
-`--upgrade-major`. Existing ledgers, goals, reports, receipts and local
-settings are not migration targets.
+copy is not proof a mixed installation is compatible. An install recorded
+under a different protocol is not upgraded in place: remove `.claude` by hand
+and run `init`. Existing ledgers, goals, reports, receipts and local
+settings are preserved.
 
 ## Troubleshooting
 

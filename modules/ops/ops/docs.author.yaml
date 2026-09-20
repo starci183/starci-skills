@@ -1,6 +1,6 @@
-# modules/ops/ops/docs.author.yaml - TINKLE-1 pure-yaml port of .claude/ops/docs.author/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/docs.author.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: docs.author
 goal:
@@ -55,8 +55,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -228,7 +227,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "What does a reader need documented about this scope - restated from decided
@@ -247,7 +246,7 @@ business:
   failureModes:
     - RECORD_UNSETTLED, SOURCE_OF_TRUTH_MISSING, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

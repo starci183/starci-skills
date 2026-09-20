@@ -1,6 +1,6 @@
-# modules/ops/ops/provision.ask.yaml - TINKLE-1 pure-yaml port of .claude/ops/provision.ask/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/provision.ask.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: provision.ask
 goal:
@@ -100,7 +100,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "What is the one thing only the owner can give - credential, account,
@@ -119,7 +119,7 @@ business:
   failureModes:
     - QUESTION_UNCLEAR (declared blocker); no answer inside the wait window = blocked authority, not an assumed grant.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

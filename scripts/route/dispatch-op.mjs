@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // dispatch-op.mjs — build the dispatch packet for one op and (optionally) spawn
-// the `[Op] <id>` Orca terminal that executes it (tinkle-12). One op = one
+// the `[Op] <id>` Orca terminal that executes it. One op = one
 // ephemeral shell agent; the kernel driver is the caller.
 //
-// Packet contract per ex-testing/briefs/tinkle/tinkle-9.md `dispatch.yaml`
-// (modules/kernel/ has NOT landed yet — assumption flagged in output):
+// Packet contract per modules/kernel/dispatch.yaml +
+// modules/kernel/verdict-contract.yaml (presence checked at runtime):
 //   packet:
 //     op: <id>
 //     brief: modules/ops/ops/<id>.yaml
@@ -12,7 +12,7 @@
 //     constraints: {model, budget, lease}
 //     returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string}
 //
-// Spawn path reconciled with the REAL orca CLI (verified live, 2026-09):
+// Spawn path reconciled with the real orca CLI:
 //   orca terminal create --worktree <selector> --title "[Op] <id>" --command "<text>" --json
 //     -> result.terminal.handle   (modules/host/orca/calls.yaml terminal-create)
 //   orca terminal send --terminal <handle> --text "<prompt>" --enter --json
@@ -111,8 +111,8 @@ function resolveModel(target, modelsDir) {
 function buildPrompt(packet, context) {
   // Compact prompt the shell agent receives. The READ ORDER is mandatory —
   // an agent that acts without reading its contract is the failure mode this
-  // packet exists to prevent (fleet wave lessons, 2026-09-20: agents that
-  // skipped reads forgot yolo flags, missed context, and never persisted).
+  // packet exists to prevent (agents that skip reads forget bypass flags,
+  // miss context, and never persist).
   // The list is not hardcoded: scripts/context/pack.mjs resolves it as a
   // function — SKILL.md + brief + verdict contract + every concrete file the
   // brief's own reads declare + the packet contract — so a brief edit never
@@ -209,7 +209,7 @@ function main() {
       profile: model.profile,
       commands: orcaCommands.map(c => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`.replace(prompt, '<prompt>'), note: c.note })),
       contractPresent,
-      ...(contractPresent ? {} : { assumption: `${VERDICT_CONTRACT} not landed yet (tinkle-9 in flight) — packet coded against brief spec ex-testing/briefs/tinkle/tinkle-9.md` }),
+      ...(contractPresent ? {} : { assumption: `${VERDICT_CONTRACT} not on disk — packet coded against modules/kernel/dispatch.yaml` }),
     },
     opContext: { riskHints: opDoc?.route?.riskHints ?? [], goal: opDoc?.goal?.en ?? opDoc?.goal ?? null },
     contextPack: ctx.error ? { error: ctx.error } : {

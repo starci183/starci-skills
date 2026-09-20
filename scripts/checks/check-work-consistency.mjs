@@ -10,8 +10,8 @@ import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCrite
  * Every check in the fleet so far reads one record and asks whether that record agrees with itself: an id
  * matching its directory, a digest matching its bytes, a ref that resolves to something
  * (check-example-work.mjs), or a record against the code and files around it (check-work-deep.mjs). Nothing
- * asked whether the records agree with EACH OTHER, and that is where the audits' worst findings sat. v6-4
- * found a rule listing `[is-idempotent, is-reversible]` as its acceptance criteria when no `ac/` directory
+ * asked whether the records agree with EACH OTHER, and that is where the worst findings sat: a rule
+ * listing `[is-idempotent, is-reversible]` as its acceptance criteria when no `ac/` directory
  * answered either name.
  * The live trees still carry `br.audit.erasure.right` and `br.audit.retention` arguing in one record's
  * `because` that they cannot both hold - both of them marked done - and a second pair, `data.audit.log-line`
@@ -415,9 +415,10 @@ export function checkTreeParity(perTree, sink) {
     sink.info.push('(single tree): parity skipped, comparing conventions needs both example trees [PARITY_SKIPPED]');
     return;
   }
-  /** Field names the layout retired: check-example-work.mjs's concept 9 refuses them on work/implementation,
-   * so a tree authoring them anywhere else is worth naming in the same breath as the divergence. */
-  const LEGACY_PATH_FIELDS = new Set(['directory', 'files', 'targetFiles']);
+  /** Field names outside the current contract: check-example-work.mjs's concept 9 refuses them on
+   * work/implementation, so a tree authoring them anywhere else is worth naming in the same breath as
+   * the divergence. */
+  const NON_CONTRACT_PATH_FIELDS = new Set(['directory', 'files', 'targetFiles']);
   const fieldsByTree = perTree.map(entry => {
     const bySchema = new Map();
     for (const rec of entry.records.values()) {
@@ -437,14 +438,14 @@ export function checkTreeParity(perTree, sink) {
     const sides = fieldsByTree.map((tree, index) => ({label: tree.label, onlyHere: onlyHereOf(index)}))
       .filter(side => side.onlyHere.length);
     if (!sides.length) continue;
-    const legacyFields = sides.flatMap(side => side.onlyHere.filter(field => LEGACY_PATH_FIELDS.has(field)));
+    const foreignFields = sides.flatMap(side => side.onlyHere.filter(field => NON_CONTRACT_PATH_FIELDS.has(field)));
     const counts = perTree.map(entry => {
       const owned = [...entry.records.values()].filter(rec => rec.schema === schema).length;
       return `${entry.label}=${owned}`;
     }).join(', ');
     const divergence = sides.map(side => `only ${side.label}: ${side.onlyHere.join(', ')}`).join('; ');
     sink.info.push(`(both trees): ${schema} is authored ${sides.length === 1 ? 'by one tree only' : 'two different ways'} (${counts} record(s)) - ${divergence}`
-      + `${legacyFields.length ? `; ${legacyFields.join(', ')} ${legacyFields.length > 1 ? 'are' : 'is'} a retired path shape` : ''} [PARITY_FIELD]`);
+      + `${foreignFields.length ? `; ${foreignFields.join(', ')} ${foreignFields.length > 1 ? 'are' : 'is'} not part of the current contract` : ''} [PARITY_FIELD]`);
   }
 }
 

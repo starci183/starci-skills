@@ -103,7 +103,7 @@ rules:
       - id: case-2
         when: The grammar package revs
         observe: |-
-          Reference renders are re-captured, and directions whose anatomy depended on the old
+          Reference renders are re-captured, and directions whose anatomy depended on the earlier
           render are flagged stale — never silently treated as still current
   - id: ANATOMY-5
     title: The prompt spells containment literally, license explicitly

@@ -37,7 +37,7 @@ The target owns `package.json#starci.codePatterns.nest.transportErrors`:
 
 All paths and exports are exact identities. An error family does not need an
 HTTP status member. A mapper may own status through an exported code map with
-an explicit fallback. The legacy `error.httpStatus ?? 500` form is supported by
+an explicit fallback. The `error.httpStatus ?? 500` form is supported by
 `status.kind: "error-property"` when the selected family intentionally owns it.
 
 GraphQL is optional. A project that selects it declares one
@@ -97,7 +97,7 @@ GraphQL envelope and domain-owned `httpStatus` are not universal Nest rules.
 
 The transport declaration does not select a universal exception hierarchy. A
 separate target declaration must choose either capability-owned error families
-or the legacy Academy hierarchy before source identity can receive machine
+or the Academy hierarchy before source identity can receive machine
 credit. The intended closed declaration is
 `package.json#starci.codePatterns.nest.errorIdentity` with schema
 `starci/nest-error-identity@1`, a profile of `capability` or

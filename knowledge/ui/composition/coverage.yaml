@@ -8,7 +8,7 @@ purpose: |-
   This file answers one question: what must the selected design specification actually enumerate, so that a later
   operator can exercise the direction instead of guessing at it?
   Every other composition topic constrains one decision at a time. This one constrains the specification as
-  a whole, folding five per-topic coverage rules into it. Retired: `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5` and `RESPONSIVE-5` are retired into this rule and their numbers are never reused.
+  a whole, folding five per-topic coverage rules into it. Closed: `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5` and `RESPONSIVE-5` are folded into this rule and their numbers are never reused.
   What the enumeration is worth is decided elsewhere: layout and taste come from the idioms and the
   playbook in the applicable [family snapshots](../../grammars/index.yaml), checked against current source, and this rule only asserts that the specification says enough
   for anyone to check them.

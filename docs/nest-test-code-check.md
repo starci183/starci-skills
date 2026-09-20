@@ -52,7 +52,7 @@ target compiler owns them. Declaration files are not subjects.
 Jest ambient APIs and imported aliases from `@jest/globals` or `vitest` must
 resolve to the installed test package's declarations; an unrelated project
 ambient declaration or local helper named `describe` is not a suite. Supporting
-API syntax does not select or migrate the project's runner. The separate
+API syntax does not select or change the project's runner. The separate
 metadata check verifies the adopted Jest runner's actual discovery/configuration.
 
 ## Construction and evidence

@@ -1,6 +1,5 @@
 schema: starci/module-goal-define@1
 id: goal.define
-aliases: [genesis]
 
 # ============================================================================
 # DEFINE-GOAL — the intake ritual. One owner prompt becomes ONE durable goal row
@@ -71,7 +70,7 @@ rules:
   - 'goal row written BEFORE inbox row — a queue entry without its goal is refused'
   - 'define-goal never dispatches — it only queues'
   - 'one prompt → one workflow; amendments → goals.revision+1 via goal.revise'
-  - 'when the workflow finishes, the goal is retired (workflows.phase=finished, inbox consumed) — a completed goal leaves the queue forever'
+  - 'when the workflow finishes, the goal is finished (workflows.phase=finished, inbox consumed) — a completed goal leaves the queue forever'
   - '--project and --repo are mutually exclusive; --project binds the ledger to work.ownerRole''s repository, not the host'
   - 'the flow is plan → owner ok → persist: --plan exits 0 having written nothing; only the ok re-run without --plan opens the ledger transaction'
 

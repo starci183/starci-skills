@@ -1,7 +1,6 @@
-# modules/ops/ops/backend.implement.yaml - TINKLE-1 pure-yaml port of .claude/ops/backend.implement/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
-# Related source files (not ported): ops/backend.implement/secondary.yaml 
+# modules/ops/ops/backend.implement.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: backend.implement
 goal:
@@ -22,7 +21,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -36,7 +35,9 @@ reads:
       en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
         and validator freshness. This consumer op requires its target node to exist. An absent
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here."
+        create a target or invent its acceptance/graph here. Current reviewed todo SRS/SDS inputs are
+        semantic refs; the settled-pass decide jobs are the execution prerequisites. Do not require those
+        specification refs to be Work state done before implementation."
   - id: business
     path: .starciwork/<business>/business/**/index.yaml
     purpose:
@@ -72,8 +73,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -178,7 +178,13 @@ steps:
         in this same implementation; never publish a package implicitly. Keep shared paths exclusive
         and report a missing required external authority rather than inventing a helper. Resolve the
         execution profile and actual tool availability before selecting instruments; this does not
-        switch the model/runtime or spawn workers. CALL POINT (discovery, implementation or
+        switch the model/runtime or spawn workers. Classify implementation feedback before stopping:
+        repository paths, private helper names, library calls and other reversible source-local choices
+        are owned here and do not require SRS/SDS expansion. A changed observable outcome, actor permission,
+        money or customer-data rule is an srs-gap; a missing logical owner, contract, authority boundary,
+        durable state/effect, compatibility, material failure/recovery or quality mechanism is an sds-gap.
+        Report a spec-affecting finding with the exact observed fact, affected semantic IDs and smallest
+        proposed delta; never edit SRS/SDS in this op. CALL POINT (discovery, implementation or
         verification): when an observed source/test fact proves the accepted SDS technically
         missing or contradictory while business and SRS stay unchanged, read
         backend.implement/secondary.json and request its implementation.architecture role. The
@@ -325,7 +331,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Does the actual backend code implement the selected accepted operations and
@@ -333,10 +339,11 @@ business:
     declared) against the tested commit?"
   whenNeeded:
     - When an accepted SRS/SDS slice needs backend code created, refined or defect-repaired (primary mode).
-    - As the declared interface.backend secondary of interface.implement for a bounded, contract-compatible backend repair (secondary.yaml / role-authority.mjs).
+    - As the declared interface.backend secondary of interface.implement for a bounded, contract-compatible backend repair.
   whenNot:
     - Not for frontend code, browser UAT, remote migrations, package publishing or production deploys (declared not-this-scope).
     - Not when SDS is merely silent - a proven SDS gap delegates to the architecture.decide secondary; a business contradiction is blocked, never guessed.
+    - Reversible source-local choices are implementation work, not automatic SRS/SDS gaps; do not stop merely because the upstream specs omit a private mechanism.
     - INFERRED: not a substitute for verification ops - its own gates prove the implementation only within its declared suite; independent proof belongs to e2e/integration/uat/review.
   consumes:
     - Accepted business + architecture records and the target node (request-bound scope).
@@ -351,7 +358,7 @@ business:
     - Uncommitted or unproven delivery is reported honestly - absent runner/sonar is blocked, not pass.
     - A failed secondary response is returned to the caller; it never becomes this op's own product scope.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.
@@ -359,5 +366,5 @@ route:
   nodeKinds: [implementation]
   phase: [implement, implementation]
   intent: [implement, backend, code, api, build]
-  prerequisites: ["business.decide done", "architecture.decide done"]
+  prerequisites: ["business.decide settled pass (reviewed SRS seed; Work leaves remain todo)", "architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)"]
   riskHints: [source-edits]

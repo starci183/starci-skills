@@ -15,7 +15,7 @@ purpose: |
   edf72554425f918e80c9205e9c6db10596e722f0, not universal framework rules or current-project
   source evidence. Inspect the selected repository's actual types/APIs, aliases and lint/test setup;
   verify reference conformance within approved .starciwork scope. Resolve incompatibilities explicitly;
-  target legacy code does not override the reference. Old counts cannot claim a fresh scan.
+  target existing code does not override the reference. Earlier counts cannot claim a fresh scan.
   Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
 appliesTo:
   - frontend

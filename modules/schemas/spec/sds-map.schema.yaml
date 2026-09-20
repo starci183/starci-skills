@@ -52,9 +52,10 @@ sections:
     required: [id, title, businessAcceptanceRefs, scopeRefs, level, setup, steps, expected, securityChecks, performanceChecks, failureChecks]
 rules:
   - All canonical SDS content is English, including natural-language prose, YAML and schema keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation names and source symbols.
-  - Accepted and reviewed SDS leaves are authored as done. Todo is reserved for genuinely unfinished drafts or unresolved architecture tasks and must not be inferred from stale metadata alone.
+  - A new SDS is minimum design-complete for the next selected implementation slice, not speculative completeness for unrelated future capabilities or reversible source-local mechanics.
+  - A reviewed SDS seed remains state todo while implementation, test/E2E or UAT evidence is open. The decide op may settle pass without authoring Work done; final reconciliation alone may author done after current SRS, SDS, code, test/E2E and UAT evidence bind the same delivery revision.
   - Architecture overview is one structured starci/sds-overview@1 payload at architecture/overview/index.yaml. It summarizes accepted SRS scope, context and independently selected target-design dispositions; prose alone cannot complete it.
-  - Inspect only relevant current source, configuration and installed APIs to establish feasibility and migration impact. Record retain, extend, correct, replace or add decisions with rationale; observations never override SRS or become implementation proof.
+  - Inspect only relevant current source, configuration and installed APIs to establish feasibility and change impact. Record retain, extend, correct, replace or add decisions with rationale; observations never override SRS or become implementation proof.
   - SDS is a source-of-truth design contract derived from SRS and design decisions, never from current source code. Source observations, revisions and implementation proof are forbidden.
   - SDS verification nodes specify scenarios and expected results only. Evidence fields and executed proof belong to excluded local run state, never SDS.
   - Flow is the primary route. Every main, alternative and exception sequence references logical components and ends in an observable application or receiver result.
@@ -64,3 +65,4 @@ rules:
   - Security, performance and reliability record applicable scenarios, mechanisms, measurement, optimizations, tradeoffs and verification.
   - Monolith and microservice topology are explicit deployment choices; flow behavior remains traceable in either topology.
   - SDS readiness means the logical design is implementable without guessing. SDS never contains code references or claims source observation; Implementation maps code to SDS and UAT proves running behavior.
+  - Implementation feedback opens an SDS revision only for a material logical ownership, contract, authority, durable-state/effect, compatibility, recovery or quality gap; reversible source-local choices remain in Implementation.

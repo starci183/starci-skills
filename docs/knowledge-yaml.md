@@ -34,13 +34,13 @@ From this skill directory:
 npm test
 ```
 
-Authored knowledge is validated as YAML by the test suite and readers. Rejected: unsafe `..` paths, duplicate rule/example IDs, missing referenced example files, unsupported YAML tags/duplicate keys. The retired knowledge compiler lives under `legacy/builders/` for historical reference only. Install/update copies the authored sources and records success after verification; see [runtime distribution](runtime-distribution.md).
+Authored knowledge is validated as YAML by the test suite and readers. Rejected: unsafe `..` paths, duplicate rule/example IDs, missing referenced example files, unsupported YAML tags/duplicate keys. Install/update copies the authored sources and records success after verification; see [runtime distribution](runtime-distribution.md).
 
 ## Schemas
 
-- `schemas/knowledge-source.schema.yaml` (authored YAML; the retired JSON mirror is historical)
-- `schemas/knowledge-rule.schema.yaml`
-- `schemas/code-example-manifest.schema.yaml`
+- `modules/schemas/knowledge-source.schema.yaml` (authored YAML)
+- `modules/schemas/knowledge-rule.schema.yaml`
+- `modules/schemas/code-example-manifest.schema.yaml`
 
 ## English only
 

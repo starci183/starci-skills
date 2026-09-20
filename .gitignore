@@ -19,7 +19,7 @@ worktrees/
 /config.yaml
 /config.json
 
-# Preserve this ignore after retirement: never accidentally track old personal settings.
+# Never accidentally track personal settings.
 resources/settings.json
 settings.local.json
 

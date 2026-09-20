@@ -28,7 +28,9 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   // The 4.x supervisor layers are gone from the host canon, not renamed inside it.
   assert.equal(contract.planCoordinator,undefined);
   assert.equal(contract.workflowMonitor,undefined);
-  assert.equal(contract.workflowKernel.role,'one-local-process-per-workflow-in-the-workflow-worktree');
+  assert.equal(contract.workflowKernel.role,'one-dedicated-agent-terminal-per-workflow');
+  assert.equal(contract.ui.semanticHierarchy.schema,'starci/agent-hierarchy@1');
+  assert.equal(contract.ui.semanticHierarchy.projection,'workflow -> Kernel -> Op');
   assert.match(contract.workflowKernel.calls.bindRun.cli,/orchestration run-create/);
   assert.match(contract.workflowKernel.calls.nameSelf.cli,/terminal rename .*\[Kernel\] <Workflow>/);
   assert.match(contract.workflowKernel.calls.attestWorktree.cli,/worktree show/);

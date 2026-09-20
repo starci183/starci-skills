@@ -9,7 +9,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 // Lane k7: this spec is written against the lane contract for api.mjs —
-//   survey|status|plan|enqueue|dispatch|settle|incident|retire
+//   survey|status|hierarchy|plan|enqueue|dispatch|settle|incident|finish
 //   --repo <path> --workflow <id> [--job <id>] [--kind <k>] [--op <id>]
 //   [--verdict pass|fail] [--report <file>] --json
 // wrapping kernel/ledger-db.mjs tables (workflows, goals, inbox, jobs,
@@ -56,7 +56,7 @@ test('survey on an empty workflow exits 0 with a sane empty result',{skip},t=>{
     if(Array.isArray(body[key]))assert.equal(body[key].length,0,`empty workflow but survey.${key} is non-empty`);
 });
 
-test('enqueue writes a pending job row the ledger can see',{skip},t=>{
+test('enqueue writes a queued job row the ledger can see',{skip},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-enqueue';
   seedGoal(repo,wf);
   const r=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
@@ -64,7 +64,36 @@ test('enqueue writes a pending job row the ledger can see',{skip},t=>{
   const jobs=read(repo,l=>l.db.prepare('SELECT * FROM jobs WHERE workflow_id=?').all(wf));
   assert.ok(jobs.length>=1,'enqueue produced no jobs row');
   const job=jobs.find(j=>j.op_id==='ex-test.probe')??jobs[0];
-  assert.ok(['pending','queued'].includes(job.status),`fresh job must be pending/queued, got ${job.status}`);
+  assert.equal(job.status,'queued',`fresh job must be queued, got ${job.status}`);
+});
+
+test('hierarchy projects workflow -> Kernel -> Op from durable job identity',{skip},t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,1,0,'kernel','kernel',?,'running',?,?,?)")
+      .run(`kernel-${wf}`,wf,json({
+        route:{host:'orca',agent:'codex',model:'gpt-5.6-sol',runtimePool:'codex-agent'},
+        hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-5.6-sol',terminalHandle:'term-kernel'}},
+      }),'term-kernel',at,at);
+  });
+  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
+  assert.equal(enq.status,0,enq.stderr);
+  const h=runApi('hierarchy','--repo',repo,'--workflow',wf,'--json');
+  assert.equal(h.status,0,h.stderr);
+  const body=out(h);
+  assert.equal(body?.schema,'starci/agent-hierarchy@1');
+  assert.equal(body?.workflow?.nodeId,`workflow:${wf}`);
+  const kernel=body?.nodes?.find(n=>n.role==='kernel');
+  const op=body?.nodes?.find(n=>n.role==='operation');
+  assert.equal(kernel?.nodeId,`agent:kernel:${wf}`);
+  assert.equal(kernel?.parentNodeId,`workflow:${wf}`);
+  assert.equal(kernel?.runtime?.agent,'codex');
+  assert.equal(kernel?.runtime?.model,'gpt-5.6-sol');
+  assert.equal(op?.parentNodeId,kernel?.nodeId);
+  assert.equal(op?.opId,'ex-test.probe');
+  assert.ok(body?.edges?.some(e=>e.parentNodeId===kernel.nodeId&&e.childNodeId===op.nodeId));
 });
 
 test('dispatch --job without --spawn prints the packet and leaves the job unclaimed',{skip},t=>{
@@ -98,7 +127,7 @@ test('settle --verdict pass --report marks the job settled and appends an event'
     events:l.db.prepare('SELECT count(*) n FROM events WHERE workflow_id=?').get(wf).n,
   }));
   assert.ok(after.job,'settled job row vanished');
-  assert.ok(!['pending','queued','running'].includes(after.job.status),`settled job still live: ${after.job.status}`);
+  assert.ok(!['queued','running'].includes(after.job.status),`settled job still live: ${after.job.status}`);
   assert.ok(after.events>before,'settle appended no event');
 });
 
@@ -111,19 +140,19 @@ test('incident writes an incidents row for the workflow',{skip},t=>{
   assert.ok(n>=1,'incident produced no incidents row');
 });
 
-test('retire finishes the workflow, closes its inbox and keeps the goals rows',{skip},t=>{
-  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-retire';
+test('finish finishes the workflow, closes its inbox and keeps the goals rows',{skip},t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-finish';
   seedGoal(repo,wf);
   const goalsBefore=read(repo,l=>l.db.prepare('SELECT count(*) n FROM goals WHERE workflow_id=?').get(wf).n);
   assert.ok(goalsBefore>=1);
-  const r=runApi('retire','--repo',repo,'--workflow',wf,'--json');
+  const r=runApi('finish','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const after=read(repo,l=>({
     phase:l.db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf)?.phase,
     pending:l.db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND status='pending'").get(wf).n,
     goals:l.db.prepare('SELECT count(*) n FROM goals WHERE workflow_id=?').get(wf).n,
   }));
-  assert.equal(after.phase,'finished','retire must set workflows.phase=finished');
-  assert.equal(after.pending,0,'retire must close the workflow inbox — no pending rows left');
-  assert.equal(after.goals,goalsBefore,'retire retires the goal, it never deletes the record');
+  assert.equal(after.phase,'finished','finish must set workflows.phase=finished');
+  assert.equal(after.pending,0,'finish must close the workflow inbox — no pending rows left');
+  assert.equal(after.goals,goalsBefore,'finish finishes the goal, it never deletes the record');
 });

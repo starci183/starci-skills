@@ -5,24 +5,45 @@
 # modules/models/runtimes.yaml runtimes AND every key of
 # modules/models/registry.yaml targets has a profile here.
 #
-# Canonical model data (ported from the retired model/ tree):
-#   capabilities.yaml  — starci/model-capability-policy@1 (contract; ported from retired kernel/model-policy.mjs)
+# Canonical model data:
+#   capabilities.yaml  — starci/model-capability-policy@1 (contract)
 #   qualifications.yaml — empty measured-qualification store seed
-#   runtimes.yaml      — provider-window pools + allocation + roleOfKind
+#   runtimes.yaml      — agent quota-window runtime pools + allocation + roleOfKind
 #   registry.yaml      — starci/profile-registry@3 (aliases, targets, operators, supervisors)
 #   kinds.yaml         — starci/kinds@2 operation catalog (kernel-agent legality graph, modules/goal/legality.yaml)
 #   records.yaml       — starci/records@1 record catalog (contract data, read directly)
-#   hosts.yaml         — starci/hosts@1 host descriptors (RETIRED — delete-manifest; host facts live in modules/models/agents/ + runtimes.yaml)
-#   agents/            — starci/agent-card@1 agent cards (was providers/orca/adapters/)
+#   agents/            — starci/agent-card@1 agent cards
+#   profiles/          — per-runtime launch facts
 #   code-patterns.yaml — starci/code-pattern-profile@1 (scripts/checks/check-scoped-lint.mjs)
-#   claude/codex/qwen/devin.yaml — starci/execution-profiles@1 per-runtime profiles
-#                      (RETIRED — delete-manifest; per-runtime launch facts live in profiles/ + modules/models/agents/)
-#   index.mjs          — RETIRED — delete-manifest; new-arch scripts read the YAML directly via engine/yaml.mjs
 
 schema: starci/module-models-index@1
 
+# Canonical naming. Keep these roles distinct in contracts and receipts:
+# - launcher: the human chat surface that invokes entry skills
+#   (codex-chat | claude-chat | devin-chat)
+# - host: Orca, which owns terminals, worktrees and managed operation workers
+# - agent: the execution adapter / Orca agent id (codex | claude | devin | qwen)
+# - provider: the credential/billing/quota family used by allocation
+# - model: a concrete model id such as gpt-5.6-sol
+# - profile: a StarCi routing/capability target such as codex-agent
+# - runtimePool: one quota/capacity window from runtimes.yaml
+# An agent and provider may currently carry the same string, but the fields are
+# not interchangeable. Only legacy `kernel.provider` aliases `kernel.agent`;
+# model-routing `provider` remains quota authority.
+glossary:
+  launcher: human chat surface invoking entry skills
+  host: Orca execution environment
+  agent: execution adapter or Orca agent id
+  provider: credential billing and quota family
+  model: concrete model id
+  profile: StarCi routing and capability target
+  runtimePool: quota and capacity window
+  deprecatedCompatibilityAlias: {kernel.provider: kernel.agent}
+
 pools:
-  # runtimes.json runtimes.* — provider-window pools the allocator serves
+  # runtimes.yaml runtimes.* — quota/capacity pools the allocator serves;
+  # `provider` names quota authority, distinct from the execution adapter even
+  # where both ids currently match.
   - {target: claude-agent,  profile: profiles/claude-agent.yaml,  provider: claude, roles: [implement, verify, write, decide, plan], automaticChains: true}
   - {target: claude-fable,  profile: profiles/claude-fable.yaml,  provider: claude, roles: [verify, decide, plan, write],             automaticChains: true, budgetWindow: fableWeekly}
   - {target: codex-agent,   profile: profiles/codex-agent.yaml,   provider: codex,  roles: [implement, verify, write, decide, plan], automaticChains: true, note: "sole image-generation route"}
@@ -39,7 +60,7 @@ exceptionTargets:
 notTargets:
   # things an agent might mistake for operation targets — they are not
   - {name: "supervisor chains (planCoordinator, workflowMonitor)", source: registry.json supervisors, note: "persistent coordinator seats, not operation pools"}
-  - {name: "nonOperation model functions (assessGoal, planOp, decide, validateOp, critiqueGoal, ...)", source: "retired model-policy.mjs MODEL_KINDS", note: "separately typed Fable/Astra + Opus/Sol pools; never consume operation probation budget"}
+  - {name: "nonOperation model functions (assessGoal, planOp, decide, validateOp, critiqueGoal, ...)", source: "kernel model-function vocabulary (MODEL_KINDS)", note: "separately typed Fable/Astra + Opus/Sol pools; never consume operation probation budget"}
 
 selection: selection.yaml   # the eligibility/probation/ordering rules —
                           # start here for "may this model take this job"

@@ -33,7 +33,7 @@ export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contr
 /** The edge kinds the layout's rules define, in the order a reader should see them. `provenBy` on a
  * work/contract is split into its own two roles because the layout's concept 9/reconciliation model treats
  * "who proves the provider side" and "who proves the consumer side" as distinct facts, not one bag of ids. */
-export const EDGE_KIND_ORDER = ['refs','composes','dependsOn','subscribes','extends','appliesTo',
+const EDGE_KIND_ORDER = ['refs','composes','dependsOn','subscribes','extends','appliesTo',
   'conflictsWith','blockedBy','tension','contractProvider','contractConsumer','provenBy'];
 const EDGE_FIELD_NAMES = new Set(['refs','composes','dependsOn','subscribes','extends','appliesTo',
   'conflictsWith','blockedBy','tension']);
@@ -163,9 +163,9 @@ function buildUsedBy(records) {
  * Whether `record`'s evidence no longer speaks for it, and why. Three independent tests, either one
  * enough:
  *  - digest staleness: the evidence is explicitly marked `stale: true`, or its `recordDigest` no longer
- *    matches the sha256 of the record's own current bytes (the exact digest kernel/reconciliation.mjs's
- *    `recordDigests`/`nodeFileOf` compute, reproduced here for the same reason check-example-work.mjs
- *    reproduces it: importing recordDigests would require building the `tree` object it expects).
+ *    matches the sha256 of the record's own current bytes (the digest the work-layout contract
+ *    declares for staleness, reproduced here for the same reason check-example-work.mjs
+ *    reproduces it).
  *  - code-digest staleness (layout concept 1): the evidence carries a `codeDigest` (scripts/example/example-
  *    ownership.mjs's `hashOwnedDirs`, over the record's own owners/module or, when it names none, every
  *    implementation proving it) that no longer matches what that same computation produces from the code
@@ -359,7 +359,7 @@ export function buildYamlDocument(derived) {
   };
 }
 
-export function buildFrontierMarkdown(derived) {
+function buildFrontierMarkdown(derived) {
   const t = derived.tally.overall;
   const lines = [
     '# Frontier',

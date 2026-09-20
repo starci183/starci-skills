@@ -22,7 +22,7 @@ provenance:
     edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
     source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
     Historical links supply provenance, not scripts or execution instructions.
-    One rule is retired here: FE-TEST-7 folded into FE-TEST-1 Case 7, because where a spec lives and
+    One rule is closed here: FE-TEST-7 folded into FE-TEST-1 Case 7, because where a spec lives and
     which half it measures are one law about one placement. Its number is not reused.
 rules:
   - id: FE-TEST-1
@@ -252,7 +252,7 @@ rules:
     verification:
       automated: []
       manual:
-        - Verify asserted export inventories against installed package dist, not retired @grammar paths.
+        - Verify asserted export inventories against installed package dist, not former @grammar paths.
     relatedExamples: []
 openQuestions:
   - id: minority-class-literal-pins

@@ -113,7 +113,7 @@ Keep four contracts distinct:
 4. A presentational props contract contains resolved render values and user actions. It does not runtime-
    import transport enums, response envelopes, Apollo errors, or operation types.
 
-Handwritten wire types may be necessary for a legacy or unavailable generator, but they must name the
+Handwritten wire types may be necessary when no usable generator is installed, but they must name the
 schema revision/introspection source and be checked for drift. They are adapter types, not reusable product
 models. Grammar never imports them.
 
@@ -184,7 +184,7 @@ src/
 
 The existing Academy backend is transport-first under `src/features/api/core/graphql/...`. That is a source
 mapping to assess, not a portable requirement and not permission to copy every wrapper. Refactoring an
-existing product still follows its accepted SDS and bounded migration plan.
+existing product still follows its accepted SDS and bounded transition plan.
 
 ## Single source and monorepo profiles
 
@@ -274,7 +274,7 @@ excluded from this trace; observations use the pinned commit.
 - Client-only page markers on adapters that merely mount a client owner enlarge the client graph without
   owning browser behavior. Keep the boundary at the connected owner when the route itself needs none.
 
-These observations describe migration targets only when an accepted SDS selects them. Current source is
+These observations describe transition targets only when an accepted SDS selects them. Current source is
 evidence for the standard, not product-design authority or proof that a target product must be refactored.
 
 ## Primary references

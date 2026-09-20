@@ -1,7 +1,5 @@
 # ============================================================================
-# TINKLE-8 — modules/goal/existing.yaml
-# Brief: ex-testing/briefs/tinkle/tinkle-8.md — "the 'what do we already have'
-# leg".
+# modules/goal/existing.yaml — the "what do we already have" leg.
 #
 # Goal breaking is NEVER on raw input — it is input x current-state. This file
 # is the SURVEY step of the 5-step method (anatomy.yaml decomposition): before
@@ -9,12 +7,11 @@
 # request touches, and the extend-vs-add decision falls out of the GAP.
 #
 # Sources:
-#   engine/ledger-db.mjs        — loadLedger, inScope, nodeAllowlist,
-#                                    executableCandidates, decisionCandidates,
-#                                    disjoint — the ownership lookup over .starciwork
-#   the kernel agent        — extensions.work3.reconciliation: the typed
-#                                    {case: reference|conflict|new, record, ...}
-#                                    rows an intake writes against decided records
+#   engine/ledger-db.mjs        — the .starciwork runtime.sqlite record rows
+#                                    (record state, ownership)
+#   modules/models/kinds.yaml — work.author's intake mode: the typed
+#                                    reference/conflict/new cases an intake
+#                                    reconciles authored records against decided ones
 #   scripts/checks/check-work-deep.mjs    — DEP_STALE: a done record whose referenced
 #                                    deps moved since baseline ("its proof was
 #                                    captured against older premises");
@@ -25,11 +22,6 @@
 #                                    unavailable input; stale evidence re-proves,
 #                                    never asserts fresh
 #   modules/ops/ops/work.author.yaml, scope.define.yaml — the record-authoring ops
-#
-# NOTE on the brief's citation: the brief cites `work-query.mjs` as the
-# ownership-lookup mechanism. No such file exists in the runtime — the actual
-# mechanism is ledger.mjs's candidate/in-scope functions plus intake.mjs's
-# reconciliation table. Flagged in the report; the real sources are cited here.
 # ============================================================================
 
 schema: starci/module-goal-existing@1
@@ -57,9 +49,9 @@ survey:
   starciwork: >-
     Query the .starciwork tree for the records that OWN the paths this request
     would touch: is there an impl/br/fr/sds record whose scope covers them
-    (ledger.mjs `inScope`, `executableCandidates`, `decisionCandidates` —
-    ownership is the node's allowlist of path prefixes, and one scope folder
-    owns one index.yaml). What state is each owner in — todo, doing, done —
+    (ownership is the node's allowlist of path prefixes, and one scope folder
+    owns one index.yaml — docs/ledger-db.md). What state is each owner in —
+    todo, doing, done —
     and what does its evidence pin.
   source: >-
     Scan the actual source surfaces those records name (or, where no record
@@ -67,13 +59,13 @@ survey:
     exist, and is it extendable — does it expose the seam this request needs,
     or is it sealed / owned by another feature's record.
   reconciliation: >-
-    The intake's reconciliation table is where the survey's findings are
-    WRITTEN: extensions.work3.reconciliation rows of {case, record, decision,
-    reads, hands, detail} — `reference` what a decided record already holds
+    work.author's intake mode is where the survey's findings land — three
+    typed cases reconciled against decided records (modules/models/kinds.yaml):
+    `reference` what a decided record already holds
     (cite by id), `conflict` what cannot hold together with it (a todo
     decision record with both sides + one recommendation), `new` what no
-    decided record covers (the kernel agent). The survey is not a memo;
-    it is typed rows the chain reads.
+    decided record covers. The survey is not a memo;
+    it is typed cases the chain reads.
   output: >-
     S₀ = the existing-surface map: {record-id -> {owns: paths, state, evidence,
     extendable: yes|no|unknown}}. Every variable in it is one a later leg can
@@ -108,7 +100,7 @@ decision:
     records: "a `new` reconciliation row — no decided record covers this"
 
 # ----------------------------------------------------------------------------
-# RULES — the four the brief names.
+# RULES — survey discipline.
 # ----------------------------------------------------------------------------
 rules:
 
@@ -118,14 +110,11 @@ rules:
       proposed — never decompose against an unmeasured S₀.
     mechanism: >-
       The .starciwork ownership lookup: which record owns the touched paths
-      (ledger.mjs inScope / executableCandidates / decisionCandidates over
-      node allowlists) + the source scan those records name. The intake writes
-      its findings as typed reconciliation rows (intake.mjs) — reference,
-      conflict, new — not prose.
-    note: >-
-      The brief cites `work-query.mjs` for this; that file does not exist.
-      The real mechanism is ledger.mjs's candidate/scope functions plus the
-      intake reconciliation table. (report flags this)
+      (the record rows in engine/ledger-db.mjs's runtime.sqlite — ownership is
+      the node's allowlist of path prefixes, docs/ledger-db.md) + the source
+      scan those records name. The intake writes its findings as typed
+      reconciliation cases (work.author intake mode, modules/models/kinds.yaml)
+      — reference, conflict, new — not prose.
 
   - id: extend-vs-add
     rule: >-
@@ -170,6 +159,6 @@ rules:
 # ----------------------------------------------------------------------------
 never:
   - never-skip: "never propose a chain without the survey — S₀ unmeasured is Δ uncomputable"
-  - never-edit-another-owner: "a record owned by another feature is read via a `reference` row or escalated via `conflict` — never edited in place (intake.mjs)"
-  - never-assert-fresh: "a stale done variable is re-PROVEN, never refreshed by assertion (CLAUDE.md work-correction policy; work-verification.md)"
+  - never-edit-another-owner: "a record owned by another feature is read via a `reference` case or escalated via `conflict` — never edited in place (work.author intake discipline)"
+  - never-assert-fresh: "a stale done variable is re-PROVEN, never refreshed by assertion (CLAUDE.md work-correction policy; docs/verify-proof.md)"
   - never-treat-absent-as-clean: "no record owning a path does not mean free rein — it means `new` scope, which scope.define still bounds"

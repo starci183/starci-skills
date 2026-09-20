@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // route-op.mjs — resolve which modules/ops/<id>.yaml operation serves a structured
 // routing request. Selection is deterministic and reads ONLY the `route:` blocks;
-// an agent must not need to read a whole op file to route (tinkle/_common.md).
+// an agent must not need to read a whole op file to route.
 //
 // CLI:
 //   node scripts/route/route-op.mjs --kind <opKind>
@@ -67,7 +67,7 @@ function yamlFiles(dir, sub) {
 }
 
 function loadOps(opsDir) {
-  // Per-op files live at <opsDir>/<id>.yaml or <opsDir>/ops/<id>.yaml (tinkle-1 layout).
+  // Per-op files live at <opsDir>/<id>.yaml or <opsDir>/ops/<id>.yaml.
   const files = [...yamlFiles(opsDir), ...yamlFiles(opsDir, 'ops')];
   const ops = [], skipped = [];
   for (const full of files) {
@@ -89,9 +89,9 @@ function loadOps(opsDir) {
       id,
       file: path.relative(skillRoot, full),
       route: {
-        nodeKinds: asList(route.nodeKinds ?? route.nodeKind),
+        nodeKinds: asList(route.nodeKinds),
         phase: asList(route.phase),
-        intent: asList(route.intent ?? route.intents),
+        intent: asList(route.intent),
         prerequisites: asList(route.prerequisites),
         riskHints: asList(route.riskHints),
       },

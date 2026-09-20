@@ -2,9 +2,7 @@
 -- machine.sql — the machine arbiter `%LOCALAPPDATA%/StarCi/runtime/machine.sqlite`
 -- (schema `starci/machine-db@1`, MACHINE_VERSION=1). This is the EXECUTED source
 -- of truth: `engine/ledger-db.mjs` reads and db.exec()s this file inside the v1
--- create transaction (migrateMachine). Originally extracted verbatim from
--- `kernel/ledger-db.mjs` (const MACHINE_DDL) and checked against
--- `docs/ledger-db.md` §5.
+-- create transaction (migrateMachine); checked against `docs/ledger-db.md` §5.
 --
 -- WHY A SECOND FILE (§1/§2/§6): one transaction cannot span two SQLite files, and
 -- repo fences are per-ledger — but `ai/*` provider quota and `machine:*` budgets

@@ -6,7 +6,7 @@ Published packages ship **sources only**. There is no build step and no generate
 
 1. Copy the declared `package.json` `files` payload into `<host>/.claude`.
 2. Preserve locally changed or unowned files on update (unless `--force`).
-3. Ensure installed `.claude/.gitignore` contains `/config.json` (older installs may still list retired staging entries).
+3. Ensure installed `.claude/.gitignore` contains `/config.yaml` and `/config.json`.
 4. Verify the installed source tree (doctor contract checks).
 5. Only then write `.starci-skills.json` with the new version and file hashes.
 

@@ -39,7 +39,7 @@ position:
   mediumTier: first in default; second in decide/plan
   easyTier: third
   chainLeads: [e2e.verify, integration.verify, perf.verify, security.verify, brand.decide, decision.prepare, provision.ask, goal.revise, scope.define, interface.draw, interface.asset]
-  chainLast: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.retire, task.execute, uat.verify, workspace.manage]
+  chainLast: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.finish, task.execute, uat.verify, workspace.manage]
   rationale: >-
     Two opposite positions, both deliberate (registry.json costPolicy): it leads
     verify because independent judgment is the product there, and it trails

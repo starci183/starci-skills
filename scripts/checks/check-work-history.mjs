@@ -10,11 +10,11 @@ import {loadRecords} from '../example/example-ownership.mjs';
 import {classifyChange} from './work-change.mjs';
 
 /**
- * A Work tree cannot say what it used to say.
+ * A Work tree cannot contradict its own committed past.
  *
  * `change.rev`, `change.kind` and `change.withdraws` are claims about a *transition*, and a record file on
  * disk holds exactly one side of it. scripts/checks/work-change.mjs already owns the semantics of the transition and
- * was found unusable in practice by the v6-4 audit for one reason: it asks for `--against <previous Work
+ * was unusable in practice for one reason: it asks for `--against <previous Work
  * tree>`, and nobody produces previous Work trees. The example trees keep no history of their own, so every
  * rev/kind/withdraws claim in them has been accepted on faith since it was authored.
  *
@@ -137,7 +137,7 @@ function withdrawalAssessment(record) {
   const scopes = withdrawalScopes([...below, ...ancestors]);
   // When the mainline chain shows no predecessor that differs, the revision the claim refers to is only
   // reachable through the lineage walk - a record that moved directory with its tree carries its rev-1 text at
-  // the path it used to live under. That closest reachable ancestor is the clause list the claim is checked
+  // the path it occupied before the move. That closest reachable ancestor is the clause list the claim is checked
   // against; if it holds, the claim stands and nothing is reported.
   const named = older ?? ancestors[0] ?? null;
   const held = statementsOf(named?.data).map(fold);

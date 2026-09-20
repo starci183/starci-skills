@@ -194,7 +194,7 @@ makes it green either, because an unproven claim must not read as a proven one.
 design references, allowlist or changed files. For `frontend.implement`/`interface.implement`, it reads PNG and
 matching markup recursively from the bound implementation node's `assets/`; a referenced UI node with no
 capture, undecodable pixels, missing markup or unavailable brand audit is a failing missing proof. Non-UI
-implementations still return null. For legacy drawing compatibility, the hook may read structurally classified
+implementations still return null. For compatibility with earlier drawing records, the hook may read structurally classified
 captures declared by the UI record; it returns **null** — not green — when that drawing carries only ImageGen
 directions, so a generated picture is never reported as exact render proof. When the run cannot start at all — a tree with no brand record, a node with no `ui:`
 spec — the hook answers a single check, `render-checks-unavailable`, as a `skip` carrying the reason: a

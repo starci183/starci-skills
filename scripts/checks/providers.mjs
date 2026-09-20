@@ -7,16 +7,13 @@ import {fileURLToPath} from 'node:url';
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
 
-// The provider contract tree after the providers/ retirement:
+// The provider contract tree:
 //   modules/models/agents/<agent>.yaml  — agent cards (schema starci/agent-card@1;
-//     the old providers/orca/adapters/<agent>.yaml card is now the document's top
-//     level, claude/codex add a `capabilities:` key)
+//     the card is the document's top level, claude/codex add a `capabilities:` key)
 //   modules/host/orca/<doc>.yaml        — the Orca host contract docs (index, api,
-//     calls, capabilities, recipes, validation, envelopes — the last was
-//     providers/common/envelopes.yaml)
+//     calls, capabilities, recipes, validation, envelopes)
 //   modules/models/profiles/<target>.yaml — profiles whose launch.orca.adapter
 //     names an agent card
-// providers/catalog.yaml, providers/validate.mjs and providers/README.md are gone.
 const AGENTS_DIR=path.join(skillRoot,'modules','models','agents');
 const HOSTS_DIR=path.join(skillRoot,'modules','host');
 const PROFILES_DIR=path.join(skillRoot,'modules','models','profiles');

@@ -1,6 +1,6 @@
-# modules/ops/ops/goal.revise.yaml - TINKLE-1 pure-yaml port of .claude/ops/goal.revise/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/goal.revise.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: goal.revise
 goal:
@@ -19,7 +19,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: goal
-    path: .starciwork/_local/workflows/<workflow>/goal.json + goal.md
+    path: the dispatch contract's context (api op-contract) — the kernel binds the approved goals row
     purpose:
       en: Read the frozen goal exactly as approved - its rev, done metrics, scope, allocations and
         the digest every derivation binds. The frozen goal is the base the diff applies to; a goal
@@ -56,8 +56,7 @@ writes:
       en: Write only state/blocker/completion on this operation's own node; the revision belongs to
         the goal files and the diff to the evidence result.
   - id: goal
-    path: .starciwork/_local/workflows/<workflow>/goal.json +
-      .starciwork/_local/workflows/<workflow>/goal.md
+    path: goal.json + goal.md under the op's declared write ceiling, listed in the report's files[]
     fields:
       - schema
       - rev
@@ -65,9 +64,10 @@ writes:
       - done
       - derivedFrom
     content:
-      en: Write goal v(n+1) whole - goal.json carries schema starci/workflow-goal@1, goal.md its human
-        rendering - the only _local/workflows/<workflow>/ files this op writes; the kernel's run
-        state (runtime.sqlite goals/jobs/inbox/reports/events rows) is never op output - rev bumped by exactly
+      en: Write goal v(n+1) whole - goal.json carries schema starci/goal@1, goal.md its human
+        rendering - these are the only runtime artifacts this op writes and they travel as report
+        evidence; the kernel persists the revision as the goals row (runtime.sqlite goals/jobs/inbox/
+        reports/events rows are never op output) - rev bumped by exactly
         one, derivedFrom naming the previous rev
         and its digest, done still a checkable metrics block. Every changed section is carried at
         its new value; sections the revision did not touch are carried byte-identical. A direct edit
@@ -132,10 +132,10 @@ steps:
       - evidence
     action:
       en: Validate the new goal - `starci validate` over the node and evidence layout, goal.json
-        carrying schema starci/workflow-goal@1, ids stable, done metrics still evaluable, rev
+        carrying schema starci/goal@1, ids stable, done metrics still evaluable, rev
         exactly +1, diff
         complete - and report done once with the rev transition and the invalidation surface.
-        Reports settled on the old rev stay bound to it and never count toward the new one.
+        Reports settled on the predecessor rev stay bound to it and never count toward the new one.
 proofs:
   - id: rev-and-diff
     requirement:
@@ -175,7 +175,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  workflow: Selected workflow id owning the goal under _local/workflows
+  workflow: Selected workflow id owning the goal (goals row in runtime.sqlite)
 goalPolicy:
   revBump: exactly-plus-one
   diff: explicit-required
@@ -191,7 +191,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "What is goal v(n+1) - the explicit diff from frozen v(n), rev+1, with
@@ -208,7 +208,7 @@ business:
   failureModes:
     - GOAL_CONTRACT_VIOLATION, AUTHORITY_WIDENING, GOAL_UNRESOLVED, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

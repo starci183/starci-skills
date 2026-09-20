@@ -91,7 +91,7 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 **Use:** A resource that must reject obsolete executors checks an execution epoch/version with each protected mutation. A lease bounds admission; it does not stop a paused worker. The token must reach the write authority and be compared there. [Kleppmann's distributed locking analysis](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html).
 
-**Avoid:** Treating lease expiry or a fenced local journal update as evidence a remote command did not happen. If a provider lacks fencing, specify its supported idempotency, conditional update, serialization or reconciliation strategy and the residual limitation.
+**Avoid:** Treating lease expiry or a fenced local record update as evidence a remote command did not happen. If a provider lacks fencing, specify its supported idempotency, conditional update, serialization or reconciliation strategy and the residual limitation.
 
 **Review/prove:** Pause executor A beyond lease expiry, admit B, then resume A; inspect the actual resource's accepted effects. Reconciliation compares recorded intent/receipt with authoritative remote state and has bounded, owned dispositions for unknown or conflicting outcomes. It must not manufacture completion.
 
@@ -147,13 +147,13 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 **Use:** Make events the authoritative history only when historical reconstruction and domain requirements justify that storage model. Plan stream concurrency, schema evolution, snapshots, replay and retention. An audit log or outbox alone is not event sourcing. [Microsoft event sourcing](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing).
 
-**Avoid:** Adopting it because CQRS, Kafka or a saga already exists. Current-state relational persistence may satisfy the scenario with far less migration and operational cost.
+**Avoid:** Adopting it because CQRS, Kafka or a saga already exists. Current-state relational persistence may satisfy the scenario with far less change and operational cost.
 
-**Review/prove:** Reconstruct state from history, handle old events, enforce competing stream appends and prevent replay from repeating external effects. The domain owns event meaning. Adding this pattern to an existing product requires an accepted storage/migration decision, not a framework-only upgrade.
+**Review/prove:** Reconstruct state from history, handle old events, enforce competing stream appends and prevent replay from repeating external effects. The domain owns event meaning. Adding this pattern to an existing product requires an accepted storage/transition decision, not a framework-only upgrade.
 
 ## DP-16 — Compatible rollout and expand/contract
 
-**Use:** When versions coexist, introduce compatible fields/contracts first, deploy readers/writers in a safe order, backfill with restartable progress, verify parity, then remove the old contract after its users are gone. This is this standard's deployment inference from explicit producer/consumer compatibility, not a claim that a schema checker proves a live rollout. See DP-11 and the [application runtime/config/health profile](application-runtime-config-and-health.md).
+**Use:** When versions coexist, introduce compatible fields/contracts first, deploy readers/writers in a safe order, backfill with restartable progress, verify parity, then drop the earlier contract after its users are gone. This is this standard's deployment inference from explicit producer/consumer compatibility, not a claim that a schema checker proves a live rollout. See DP-11 and the [application runtime/config/health profile](application-runtime-config-and-health.md).
 
 **Avoid:** A destructive schema change and new binary that can only work when every process changes atomically; replaying old sagas through an incompatible definition; calling a rollback safe after irreversible data transformation.
 

@@ -25,7 +25,7 @@ test('every shipped skill declares its directory name and a description, and the
 
 test('the workflow-chat skill supervises the kernel through api.mjs and names no dead runtime paths',()=>{
   const skill=read('skills/workflow-chat/SKILL.md');
-  assert.match(skill,/scripts\/kernel\/api\.mjs|bin\/starci\.mjs api\b/,'the chat drives the kernel through api.mjs, not a retired launcher');
+  assert.match(skill,/scripts\/kernel\/api\.mjs|bin\/starci\.mjs api\b/,'the chat drives the kernel through api.mjs, not a removed launcher');
   for(const dead of ['hosts/','cli/main.mjs','workflows/','kernel/store.mjs','launch.mjs','workflow-goal','workflow-run','workflow-approve'])
     assert.equal(skill.includes(dead),false,`workflow-chat must not name the dead surface ${dead}`);
 });

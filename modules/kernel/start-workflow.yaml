@@ -1,13 +1,12 @@
 schema: starci/module-kernel-start@1
 id: kernel.start-workflow
-aliases: [kernel.boot]
 
 # ============================================================================
 # START-WORKFLOW <goal-id> — claims a queued goal from the ledger inbox and
 # spawns ONE long-lived [Kernel] agent bound to that workflow_id. The kernel
 # then runs modules/kernel/driver-loop.yaml until the workflow finishes. On
-# finish the goal is retired — the queue entry is consumed and the workflow
-# closes; a finished goal never re-enters the queue.
+# finish the queue entry is consumed and the workflow closes; a finished
+# goal never re-enters the queue.
 # ============================================================================
 
 about:
@@ -19,12 +18,17 @@ about:
     (kernel attempt+1, same workflow generation), never a duplicate. Durable
     plan/jobs/events survive agent churn.
 
-actor: any launcher — owner chat, a host automation, another kernel
+actor: >-
+  launcher — a human Codex, Claude or Devin chat surface
+  (codex-chat | claude-chat | devin-chat). The launcher is ingress only; it
+  does not become the workflow's execution host or Kernel agent.
+host: orca
 executable: scripts/kernel/start-workflow.mjs
 
-usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--provider <name>]
+usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>]
+# --repo is the project repository that owns .starciwork/runtime.sqlite, not Source
 # without --goal: claims the oldest pending inbox goal
-# without --provider: the kernel host is routed, not chosen — same machinery as ops
+# --agent pins an explicit Kernel agent override (routedBy: override)
 
 claim:
   transaction: >-
@@ -42,23 +46,20 @@ claim:
 spawn:
   title: '[Kernel] <workflow_id>'
   routing: >-
-    kernel host resolved by scripts/route/route-model.mjs --kind
-    model.manageWorkflow --risk high (selection.yaml kernelFunctionKinds) —
-    the same model-routing machinery ops use. pick.target →
-    modules/models/profiles/<target>.yaml provider field. Router refusal
-    ('no eligible model') or failure falls back to provider devin with
-    routedBy: fallback. --provider <name> is an explicit operator override
-    (routedBy: override).
+    Orca is always the execution host. The Kernel agent and concrete model are
+    resolved by owner config first, otherwise scripts/route/route-model.mjs
+    --kind model.manageWorkflow --risk high. A config or launcher override is
+    an explicit Kernel identity pin and fails closed when unavailable; it is
+    never silently replaced by Devin or another agent. Operation jobs retain
+    their own independent profile/runtime-pool routing and fallback policy.
   command: >-
-    spawn flags from the provider adapter card
-    modules/models/agents/<provider>.yaml — commandPrefix/credentialRefresh
-    [platform] + kernelCommandRequirements when declared (Devin uses dangerous
-    mode only for its dedicated kernel terminal so API commands cannot stall),
-    otherwise commandRequirements (qwen --yolo + credential refresh, Devin
-    ACP_BACKEND strip + auth probe),
-    or terminalFallback.command + bypassFlag for native-managed agents
-    (claude --dangerously-skip-permissions, codex --full-auto). The
-    PROVIDER_CMD map is the fallback when the card carries no command fields.
+    Every Kernel boots as one dedicated Orca terminal, including Codex and
+    Claude agents that use managed workers for operation jobs. The command is
+    composed only from modules/models/agents/<agent>.yaml. The card owns the
+    executable plus modelArgs, effortArgs, bypassArgs and any credential/env
+    preparation; the launcher never improvises flags. Codex currently uses
+    --model <model>, -c model_reasoning_effort="<effort>",
+    --ask-for-approval never and --sandbox danger-full-access.
   prompt: >-
     kernel packet: rendered from modules/kernel/kernel-prompt.md (contract
     data — the template lives in modules/, not scripts/): resolved Source
@@ -68,27 +69,38 @@ spawn:
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
     mutation goes through node scripts/kernel/api.mjs <cmd>
     (survey/status/plan/enqueue/route/dispatch/consume-report/check/settle/
-    incident/retire — plus the worker-side op IPC op-contract/report) — never
+    incident/finish — plus the worker-side op IPC op-contract/report) — never
     direct sqlite writes, never self-spawned op terminals, never direct
-    orca/git/provider-CLI calls, never .starciwork/_local/ writes (report/
-    contract/check truth is the ledger rows via the api verbs; _local is
-    scratch only); `api route` persists the model decision before every
-    dispatch; dispatch goes through api dispatch; findings/plans persist via
-    api plan|incident before dispatch (kernel-prompt.md BOUNDARY).
+    orca/git/agent-CLI calls (report/contract/check truth is the ledger
+    rows via the api verbs); `api route` persists the model decision before
+    every dispatch; dispatch goes through api dispatch; findings/plans
+    persist via api plan|incident before dispatch (kernel-prompt.md BOUNDARY).
+  attestation: >-
+    terminal.create → terminal.read readiness → terminal.send prompt →
+    terminal.read activity. When a concrete model is requested, the ready
+    terminal must render that exact model id before the prompt is accepted.
+    A command-line model flag is request evidence, not attestation. Mismatch or
+    absence fails with step=model-attestation, closes the terminal, clears the
+    startup reservation and never records the Kernel job as running.
 
 records:
-  jobs_row: {kind: 'kernel', workflow_id, status: 'running', worker_id: <terminal handle>}
-  signals_row: {scope: 'kernel', key: workflow_id, token}  # the singleton lock
+  jobs_row: {kind: 'kernel', workflow_id, status: 'running', worker_id: <terminal handle>, payload: {route: {host: orca, agent, model}, hierarchy: {schema: starci/agent-hierarchy@1, nodeId: 'agent:kernel:<workflow_id>', parentNodeId: 'workflow:<workflow_id>', role: kernel, runtime: {host: orca, agent, provider, model, profile, runtimePool, terminalHandle}}}}
+  signals_row: {scope: 'kernel', key: workflow_id, token, value: {terminal: <terminal handle>, modelAttested: true}}
 
 rules:
   - 'one kernel per workflow — signals singleton enforces it'
   - 'startup reserves the singleton with a bounded TTL before terminal creation'
-  - 'prompt delivery is successful only after readiness and visible TUI activity'
+  - 'boot never calls orchestration run-create/task-create/worker-start; those are operation lifecycle APIs'
+  - 'prompt delivery is successful only after readiness, exact requested-model attestation and visible TUI activity'
   - 'kernel outlives ops; ops are ephemeral, kernel is not'
   - 'claim first, spawn second — never spawn for an unclaimed goal'
-  - 'workflow finish retires the goal: workflows.phase=finished, inbox consumed'
+  - 'workflow finish closes the goal: workflows.phase=finished, inbox closed (status done)'
 
 returns:
   kernel_terminal: handle
   workflow_id: bound
+  host: orca
+  agent: codex|claude|devin|qwen
+  model: concrete model id
+  model_attested: true
   replaced: true|false

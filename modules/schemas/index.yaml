@@ -1,21 +1,14 @@
 # ============================================================================
-# modules/schemas/ — the merged schema catalog (catalog + analysis, no schema bodies)
+# modules/schemas/ — the schema catalog (catalog + analysis, no schema bodies)
 # ============================================================================
-# TINKLE-3 produced this file as a MAP of the root schemas/ tree. The M2
-# consolidation executed the merge it predicted: every schema the keep-set
-# still consumes was copied from the retired root `schemas/` into
-# `modules/schemas/`, and the five specification schema bodies moved from
-# `specifications/` into `modules/schemas/spec/` with normalized
-# `*.schema.yaml` names. This file is now the index of the merged tree.
+# This file is the index of the authored schema tree: every schema in live
+# use lives under `modules/schemas/`, and the five
+# specification schema bodies live under `modules/schemas/spec/` with
+# normalized `*.schema.yaml` names.
 #
-# The compiled JSON projection stays retired — the authored YAML under
+# There is no compiled JSON projection — the authored YAML under
 # modules/schemas/ is the only authority; consumers resolve `.json` names to
-# these files through the readDistJson compatibility bridge until the global
-# path rewire lands.
-#
-# What was NOT merged (see `retired:` at the bottom): the eleven schema files
-# bound only to delete-scheduled machinery, plus orca-call.schema.yaml, which
-# R2 ruled belongs beside the Orca host contract (now modules/host/orca/), not in this tree.
+# these files through the readDistJson compatibility bridge.
 
 about:
   kind: schema-catalog
@@ -29,9 +22,6 @@ about:
     not the file name.
   sourceOnly:
     excluded: deliberately source-only (json-exceptions.yaml)
-  merge:
-    wave: M2
-    sources: ["root schemas/ (folded in)", "specifications/*.yaml schema bodies -> modules/schemas/spec/ (names normalized to *.schema.yaml)", "schemas/goal-plan.yaml rewritten to the {legs:[{op,paths?,notes?}]} shape scripts/kernel/api.mjs actually parses"]
 
 schemas:
 
@@ -49,7 +39,6 @@ schemas:
       carries (shape: maps family -> `schema work/<kind>`). The tree, not the record bodies.
     binds: .starciwork/** (workspace.yaml, index.yaml, features/<feature>/<family>/<name>/index.yaml)
     usedBy:
-      - scripts/checks/work-layout.mjs (the report-only work-layout check — run as `node .claude/scripts/checks/work-layout.mjs`)
       - scripts/checks/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
       - scripts/checks/check-work-consistency.mjs, scripts/example/work-example.mjs
     business:
@@ -66,20 +55,20 @@ schemas:
     governs: >-
       Work v1 metadata monolith: the versioned record kinds work/workspace@1, work/node@2,
       work/resource@1, work/evidence@1, work/disposable-accounts@1 plus starci/source-identity@1
-      and starci/design-review@1 — the pre-v2 generation of Work records.
-    binds: legacy/versioned .starciwork records carrying @-suffixed schema ids
+      and starci/design-review@1.
+    binds: versioned .starciwork records carrying @-suffixed schema ids
     usedBy:
       - engine/index.mjs (metadataSchema — reads modules/schemas/work.schema.yaml)
       - modules/models/kinds.yaml (its knowledge-schema list names the v1 kinds verbatim)
       - scripts/example/work-example.mjs (projected for readers)
     business:
-      question: "Is a legacy/versioned Work record still structurally valid?"
-      whenNeeded: Reading trees authored before the Work v2 per-family split, and the auxiliary kinds (source-identity, design-review, evidence-packet) that v2 does not re-issue.
+      question: "Is a versioned Work record still structurally valid?"
+      whenNeeded: Reading trees that carry @-suffixed record kinds, and the auxiliary kinds (source-identity, design-review, evidence-packet) that v2 does not re-issue.
       whenNot: Not for new v2 records — work/<kind> (unversioned) is governed by its own work-<kind>.schema.yaml. Authoring a NEW record under a v1 @-kind is the misuse mode.
       selectedBy: Record's own `schema:` const — a work/foo@1 record resolves here, a work/foo record resolves to work-foo.schema.yaml.
     note: "v1 and v2 coexist by design; v2 dropped the @N suffix on record ids (inferred from consts: work/evidence@1 vs work/evidence)."
 
-  # --- Work v2 per-record schemas (all pending-build today) ------------------
+  # --- Work v2 per-record schemas -------------------------------------------
 
   - id: work/workspace
     file: modules/schemas/work-workspace.schema.yaml
@@ -222,7 +211,7 @@ schemas:
     business:
       question: "What does the product remember, and what promises does that memory keep?"
       whenNeeded: Business/data modeling; invariants are what rules depend on and refactors break.
-      whenNot: Not a schema-migration doc — fields describe shape, invariants describe promises; do not author DDL here.
+      whenNot: Not a DDL doc — fields describe shape, invariants describe promises; do not author DDL here.
       selectedBy: define-business; consumed by sds/impl that realise the storage.
 
   - id: work/sds-component
@@ -306,15 +295,14 @@ schemas:
       selectedBy: Verification lanes publish; completion review reads.
 
   # --------------------------------------------------------------------------
-  # KERNEL — the plan-file contract (the only kernel record schema that survives;
-  #          the retired kernel/engine record schemas are listed under `retired:`)
+  # KERNEL — the plan-file contract
   # --------------------------------------------------------------------------
 
   - id: starci/goal-plan@1
     file: modules/schemas/goal-plan.yaml
     dialect: prose-contract
     subsystem: kernel
-    governs: "The api `plan --file` document: {legs:[{op, paths?, notes?}]} — the kernel's derived op chain diffed structurally against the approved goals.json.opChain.legs. REWRITTEN in M2: the retired file described the assessGoal record (definitionOfDone/ledger/ops/risks/questions), a different shape than scripts/kernel/api.mjs parses — R2 §8.3's SSOT violation."
+    governs: "The api `plan --file` document: {legs:[{op, paths?, notes?}]} — the kernel's derived op chain diffed structurally against the approved goals.json.opChain.legs."
     binds: "the --file JSON a kernel agent hands to `api plan`"
     usedBy: [scripts/kernel/api.mjs (cmdPlan legs check + plan-derived event), modules/kernel/api.yaml commands.plan]
     business:
@@ -322,6 +310,22 @@ schemas:
       whenNeeded: Every tick.plan — the api persists digest + structural diff and a divergent plan escalates, never dispatches.
       whenNot: Not the goal record itself — the goal lives in the goals table; this is only the derived-plan file contract.
       selectedBy: The kernel agent's plan step — driver-loop.yaml tick.plan.
+
+  - id: starci/agent-hierarchy@1
+    file: modules/schemas/agent-hierarchy.yaml
+    dialect: prose-contract
+    subsystem: kernel
+    governs: "The durable Workflow -> Kernel -> Op ownership tree, including stable node ids, semantic edges and distinct agent/provider/model/profile/runtimePool plus Orca Run/Task/Dispatch/terminal runtime references."
+    binds: "the read-only document emitted by `node scripts/kernel/api.mjs hierarchy --workflow <id>`"
+    usedBy:
+      - scripts/kernel/api.mjs (cmdHierarchy projection)
+      - modules/kernel/api.yaml (commands.hierarchy)
+      - Orca UI integrations that render workflow agent ownership
+    business:
+      question: "Which long-lived Kernel owns this workflow, and which operation agents did that Kernel dispatch?"
+      whenNeeded: Inspecting, rendering or auditing a workflow's agent tree independently of Orca tab/pane layout.
+      whenNot: Never infer ownership from paneKey, parentPaneKey, terminal titles or tab order; those are presentation/runtime hints only.
+      selectedBy: Workflow id; the command reads persisted workflow/job hierarchy metadata and derives legacy provider metadata from the selected profile.
 
   - id: starci/source-staleness-report@1
     file: modules/schemas/source-staleness.schema.yaml
@@ -341,12 +345,11 @@ schemas:
   # --------------------------------------------------------------------------
 
   - id: starci/orca-calls@1 (emits starci/orca-call-result@1)
-    file: modules/host/orca/orca-call.schema.yaml
-    dialect: json-schema
+    file: modules/host/orca/calls.yaml
+    dialect: prose-contract
     subsystem: host
-    relocation: "R2 §2: this contract belongs beside modules/host/orca/ (it governs modules/host/orca/calls.yaml), not in modules/schemas/. The entry stays listed so the id keeps a catalog home until that move lands."
-    governs: "The complete Orca public-command contract — provider orca, api, liveSchema{call:agent-context,schemaVersion:1,compare:[command,flags],onMismatch:stop-before-effects-and-request-runtime-contract-upgrade}, envelope, defaults, idempotency, calls, forbiddenCalls, recoveries."
-    binds: modules/host/orca/calls.yaml (the governed instance)
+    governs: "The complete Orca public-command contract — provider orca, api, liveSchema{call:agent-context,schemaVersion:1,compare:[command,flags],onMismatch:stop-before-effects-and-request-runtime-contract-upgrade}, envelope, defaults, idempotency, calls, forbiddenCalls, recoveries. The document carries the schema const itself."
+    binds: modules/host/orca/calls.yaml (the contract document)
     usedBy: [scripts/api/orca/ (call sites need calls.schema==='starci/orca-calls@1'; live agent-context compare), scripts/checks/providers.mjs (envelope must emit starci/orca-call-result@1)]
     business:
       question: "Which Orca commands may the runtime issue, with what envelope, and what happens when live Orca disagrees?"
@@ -364,16 +367,12 @@ schemas:
     subsystem: routing
     governs: "Project binding resolution — .claude+.workspaces host pair, registry .workspaces/projects/<project>/work.json, one canonical .starciwork per project, features under features/<feature>/, rules against copying the host into routed sources."
     binds: host repo layout + project registry entries
-    usedBy: [the kernel agent (the routing questions it asks before effects), SKILL.md, its own sourceLayoutContract -> retired source-layout (flagged dangling)]
+    usedBy: [the kernel agent (the routing questions it asks before effects), SKILL.md]
     business:
       question: "Which backend/frontend/Work does this project bind — before any effect?"
       whenNeeded: Project start/prep and any cross-repo delegation; preserve binding when changing directories.
       whenNot: Routed sources never receive .claude/.workspaces copies; a task opened in FE must get host+binding explicitly.
       selectedBy: Every job that resolves repositories — read at binding, not per-operation.
-
-  # (starci/source-layout@1 is retired — see `retired:` below. Its kinds.yaml
-  #  `stacks:` citations now point at workspace-routing or were dropped (M14);
-  #  op `reads:` citations remain an open issue in modules/ops/ops/*.yaml.)
 
   # --------------------------------------------------------------------------
   # STACKS — .starcistacks deployment knowledge
@@ -388,11 +387,11 @@ schemas:
     usedBy: [docs/application-stacks.md (checker shares its read-only findings), scripts/checks/stacks.mjs]
     business:
       question: "Which directories/files must a stack tree have — and which are refused?"
-      whenNeeded: Stack declaration/migration lanes; it governs the tree while application-stacks.schema.yaml governs the manifest CONTENT — confusing the two is why three incompatible .starcistacks trees existed.
+      whenNeeded: Stack declaration/deploy lanes; it governs the tree while application-stacks.schema.yaml governs the manifest CONTENT — confusing the two is why three incompatible .starcistacks trees existed.
       whenNot: Layout says nothing about whether a stack ran — no runtime evidence here.
       selectedBy: application-stacks / deploy lanes; checker reads both halves.
 
-  - id: starci/application-stacks (legacy starci/application-stacks@1 accepted, STACKS_SCHEMA_LEGACY_ID)
+  - id: starci/application-stacks
     file: modules/schemas/application-stacks.schema.yaml
     dialect: json-schema
     subsystem: stacks
@@ -403,7 +402,7 @@ schemas:
       question: "Is this stack declaration structurally complete — components, environments, custody, runbook?"
       whenNeeded: Validating a stack manifest before deploy work; declares intent, never proves a stack ran.
       whenNot: Not evidence of runtime health; readiness/recovery is a separate check.
-      selectedBy: stacks checker + deploy lanes; legacy @1 id is accepted-and-named, not silently passed.
+      selectedBy: stacks checker + deploy lanes; the unversioned id is required verbatim.
 
   # --------------------------------------------------------------------------
   # KNOWLEDGE / EXAMPLES — compiled knowledge inputs
@@ -414,7 +413,7 @@ schemas:
     dialect: json-schema
     subsystem: knowledge
     governs: "One authored knowledge topic — id, title, purpose, appliesTo, related/families/observations."
-    binds: knowledge/**/*.yaml topic files (formerly compiled by compile-knowledge.mjs, now read as authored sources)
+    binds: knowledge/**/*.yaml topic files (read directly as authored sources)
     usedBy: [agents and skills read authored knowledge/**/*.yaml directly — no compiled mirror]
     business:
       question: "Is this authored guidance a well-formed knowledge topic?"
@@ -492,9 +491,8 @@ schemas:
       selectedBy: pattern-check orchestration; auditors read reportDigest-bound output.
 
   # --------------------------------------------------------------------------
-  # SPECIFICATION — SRS/SDS payload contracts (merged from specifications/ in
-  # M2; names normalized to *.schema.yaml; validators live in
-  # scripts/checks/spec/ per the same wave's move)
+  # SPECIFICATION — SRS/SDS payload contracts (bodies under
+  # modules/schemas/spec/; validators live in scripts/checks/spec/)
   # --------------------------------------------------------------------------
 
   - id: starci/specification-contract@1
@@ -502,7 +500,7 @@ schemas:
     dialect: prose-contract
     subsystem: spec
     governs: "The specification contract meta-record — required sections, row shapes, statuses (draft|blocked|pass), preserved-English rules, and pointers to the current SRS/SDS contracts (srs-sections.schema.yaml, sds-map.schema.yaml, sds.schema.yaml, srs-v3.schema.yaml)."
-    binds: legacy cohesive starci/specification@1|@2 records + the split SRS/SDS layout rules
+    binds: cohesive starci/specification@1|@2 records + the split SRS/SDS layout rules
     usedBy: [scripts/checks/spec/validate.mjs (loads it as the section contract), work-*/index.yaml extensions.work3.specification|srs|sds payloads]
     business:
       question: "Which sections must a specification carry, in which language, under which lifecycle?"
@@ -520,7 +518,7 @@ schemas:
     business:
       question: "Is this SDS structurally a source-independent design record?"
       whenNeeded: architecture.decide output validation; compatibility reads of v3 records.
-      whenNot: New authoring prefers the component-based sds-map sections over the v3 monolith.
+      whenNot: New authoring uses the component-based sds-map sections over the v3 monolith.
       selectedBy: The record's own schema const starci/specification@3.
 
   - id: starci/sds-map@1
@@ -554,11 +552,11 @@ schemas:
     dialect: json-schema
     subsystem: spec
     governs: "The compatibility SRS v3 record — id, nodeType, name, summary, refs, content; op const business.decide."
-    binds: legacy business/srs v3 leaves (compatibility/recovery only)
+    binds: business/srs v3 leaves (compatibility/recovery only)
     usedBy: [scripts/checks/spec/srs-v3.mjs (SRS_V3_SCHEMA compat reader), contract.schema.yaml compatibilityBusinessV3.schema]
     business:
       question: "Is a pre-split SRS v3 record still readable under its original checks?"
-      whenNeeded: Compatibility reads and migrations of existing v3 records.
+      whenNeeded: Compatibility reads of existing v3 records.
       whenNot: Never for new authoring — new SRS uses srs-sections.schema.yaml.
       selectedBy: The record's schema const starci/srs@3.
 
@@ -590,55 +588,36 @@ schemas:
       question: "Which runtimes/agents exist, what can each run, and what is the fallback order?"
       whenNeeded: Before creating execution agents — load the registry catalog tree first, fail closed on disagreement.
       whenNot: Quota/eligibility still gate each call — registry presence is not dispatch authority.
-      selectedBy: Provider validation + agent admission (tinkle-2 modules/models/ analyzes the model side).
+      selectedBy: Provider validation + agent admission (modules/models/ holds the model-side detail).
 
   # --------------------------------------------------------------------------
-  # MIGRATION / BUILD HELPERS
+  # BUILD HELPERS
   # --------------------------------------------------------------------------
 
   - id: starci/json-exceptions@1
     file: modules/schemas/json-exceptions.yaml
     dialect: prose-data
     subsystem: build
-    governs: "Exact relative paths allowed to remain authored JSON after the YAML migration — no directory wildcards; each entry carries a reason."
+    governs: "Exact relative paths allowed to remain authored JSON — no directory wildcards; each entry carries a reason."
     binds: the authored-JSON allowlist (rendered envs, realm imports, UAT run receipts, licenses...)
     usedBy: [scripts/checks/check-json-exceptions.mjs (inventory-only; offenders listed)]
     business:
-      question: "Which JSON files are legitimate exceptions, not YAML-migration debt?"
+      question: "Which JSON files are legitimate exceptions?"
       whenNeeded: Adding any authored .json — it needs a listed exception with a reason, or it converts to YAML.
       whenNot: Never a wildcard allowlist; adding an exception is a deliberate per-file decision.
       selectedBy: The json-exceptions check at lint/gate time.
 
   # --------------------------------------------------------------------------
-  # KNOWN GAPS (observed, not invented)
+  # KNOWN GAPS
   # --------------------------------------------------------------------------
 
 gaps:
   - "work-layout@3 shape declares 15 families; only 11 have per-family schemas. work/contract, work/integration, work/gap, work/event have NO work-*.schema.yaml file — check-work-consistency.mjs comments confirm contract+integration 'author requiresProof in both live trees and have no per-family schema file of their own' (gap/event likewise unfiled). Their records are covered only by the layout's shape line and the generic work/ walk in check-work-artifacts.mjs."
-  - "RESOLVED in M2: the two goal ids no longer coexist as schema files — goal.schema.yaml (starci/goal@1) retired with its only consumer workflows/lifecycle.mjs; the workflow goal is a sqlite row written by `api enqueue`/define-goal whose contract lives in modules/goal/define-goal.yaml. starci/workflow-goal@1 (kernel goal.json) still has no dedicated schema file — observed, accepted."
+  - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `api enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
   - "starci/code-pattern-script@1 is emitted by every scripts/checks/code-patterns/*.mjs script and consumed by check-scoped-lint.mjs, but has no schema file — only the aggregate starci/code-pattern-check@1 is schematized."
   - "Record kinds named in modules/models/kinds.yaml but not backed by a file here: work/node@2, work/resource@1 (inside work.schema.yaml monolith — covered), starci/evidence-packet@1 (no file found — only listed)."
-  - "DANGLING REFERENCES after the merge (flagged, owned by the flip/other lanes): modules/models/kinds.yaml `stacks:` lists were rewired to modules/schemas/ in M14. Remaining: several op `reads:` still cite `schemas/…` paths — including retired `schemas/source-layout.yaml` and `schemas/goal.schema.yaml` (goal.revise, goal.validate); op files also cite `specifications/*.json` compatibility paths now living at modules/schemas/spec/*.schema.yaml. Op-file rewiring belongs to the M6/flip step."
-
-# Schemas NOT merged — bound only to delete-scheduled machinery (R2-REPORT §2
-# DELETE list; files die with the doomed root schemas/ tree in the flip).
-retired:
-  - {file: schemas/goal.schema.yaml, id: starci/goal@1, why: "old goal record; only consumer workflows/lifecycle.mjs is delete-scheduled — the new goal is a sqlite row + modules/goal/define-goal.yaml"}
-  - {file: schemas/op-io.yaml, id: starci/op-io@1, why: "old op envelope; superseded by modules/kernel/dispatch.yaml packet"}
-  - {file: schemas/op-report.schema.yaml, id: starci/op-report@1, why: "old report record; superseded by modules/kernel/verdict-contract.yaml"}
-  - {file: schemas/workflow-report.schema.yaml, id: starci/workflow-report@1, why: "monitor→coordinator record; no monitor exists in the new arch"}
-  - {file: schemas/workflow-amendment.schema.yaml, id: starci/workflow-amendment@1, why: "kernel/amendment.mjs consumer is delete-scheduled; api.mjs has no amend verb"}
-  - {file: schemas/workflow-state.schema.yaml, id: starci/workflow-state@1, why: "kernel/store.mjs snapshots are delete-scheduled; sqlite rows are the state"}
-  - {file: schemas/orchestration-supervision.yaml, id: starci/orchestration-supervision@1, why: "governs workflows/supervision.yaml — delete-scheduled"}
-  - {file: schemas/execution-request.schema.yaml, id: starci.workflow/v1, why: "execution/* consumers only"}
-  - {file: schemas/execution-receipt.schema.yaml, id: starci.execution/v1, why: "execution/* consumers only"}
-  - {file: schemas/source-layout.yaml, id: starci/source-layout@1, why: "workflows/source-layout.mjs + bin source-layout verb are delete-scheduled; its remaining citations are the dangling-references gap above"}
-  - {file: schemas/ledger-db.schema.yaml, id: starci/ledger-db-catalog@1, why: "column-catalog doc duplicated the executable DDL — engine/schema.sql becomes the loaded DDL source (R2 §8.1)"}
-  - {file: schemas/goal-plan.yaml (as authored), id: starci/goal-plan@1, why: "REWRITTEN, not deleted: the file described the assessGoal record; the merged file describes the {legs:[…]} plan file api.mjs parses"}
 
 coverage:
-  mergedTree: "modules/schemas/ — 33 authored files (32 merged verbatim + goal-plan.yaml rewritten) + modules/schemas/spec/ 5 files + index.yaml + relationships.yaml"
-  authoredFiles: 38            # 33 top-level + 5 under spec/ — was 45 at root + 5 in specifications/
-  projection: retired          # the compiled projection was deleted in the distless wave; sources are read directly
-  historicalSnapshot: "2026-09-19, before retirement: 44 projected sources (all but json-exceptions.yaml), 23 fresh, 4 stale-content (application-stacks, source-layout, stacks-layout, work-layout), 17 pending (every work-*.schema.yaml)"
-  verification: "M2 merge: every KEEP/MOVE verdict of R2-REPORT §2 copied; 11 files retired (see retired:); orca-call.schema.yaml pending relocation to modules/host/orca/"
+  tree: "modules/schemas/ — 34 authored files + modules/schemas/spec/ 5 files + index.yaml + relationships.yaml"
+  authoredFiles: 39            # 34 top-level + 5 under spec/
+  projection: none             # no compiled projection — consumers read the authored YAML directly

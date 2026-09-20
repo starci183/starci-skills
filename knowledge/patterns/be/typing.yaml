@@ -16,7 +16,7 @@ provenance:
     - https://docs.nestjs.com/techniques/validation
   limitations: Adopted Nest/TypeScript profile, not universal framework law. Historical Academy examples contain
     debt and do not override these revised rules. Existing profile-specific lint/source needs an authorized
-    coherent migration; runtime installation neither migrates product source nor refreshes proof. Static
+    coherent update; runtime installation neither modifies product source nor refreshes proof. Static
     checks do not establish behavior.
 rules:
   - id: BE-TYPING-1

@@ -1,6 +1,6 @@
-# modules/ops/ops/request.analyze.yaml - TINKLE-1 pure-yaml port of .claude/ops/request.analyze/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/request.analyze.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: request.analyze
 goal:
@@ -43,7 +43,7 @@ reads:
         invent tools or dispatch agents solely from a profile.
 writes:
   - id: intake
-    path: .starciwork/_local/workflows/<workflow>/intake.json
+    path: intake.json under the op's declared write ceiling, listed in the report's files[]
     fields:
       - schema
       - request
@@ -57,8 +57,8 @@ writes:
         selected workflow id from the catalog, the scope statement (proposed nodes, dependencies and
         exclusions for scope.define to bound), the acceptance criteria and the unresolved questions.
         No guessed defaults; an unanswerable question is carried in open, not answered. The intake
-        file is the only _local/workflows/<workflow>/ file this op writes; the kernel's run state
-        (runtime.sqlite goals/jobs/inbox/reports/events rows) is never op output.
+        file is the only runtime artifact this op writes — delivered as report evidence; the kernel's
+        run state (runtime.sqlite goals/jobs/inbox/reports/events rows) is never op output.
   - id: evidence
     path: E/intake.json + E/result.json + E/artifacts
     fields:
@@ -121,7 +121,7 @@ steps:
       en: Verify the selected workflow can produce every criterion assigned to this segment and that
         the scope statement bounds it - other requested outcomes remain covered as named open items.
         Verify the written intake record carries schema starci/workflow-intake@1 at its declared
-        _local path; a wrong path, name or schema fails the run.
+        path inside the write ceiling; a wrong path, name or schema fails the run.
         If no catalog workflow safely matches, return blocked with the exact missing decision or
         contract gap; never use analysis as a broad fallback executor.
   - reads:
@@ -187,7 +187,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Which one catalog workflow owns this request's first segment - and what
@@ -202,11 +202,11 @@ business:
   consumes:
     - The user request + supplied files; the workflow catalog + op registry + kinds; repo context when relevant.
   produces:
-    - intake.json (starci/workflow-intake@1) under _local/workflows/<workflow>/ plus the request-owned evidence dir.
+    - intake.json (starci/workflow-intake@1) under the declared write ceiling, delivered as report evidence, plus the request-owned evidence dir.
   failureModes:
     - INTENT_UNRESOLVED, NO_MATCHING_WORKFLOW, OUTSIDE_SCOPE, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

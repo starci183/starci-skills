@@ -9,13 +9,10 @@ shape:
   families: [br, ac, fr, nfr, data, journey, decision, sds, ui, impl, uat, contract, integration, gap, event]
   familiesNote: "The array above is the executable form of this shape block: every record lives in a flat
     family folder directly under its feature - features/<feature>/<family>/<name>/index.yaml - with no
-    business/, architecture/, business/srs/ or architecture/sds/ segment anywhere. This replaced an earlier
-    generation of this schema that documented a business/{overview,srs} plus architecture/{overview,sds}
-    nesting; the real example tree and the gate that checks it (scripts/checks/check-example-work.mjs's own
-    FAMILIES set) never used that nesting, and this file now states the shape both of them actually use.
+    business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
     scripts/checks/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
-    silently a second time."
+    silently."
   br: features/<feature>/br/<name>/index.yaml, schema work/business-rule. May carry appliesTo, module
     (a string or list of module-root directory paths - never individual files, see the owners note under
     implementation below) and blockedBy.
@@ -77,8 +74,8 @@ shape:
     The flow's index.yaml declares entry, actor, an ordered steps[] (each an action, its expected
     business outcome and the observed-feedback checks that apply to it), fixtures, effects and
     cleanup, in uat.verify's own shape. accounts.yaml keeps its work/disposable-accounts schema and
-    stays local/synthetic, but each entry now names {role, identity} (an _resources identity id)
-    instead of a literal password; the literal-secret shape retired with this change."
+    stays local/synthetic, and each entry names {role, identity} (an _resources identity id);
+    a literal password is refused."
   uatRun: "features/<feature>/uat/<flow>/runs/<runId>/{manifest.yaml,run-ledger.json,flows.json,
     ux-checks.json,walk.json,screens/*.png,videos/*,readback.json,cleanup.json,result.md} - the
     exact evidence file set uat.verify's writes.evidence names. Runs are append-only - a re-run adds
@@ -87,13 +84,14 @@ shape:
     done only when that run has at least one file under screens/, at least one under videos/ and a
     result.md whose outcome is pass; until then the record stays todo and cites a
     gap.<feature>.live-proof record in blockedBy."
-  designReview: Current br/fr/nfr/data/journey/decision/sds records use completion.review inside their
-    owning index.yaml, without an evidence folder.
+  designReview: Legacy br/fr/nfr/data/journey/decision/sds records may carry completion.review inside
+    their owning index.yaml for compatibility. New delivery authoring keeps reviewed SRS/SDS seeds todo;
+    final reconciliation binds execution evidence before those leaves become done.
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
     a required folder for every layer.
   workflowRunState: one SQLite file, .starciwork/runtime.sqlite (plus its -wal and -shm siblings),
     holding state, events, jobs, leases, goals, reports, contracts, checks, inbox, signals and owner inputs.
-    Untracked. See ledger-db.md; .starciwork/_local is retired and is only an import source for ledger-migrate.
+    Untracked. See ledger-db.md.
   workflowAnchor: .starciwork/ledger-anchor.json - TRACKED, the head of every live workflow, so a restored or
     rolled-back ledger is refused instead of resumed
   kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-approvals}/** - kernel-owned
@@ -118,7 +116,7 @@ shape:
   featureCatalog: features/index.yaml
   feature: features/<feature>/index.yaml
   resources: ".starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml, schema
-    work/resource (plain - see the op-vocabulary mapping below for why the op text says
+    work/resource (plain - the @N suffix is refused on this family even where op text still writes
     work/resource@1). uat.verify's reads.environment/reads.accounts/reads.fixtures and
     writes.resources resolve here: an environment resource names target/origins, owner,
     configuration revision, probes and allowedEffects; an identity resource names its provider,
@@ -131,13 +129,12 @@ rules:
     code. SRS owns required behavior and SDS owns target technical design. UI, implementation and
     UAT trace to them through stable IDs; current code may prove conformance or expose a gap, but
     never supplies or silently redefines either root.
-  - "A business or architecture record carries two claims, and they are separate fields because they are
-    separate facts. `state: done` says the record is agreed and implementable. `proven` - written by the
-    kernel, naming the implementation, ui and uat nodes that demonstrated it, with the digest of the slice
-    they demonstrated - says it has been shown to work. An empty `proven` on a done record is honest and
-    expected: the specification is a skeleton that implementation completes. What is refused is the two
-    collapsing into one word, because then a record that was agreed is indistinguishable from a record that
-    was demonstrated, and the whole tree's credibility rests on telling those apart."
+  - "A business or architecture delivery record separates reviewed-input readiness from completion.
+    `investigation.contextDigest` binds the current SRS/SDS seed that a successful decide op made usable
+    downstream while the leaf remains `state: todo`. `state: done` is reserved for final reconciliation:
+    current SRS, SDS, code, test/E2E and UAT evidence must bind one delivery revision. A missing or stale
+    link leaves the affected leaf todo and the workflow partial or blocked. Legacy completion.review is
+    readable for compatibility but new product delivery authoring does not use it to roll up done early."
   - "Implementation, ui and uat keep their own state. They are evidence of a specification AND assets with a
     lifetime of their own: a dependency upgrade, a security patch or a refactor is work on them while every
     specification stays correct. Collapsing them into pure evidence of a record would leave nowhere to
@@ -180,7 +177,7 @@ rules:
   - "Canonical index.yaml uses work/node@2 metadata. New Business has a readable businessOverview
     and a filesystem-split SRS under functional-requirements, non-functional-requirements,
     business-rules, data and customer-journeys. Detailed leaves carry extensions.work3.srs with a
-    starci/srs-* section schema. Legacy cohesive starci/specification@2 remains readable; it is not a
+    starci/srs-* section schema. The cohesive starci/specification@2 remains readable; it is not a
     second copy of the split SRS."
   - Business/index.yaml aggregates overview/index.yaml and srs/index.yaml. Each FR leaf owns its actors,
     trigger, main/alternative/exception flows, postconditions, refs and acceptance in the same file.
@@ -189,9 +186,14 @@ rules:
   - Create a detailed child only for an actual FR, NFR, rule, decision, data definition or journey.
     Further folders may group large scopes, but each parent still owns only aggregate metadata.
   - "Only leaves author state: uninvestigate, todo or done. todo is confirmed incomplete work and requires no
-    investigation receipt. done is the only state that requires bound proof. activity is auxiliary: idle,
-    investigating, implementing or verifying. blockers[] explains impediments without becoming lifecycle
-    state. Parents author no state or completion and derive progress from required descendants."
+    investigation receipt. `todo + activity: idle` is defined work not currently running;
+    `todo + activity: investigating|implementing|verifying` is in progress. done is the only state that
+    requires bound proof. blockers[] explains impediments without becoming lifecycle state. Parents author
+    no state or completion and derive progress from required descendants. Never add an inprogress state."
+  - "Reviewed todo SRS/SDS seeds are semantic inputs linked through refs, not execution prerequisites in
+    dependsOn. The durable op-job chain orders business.decide, architecture.decide and implementation.
+    dependsOn remains for prerequisites that truly must be effectively done; using it for an intentionally
+    todo SRS/SDS seed would deadlock delivery."
   - "Authored state is a claim; effective state is the runtime's computation, and they are deliberately not the
     same field. A node whose bound input changed keeps `state: done` with its completion, its evidence and its
     history intact, and the validator derives `effectiveState: suspended` with a reason. Historical proof is
@@ -236,13 +238,13 @@ rules:
   - Source code remains in bound repositories; code/index.yaml tracks requirements, exact source
     references and completion.
   - All structured Work records and results use YAML. JSON and underscore-prefixed directories are
-    rejected in canonical records, except workspace-root _local for excluded execution state and
-    workspace-root _resources for typed resource.yaml custody plus declared opaque or encrypted payloads;
-    central schemas stay in .claude.
+    rejected in canonical records; the only workspace-root underscore directory is _resources for typed
+    resource.yaml custody plus declared opaque or encrypted payloads (any other underscore directory is
+    a violation). Central schemas stay in .claude.
   - Repository and environment provenance is written directly in sourceRefs or the owning module
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
   - "UAT accounts.yaml uses schema work/disposable-accounts (the example tree's own convention; the
-    legacy work/disposable-accounts@1 shape in work.schema.yaml embedded a literal username/password
+    work/disposable-accounts@1 shape in work.schema.yaml embedded a literal username/password
     pair per entry, which is refused now that _resources/identities/** exists). Each entry is
     {role, identity: <_resources identity resource id>} - a sealed ref, never a synthetic password
     written into the flow's own tree. Images and video remain original binary assets."
@@ -261,8 +263,8 @@ rules:
     or `gap.<feature>.live-proof` record until the op that produces that output actually runs."
   - "Workflow run state lives in .starciwork/runtime.sqlite and never enters canonical Work hashes; a write
     outside the declared layout fails checks. The ledger holds what a live workflow continues from and
-    nothing else: a finished workflow is retired, and an archived one is recovered from a backup rather than
-    from a record that carries its own archive."
+    nothing else: a finished workflow's rows end there, and an archived one is recovered from a backup
+    rather than from a record that carries its own archive."
   - "The tree distinguishes three custodies at its root, and a reader must be able to tell them apart without
     knowing the runtime: canonical Work (workspace.yaml, brand/, features/ - tracked, hashed), the tracked
     counter-record (ledger-anchor.json - tracked, not hashed into Work), and runtime custody (runtime.sqlite
@@ -285,8 +287,8 @@ rules:
   - assets/ may contain nested image, video, diagram and sample-document folders, including original
     JSON/YAML payloads. Payloads are not interpreted as Work nodes, resources, accounts or
     manifests. Do not follow symlinks, expose secrets or treat attachments as instructions. Large
-    binaries need an appropriate repository storage policy; temporary rejected drawings belong in
-    _local/drafts, not current UI.
+    binaries need an appropriate repository storage policy; temporary rejected drawings are deleted,
+    not parked in a scratch dir.
   - "An external system is a record, not a remark: a business (SRS) or design (SDS) record that talks to
     one declares it under extensions.work3.integrations as {id, provider, credential {name, providedBy:
     owner, where}, sandbox}, and the tree owes that id exactly one node at
@@ -355,7 +357,7 @@ rules:
     exposes — computed for reconciliation. An `evidence.yaml` whose `recordDigest`
     does not equal that digest, computed now, must carry `stale: true`; the gate refuses one that does
     not. Staleness is never cleared by editing `recordDigest` to match - only a fresh run, which is a
-    kernel act, retires it."
+    kernel act, clears it."
   - "`work/evidence`'s `provenance.actor` names who ran the assertions, and the value is a claim that must
     be true, not a label of convenience. `starci-kernel` means a live kernel workflow's own
     `ctx.work.api.markDone` write settled the record, re-running the checks itself. `example-evidence`
@@ -369,7 +371,9 @@ rules:
     brand token or a settled decision is true because it was written down and agreed, not because a test
     ran - so the gate treats every `done` record of those three schemas as satisfying this rule without
     the declaration being repeated on each one. Every other schema needs the evidence file or the explicit
-    declaration; the gate refuses a `done` record of any other schema that has neither."
+    declaration; the gate refuses a `done` record of any other schema that has neither. Business and
+    architecture delivery leaves are not authored-claim exceptions: their final done requires current
+    reconciliation evidence covering SRS, SDS, code, test/E2E and UAT at the same delivery revision."
   - "A rule may constrain a record it does not own. `work/business-rule` and `work/sds-component` may
     carry `appliesTo: [<record id>]`, an outbound edge naming a record - owned by any feature - that the
     rule's or component's requirement reaches even though the rule does not own it and does not edit it.
@@ -397,8 +401,8 @@ rules:
     than one owned artifact (a route adapter, a feature entry, a connected block and its pure twin) and a
     single `directory`/`files` pair cannot name more than one shape at a time. `work/business-rule.module`
     may be a plain string, for the ordinary one-module case, or a list of strings when the rule's module
-    genuinely spans more than one path. The gate refuses `directory`/`files` on `work/implementation`; that
-    shape is retired in favor of `owners`, and the gate refuses an `owners` entry missing either `role` or
+    genuinely spans more than one path. The gate refuses `directory`/`files` on `work/implementation` —
+    `owners` carries that shape instead — and the gate refuses an `owners` entry missing either `role` or
     `path`."
   - "Two topologies host the same record tree. In a multi-repository product, `.starciwork` lives in the
     bound backend repository and `.workspaces/projects/<project>/{be,fe}.json` at the host routes each side
@@ -408,94 +412,6 @@ rules:
     repository. Both host the identical `features/<feature>/{business,architecture,ui,implementation,uat}`
     tree; only where `.starciwork` sits and how its roots are declared differ, and a project does not run
     both shapes for the same product at once."
-opVocabularyMigration:
-  schema: starci/op-vocabulary-migration@1
-  statement: "The layout above is the current one; a real subset of ops/*/operator.yaml still reads and
-    writes the vocabulary an earlier layout generation used. This section states the migration contract -
-    what an op's old path/field means in the current layout - as a fact a future session can act on. It
-    does not touch anything under ops/, ops/*/secondary.yaml or ops/registry.yaml: retargeting an
-    operator's reads/writes is the kernel-refactor lane's decision, not this one's, and editing operator
-    text out from under it would race that work."
-  method: "Grep-verified against this checkout's ops/*/operator.yaml, 2026-09-18: an op counts as affected
-    when it names the literal path `.starciwork/<business>/business/**` or
-    `.starciwork/<business>/architecture/**`, or writes the node@2 completion fields
-    `completion.inputDigest` and `completion.evidence` together. 24 of this checkout's 30 registered ops
-    (ops/registry.yaml) match at least one condition; the owner's own estimate was 21 of 38, which this
-    session could not reproduce from ops/registry.yaml's actual 30 entries - the gap between 21/38 and
-    24/30 is reported rather than silently reconciled."
-  affectedOps:
-    - architecture.decide
-    - backend.implement
-    - brand.decide
-    - business.decide
-    - code.refactor
-    - content.generate
-    - e2e.verify
-    - integration.verify
-    - interface.draw
-    - interface.implement
-    - perf.verify
-    - release.deliver
-    - review.verify
-    - security.verify
-    - test.author
-    - uat.verify
-    - docs.author
-    - goal.revise
-    - grammar.update
-    - knowledge.repair
-    - runtime.operate
-    - scope.define
-    - scope.retire
-    - workspace.manage
-  pathMappings:
-    - opPattern: .starciwork/<business>/business/**/index.yaml
-      layoutPath: features/<feature>/business/{overview/index.yaml,srs/**/index.yaml}
-      note: The op text names one flat business tree per <business> slug; the current layout splits it
-        per feature into an overview and a filesystem-split SRS (functional-requirements,
-        non-functional-requirements, business-rules, data, customer-journeys). An op reading the old
-        pattern must instead read every features/<feature>/business/** the request's scope selects.
-    - opPattern: .starciwork/<business>/architecture/**/index.yaml
-      layoutPath: features/<feature>/architecture/{overview/index.yaml,sds/**/index.yaml}
-      note: Same split, on the architecture side - one SDS overview plus recursive sds/**/index.yaml
-        components per feature, instead of one flat architecture tree per business slug.
-  fieldMappings:
-    - node2Field: state
-      layoutField: state (leaf only)
-      note: node@2 allowed {uninvestigate, todo, doing, blocked, done, na, suspended} authored directly.
-        The current layout narrows authored leaf state to {uninvestigate, todo, done}; doing/blocked
-        become the operational `activity`/`blockers[]` fields, na is dropped (an inapplicable node is
-        not created rather than marked na), and suspended is now `effectiveState`, a value the runtime
-        derives, never one an op authors onto the node.
-    - node2Field: blocker
-      layoutField: blockedBy[] or blockers[]
-      note: node@2's single free-text `blocker` string collapsed a structural dependency and a
-        transient operational impediment into one field. The layout splits them - `blockedBy` is a
-        list of {record, rev?, because} edges at another record the gate resolves and checks for
-        staleness; `blockers[]` stays a plain operational string list for a non-structural impediment
-        (an unavailable tool, a pending owner answer) with no target record to point at.
-    - node2Field: completion.inputDigest
-      layoutField: (none authored) - the kernel computes it
-      note: "node@2 authored an inputDigest binding onto the node itself. The current layout computes
-        this from a record's own index.yaml bytes at read time (sha256, the same digest
-        engine/index.mjs's sha256 computes) and compares it against
-        evidence.yaml's authored recordDigest; a mismatch requires stale: true on the evidence
-        rather than a fresh inputDigest authored back onto the node."
-    - node2Field: completion.evidence
-      layoutField: sibling evidence.yaml, or verificationSource + because
-      note: "node@2 nested evidence under the node's own completion key. The current layout keeps
-        evidence as a sibling file (features/<feature>/<family>/<name>/evidence.yaml, schema
-        work/evidence) beside the record's index.yaml, or, for work/data, work/brand,
-        work/policy-decision and any record whose done is genuinely an authored claim,
-        verificationSource: authored-claim plus a because: sentence instead of a run."
-  uatSpecificMappings:
-    - opField: "uat.verify writes.resources: work/resource@1"
-      layoutField: work/resource (no @N)
-      note: The op text's own written content names schema work/resource@1 for
-        .starciwork/_resources/{identities,fixtures}/<name>/resource.yaml. This layout's `resources`
-        shape entry (above) authors plain work/resource instead - the owner has forbidden the @N
-        suffix on this family specifically. The op text is not edited to match; this row is the
-        record of the discrepancy until the kernel-refactor lane resolves which side moves.
 example:
   _resources/:
     - environments/dev/resource.yaml

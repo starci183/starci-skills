@@ -1,6 +1,5 @@
 # ============================================================================
-# TINKLE-8 — modules/goal/anatomy.yaml
-# Brief: ex-testing/briefs/tinkle/tinkle-8.md + _common.md.
+# modules/goal/anatomy.yaml
 #
 # What a goal IS — the record, the revision counter, the amendments, and the
 # lifecycle (derive -> critique -> approve/freeze -> derive ops -> revise ->
@@ -16,16 +15,12 @@
 #                                  diffGoalSections, propagateInvalidation,
 #                                  adoptReportRev, noteGoalMetrics,
 #                                  GOAL_SPIN_LIMIT, applyWorkflowAmendment,
-#                                  designGate, cutOpFor, goalRevOf) are now
+#                                  designGate, cutOpFor, goalRevOf) are
 #                                  kernel-agent reasoning over these contracts
-#   modules/kernel/api.yaml         — api.mjs verbs incl. owner asks
-#                                  (openOwnerAsk, ASK_KINDS, STOP_KINDS,
-#                                  PROVISION_KINDS, stopReasonFor,
-#                                  openConflictDecision, applyOwnerAction)
-#   modules/goal/define-goal.yaml — the goal contract (starci/goal@1 record shape retired with goal.schema.yaml)
+#   modules/kernel/api.yaml         — the api.mjs command surface the kernel
+#                                  reasons through
+#   modules/goal/define-goal.yaml — the goal contract (starci/goal@1 record shape)
 #   modules/schemas/goal-plan.yaml — the api plan --file shape {legs:[{op,paths?,notes?}]}
-#                                  (the assessGoal ledger form done/ledger/ops/risks/questions
-#                                  retired with the old engine — models/functions.mjs is gone)
 #   engine/ledger-db.mjs           — the .starciwork/runtime.sqlite goal/job rows
 #   docs/workflow-kernel.md        — goal phase narrative
 #   skills/define-goal/SKILL.md    — the owner-only approval gate (exact `ok`)
@@ -63,10 +58,11 @@ about:
 stateModel:
   opIs: >-
     A state transition: `needs:` (preconditions on state variables) ->
-    `produces:` (postconditions it establishes). The kernel's route block
+    `produces:` (postconditions it establishes). The op's route block
     `prerequisites:` are the needs; the produces vocabulary is specified in
-    legality.yaml `producesVocabulary` (inferred — modules/ops route blocks do
-    not yet declare it; gap flagged in the report).
+    legality.yaml `producesVocabulary` — the machine-readable table
+    scripts/route/route-plan.mjs consumes (route: blocks carry prerequisites
+    only; each op's produces lives as business: prose on its contract).
   stateSpace: >-
     The state variables carried by .starciwork records — e.g.
     `business.X: decided`, `sds.X: decided`, `ui.X: verified`,
@@ -89,7 +85,7 @@ stateModel:
     extend-vs-add).
   sources:
     - the kernel agent (evaluateGoalMetrics, deriveGoalMetrics)
-    - engine/ledger-db.mjs (record states, disjoint, inScope)
+    - engine/ledger-db.mjs (record states) + the api's path:* lease admission (scripts/kernel/api.mjs)
     - scripts/checks/check-work-deep.mjs (normDigest/DEP_STALE — staleness of a done variable)
     - modules/goal/existing.yaml
 
@@ -108,9 +104,11 @@ decomposition:
     - id: SURVEY
       does: >-
         measure S₀: query .starciwork owners for the records owning the touched
-        paths (ledger.mjs inScope/executableCandidates/decisionCandidates;
-        intake.mjs extensions.work3.reconciliation — reference/conflict/new
-        against decided records) and scan the source surfaces they name
+        paths (the .starciwork ownership tree — docs/ledger-db.md; record
+        state via engine/ledger-db.mjs; work.author's intake mode reconciles
+        authored records against decided ones as three typed cases —
+        reference/conflict/new — modules/models/kinds.yaml) and scan the
+        source surfaces they name
       produces: "the existing-surface map — what exists, what state, extendable or not"
       detail: "the full survey leg is existing.yaml — every feature/refactor input passes it BEFORE a chain is proposed"
 
@@ -129,8 +127,8 @@ decomposition:
         -> topological sort by needs -> the op chain
       requires: >-
         a produces: vocabulary per op (legality.yaml producesVocabulary —
-        currently absent from modules/ops route blocks; flagged as the
-        tinkle-1 backfill gap in the report)
+        the machine-readable table route-plan.mjs consumes; each op also
+        declares its produces as business: prose on its contract)
       fallback: "when no archetype caches this Δ->chain pattern, this step IS the algorithm — never force-fit an archetype"
 
     - id: VALIDATE
@@ -145,7 +143,7 @@ decomposition:
   sources:
     - the kernel agent
     - engine/ledger-db.mjs
-    - the kernel agent (reconciliation: reference/conflict/new)
+    - modules/models/kinds.yaml work.author intake cases (reference/conflict/new)
     - scripts/checks/check-work-deep.mjs (DEP_STALE)
     - modules/goal/legality.yaml, modules/goal/existing.yaml, modules/goal/archetypes.yaml
 
@@ -156,7 +154,7 @@ identity:
   record: starci/goal@1
   files:
     goalRow: .starciwork/runtime.sqlite goals/inbox rows  # the durable record (engine/ledger-db.mjs)
-    goalMd:  rendered for humans only — never a store     # nothing lives under .starciwork/_local/
+    goalMd:  rendered for humans only — never a store     # runtime.sqlite is the store
   requiredFields:  # modules/goal/define-goal.yaml `required`
     - schema          # const starci/goal@1
     - id
@@ -205,9 +203,7 @@ derivation:
       later derived per node from its lane (modules/models/kinds.yaml lanes:).
     plan: >-
       `state.ledgerMode === 'plan'`: `assessGoal` fills the plan form
-      (modules/schemas/goal-plan.yaml — the api --file shape is {legs:[...]};
-      the richer assessGoal form done/ledger/ops/risks/questions is the
-      retired models/functions.mjs contract).
+      (modules/schemas/goal-plan.yaml — the api --file shape is {legs:[...]}).
       Only plan kinds may appear — PLAN_OP_KINDS = the kinds whose writes
       stay inside {code, runtime, evidence, asset} or nothing
       (modules/models/kinds.yaml). Record-writing kinds (business.decide,
@@ -380,7 +376,8 @@ questions:
     PROVISIONAL answer. The owner overturns it later; a different answer
     reopens what was built on it (the kernel agent header + openOwnerAsk).
   enrolledMode: >-
-    When the workflow is enrolled (engine or explicit), every non-mechanical
+    When the workflow is enrolled — its engine record carries ENGINE_SCHEMA
+    (engine/constants.mjs isEnrolled) — every non-mechanical
     question is ownerRequired — the provisional path closes (openOwnerAsk).
   conflictDecision: >-
     openConflictDecision takes an intake-recorded conflict as a decision
@@ -395,7 +392,6 @@ questions:
     receipts — a credential is "verified" only after the integration.verify it
     feeds reports done+pass (verifyAcceptedIntegrationOwnerRequests).
   sources:
-    - the kernel agent
     - the kernel agent
 
 # ----------------------------------------------------------------------------

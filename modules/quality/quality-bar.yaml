@@ -117,7 +117,7 @@ layers:
       - sufficient gen-AI image/mockup assets
       - sufficient UAT scenario coverage
       - evidence re-derives (never refreshed by assertion)
-    enforcedBy: [scripts/checks/work-layout.mjs, scripts/checks/check-work-consistency.mjs, scripts/checks/check-stales.mjs, scripts/checks/acceptance.mjs, scripts/checks/render.mjs]
+    enforcedBy: [scripts/checks/check-work-consistency.mjs, scripts/checks/check-stales.mjs, scripts/checks/acceptance.mjs, scripts/checks/render.mjs]
     status: enforced
 
 aggregator:

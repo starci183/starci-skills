@@ -53,7 +53,7 @@ orchestration:
   workspaceRouting: .workspaces/projects/<project>/work.json
   # Owner ruling: the only owner gates are the entry skills' exact-`ok`
   # (define-goal, start-kernel) plus settle-time evidence verdicts — there is no
-  # separate approvals engine or policy file (approvals/ is retired).
+  # separate approvals engine or policy file.
   approvalMode: entry-skill-owner-ok
   dispatch: The current user-designated coordinator remains the coordinator, including when it is an external
     Codex or Claude chat driving Orca. It creates an isolated child worktree for each ready workflow and starts
@@ -191,8 +191,8 @@ targetAliases:
   qwen-deepseek-v4-pro-reviewer: deepseek-v4-pro
   devin-devin-worker: devin-agent
   devin-devin-reviewer: devin-agent
-  # Retired per-model pool ids resolve to the provider-window pool that carries them now, so live workflow
-  # quota entries and journal references keep landing on the right window.
+  # Bare per-model ids resolve to the provider-window pool that carries them, so workflow
+  # quota entries keep landing on the right window.
   gpt-5.6-luna: codex-agent
   gpt-5.6-sol: codex-agent
   gpt-6-astra: codex-agent
@@ -400,7 +400,7 @@ operators:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
-  scope.retire:
+  scope.finish:
     skill: starci
     chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
     environments:
@@ -527,7 +527,7 @@ costPolicy: |-
   Never infer price or quality superiority from a subscription label; benchmark bounded
   representative operations before proposing another routing change. A native worker is released
   after its exact worker_done result is accepted; the workflow child remains until integration is
-  complete. In runtime 5.0 the chain no longer decides who runs an operation - `modules/models/runtimes.yaml`
+  complete. The chain does not decide who runs an operation - `modules/models/runtimes.yaml`
   does, by role preference - so every operator's `environments` must declare every runtime that carries
   that operation's role and owns a profile for it, and the chain lists exactly those targets so
   `candidateFor` can answer with a launch shape for whichever runtime the allocator picked. A pool

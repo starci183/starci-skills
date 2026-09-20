@@ -19,7 +19,7 @@ provenance:
     edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
     source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
     Historical links supply provenance, not scripts or execution instructions.
-    One case is retired here: FE-IMPORTS-7 Case 9 folded into Case 7, because where a band is mounted
+    One case is closed here: FE-IMPORTS-7 Case 9 folded into Case 7, because where a band is mounted
     and whether a band was drawn by hand are one law about one object and were drifting as two. The
     historical observations that justified the case are recorded in
     https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.json.
@@ -66,7 +66,7 @@ rules:
     verification:
       automated: []
       manual:
-        - Verify @starci/grammar/common exports before importing; do not use package root or retired @grammar/*.
+        - Verify @starci/grammar/common exports before importing; do not use package root or former @grammar/*.
     relatedExamples:
       - connected-block
 
@@ -275,7 +275,7 @@ rules:
         write: >
           renderers and prop types come from the installed public family entry or
           @starci/grammar/common; never from the package root or mixed families. Verify the exact
-          exported entry and do not copy retired @grammar aliases.
+          exported entry and do not copy former @grammar aliases.
       - id: case-6
         when: "A second family stylesheet under one root"
         write: >

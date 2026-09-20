@@ -18,7 +18,7 @@ rules:
     title: Authored obligations are authority
     kind: mandatory
     requirement: Use model/code-patterns.yaml as the exact Nest/Next mechanical inventory. Installed package exports are a toolbox and cannot silently add, remove or weaken an obligation.
-    rationale: Package recommendations contain legacy, disabled and profile-conflicting rules; adoption must remain explicit and reviewable.
+    rationale: Package recommendations contain outdated, disabled and profile-conflicting rules; adoption must remain explicit and reviewable.
   - id: CODE-PATTERN-2
     title: Complete applicable machine coverage
     kind: mandatory

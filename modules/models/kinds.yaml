@@ -8,7 +8,7 @@ purpose: |-
   file: changing the process means editing this profile, never prompting harder.
 
   Input and output are explicit. Every kind declares `reads` and `writes` over the record catalog of
-  `modules/models/records.yaml` - the single list of 5-plus that replaced the `mutates` list of 5.1 - so the
+  `modules/models/records.yaml` - the single record vocabulary both fields share - so the
   contract, the validator and the kernel are held to one declaration instead of each keeping a set of its
   own. `validateGraph` refuses a kind that writes a record it is blind to, a lane whose prove step cannot
   read what its build step wrote, and a route to a kind that writes nothing its requesters read.
@@ -56,7 +56,7 @@ vocabularies:
   # inbox) and the `features/<feature>/` record trees - so a write outside it fails checks. Layout
   # definitions (`work-layout`, `workspace-routing`) and kernel transport records are never artifact
   # consts, so they are absent here.
-  schemas: [work/workspace@1, work/node@2, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks@1, starci/knowledge-rule@1, starci/knowledge-source@1]
+  schemas: [work/workspace@1, work/node@2, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks, starci/knowledge-rule@1, starci/knowledge-source@1]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
   # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
   # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
@@ -65,7 +65,7 @@ vocabularies:
   # inventing an image. `grammar-gap` is the third gap and the deepest one: the accepted requirement needs a shape
   # the installed grammar cannot render and that no composition of existing contracts covers, so the language itself
   # is short a word - grown once in the grammar package, never invented beside it in a page.
-  # `srs-gap` is the deepest of the record gaps and the one that was missing until 5-plus: the REQUIREMENT the
+  # `srs-gap` is the deepest of the record gaps: the REQUIREMENT the
   # work is derived from does not settle the case, or settles it twice in two ways. It is not an `sds-gap` -
   # revising the design would invent the product rule it is supposed to realise - and it is not an
   # `authority` block either when ordinary technical ambiguity has one safe reversible reading: the runtime may
@@ -82,7 +82,7 @@ vocabularies:
   verdicts: [pass, findings, rejected, gate-failed]
   # What happens to the operation that produced the report:
   #   retry    - no new operation; the same op runs again
-  #   reopen   - the op returns to pending and depends on the routed op
+  #   reopen   - the op returns to queued and depends on the routed op
   #   pause    - the op is parked until the routed op is done
   #   settle   - the op is finished; only the routed op carries the work forward
   #   needUser - nothing is routed automatically; the workflow stops for the user
@@ -114,13 +114,8 @@ kinds:
   # repair kinds a gap blocker routes to, goal.validate is the kernel's own read of the goal
   # against review.verify's contract, implementation.plan is the kernel-planned cut carried by
   # work.author. None of them needs an op file of its own; every `operator` value must resolve to
-  # a file in modules/ops/ops/. (Reconciled in the M2 wave: this catalogue is keyed by KIND, the
+  # a file in modules/ops/ops/. (This catalogue is keyed by KIND; the
   # operator catalog modules/ops/registry.yaml is keyed by OP.)
-  #
-  # NOT REGISTERED HERE: ex-test.probe - a self-contained dispatch-loop canary that writes only
-  # under ex-testing/ (lifecycle: internal-canary). It is delete-scheduled with the ex-testing
-  # harness, so it deliberately has no kind entry; the generated ops registry lists it because it
-  # is a file on disk, not because it is workflow vocabulary.
   #
   # The runtime never decides for the owner; it prepares the decision. This op writes the owner's decision
   # draft: the question, why it matters, the options with what each means for architecture, user stories,
@@ -283,7 +278,7 @@ kinds:
     operator: interface.asset
     readOnly: false
     reads: [design, brand]
-    # Deviation from the 5-plus design table, which names `asset, design`: the generated artwork lands in the
+    # The generated artwork lands in the
     # bound source repository at the path the design record declares, and a bound repository is `code` in the
     # record catalog. The files are asset bytes and they are product source at the same time.
     writes: [asset, design, code]
@@ -301,8 +296,8 @@ kinds:
     operator: interface.implement
     readOnly: false
     # The whole design side is an input: the drawing and its generated artwork, the identity they sit inside,
-    # the grammar the markup is written in, and the source it is being added to. `srs` is the 5-plus addition and
-    # the reason is the blocker: an operation may only report `srs-gap` about a requirement it actually had in
+    # the grammar the markup is written in, and the source it is being added to. `srs` is required because
+    # of the blocker: an operation may only report `srs-gap` about a requirement it actually had in
     # front of it, and a build that never reads the requirement cannot say the requirement is unsettled.
     reads: [srs, sds, design, asset, brand, grammar, code]
     # A frontend build also owns the browser capture and markup evidence kept under its implementation
@@ -393,7 +388,7 @@ kinds:
     knowledge: [application-stacks]
     checks: []
     stacks: [.stacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/resource@1, starci/application-stacks@1]
+    carries: [work/resource@1, starci/application-stacks]
     purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -423,11 +418,11 @@ kinds:
     role: verify
     operator: uat.verify
     readOnly: false
-    # Deviation from the 5-plus design table, which omits `brand`: `kindsReadingBrand()` replaces the
-    # kernel's hard-coded DESIGN_KINDS, and a walk that judges the rendered surface is given the brand
+    # `kindsReadingBrand()` decides brand reads from this catalog: a walk that judges the rendered
+    # surface is given the brand
     # payload exactly like the drawing and the build are.
     reads: [srs, design, asset, brand, code]
-    # Deviation from the design table, which names `evidence` alone: the walk authors its scenario and its
+    # The walk authors its scenario and its
     # scripts inside the bound repository, which is `code`.
     writes: [evidence, code]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
@@ -444,7 +439,7 @@ kinds:
     operator: e2e.verify
     readOnly: false
     reads: [srs, sds, code]
-    # Deviation from the 5-plus design table, which names `evidence` alone: the proof authors one scenario
+    # The proof authors one scenario
     # spec per assertion inside the bound repository, which is `code`. What it may never write is product
     # code - that ceiling is the operator's allowlist, not the record catalog.
     writes: [evidence, code]
@@ -480,9 +475,8 @@ kinds:
     role: verify
     operator: review.verify
     readOnly: true
-    # Deviation from the 5-plus design table, which omits `runtime`: the operations lane proves
-    # `runtime.operate` with this kind, and a prover that cannot read the runtime record its build wrote is
-    # `lane-proof-blind`.
+    # The operations lane proves `runtime.operate` with this kind, and a prover that cannot read the
+    # runtime record its build wrote is `lane-proof-blind`.
     reads: [srs, sds, code, evidence, runtime]
     writes: []
     knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, design-patterns, code-pattern-enforcement]
@@ -507,7 +501,7 @@ kinds:
     # An intake reads the decided records of the whole product before it authors anything, which is what
     # makes the three reconciliation cases checkable against ids rather than against wording.
     reads: [srs, sds, decision, code, record]
-    # An intake or a migration also authors the todo integration node every declared integration owes.
+    # An intake or an import also authors the todo integration node every declared integration owes.
     writes: [record, srs, sds, decision, integration]
     knowledge: [application-stacks]
     checks: []
@@ -668,7 +662,7 @@ kinds:
     checks: [scripts/checks/acceptance.mjs]
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
-    purpose: Measure the running product against the performance budget the goal declared and leave the observed numbers as evidence.
+    purpose: Measure the running product against the performance budget the goal declared and leave the measured numbers as evidence.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, environment, authority]
@@ -742,13 +736,13 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, authority]
-  scope.retire:
+  scope.finish:
     family: build
     role: implement
-    operator: scope.retire
+    operator: scope.finish
     readOnly: false
-    # The retirement reads the nodes and repository it retires, the live consumers it must preserve and the
-    # owner decision that authorises it; it writes the retired scope's own record - removal runs only where
+    # The finish op reads the nodes and repository it removes, the live consumers it must preserve and the
+    # owner decision that authorises it; it writes the removed scope's own record - removal runs only where
     # separately authorised, and evidence is preserved rather than rewritten.
     reads: [record, code, decision]
     writes: [record]

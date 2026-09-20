@@ -4,7 +4,7 @@
 //
 //   node scripts/agent/spawn.mjs --provider <devin|qwen|claude|codex>
 //     --worktree <path> --title <t> [--prompt <text> | --prompt-file <f>]
-//     [--command <override>] [--kernel] [--dispatch-id <id>] [--json]
+//     [--command <override>] [--kernel] [--dispatch-id <id>]
 //
 // --kernel selects the card's kernelCommandRequirements (devin dangerous mode).
 // --command supplies a profile launch command (model+tuning); the card's

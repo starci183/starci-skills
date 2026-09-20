@@ -9,7 +9,7 @@ import {readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords,
 
 /**
  * Deep/semantic staleness checks layered on top of check-example-work.mjs, which only sees local shape:
- * an id matching its directory, a digest matching its bytes, a ref that resolves. The v6-3/v6-4 audits
+ * an id matching its directory, a digest matching its bytes, a ref that resolves. Audits
  * showed everything that gate cannot see: a done record whose dependencies moved underneath it, a proof
  * command that names a spec file which does not exist, a contract surface no controller serves, a
  * shipped mutation no record claims. Those are the checks here.

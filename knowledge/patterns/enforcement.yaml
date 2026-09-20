@@ -15,7 +15,7 @@ provenance:
   limitations: |
     These proposals do not authorize editing or publishing external lint packages. Source
     observations are not automatically best practice: classify a repeated pattern, a sanctioned
-    exception and legacy debt separately.
+    exception and existing debt separately.
 rules:
   - id: ENF-MANDATORY-1
     title: Preserve responsibilities across projects
@@ -87,7 +87,7 @@ rules:
     kind: mandatory
     requirement: |
       Source observations are not automatically best practice: classify a repeated pattern, a
-      sanctioned exception and legacy debt separately. Do not promote an accidental loophole such
+      sanctioned exception and existing debt separately. Do not promote an accidental loophole such
       as an unrecognized shell directory into a new standard.
     rationale: |
       Accidental loopholes become permanent debt when treated as reusable tiers.

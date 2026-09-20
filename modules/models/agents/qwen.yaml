@@ -9,7 +9,7 @@ commandRequirements:
 commandRequirementsReason: |-
   --yolo is mandatory for terminal-spawned qwen, not optional: without it the TUI asks command approval
   per tool kind (Read, grep, Bash...) and answering "allow always" only whitelists that one kind — the
-  next kind re-prompts and the lane stalls forever. Observed 2026-09-20 (exup lanes).
+  next kind re-prompts and the lane stalls forever.
 why: |-
   Orca 1.4.188's native qwen-code adapter cannot deliver a Task prompt to Qwen Code 0.23.3
   (agent_prompt_stalled, agent_readiness timeout). A terminal created with the declared qwen command
@@ -43,9 +43,9 @@ approvalMode:
   reasoning: yolo
   reason: |-
     Every Qwen operation runs unattended in an isolated child worktree under a contract allowlist, so both roles use
-    yolo. Plan mode was rejected live (4.2): it asks for confirmation on every shell command, including the heartbeat
-    send, so a review parked at "Allow execution of: 'orca'?" while its heartbeat stayed fresh. Auto mode was rejected
-    earlier (OBS-27) for the same reason with a remote classifier. Write authority for a review is enforced by the
+    yolo. Plan mode asks for confirmation on every shell command, including the heartbeat
+    send, so a review would park at "Allow execution of: 'orca'?" while its heartbeat stayed fresh; auto mode stalls
+    the same way behind a remote classifier. Write authority for a review is enforced by the
     contract allowlist and the Monitor's report validation, not by the provider's approval mode.
 start:
   - api: terminal.create

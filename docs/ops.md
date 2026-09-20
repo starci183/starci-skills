@@ -63,7 +63,7 @@ route:                           # the resolver index — route-op.mjs reads ONL
   nodeKinds: [implementation]
   phase: [implement, implementation]
   intent: [implement, backend, code, api, build]
-  prerequisites: ["business.decide done", "architecture.decide done"]
+  prerequisites: ["business.decide settled pass (reviewed SRS seed; Work leaves remain todo)", "architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)"]
   riskHints: [source-edits]
 ```
 
@@ -93,8 +93,9 @@ route:                           # the resolver index — route-op.mjs reads ONL
 ```text
 kernel: api enqueue --op <id> --paths <csv>   (brief file must exist → unknown-op)
       → api dispatch --job <id> --spawn      (packet = {op, brief, context, constraints, returns})
-      → [Op] agent works inside owned_paths, writes the report file
-      → api settle --job <id> --verdict <v> --report <path>
+      → [Op] agent works inside owned_paths, files its report row
+      → api report --job <id> --report <file>  (starci/op-report@1 envelope)
+      → api consume-report → api check → api settle --job <id> --verdict <v>
 ```
 
 The packet fields and lease semantics are `modules/kernel/dispatch.yaml`; what

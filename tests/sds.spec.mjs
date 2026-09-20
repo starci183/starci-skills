@@ -67,7 +67,7 @@ test('nested SDS resolves canonical SRS IDs and imports shared views without cop
   assert.ok(f.run().errors.some(e => e.code === 'SDS_BINDING'));
 });
 
-test('SDS rejects undeclared graph imports, legacy source mapping and false acceptance', t => {
+test('SDS rejects undeclared graph imports, misplaced source mapping and false acceptance', t => {
   for (const mode of ['unbound', 'source', 'pass', 'wrong-kind']) {
     const f = fixture(t), s = documentSDS();
     const meta = f.node('example.architecture.sds', {state: 'todo', extensions: {work3: {specification: s}}});

@@ -12,7 +12,7 @@ import {openLedger} from '../engine/ledger-db.mjs';
  *
  * The temptation this gate exists to refuse is a content table with no parent - a `blobs` table keyed by
  * digest, say, so two workflows could share one attachment. It reads like deduplication and it is a second
- * root: rows that no workflow owns, that no retirement clears, and that quietly become the place where things
+ * root: rows that no workflow owns, that no finish clears, and that quietly become the place where things
  * accumulate. A document that must outlive a workflow belongs in the Work tree, in git, beside `features/`.
  *
  * So the shape is asserted, not described. A new table either carries `workflow_id` with a path to
@@ -20,7 +20,7 @@ import {openLedger} from '../engine/ledger-db.mjs';
  * same commit - deliberately, with a reason - rather than a precedent being set by accident.
  */
 // The parent itself is not in this list: it carries workflow_id as its own primary key.
-const LEDGER_WIDE=['budget_reservations','budgets','meta','migrations','resources','runtime_loads','signals'];
+const LEDGER_WIDE=['budget_reservations','budgets','meta','resources','signals'];
 
 const withLedger=fn=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-shape-'));

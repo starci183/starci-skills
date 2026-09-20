@@ -14,7 +14,7 @@ StarCi provides:
   op chain in the ledger — the plan survives sessions, restarts and context loss.
 - **A kernel agent per workflow:** `start-kernel` claims a queued goal and boots one long-lived
   `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
-  through `node scripts/kernel/api.mjs <survey|status|plan|enqueue|dispatch|settle|incident|retire>`.
+  through `node scripts/kernel/api.mjs <survey|status|plan|enqueue|dispatch|settle|incident|finish>`.
 - **Ephemeral op agents:** `api dispatch` spawns one short-lived `[Op]` agent per job through the
   per-agent cards (`modules/models/agents/`). Adapter flags are injected by the spawner — the kernel
   cannot forget them; `settle` records the verdict and closes the worker.
@@ -27,7 +27,7 @@ StarCi provides:
 comes from locally configured agent CLIs (Devin, Claude Code, Codex, Orca) — StarCi has no API key
 of its own.
 
-**Status:** `1.0.4`, MIT, not yet published to npm. Use the source or a reviewed archive.
+**Status:** `2.0.0`, MIT, not yet published to npm. Use the source or a reviewed archive.
 
 [Install](#install) · [How it runs](#how-it-runs) · [Configuration](#configuration) ·
 [Layout](#layout) · [Documentation](#documentation)
@@ -65,7 +65,7 @@ The installer:
 owner prompt
   └─ define-goal        → goal + op chain queued in .starciwork/runtime.sqlite
        └─ start-kernel  → claims the goal, boots the long-lived [Kernel] agent
-            └─ api.mjs  → survey → plan → enqueue → dispatch → settle → retire
+            └─ api.mjs  → survey → plan → enqueue → dispatch → settle → finish
                  └─ dispatch spawns one ephemeral [Op] agent per job
                       (adapter card injects the provider CLI flags)
 ```
@@ -80,7 +80,7 @@ owner prompt
 ## Configuration
 
 `config.yaml` (untracked, seeded from `config.example.yaml`) holds per-project settings: kernel
-model, effort and budgets. Resolution order: explicit `--provider` flag > owner `config.yaml` >
+model, effort and budgets. Resolution order: explicit `--agent` flag > owner `config.yaml` >
 `scripts/route/route-model.mjs` defaults. See [config format](docs/config-format.md).
 
 ## Layout

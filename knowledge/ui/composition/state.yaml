@@ -92,8 +92,8 @@ rules:
         when: The branch contained anything focusable
         assert: |-
           Nothing from that branch is focusable and nothing from it appears in the accessibility tree
-    retired: |-
-      STATE-4 is retired into COVERAGE-1 and is not reused; the address stays spent.
+    closed: |-
+      STATE-4 is folded into COVERAGE-1 and is not reused; the address stays spent.
   - id: STATE-5
     title: Whole-surface action or static surface
     governs: Governs whether a surface is itself one interactive thing.

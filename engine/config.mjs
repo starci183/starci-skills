@@ -13,23 +13,23 @@ const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const defaults=()=>({pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...DEFAULT_NON_OPERATION_MODELS},selection:'quota-aware'});
 function runtimeProfile(){const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));if(!fs.existsSync(source))throw Error('Missing modules/models/runtimes.yaml');return parseYaml(fs.readFileSync(source,'utf8'));}
 function targetAliases(){const source=fileURLToPath(new URL('../modules/models/registry.yaml',import.meta.url));try{const registry=fs.existsSync(source)?parseYaml(fs.readFileSync(source,'utf8')):null;return registry?.targetAliases??{};}catch{return {};}}
-// A legacy config names the retired per-model pools; each id resolves to the provider-window pool that carries
-// it now, so `critique.runtimes: [claude-opus, gpt-5.6-sol]` still identifies the opus-sol pair.
+// An older config names per-model pools by runtime id; each id resolves to the provider-window pool that
+// carries it now, so `critique.runtimes: [claude-opus, gpt-5.6-sol]` still identifies the opus-sol pair.
 const canonical=id=>targetAliases()[id]??id;
 const poolFor=(values,pools)=>Object.entries(pools).find(([,members])=>Array.isArray(values)&&values.length===members.length&&values.every(id=>members.includes(canonical(id))))?.[0]??null;
-function migrateLegacy(config){
+function upgradeConfig(config){
   const current=config?.models,keys=plain(current?.nonOperation)?Object.keys(current.nonOperation):[],sixRoles=['goalAssessment','operationPlanner','kernelManager','technicalDecision','goalCritic','validator'];
   if(plain(current?.pools)&&plain(current?.nonOperation)&&keys.every(key=>Object.hasOwn(NON_OPERATION_ROLES,key)))return config;
   if(plain(current?.pools)&&plain(current?.nonOperation)&&keys.some(key=>!sixRoles.includes(key)))return config;
   const models=defaults();
   if(plain(current?.nonOperation)){
     const old=current.nonOperation,groups={planner:['goalAssessment','operationPlanner'],kernelManager:['kernelManager','technicalDecision'],validator:['goalCritic','validator']};
-    for(const [role,keys] of Object.entries(groups)){const named=keys.filter(key=>old[key]!==undefined).map(key=>Array.isArray(old[key])?poolFor(old[key],models.pools):old[key]);if(named.some(pool=>!pool)||new Set(named).size>1)throw Error(`Invalid legacy config.json: ${keys.join('/')} cannot be merged into models.nonOperation.${role}.`);if(named.length)models.nonOperation[role]=named[0];}
+    for(const [role,keys] of Object.entries(groups)){const named=keys.filter(key=>old[key]!==undefined).map(key=>Array.isArray(old[key])?poolFor(old[key],models.pools):old[key]);if(named.some(pool=>!pool)||new Set(named).size>1)throw Error(`Invalid config.json: ${keys.join('/')} cannot be merged into models.nonOperation.${role}.`);if(named.length)models.nonOperation[role]=named[0];}
     return {...config,models};
   }
-  const legacy=[['supervisor','kernelManager'],['validator','validator'],['critique','validator']],assigned=new Map();
-  for(const [old,role] of legacy){const section=config?.[old],values=Array.isArray(section?.runtimes)?section.runtimes:typeof section==='string'?[section]:null;if(!values?.length)continue;const pool=poolFor(values,models.pools);if(!pool)throw Error(`Invalid legacy config.json: ${old}.runtimes does not match a supported model pool.`);if(assigned.has(role)&&assigned.get(role)!==pool)throw Error(`Invalid legacy config.json: ${old} conflicts with models.nonOperation.${role}.`);assigned.set(role,pool);models.nonOperation[role]=pool;}
-  return {...Object.fromEntries(Object.entries(config??{}).filter(([key])=>!legacy.some(([old])=>old===key))),models};
+  const oldSections=[['supervisor','kernelManager'],['validator','validator'],['critique','validator']],assigned=new Map();
+  for(const [old,role] of oldSections){const section=config?.[old],values=Array.isArray(section?.runtimes)?section.runtimes:typeof section==='string'?[section]:null;if(!values?.length)continue;const pool=poolFor(values,models.pools);if(!pool)throw Error(`Invalid config.json: ${old}.runtimes does not match a supported model pool.`);if(assigned.has(role)&&assigned.get(role)!==pool)throw Error(`Invalid config.json: ${old} conflicts with models.nonOperation.${role}.`);assigned.set(role,pool);models.nonOperation[role]=pool;}
+  return {...Object.fromEntries(Object.entries(config??{}).filter(([key])=>!oldSections.some(([old])=>old===key))),models};
 }
 export function validateConfig(config){
   const allowed=['language','model','effort','models','debug','providers','allocation','kernel','budgets'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
@@ -51,8 +51,13 @@ export function validateConfig(config){
   }
   if(config?.kernel!==undefined){
     const kernel=config.kernel;
-    if(!plain(kernel)||Object.keys(kernel).some(key=>!['provider','model','effort'].includes(key))||Object.values(kernel).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
-      throw Error('Invalid config.yaml: kernel must be {provider?, model?, effort?} with string-or-null values.');
+    if(!plain(kernel)||Object.keys(kernel).some(key=>!['agent','provider','model','effort'].includes(key))||Object.values(kernel).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
+      throw Error('Invalid config.yaml: kernel must be {agent?, model?, effort?}; legacy provider? is accepted with string-or-null values.');
+    if(typeof kernel.agent==='string'&&typeof kernel.provider==='string'&&kernel.agent!==kernel.provider)
+      throw Error(`Invalid config.yaml: kernel.agent ${kernel.agent} conflicts with deprecated kernel.provider ${kernel.provider}.`);
+    const kernelAgent=kernel.agent??kernel.provider;
+    if(typeof kernelAgent==='string'&&!knownProviders.has(kernelAgent))
+      throw Error(`Invalid config.yaml: kernel.agent ${kernelAgent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     if(typeof kernel.effort==='string'&&!['none','minimal','low','medium','high','xhigh','max','ultra'].includes(kernel.effort))
       throw Error('Invalid config.yaml: kernel.effort must use the effort vocabulary.');
   }
@@ -75,26 +80,26 @@ export function effectiveNonOperationModels(config=loadConfig()){const models=va
 export function configuredAllocationPolicy(config=loadConfig()){
   validateConfig(config);
   if(plain(config.allocation))return {mode:ADAPTIVE_ALLOCATION_MODE,preferredProvider:config.allocation.preferredProvider??null,source:'allocation'};
-  const legacy=Array.isArray(config.providers)?config.providers.filter(provider=>typeof provider==='string'&&provider.trim()):[];
-  return legacy.length?{mode:ADAPTIVE_ALLOCATION_MODE,preferredProvider:legacy[0],source:'legacy-providers'}:
+  const ordered=Array.isArray(config.providers)?config.providers.filter(provider=>typeof provider==='string'&&provider.trim()):[];
+  return ordered.length?{mode:ADAPTIVE_ALLOCATION_MODE,preferredProvider:ordered[0],source:'legacy-providers'}:
     {mode:ADAPTIVE_ALLOCATION_MODE,preferredProvider:null,source:'default'};
 }
 /** @deprecated Compatibility accessor; only the first entry is an owner preference, never a try chain. */
 export const configuredProviderOrder=(config=loadConfig())=>{const policy=configuredAllocationPolicy(config);return policy?.preferredProvider?[policy.preferredProvider]:[];};
 export const nonOperationModels=(role,config=loadConfig())=>{if(!Object.hasOwn(NON_OPERATION_ROLES,role))throw Error(`Unknown non-operation model role ${role}`);return effectiveNonOperationModels(config)[role].runtimes;};
-function readExample(root=configRoot){const yaml=path.join(root,'config.example.yaml');if(fs.existsSync(yaml))return validateConfig(migrateLegacy(parseYaml(fs.readFileSync(yaml,'utf8'))));const json=path.join(root,'config.example.json');if(fs.existsSync(json))return validateConfig(migrateLegacy(JSON.parse(fs.readFileSync(json,'utf8'))));throw Error('Missing config.example.yaml (or legacy config.example.json)');}
+function readExample(root=configRoot){const yaml=path.join(root,'config.example.yaml');if(fs.existsSync(yaml))return validateConfig(upgradeConfig(parseYaml(fs.readFileSync(yaml,'utf8'))));const json=path.join(root,'config.example.json');if(fs.existsSync(json))return validateConfig(upgradeConfig(JSON.parse(fs.readFileSync(json,'utf8'))));throw Error('Missing config.example.yaml (or config.example.json)');}
 /**
  * The owner config reader: `config.yaml` is the per-project file (gitignored,
  * seeded verbatim from `config.example.yaml` by the installer — comments and
- * all). A legacy `config.json` is still honored so existing installs keep
+ * all). A `config.json` is still honored so existing installs keep
  * working. Absent both → the example's defaults. Returns the validated config
  * or null when no owner file exists.
  */
 export function readOwnerConfig(root=configRoot){
   const yaml=path.join(root,'config.yaml');
-  if(fs.existsSync(yaml))return validateConfig(migrateLegacy(parseYaml(fs.readFileSync(yaml,'utf8'))));
+  if(fs.existsSync(yaml))return validateConfig(upgradeConfig(parseYaml(fs.readFileSync(yaml,'utf8'))));
   const json=path.join(root,'config.json');
-  if(fs.existsSync(json))return validateConfig(migrateLegacy(JSON.parse(fs.readFileSync(json,'utf8'))));
+  if(fs.existsSync(json))return validateConfig(upgradeConfig(JSON.parse(fs.readFileSync(json,'utf8'))));
   return null;
 }
 export const loadOwnerConfig=readOwnerConfig;

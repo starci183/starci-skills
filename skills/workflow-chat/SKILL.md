@@ -17,11 +17,19 @@ no second mechanism and no second mutation surface: it reads ledger projections 
 speaks to the kernel through its terminal. The chat is a monitor, never an agent layer above the
 kernel and never an operation.
 
+The current Codex, Claude or Devin chat is the **launcher** and monitor only.
+**Host** means Orca. **Agent** means the execution adapter/Orca agent id such
+as `codex`; **model** means the concrete id such as `gpt-5.6-sol`; **profile**
+means a StarCi routing/capability target such as `codex-agent`; **runtimePool**
+means a quota/capacity window. Do not collapse these roles into “provider”.
+
 ## Resolve once
 
-- `<skill root>` is the `.claude` directory that holds the `SKILL.md` you were sent to; `<repo>` is
-  the repository that owns the workflow's `.starciwork/runtime.sqlite` (the project ledger owner —
-  `define-goal` printed it as `LEDGER`).
+- `<skill root>` is the Source host's `.claude` directory that holds the
+  `SKILL.md` you were sent to. `<repo>` is separately the project repository
+  that owns the workflow's `.starciwork/runtime.sqlite` (`define-goal` printed
+  it as `LEDGER`). `--repo` always names that ledger owner, even when this chat
+  was opened elsewhere.
 - Every runtime call goes through the runtime's own scripts, run from anywhere:
 
   ```
@@ -47,9 +55,16 @@ kernel and never an operation.
 
 ## 2. Boot the kernel — through the entry skill
 
-- Follow the `start-kernel` skill verbatim: `--plan` preview (goal revision, inbox status, routed
-  provider, or "already live"), the owner's exact `ok`, then boot. Keep the `[Kernel]` terminal
-  handle the result prints — it is your relay channel for the rest of the workflow's life.
+- Follow the `start-kernel` skill verbatim: `--plan` preview (goal revision,
+  inbox status, `host=orca`, Kernel agent/concrete model, exact terminal
+  command, or "already live"), the owner's exact `ok`, then boot. Keep the
+  attested `[Kernel]` terminal handle the result prints — it is your relay
+  channel for the rest of the workflow's life.
+- Kernel boot is terminal-create/read/send/attest. It never requires an
+  orchestration run to exist in the launcher chat. A configured agent/model
+  pin that is unavailable, or a ready terminal that does not render the exact
+  requested model, fails closed and returns to the owner; never accept an
+  implicit Devin substitution.
 - A live kernel refuses a second boot; a dead one is rebound as a replacement (kernel attempt+1,
   same workflow) — re-running the boot is the resume path, never a duplicate.
 
@@ -86,16 +101,15 @@ kernel and never an operation.
 - When the owner says stop, send that to the kernel terminal — every api write is a single
   transaction, so a kernel that stands down (or whose terminal is closed) leaves no half-write; the
   claimed goal waits in the `inbox` until a replacement kernel is booted.
-- `phase=finished` in `api.mjs status` means the kernel called `retire`: the goal is retired and the
+- `phase=finished` in `api.mjs status` means the kernel called `finish`: the goal is finished and the
   history preserved. Report the outcome and the settled/failed job counts; a finish with open
   incidents is the owner's open questions, not a defect.
 
 ## Never
 
-- Write `.starciwork/runtime.sqlite`, `state.json`, or anything under `.starciwork/_local` — the
-  kernel mutates the ledger only through `scripts/kernel/api.mjs`, the chat mutates nothing at all,
-  and `_local` holds no runtime state. A live kernel is driven through its `inbox` rows and its
-  terminal.
+- Write `.starciwork/runtime.sqlite` or `state.json` — the kernel mutates the ledger only through
+  `scripts/kernel/api.mjs` and the chat mutates nothing at all. A live kernel is driven through its
+  `inbox` rows and its terminal.
 - Never approve — the exact-`ok` gate in `define-goal`/`start-kernel` fires only on the owner's
   literal word; a relayed "looks fine to me" is not approval unless the owner typed it.
 - Spawn a second kernel or a second workflow in this chat. A second goal is a second workflow: open

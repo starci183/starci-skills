@@ -84,6 +84,6 @@ provenance:
     - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/graphql-types/response.ts
     - starci-academy-backend/src/modules/databases/postgresql/primary/primary.decorators.ts
   simplifications: |
-    Replaced cart/enrollment/legacy-sales business rules with a synthetic
+    Replaced cart/enrollment/sales business rules with a synthetic
     ExampleItem create-or-return flow. Omitted MountFilesystemService optional
     dependency. Kept Academy decorator order and ICQRSHandler/ExecuteParams shapes.

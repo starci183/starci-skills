@@ -83,8 +83,8 @@ rules:
           An anchor is being used with a click handler and no destination
         assert: |-
           No such node exists in the tree; the command owner carries the effect instead
-    retired: |-
-      ACTION-4 is retired into COVERAGE-1 and is not reused; the address stays spent.
+    closed: |-
+      ACTION-4 is folded into COVERAGE-1 and is not reused; the address stays spent.
 doesNotDecide: |-
   Which action deserves emphasis and what its variant promises is [CTA](cta.yaml). Which surface is
   itself an action, and which controlled values persist, is [State](state.yaml). What the reader is told

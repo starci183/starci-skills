@@ -919,8 +919,8 @@ function resolveProjectAuthority(repository, contractProjects, architectureProje
       try {
         const absolute = exactRegularRepositoryFile(repository, architectureProjects.configPath, 'Architecture config');
         const bytes = fs.readFileSync(absolute);
-        const observed = crypto.createHash('sha256').update(bytes).digest('hex');
-        if (observed !== architectureProjects.configDigest) throw Error('architecture config digest does not match its exact bytes');
+        const actual = crypto.createHash('sha256').update(bytes).digest('hex');
+        if (actual !== architectureProjects.configDigest) throw Error('architecture config digest does not match its exact bytes');
         if (context && !context.has(architectureProjects.configPath)) throw Error('architecture config is absent from exact contextFiles');
         const parsed = JSON.parse(bytes.toString('utf8'));
         if (parsed?.schema !== 'starci/architecture-config@1'

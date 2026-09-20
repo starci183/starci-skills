@@ -1,5 +1,5 @@
 schema: starci/codex-recipes@1
-api: api.json
+api: api.yaml
 recipes:
   solo-workflow:
     host: current-codex-chat

@@ -17,7 +17,7 @@ stages:
   implement: write product/test/content/knowledge source inside ceilings
   verify: independent evidence-bound proof; never repairs
   release: publish/deploy/migrate — terminal external effect
-  operate: runtime/service lifecycle, goal maintenance, end-of-life retirement
+  operate: runtime/service lifecycle, goal maintenance, end-of-life closeout
 coarsePhases:
   intake: pre-implementation
   scope: pre-implementation
@@ -31,8 +31,9 @@ count: 33
 ops:
   - id: architecture.decide
     family: architecture
-    goal: Design a flow-led, source-independent architecture with logical components, contracts, state
-      paths, recovery and planned verification.
+    goal: Design the selected implementation slice with the minimum complete flow-led,
+      source-independent architecture needed to build safely, then refine it from concrete
+      implementation evidence.
     nodeKinds:
       - architecture
     completionProfile: architecture
@@ -62,14 +63,14 @@ ops:
         - contracts
         - decide
       prerequisites:
-        - business.decide done (accepted SRS)
+        - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     lifecyclePosition: decide | pre-implementation
     kindInferred: decide
     businessQuestion: '"What is the source-independent technical design (SDS) that realizes the accepted
       SRS - flows, components, contracts, data, quality, deployment, decisions, verification -
       precise enough that a builder'
-    whenNeeded: After accepted business scope (SRS) exists and before backend/frontend implementation of
-      that scope (goal + primary-mode name).
+    whenNeeded: After an accepted SRS slice exists, author the minimum design-complete SDS needed before
+      backend/frontend implementation of that selected slice.
   - id: backend.implement
     family: backend
     goal: Implement one selected backend outcome and prove its declared contract on actual code.
@@ -106,8 +107,8 @@ ops:
         - api
         - build
       prerequisites:
-        - business.decide done
-        - architecture.decide done
+        - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
+        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
       riskHints:
         - source-edits
     lifecyclePosition: implement | implementation
@@ -151,7 +152,7 @@ ops:
         - bootstrap
         - init
       prerequisites:
-        - architecture.decide done
+        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - repository bound
       riskHints:
         - source-edits
@@ -207,8 +208,8 @@ ops:
     whenNeeded: Before interface.draw / interface.asset need an identity to draw against.
   - id: business.decide
     family: business
-    goal: Specify the selected business behavior precisely enough to implement and independently accept
-      it.
+    goal: Specify the selected business slice with the minimum complete observable behavior needed to
+      implement and independently accept it, then refine that contract from authoritative feedback.
     nodeKinds:
       - business
       - business-overview
@@ -222,7 +223,6 @@ ops:
       - profile
     writes:
       - node
-      - review
       - matrixHandoff
     route:
       nodeKinds:
@@ -657,8 +657,8 @@ ops:
         - imagegen
         - ui-design
       prerequisites:
-        - business.decide done
-        - architecture.decide done
+        - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
+        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - brand.decide done
       riskHints:
         - host-tool-required:image_gen.imagegen
@@ -715,7 +715,7 @@ ops:
         - code
       prerequisites:
         - interface.draw done
-        - architecture.decide done
+        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
       riskHints:
         - source-edits
     lifecyclePosition: implement | implementation
@@ -761,7 +761,7 @@ ops:
         - bootstrap
         - init
       prerequisites:
-        - architecture.decide done
+        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - grammar bound
         - repository bound
       riskHints:
@@ -848,7 +848,7 @@ ops:
         - bootstrap
         - init
       prerequisites:
-        - architecture.decide done
+        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - repository bound
       riskHints:
         - source-edits
@@ -1125,16 +1125,16 @@ ops:
       workflow may touch - grounded in the request and inspected records and source?"'
     whenNeeded: After intake (or directly from a request) when a workflow needs a typed scope record
       before any effects run.
-  - id: scope.retire
+  - id: scope.finish
     family: scope
-    goal: Retire exactly the selected business/resource scope while preserving required evidence and
-      live consumers.
+    goal: Finish exactly the selected business/resource scope - end-of-life - while preserving required
+      evidence and live consumers.
     nodeKinds:
       - operations
     completionProfile: operations
     sideEffects:
       count: 1
-      summary: explicit retirement metadata and separately authorized exact destructive actions only
+      summary: explicit end-of-life metadata and separately authorized exact destructive actions only
     reads:
       - target
       - repo
@@ -1153,7 +1153,7 @@ ops:
         - operate
         - post-implementation
       intent:
-        - retire
+        - finish
         - remove
         - scope
         - end-of-life
@@ -1162,8 +1162,8 @@ ops:
       riskHints:
         - destructive-gate
     lifecyclePosition: operate | post-implementation
-    kindInferred: retire
-    businessQuestion: '"Can exactly the selected scope be retired while every live consumer and every
+    kindInferred: finish
+    businessQuestion: '"Can exactly the selected scope be finished while every live consumer and every
       required piece of evidence or custody survives?"'
     whenNeeded: End-of-life handling for a selected business/resource scope; also explicitly authorized
       exact removals (registered worktrees, artifact directories).
@@ -1420,4 +1420,3 @@ ops:
       with verified repo bindings; import: reconstructed from inspected source with preserved
       provenance?"'
     whenNeeded: "[object Object]"
-engines: {}

@@ -107,7 +107,7 @@ guidance:
       VPS Swarm instead uses immutable versioned engine secrets, created through private stdin
       and granted to exact services. Retained plaintext Compose mount files are not the Swarm
       custody model. Preserve encrypted source and recovery identities; stage new secret names,
-      update and verify consumers, then retire old names only when no consumer needs them.
+      update and verify consumers, then drop old names only when no consumer needs them.
   - id: STACK-VPS
     requirement: |
       VPS defaults to Docker Swarm on declared supported Ubuntu/CPU versions with sufficient

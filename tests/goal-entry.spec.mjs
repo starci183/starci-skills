@@ -71,6 +71,26 @@ test('start-workflow --plan prints the plan and leaves the inbox row pending',t=
   assert.equal(status,'pending','--plan claimed the inbox row — it must only read');
 });
 
+test('start-workflow treats --repo as the project ledger owner when launched outside Source',t=>{
+  const repo=fixture(t).repo();
+  const def=run(DEFINE_GOAL,'--repo',repo,'--text','build the enrolment api endpoint','--json');
+  assert.equal(def.status,0,def.stderr);
+  const workflowId=out(def)?.workflowId;
+  assert.ok(workflowId);
+  // Codex, Claude and Devin chats are ingress launchers. They may invoke the
+  // absolute executable from any cwd; --repo remains the project-owned
+  // ledger root, while Source is derived from the executable itself.
+  const r=spawnSync(process.execPath,[START_WORKFLOW,'--repo',repo,'--goal',workflowId,'--plan','--json'],{
+    cwd:repo,encoding:'utf8',windowsHide:true,timeout:120000,
+  });
+  assert.equal(r.status,0,r.stderr||r.error?.message);
+  const plan=out(r);
+  assert.equal(plan?.sourceHost,path.dirname(ROOT));
+  assert.equal(path.resolve(plan?.ledger??''),ledgerFileFor(repo));
+  assert.equal(plan?.executionHost,'orca');
+  assert.equal(plan?.inbox,'pending');
+});
+
 test('start-workflow on a finished workflow exits nonzero',t=>{
   const repo=fixture(t).repo();
   const def=run(DEFINE_GOAL,'--repo',repo,'--text','build the enrolment api endpoint','--json');
@@ -81,5 +101,5 @@ test('start-workflow on a finished workflow exits nonzero',t=>{
   try{ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(workflowId);}
   finally{ledger.close();}
   const r=run(START_WORKFLOW,'--repo',repo,'--goal',workflowId,'--json');
-  assert.notEqual(r.status,0,'a finished goal is retired — starting it again must be refused');
+  assert.notEqual(r.status,0,'a finished workflow never restarts — starting it again must be refused');
 });

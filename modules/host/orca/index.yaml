@@ -31,18 +31,23 @@ ui:
     - terminal-title
     - supervised-worker-receipt
   note: 'A sidebar subtitle such as "Bash: orca orchestration check" means the native agent is currently using Bash; it does not mean the terminal is a shell-only worker. The kernel terminal is a shell by design: the loop is code, not an agent.'
+  semanticHierarchy:
+    schema: starci/agent-hierarchy@1
+    projection: 'workflow -> Kernel -> Op'
+    source: 'durable workflow/job identity plus Run coordinator, Task and Dispatch receipts'
+    neverFrom: [terminal-title-parsing, tab-order, pane-layout, parentPaneKey]
+    rule: 'same-worktree peers remain semantic children when their Task/Dispatch belongs to the Kernel-owned Run'
 names:
   workflowWorktree: "[Workflow] <Workflow>"
   workflowKernel: "[Kernel] <Workflow>"
   operationAgent: "[Op] <operation> - <scope>"
   rule: A worktree carries its workflow name; the one kernel process that owns the loop inside that worktree is its Kernel; every operation agent is an Op. There is no supervisor layer between a Kernel and an Op.
 workflowKernel:
-  role: one-local-process-per-workflow-in-the-workflow-worktree
+  role: one-dedicated-agent-terminal-per-workflow
   note: |-
-    The kernel is not an Orca worker. It is ordinary Node code (kernel/kernel.mjs) running in a
-    worktree: it binds a Run, launches operation agents through the canonical launcher, reads their report
-    files and waits on the Run boundary. Orca supplies worktrees and attested terminals; everything above
-    them is the kernel's.
+    The Kernel is not an Orca worker. start-workflow boots one dedicated attested agent terminal; its
+    first operation lazily binds a Run with that terminal as coordinator. Every operation Task/Dispatch
+    in the Run is a semantic child of the Kernel even when Orca renders its terminal as a peer tab.
   calls:
     bindRun:
       api: orchestration.run-create

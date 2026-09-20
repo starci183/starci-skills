@@ -78,7 +78,7 @@ $defs:
     properties:
       schema:
         const: work/resource@1
-        description: Legacy resource format discriminator; canonical Work v2 uses direct provenance.
+        description: v1 resource format discriminator; canonical Work v2 uses direct provenance.
       id:
         $ref: "#/$defs/id"
         description: Stable graph identifier used by dependencies and digest propagation; example
@@ -334,7 +334,7 @@ $defs:
               cannot say who set it."
           where:
             $ref: "#/$defs/string"
-            description: "Retired in 5-plus and kept only so an older tree is told what to change: it named
+            description: "Kept only so an older tree is told what to change: it named
               a place, not a custody. Declare custody instead; a declaration with neither is the problem
               credential-custody-missing."
       sandbox:
@@ -1259,7 +1259,7 @@ $defs:
             $ref: "#/$defs/digest"
             description: Exact context digest reviewed or completed.
         x-operational: true
-        description: Optional reviewed-context receipt for previously unconfirmed source material.
+        description: Optional reviewed-context receipt for unconfirmed source material.
       history:
         type: array
         items:

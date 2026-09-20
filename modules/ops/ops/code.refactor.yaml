@@ -1,6 +1,6 @@
-# modules/ops/ops/code.refactor.yaml - TINKLE-1 pure-yaml port of .claude/ops/code.refactor/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/code.refactor.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: code.refactor
 goal:
@@ -56,8 +56,8 @@ reads:
         cannot run is reported `blocked` with blocker kind `test-gap`, which routes to test.author;
         it is never a reason to skip the invariant or to write the missing coverage inside this op.
   - id: conventions
-    path: knowledge/coding-reference.json + knowledge/patterns/fe/INDEX.json +
-      knowledge/patterns/be/INDEX.json
+    path: knowledge/coding-reference.yaml + knowledge/patterns/fe/index.yaml +
+      knowledge/patterns/be/index.yaml
     purpose:
       en: Read the adopted naming, error-identity, structure and typing conventions the restructure
         must preserve or improve toward - a refactor that degrades declared pattern conformance is a
@@ -84,8 +84,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -252,12 +251,17 @@ blockers:
         paths as blocker kind shared-change rather than widening the allowlist.
   - code: REQUIREMENT_UNSETTLED
     condition:
-      en: "The behavior to preserve is not settled by the accepted requirement - report blocked with
-        blocker kind srs-gap, never pick a reading in code."
+      en: "The observable behavior, actor permission or business effect to preserve is not settled by
+        the accepted requirement - report blocked with blocker kind srs-gap and the smallest affected
+        semantic IDs; never pick a business reading in code. A source-local refactoring choice is not
+        an SRS gap."
   - code: DESIGN_GAP
     condition:
-      en: "The design record is silent about the boundary or contract the restructure must hold -
-        report blocked with blocker kind sds-gap, never invent the contract."
+      en: "The design record is silent or contradictory about a material logical owner, public contract,
+        authority boundary, durable state/effect, compatibility or recovery rule the restructure must
+        preserve - report blocked with blocker kind sds-gap and the smallest affected semantic IDs.
+        File layout, extraction shape and private helper choices are owned by this refactor and are not
+        SDS gaps."
   - code: ENVIRONMENT_UNAVAILABLE
     condition:
       en: "The declared regression runner, a declared architecture/code-pattern machine, a
@@ -301,7 +305,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Can this code slice be restructured while the same regression check proves
@@ -313,7 +317,7 @@ business:
     - Any behavior, contract, schema or config change is a separate operation - never smuggled into a refactor.
     - No covering regression check = test-gap blocked (routes to test.author), never a refactor by inspection.
     - Red baseline = failed, not "refactored"; a refactor never starts from failing regression.
-    - Requirement unsettled (srs-gap) or design gap (sds-gap) routes to its owner, not resolved here.
+    - A material requirement gap (srs-gap) or logical design gap (sds-gap) routes to its owner; reversible source-local restructuring choices remain in this op.
   consumes:
     - Target node, business/architecture boundaries for the slice.
     - Repo slice + all callers; the existing regression suite and check commands; coding conventions; sealed check machines.
@@ -324,7 +328,7 @@ business:
     - TEST_COVERAGE_ABSENT (test-gap), SCOPE_WIDENING (shared-change), REQUIREMENT_UNSETTLED (srs-gap), DESIGN_GAP (sds-gap), ENVIRONMENT_UNAVAILABLE, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET.
     - Behavioral drift discovered mid-run = restore and report; the proof is identical regression output, not reviewer opinion.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

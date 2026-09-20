@@ -73,7 +73,7 @@ These rules guide project inquiry rather than require identical folders or frame
 
 Read-only inspection used Academy backend `1731b15ba4ed526477e3c572b9d82c31ab64f1d5` and frontend `44bba218685b7eed2a5d9e479689707ab6381bc8` as evidence, not universal authority.
 
-| Observed source | Retain | Correct in the adopted default |
+| Reference source | Retain | Correct in the adopted default |
 | --- | --- | --- |
 | Backend `src/modules/platform/env/config.ts` and `utils/parse-env.ts` give keys typed call sites and make secret `_FILE` support explicit through `parseEnvSecret` | Explicit secret classification, file custody, typed access and parser tests | `parseInt`, `Number.parseFloat`, duration and boolean parsing must reject invalid, non-finite, out-of-range and unexpected values. Build one startup-validated config instead of letting an invalid field remain latent until a later `envConfig()` call. |
 | Backend `src/modules/platform/health/system-health.service.ts` bounds probes, caches results and returns total component status; the GraphQL resolver maps a public status projection | Bounded probes, stable names, caching and explicit safe projection | Its broad datastore, SaaS and metrics sweep is operational status, not process liveness. Define the required readiness subset separately; keep liveness process-local so a provider outage does not cause restart churn. |

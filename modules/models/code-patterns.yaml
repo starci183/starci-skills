@@ -170,7 +170,7 @@ profiles:
             expected: { severity: off }
         semantic:
           guidance: docs/nest-error-identity-check.md
-          review: The legacy off guard never substitutes for the active NEST-EXCEPTION-IDENTITY obligation.
+          review: The off-state guard never substitutes for the active NEST-EXCEPTION-IDENTITY obligation.
         status: implemented
       - id: NEST-OBSERVABILITY
         sourceRuleIds: [BE-ERROR-7, BE-IMPORTS-6]
@@ -411,7 +411,7 @@ profiles:
         sourceRuleIds: [BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
         applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'] }
         mechanical:
-          requirement: Keep legacy private-file and no-public-entry heuristics explicitly disabled while the owner public-entry architecture check enforces the adopted boundary.
+          requirement: Keep the private-file and no-public-entry heuristics explicitly disabled while the owner public-entry architecture check enforces the adopted boundary.
           check:
             kind: eslint
             sourceOnly: true
@@ -884,5 +884,5 @@ profiles:
         guidance: knowledge/patterns/fe/test.yaml
       - id: NEXT-IMPORT-ORDER-OBSERVATION
         sourceRuleIds: [FE-IMPORTS-2]
-        rationale: The source explicitly records import order as observed rather than mandatory.
+        rationale: The source explicitly records import order as descriptive rather than mandatory.
         guidance: knowledge/patterns/fe/imports.yaml

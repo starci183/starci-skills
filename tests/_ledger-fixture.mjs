@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {ledgerFileFor,machineFileFor,openLedger,openMachine} from '../engine/ledger-db.mjs';
 
 const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
-/* Inlined from the retired kernel/store.mjs: the seed's goal identity only has to be the same stable
+/* Inlined from the removed kernel/store.mjs: the seed's goal identity only has to be the same stable
  * digest the old store wrote, so the fixture keeps the formula verbatim instead of importing a survivor. */
 const stateGoalIdentity=state=>String(state?.goalDigest??state?.approval?.goalDigest??state?.approvalDigest??state?.goal?.digest??digest(json({job:state?.job??null,inputs:state?.inputs??state?.goal?.inputs??null,scope:state?.scope??state?.goal?.scope??null,definitionOfDone:state?.definitionOfDone??state?.goal?.definitionOfDone??null,ledgerMode:state?.ledgerMode??state?.goal?.ledgerMode??null})));
 /** The §4 event chain: digest = sha256((prev_digest ?? '') + event_id + kind + payload_json + created_at). */

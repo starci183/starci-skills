@@ -1,11 +1,11 @@
-# modules/ops/ops/business.decide.yaml - TINKLE-1 pure-yaml port of .claude/ops/business.decide/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
-# Related source files (not ported): ops/business.decide/specification.yaml 
+# modules/ops/ops/business.decide.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: business.decide
 goal:
-  en: Specify the selected business behavior precisely enough to implement and independently accept it.
+  en: Specify the selected business slice with the minimum complete observable behavior needed to
+    implement and independently accept it, then refine that contract from authoritative feedback.
 nodeKinds:
   - business
   - business-overview
@@ -54,13 +54,16 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: .starciwork/<business>/business/**/index.yaml
     fields:
       - schema
+      - state
+      - activity
+      - blockers
+      - investigation.contextDigest
       - businessOverview
       - extensions.work3.srs
       - refs
@@ -77,24 +80,18 @@ writes:
         starci/srs-*@1 section const. Every item owns a folder/index.yaml; every
         intermediate index carries only starci/srs-aggregate@1 metadata. Keep each FR's main,
         alternative and exception flows, branch review, postconditions and acceptance together.
+        For a not-yet-implemented slice, author the smallest decision-complete contract covering actor goal,
+        observable outcome, material invariants and permissions, relevant branches, acceptance and
+        consequential open decisions. Do not pre-author hypothetical future capabilities or source-local
+        mechanics merely to make the document look comprehensive. Keep the selected SRS leaves at
+        state todo while implementation, test/E2E or UAT evidence is still open; activity records
+        investigating, implementing or verifying without inventing another lifecycle state. A passing
+        business.decide job means the current SRS seed is reviewed and usable downstream, not that the
+        Work leaf or feature is done.
         Write all canonical SRS content in English, including natural-language prose, YAML/schema
         keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables, types,
         operation names and source symbols. Stable semantic refs resolve
         through exact owning Work refs without copying.
-  - id: review
-    path: N/index.yaml
-    fields:
-      - completion.inputDigest
-      - completion.review.schema
-      - completion.review.reviewer
-      - completion.review.authority
-      - completion.review.reviewedAt
-      - completion.review.observations
-      - completion.review.limitations
-    content:
-      en: Record current requirement-to-acceptance review on the owning node after contradictions and
-        blockers are resolved. This is not implementation evidence and never carries a prior done or
-        rewritten digest across changed content.
   - id: matrixHandoff
     path: E/job-result.yaml
     fields:
@@ -125,7 +122,9 @@ steps:
       en: Resolve the canonical .starciwork workspace and selected business leaf. Research accepted
         intent and supplied domain documents. Classify every citation as accepted intent, observed
         source, proposal or unknown; source behavior never
-        approves policy. Resolve the execution profile and actual tool availability before selecting
+        approves policy. Bound authoring to the next selected implementation slice. Separate what must
+        be decided now from later product possibilities and source-local implementation choices; record
+        only consequential unknowns. Resolve the execution profile and actual tool availability before selecting
         instruments; this does not switch the model/runtime or spawn workers.
   - reads:
       - intent
@@ -146,12 +145,14 @@ steps:
     writes:
       - node
     action:
-      en: "Every FR resolves to a detailed flow, not a title alone: trigger, primary/supporting actors,
+      en: "Every selected FR resolves to an implementation-ready flow, not a title alone: trigger, primary/supporting actors,
         inputs, preconditions, numbered actor/request/system-response steps, guards, effects,
         failures, repeat behavior and success/failure postconditions. Alternative and exception
         branches identify their starting step, condition, ordered steps, resume/end and acceptance.
         Review denied/invalid input, cancellation, duplicate/retry, concurrency and recovery where
-        relevant; explain absent branch classes without fabricating cases."
+        they can materially change the observable result of this slice; explain absent branch classes
+        without fabricating cases. Do not expand generic edge-case inventories that have no plausible
+        actor, state or acceptance consequence in the selected slice."
   - reads:
       - target
       - intent
@@ -206,22 +207,29 @@ steps:
         money, authority or customer data, do not choose silently - report ask with question.kind decision,
         one numbered option per reading with what each costs and who it affects, and one recommendation; the
         kernel writes that decision record for the owner and carries the work on the recommendation until
-        they answer. Never ask for anything else."
+        they answer. Never ask for anything else. Treat implementation feedback as evidence about feasibility
+        or a missing observable case, not as business authority: revise only when it exposes an actual
+        requirement gap or accepted owner feedback. File names, private helper choices and other reversible
+        source-local details remain in Implementation and do not trigger an SRS revision. Preserve valid
+        unrelated content and invalidate only downstream proof affected by the accepted delta."
   - reads:
       - target
       - repo
       - intent
       - matrix
     writes:
-      - review
+      - node
       - matrixHandoff
     action:
       en: Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph.
-        Review contradictions, scope and unresolved decisions with the user. A complete branch rolls
-        up only from valid required leaves; draft placeholders and schema validity cannot earn done.
-        Output reviewed business outcomes and observable security/quality acceptance for
-        Architecture; no implementation or deployed-proof claim. Return the selected matrix's
-        request-bound typed outputs when applicable.
+        Review contradictions, scope and unresolved decisions with the user. Bind the reviewed current
+        semantic context in investigation.contextDigest, leave selected SRS leaves state todo, and return
+        activity to idle after the review. Open material issues stay in blockers[] and produce partial or
+        blocked; they are never hidden by schema validity. Output reviewed business outcomes and observable
+        security/quality acceptance for Architecture; no implementation or deployed-proof claim. The op job
+        may settle done because this bounded authoring job completed, but Work state done is reserved for
+        final reconciliation of current SRS, SDS, code, test/E2E and UAT evidence at one revision. Return the
+        selected matrix's request-bound typed outputs when applicable.
 proofs:
   - id: binding
     requirement:
@@ -230,15 +238,16 @@ proofs:
         done.
   - id: coverage
     requirement:
-      en: Each applicable FR/NFR/BR has acceptance IDs and source intent; no vague
-        fast/secure/user-friendly NFR is accepted as measurable. Implementation/UAT status is
-        untouched.
+      en: Each item needed by the selected implementation slice has acceptance IDs and source intent;
+        later product possibilities are not manufactured as current requirements, and no vague
+        fast/secure/user-friendly NFR is accepted as measurable. Consequential open decisions remain
+        explicit. Implementation/UAT status is untouched.
   - id: impact-security-coverage
     requirement:
       en: Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps
         and postconditions, and security has observable negative acceptance. Validate nested
         ownership and every split SRS section contract; no code/service inventory is required in
-        Business. Legacy specification@2 and srs@3 are compatibility inputs, never new output.
+        Business. Existing specification@2 and srs@3 records are readable inputs, never new output.
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
@@ -284,32 +293,33 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "What must the product observably do - actors, flows, rules, policy
     decisions, data, customer journeys, acceptance - stated so an implementer
     and an acceptor need no guesses?"
   whenNeeded:
-    - When a selected scope needs authored or revised SRS: overview plus the six typed sections (functional/non-functional requirements, business-rules, policy-decisions, data, customer-journeys).
-    - Repair mode (business.revise secondary request): when a requirement is silent, ambiguous or contradictory for a downstream op.
+    - When a selected scope needs a minimum decision-complete SRS seed: only the typed leaves required by the next implementation slice, plus its readable overview context.
+    - Repair mode (business.revise secondary request): when implementation evidence or accepted feedback proves an observable requirement silent, ambiguous or contradictory.
   whenNot:
     - Not for technical design - that is architecture.decide; this op does not design components or pick frameworks.
     - Not for code/service inventories - repo reads ground the SRS, they are not the deliverable.
+    - Not for speculative completeness across unselected future capabilities or reversible source-local choices; those do not block the selected slice.
     - Never turns observed source behavior into approved policy; money/authority/customer-data conflicts go to the owner via ask, never averaged silently.
   consumes:
     - Target business node; accepted user intent, domain documents and prior decided records.
     - Repo observation for grounding (existing behavior is a candidate fact, not authority).
-    - specification.yaml section contract (loaded by contracts.mjs for this op).
+    - modules/schemas/spec/contract.schema.yaml section contract (loaded by spec/validate.mjs for this op).
   produces:
     - business/overview + typed SRS leaf records (starci/srs-*@1 schemas per specification.yaml).
-    - completion.review on the business node; decisionLog entries on every revision; E/ matrix job-result when selected.
-    - Downstream: the accepted scope + journeys that architecture.decide, scope.define and verification ops consume.
+    - Current investigation.contextDigest on reviewed todo leaves; decisionLog entries on every revision; E/ matrix job-result when selected.
+    - Downstream: the reviewed SRS seed + journeys that architecture.decide, scope.define and verification ops consume; later evidence may refine them through a new reviewed revision. This op does not author Work state done.
   failureModes:
     - BUSINESS_UNKNOWN, BUSINESS_CONTRADICTION, DECLARED_DEPENDENCY_UNMET (declared blockers).
     - A changed record without a decisionLog entry is a defect; unreviewed contradiction cannot be hidden in prose.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

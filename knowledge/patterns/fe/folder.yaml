@@ -216,7 +216,7 @@ rules:
     verification:
       automated: []
       manual:
-        - Verify public app imports use @starci/grammar/common and installed exports, not package root or retired @grammar/*.
+        - Verify public app imports use @starci/grammar/common and installed exports, not package root or former @grammar/*.
     relatedExamples: []
 
   - id: FE-FOLDER-6

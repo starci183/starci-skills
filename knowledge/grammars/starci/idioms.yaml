@@ -260,7 +260,7 @@ idioms:
             - ProSubscriptionBlock purchase status
     notes: |
       The historical note counted eight pairs in its sample, seven built with an app div. The
-      typed-slot proposal cited by the old document is unavailable and unverified; do not treat that
+      typed-slot proposal cited by the earlier document is unavailable and unverified; do not treat that
       proposal as a published API. If ownership needs changing, inspect current source and record a
       fresh scoped proposal.
 

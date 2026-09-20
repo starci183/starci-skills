@@ -1,6 +1,5 @@
 /**
- * The constants that outlived their old modules. `ENGINE_SCHEMA` was the one live export of the retired
- * `kernel/common.mjs` — the durable engine's identity in workflow state: a schema, not a number, so a build
+ * `ENGINE_SCHEMA` is the durable engine's identity in workflow state: a schema, not a number, so a build
  * is named by what it is. The installer (`bin/starci-skills.mjs` → `scripts/install/`) consumes it.
  *
  * The store schemas are deliberately NOT re-declared here: `LEDGER_SCHEMA`/`LEDGER_VERSION` and

@@ -5,22 +5,22 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
-import {ANCHOR_SCHEMA,LEDGER_SCHEMA,LEDGER_VERSION,MACHINE_SCHEMA,checkpointLedger,compactSnapshots,ensureWorkflow,eventsHead,inspectLedger,ledgerFileFor,ledgerIdOf,ledgerWorkflows,liveRows,machineFileFor,openLedger,openMachine,pruneRetiredGenerations,readAnchor,releaseTwoPhase,reserveTwoPhase,retireWorkflow,verifyAnchor,verifyChain,writeAnchor} from '../engine/ledger-db.mjs';
+import {ANCHOR_SCHEMA,LEDGER_SCHEMA,LEDGER_VERSION,MACHINE_SCHEMA,checkpointLedger,compactSnapshots,ensureWorkflow,eventsHead,finishWorkflow,inspectLedger,ledgerFileFor,ledgerIdOf,ledgerWorkflows,liveRows,machineFileFor,openLedger,openMachine,pruneDroppedGenerations,readAnchor,releaseTwoPhase,reserveTwoPhase,verifyAnchor,verifyChain,writeAnchor} from '../engine/ledger-db.mjs';
 
 /**
  * The ledger DB contract (docs/ledger-db.md): schema, meta identity, WAL-by-default with a recorded DELETE
  * fallback, the leases_match_job invariant, the event hash chain, nested-transaction refusal, two-phase
  * reservation against the machine arbiter, sweep of orphaned machine rows (guarded by meta.ledger_id, not a
- * path), the retention semantics ported from journal.mjs, and the §12 tracked anchor.
+ * path), the retention semantics for dropped generations, and the §12 tracked anchor.
  */
 const require=createRequire(import.meta.url);
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-db-'));
 /**
  * A v1 ledger exactly as it looked before the identity/anchor addendum: every §4 table except `meta`, and
- * `events.digest` with no default and no chain trigger — the shape a ledger built by an earlier 1.0.4 agent
- * (or any file that reached user_version=1 before this module carried `meta`) is stuck in.
+ * `events.digest` with no default and no chain trigger — the shape a ledger built by an earlier agent
+ * build (or any file that reached user_version=1 before this module carried `meta`) is stuck in.
  */
-function legacyLedgerFile(){
+function preMetaLedgerFile(){
   const dir=temporary(),file=path.join(dir,'runtime.sqlite');
   const {DatabaseSync}=require('node:sqlite');
   const db=new DatabaseSync(file);
@@ -105,7 +105,7 @@ test('the ledger schema carries every contract table, the meta identity, the dri
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),2,'synchronous=FULL');
   const names=ledger.db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index')").all().map(row=>row.name);
-  for(const table of ['meta','workflows','goals','state_snapshots','events','jobs','resources','leases','budgets','budget_reservations','incidents','reports','contracts','checks','inbox','signals','runtime_loads','inputs','migrations'])
+  for(const table of ['meta','workflows','goals','state_snapshots','events','jobs','resources','leases','budgets','budget_reservations','incidents','reports','contracts','checks','inbox','signals','inputs'])
     assert.ok(names.includes(table),`missing table ${table}`);
   assert.ok(names.includes('leases_match_job')&&names.includes('leases_match_job_update'),'the drift trigger covers INSERT and UPDATE');
   for(const index of ['state_snapshots_lookup','events_entity','events_kind','jobs_queue','jobs_op','leases_expiry'])assert.ok(names.includes(index),`missing index ${index}`);
@@ -309,7 +309,7 @@ test('bound compaction keeps the transition checkpoints and the latest save of t
   const changed=compactSnapshots(ledger.db,{workflowId:'wf',generation:2,goalIdentity:'goal'});
   const rows=ledger.db.prepare('SELECT checkpoint_id,generation,length(state_json) body FROM state_snapshots ORDER BY snapshot_id').all();
   assert.deepEqual(rows.map(row=>[row.checkpoint_id,row.body>0]),[['bind:wf:2:seed',false],['transition:wf:2:t-1',false],['transition:wf:2:t-2',false],['save:wf:2:latest',true]]);
-  assert.equal(ledger.db.prepare('SELECT count(*) n FROM state_snapshots WHERE generation=1').get().n,0,'a retired generation keeps nothing');
+  assert.equal(ledger.db.prepare('SELECT count(*) n FROM state_snapshots WHERE generation=1').get().n,0,'a dropped generation keeps nothing');
   assert.ok(changed>0);assert.equal(compactSnapshots(ledger.db,{workflowId:'wf',generation:2,goalIdentity:'goal'}),0,'idempotent');
   ledger.close();
 });
@@ -325,7 +325,7 @@ test('unbound compaction takes each workflow\'s newest generation as bound and l
   ledger.close();
 });
 
-test('retired generations lose their settled jobs and events; a leased or unsettled job keeps its rows whatever its generation',t=>{
+test('dropped generations lose their settled jobs and events; a leased or unsettled job keeps its rows whatever its generation',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   job(ledger,{jobId:'old-done',generation:1});job(ledger,{jobId:'old-failed',generation:1,status:'failed'});job(ledger,{jobId:'old-running',generation:1,status:'running'});
@@ -333,12 +333,12 @@ test('retired generations lose their settled jobs and events; a leased or unsett
   ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id='old-leased'").run();
   job(ledger,{jobId:'current-done',generation:2});job(ledger,{jobId:'other-old',workflowId:'other',generation:1});
   ledger.appendEvent({eventId:'wf:workflow:1',workflowId:'wf',entityType:'workflow',entityId:'wf',generation:1,kind:'state-transition'});
-  const pruned=ledger.retireGenerations({workflowId:'wf',generation:2});
+  const pruned=ledger.dropGenerations({workflowId:'wf',generation:2});
   assert.deepEqual(pruned,{jobs:2,events:3},'two settled jobs of generation 1 and their events, plus the workflow event of generation 1');
   assert.deepEqual(ledger.listJobs().map(item=>item.job_id).sort(),['current-done','old-leased','old-running','other-old']);
   assert.deepEqual(ledger.events({workflowId:'wf'}).map(event=>event.entity_id).sort(),['current-done','old-leased','old-running']);
   assert.deepEqual(liveRows(ledger.db,'wf'),{leases:[{jobId:'old-leased',resource:'ai/global'}],jobs:[{jobId:'old-running',status:'running',generation:1}]});
-  assert.equal(pruneRetiredGenerations(ledger.db,{workflowId:'wf',generation:2}).jobs,0,'idempotent');
+  assert.equal(pruneDroppedGenerations(ledger.db,{workflowId:'wf',generation:2}).jobs,0,'idempotent');
   ledger.close();
 });
 
@@ -360,22 +360,22 @@ test('inputs bind bytes by sha256: put returns a ledger:// ref, and a tampered r
   ledger.close();
 });
 
-test('a workflow is retired whole only when nothing of it is live, and its workflows row goes with it',t=>{
+test('a workflow finishes out of the ledger only when nothing of it is live, and its workflows row goes with it',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   snapshot(ledger,{generation:1,checkpoint:'save:wf:1:1'});job(ledger,{jobId:'j1',generation:1});job(ledger,{jobId:'j2',generation:1,status:'queued'});
   ledger.inputs.put({workflowId:'wf',key:'1-brief.md',goalRevision:1,bytes:Buffer.from('hello'),origin:'C:/owner/brief.md'});
   lease(ledger,{jobId:'j2'});
-  const refused=ledger.retireWorkflow('wf');
+  const refused=ledger.finishWorkflow('wf');
   assert.equal(refused.ok,false);assert.equal(refused.live.leases.length,1);assert.equal(ledger.db.prepare('SELECT count(*) n FROM jobs').get().n,2,'nothing removed');
   ledger.db.prepare('DELETE FROM leases WHERE job_id=?').run('j2');
   ledger.db.prepare("UPDATE jobs SET status='cancelled',lease_token=NULL,deadline=NULL WHERE job_id='j2'").run();
-  const retired=ledger.retireWorkflow('wf');
-  assert.equal(retired.ok,true);assert.equal(retired.removed.workflows,1,'the registration row goes too');
-  assert.equal(retired.removed.inputs,1,'input rows go with the workflow');
-  assert.equal(retired.removed.snapshots,1);assert.equal(retired.removed.jobs,2);assert.equal(retired.removed.events,2);
+  const finished=ledger.finishWorkflow('wf');
+  assert.equal(finished.ok,true);assert.equal(finished.removed.workflows,1,'the registration row goes too');
+  assert.equal(finished.removed.inputs,1,'input rows go with the workflow');
+  assert.equal(finished.removed.snapshots,1);assert.equal(finished.removed.jobs,2);assert.equal(finished.removed.events,2);
   assert.deepEqual(ledgerWorkflows(ledger.db),[]);
-  assert.equal(retireWorkflow(ledger.db,'wf').ok,true,'retiring an absent workflow removes nothing and is not an error');
+  assert.equal(finishWorkflow(ledger.db,'wf').ok,true,'finishing an absent workflow removes nothing and is not an error');
   ledger.close();
 });
 
@@ -385,8 +385,8 @@ test('finished shared-store custody keeps one final state and only the latest ex
   snapshot(ledger,{generation:2,checkpoint:'save:wf:2:old',body:'{"phase":"run"}'});snapshot(ledger,{generation:2,checkpoint:'save:wf:2:final',body:'{"phase":"done"}'});
   job(ledger,{jobId:'settled',generation:2});ledger.appendEvent({eventId:'workflow-history',workflowId:'wf',entityType:'workflow',entityId:'wf',generation:2,kind:'finished'});
   for(const [eventId,entityId,sum] of [['state-old','state.json','old'],['state-final','state.json','final'],['events-final','events.jsonl','events']])ledger.appendEvent({eventId,workflowId:'wf',entityType:'runtime-file',entityId,generation:2,kind:'runtime-file-written',payload:{relative:entityId,sha256:sum}});
-  const retired=ledger.retireWorkflow('wf',{preserveRuntimeCustody:true});
-  assert.equal(retired.ok,true);assert.deepEqual(retired.retained,{snapshots:1,runtimeFileReceipts:2,generation:2});
+  const finished=ledger.finishWorkflow('wf',{preserveRuntimeCustody:true});
+  assert.equal(finished.ok,true);assert.deepEqual(finished.retained,{snapshots:1,runtimeFileReceipts:2,generation:2});
   assert.equal(ledger.listJobs().length,0);assert.deepEqual(ledger.events({workflowId:'wf'}).map(event=>event.event_id).sort(),['events-final','state-final']);
   assert.deepEqual(ledger.db.prepare('SELECT state_json FROM state_snapshots WHERE workflow_id=?').all('wf').map(row=>row.state_json),['{"phase":"done"}']);
   assert.equal(ledger.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get('wf').n,1,'the kept snapshot still references a registration');
@@ -445,8 +445,8 @@ test('verifyAnchor: no tracked anchor is a legitimate first boot, and the three 
   ledger.close();
 });
 
-test('openLedger migrates a v1 file that predates meta, preserving every row and retrofitting the digest trigger',t=>{
-  const {dir,file,firstDigest}=legacyLedgerFile();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+test('openLedger upgrades a schema file that predates meta, preserving every row and retrofitting the digest trigger',t=>{
+  const {dir,file,firstDigest}=preMetaLedgerFile();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const {DatabaseSync}=require('node:sqlite'),precheck=new DatabaseSync(file,{readOnly:true});
   assert.equal(precheck.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined,'confirms the fixture predates meta');
   precheck.close();

@@ -1,9 +1,8 @@
 # selection.yaml — how the runtime decides WHICH model may take WHICH workload.
 #
-# Declarative port of the retired kernel/model-policy.mjs (this file is now
-# the source of truth). Historical citations `model-policy.mjs::<fn>` name the
-# retired implementation a rule was ported from; they are provenance, not a
-# live import. Allocation-order facts that live in
+# This file is the source of truth. `model-policy.mjs::<fn>` citations name the
+# implementation a rule was ported from; they are provenance, not a live import.
+# Allocation-order facts that live in
 # modules/models/runtimes.yaml and registry.yaml are in `allocationFacts` and cite
 # those files instead.
 #
@@ -15,13 +14,11 @@
 
 schema: starci/module-model-selection@1
 sources:
-  - modules/models/selection.yaml  # this file is now the contract
+  - modules/models/selection.yaml  # this file is the contract
   - modules/models/runtimes.yaml
   - modules/models/registry.yaml
   - modules/models/capabilities.yaml
   - modules/models/qualifications.yaml
-  # retired sources: kernel/model-policy.mjs, docs/model-catalog.md,
-  # docs/model-functions.md (old engine — kept as provenance only)
 
 # ---------------------------------------------------------------------------
 # 1. Vocabularies and ladders
@@ -41,17 +38,12 @@ closedSets:
   highKinds:                 # HIGH_KINDS — never probation-eligible, force elevation
     - integration.verify
     - release.deliver
-    # Reconciled against modules/models/kinds.yaml in the M2 wave: the former
-    # entries deployment.operate, data.correct and production.deploy named kinds
-    # the operation-kind catalog does not declare - stale vocabulary removed,
-    # not an eligibility change (an elevation check on a nonexistent kind could
-    # never fire either way).
   kernelFunctionKinds:       # MODEL_KINDS + 'judge' — the kernel's own model calls,
     - model.assessGoal       # NOT operation work. They draw per-call scope but never
     - model.planOp           # consume the workflow's probation budget.
-    - model.decide           # (model-policy.mjs MODEL_KINDS + comment: "a workflow
-    - model.validateOp       #  that spent that budget on twenty-five manager
-    - model.manageWorkflow   #  decisions went blind and headless")
+    - model.decide           # (model-policy.mjs MODEL_KINDS: a workflow that spent
+    - model.validateOp       #  that budget on manager decisions would starve its
+    - model.manageWorkflow   #  own operation work)
     - model.critiqueGoal
     - model.classifyScreen
     - model.presentOwnerQuestion
@@ -198,11 +190,10 @@ probation:
     proofs:
       - {code: native-execution-never-began, requires: "effectState 'none' AND taskCreated false AND inputAccepted false"}
       - {code: runtime-perception-settlement, requires: "liveness 'stalled-idle' — the kernel misread a running turn as idle; the model did not fail"}
-      - {code: runtime-restart-settlement, requires: "proof.generation < current engine generation — an owner-directed retry retires a generation; the attempts were the runtime's to end"}
+      - {code: runtime-restart-settlement, requires: "proof.generation < current engine generation — an owner-directed retry ends a generation; the attempts were the runtime's to end"}
     identityBinding: >-
       proof.attestationId + jobId + generation + workflowId + opId + runtimeId
-      must all match the consumed receipt (or a durable-journal cancellation for
-      legacy jobs). Anything else: 'probation-refund-proof-invalid'.
+      must all match the consumed receipt. Anything else: 'probation-refund-proof-invalid'.
     effect: "scope.remaining += 1 (capped at initial); workflow budget += 1 for non-kernel functions; exhausted records revive while attempts remain"
 
 # ---------------------------------------------------------------------------
@@ -253,7 +244,7 @@ allocationFacts:
   maxParallelOps: 20                  # global; per-pool maxParallel in profiles/
   difficultyVocabulary:               # pool models/effort maps and tier keys
     canonical: [easy, medium, hard, insane]
-    aliases: "legacy S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
+    aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
   tiers:                              # role-ordered pool preference per difficulty tier
     insane: "claude-agent → codex-agent (verify/decide/plan lead claude-fable)"
     hard: "claude-agent → devin-agent → codex-agent (verify/decide/plan lead claude-fable)"

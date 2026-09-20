@@ -153,9 +153,9 @@ export function hashOwnedDirs(dirs) {
 }
 
 // ---- v11 compact format: inlined acceptance criteria ----
-// A criterion that used to be its own `ac/<name>/index.yaml` record can be carried inline on the parent
-// record's `acceptance:` (or `statements:`) list as an entry with `id: <former ac-id>`. A collapsed
-// criterion must resolve like the record it used to be: its old `ac.*` id still answers, and the new
+// A criterion can be carried inline on the parent
+// record's `acceptance:` (or `statements:`) list as an entry with `id: <ac-id>`. An inlined
+// criterion resolves like a record: its `ac.*` id answers directly, and the
 // canonical form `parent#ac-id` (or `parent#<short-name>`) answers through the parent. These three
 // helpers are the single resolution every script shares, so the gate, the deep check, the consistency
 // check and the derive/evidence tools cannot drift on what "the same criterion" means.

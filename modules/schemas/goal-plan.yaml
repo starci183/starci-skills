@@ -28,9 +28,3 @@ validation: |-
   legs shape is wrong. On success the api writes goals.json.derivedPlan {legs, divergence,
   derivedAt} and appends one 'plan-derived' event carrying the legs and the divergence record
   {missing, extra, reordered, diverged}.
-history: |-
-  Rewritten in the M2 modules/ consolidation: the retired schemas/goal-plan.yaml described the
-  assessGoal record {definitionOfDone, ledger, ops, risks, questions} - a different shape from the
-  {legs:[...]} document api.mjs actually parses (the SSOT violation R2-REPORT.md §8.3 named). The
-  ledger/doD content that schema governed lives in the goal record itself now; this file is the
-  plan-file contract alone.

@@ -84,7 +84,7 @@ properties:
       implementation declares what it `proves`) and the capture time is already in the manifest. A copy of
       either here would be a second source of truth for the same fact, and when two copies disagree there is
       no answer to which is right. At most one directory is allowed, because a record has one current answer
-      to whether it holds; a superseded proof stays in its own manifest, marked stale.
+      to whether it holds; a replaced proof stays in its own manifest, marked stale.
   change:
     type: object
     additionalProperties: false

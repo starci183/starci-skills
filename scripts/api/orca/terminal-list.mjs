@@ -7,7 +7,7 @@ export function terminalList({ worktree } = {}) {
   const argv = ['terminal', 'list', '--json'];
   if (worktree) argv.push('--worktree', worktree);
   const r = orcaRun(argv);
-  const terminals = jsonOf(r.stdout)?.result?.terminals ?? jsonOf(r.stdout)?.terminals ?? [];
+  const terminals = jsonOf(r.stdout)?.result?.terminals ?? [];
   return { ok: r.status === 0, terminals, error: r.error ?? r.stderr };
 }
 

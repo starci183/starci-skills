@@ -6,7 +6,7 @@ import {readDistJson} from '../../engine/runtime-root.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** Read a public contract document; `.json` spellings resolve to the authored YAML source. */
+/** Read a public contract document under the runtime root; parsed by file extension. */
 export function readPublicJson(...parts) {
   return readDistJson(...parts);
 }

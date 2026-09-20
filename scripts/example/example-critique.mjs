@@ -590,14 +590,14 @@ export function computeCritique(workRoot) {
   return {findings};
 }
 
-export function buildCritiqueYamlDocument(critique) {
+function buildCritiqueYamlDocument(critique) {
   return {
     schema: 'work/critique@1',
     findings: critique.findings.map(f => ({id: f.id, kind: f.kind, severity: f.severity, records: f.records, because: f.because})),
   };
 }
 
-export function buildCritiqueMarkdown(critique) {
+function buildCritiqueMarkdown(critique) {
   const lines = [
     '# Critique',
     '',

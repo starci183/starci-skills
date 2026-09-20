@@ -33,7 +33,7 @@ import {readWorkspace, loadRecords} from './example-ownership.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-export const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
+const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
   .flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
 
 const slash = value => String(value ?? '').replaceAll('\\', '/');
@@ -47,7 +47,7 @@ const CORE_CHECKS = new Set(['palette-off-brand', 'primary-absent', 'entity-list
  * IMPL_BEFORE_DIRECTION rule uses: it names a work/ui-screen in `proves`, or its `repository` resolves to a
  * `role: fe` entry in workspace.yaml. Backend records and records proving no screen are untouched.
  */
-export function isFrontendImpl(rec, records, workspaceDoc) {
+function isFrontendImpl(rec, records, workspaceDoc) {
   const data = rec?.data ?? {};
   const provesUi = (Array.isArray(data.proves) ? data.proves : [])
     .some(pid => records.get(pid)?.schema === 'work/ui-screen');

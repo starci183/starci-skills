@@ -1,6 +1,5 @@
 # ============================================================================
-# TINKLE-8 — modules/goal/archetypes.yaml
-# Brief: ex-testing/briefs/tinkle/tinkle-8.md.
+# modules/goal/archetypes.yaml
 #
 # Decomposition PRIORS — explicitly NOT an enum. Each archetype is a signal
 # pattern the analyzer recognises plus the op chain that pattern usually
@@ -16,7 +15,7 @@
 #   modules/models/kinds.yaml              — lanes (nodeKind -> ordered steps), routes, kind catalog
 #   the kernel agent         — designGate, cutOpFor (fan-out + seam-first)
 #   engine/ledger-db.mjs       — disjoint(allowlist) path-prefix coverage
-#   modules/goal/legality.yaml       — allowlistsOverlap
+#   modules/goal/legality.yaml       — the disjoint-allowlist split rule
 #   modules/kernel/dispatch.yaml  — seam-first cut, one behaviour per child, serial fallback
 #   docs/ledger-db.md     — .starciwork ownership: one index.yaml per scope folder
 #   docs/verify-proof.md — verify is read-only; layers of proof
@@ -80,7 +79,8 @@ legRationale:
   decide: >-
     business.decide / architecture.decide write the SRS/SDS records the builds
     and drawings read. Their route prerequisites chain them: architecture
-    requires "business.decide done (accepted SRS)".
+    requires a settled-pass business.decide job with a current reviewed SRS seed.
+    The decide jobs may complete while their Work leaves remain todo until final reconciliation.
   draw: >-
     interface.draw is the `direct`-phase leg that produces the ui design record
     the frontend lane's designGate waits on (the kernel agent). Route
@@ -274,7 +274,7 @@ archetypes:
     laneNote: >-
       review.verify is KERNEL_PLANNED on a Work ledger; as a standalone
       verify-only goal on a plan ledger it is a PLAN_OP_KINDS member (writes
-      nothing). (inferred from kinds.yaml + functions.mjs)
+      nothing). (inferred from kinds.yaml)
     workedExample:
       prompt: "lint check repo"
       signalMatch: "audit verb, no build -> verify-only"
@@ -375,4 +375,3 @@ composition:
   sources:
     - modules/models/kinds.yaml
     - modules/ops/ops/*.yaml
-    - modules/models/kinds.yaml

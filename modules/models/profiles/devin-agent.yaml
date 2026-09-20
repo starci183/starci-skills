@@ -43,7 +43,7 @@ position:
   easyTier: second
   mediumTier: last in default
   hardTier: second in default/implement/write; last in verify
-  chainSecond: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.retire, task.execute, uat.verify, workspace.manage, review.verify]
+  chainSecond: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.finish, task.execute, uat.verify, workspace.manage, review.verify]
   note: >-
     It is second in most execution chains; slots are owner-granted capacity, so
     quota grants, not position, decide availability.

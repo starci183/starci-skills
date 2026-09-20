@@ -117,11 +117,24 @@ const dispatchRunning=(fx,jobId)=>{
   assert.ok(job?.worker_id,'a dispatched job binds its worker/terminal id');
   return {r,job};
 };
-const fileReport=(fx,jobId,{outcome='done',sentinel='SENTINEL-ALPHA',name='report-1.md'}={})=>{
+// The report file is a starci/op-report@1 JSON envelope — api report validates
+// it and stamps run/task/dispatch/from from the job row.
+const writeEnvelope=(fx,{outcome='done',sentinel='SENTINEL-ALPHA',name='report-1.json',extra={},files=['src/op-ipc.txt']}={})=>{
   const file=path.join(fx.repo,name);
-  fs.writeFileSync(file,`# op report\noutcome: ${outcome}\n${sentinel}\n`);
-  const r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--outcome',outcome,'--report',file,'--json');
-  assert.equal(r.status,0,`api report (${outcome}) failed: ${r.stderr||r.stdout}`);
+  fs.writeFileSync(file,JSON.stringify({
+    schema:'starci/op-report@1',outcome,summary:`op ${outcome} — ${sentinel}`,
+    files,checks:[{name:'self-check',command:'true',exitCode:0}],
+    ...(outcome==='partial'?{open:['one unfinished item']}:{}),
+    ...(outcome==='ask'?{question:{text:'which way?',options:['a','b']}}:{}),
+    ...(outcome==='blocked'?{blocker:{kind:'environment',detail:'dep missing'}}:{}),
+    ...extra,
+  }));
+  return file;
+};
+const fileReport=(fx,jobId,opts={})=>{
+  const file=writeEnvelope(fx,opts);
+  const r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',file,'--json');
+  assert.equal(r.status,0,`api report (${opts.outcome??'done'}) failed: ${r.stderr||r.stdout}`);
   return r;
 };
 
@@ -140,6 +153,17 @@ test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=runn
   assert.equal(contract.attempt,job.attempt,'the contract keys to the job attempt');
   assert.ok(contract.markdown?.trim(),'contract markdown must be non-empty');
   assert.ok(contract.dispatch_id,'the contract row names the dispatch it was written for');
+  const payload=JSON.parse(job.payload_json);
+  assert.equal(payload?.orca?.runId,'run-fake-1');
+  assert.equal(payload?.orca?.taskId,'task-fake-1');
+  assert.equal(payload?.orca?.dispatchId,contract.dispatch_id,
+    'command-terminal jobs keep the terminal handle for cleanup but key reports/contracts to the Orca Dispatch');
+  assert.equal(payload?.orca?.agentTerminalHandle,job.worker_id);
+  assert.equal(payload?.hierarchy?.parentNodeId,`agent:kernel:${WORKFLOW}`);
+  assert.equal(payload?.hierarchy?.runtime?.dispatchId,contract.dispatch_id);
+  const calls=fs.readFileSync(fx.env.STARCI_FAKE_ORCA_LOG,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line).argv.slice(0,2).join(' '));
+  for(const step of ['orchestration run-create','orchestration task-create','terminal create','orchestration dispatch'])
+    assert.ok(calls.includes(step),`command-terminal hierarchy never called '${step}' — log: ${calls.join(', ')}`);
 
   // Every owned_path is fenced in the ledger the worker runs against.
   const keys=leaseRows(fx,jobId).map(l=>l.resource_key).sort();
@@ -246,4 +270,76 @@ test('dispatch-rejected regression: a dead provider claims no contract, no lease
   assert.equal(leaseRows(fx,jobId).length,0,'a rejected dispatch holds no leases');
   assert.notEqual(phaseOf(fx),'running','a rejected dispatch must not claim phase=running');
   assert.ok(eventKinds(fx).includes('dispatch-rejected'),'the dispatch-rejected event is the audit record');
+});
+
+/* -------------------------------------- op-report@1 envelope enforcement */
+
+test('api report enforces the starci/op-report@1 envelope',t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx);
+  dispatchRunning(fx,jobId);
+
+  // A bare markdown dump is not an answer — the envelope is the only shape.
+  const bad=path.join(fx.repo,'bad.md');fs.writeFileSync(bad,'# op report\nlooks done\n');
+  let r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',bad,'--json');
+  assert.notEqual(r.status,0,'a non-envelope report must be refused');
+  assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);
+
+  // Conditional payloads: partial without open[], files outside owned_paths.
+  const noOpen=path.join(fx.repo,'noopen.json');fs.writeFileSync(noOpen,JSON.stringify({outcome:'partial',summary:'x'}));
+  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',noOpen,'--json');
+  assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/open\[\]/);
+
+  const escaped=path.join(fx.repo,'escaped.json');fs.writeFileSync(escaped,JSON.stringify({outcome:'done',summary:'x',files:['../outside.txt']}));
+  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',escaped,'--json');
+  assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/outside owned_paths/);
+
+  // Identity is the job's, not the worker's claim.
+  const forged=path.join(fx.repo,'forged.json');fs.writeFileSync(forged,JSON.stringify({outcome:'done',summary:'x',dispatch:'someone-else'}));
+  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',forged,'--json');
+  assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/identity 'dispatch'/);
+
+  // A --outcome flag contradicting the envelope is refused.
+  const good=writeEnvelope(fx,{outcome:'done',name:'good.json'});
+  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',good,'--outcome','blocked','--json');
+  assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/outcome-mismatch/);
+
+  // The row carries the stamped identity + the exact outcome the kernel reads.
+  r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',good,'--json');
+  assert.equal(r.status,0,`valid envelope refused: ${r.stderr||r.stdout}`);
+  const row=reportRows(fx)[0];
+  const stored=JSON.parse(row.report_json);
+  assert.equal(stored.schema,'starci/op-report@1');
+  assert.equal(stored.from,jobId,'from is stamped from the job row');
+  assert.equal(stored.dispatch,row.dispatch_id,'dispatch is stamped to the worker handle');
+  assert.equal(row.outcome,'done');
+});
+
+/* ------------------------------------------------ kernel reads the answer */
+
+test('api status projects filed reports; settle works row-first without --report and enforces verdict↔outcome',{skip:skipFor(['dispatchIpc','report','consumeWrite'])},t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx);
+  dispatchRunning(fx,jobId);
+  fileReport(fx,jobId,{outcome:'done'});
+
+  // `api status` is how the kernel learns the op finished and with what result.
+  const st=fx.run(API,'status','--repo',fx.repo,'--workflow',WORKFLOW,'--json');
+  assert.equal(st.status,0,st.stderr);
+  const reports=JSON.parse(st.stdout).reports??[];
+  assert.ok(reports.some(r=>r.job_id===jobId&&r.outcome==='done'&&!r.consumed_at),`status must surface the filed unconsumed report — got ${JSON.stringify(reports)}`);
+
+  // A verdict that contradicts the filed outcome is refused.
+  const bad=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','blocked','--json');
+  assert.notEqual(bad.status,0,'verdict blocked cannot settle a done report');
+  assert.match(`${bad.stderr}${bad.stdout}`,/verdict-outcome-mismatch/);
+
+  // Settle consumes the row — no --report needed; the row is the verdict.
+  const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
+  assert.equal(s.status,0,`row-first settle failed: ${s.stderr||s.stdout}`);
+  const settled=JSON.parse(s.stdout);
+  assert.equal(settled.reportFiled,true);
+  assert.equal(settled.reportOutcome,'done');
+  assert.equal(jobRow(fx,jobId)?.status,'succeeded');
+  assert.ok(reportRows(fx)[0]?.consumed_at);
 });

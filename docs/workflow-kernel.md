@@ -13,7 +13,7 @@ owner prompt
   → node scripts/goal/define-goal.mjs        workflows + goals(rev) + inbox rows
   → node scripts/kernel/start-workflow.mjs   claims the inbox row, spawns [Kernel] <workflow_id>
   → driver loop (below)                      until every job settled + final verify pass
-  → api retire                               phase=finished; history preserved, never deleted
+  → api finish                               phase=finished; history preserved, never deleted
 ```
 
 Kernel death is recoverable: re-running `start-workflow` with the same goal
@@ -30,9 +30,9 @@ Each iteration, in order, expressed in api calls:
 | --- | --- | --- |
 | survey | `api survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
 | plan | `api plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
-| enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `pending` job row per planned op the queue lacks. Refusals: `already-queued`, `empty-paths` (an op without `owned_paths` is an unbounded grant), `unknown-op`. |
+| enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. Refusals: `already-queued`, `empty-paths` (an op without `owned_paths` is an unbounded grant), `unknown-op`. |
 | drive | `status → dispatch → wait → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); settle every arrived verdict before picking again; route retries inside the kind's budget, then escalate. |
-| retire | `api retire --workflow <id>` | Last call. Refuses while any job is unsettled (`jobs-unsettled`) or the final verify leg has not passed (`verify-open`). |
+| finish | `api finish --workflow <id>` | Last call. Refuses while any job is unsettled (`jobs-unsettled`) or the final verify leg has not passed (`verify-open`). |
 
 The kernel decides order and assignment. It never decides scope, identity or
 authority, never answers an `ask` itself, and never edits the ledger by hand.
@@ -43,11 +43,16 @@ authority, never answers an `ask` itself, and never edits the ledger by hand.
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
 survey   status                       reads: projections only
 plan     --file <plan.json>           write: plan-derived event + structural diff
-enqueue  --op <opId> --paths <csv>    write: pending job row
+enqueue  --op <opId> --paths <csv>    write: queued job row
 dispatch --job <id> [--spawn] [--model <t>] [--worktree <sel>]
-settle   --job <id> --verdict <pass|fail|blocked> --report <path>
+route    --job <id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
+op-contract --job <id>           worker reads its contracts row
+report   --job <id> --report <file> [--outcome <o>]   files a starci/op-report@1 row
+consume-report --job <id>        kernel marks the report integrated
+check    --job <id> --checks '<json>'    kernel records its re-run
+settle   --job <id> --verdict <pass|fail|blocked> [--report <path>]
 incident --kind <k> --detail <s> [--op <opId>]
-retire
+finish
 ```
 
 Every write is one transaction + one hash-chained `events` row; every refusal
@@ -81,8 +86,8 @@ fact, never silent loss.
 
 - Open `.starciwork/runtime.sqlite` or write any row directly — api only.
 - Call the host (Orca) API or spawn terminals directly — `dispatch` owns host mechanics.
-- Pick a model by taste — `scripts/route/route-model.mjs` resolves eligibility from `modules/models/selection.yaml`; owner `config.yaml` and an explicit `--provider` override in that order.
-- Delete history — `retire` preserves goals/jobs/reports/events.
+- Pick a model by taste — `scripts/route/route-model.mjs` resolves eligibility from `modules/models/selection.yaml`; owner `config.yaml` and an explicit `--agent` override in that order.
+- Delete history — `finish` preserves goals/jobs/reports/events.
 - Retry forever — routes carry per-kind limits; exhaustion is an `incident`, and identical evidence is not progress.
 
 ## Durable memory

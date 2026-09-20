@@ -2,6 +2,22 @@
 
 Business defines observable product behavior. SRS is a source-of-truth contract derived from product intent, stakeholder authority, policy and customer outcomes. It is independent of source code. Architecture maps SRS behavior to a target technical design; Implementation later proves whether actual code conforms.
 
+## Progressive authoring
+
+For a not-yet-implemented capability, author the smallest decision-complete SRS for the next selected
+implementation slice. It must settle the actor goal, observable outcome, material invariants and
+permissions, relevant main/alternative/exception behavior, acceptance and consequential open decisions.
+It need not predict unrelated future capabilities or reversible source-local mechanics.
+
+A reviewed SRS seed remains `state: todo` while implementation, test/E2E or UAT evidence is open.
+Use `activity: investigating|implementing|verifying` to show current work and `blockers[]` for impediments;
+do not invent another lifecycle state. The bounded `business.decide` job may pass once the seed is usable
+downstream, but that job result is not Work completion. During implementation, concrete observations may
+expose a missing observable case. They are feedback, not business authority: revise the SRS only from
+accepted intent or an owner decision, preserve unaffected content, append the required decision log and
+invalidate only affected downstream proof. File names, private helpers and library choices remain in
+Implementation.
+
 Write all current canonical SRS content in English, including natural-language prose, YAML and schema
 keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types,
 operation names and source symbols. Conversation or presentation locale never translates canonical
@@ -55,7 +71,7 @@ Every folder owns one `index.yaml`. Parent indexes aggregate scope and immediate
 | Business data | `starci/srs-data-definition@1` |
 | Customer journey | `starci/srs-customer-journey@1` |
 
-The machine-readable contract is `specifications/srs-sections.json`. A legacy cohesive `starci/specification@2` leaf remains readable, but new work uses the split tree. Do not use a product-specific schema such as `starci-next/srs@1`.
+The machine-readable contract is `modules/schemas/spec/srs-sections.schema.yaml`. An earlier cohesive `starci/specification@2` leaf remains readable, but new work uses the split tree. Do not use a product-specific schema such as `starci-next/srs@1`.
 
 ## Functional requirements
 
@@ -72,7 +88,7 @@ The machine-readable contract is `specifications/srs-sections.json`. A legacy co
 
 Authority references identify product briefs, stakeholder decisions, policies or approved research as `authorityRefs`. Do not put repository roles, code paths, symbols, commits, `sourceRefs` or implementation observations into SRS.
 
-Main, alternative and exception flows remain inside the same functional requirement file. When a branch class genuinely does not apply, record an explicit rationale; an empty list without rationale is invalid. Repeated requests, concurrent changes, cancellation, timeouts, uncertain outcomes and recovery are specified when they can change the observable result.
+Main, alternative and exception flows remain inside the same functional requirement file. When a branch class genuinely does not apply, record an explicit rationale; an empty list without rationale is invalid. Repeated requests, concurrent changes, cancellation, timeouts, uncertain outcomes and recovery are specified when they can materially change the observable result of the selected slice. Do not manufacture generic edge cases with no plausible actor, state or acceptance consequence.
 
 ## NFR, rules, data and decisions
 
@@ -123,6 +139,6 @@ business/srs/
 
 Run `node bin/starci.mjs validate <work-root>`. The validator checks folder/schema matching, parent/leaf ownership, semantic ID uniqueness, FR flow/step/acceptance joins, typed references, journey coverage and data transitions. It does not prove stakeholder acceptance, complete reasoning, implementation or production behavior.
 
-Draft and blocked payloads cannot earn completed Work. An accepted, reviewed SRS leaf is authored as `done` in the same change; `todo` is reserved for a genuinely unfinished draft or unresolved business-design task. An implementation workflow must not reopen or rewrite accepted SRS solely because stale lifecycle metadata says `todo`. Reorganizing folders changes semantic ancestry; preserve old proof and establish new review for changed content. Current accepted SRS remains the input to SDS, UI, implementation and UAT.
+Draft and blocked payloads cannot earn completed Work. A reviewed SRS seed is authored as `todo` and remains the current product contract for downstream SDS, UI, implementation and UAT. `todo + activity: idle` means defined but not currently being worked; `todo + activity: investigating|implementing|verifying` means in progress. Only final reconciliation may author `done`, after current SRS, SDS, code, test/E2E and UAT evidence bind the same delivery revision and every required assertion passes. Missing, stale or mismatched evidence leaves the record `todo` and the workflow partial or blocked. Reorganizing folders changes semantic ancestry; preserve old proof and establish fresh evidence for changed content.
 
-The compatibility reader also accepts the pre-upstream `starci/srs@3` leaf format for recovery and explicitly authorized migration. Do not use it for new authoring: new SRS content uses the section schemas published in `specifications/srs-sections.json`. Migration preserves stable IDs and useful evidence but requires a fresh scoped review; it never copies stale `done` state.
+The compatibility reader also accepts the pre-upstream `starci/srs@3` leaf format for recovery and explicitly authorized conversion. Do not use it for new authoring: new SRS content uses the section schemas published in `modules/schemas/spec/srs-sections.schema.yaml`. Conversion preserves stable IDs and useful evidence but requires a fresh scoped review; it never copies stale `done` state.

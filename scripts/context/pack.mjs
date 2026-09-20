@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 // pack.mjs — context cutting as a function (wave m7).
 //
-// Problem this solves: ops used to get a brief path + owned_paths and then
-// chose their own context — agents forgot to read their contracts (fleet wave
-// lessons, 2026-09-20). Context assembly is now a deterministic function:
+// Context assembly is a deterministic function:
 // `node scripts/context/pack.mjs --op <id>` returns the mandatory read list,
 // the brief's declared reads with placeholders flagged, the resolved owned
 // write set and the actual files it currently holds on disk — plus a rendered
@@ -11,7 +9,7 @@
 //
 // Consumed two ways:
 //   - CLI (this file's main): kernel/api calls it to materialize a packet.
-//   - Library: scripts/route/dispatch-op.mjs imports buildContext/renderPacket
+//   - Library: scripts/route/dispatch-op.mjs imports buildContext/renderPromptReads
 //     so the [Op] prompt carries the resolved MANDATORY READS list, not just
 //     "read SKILL.md".
 //
@@ -29,8 +27,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// yaml engine: core/yaml.mjs today (engine/yaml.mjs is the canonical target —
-// the tree flip rewires this import).
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
 
@@ -39,7 +35,7 @@ const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 const DISPATCH_CONTRACT = 'modules/kernel/dispatch.yaml';
 const FILE_CAP = 200;
 
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.git', '_local']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.git']);
 
 const walk = dir => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true })
   .flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]) : []);
@@ -136,7 +132,7 @@ const escapeRx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * dispatch-op.mjs uses (example-ownership helpers over the .starciwork tree).
  * Pass `ownedPaths` to reuse an already-resolved set (dispatch-op does).
  */
-export function resolveOwnedPaths(records, stateDir, preResolved) {
+function resolveOwnedPaths(records, stateDir, preResolved) {
   if (preResolved) return { ownedPaths: preResolved, missing: [] };
   if (!stateDir) {
     return { ownedPaths: [], missing: [],
@@ -260,7 +256,7 @@ export function buildContext({
 
 /** The rendered packet — the exact text the op must be told to read, in load
  *  order. Written to --out or embedded in the dispatch prompt. */
-export function renderPacket(context) {
+function renderPacket(context) {
   if (context.error) return `CONTEXT PACKET — op ${context.op}\nERROR: ${context.error}`;
   const lines = [`CONTEXT PACKET — op ${context.op}`, ''];
   lines.push('MANDATORY READS — read in this order before any action:');

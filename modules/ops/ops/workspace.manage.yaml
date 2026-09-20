@@ -1,6 +1,6 @@
-# modules/ops/ops/workspace.manage.yaml - TINKLE-1 pure-yaml port of .claude/ops/workspace.manage/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/workspace.manage.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: workspace.manage
 goal:
@@ -42,8 +42,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -108,7 +107,7 @@ steps:
     action:
       en: Complete the selected Work creation/reconstruction job and return canonical Work references,
         actual repository/source bindings, evidence and unresolved intent. Import never approves
-        inferred business or executes product work. No deletion, retirement or unrelated docs/site
+        inferred business or executes product work. No deletion or unrelated docs/site
         removal is implied.
 proofs:
   - id: mode-result
@@ -184,8 +183,7 @@ executionModes:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
             availability proof. Capabilities are the intersection of actual tools, selected profile
-            policy, op permissions and existing task authority. Do not revive V2 dispatch chains,
-            retired profiles or extra-agent permissions.
+            policy, op permissions and existing task authority.
     writes:
       - id: workspace
         path: .starciwork/workspace.yaml
@@ -397,7 +395,7 @@ executionModes:
     sideEffects:
       - selected canonical workspace/resource/scope writes
       - scoped documentation commits only when authorized
-      - optional explicitly authorized exact preserved artifact-directory retirement; registered Git
+      - optional explicitly authorized exact preserved artifact-directory removal; registered Git
         worktree removal only through Git
     graphPolicy:
       mode: selected-scope-only
@@ -439,13 +437,13 @@ executionModes:
         path: actual canonical repository/storage ownership + selected artifact retrieval and retention
           policy
         purpose:
-          en: Resolve durable non-ephemeral destination outside the retirement target, asset rights and sealed
+          en: Resolve durable non-ephemeral destination outside the removal target, asset rights and sealed
             credential custody when present. Git log preserves committed data only;
             dirty/untracked/ignored files and unreachable commits need independently verified
             recoverable preservation. Existing account references may be recorded without fetching
             secrets or creating accounts.
       - id: application-stacks
-        path: knowledge/application-stacks.json + docs/application-stacks.md +
+        path: knowledge/application-stacks.yaml + docs/application-stacks.md +
           docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
         purpose:
           en: When the imported source contains application deployment, .starcistacks compose material or
@@ -467,8 +465,7 @@ executionModes:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
             availability proof. Capabilities are the intersection of actual tools, selected profile
-            policy, op permissions and existing task authority. Do not revive V2 dispatch chains,
-            retired profiles or extra-agent permissions.
+            policy, op permissions and existing task authority.
     writes:
       - id: workspace
         path: .starciwork/workspace.yaml
@@ -560,11 +557,11 @@ executionModes:
             blocked/not-requested. Imported child product assertions must have no fabricated
             evidence."
       - id: source
-        path: repository:<repo-id>/<retirement-target>
+        path: repository:<repo-id>/<removal-target>
         fields:
           - optional exact old artifact-directory removal only; no product implementation edits
         content:
-          en: "Only if cleanup was explicitly selected and authorized: retire the one resolved old directory
+          en: "Only if cleanup was explicitly selected and authorized: remove the one resolved old directory
             after all preservation/retrieval hashes, committed history reachability, recoverable
             dirty/untracked/ignored data, ownership and inactive-worker checks pass. The target
             cannot be a repository root, canonical .starciwork root, broad parent or symlink; use
@@ -667,7 +664,7 @@ executionModes:
           en: If and only if exact cleanup is selected, re-inspect worktree registration, source/dirty
             inventory and active-worker ownership immediately before removal. Require explicit
             deletion authority, verified durable bytes and recoverable commits/uncommitted data.
-            Remove a registered worktree with Git without force, or retire a verified custom
+            Remove a registered worktree with Git without force, or remove a verified custom
             artifact directory recoverably. If any check fails, leave original untouched and record
             the separate cleanup leaf blocked. Do not run a successor op.
       - reads:
@@ -712,7 +709,7 @@ executionModes:
             acceptance.
       - id: cleanup
         requirement:
-          en: Cleanup is not-requested, proven exact safe retirement, or separately blocked with original data
+          en: Cleanup is not-requested, proven exact safe removal, or separately blocked with original data
             retained. Migration success never hides required unresolved cleanup.
     blockers:
       - code: PILOT_SCOPE_UNKNOWN
@@ -721,8 +718,8 @@ executionModes:
       - code: PRESERVATION_UNPROVEN
         condition:
           en: Selected bytes/history/uncommitted data cannot be retrieved identically and recoverably outside
-            the retirement target; retain originals.
-      - code: RETIREMENT_UNSAFE
+            the removal target; retain originals.
+      - code: REMOVAL_UNSAFE
         condition:
           en: Deletion authority, exact target ownership, inactive worker status or worktree registration is
             missing/uncertain; do not delete or force.
@@ -744,7 +741,7 @@ executionModes:
       piece: Stable selected piece slug
       flow: Selected UAT journey slug
       screen: Selected surface/state slug
-      retirement-target: Exact inventoried old directory relative to the bound repository, verified within
+      removal-target: Exact inventoried old directory relative to the bound repository, verified within
         the selected ceiling
     migrationPolicy:
       scope: one-selected-business
@@ -763,7 +760,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Does a canonical .starciwork workspace exist for this purpose - prepare:
@@ -782,9 +779,9 @@ business:
   produces:
     - workspace.yaml; business/setup or migration/cleanup nodes; repository/import resources + preserved assets; evidence: scope-review, inventory, preservation, import-review, cleanup.
   failureModes:
-    - OPERATION_REQUIRED; PURPOSE_AMBIGUOUS, PILOT_SCOPE_UNKNOWN, PRESERVATION_UNPROVEN, RETIREMENT_UNSAFE, DECLARED_DEPENDENCY_UNMET (declared blockers).
+    - OPERATION_REQUIRED; PURPOSE_AMBIGUOUS, PILOT_SCOPE_UNKNOWN, PRESERVATION_UNPROVEN, REMOVAL_UNSAFE, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

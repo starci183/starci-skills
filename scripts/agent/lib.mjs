@@ -6,12 +6,12 @@
 // injected automatically — forgetting a bypass flag is structurally
 // impossible because no caller ever assembles a provider command by hand.
 //
-//   spawnAgent({provider, worktree, title, prompt|promptFile, kernel})
+//   spawnAgent({provider, model, effort, worktree, title, prompt|promptFile, kernel})
 //     → create terminal → awaitReadiness → send → awaitSubmission
 //     → awaitAttestation (bounded death-watch: provider activity AND absence
 //       of known-failure signatures) → receipt. A submitted prompt is NOT a
-//       live agent — observed: a qwen terminal died at '401 Invalid API-key'
-//       after submission while the job was marked running.
+//       live agent — a terminal can die on an auth failure after submission
+//       while the job is still marked running.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,7 +24,7 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { sleep } from '../api/orca/lib.mjs';
 
-export const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 export function loadAdapter(provider) {
   const file = path.join(skillRoot, 'modules', 'models', 'agents', `${provider}.yaml`);
@@ -41,8 +41,31 @@ export function loadAdapter(provider) {
 //   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
 //   OR the card's own body: commandRequirements (kernel → kernelCommandRequirements)
 //     or terminalFallback.command + bypassFlag for native-managed agents.
+// A terminalFallback may additionally declare modelArgs/effortArgs/bypassArgs.
+// Those arrays are the only source of provider-specific CLI flags; placeholder
+// values are shell-quoted before they enter Orca's command string.
 // Requirements ALWAYS come from the card — that is where --yolo lives.
-export function buildSpawnCommand({ provider, kernel = false, command = null } = {}) {
+const shellQuote = (value) => {
+  const text = String(value);
+  return process.platform === 'win32'
+    ? `'${text.replaceAll("'", "''")}'`
+    : `'${text.replaceAll("'", `'"'"'`)}'`;
+};
+
+const renderArgs = (args, values) => {
+  if (!Array.isArray(args)) return [];
+  return args.map((arg) => {
+    const raw = String(arg);
+    const exact = raw.match(/^<(model|effort)>$/);
+    if (exact) return shellQuote(values[exact[1]]);
+    let rendered = raw;
+    for (const [name, value] of Object.entries(values))
+      rendered = rendered.replaceAll(`<${name}>`, String(value));
+    return rendered === raw ? raw : shellQuote(rendered);
+  });
+};
+
+export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null } = {}) {
   const { card, error } = loadAdapter(provider);
   if (error) return { provider, error };
   const plat = process.platform === 'win32' ? 'win32' : 'posix';
@@ -54,14 +77,24 @@ export function buildSpawnCommand({ provider, kernel = false, command = null } =
   const tf = card?.terminalFallback;
   let body = typeof command === 'string' && command.trim() ? command.trim() : null;
   if (!body && typeof tf?.command === 'string' && tf.command.trim()) {
-    // bypassFlag may carry a prose tail ("--full-auto (or …)") — first token only.
-    const bypass = String(tf.bypassFlag ?? '').match(/^(--?\S+)/)?.[1] ?? '';
-    body = [tf.command.trim(), reqs, bypass].filter(Boolean).join(' ');
+    if (model && !Array.isArray(tf.modelArgs))
+      return { provider, error: `adapter card ${provider}.yaml cannot pin model '${model}' (terminalFallback.modelArgs missing)` };
+    if (effort && !Array.isArray(tf.effortArgs))
+      return { provider, error: `adapter card ${provider}.yaml cannot pin effort '${effort}' (terminalFallback.effortArgs missing)` };
+    const modelArgs = model ? renderArgs(tf.modelArgs, { model, effort }) : [];
+    const effortArgs = effort ? renderArgs(tf.effortArgs, { model, effort }) : [];
+    // bypassArgs is canonical. bypassFlag remains a compatibility seam for
+    // older installed cards and deliberately keeps only its first CLI token.
+    const bypassArgs = Array.isArray(tf.bypassArgs)
+      ? tf.bypassArgs.map(String)
+      : [String(tf.bypassFlag ?? '').match(/^(--?\S+)/)?.[1] ?? ''].filter(Boolean);
+    body = [tf.command.trim(), reqs, ...modelArgs, ...effortArgs, ...bypassArgs].filter(Boolean).join(' ');
   } else if (!body && (prefix || reqs)) {
     body = [card?.agent ?? provider, reqs].filter(Boolean).join(' ');
   }
   if (!body) return { provider, error: `adapter card ${provider}.yaml yields no command (no command, no terminalFallback)` };
-  return { provider, command: [prefix, body].filter(Boolean).join(' '), commandSource: `modules/models/agents/${provider}.yaml`, adapter: card };
+  return { provider, command: [prefix, body].filter(Boolean).join(' '), commandSource: `modules/models/agents/${provider}.yaml`, adapter: card,
+    model: model ?? null, effort: effort ?? null };
 }
 
 const regexp = (source, fallback) => {
@@ -78,7 +111,7 @@ const signalRegexp = (source) => {
 
 // Card-driven readiness: screen must show the provider's prompt pattern
 // (and identity when declared) before anything is sent.
-export function awaitReadiness(handle, adapter) {
+function awaitReadiness(handle, adapter) {
   const spec = adapter?.readiness && typeof adapter.readiness === 'object' ? adapter.readiness : {};
   const ready = regexp(spec.screenPattern, '(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*[>❯❭]\\s*$)');
   const identity = spec.identityPattern ? regexp(spec.identityPattern, spec.identityPattern) : null;
@@ -92,6 +125,32 @@ export function awaitReadiness(handle, adapter) {
     if (elapsed < timeoutMs) sleep(intervalMs);
   }
   return { ok: false, reason: `terminal readiness timeout after ${timeoutMs}ms`, screen };
+}
+
+const modelPattern = (model) => {
+  const escaped = String(model).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^A-Za-z0-9._:-])${escaped}(?=$|[^A-Za-z0-9._:-])`, 'i');
+};
+
+// A CLI flag is intent, not proof. Kernel boot accepts a pinned model only
+// after the provider TUI renders that exact model id on the terminal screen.
+function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '') {
+  if (!expectedModel) return { ok: true, screen: initialScreen, model: null };
+  const spec = adapter?.modelAttestation && typeof adapter.modelAttestation === 'object' ? adapter.modelAttestation : {};
+  const timeoutMs = Number(spec.timeoutMs) || 15000;
+  const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
+  const expected = modelPattern(expectedModel);
+  let screen = initialScreen ?? '';
+  for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
+    if (expected.test(screen)) return { ok: true, screen, model: expectedModel };
+    if (elapsed >= timeoutMs) break;
+    sleep(intervalMs);
+    const read = terminalRead({ terminal: handle });
+    screen = read.screen ?? '';
+    if (!read.ok || read.terminal?.connected === false)
+      return { ok: false, screen, reason: `terminal became ${read.terminal?.connected === false ? 'disconnected' : 'unreadable'} before model attestation` };
+  }
+  return { ok: false, screen, reason: `terminal did not render expected model '${expectedModel}' within ${timeoutMs}ms` };
 }
 
 // Card-driven submission: the prompt is consumed when the provider shows
@@ -118,13 +177,14 @@ export function awaitSubmission(handle, adapter) {
   return { ok: false, reason: `prompt was not consumed within ${timeoutMs}ms`, screen, enters };
 }
 
-// Post-submission attestation — the step that was missing when a qwen terminal
-// died at '401 Invalid API-key' yet its job showed running. For a bounded
-// window (attestation.timeoutMs, default ~20s, card-overridable) the screen is
-// watched for the card's knownFailures[].signal patterns PLUS generic
-// auth/crash markers; the first signature rejects. A dead or unreadable
-// terminal rejects too. Idle-without-failure is NOT a rejection — providers
-// pause between turns; submission already proved the prompt was consumed.
+// Post-submission attestation — submission proves the prompt was consumed, not
+// that the agent stays alive; a terminal can still die on auth failure while
+// its job shows running. For a bounded window (attestation.timeoutMs, default
+// ~20s, card-overridable) the screen is watched for the card's
+// knownFailures[].signal patterns PLUS generic auth/crash markers; the first
+// signature rejects. A dead or unreadable terminal rejects too.
+// Idle-without-failure is NOT a rejection — providers pause between turns;
+// submission already proved the prompt was consumed.
 export function awaitAttestation(handle, adapter) {
   const spec = adapter?.attestation && typeof adapter.attestation === 'object' ? adapter.attestation : {};
   const timeoutMs = Number(spec.timeoutMs) || 20000;
@@ -160,8 +220,8 @@ export function awaitAttestation(handle, adapter) {
 // Delivery per card: file-reference-above-inline-limit writes the prompt to a
 // file and sends the card's @file prompt template — multi-kilobyte inline
 // paste is a known provider crash. The artifact dir defaults to a fresh OS
-// temp dir (dispatch artifacts must NOT persist under <worktree>/.starciwork/
-// _local — observed defect); the card's delivery.fileDirectory stays an
+// temp dir (dispatch artifacts must NOT persist under the worktree's
+// .starciwork tree); the card's delivery.fileDirectory stays an
 // explicit override (relative resolves under the worktree). The returned
 // artifact is deleted by cleanupDeliveryArtifact once submission is attested.
 export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 'prompt' }) {
@@ -202,20 +262,22 @@ export function cleanupDeliveryArtifact(artifact) {
 // `attest` (default true) adds the post-submission death-watch; a rejection
 // comes back as {ok:false, step:'attestation', signal} with the terminal
 // already closed — the caller must never mark the job running on it.
-export function spawnAgent({ provider, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true } = {}) {
-  const built = buildSpawnCommand({ provider, kernel, command });
+export function spawnAgent({ provider, model = null, effort = null, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true } = {}) {
+  const built = buildSpawnCommand({ provider, kernel, command, model, effort });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
   const create = terminalCreate({ worktree, title, command: built.command });
   const handle = create.handle;
   let artifact = null;
-  const fail = (step, error, signal = null) => {
+  const fail = (step, error, signal = null, extra = {}) => {
     cleanupDeliveryArtifact(artifact);
     if (handle) terminalClose({ terminal: handle });
-    return { ok: false, step, error, ...(signal ? { signal } : {}), terminal: handle, provider, command: built.command };
+    return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, terminal: handle, provider, command: built.command };
   };
   if (!handle) return fail('create', create.error || 'no terminal handle');
   const ready = awaitReadiness(handle, built.adapter);
   if (!ready.ok) return fail('readiness', ready.reason);
+  const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen);
+  if (!modelAttested.ok) return fail('model-attestation', modelAttested.reason, null, { requestedModel: model });
   const text = promptFile ? fs.readFileSync(promptFile, 'utf8') : prompt;
   if (text != null) {
     const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree, dispatchId });
@@ -231,7 +293,8 @@ export function spawnAgent({ provider, worktree, title, prompt = null, promptFil
     cleanupDeliveryArtifact(artifact);
     artifact = null;
   }
-  return { ok: true, terminal: handle, provider, command: built.command, commandSource: built.commandSource };
+  return { ok: true, terminal: handle, provider, model: model ?? null, effort: effort ?? null,
+    modelAttested: modelAttested.model, command: built.command, commandSource: built.commandSource };
 }
 
 // Health: terminal identity is the proof — connected + writable, with the

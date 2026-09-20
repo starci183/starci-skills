@@ -40,7 +40,7 @@ position:
   easyTier: first             # runtimes.json allocation.tiers.easy
   mediumTier: third in default
   hardTier: absent — not listed in any hard-tier order
-  chainLeads: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.retire, task.execute, uat.verify, workspace.manage, review.verify]
+  chainLeads: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.finish, task.execute, uat.verify, workspace.manage, review.verify]
   orchestrationDefault: qwen-agent   # registry.json orchestration.defaultOperationTarget
 
 business:

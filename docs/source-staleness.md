@@ -56,7 +56,7 @@ the declared scoped paths have identical bytes; unrelated Git commits and
 unrelated dirty paths do not invalidate scoped proof. Changed covered bytes
 require revalidation. Dirty identities remain `unverifiable` because the
 canonical identity preserves an evidence asset and digest but does not define
-a reversible checkout format for every snapshot. Legacy `codeRefs` identify a
+a reversible checkout format for every snapshot. Earlier `codeRefs` identify a
 commit but not covered paths, so they remain explicitly unverifiable rather
 than receiving a full-tree assumption.
 

@@ -171,8 +171,9 @@ test('missing resources, duplicate identities and circular refs fail closed',t=>
   const c=codes(f.run());for(const code of ['MISSING_REF','DUPLICATE_ID','CYCLE'])assert.ok(c.includes(code));
 });
 test('local scratch is ignored and never promoted as canonical evidence',t=>{
-  const f=fixture(t);f.node('biz');f.write('_local/cache/node.md','malformed scratch');assert.equal(f.run().ok,true);
-  f.done('biz',{assets:[{path:'../../../_local/cache/node.md',sha256:sha256('malformed scratch')}]});assert.equal(f.run().ok,false);
+  // kernel-strays is the runtime custody dir the rule exercises.
+  const f=fixture(t);f.node('biz');f.write('kernel-strays/cache/node.md','malformed scratch');assert.equal(f.run().ok,true);
+  f.done('biz',{assets:[{path:'../../../kernel-strays/cache/node.md',sha256:sha256('malformed scratch')}]});assert.equal(f.run().ok,false);
 });
 test('one evidence bundle supports explicitly bound leaves without copying assets',t=>{
   const f=fixture(t);f.node('flow/a');f.node('flow/b');f.node('flow/unbound');

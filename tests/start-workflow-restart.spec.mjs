@@ -16,6 +16,8 @@ const fixture=t=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
+  const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-5.6-sol, effort: high}\n');
   fs.writeFileSync(state,JSON.stringify({counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,`import fs from 'node:fs';
 const file=process.env.FAKE_ORCA_STATE;
@@ -25,13 +27,15 @@ const save=()=>fs.writeFileSync(file,JSON.stringify(state));
 const ok=result=>{console.log(JSON.stringify({ok:true,result}));process.exit(0)};
 if(args[0]==='terminal'&&args[1]==='create'){
   const handle='term_fake_'+(++state.counter);
-  state.terminals[handle]={handle,connected:true,writable:true,sent:false,prompt:null,command:at('--command')};
-  state.commands.push(at('--command'));save();ok({terminal:{handle,connected:true,writable:true}});
+  const command=at('--command');
+  const model=String(command||'').match(/(?:^|\\s)(?:-m|--model)\\s+["']?([^\\s"']+)/i)?.[1]??null;
+  state.terminals[handle]={handle,connected:true,writable:true,sent:false,prompt:null,command,model};
+  state.commands.push(command);save();ok({terminal:{handle,connected:true,writable:true}});
 }
 const handle=at('--terminal'),term=state.terminals[handle];
 if(args[0]==='terminal'&&args[1]==='show')ok({terminal:term??{handle,connected:false,writable:false}});
 if(args[0]==='terminal'&&args[1]==='read'){
-  const tail=term?.sent?['Thinking · 1s (esc twice to interrupt)']:['Devin CLI','❭'];
+  const tail=term?.sent?['Codex','model: '+term.model,'Thinking · 1s (esc twice to interrupt)']:['Codex','model: '+term.model,'Enter a prompt','❭'];
   ok({terminal:{...term,tail}});
 }
 if(args[0]==='terminal'&&args[1]==='send'){
@@ -43,7 +47,7 @@ if(args[0]==='terminal'&&args[1]==='close'){
 }
 console.error('unsupported '+args.join(' '));process.exit(2);
 `);
-  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),FAKE_ORCA_STATE:state};
+  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),FAKE_ORCA_STATE:state,STARCI_OWNER_ROOT:ownerRoot};
   const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   return {repo,state,run};
 };
@@ -54,24 +58,26 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
 
-  const first=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--provider','devin','--json');
+  const first=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
   assert.equal(first.status,0,first.stderr);
   const firstOut=json(first.stdout);assert.equal(firstOut?.replaced,false);assert.equal(firstOut?.attempt,1);
   assert.equal(firstOut?.generation,0);assert.equal(firstOut?.promptSubmitted,true);
   let state=json(fs.readFileSync(f.state,'utf8'));
-  assert.match(state.commands[0],/--permission-mode dangerous/);
-  assert.doesNotMatch(state.commands[0],/--permission-mode accept-edits/);
+  assert.match(state.commands[0],/\bcodex\b/i);
+  assert.match(state.commands[0],/(?:^|\s)--model\s+['"]?gpt-5\.6-sol['"]?(?:\s|$)/i);
+  assert.match(state.commands[0],/--ask-for-approval\s+never/);
+  assert.match(state.commands[0],/--sandbox\s+danger-full-access/);
   assert.match(state.terminals[firstOut.terminal].prompt,new RegExp(ROOT.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
   assert.match(state.terminals[firstOut.terminal].prompt,/Never look for or create a\s+target-local `\.claude`/);
 
-  const duplicate=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--provider','devin','--json');
+  const duplicate=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
   assert.equal(duplicate.status,0,duplicate.stderr);
   assert.equal(json(duplicate.stdout)?.terminal,firstOut.terminal);
   state=json(fs.readFileSync(f.state,'utf8'));assert.equal(state.counter,1,'a connected kernel must not duplicate');
 
   state.terminals[firstOut.terminal].connected=false;state.terminals[firstOut.terminal].writable=false;
   fs.writeFileSync(f.state,JSON.stringify(state));
-  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--provider','devin','--json');
+  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
   assert.equal(restarted.status,0,restarted.stderr);
   const restartOut=json(restarted.stdout);assert.equal(restartOut?.replaced,true);assert.equal(restartOut?.attempt,2);
   assert.equal(restartOut?.generation,0,'agent churn must not invalidate the workflow generation');

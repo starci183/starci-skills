@@ -117,8 +117,8 @@ rules:
         when: The decision is checked for fit
         assert: |-
           It is checked twice, and neither pass replaces the other. Before the tree exists, every candidate is rendered and served once per viewport of the coverage, so a person compares the wide and the narrow render while the direction can still change. After the tree is built, the audit captures every viewport of that same coverage and measures the rules above on what rendered. A decision looked at once has been checked at one width only
-    retired: |-
-      RESPONSIVE-5 is retired into COVERAGE-1 and is not reused; the address stays spent.
+    closed: |-
+      RESPONSIVE-5 is folded into COVERAGE-1 and is not reused; the address stays spent.
 doesNotDecide: |-
   Which regions exist and who owns their tracks is [Layout](layout.yaml). Whether meaning keeps its rank
   through a reflow is [Hierarchy](hierarchy.yaml), and whether an action group keeps its order is

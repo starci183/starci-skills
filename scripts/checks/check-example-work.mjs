@@ -43,10 +43,8 @@ const expectedId = segments => {
   return [family, feature, ...rest.filter(segment => !FAMILIES.has(segment))].join('.');
 };
 
-/** sha256 of a record's own index.yaml bytes - the same digest kernel/reconciliation.mjs's recordDigests
- * takes over the node file's bytes (see nodeFileOf/recordDigests there). Replicated inline rather than
- * imported because recordDigests expects a whole `tree` object with node.path/workRoot wiring this script
- * does not build; the byte-for-byte sha256 over the record file is the exact operation reused. */
+/** sha256 of a record's own index.yaml bytes - the recordDigest the work-layout contract
+ * (modules/schemas/work-layout.yaml) declares for staleness. Computed inline here. */
 const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
 /**
@@ -163,8 +161,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
   }
 
   // ---- inline acceptance criteria (v11 compact format) ----
-  // A criterion that used to be its own `ac/<name>/index.yaml` record may be carried inline on the
-  // parent's `acceptance:`/`statements:` list as an entry with `id: <former ac-id>`. Two rules keep the
+  // A criterion may be carried inline on the
+  // parent's `acceptance:`/`statements:` list as an entry with `id: <ac-id>`. Two rules keep the
   // collapse honest: an entry's declared id must be the id its place implies (`ac.` + the parent's id
   // minus its family segment + `.` + name), the same place-law a file under ac/ lived under; and one id
   // may not be claimed by two parents.
@@ -362,7 +360,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     // ---- concept 9: implementation owners ----
     if (schema === 'work/implementation') {
       if ('directory' in data || 'files' in data || 'targetFiles' in data) {
-        problems.push(`${rec.shown}: work/implementation carries legacy directory/files/targetFiles; use owners: [{role, path}] instead`);
+        problems.push(`${rec.shown}: work/implementation carries directory/files/targetFiles, which are not part of the contract; use owners: [{role, path}]`);
       }
       if (data.owners) {
         for (const owner of data.owners) {
@@ -389,7 +387,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       }
     }
     // `owners[].path` / `module` name module-root directories (schemas/work-layout.yaml's `impl` shape
-    // entry; scripts/example/example-ownership.mjs's moduleRootOf normalises a legacy file or `/**` glob path down
+    // entry; scripts/example/example-ownership.mjs's moduleRootOf normalises a file or `/**` glob path down
     // to that root). A done record naming one that does not exist on disk is refused; a todo one is only
     // warned, since the module a todo record targets may not have been built yet.
     if (declaresOwnPaths(data)) {

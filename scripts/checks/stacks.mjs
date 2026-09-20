@@ -6,10 +6,8 @@ import {parseYaml} from '../../engine/yaml.mjs';
 
 const RESULT='starci/application-stacks-check@1';
 const STACKS_DIR='.starcistacks';
-const LEGACY_STACKS_DIR='.stacks';
 const MAX_INPUT_BYTES=4*1024*1024;
 const SCHEMA_ID='starci/application-stacks';
-const LEGACY_SCHEMA_ID='starci/application-stacks@1';
 const RUNBOOK_COMMANDS=['prepare','doctor','up','status','logs','down','verification'];
 const PLAINTEXT_SECRET_PATTERN=/\.(key|pem|p12|pfx)$/i;
 const slash=value=>String(value??'').replaceAll('\\','/');
@@ -130,8 +128,6 @@ export function checkApplicationStacks({repoRoot,environment,deploymentModelFile
   const root=path.resolve(String(repoRoot??'')),stacksRoot=path.join(root,STACKS_DIR),manifestFile=path.join(stacksRoot,'application-stacks.yaml'),errors=[];
   const add=(code,at,message)=>errors.push({code,path:at,message});
   if(!nonempty(environment))add('environment-invalid','environment','environment must name a declared environment');
-  if(!directory(stacksRoot)&&directory(path.join(root,LEGACY_STACKS_DIR)))
-    add('STACKS_LEGACY_DIRECTORY',LEGACY_STACKS_DIR,`the stack directory must be renamed from ${LEGACY_STACKS_DIR} to ${STACKS_DIR}; a legacy ${LEGACY_STACKS_DIR} directory is not read as the contract`);
   if(!regular(manifestFile,{root:stacksRoot}))add('manifest-unavailable',`${STACKS_DIR}/application-stacks.yaml`,`manifest must be a regular file inside ${STACKS_DIR}`);
   if(!regular(deploymentModelFile))add('deployment-model-unavailable','deploymentModelFile','rendered deployment evidence must be a regular, non-symlink file');
   for(const [file,at] of [[manifestFile,`${STACKS_DIR}/application-stacks.yaml`],[deploymentModelFile,'deploymentModelFile']])
@@ -145,8 +141,7 @@ export function checkApplicationStacks({repoRoot,environment,deploymentModelFile
   if(!object(manifest))manifest={};if(!object(model))model={};
 
   for(const issue of validateSchema(manifest))add('schema-shape-invalid',issue.path,issue.message);
-  if(manifest.schema===LEGACY_SCHEMA_ID)add('STACKS_SCHEMA_LEGACY_ID','schema',`schema should be ${SCHEMA_ID} without the @1 suffix; drop it`);
-  else if(manifest.schema!==SCHEMA_ID)add('schema-invalid','schema',`expected ${SCHEMA_ID}`);
+  if(manifest.schema!==SCHEMA_ID)add('schema-invalid','schema',`expected ${SCHEMA_ID}`);
 
   const catalog=object(manifest.components)?manifest.components:{},ids=new Set(Object.keys(catalog));
   if(!ids.size)add('components-empty','components','declare at least one applicable application component');

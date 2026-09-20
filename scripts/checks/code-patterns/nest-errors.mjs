@@ -838,9 +838,9 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
     }
     if (ruleIds.includes('NEST_TRANSPORT_ERROR_MAPPER')) {
       for (const item of discoveryErrors) add(item.source, 'NEST_TRANSPORT_ERROR_MAPPER', item.node, item.message, true);
-      const observed = new Set([...(discoveredHttp.length ? ['http'] : []), ...(discoveredGraphql.length ? ['graphql'] : [])]);
-      for (const kind of observed) if (!contract.transports.has(kind)) add(bindings.values().next().value.source, 'NEST_TRANSPORT_ERROR_MAPPER', bindings.values().next().value.source, `Discovered ${kind} transport is omitted from the declared mapper inventory.`, true);
-      for (const kind of contract.transports) if (!observed.has(kind)) add(bindings.values().next().value.source, 'NEST_TRANSPORT_ERROR_MAPPER', bindings.values().next().value.source, `Declared ${kind} transport has no discovered static framework boundary.`, true);
+      const discovered = new Set([...(discoveredHttp.length ? ['http'] : []), ...(discoveredGraphql.length ? ['graphql'] : [])]);
+      for (const kind of discovered) if (!contract.transports.has(kind)) add(bindings.values().next().value.source, 'NEST_TRANSPORT_ERROR_MAPPER', bindings.values().next().value.source, `Discovered ${kind} transport is omitted from the declared mapper inventory.`, true);
+      for (const kind of contract.transports) if (!discovered.has(kind)) add(bindings.values().next().value.source, 'NEST_TRANSPORT_ERROR_MAPPER', bindings.values().next().value.source, `Declared ${kind} transport has no discovered static framework boundary.`, true);
       const declaredHttp = contract.mappers.filter(item => item.kind === 'nest-http-filter');
       for (const surface of discoveredHttp) if (!declaredHttp.some(item => item.path === surface.path && item.export === surface.export)) add(bindings.get(surface.path).source, 'NEST_TRANSPORT_ERROR_MAPPER', bindings.get(surface.path).source, 'Discovered Nest exception filter is absent from the declared mapper inventory.', true);
       for (const mapper of declaredHttp) {

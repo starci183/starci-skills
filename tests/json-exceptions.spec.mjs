@@ -86,7 +86,7 @@ test('root-local runtime JSON is excluded without hiding authored JSON or nested
     'schema: starci/json-exceptions@1\nexceptions: []\n',
   );
   const localFiles = [
-    '.starciwork/_local/workflows/wf/state.json',
+    '.starciwork/kernel-evidence/wf/state.json',
     'runtime/engine/builds/digest/runtime-pin.json',
     'settings.local.json',
   ];

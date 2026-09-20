@@ -111,7 +111,8 @@ sections:
       - acceptanceCriteria
 rules:
   - All canonical SRS content is English, including natural-language prose, YAML and schema keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation names and source symbols.
-  - Accepted and reviewed SRS leaves are authored as done. Todo is reserved for genuinely unfinished drafts or unresolved business-design tasks and must not be inferred from stale metadata alone.
+  - A new SRS is minimum decision-complete for the next selected implementation slice, not speculative completeness for unrelated future capabilities or reversible source-local mechanics.
+  - A reviewed SRS seed remains state todo while implementation, test/E2E or UAT evidence is open. The decide op may settle pass without authoring Work done; final reconciliation alone may author done after current SRS, SDS, code, test/E2E and UAT evidence bind the same delivery revision.
   - SRS is a source-of-truth product contract derived from accepted intent and authority, never from source code. Code paths, symbols, revisions and implementation proof are forbidden.
   - SRS defines acceptance and decision-closure criteria, never evidence requirements or executed-proof fields. Runtime proof belongs only to excluded local run state.
   - Product briefs, stakeholder decisions, policy and research may be cited as authorityRefs; this is distinct from implementation sourceRefs.
@@ -121,3 +122,4 @@ rules:
   - A missing numeric NFR target remains an explicit decision reference, never an invented threshold.
   - Parent indexes aggregate immediate scope and children; they do not repeat descendant detail.
   - Structural validity proves internal consistency only, not stakeholder acceptance, implementation or production behavior.
+  - Implementation observations may reveal a gap but are not business authority; revisions require accepted intent or an owner decision and preserve unaffected content.

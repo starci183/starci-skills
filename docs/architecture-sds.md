@@ -12,9 +12,26 @@ operation names and source symbols. Conversation or presentation locale never tr
 specifications.
 
 Architecture may inspect a small relevant source/configuration/API surface to check feasibility and
-migration impact. Those observations inform a design decision but never become SDS content or
-authority. Record the selected logical design, rationale, impact and migration; record actual code
+transition impact. Those observations inform a design decision but never become SDS content or
+authority. Record the selected logical design, rationale, impact and transition; record actual code
 mapping and conformance under Implementation.
+
+## Progressive authoring
+
+For a not-yet-implemented capability, author the smallest design-complete SDS for the next selected
+implementation slice. It settles logical ownership, public contracts, authority, durable state and
+effects, material failure/recovery, compatibility and planned verification. It does not predict endpoint
+names, database tables, event topics, file layout, private helpers or library calls unless an accepted
+constraint makes one of those details part of the logical contract.
+
+A reviewed SDS seed remains `state: todo` while implementation, test/E2E or UAT evidence is open.
+Use `activity: investigating|implementing|verifying` to show current work and `blockers[]` for impediments;
+do not invent another lifecycle state. The bounded `architecture.decide` job may pass once the seed is
+usable downstream, but that job result is not Work completion. Implementation feedback first gets
+classified. Reversible source-local choices stay in Implementation. A proven gap in logical ownership,
+contract, authority, durable state/effect, compatibility, material failure/recovery or quality mechanism
+opens a bounded SDS revision. Preserve unaffected design and invalidate only downstream proof touched by
+that delta.
 
 ## Required tree
 
@@ -50,7 +67,7 @@ state/completion. Detailed leaves use `extensions.work3.sds`:
 
 The overview leaf carries `starci/sds-overview@1`: accepted SRS IDs, goals, scope, actors, system
 context, quality strategy, constraints, topology references, implementation handoff and design
-decisions. The machine-readable contract is `specifications/sds-map.json`. Legacy
+decisions. The machine-readable contract is `modules/schemas/spec/sds-map.schema.yaml`. Earlier
 source-independent `starci/specification@3` remains readable; it is not the new authoring format.
 
 ## Flows and components
@@ -123,9 +140,12 @@ shape and traceability. Review checks that significant SRS branches reach logica
 observable outcomes, contract/data ownership is unambiguous and material edge cases have selected
 mechanisms. Implementation separately maps actual source to these IDs and proves conformance.
 
-An accepted, reviewed SDS leaf is authored as `done` in the same change; `todo` is reserved for a
-genuinely unfinished draft or unresolved architecture task. An implementation workflow treats current
-accepted SDS as its input and opens a separate architecture sidearm only when concrete code or test
-facts prove a bounded contradiction or missing design decision. Changing accepted SRS invalidates
-dependent SDS review. Changing logical SDS invalidates affected Implementation and UAT. Preserve
-unrelated completed scopes and historical local run state.
+A reviewed SDS seed is authored as `todo` and remains the current design input to implementation. An
+implementation workflow opens a separate architecture sidearm only when concrete code or test facts prove
+a bounded contradiction or missing design decision. `todo + activity: idle` means defined but not currently
+being worked; `todo + activity: investigating|implementing|verifying` means in progress. Only final
+reconciliation may author `done`, after current SRS, SDS, code, test/E2E and UAT evidence bind the same
+delivery revision and every required assertion passes. Missing, stale or mismatched evidence leaves the
+record `todo` and the workflow partial or blocked. Changing accepted SRS invalidates dependent SDS review;
+changing logical SDS invalidates affected Implementation and UAT. Preserve unrelated completed scopes and
+historical local run state.

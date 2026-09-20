@@ -1,6 +1,6 @@
-# modules/ops/ops/release.deliver.yaml - TINKLE-1 pure-yaml port of .claude/ops/release.deliver/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/release.deliver.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: release.deliver
 goal:
@@ -18,7 +18,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -50,8 +50,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -193,8 +192,7 @@ executionModes:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
             availability proof. Capabilities are the intersection of actual tools, selected profile
-            policy, op permissions and existing task authority. Do not revive V2 dispatch chains,
-            retired profiles or extra-agent permissions.
+            policy, op permissions and existing task authority.
     writes:
       - id: node
         path: N/index.yaml
@@ -345,7 +343,7 @@ executionModes:
       dispatch: never
     reads:
       - id: application-stacks
-        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+        path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
         purpose:
           en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
             load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -392,8 +390,7 @@ executionModes:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
             availability proof. Capabilities are the intersection of actual tools, selected profile
-            policy, op permissions and existing task authority. Do not revive V2 dispatch chains,
-            retired profiles or extra-agent permissions.
+            policy, op permissions and existing task authority.
     writes:
       - id: node
         path: N/index.yaml
@@ -562,7 +559,7 @@ executionModes:
     id: release.deliver
     goal:
       en: Apply the explicitly selected source-owned migration set to one verified target and prove its
-        journal/data outcome.
+        migration-history/data outcome.
     nodeKinds:
       - release
     completionProfile: release
@@ -575,7 +572,7 @@ executionModes:
       dispatch: never
     reads:
       - id: application-stacks
-        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+        path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
         purpose:
           en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
             load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -614,7 +611,7 @@ executionModes:
         path: selected source-owned migration files/runner/config + explicit target authority
         purpose:
           en: Read exact migration IDs/checksums, intended schema/data delta, source tests, backup/rollback
-            constraints and journal inspection method. Creating/editing migration code is a separate
+            constraints and migration-history inspection method. Creating/editing migration code is a separate
             implementation scope.
       - id: matrix
         path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
@@ -628,8 +625,7 @@ executionModes:
           en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
             profiles. Use current host model configuration; historical model names are not
             availability proof. Capabilities are the intersection of actual tools, selected profile
-            policy, op permissions and existing task authority. Do not revive V2 dispatch chains,
-            retired profiles or extra-agent permissions.
+            policy, op permissions and existing task authority.
     writes:
       - id: node
         path: N/index.yaml
@@ -646,7 +642,7 @@ executionModes:
             refs/dependencies/acceptance require a reported gap or separately selected scope update;
             never add/remove them to obtain pass.
       - id: evidence
-        path: E/manifest.yaml + E/journal-before.json + E/journal-after.json + E/migration-output.txt +
+        path: E/manifest.yaml + E/migrations-before.json + E/migrations-after.json + E/migration-output.txt +
           E/replay.json + E/result.md
         fields:
           - id
@@ -659,7 +655,7 @@ executionModes:
           - codeRefs
           - extensions
         content:
-          en: "Keep migration checksums, actual runner/command, redacted output, before/after journal/data
+          en: "Keep migration checksums, actual runner/command, redacted output, before/after migration-history/data
             checks and safe no-op replay/inspect result; no credentials in logs. Operator-specific
             observed result in E/result.md: Pin exact target/schema/source migration identity and
             expected postconditions. Production mutation is allowed only by explicit scoped
@@ -707,7 +703,7 @@ executionModes:
         writes:
           - evidence
         action:
-          en: Inspect current journal/schema and backup/precondition evidence. Classify applied, safely
+          en: Inspect current migration history/schema and backup/precondition evidence. Classify applied, safely
             pending, conflicting or partial/uncertain; never rerun a partial unknown effect blindly.
       - reads:
           - migration
@@ -717,7 +713,7 @@ executionModes:
           - evidence
         action:
           en: Run only approved pending set through the actual reviewed source runner, or record inspected
-            no-op. Preserve original journal rows and actual error output; no ad hoc SQL repair or
+            no-op. Preserve original migration-history rows and actual error output; no ad hoc SQL repair or
             automatic down migration.
       - reads:
           - migration
@@ -729,7 +725,7 @@ executionModes:
           - evidence
           - matrixHandoff
         action:
-          en: Verify declared schema/data invariants and journal after execution; perform safe supported no-op
+          en: Verify declared schema/data invariants and migration history after execution; perform safe supported no-op
             replay or inspect to prove no pending changes. Report irreversible/partial effects and
             stop without deploying. When selected in a job matrix, produce E/job-result.json bound
             to the exact request, its output schema and every required criterion. This handoff is
@@ -742,7 +738,7 @@ executionModes:
             earn done.
       - id: migration
         requirement:
-          en: Exact selected set applied/no-op with journal integrity and declared data invariants proved;
+          en: Exact selected set applied/no-op with migration-history integrity and declared data invariants proved;
             successful process exit alone is insufficient.
     blockers:
       - code: MIGRATION_TARGET_UNKNOWN
@@ -750,7 +746,7 @@ executionModes:
           en: Exact environment/schema/runner revision or mutation authority is missing.
       - code: MIGRATION_PARTIAL
         condition:
-          en: Current journal/data or prior effect is partial, conflicting or uncertain; require owner
+          en: Current migration-history/data or prior effect is partial, conflicting or uncertain; require owner
             recovery decision.
       - code: DECLARED_DEPENDENCY_UNMET
         condition:
@@ -787,7 +783,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Is the one explicitly selected publish/deploy/migrate effect delivered -
@@ -802,11 +798,11 @@ business:
   consumes:
     - The selection (exactly one mode); target; release/environment resources; repo; application-stacks declarations when relevant.
   produces:
-    - Mode-bound evidence (git-publication / deployment / journal); release resource updates; node completion; matrix job-result when selected.
+    - Mode-bound evidence (git-publication / deployment / migration-history); release resource updates; node completion; matrix job-result when selected.
   failureModes:
     - OPERATION_REQUIRED; per-mode PUBLISH_NOT_AUTHORIZED/GIT_DIVERGED, RELEASE_AUTHORITY_MISSING/CONCURRENT_RELEASE/STEADY_STATE_UNPROVEN, MIGRATION_TARGET_UNKNOWN/MIGRATION_PARTIAL; DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

@@ -19,7 +19,7 @@ provenance:
     Primary framework/database documentation, original engineering analyses and selected
     source inspection are recorded in the linked Markdown.
     Neither proves current product behavior, provider effects, deployed topology or
-    complete code-rule enforcement. Runtime installation does not migrate product source.
+    complete code-rule enforcement. Runtime installation does not modify product source.
 guidance:
   - id: pattern-selection
     requirement: >-

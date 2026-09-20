@@ -253,9 +253,9 @@ function checkAliases(root, descriptor, config, result, relatedPath) {
     const index = mappings.findIndex(item => item[0] === expression);
     if (index < 0) { add(`Jest is missing the TypeScript alias ${alias}.`); continue; }
     const expected = targets.map(target => key(path.resolve(base, target.replace('*', '$1'))));
-    const observed = (Array.isArray(mappings[index][1]) ? mappings[index][1] : [mappings[index][1]])
+    const actual = (Array.isArray(mappings[index][1]) ? mappings[index][1] : [mappings[index][1]])
       .map(target => typeof target === 'string' ? key(path.resolve(config.rootDir, target.replaceAll('<rootDir>', config.rootDir))) : null);
-    if (JSON.stringify(expected) !== JSON.stringify(observed)) add(`Jest alias ${alias} does not preserve TypeScript target order and paths.`);
+    if (JSON.stringify(expected) !== JSON.stringify(actual)) add(`Jest alias ${alias} does not preserve TypeScript target order and paths.`);
     for (let position = 0; position < index; position++) {
       const prior = aliasRegexPattern(mappings[position][0]);
       if (prior === null) throw Error(`Cannot prove alias precedence for mapper ${mappings[position][0]}. Use anchored exact or single-wildcard mapper forms.`);

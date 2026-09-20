@@ -89,8 +89,9 @@ records:
     schema: null
     validator: [modules/schemas/workspace-routing.yaml]
     nodeKinds: [implementation]
-    # Deviation from the 5-plus design table, which names `sds` alone: product code is also derived from
-    # the interface design it realises and from the installed grammar it is written in. `grammar.update`
+    # Product code is derived from
+    # the interface design it realises and from the installed grammar it is written in, not from `sds`
+    # alone: `grammar.update`
     # and `uat.verify` both write code while reading the design and the grammar and never the sds, so a
     # catalog with `sds` alone makes `writer-blind` refuse the shipped kind table.
     reads: [sds, design, grammar]

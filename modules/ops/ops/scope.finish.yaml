@@ -1,16 +1,16 @@
-# modules/ops/ops/scope.retire.yaml - TINKLE-1 pure-yaml port of .claude/ops/scope.retire/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/scope.finish.yaml — scope end-of-life operator.
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
-id: scope.retire
+id: scope.finish
 goal:
-  en: Retire exactly the selected business/resource scope while preserving required evidence and live
-    consumers.
+  en: Finish exactly the selected business/resource scope - end-of-life - while preserving required
+    evidence and live consumers.
 nodeKinds:
   - operations
 completionProfile: operations
 sideEffects:
-  - explicit retirement metadata and separately authorized exact destructive actions only
+  - explicit end-of-life metadata and separately authorized exact destructive actions only
 graphPolicy:
   mode: selected-scope-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -35,13 +35,13 @@ reads:
   - id: inventory
     path: selected nodes/resources + incoming refs + actual Git worktree inventory
     purpose:
-      en: Read selected retirement request, stable IDs, live incoming references, retention/custody
+      en: Read selected end-of-life request, stable IDs, live incoming references, retention/custody
         requirements, tracked/dirty/untracked artifacts and exact worktree registrations. A folder
         called .worktrees is not evidence of disposable content.
   - id: authority
-    path: explicit retirement/deletion scope + durable storage policy
+    path: explicit end-of-life/deletion scope + durable storage policy
     purpose:
-      en: Read exact selected removals and recovery constraints; default retirement is a scoped metadata
+      en: Read exact selected removals and recovery constraints; default finish is a scoped metadata
         decision, not recursive deletion.
   - id: matrix
     path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
@@ -55,8 +55,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -71,13 +70,13 @@ writes:
       - assertions
       - required
     content:
-      en: "Write only the explicitly authorized retirement decision/scope on the work/node@2 record before review; preserve stable
+      en: "Write only the explicitly authorized end-of-life decision/scope on the work/node@2 record before review; preserve stable
         IDs and obligations. Actual removal/retention observations belong in evidence. Graph edits
         apply only to the explicitly selected approved scope: declare real prerequisite node IDs in
         dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new
         unrelated scope; finish all graph/spec changes before review proof."
   - id: evidence
-    path: E/manifest.yaml + E/retirement-inventory.json + E/retention-check.json + E/removal.json only
+    path: E/manifest.yaml + E/finish-inventory.json + E/retention-check.json + E/removal.json only
       when selected + E/result.md
     fields:
       - id
@@ -92,7 +91,7 @@ writes:
     content:
       en: "Record exact artifacts, ownership, safe destinations, verified hashes/readability and selected
         removal outcomes/recovery limitations; never copy secret plaintext. Operator-specific
-        observed result in E/result.md: Record retired scope, actual decision authority, replacement
+        observed result in E/result.md: Record finished scope, actual decision authority, replacement
         IDs where applicable, consumer dispositions and retention/access policy. Preserve stable
         identities and do not relabel unfinished required work na without a real scope decision."
   - id: matrixHandoff
@@ -132,7 +131,7 @@ steps:
     writes:
       - node
     action:
-      en: Resolve consumer preserve/replace/defer/retire dispositions and retention/recovery obligations.
+      en: Resolve consumer preserve/replace/defer/finish dispositions and retention/recovery obligations.
         Missing decision or custody blocks deletion, not the read-only inventory.
   - reads:
       - inventory
@@ -151,7 +150,7 @@ steps:
     writes:
       - evidence
     action:
-      en: Execute only separately authorized exact retirement effects, preferring reversible operations
+      en: Execute only separately authorized exact end-of-life effects, preferring reversible operations
         and appropriate Git worktree lifecycle. Preserve uncommitted/untracked user work; uncertain
         ownership stops removal.
   - reads:
@@ -164,7 +163,7 @@ steps:
       - evidence
       - matrixHandoff
     action:
-      en: Validate surviving references/readability and report what was retired, actually removed,
+      en: Validate surviving references/readability and report what was finished, actually removed,
         retained and recoverable. Stop; no opportunistic cleanup of adjacent work. When selected in
         a job matrix, produce E/job-result.json bound to the exact request, its output schema and
         every required criterion. This handoff is conditional and does not change standalone or
@@ -180,7 +179,7 @@ proofs:
       en: No required live consumer or sole evidence/custody copy is lost; exact selected effects and
         recovery status are observed.
 blockers:
-  - code: RETIREMENT_UNSAFE
+  - code: FINISH_UNSAFE
     condition:
       en: Exact target, user ownership, consumer disposition or durable retention is unresolved.
   - code: DECLARED_DEPENDENCY_UNMET
@@ -209,31 +208,31 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
-    "Can exactly the selected scope be retired while every live consumer and
+    "Can exactly the selected scope be finished while every live consumer and
     every required piece of evidence or custody survives?"
   whenNeeded:
     - End-of-life handling for a selected business/resource scope; also explicitly authorized exact removals (registered worktrees, artifact directories).
     - When consumers must be proven unaffected before a record leaves service.
   whenNot:
-    - Default retirement is metadata, not recursive deletion - removal is a separately authorized exact-target act.
+    - Default finish is metadata, not recursive deletion - removal is a separately authorized exact-target act.
     - Never deletes where ownership, consumer disposition or retention is unresolved; no opportunistic adjacent cleanup.
   consumes:
     - Target; inventory (nodes, refs, git worktrees, dirty state); authority (selected removals + retention policy); repo.
   produces:
-    - Retirement metadata on the node; evidence: retirement-inventory, retention-check, removal (when selected).
+    - End-of-life metadata on the node; evidence: finish-inventory, retention-check, removal (when selected).
   failureModes:
-    - RETIREMENT_UNSAFE, DECLARED_DEPENDENCY_UNMET (declared blockers).
+    - FINISH_UNSAFE, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [operations]
   phase: [operate, post-implementation]
-  intent: [retire, remove, scope, end-of-life]
+  intent: [finish, remove, scope, end-of-life]
   prerequisites: ["the scope exists"]
   riskHints: [destructive-gate]

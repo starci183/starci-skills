@@ -1,7 +1,6 @@
 schema: starci/workspace-routing@1
 source: The StarCi host directory containing this .claude checkout and its paired sibling .workspaces route registry.
 registry: .workspaces/projects/<project>/work.json
-sourceLayoutContract: null  # retired with the old source-layout schema — the rules below are the live contract
 rules:
   - .claude and .workspaces are a host pair. They are not default directories for every source;
     routed frontend and ordinary source repositories must not receive copies.
@@ -38,11 +37,10 @@ rules:
   - Validate the resolved backend/frontend pair against this routing contract before workflow
     effects. A failed source binding never authorizes creating a second runtime, stack or
     workspace in frontend.
-  - Before new workspace creation, inspect backend storage for legacy `.work`/`.starci` names —
-    they mean migration-required, mixed names mean conflict. Coordinate migration before new
-    planning, never create a parallel tree; never relocate active records or rewrite approvals
-    silently. New runtime state lives in `.starciwork/runtime.sqlite` only — nothing is written
-    under `.starciwork/_local/`.
+  - Before new workspace creation, inspect backend storage for `.work`/`.starci` names —
+    they mean the tree predates `.starciwork`, mixed names mean conflict. Coordinate the rename
+    before new planning, never create a parallel tree; never relocate active records or rewrite
+    approvals silently. New runtime state lives in `.starciwork/runtime.sqlite` only.
 bindingShape:
   schema: starci/workspace-binding@1
   project: project identifier

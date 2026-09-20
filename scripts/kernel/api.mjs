@@ -7,17 +7,18 @@
 //
 //   survey   --repo <path> --workflow <id>
 //   status   --repo <path> --workflow <id>
+//   hierarchy --repo <path> --workflow <id>
 //   plan     --repo <path> --workflow <id> --file <plan.json>
 //   enqueue  --repo <path> --workflow <id> --op <opId> --paths <csv> [--title <t>] [--risk <r>]
 //   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
-//   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> --report <path>
-//   report   --repo <path> --job <job_id> --outcome <done|partial|failed|ask|blocked> --report <file>
+//   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
+//   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
 //   check    --repo <path> --job <job_id> (--checks '<json>' | --checks-file <path>)
 //   consume-report --repo <path> --job <job_id>
 //   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>]
-//   retire   --repo <path> --workflow <id>
+//   finish   --repo <path> --workflow <id>
 //
 // Every read prints a JSON-safe result; every write runs inside one
 // ledger.transaction. --json gives the machine form; without it each command
@@ -31,7 +32,12 @@ import {
   newToken, SETTLED_JOB_STATUSES, reserveTwoPhase,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { spawnAgent, buildSpawnCommand } from '../agent/lib.mjs';
+import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
+import { renderReportBlock } from './report-render.mjs';
+import {
+  spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
+  awaitSubmission, awaitAttestation,
+} from '../agent/lib.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 // Pool selection + launch-model resolution (pinned lane: scripts/agent/models.mjs)
 // and the Orca orchestration wrappers the managed-agent dispatch path drives —
@@ -52,31 +58,33 @@ const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
 // The kernel-agent status vocabulary. enqueue writes 'queued' — the durable
-// engine's own word (ledger.enqueueJob); 'pending' was the spec's alias and is
-// still accepted as dispatchable for jobs written before the op-IPC wiring
-// (reserveOpLeases bridges it forward at admission, since reserveTwoPhase only
-// takes 'queued'). settle writes the engine's settled vocabulary:
-// 'succeeded'|'failed' — so liveRow/retireWorkflow see settled jobs correctly.
+// engine's own word (ledger.enqueueJob). settle writes the engine's settled
+// vocabulary: 'succeeded'|'failed'.
 const SETTLED = [...new Set([...SETTLED_JOB_STATUSES, 'effect_unknown'])];
-const DISPATCHABLE = ['pending', 'queued', 'leased', 'running', 'answering'];
+const DISPATCHABLE = ['queued', 'leased', 'running', 'answering'];
 // The reports.outcome vocabulary — the worker-facing half of the op IPC.
-const REPORT_OUTCOMES = ['done', 'partial', 'failed', 'ask', 'blocked'];
+const REPORT_OUTCOMES = OP_REPORT_OUTCOMES;
+// Kernel verdict ↔ worker outcome consistency at settle: a pass settles a
+// `done` report, a fail settles `failed|partial`, a blocked verdict settles
+// `blocked|ask` (an unanswered ask is a blocked op).
+const VERDICT_OUTCOMES = { pass: ['done'], fail: ['failed', 'partial'], blocked: ['blocked', 'ask'] };
 
 const usage = (code) => {
   console.error(`use: node scripts/kernel/api.mjs <cmd> --repo <path> [...] [--json]
   survey   --workflow <id>
   status   --workflow <id>
+  hierarchy --workflow <id>
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--title <t>] [--risk <r>]
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  settle   --job <job_id> --verdict <pass|fail|blocked> --report <path>
-  report   --job <job_id> --outcome <done|partial|failed|ask|blocked> --report <file>
+  settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
+  report   --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>]
-  retire   --workflow <id>`);
+  finish   --workflow <id>`);
   process.exit(code);
 };
 
@@ -111,6 +119,78 @@ const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHER
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
 const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
+const AGENT_HIERARCHY_SCHEMA = 'starci/agent-hierarchy@1';
+const workflowNodeId = (workflowId) => `workflow:${workflowId}`;
+const kernelNodeId = (workflowId) => `agent:kernel:${workflowId}`;
+const operationNodeId = (jobId) => `agent:operation:${jobId}`;
+const profileProviderCache = new Map();
+const providerForProfile = (profile) => {
+  if (!profile) return null;
+  if (profileProviderCache.has(profile)) return profileProviderCache.get(profile);
+  const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${profile}.yaml`);
+  let provider = null;
+  try { provider = fs.existsSync(file) ? (parseYaml(fs.readFileSync(file, 'utf8'))?.provider ?? null) : null; } catch { provider = null; }
+  profileProviderCache.set(profile, provider);
+  return provider;
+};
+
+// Durable semantic hierarchy. Terminal tabs and pane ancestry are placement
+// hints only; workflow/job identities survive terminal recreation, Kernel
+// restarts and operation retries.
+const hierarchyNodeOf = (row) => {
+  const payload = jobPayloadOf(row);
+  const stored = payload.hierarchy ?? {};
+  const kernel = row.kind === 'kernel';
+  const managed = payload.managed ?? {};
+  const orca = payload.orca ?? {};
+  const route = payload.route ?? {};
+  const runtime = stored.runtime ?? {};
+  const profile = runtime.profile ?? route.profile ?? payload.model ?? null;
+  const profileProvider = providerForProfile(profile);
+  return {
+    nodeId: stored.nodeId ?? (kernel ? kernelNodeId(row.workflow_id) : operationNodeId(row.job_id)),
+    parentNodeId: stored.parentNodeId ?? (kernel ? workflowNodeId(row.workflow_id) : kernelNodeId(row.workflow_id)),
+    role: stored.role ?? (kernel ? 'kernel' : 'operation'),
+    workflowId: row.workflow_id,
+    jobId: row.job_id,
+    opId: row.op_id ?? payload.opId ?? null,
+    attempt: row.attempt,
+    generation: row.generation,
+    status: row.status,
+    runtime: {
+      host: runtime.host ?? route.host ?? 'orca',
+      agent: runtime.agent ?? route.agent ?? payload.agent ?? payload.provider ?? profileProvider ?? null,
+      provider: runtime.provider ?? payload.provider ?? route.agent ?? profileProvider ?? null,
+      model: runtime.model ?? route.model ?? payload.modelId ?? null,
+      profile,
+      runtimePool: runtime.runtimePool ?? route.runtimePool ?? payload.model ?? null,
+      runId: runtime.runId ?? managed.runId ?? orca.runId ?? null,
+      taskId: runtime.taskId ?? managed.taskId ?? orca.taskId ?? null,
+      dispatchId: runtime.dispatchId ?? managed.dispatchId ?? orca.dispatchId ?? null,
+      terminalHandle: runtime.terminalHandle ?? managed.agentTerminalHandle ?? orca.agentTerminalHandle
+        ?? (kernel ? row.worker_id : (managed.dispatchId ? null : row.worker_id)) ?? null,
+    },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
+
+const agentHierarchyOf = (db, workflowId) => {
+  const workflow = getWorkflow(db, workflowId);
+  if (!workflow) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const root = {
+    nodeId: workflowNodeId(workflowId), role: 'workflow', workflowId,
+    title: workflow.title ?? workflowId, status: workflow.phase ?? null,
+    generation: workflow.generation ?? 0,
+  };
+  const nodes = db.prepare('SELECT * FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(workflowId).map(hierarchyNodeOf);
+  const edges = nodes.map((node) => ({
+    parentNodeId: node.parentNodeId,
+    childNodeId: node.nodeId,
+    relation: node.role === 'kernel' ? 'coordinates' : 'dispatches',
+  }));
+  return { schema: AGENT_HIERARCHY_SCHEMA, workflow: root, nodes, edges };
+};
 
 /* ---------------------------------------------------------------- survey */
 function cmdSurvey(ledger, args) {
@@ -160,10 +240,30 @@ function cmdStatus(ledger, args) {
   for (const r of db.prepare('SELECT status,count(*) n FROM jobs WHERE workflow_id=? GROUP BY status ORDER BY status').all(workflowId)) byStatus[r.status] = r.n;
   const leases = db.prepare('SELECT resource_key,job_id,expires_at FROM leases WHERE workflow_id=? AND expires_at>? ORDER BY resource_key').all(workflowId, now);
   const inboxPending = db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND status='pending'").get(workflowId).n;
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, jobs: byStatus, activeLeases: leases, inboxPending };
+  // Filed op reports — the kernel's exact "is it done and with what result"
+  // signal. dispatch_id binds the worker handle (falling back to the job id),
+  // so each row joins back to its job either way.
+  const reports = db.prepare(
+    `SELECT r.dispatch_id, r.op_id, r.attempt, r.outcome, r.consumed_at, r.created_at,
+            COALESCE(jw.job_id, jj.job_id) AS job_id
+     FROM reports r
+     LEFT JOIN jobs jw ON jw.workflow_id=r.workflow_id AND jw.worker_id=r.dispatch_id
+     LEFT JOIN jobs jj ON jj.workflow_id=r.workflow_id AND jj.job_id=r.dispatch_id
+     WHERE r.workflow_id=? ORDER BY r.created_at`
+  ).all(workflowId);
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, jobs: byStatus, activeLeases: leases, inboxPending, reports };
   emit(out,
-    `${workflowId} phase=${out.phase ?? '-'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending}`,
+    `${workflowId} phase=${out.phase ?? '-'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${reports.filter((r) => !r.consumed_at).length} unconsumed)`,
     args.json);
+}
+
+/* ------------------------------------------------------------- hierarchy */
+function cmdHierarchy(ledger, args) {
+  const out = { ok: true, ...agentHierarchyOf(ledger.db, args.workflow) };
+  emit(out, [
+    `${out.workflow.nodeId} (${out.workflow.status ?? '-'})`,
+    ...out.nodes.map((node) => `  ${node.parentNodeId} -> ${node.nodeId} [${node.status}]${node.runtime.model ? ` ${node.runtime.agent ?? '-'} / ${node.runtime.model}` : ''}`),
+  ].join('\n'), args.json);
 }
 
 /* ------------------------------------------------------------------ plan */
@@ -225,11 +325,26 @@ function cmdEnqueue(ledger, args) {
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
-  const payload = { opId: args.op, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null };
+  let payload;
 
   let job;
   ledger.transaction(() => {
     const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, args.op).a;
+    payload = {
+      opId: args.op, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
+      hierarchy: {
+        schema: AGENT_HIERARCHY_SCHEMA,
+        nodeId: operationNodeId(jobId),
+        parentNodeId: kernelNodeId(workflowId),
+        role: 'operation',
+        workflowId,
+        jobId,
+        opId: args.op,
+        attempt,
+        generation: wf.generation ?? 0,
+        runtime: { host: 'orca' },
+      },
+    };
     db.prepare(
       "INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,?, 'op','op',?, 'queued',?,?)"
     ).run(jobId, workflowId, args.op, attempt, wf.generation ?? 0, JSON.stringify(payload), now, now);
@@ -281,7 +396,7 @@ async function cmdRoute(ledger, args) {
   if (!kind) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
 
   const gj = goalJsonOf(latestGoal(db, job.workflow_id));
-  const goalBias = gj.routing_bias ?? gj.routingBias ?? {};
+  const goalBias = gj.routing_bias ?? {};
   const bias = {
     prefer: [...new Set([...csvList(args.prefer), ...csvList(goalBias.prefer)])],
     avoid: [...new Set([...csvList(args.avoid), ...csvList(goalBias.avoid)])],
@@ -329,10 +444,26 @@ async function cmdRoute(ledger, args) {
     model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? null,
     routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [],
   };
+  const selectedRuntime = Object.entries(pools)
+    .find(([poolId, runtime]) => (runtime?.target ?? poolId) === decision.target)?.[1] ?? null;
   ledger.transaction(() => {
     const now = Date.now();
+    const hierarchy = payload.hierarchy ?? {
+      schema: AGENT_HIERARCHY_SCHEMA,
+      nodeId: operationNodeId(jobId), parentNodeId: kernelNodeId(job.workflow_id),
+      role: 'operation', workflowId: job.workflow_id, jobId, opId: kind,
+      attempt: job.attempt, generation: job.generation,
+    };
+    hierarchy.runtime = {
+      ...(hierarchy.runtime ?? {}), host: 'orca',
+      agent: selectedRuntime?.provider ?? null,
+      provider: selectedRuntime?.provider ?? null,
+      model: decided.modelId,
+      profile: decided.model,
+      runtimePool: decided.model,
+    };
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...payload, ...decided, difficulty }), now, jobId);
+      .run(JSON.stringify({ ...payload, ...decided, difficulty, hierarchy }), now, jobId);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'route-decided', payload: { kind, difficulty, bias, ...decided },
@@ -384,9 +515,12 @@ const buildPrompt = (packet, jobId, repo) => [
   `owned_paths: ${[...new Set(packet.context.owned_paths.map((p) => p.path))].join(', ') || '(per brief write-ceiling)'}`,
   `   only owned_paths may be modified; anything else is out of scope.`,
   `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
-  `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory. Markers and reports are the truth.`,
-  `reporting: when you finish you MUST file your report into the ledger — write report.json on disk (the artifact) AND record the durable signal:`,
-  `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --outcome <done|partial|failed|ask|blocked> --report <path-to-report.json>`,
+  `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory.`,
+  `reporting: your answer is a starci/op-report@1 JSON envelope — report.json on disk (the artifact) filed into the ledger (the durable signal):`,
+  `  {"outcome":"done|partial|failed|ask|blocked","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
+  `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
+  `  run/task/dispatch/from are stamped by the api — never write another job's identity. File it:`,
+  `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repo} --job ${jobId}`,
   `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${VERDICT_CONTRACT}`,
   `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
@@ -438,10 +572,9 @@ const opLeaseRequests = (payload) => [...new Set((payload.owned_paths ?? [])
 
 const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS } = {}) => {
   const db = ledger.db, leases = opLeaseRequests(payload);
-  // Declare the path resources, then bridge jobs enqueued before 'queued'
-  // became the written status — reserveTwoPhase only admits 'queued'.
+  // Declare the path resources; reserveTwoPhase then flips the job
+  // queued → leased with its fencing token — it only admits 'queued'.
   ledger.transaction(() => {
-    db.prepare("UPDATE jobs SET status='queued', updated_at=? WHERE job_id=? AND status='pending'").run(Date.now(), job.job_id);
     for (const l of leases) db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,1)').run(l.resourceKey);
   });
   let machine;
@@ -506,11 +639,17 @@ function cmdDispatch(ledger, args, repo) {
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
     ? [
+      { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow; later operations reuse it' },
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
       { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', composedCommand ?? '<command>', '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle>', '--screen', '--json'], note: 'readiness — verify the prompt landed before sending' },
-      { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle>', '--text', '<prompt>', '--enter', '--json'] },
+      { step: 'dispatch', argv: ['orchestration', 'dispatch', '--task', '<operation-task-id>', '--to', '<handle>', '--from', '<kernel-terminal>', '--run', '<workflow-run-id>', '--return-preamble', '--json'] },
+      { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle>', '--text', '<dispatch-preamble>', '--enter', '--json'] },
     ]
-    : [{ step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--json'], note: `${model.target} is a managed agent (launch.orca.kind=${model.kind}) — needs an orchestration Task id, not terminal create` }];
+    : [
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
+      { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--model', '<resolved-model-id>', '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'], note: `${model.target} is a managed agent; worker-start owns dispatch/injection and must not be followed by orchestration dispatch` },
+    ];
 
   if (!args.spawn) {
     const out = {
@@ -566,14 +705,33 @@ function cmdDispatch(ledger, args, repo) {
   if (model.kind !== 'command-terminal') {
     throw Object.assign(new Error(`spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`), { code: 'managed-agent' });
   }
-  // spawnAgent assembles the command: the profile's launch.orca.command carries
-  // model+tuning flags; the provider adapter card injects its credential/env
-  // prefix (devin ACP strip, qwen key unset) and requirements automatically.
-  // The pipeline runs create → readiness → deliver → submission → attestation;
-  // an attestation rejection means the terminal died after consuming the
-  // prompt (observed: qwen 401 Invalid API-key) — spawnAgent already closed it.
+  // Command-terminal agents still join the workflow's Orca Run. Create the
+  // operation Task first, then create/attest the terminal, dispatch that Task
+  // to the exact handle and submit Orca's returned preamble. This gives Qwen
+  // and Devin the same durable Kernel → Task → Dispatch hierarchy as managed
+  // workers without pretending Orca owns their process lifecycle.
+  const run = ensureWorkflowRun(ledger, { job, jobId, payload });
+  if (!run.ok) {
+    rejectDispatch(ledger, job, jobId, op, model, { step: 'run-create', error: run.error });
+    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, step: 'run-create', error: run.error },
+      `dispatch REJECTED for ${jobId} (run-create): ${run.error}`, args.json);
+    process.exit(1);
+  }
+  const { runId, kernelHandle } = run;
+  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle });
+  if (!task?.ok || !task.taskId) {
+    const error = task?.error ?? 'task-create returned no taskId';
+    rejectDispatch(ledger, job, jobId, op, model, { step: 'task-create', error });
+    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, step: 'task-create', error },
+      `dispatch REJECTED for ${jobId} (task-create): ${error}`, args.json);
+    process.exit(1);
+  }
+  const taskId = task.taskId;
+
+  // spawnAgent assembles the command and attests readiness/model, but prompt
+  // delivery is delayed until Orca returns this Task's authoritative preamble.
   const spawned = spawnAgent({
-    provider: model.provider, worktree, title, prompt,
+    provider: model.provider, worktree, title, prompt: null,
     command: model.command, dispatchId: jobId,
   });
   const handle = spawned.terminal ?? null;
@@ -594,30 +752,72 @@ function cmdDispatch(ledger, args, repo) {
     process.exit(1);
   }
 
-  if (spawn.ok) {
-    const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
-    ledger.transaction(() => {
-      const now = Date.now();
-      // The durable kernel→worker contract lands BEFORE the running mark —
-      // the row is the dispatch authority, the terminal text is not.
-      fileContract(db, {
-        job, op, dispatchId: handle, markdown: contractMarkdown, now,
-        context: { packet, worktree, model: model.target, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing } },
-      });
-      db.prepare("UPDATE jobs SET status='running', worker_id=?, updated_at=? WHERE job_id=?").run(handle, now, jobId);
-      transitionQueuedToRunning(ledger, job.workflow_id, now);
-      ledger.appendEvent({
-        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-        kind: 'op-dispatched',
-        payload: { op, terminal: handle, model: model.target, worktree, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
-      });
-    });
+  let artifact = null;
+  const rejectCommand = ({ step, error = null, signal = null, dispatchId = null, incident = false }) => {
+    cleanupDeliveryArtifact(artifact);
+    if (handle) terminalClose({ terminal: handle });
+    rejectDispatch(ledger, job, jobId, op, model, { step, signal, error, terminal: dispatchId ?? handle, incident });
+    const reason = signal ?? error ?? `command-terminal dispatch failed at ${step}`;
+    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, step, dispatchId, terminal: handle, error: reason },
+      `dispatch REJECTED for ${jobId} (${step}): ${reason}`, args.json);
+    process.exit(1);
+  };
+
+  const dispatched = orchDispatch({ task: taskId, to: handle, from: kernelHandle, run: runId });
+  const dispatchId = dispatched?.dispatchId ?? null;
+  if (!dispatched?.ok || !dispatchId || !dispatched.preamble) {
+    return rejectCommand({ step: 'dispatch', dispatchId, error: dispatched?.error ?? 'orchestration dispatch returned no dispatch/preamble' });
   }
-  const out = { ok: spawn.ok, jobId, spawned: spawn.ok, handle, packet, spawn };
-  emit(out, spawn.ok
-    ? `dispatched ${jobId} — [Op] ${op} on ${handle} (${model.target}); job status=running`
-    : `spawn FAILED for ${jobId}: ${spawned.error ?? 'unknown'}`, args.json);
-  if (!spawn.ok) process.exit(1);
+  const adapter = spawnCmd?.adapter;
+  const sent = deliverPrompt({ handle, adapter, prompt: dispatched.preamble, worktree, dispatchId });
+  artifact = sent.artifact ?? null;
+  if (!sent.ok) return rejectCommand({ step: 'send', dispatchId, error: sent.error ?? 'terminal send failed' });
+  const submitted = awaitSubmission(handle, adapter);
+  if (!submitted.ok) return rejectCommand({ step: 'submission', dispatchId, error: submitted.reason });
+  const attested = awaitAttestation(handle, adapter);
+  if (!attested.ok) return rejectCommand({ step: 'attestation', dispatchId, signal: attested.signal, error: `attestation rejected: ${attested.signal}`, incident: true });
+  cleanupDeliveryArtifact(artifact);
+  artifact = null;
+  const shown = dispatchShow({ task: taskId, from: kernelHandle });
+  if (!shown?.ok || shown.assigneeHandle !== handle) {
+    return rejectCommand({ step: 'dispatch-show', dispatchId, error: shown?.error ?? `expected assignee ${handle}, got ${shown?.assigneeHandle ?? 'none'}` });
+  }
+
+  payload.orca = { ...(payload.orca ?? {}), runId, taskId, dispatchId, agentTerminalHandle: handle };
+  payload.agent = model.provider;
+  payload.provider = model.provider;
+  payload.model = model.target;
+  payload.hierarchy = payload.hierarchy ?? {
+    schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
+    parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
+    workflowId: job.workflow_id, jobId, opId: op,
+    attempt: job.attempt, generation: job.generation,
+  };
+  payload.hierarchy.runtime = {
+    ...(payload.hierarchy.runtime ?? {}), host: 'orca',
+    agent: model.provider, provider: model.provider,
+    model: payload.modelId ?? null, profile: model.target, runtimePool: model.target,
+    runId, taskId, dispatchId, terminalHandle: handle,
+  };
+  const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
+  ledger.transaction(() => {
+    const now = Date.now();
+    fileContract(db, {
+      job, op, dispatchId, markdown: contractMarkdown, now,
+      context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing } },
+    });
+    db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, updated_at=? WHERE job_id=?")
+      .run(handle, JSON.stringify(payload), now, jobId);
+    transitionQueuedToRunning(ledger, job.workflow_id, now);
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'op-dispatched',
+      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+    });
+  });
+  const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
+    orca: { runId, taskId, dispatchId, assignee: handle } };
+  emit(out, `dispatched ${jobId} — [Op] ${op} on ${handle} (${model.target}, dispatch ${dispatchId}); job status=running`, args.json);
 }
 
 // launch.orca.kind values that take the managed pipeline — profiles write
@@ -625,8 +825,68 @@ function cmdDispatch(ledger, args, repo) {
 // orchestration worker-start, never terminal create.
 const MANAGED_KINDS = ['native-managed-agent', 'managed-agent'];
 
-// Managed-agent dispatch: run → task → worker-start → return-preamble →
-// worker-show attestation. Any step's failure takes the same dispatch-rejected
+// One Orca Run per workflow, bound to the dedicated Kernel terminal. The Run
+// is created lazily by the first operation so Kernel boot stays independent of
+// launcher context. Every operation Task in that Run is therefore a semantic
+// child of the Kernel coordinator even when its terminal is a peer tab in the
+// same worktree.
+function ensureWorkflowRun(ledger, { job, jobId, payload }) {
+  const db = ledger.db;
+  const kernelJob = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(job.workflow_id);
+  const kernelPayload = jobPayloadOf(kernelJob);
+  let runId = kernelPayload?.orca?.runId ?? payload?.orca?.runId ?? null;
+  if (runId) return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };
+
+  const wf = getWorkflow(db, job.workflow_id);
+  const objective = `[Workflow] ${job.workflow_id} — ${wf?.title ?? job.workflow_id}`;
+  const created = runCreate({ objective, from: kernelJob?.worker_id ?? null });
+  if (!created?.ok || !created.runId) {
+    return { ok: false, error: created?.error ?? 'run-create returned no runId', kernelJob, kernelPayload };
+  }
+  runId = created.runId;
+  ledger.transaction(() => {
+    const now = Date.now();
+    if (kernelJob) {
+      kernelPayload.orca = { ...(kernelPayload.orca ?? {}), runId };
+      kernelPayload.hierarchy = kernelPayload.hierarchy ?? {
+        schema: AGENT_HIERARCHY_SCHEMA, nodeId: kernelNodeId(job.workflow_id),
+        parentNodeId: workflowNodeId(job.workflow_id), role: 'kernel',
+        workflowId: job.workflow_id, jobId: kernelJob.job_id,
+        attempt: kernelJob.attempt, generation: kernelJob.generation,
+      };
+      kernelPayload.hierarchy.runtime = { ...(kernelPayload.hierarchy.runtime ?? {}), host: 'orca', runId };
+      db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(kernelPayload), now, kernelJob.job_id);
+    } else {
+      payload.orca = { ...(payload.orca ?? {}), runId };
+      payload.hierarchy = payload.hierarchy ?? {
+        schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
+        parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
+        workflowId: job.workflow_id, jobId, opId: job.op_id,
+        attempt: job.attempt, generation: job.generation,
+      };
+      payload.hierarchy.runtime = { ...(payload.hierarchy.runtime ?? {}), host: 'orca', runId };
+      db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(payload), now, jobId);
+    }
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'run-created', payload: { runId, coordinatorTerminal: kernelJob?.worker_id ?? null, storedOn: kernelJob ? kernelJob.job_id : jobId },
+    });
+  });
+  return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };
+}
+
+const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle }) =>
+  taskCreate({
+    run: runId,
+    spec: prompt,
+    taskTitle: `${op} #${attempt}`,
+    displayName: title,
+    from: kernelHandle,
+  });
+
+// Managed-agent dispatch: run → task → worker-start → worker-show attestation.
+// worker-start owns Task injection; issuing orchestration dispatch again would
+// double-dispatch the Task and is a typed runtime rejection. Any step's failure takes the same dispatch-rejected
 // path as a dead terminal spawn (job failed + event + infra-provider incident
 // on attestation failures) — after stopping and releasing whatever partial
 // Dispatch the attempt created, per calls.yaml settle-dispatch.
@@ -663,38 +923,14 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     effort = resolved.effort ?? null;
   }
 
-  // 2. Run id — the workflow's Orca run lives on the kernel job's payload
-  // (kind='kernel', same workflow). The first managed dispatch creates it and
-  // persists it back there (onto this job's payload when no kernel job exists).
-  const kernelJob = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(job.workflow_id);
-  const kernelPayload = jobPayloadOf(kernelJob);
-  let runId = kernelPayload?.orca?.runId ?? payload?.orca?.runId ?? null;
-  if (!runId) {
-    const wf = getWorkflow(db, job.workflow_id);
-    const created = runCreate({ objective: wf?.title ?? job.workflow_id, from: kernelJob?.worker_id ?? null });
-    if (!created?.ok || !created.runId) {
-      return reject({ step: 'run-create', error: created?.error ?? 'run-create returned no runId' });
-    }
-    runId = created.runId;
-    ledger.transaction(() => {
-      const now = Date.now();
-      if (kernelJob) {
-        kernelPayload.orca = { ...(kernelPayload.orca ?? {}), runId };
-        db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(kernelPayload), now, kernelJob.job_id);
-      } else {
-        payload.orca = { ...(payload.orca ?? {}), runId };
-        db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(payload), now, jobId);
-      }
-      ledger.appendEvent({
-        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-        kind: 'run-created', payload: { runId, storedOn: kernelJob ? kernelJob.job_id : jobId },
-      });
-    });
-  }
+  // 2. Run id — one workflow Run, with the Kernel terminal as coordinator.
+  const run = ensureWorkflowRun(ledger, { job, jobId, payload });
+  if (!run.ok) return reject({ step: 'run-create', error: run.error });
+  const { runId, kernelHandle } = run;
 
   // 3. Task — the operation's contract. The spec is the rendered packet prompt
   // (the same text a command-terminal launch would have sent).
-  const task = taskCreate({ run: runId, spec: prompt, taskTitle: op, displayName: title, from: kernelJob?.worker_id ?? null });
+  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle });
   if (!task?.ok || !task.taskId) {
     return reject({ step: 'task-create', error: task?.error ?? 'task-create returned no taskId' });
   }
@@ -703,7 +939,10 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   // 4. worker-start — outcome ok means a ready worker (calls.yaml classify:
   // exit 0 + result.state 'ready'). Anything else, including a receipt with no
   // dispatchId, is a rejection; a partial effect is stopped + released.
-  const started = workerStart({ task: taskId, worktree, agent: model.provider, model: modelId, effort, run: runId });
+  const started = workerStart({
+    task: taskId, worktree, agent: model.provider, model: modelId, effort,
+    displayName: title, run: runId, from: kernelHandle,
+  });
   const dispatchId = started?.dispatchId ?? null;
   if (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId) {
     return reject({
@@ -712,15 +951,11 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     });
   }
 
-  // 5. Deliver the packet — return-preamble dispatch to the assignee the
-  // worker-start bound (dispatch-show is the read of record for the handle).
-  const shown = dispatchShow({ task: taskId });
+  // 5. Resolve the exact terminal worker-start already dispatched. This is a
+  // read/attestation step, not a second orchestration dispatch.
+  const shown = dispatchShow({ task: taskId, from: kernelHandle });
   if (!shown?.ok || !shown.assigneeHandle) {
     return reject({ step: 'dispatch-show', error: shown?.error ?? 'dispatch-show returned no assignee', dispatchId });
-  }
-  const delivered = orchDispatch({ task: taskId, to: shown.assigneeHandle, run: runId });
-  if (!delivered?.ok) {
-    return reject({ step: 'dispatch', error: delivered?.error ?? 'orchestration dispatch failed', dispatchId });
   }
 
   // 6. Attest — the worker's EFFECTIVE agent/model must equal what routing
@@ -739,10 +974,24 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
 
   // 7. Running — worker_id is the Dispatch id (managed workers have no
   // command-terminal handle); payload.managed carries the Orca ids settle needs.
-  payload.managed = { runId, taskId, dispatchId };
+  payload.managed = { runId, taskId, dispatchId, agentTerminalHandle: shown.assigneeHandle };
+  payload.agent = model.provider;
+  payload.provider = model.provider;
   payload.model = model.target;
   payload.modelId = modelId;
   payload.effort = effort;
+  payload.hierarchy = payload.hierarchy ?? {
+    schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
+    parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
+    workflowId: job.workflow_id, jobId, opId: op,
+    attempt: job.attempt, generation: job.generation,
+  };
+  payload.hierarchy.runtime = {
+    ...(payload.hierarchy.runtime ?? {}), host: 'orca',
+    agent: model.provider, provider: model.provider, model: modelId,
+    profile: model.target, runtimePool: model.target,
+    runId, taskId, dispatchId, terminalHandle: shown.assigneeHandle,
+  };
   const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
   ledger.transaction(() => {
     const now = Date.now();
@@ -750,7 +999,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     // the dispatch authority; dispatch_id is the worker's Dispatch id.
     fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
-      context: { packet, worktree, model: model.target, managed: { runId, taskId, dispatchId }, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing } },
+      context: { packet, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing } },
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, updated_at=? WHERE job_id=?")
       .run(dispatchId, JSON.stringify(payload), now, jobId);
@@ -758,12 +1007,13 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, taskId, modelId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = {
     ok: true, jobId, spawned: true, dispatchId, packet,
-    managed: { runId, taskId, dispatchId, modelId, effort, assignee: shown.assigneeHandle, preamble: delivered.preamble ?? null },
+    managed: { runId, taskId, dispatchId, modelId, effort, assignee: shown.assigneeHandle },
+    hierarchy: payload.hierarchy,
   };
   emit(out, `dispatched ${jobId} — [Op] ${op} managed worker ${dispatchId} (${model.target}/${modelId}, task ${taskId}); job status=running`, args.json);
 }
@@ -771,10 +1021,12 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
 /* ---------------------------------------------------------------- settle */
 function cmdSettle(ledger, args, repo) {
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
-  const reportAbs = [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p));
-  if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
+  const reportAbs = args.report
+    ? [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p))
+    : null;
+  if (args.report && !reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
 
-  let machineRefs = [], released = 0, job, reportsConsumed = false;
+  let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   ledger.transaction(() => {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -787,6 +1039,30 @@ function cmdSettle(ledger, args, repo) {
     payload.settledAt = Date.now();
     const status = verdict === 'pass' ? 'succeeded' : 'failed';
     const result = { verdict, report: reportAbs, at: payload.settledAt };
+    // The worker's claim is the reports row keyed by its dispatch. No row yet:
+    // a --report file that is itself a valid op-report@1 envelope is filed on
+    // the job's behalf first; anything else (markdown, absent — a dead worker)
+    // settles on the kernel's verdict alone.
+    const dispatchId = reportDispatchIdOf(job);
+    const row = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, dispatchId);
+    let envelope = null;
+    if (row) envelope = parseJson(row.report_json);
+    if (!row && reportAbs) {
+      const ownedPaths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths, identity: reportIdentityOf(job) });
+      if (valid.ok) {
+        envelope = valid.report;
+        db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
+          .run(job.workflow_id, dispatchId, jobOpOf(job), job.attempt, job.generation, envelope.outcome, JSON.stringify(envelope), job.worker_id ?? null, payload.settledAt);
+      }
+    }
+    if (envelope?.outcome) {
+      reportOutcome = envelope.outcome;
+      reportFiled = true;
+      if (!VERDICT_OUTCOMES[verdict].includes(envelope.outcome)) {
+        throw Object.assign(new Error(`verdict '${verdict}' cannot settle a report of outcome '${envelope.outcome}'`), { code: 'verdict-outcome-mismatch' });
+      }
+    }
     machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
     released = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
     db.prepare('UPDATE jobs SET status=?, payload_json=?, result_json=?, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?')
@@ -795,10 +1071,10 @@ function cmdSettle(ledger, args, repo) {
     // worker→kernel signal is spent exactly once (dispatch_id is the worker's
     // handle, falling back to the job id when none was ever bound).
     reportsConsumed = db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL')
-      .run(payload.settledAt, job.workflow_id, job.worker_id ?? jobId).changes > 0;
+      .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(job)).changes > 0;
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'op-settled', payload: { verdict, status, report: reportAbs, leasesReleased: released, machineRefs, reportsConsumed },
+      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, leasesReleased: released, machineRefs, reportsConsumed },
     });
   });
 
@@ -814,8 +1090,8 @@ function cmdSettle(ledger, args, repo) {
   }
 
   // The settled op's Orca terminal is released with its leases — worker_id is
-  // the handle (observed defect: settled op terminals stayed alive). Runs
-  // after the settled state is written; a close failure never un-settles.
+  // the handle. Runs after the settled state is written; a close failure
+  // never un-settles.
   // Managed jobs hold a Dispatch id in worker_id, not a terminal handle — they
   // take the worker-stop/-release path below, never terminal close.
   const managed = jobPayloadOf(job)?.managed ?? null;
@@ -853,7 +1129,7 @@ function cmdSettle(ledger, args, repo) {
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, report: reportAbs, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, ...(managedWorker ? { managedWorker } : {}) };
+  const out = { ok: true, jobId, verdict, status, report: reportAbs, reportFiled, reportOutcome, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, ...(managedWorker ? { managedWorker } : {}) };
   emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
 }
 
@@ -875,19 +1151,19 @@ function cmdIncident(ledger, args) {
   emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}: ${args.detail}`, args.json);
 }
 
-/* ---------------------------------------------------------------- retire */
-function cmdRetire(ledger, args) {
+/* ---------------------------------------------------------------- finish */
+function cmdFinish(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   const already = wf.phase === 'finished';
 
-  // Retire ≠ erase: goals/events/jobs history stays. Phase flag + inbox close
+  // Finish ≠ erase: goals/events/jobs history stays. Phase flag + inbox close
   // + one event are the whole mutation.
   let closed = 0;
   ledger.transaction(() => {
     db.prepare("UPDATE workflows SET phase='finished', finished_json=?, updated_at=? WHERE workflow_id=?")
-      .run(JSON.stringify({ retiredAt: now, by: 'kernel-api' }), now, workflowId);
+      .run(JSON.stringify({ finishedAt: now, by: 'kernel-api' }), now, workflowId);
     closed = db.prepare("UPDATE inbox SET status='done', applied_at=? WHERE workflow_id=? AND status NOT IN ('done','applied')").run(now, workflowId).changes;
     ledger.appendEvent({
       workflowId, entityType: 'workflow', entityId: workflowId,
@@ -909,9 +1185,13 @@ const resolveJob = (db, jobId) => {
   return job;
 };
 const jobOpOf = (job) => job.op_id ?? jobPayloadOf(job).opId ?? null;
-// reports.dispatch_id is the worker's handle — terminal handle or managed
-// Dispatch id — falling back to the job id when the job was never bound.
-const reportDispatchIdOf = (job) => job.worker_id ?? job.job_id;
+// reports.dispatch_id is the orchestration Dispatch id whenever one exists.
+// command-terminal jobs retain their terminal handle in worker_id for exact
+// cleanup, so payload.orca.dispatchId is the durable report identity.
+const reportDispatchIdOf = (job) => {
+  const payload = jobPayloadOf(job);
+  return payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? job.worker_id ?? job.job_id;
+};
 const parseAttempt = (v) => {
   if (v == null) return null;
   const n = Number(v);
@@ -920,27 +1200,46 @@ const parseAttempt = (v) => {
 };
 
 /* --------------------------------------------------------------- report */
-// Worker-facing: the report.json file stays the artifact, this upsert is the
-// durable signal (UNIQUE(workflow_id,dispatch_id) makes a re-file idempotent).
+// Worker-facing: the report file is a starci/op-report@1 JSON envelope — the
+// row is the durable signal and the ONLY shape the kernel reads
+// (UNIQUE(workflow_id,dispatch_id) makes a re-file idempotent). The api stamps
+// run/task/dispatch/from from the job row; a file that claims a different
+// identity is report-invalid. --outcome is optional consistency: when given it
+// must equal the envelope's outcome.
+const reportIdentityOf = (job) => {
+  const payload = jobPayloadOf(job);
+  return { run: payload.managed?.runId ?? payload.orca?.runId ?? null,
+           task: payload.managed?.taskId ?? payload.orca?.taskId ?? null,
+           dispatch: reportDispatchIdOf(job), from: job.job_id };
+};
 function cmdReport(ledger, args, repo) {
   const db = ledger.db, job = resolveJob(db, args.job);
+  const jobPayload = jobPayloadOf(job);
   const reportAbs = [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p));
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
-  const body = fs.readFileSync(reportAbs, 'utf8');
-  const parsed = parseJson(body);
-  const reportJson = parsed === null ? body : JSON.stringify(parsed);
-  const dispatchId = reportDispatchIdOf(job), op = jobOpOf(job);
+  const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
+  const ownedPaths = (jobPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(job) });
+  if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
+  const report = valid.report;
+  if (args.outcome && args.outcome !== report.outcome)
+    throw Object.assign(new Error(`--outcome '${args.outcome}' contradicts the envelope's '${report.outcome}'`), { code: 'outcome-mismatch' });
+  const dispatchId = report.dispatch, op = jobOpOf(job);
   ledger.transaction(() => {
     const now = Date.now();
     db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(job.workflow_id, dispatchId, op, job.attempt, job.generation, args.outcome, reportJson, job.worker_id ?? null, now);
+      .run(job.workflow_id, dispatchId, op, job.attempt, job.generation, report.outcome, JSON.stringify(report),
+        jobPayload.managed?.agentTerminalHandle ?? jobPayload.orca?.agentTerminalHandle ?? job.worker_id ?? null, now);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: args.outcome, report: reportAbs },
+      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: reportAbs },
     });
   });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: args.outcome, report: reportAbs };
-  emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${args.outcome})`, args.json);
+  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: reportAbs };
+  emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})`, args.json);
+  // The op terminal gets the canonical human rendering of the filed row — the
+  // reports row is the truth, this block is its projection.
+  console.log(renderReportBlock(report));
 }
 
 /* ---------------------------------------------------------- op-contract */
@@ -1027,18 +1326,18 @@ async function main() {
   const repo = path.resolve(args.repo ?? process.cwd());
 
   const required = {
-    survey: ['workflow'], status: ['workflow'], plan: ['workflow', 'file'],
+    survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', 'paths'], route: ['job'], dispatch: ['job'],
-    settle: ['job', 'verdict', 'report'],
-    report: ['job', 'outcome', 'report'], 'op-contract': [], check: ['job'],
+    settle: ['job', 'verdict'],
+    report: ['job', 'report'], 'op-contract': [], check: ['job'],
     'consume-report': ['job'],
     incident: ['workflow', 'kind', 'detail'],
-    retire: ['workflow'],
+    finish: ['workflow'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
   if (cmd === 'settle' && !['pass', 'fail', 'blocked'].includes(args.verdict)) need(false, `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
-  if (cmd === 'report') need(REPORT_OUTCOMES.includes(args.outcome), `report --outcome must be ${REPORT_OUTCOMES.join('|')}, got '${args.outcome}'`);
+  if (cmd === 'report' && args.outcome) need(REPORT_OUTCOMES.includes(args.outcome), `report --outcome must be ${REPORT_OUTCOMES.join('|')}, got '${args.outcome}'`);
   if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
 
@@ -1053,6 +1352,7 @@ async function main() {
     switch (cmd) {
       case 'survey': return cmdSurvey(ledger, args);
       case 'status': return cmdStatus(ledger, args);
+      case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args);
       case 'route': return await cmdRoute(ledger, args);
@@ -1063,7 +1363,7 @@ async function main() {
       case 'check': return cmdCheck(ledger, args, repo);
       case 'consume-report': return cmdConsumeReport(ledger, args);
       case 'incident': return cmdIncident(ledger, args);
-      case 'retire': return cmdRetire(ledger, args);
+      case 'finish': return cmdFinish(ledger, args);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

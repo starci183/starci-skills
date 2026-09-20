@@ -4,15 +4,15 @@ These are the shared rules for StarCi projects: TypeScript, Next.js frontend and
 
 ## Authority and load order
 
-1. Read `knowledge/architecture-rules.json`: the common invariants and their applicability.
-2. Read `knowledge/coding-reference.json`: resolve the applicable Nest/Next profile and actual installed versions/APIs.
+1. Read `knowledge/architecture-rules.yaml`: the common invariants and their applicability.
+2. Read `knowledge/coding-reference.yaml`: resolve the applicable Nest/Next profile and actual installed versions/APIs.
 3. Read only the relevant FE/BE topics and the [portable source profile](portable-source-architecture.md). The [backend profile](backend-source-pattern.md) specializes these rules for Nest/TypeScript.
 4. Resolve actual repository roots, manifests, aliases, exports and source/Work bindings. Record the selected profile/mapping in the existing design or implementation brief; no new approval ceremony or duplicate checklist is required.
 5. Run every applicable code-pattern script and the behavioral verification required by the selected effects. Code-rule coverage must be complete for a code-conformance pass. Missing/disabled/unavailable checkers are failures of coverage; an agent cannot substitute visual review for a required code check. Agents use the design guidance to review semantic choices and edge cases, retaining required executable behavior evidence.
 
-The executable inventory is `model/code-patterns.yaml`, described in [code-pattern enforcement](code-pattern-enforcement.md). The [design catalog](design-pattern-catalog.md) supplies conditional semantic decisions and failure cases. The common-rule mappings below point to applicable checks; they do not replace the profile's complete inventory or make a missing checker pass.
+The executable inventory is `modules/models/code-patterns.yaml`, described in [code-pattern enforcement](code-pattern-enforcement.md). The [design catalog](design-pattern-catalog.md) supplies conditional semantic decisions and failure cases. The common-rule mappings below point to applicable checks; they do not replace the profile's complete inventory or make a missing checker pass.
 
-User authority and accepted product SRS/SDS retain their own roles. Common rules do not invent product requirements. A project incompatibility is a concrete design/profile conflict to resolve under current authority, not permission to weaken a checker or silently change requirements. A profile may specialize a rule; it may not reverse an invariant. Runtime installation does not migrate existing source, Work, approvals or evidence.
+User authority and accepted product SRS/SDS retain their own roles. Common rules do not invent product requirements. A project incompatibility is a concrete design/profile conflict to resolve under current authority, not permission to weaken a checker or silently change requirements. A profile may specialize a rule; it may not reverse an invariant. Runtime installation does not modify existing source, Work, approvals or evidence.
 
 ## Mandatory invariants
 
@@ -64,7 +64,7 @@ Similarly:
 - Frontend composition follows the owner's patterns and verified Grammar public APIs. Never invent package exports or component props.
 - A monorepo package and a separate source repository preserve the same owner graph. Paths, build tools and package managers are discovered/configured rather than assumed.
 
-Existing historical Academy topics remain useful only within their stated profile. Current common rules and adopted boundary rules take precedence over historical wrapper, global-registration, deep-import or test-shape examples. A conflicting installed lint rule must be migrated coherently within authorized scope; turning it off to claim conformance is not a migration.
+Existing historical Academy topics remain useful only within their stated profile. Current common rules and adopted boundary rules take precedence over historical wrapper, global-registration, deep-import or test-shape examples. A conflicting installed lint rule must be updated coherently within authorized scope; turning it off to claim conformance is not an update.
 
 ## Rule authoring and enforcement contract
 

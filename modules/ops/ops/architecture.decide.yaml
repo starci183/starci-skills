@@ -1,12 +1,11 @@
-# modules/ops/ops/architecture.decide.yaml - TINKLE-1 pure-yaml port of .claude/ops/architecture.decide/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
-# Related source files (not ported): ops/architecture.decide/specification.yaml 
+# modules/ops/ops/architecture.decide.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: architecture.decide
 goal:
-  en: Design a flow-led, source-independent architecture with logical components, contracts, state
-    paths, recovery and planned verification.
+  en: Design the selected implementation slice with the minimum complete flow-led, source-independent
+    architecture needed to build safely, then refine it from concrete implementation evidence.
 nodeKinds:
   - architecture
 completionProfile: architecture
@@ -18,14 +17,14 @@ graphPolicy:
   dispatch: never
 reads:
   - id: design-patterns
-    path: knowledge/architecture-rules.json + knowledge/design-patterns.json + docs/design-pattern-catalog.md
+    path: knowledge/architecture-rules.yaml + knowledge/design-patterns.yaml + docs/design-pattern-catalog.md
     purpose:
       en: Apply the fixed NestJS/Next.js ownership standard and select only patterns triggered by the
         actual scenario. Review transaction/effect boundaries, state authority, concurrency, failure
         and recovery using primary sources where needed. Record decisions in the existing design;
         pattern names and source observations are not behavioral proof or authority for code edits.
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -77,13 +76,16 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: .starciwork/<business>/architecture/{overview,sds/**}/index.yaml
     fields:
       - schema
+      - state
+      - activity
+      - blockers
+      - investigation.contextDigest
       - refs
       - dependsOn
       - assertions
@@ -97,7 +99,16 @@ writes:
         declared starci/sds-*@1 section const. Parent indexes carry only
         starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
         interfaces without repository roles, paths, symbols, signatures, source status or revision
-        evidence. Write all canonical SDS content in English, including natural-language prose,
+        evidence. For a not-yet-implemented slice, author the smallest design-complete map that settles
+        logical ownership, contracts, authority, durable state/effects, material failure/recovery and
+        planned verification. Do not invent endpoints, tables, event topics, retry counts, file layouts
+        or private helpers unless an accepted constraint makes that logical contract necessary. Keep the
+        selected SDS leaves at state todo while implementation, test/E2E or UAT evidence is still open;
+        activity records investigating, implementing or verifying without inventing another lifecycle state.
+        A passing architecture.decide job means the current SDS seed is reviewed and usable downstream, not
+        that the Work leaf or feature is done. Link reviewed todo SRS inputs through refs; do not place them
+        in dependsOn, because the durable business.decide-to-architecture.decide job edge owns execution order.
+        Write all canonical SDS content in English, including natural-language prose,
         YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
         types, operation names and source symbols. Preserve Business and shared
         design through stable IDs and exact owning Work refs.
@@ -134,7 +145,9 @@ steps:
       en: "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read
         modules/schemas/spec/sds-map.schema.yaml and docs/architecture-sds.md. Survey relevant source,
         configuration and installed APIs; then independently record retain, extend, correct, replace
-        or add decisions with rationale, impact and migration. Prescribe logical responsibilities,
+        or add decisions with rationale, impact and migration. Bound the design to the next selected
+        implementation slice and separate material logical decisions from reversible source-local
+        mechanics. Prescribe logical responsibilities,
         interfaces, state and failure behavior. Repository/file/symbol/call mappings and actual
         revisions or proof belong to Implementation. Never write product
         code or present a design constraint as deployed behavior."
@@ -161,11 +174,12 @@ steps:
       - node
     action:
       en: Design runtime scenarios referencing canonical SRS flow IDs. Every step names its component,
-        target repo/path/symbol/signature, callers/callees, contracts, authorization, data,
+        logical operation, callers/receivers, contracts, authorization, data,
         transaction/state decision, return path, failure outcome, recovery and planned verification.
-        Do not attach source status or revision evidence. Cover significant architectural
+        Repository roles, paths, symbols and signatures belong to the later Implementation mapping;
+        do not attach source status or revision evidence. Cover significant architectural
         differences, including response loss, concurrency, duplicates, ordering, partial success and
-        cancellation where relevant.
+        cancellation only where they can materially change this slice's contract or recovery.
   - reads:
       - target
       - business
@@ -215,9 +229,12 @@ steps:
       en: Validate recursive layout and exact canonical SRS/shared-design references. Review full
         requirement/flow/acceptance coverage across the owning architecture scope. Resolve material
         design blockers before pass. Confirm that all canonical SDS content is English; schema
-        validity alone is not review.
-        Implementation owns source mapping and test execution. Done means current reviewed design,
-        never an edit lock.
+        validity alone is not review. Bind the reviewed current semantic context in
+        investigation.contextDigest, leave selected SDS leaves state todo, and return activity to idle.
+        Open material issues stay in blockers[] and produce partial or blocked. Implementation owns source
+        mapping and test execution. The op job may settle done because this bounded design job completed,
+        but Work state done is reserved for final reconciliation of current SRS, SDS, code, test/E2E and
+        UAT evidence at one revision.
   - reads:
       - target
       - business
@@ -238,13 +255,18 @@ steps:
         question.kind decision, one numbered option per reading with what each costs and who it affects, and
         one recommendation; the kernel writes that decision record for the owner and carries the work on the
         recommendation until they answer. Never ask for anything else. A gap that is really a missing or
-        self-contradictory REQUIREMENT is blocked with srs-gap back to the business record that owns it."
+        self-contradictory REQUIREMENT is blocked with srs-gap back to the business record that owns it.
+        Classify implementation feedback before revising: a source-local name, file layout, private helper,
+        library call or other reversible detail stays in Implementation; a proven gap in logical ownership,
+        contract, authority, durable state/effect, compatibility, material failure/recovery or quality
+        mechanism belongs here. Revise only that bounded design delta, preserve valid unrelated design and
+        invalidate only affected downstream proof."
 proofs:
   - id: binding
     requirement:
       en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done. Legacy specification@3 remains a readable compatibility input, never new
+        done. The specification@3 record remains a readable input for existing trees, never new
         authoring output.
   - id: implementability
     requirement:
@@ -253,7 +275,8 @@ proofs:
         implementation slice. The Implementation handoff names the required source-mapping scope
         without putting repository paths or symbols into SDS. Proactively walk realistic
         main, alternative, failure and edge cases and relevant constraints; foreseeable material cases
-        and core choices must not be left for implementers to invent. Explicit unknowns and subsequent
+        and core choices must not be left for implementers to invent. Reversible source-local mechanics
+        and unrelated future capabilities are not SDS gaps. Explicit consequential unknowns and subsequent
         empirical refinement do not require theoretical perfection before coding.
   - id: impact-security-coverage
     requirement:
@@ -302,7 +325,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "What is the source-independent technical design (SDS) that realizes the
@@ -310,16 +333,17 @@ business:
     decisions, verification - precise enough that a builder needs no invention?"
   whenNeeded:
     - >-
-      After accepted business scope (SRS) exists and before backend/frontend
-      implementation of that scope (goal + primary-mode name).
+      After an accepted SRS slice exists, author the minimum design-complete SDS needed before
+      backend/frontend implementation of that selected slice.
     - >-
       Mid-implementation when an implement op proves an SDS gap - repair mode via
       the declared implementation.architecture secondary calls of
-      backend.implement/interface.implement (role-authority.mjs), or the
+      backend.implement/interface.implement, or the
       architecture.revise secondary request contract.
   whenNot:
-    - Not to write product code or map repository paths/symbols - Implementation resolves source and freezes write ceilings (architecture-to-implement handoff invariant, basic-ops.mjs).
+    - Not to write product code or map repository paths/symbols - Implementation resolves source and freezes write ceilings (architecture-to-implement handoff invariant).
     - Not to re-decide business intent - an srs-gap blocks back to business.decide, never gets resolved silently.
+    - Not for speculative completeness, unrelated future capabilities or reversible source-local mechanics that Implementation can choose without changing a logical contract.
     - Not proof a deployment/recovery ran - design records plan verification; drills are a separate operation's proof.
     - INFERRED: not for invented design - every change must trace to a requested SDS change or reported gap (revision-block protocol).
   consumes:
@@ -329,14 +353,14 @@ business:
     - Optionally: matrix cell request, runtime execution profile.
   produces:
     - architecture overview + SDS leaves (sds-flow/component/contract/data-model/quality/deployment/decision/verification records) under features/<feature>/architecture/ - written only by this op's architecture mode.
-    - decisionLog entries on every revision; completion.review on the architecture node; E/ matrix job-result when selected.
-    - Downstream: frozen design authority consumed by interface.implement/backend.implement write ceilings and secondary responses.
+    - Current investigation.contextDigest on reviewed todo leaves; decisionLog entries on every revision; E/ matrix job-result when selected.
+    - Downstream: current reviewed design authority consumed by interface.implement/backend.implement write ceilings and secondary responses; concrete evidence may open a bounded revised version.
   failureModes:
     - OWNERSHIP_UNKNOWN / COMPATIBILITY_UNKNOWN / DECLARED_DEPENDENCY_UNMET (declared blockers).
     - Revision without decisionLog + revision block is a defect; money/authority/customer-data reading changes without an owner decision record is a defect (output checks).
-    - sds-obsolete reported findings are conflicts, not authority to retire records unilaterally.
+    - Reported stale-record findings are conflicts to resolve, not authority to remove records unilaterally.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.
@@ -344,4 +368,4 @@ route:
   nodeKinds: [architecture]
   phase: [decide, pre-implementation]
   intent: [architecture, sds, design, contracts, decide]
-  prerequisites: ["business.decide done (accepted SRS)"]
+  prerequisites: ["business.decide settled pass (reviewed SRS seed; Work leaves remain todo)"]

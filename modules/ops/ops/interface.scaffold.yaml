@@ -189,5 +189,5 @@ route:
   nodeKinds: [implementation]
   phase: [implement]
   intent: [scaffold, greenfield, new-source, frontend, interface, bootstrap, init]
-  prerequisites: ["architecture.decide done", "grammar bound", "repository bound"]
+  prerequisites: ["architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)", "grammar bound", "repository bound"]
   riskHints: [source-edits, new-tree]

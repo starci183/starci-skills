@@ -1,7 +1,6 @@
-# modules/ops/ops/interface.implement.yaml - TINKLE-1 pure-yaml port of .claude/ops/interface.implement/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
-# Related source files (not ported): ops/interface.implement/secondary.yaml 
+# modules/ops/ops/interface.implement.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: interface.implement
 goal:
@@ -24,7 +23,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -38,7 +37,9 @@ reads:
       en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
         and validator freshness. This consumer op requires its target node to exist. An absent
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here."
+        create a target or invent its acceptance/graph here. Current reviewed todo SRS/SDS inputs are
+        semantic refs; the settled-pass decide jobs are the execution prerequisites. Do not require those
+        specification refs to be Work state done before implementation."
   - id: business
     path: .starciwork/<business>/business/**/index.yaml
     purpose:
@@ -63,7 +64,7 @@ reads:
         request; no invented repository or fact citation. Source implementation still needs an
         actual selected writable repository.
   - id: knowledge
-    path: knowledge/INDEX.json + applicable FE, UI composition/presentation/proof and selected family
+    path: knowledge/index.yaml + applicable FE, UI composition/presentation/proof and selected family
       topics
     purpose:
       en: "Read applicable English knowledge topics and record actual rule IDs/cases and their scope.
@@ -126,8 +127,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
   - id: assetSources
     path: all input draws + selected repository assets/design system + authorized source assets
     purpose:
@@ -293,7 +293,13 @@ steps:
         selected frontend source. Draw is only needed when the request requires a new visual
         decision; do not add a mandatory planning predecessor. Resolve the execution profile and
         actual tool availability before selecting instruments; this does not switch the
-        model/runtime or spawn workers. CALL POINT (discovery, implementation or verification):
+        model/runtime or spawn workers. Classify implementation feedback before stopping: routes,
+        component file layout, private state helpers, library calls and other reversible source-local
+        choices are owned here and do not require SRS/SDS expansion. A changed observable outcome,
+        actor permission, money or customer-data rule is an srs-gap; a missing logical owner, contract,
+        authority boundary, durable state/effect, compatibility, material failure/recovery or quality
+        mechanism is an sds-gap. Report a spec-affecting finding with the exact observed fact, affected
+        semantic IDs and smallest proposed delta; never edit SRS/SDS in this op. CALL POINT (discovery, implementation or verification):
         when an observed source/API/render/test fact proves the accepted SDS technically missing or
         contradictory while business and SRS stay unchanged, read interface.implement/secondary.json
         and request its implementation.architecture role. The frontend worker waits and never edits
@@ -589,7 +595,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Does the implemented frontend render the accepted draws + business and
@@ -601,6 +607,7 @@ business:
   whenNot:
     - Not for SDS edits - a proven design gap delegates to the architecture.decide secondary (implementation.architecture role).
     - Business/SRS/scope changes are blocked for the owner, never implemented by interpretation.
+    - Reversible source-local choices are implementation work, not automatic SRS/SDS gaps; do not stop merely because the upstream specs omit a private mechanism.
     - Backend repair beyond the bounded interface.backend secondary is a separate job; never claims a UAT pass.
   consumes:
     - The draws array (every image actually opened), design map, SRS/SDS contracts; repo + knowledge rules; environment; declared assetSources.
@@ -610,7 +617,7 @@ business:
     - DRAWS_INPUT_INVALID, DRAWS_MAPPING_UNRESOLVED, DRAW_KNOWLEDGE_CONFLICT, DESIGN_INPUT_UNRESOLVED, UI_CONTRACT_UNKNOWN, RUNTIME_UNVERIFIED, DECLARED_DEPENDENCY_UNMET (declared blockers).
     - INFERRED: every secondary response must be awaited and re-verified before the final response - a resumed run cannot inherit stale render proof.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.
@@ -618,5 +625,5 @@ route:
   nodeKinds: [implementation]
   phase: [implement, implementation]
   intent: [implement, frontend, ui, code]
-  prerequisites: ["interface.draw done", "architecture.decide done"]
+  prerequisites: ["interface.draw done", "architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)"]
   riskHints: [source-edits]

@@ -9,9 +9,14 @@ export function runCreate({ objective, from }) {
   const argv = ['orchestration', 'run-create', '--objective', objective, '--json'];
   if (from) argv.push('--from', from);
   const r = orcaRun(argv);
-  const result = jsonOf(r.stdout)?.result ?? null;
+  const envelope = jsonOf(r.stdout);
+  const result = envelope?.result ?? null;
   const runId = result?.run?.id ?? null;
-  return { ok: r.status === 0 && Boolean(runId), runId, result, error: r.error ?? r.stderr };
+  const receiptError = typeof envelope?.error === 'string'
+    ? envelope.error
+    : (envelope?.error ? JSON.stringify(envelope.error) : null);
+  const error = r.error || r.stderr || receiptError || (!runId ? r.stdout : null);
+  return { ok: r.status === 0 && Boolean(runId), runId, result, error };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('run-create.mjs')) {

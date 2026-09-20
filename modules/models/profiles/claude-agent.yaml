@@ -6,7 +6,7 @@
 target: claude-agent            # registry.json: targets.claude-agent
 provider: claude                # runtimes.json: runtimes.claude-agent.provider
 runtime: claude                 # registry.json: targets.claude-agent.runtime
-schema: starci/module-model-profile@1  # TINKLE-local document kind; no upstream schema
+schema: starci/module-model-profile@1  # module-local document kind; no upstream schema
 
 identity:
   requestedModel: claude-opus-5   # registry.json targets.claude-agent.requestedModel

@@ -72,7 +72,7 @@ catalogNotes: |-
   `ship`, `fix-first`, `blocked` are assessment conclusions, not node states or release authority.
   No receipt, response table, dispatcher or copied verdict is required between ops.
   Missing evidence, failing required assertions and unapproved scope cannot become `done`.
-  One topic is retired here. `UI-1` to `UI-11` were a scorecard file that named the lenses and pointed
+  One topic is closed here. `UI-1` to `UI-11` were a scorecard file that named the lenses and pointed
   at the rules that owned them; every one of them now resolves to the topic rule that survived, and
   those numbers are never reused. The mapping is recorded in
   [the consolidation evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.json).
@@ -82,8 +82,8 @@ guidance:
       `A11Y-1`, `FOCUS-5`, and the other `PREFIX-n` names are stable ordinal addresses within their topic.
       The number is not a severity or a conformance level. A topic may publish a non-contiguous series:
       `contrast.json` publishes only `COLOR-3`, `COLOR-5` and `CONTRAST-1`, because the other numbers of that
-      prefix were retired with the topic they came from and are never reused, and the whole `UI-` prefix is
-      retired.
+      prefix were closed with the topic they came from and are never reused, and the whole `UI-` prefix is
+      closed.
       Every rule carries its heading, one line naming what the rule governs, and one table:
       | Case | When | Observe |
       | --- | --- | --- |

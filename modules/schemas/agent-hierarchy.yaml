@@ -1,0 +1,51 @@
+schema: starci/agent-hierarchy-schema@1
+describes: starci/agent-hierarchy@1
+module: scripts/kernel/api.mjs
+
+purpose: >-
+  Define the durable semantic tree exposed by `api hierarchy`: one workflow owns one
+  long-lived Kernel coordinator, and that Kernel dispatches stable operation agents.
+  This projection is the ownership source for future Orca UI rendering; tab order,
+  pane nesting and terminal titles are runtime presentation only.
+
+identity:
+  workflowNode: workflow:<workflow_id>
+  kernelNode: agent:kernel:<workflow_id>
+  operationNode: agent:operation:<job_id>
+
+shape:
+  workflow:
+    required: [id, title, status]
+  nodes:
+    required: [id, kind, role, label, status]
+    kinds: [kernel, operation]
+    roles:
+      kernel: coordinator
+      operation: worker
+    runtime:
+      optional:
+        - host
+        - agent
+        - provider
+        - model
+        - profile
+        - runtimePool
+        - runId
+        - taskId
+        - dispatchId
+        - terminalHandle
+  edges:
+    required: [from, to, relation]
+    relations:
+      - coordinates
+      - dispatches
+
+rules:
+  - One workflow has one stable Kernel node; a Kernel restart changes attempt/runtime fields, not node identity.
+  - Every operation job has one stable Op node parented directly by the workflow Kernel.
+  - Parent identity MUST NOT be inferred from terminal titles, tab order, paneKey or parentPaneKey.
+  - The Kernel terminal is the Orca Run coordinator and is the explicit from-terminal for child Tasks and Dispatches.
+  - A managed worker-start owns its Dispatch lifecycle; the runtime MUST NOT dispatch the same Task a second time.
+  - A command-terminal worker still receives a Run, Task and Dispatch; its terminal handle is retained for cleanup while its Dispatch id keys reports and contracts.
+  - agent, provider, model, profile and runtimePool are separate fields and MUST NOT be used as aliases for one another.
+  - The hierarchy command is read-only and may derive missing provider metadata for legacy jobs from their persisted profile.

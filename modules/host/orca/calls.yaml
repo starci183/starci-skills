@@ -1,6 +1,6 @@
 schema: starci/orca-calls@1
 provider: orca
-api: api.json
+api: api.yaml
 purpose: |-
   One typed contract per Orca call that StarCi may issue. The wrappers in scripts/api/orca/ —
   one .mjs file per verb over the shared lib.mjs — build argv only from these entries, verify
@@ -98,7 +98,7 @@ calls:
       on: [windows, macos, linux]
     receipt: [result.dispatchId]
     creates: dispatch
-    note: "--from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle. Observed 1.4.188 receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1."
+    note: "--from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle. Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1."
     classify:
       - when: {exitCode: 0, path: result.state, in: [ready]}
         outcome: ok
@@ -159,7 +159,7 @@ calls:
     flags: [dispatch]
     required: [dispatch]
     receipt: [result.dispatchId, result.state]
-    note: Observed 1.4.188 receipt has result.state (worker state after the stop), result.alreadySettled, result.processAction and result.mutation.requestId.
+    note: Receipt carries result.state (worker state after the stop), result.alreadySettled, result.processAction and result.mutation.requestId.
     classify:
       - when: {path: result.state, in: [stop_unknown, unverifiable, outcome_unknown]}
         outcome: unknown
@@ -185,7 +185,7 @@ calls:
     flags: [dispatch]
     required: [dispatch]
     receipt: [result.dispatchId, result.state]
-    note: Observed 1.4.188 receipt has result.state (released, already_released, retained, release_pending, release_unknown), result.reason and result.processAction.
+    note: Receipt carries result.state (released, already_released, retained, release_pending, release_unknown), result.reason and result.processAction.
     classify:
       - when: {exitCode: 0, path: result.state, in: [released, already_released]}
         outcome: ok

@@ -1,6 +1,6 @@
 {
   "name": "starci",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "description": "StarCi: kernel-agent workflow runtime — one long-lived kernel agent per workflow, one ephemeral op agent per job, a sqlite ledger as the only state.",
   "license": "MIT",
   "type": "module",

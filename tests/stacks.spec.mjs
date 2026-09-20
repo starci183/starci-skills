@@ -51,11 +51,6 @@ test('accepts a static vps inventory using the swarm runtime',t=>{
   const f=fixture(t,'vps'),result=f.check();assert.equal(result.ok,true,result.errors.map(x=>`${x.code}:${x.path}`).join(','));
 });
 
-test('rejects a legacy @1 schema id with a named finding instead of a bare mismatch',t=>{
-  const f=fixture(t);f.manifest.schema='starci/application-stacks@1';f.write();
-  const codes=f.check().errors.map(x=>x.code);assert.ok(codes.includes('STACKS_SCHEMA_LEGACY_ID'),codes.join(','));assert.equal(codes.includes('schema-invalid'),false);
-});
-
 test('rejects an unrecognized schema id',t=>{
   const f=fixture(t);f.manifest.schema='starci/other';f.write();assert.ok(f.check().errors.some(x=>x.code==='schema-invalid'));
 });
@@ -207,22 +202,3 @@ test('the stacks check reports malformed input and never echoes secret material'
   assert.equal(result.ok,false);assert.equal(JSON.stringify(result).includes(sentinel),false);assert.deepEqual(fs.readFileSync(f.modelFile),before);
 });
 
-test('a legacy .stacks-only tree without .starcistacks fires STACKS_LEGACY_DIRECTORY instead of crashing or being accepted silently',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-legacy-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  fs.mkdirSync(path.join(root,'.stacks','dev'),{recursive:true});
-  fs.writeFileSync(path.join(root,'.stacks','application-stacks.yaml'),stringifyYaml(manifestFor()));
-  const modelFile=path.join(root,'rendered.json');fs.writeFileSync(modelFile,JSON.stringify({}));
-  assert.doesNotThrow(()=>checkApplicationStacks({repoRoot:root,environment:'dev',deploymentModelFile:modelFile}));
-  const result=checkApplicationStacks({repoRoot:root,environment:'dev',deploymentModelFile:modelFile});
-  assert.equal(result.ok,false);
-  const finding=result.errors.find(x=>x.code==='STACKS_LEGACY_DIRECTORY');
-  assert.ok(finding,result.errors.map(x=>x.code).join(','));
-  assert.match(finding.message,/renamed.*\.starcistacks/);
-});
-
-test('a .starcistacks tree never fires STACKS_LEGACY_DIRECTORY, including when a leftover .stacks directory also exists',t=>{
-  const f=fixture(t);
-  assert.equal(f.check().errors.some(x=>x.code==='STACKS_LEGACY_DIRECTORY'),false);
-  fs.mkdirSync(path.join(f.root,'.stacks'),{recursive:true});
-  assert.equal(f.check().errors.some(x=>x.code==='STACKS_LEGACY_DIRECTORY'),false);
-});

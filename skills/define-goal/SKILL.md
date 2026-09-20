@@ -40,7 +40,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    (`bias.mjs "<text>"` is the no-agent fallback — automation calling
    define-goal without anyone to read intent.) Keep the JSON — it persists as
    `routing_bias` in the goal payload at the persist step so the kernel router
-   honors the owner's provider preference without re-parsing prose. An empty
+   honors the owner's agent preference without re-parsing prose. An empty
    `{prefer:[], avoid:[]}` is a valid result — persist it anyway.
 3. **Assess BEFORE drafting** — cold-scan the bound project repositories:
 
@@ -95,9 +95,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
   answer "what's queued" from memory; query `inbox`/`goals`/`jobs`. The ledger
   is written ONLY by the executables above (and at runtime by
   `node .claude/scripts/kernel/api.mjs <cmd>`, the kernel agent's single
-  mutation surface). Never open or edit the sqlite file by hand, and never
-  stage goal/dispatch artifacts under `.starciwork/_local/` — that tree holds
-  no runtime state.
+  mutation surface). Never open or edit the sqlite file by hand.
 - The op chain is derived by `route-plan.mjs` — underivable chains are shown as such,
   never guessed.
 - Do NOT start the workflow here. Starting is the `start-kernel` skill, which

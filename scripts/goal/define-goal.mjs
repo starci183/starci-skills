@@ -93,7 +93,7 @@ function assessRepos(repos) {
 // estimate is a class guess, and the table says so ('estimate is cold').
 const COLD_MINUTES = { easy: 15, medium: 45, hard: 90 };
 const COLD_TIER = [
-  [/^(provision\.ask|request\.analyze|scope\.define|scope\.retire|decision\.prepare|goal\.revise|workspace\.manage)$/, 'easy'],
+  [/^(provision\.ask|request\.analyze|scope\.define|scope\.finish|decision\.prepare|goal\.revise|workspace\.manage)$/, 'easy'],
   [/\.(implement|refactor)$|^(integration|e2e|uat)\.verify$|^(release\.deliver|runtime\.operate)$/, 'hard'],
 ];
 const tierOf = op => COLD_TIER.find(([re]) => re.test(op))?.[1] ?? 'medium';
@@ -115,11 +115,10 @@ const assessLineFor = (data, repoPath) => {
 
 // Owner config surface for the plan table: <skillRoot>/config.yaml (gitignored,
 // seeded from config.example.yaml by the installer) decides the kernel seat
-// before route-model does — precedence: --provider flag > config.yaml kernel
-// pin > route-model. The plan shows the pin so the owner sees the config
-// effect before ok; the kernel itself resolves it at start-workflow time.
-// engine/config.mjs is the canonical loader once it exists; a missing or
-// unparsable file is reported, never fatal.
+// before route-model does — precedence: --agent (legacy --provider) flag >
+// config.yaml kernel pin > route-model. The plan shows the pin so the owner
+// sees the config effect before ok; the kernel itself resolves it at
+// start-workflow time. A missing or unparsable file is reported, never fatal.
 function ownerConfigSummary() {
   const file = path.join(skillRoot, 'config.yaml');
   if (!fs.existsSync(file)) return { file: null };
@@ -128,7 +127,7 @@ function ownerConfigSummary() {
     return {
       file: path.relative(skillRoot, file),
       kernel: {
-        provider: c?.kernel?.provider ?? null,
+        agent: c?.kernel?.agent ?? c?.kernel?.provider ?? null,
         model: c?.kernel?.model ?? null,
         effort: c?.kernel?.effort ?? c?.effort ?? null,
       },
@@ -169,7 +168,7 @@ if (planOnly) {
     assessNote: assess.available ? undefined : assess.note,
     willWrite,
     config: ownerConfigSummary(),
-    kernelRoute: 'precedence: --provider flag > config.yaml kernel pin > route-model',
+    kernelRoute: 'precedence: --agent (legacy --provider) flag > config.yaml kernel pin > route-model',
     ledger: ledgerFileFor(repo),
   };
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
@@ -192,10 +191,10 @@ if (planOnly) {
   }
   const cfg = out.config;
   lines.push(cfg.file
-    ? `CONFIG: ${cfg.file} — kernel pin provider=${cfg.kernel?.provider ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'} effort=${cfg.kernel?.effort ?? '(default)'}`
+    ? `CONFIG: ${cfg.file} — kernel pin agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'} effort=${cfg.kernel?.effort ?? '(default)'}`
       + (cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : '')
       + (cfg.error ? ` (${cfg.error})` : '')
-    : 'CONFIG: no config.yaml — kernel route falls to --provider flag or route-model');
+    : 'CONFIG: no config.yaml — kernel route falls to --agent flag or route-model');
   lines.push('WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
   lines.push(`ledger: ${out.ledger}`, 're-run without --plan to persist');
   console.log(lines.join('\n'));

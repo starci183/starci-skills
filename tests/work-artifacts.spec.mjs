@@ -207,7 +207,7 @@ test('severity discipline: a declared INPUT that is not on disk is suspected, ne
   assert.equal(found.refuse.filter(line => line.includes('gone.png')).join('\n'), '');
 });
 
-test('a superseded direction is checked for its path only - its digest describes the bytes it retired', () => {
+test('a superseded direction is checked for its path only - its digest describes the bytes it replaced', () => {
   const bytes = pngBytes();
   const found = findingsFor({
     ...UI_RECORD('    - {path: assets/one.png, role: direction}\n'),

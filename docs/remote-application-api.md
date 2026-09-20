@@ -63,7 +63,7 @@ its npm script on the developer host and consumes the AgentOS Controlplane API.
 The `agentos-controlplane` application runs as a workload inside the existing Tino
 K3s cluster. This is a project example, not a Tino dependency for other projects.
 The selected Nivo declaration must reconcile that placement with any older local
-Compose controlplane entry; publishing this runtime does not perform that migration.
+Compose controlplane entry; publishing this runtime does not perform that relocation.
 
 ## Primary references
 

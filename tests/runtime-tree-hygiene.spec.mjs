@@ -28,7 +28,7 @@ test('no spec builds its fixture inside the runtime tree',()=>{
 });
 
 test('the runtime tree carries no fixture leftovers',()=>{
-  // `_local` under the runtime's own `.starciwork` means a kernel resolved this directory as a Work root.
+  // `.starciwork` in the runtime's own root means a kernel resolved this directory as a Work root.
   const strays=fs.readdirSync(runtimeRoot,{withFileTypes:true})
     .filter(entry=>entry.isDirectory())
     .map(entry=>entry.name)

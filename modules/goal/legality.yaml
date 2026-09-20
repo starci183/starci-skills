@@ -1,6 +1,5 @@
 # ============================================================================
-# TINKLE-8 — modules/goal/legality.yaml
-# Brief: ex-testing/briefs/tinkle/tinkle-8.md.
+# modules/goal/legality.yaml
 #
 # The legality rules a proposed op chain must satisfy and the kernel enforces.
 # FIVE families: forward edges (ordering), backward edges (the cấn cấn
@@ -12,14 +11,20 @@
 #
 # Sources:
 #   modules/models/kinds.yaml                — lanes (step order), routes (outcome/blocker routing), kind catalog
-#   the kernel agent           — designGate, cutOpFor, disjoint child ops
-#   engine/ledger-db.mjs         — disjoint(allowlists), inScope, candidates — path-prefix coverage + ownership
-#   modules/goal/legality.yaml         — allowlistsOverlap
-#   the kernel agent         — extensions.work3.reconciliation (reference/conflict/new)
-#   the kernel agent           — reviseGoal, validateGoalRevision, propagateInvalidation, applyWorkflowAmendment
-#   the kernel agent          — STOP_KINDS, PROVISION_KINDS, openOwnerAsk (pause vs provisional)
-#   the kernel agent — owner request kinds; credential verified only after integration.verify done+pass
-#   modules/goal/legality.yaml          — validateGraph: "a lane that builds without proving, a design step after a build step" is refused
+#   the kernel agent           — designGate, cutOpFor, disjoint child ops,
+#                                reviseGoal, validateGoalRevision,
+#                                propagateInvalidation, applyWorkflowAmendment,
+#                                STOP_KINDS, PROVISION_KINDS, openOwnerAsk
+#                                (pause vs provisional); owner request kinds;
+#                                credential verified only after
+#                                integration.verify done+pass
+#   engine/ledger-db.mjs         — the .starciwork runtime.sqlite record rows —
+#                                path-prefix allowlist coverage + ownership
+#   modules/goal/legality.yaml         — the disjoint-allowlist split rule
+#   modules/models/kinds.yaml work.author — intake reconciliation cases
+#                                (reference/conflict/new)
+#   modules/models/kinds.yaml          — validateGraph: a lane whose prove step
+#                                cannot read what its build step wrote is refused
 #   docs/ledger-db.md       — .starciwork ownership: one index.yaml per scope folder, only leaves author state
 #   modules/kernel/dispatch.yaml    — seam-first cut, one observable behaviour per child, serial fallback
 #   docs/verify-proof.md — verify is read-only; source drift vs evidence invalidation vs unavailable input
@@ -39,20 +44,20 @@ about:
   enforcement: >-
     The analyzer proposes; these rules are what the proposal is checked
     against. The kernel enforces them at three seams — lane derivation
-    (sync.mjs/kinds.yaml), outcome routing (graph.mjs routes), and revision
-    validation (goal.mjs) — so a chain that violates them is refused or
+    (modules/models/kinds.yaml lanes), outcome routing (modules/models/kinds.yaml
+    routes), and revision validation (the kernel agent's reviseGoal /
+    validateGoalRevision) — so a chain that violates them is refused or
     rerouted, never silently run.
 
 # ============================================================================
 # PRODUCES VOCABULARY — the postcondition vocabulary backward chaining needs.
-# KNOWN GAP (per brief): modules/ops/*.yaml route: blocks carry `prerequisites:`
-# (the needs) but no `produces:` — step 4 (backward CHAIN) cannot run against
-# the route index today; this table IS the required vocabulary, derived from
-# kinds.yaml writes/lanes + the ops' completion profiles. tinkle-1 files need
-# this backfilled as a `produces:` key on each route block, and a future
-# scripts/route/route-plan.mjs (chain builder; route-op.mjs only picks one op)
-# would consume it. (inferred vocabulary — source: kind.writes + lane step
-# purposes, not a declared field)
+# modules/ops/*.yaml route: blocks carry `prerequisites:` (the needs); each
+# op's produces lives as business: prose on its contract. This table IS the
+# machine-readable vocabulary, derived from kinds.yaml writes/lanes + the
+# ops' completion profiles — the table scripts/route/route-plan.mjs (the
+# chain builder; route-op.mjs picks one op) consumes for step 4 (backward
+# CHAIN). (inferred vocabulary — source: kind.writes + lane step purposes,
+# not a declared field)
 # ============================================================================
 producesVocabulary:
   stateVariables:  # the variables a goal's S* is written in
@@ -76,7 +81,7 @@ producesVocabulary:
     - "decision.X: prepared"     # options + recommendation drafted
     - "goal: revised"            # rev+1, derivations stale-marked
     - "scope.X: defined"         # bounded scope statement exists
-    - "scope.X: retired"         # end-of-life completed
+    - "scope.X: finished"        # end-of-life completed
     - "grammar: grown"           # semantic unit added
     - "runtime: operated"        # environment/infra effect applied
     - "release: delivered"       # external/terminal effect done
@@ -112,7 +117,7 @@ producesVocabulary:
     provision.ask:        ["provision.X: provided"]
     decision.prepare:     ["decision.X: prepared"]
     goal.revise:          ["goal: revised"]
-    scope.retire:         ["scope.X: retired"]
+    scope.finish:         ["scope.X: finished"]
     grammar.update:       ["grammar: grown"]
     runtime.operate:      ["runtime: operated"]
     release.deliver:      ["release: delivered"]
@@ -124,7 +129,7 @@ producesVocabulary:
   stalenessNote: >-
     A produced variable is only as good as its evidence binding: DEP_STALE /
     evidence-invalidation flips it back to unsettled (check-work-deep.mjs,
-    work-verification.md). Backward chaining must treat a stale variable as
+    docs/verify-proof.md). Backward chaining must treat a stale variable as
     missing — it produces a re-verification leg, not a skip.
 
 # ============================================================================
@@ -160,20 +165,20 @@ forwardEdges:
 
   - id: architecture-after-business
     if: "architecture.decide is proposed"
-    thenRequired: "business.decide done (accepted SRS)"
+    thenRequired: "business.decide settled pass with a current reviewed SRS seed; the SRS Work leaves remain todo"
     enforcement: route block prerequisite (modules/ops/ops/architecture.decide.yaml)
     why: "the SDS realises the SRS — design may not invent the product rule it is supposed to realise (modules/models/kinds.yaml srs-gap route purpose)"
     illegal: "architecture.decide before an accepted business scope is ILLEGAL"
 
   - id: backend-after-decisions
     if: "backend.implement is proposed"
-    thenRequired: "business.decide done AND architecture.decide done"
+    thenRequired: "business.decide and architecture.decide settled pass with current reviewed SRS/SDS seeds; their Work leaves remain todo until final reconciliation"
     enforcement: route block prerequisites (modules/ops/ops/backend.implement.yaml)
     illegal: "backend implementation without both decision legs is ILLEGAL"
 
   - id: frontend-after-direction-and-design
     if: "interface.implement is proposed"
-    thenRequired: "interface.draw done AND architecture.decide done"
+    thenRequired: "interface.draw and architecture.decide settled pass with current direction and reviewed SDS seed; the SDS Work leaves remain todo until final reconciliation"
     enforcement: route block prerequisites + designGate
     illegal: "frontend implementation without direction and architecture is ILLEGAL"
 
@@ -192,8 +197,8 @@ forwardEdges:
     if: "any implement leg is proposed"
     thenBefore: "every decide/direct leg its route prerequisites name"
     enforcement: >-
-      validateGraph refuses "a lane that builds without proving, a design
-      step after a build step" (modules/goal/legality.yaml). The registry stage
+      validateGraph refuses a lane whose prove step cannot read what its
+      build step wrote (modules/models/kinds.yaml). The registry stage
       order (intake > scope > decide > direct > implement > verify > release >
       operate) is the coarse ordering every chain obeys.
     illegal: "a build leg before a design/decision leg it depends on is ILLEGAL; a build leg with no proof leg after it is ILLEGAL"
@@ -295,10 +300,12 @@ splitRules:
     tree itself forbids two children asserting over overlapping scope.
   disjointnessIsTheTest: >-
     A split is legal ONLY when the siblings' write scopes are disjoint —
-    disjoint()/.allowlistsOverlap use path-prefix coverage: `src/**` and
-    `src/x.ts` overlap, `src/a/**` and `src/b/**` do not
-    (engine/ledger-db.mjs disjoint, modules/goal/legality.yaml
-    allowlistsOverlap). On a plan ledger the same rule is a schema constraint:
+    path-prefix coverage is the test: `src/**` and
+    `src/x.ts` overlap, `src/a/**` and `src/b/**` do not. The api enforces it
+    at admission — one capacity-1 `path:*` lease per owned_path plus the
+    dispatch-planning conflict check (scripts/kernel/api.mjs;
+    modules/kernel/dispatch.yaml fields.owned_paths).
+    On a plan ledger the same rule is a schema constraint:
     independent ops must have disjoint path-prefix allowlists (goal-plan.json).
   noSharedPath: >-
     No two sibling nodes may own the same path. A path every sibling must
@@ -334,7 +341,7 @@ existingSurfaceRules:
   - id: survey-before-chain
     if: "any feature/refactor/integration input is being decomposed"
     thenRequired: "the SURVEY leg runs BEFORE the chain is proposed — S₀ unmeasured is Δ uncomputable"
-    mechanism: ".starciwork ownership lookup (ledger.mjs inScope/executableCandidates/decisionCandidates) + source scan + intake reconciliation rows (intake.mjs)"
+    mechanism: ".starciwork ownership lookup (the record rows in engine/ledger-db.mjs's runtime.sqlite — path-prefix allowlist coverage, docs/ledger-db.md) + source scan + intake reconciliation cases (work.author intake mode, modules/models/kinds.yaml)"
     citation: "modules/goal/existing.yaml rules.existing-surface-detection"
     illegal: "a chain proposed against an unsurveyed tree is ILLEGAL"
 

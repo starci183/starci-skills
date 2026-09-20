@@ -20,7 +20,7 @@ provenance:
   limitations: Fixed Nest/Next family; source topology is configurable, framework substitution is not. Automated
     checks have explicit supported syntax/path/contract bounds. Missing applicable code-rule coverage blocks
     conformance. Agent design review and real behavioral evidence cover semantic obligations. Runtime
-    installation performs no product migration.
+    installation performs no product source changes.
 rules:
   - id: ARCH-OWNERSHIP
     title: One accountable owner
@@ -154,7 +154,7 @@ rules:
     kind: mandatory
     requirement: Each mutation or external effect declares atomicity, identity, timeout, failure and
       retry/recovery behavior. Unknown remote outcomes remain unknown until reconciled; a local
-      acknowledgement or journal fence cannot prove remote enforcement.
+      acknowledgement or local fence record cannot prove remote enforcement.
     rationale: A crash or lost acknowledgement can separate the effect from its recorded result.
     verification:
       automated: []

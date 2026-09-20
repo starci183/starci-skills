@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fail if any authored *.json under the skill root is outside
- * modules/schemas/json-exceptions.yaml. Inventory-only migration helper.
+ * modules/schemas/json-exceptions.yaml. Inventory-only helper.
  *
  * Usage:
  *   node scripts/checks/check-json-exceptions.mjs
@@ -33,8 +33,8 @@ const SKIP_DIR_NAMES = new Set([
 ]);
 
 /**
- * Generated JSON that is runtime output, not authored declarative source. The retired `.dist`
- * projections are gone; what remains is site build output regenerated from source YAML.
+ * Generated JSON that is runtime output, not authored declarative source: site build output
+ * regenerated from source YAML.
  */
 export const GENERATED = Object.freeze([
   'sites/skills/src/catalog.generated.json',
@@ -50,7 +50,7 @@ const LOCAL_ONLY = new Set(['config.json', 'settings.local.json']);
  * runtime packets, not authored declarative source. A same-named directory nested anywhere else
  * remains part of the authored-source inventory.
  */
-const ROOT_LOCAL_DIRS = new Set(['.starciwork', 'runtime']);
+const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime']);
 
 function loadAllowlist(allowlistFile) {
   if (!fs.existsSync(allowlistFile)) {
@@ -92,7 +92,7 @@ function loadAllowlist(allowlistFile) {
 
 function shouldSkipDir(relativePosix, name) {
   if (SKIP_DIR_NAMES.has(name)) return true;
-  if (relativePosix === '' && ROOT_LOCAL_DIRS.has(name)) return true;
+  if (relativePosix === '' && RUNTIME_OWNED_ROOTS.has(name)) return true;
   if (relativePosix.startsWith('sites/') && (name === '.next' || name === 'out')) return true;
   return false;
 }

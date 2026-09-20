@@ -143,8 +143,8 @@ rules:
           DOM, reading, focus, and action order are identical to task order at every width; the composition differs, the order does not
     notThisRule: |-
       whether the projection actually clears the content beneath it at a given viewport is observed by the audit operator, not settled here.
-    retired: |-
-      LAYOUT-5 is retired into COVERAGE-1 and is not reused; the address stays spent.
+    closed: |-
+      LAYOUT-5 is folded into COVERAGE-1 and is not reused; the address stays spent.
 doesNotDecide: |-
   Which rank the content inside a region carries is [Hierarchy](hierarchy.yaml). How a region recomposes
   as space changes is [Responsive](responsive.yaml). Which action inside a region is dominant is

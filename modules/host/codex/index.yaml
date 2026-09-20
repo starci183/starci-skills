@@ -3,9 +3,9 @@ provider: codex
 purpose: Canonical Codex execution forms and agent API calls for StarCi.
 files:
   capabilities: ../../models/agents/codex.yaml
-  api: api.json
-  recipes: recipes.json
-  validation: validation.json
+  api: api.yaml
+  recipes: recipes.yaml
+  validation: validation.yaml
 modes:
   solo:
     supported: true

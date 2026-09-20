@@ -11,9 +11,9 @@ purpose: |-
   computed foreground measured against the background that was actually composed beneath it, after
   transparency, overlays, and state opacity. Each rule below names the observation that would falsify
   it.
-  `COLOR-3` and `COLOR-5` are the two surviving addresses of the retired `ui/color.json` topic. The
-  numbers `COLOR-1`, `COLOR-2`, and `COLOR-4` were retired with it and are not reused. New rules in this topic
-  take its own prefix, `CONTRAST-`; `COLOR-6` (retired) → `CONTRAST-1`.
+  `COLOR-3` and `COLOR-5` are the two surviving addresses of the closed `ui/color.json` topic. The
+  numbers `COLOR-1`, `COLOR-2`, and `COLOR-4` were closed with it and are not reused. New rules in this topic
+  take its own prefix, `CONTRAST-`; `COLOR-6` (closed) → `CONTRAST-1`.
 rules:
   - id: COLOR-3
     title: Action, destination, selection, and focus stay distinguishable

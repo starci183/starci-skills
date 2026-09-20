@@ -10,7 +10,7 @@ lives in **one SQLite ledger**. The kernel reasons; small executables transact.
 | Actor | Lifetime | What it does | What it never does |
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`node scripts/goal/define-goal.mjs`), answers asks, approves. | Not an agent layer above the kernel; the kernel is spawned, not supervised, by chat. |
-| `[Kernel] <workflow>` | One per workflow, long-lived | Surveys the ledger, derives the plan, enqueues ops, routes the model, dispatches, settles verdicts, escalates incidents, retires the workflow. Spawned by `node scripts/kernel/start-workflow.mjs`. | Never opens the sqlite file, never writes a job row, never spawns a terminal, never calls the host (Orca) API directly. |
+| `[Kernel] <workflow>` | One per workflow, long-lived | Surveys the ledger, derives the plan, enqueues ops, routes the model, dispatches, settles verdicts, escalates incidents, finishes the workflow. Spawned by `node scripts/kernel/start-workflow.mjs`. | Never opens the sqlite file, never writes a job row, never spawns a terminal, never calls the host (Orca) API directly. |
 | `[Op] <op-id>` | One per job, ephemeral | Receives one dispatch packet, works inside its `owned_paths`, writes one report, dies. | Never sees the ledger; its report file is its only channel back. |
 
 ## The gate: `scripts/kernel/api.mjs`
@@ -19,21 +19,35 @@ Every kernel state operation is one command:
 
 ```text
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
-  survey | status | plan | enqueue | dispatch | settle | incident | retire
+  survey | status | hierarchy | plan | enqueue | route | dispatch | op-contract | report |
+  consume-report | check | settle | incident | finish
 ```
 
-Reads (`survey`, `status`) return projections. Each write runs inside one
+Reads (`survey`, `status`, `hierarchy`) return projections. Each write runs inside one
 `BEGIN IMMEDIATE` transaction and appends one hash-chained event. A refusal
 exits non-zero with `{ok:false, reason}` — a refusal is a fact the driver loop
 routes, never a crash. The full contract (arguments, reads/writes, refusal
 strings) is `modules/kernel/api.yaml`.
 
-`dispatch --spawn` is the only place an agent terminal is born: the api —
+`hierarchy` is the semantic agent-tree projection. It renders
+`workflow → Kernel → Op` from durable workflow/job identity and includes Orca
+Run/Task/Dispatch/terminal metadata as attributes. Terminal title, tab order,
+pane layout and `parentPaneKey` are never ownership authority. A Kernel restart
+keeps the same stable Kernel node; an Op retry is a new operation-job node.
+
+`dispatch --spawn` is the only place an operation agent terminal is born: the api —
 through `scripts/agent/lib.mjs` and the agent card
 (`modules/models/agents/<agent>.yaml`) — creates the terminal, attests
-readiness, delivers the packet and attests submission. Provider flags
+readiness, delivers the packet and attests submission. Agent flags
 (`--yolo`, `--permission-mode dangerous`, …) are injected from the card; no
-caller assembles a provider command by hand.
+caller assembles an agent command by hand.
+
+The first operation lazily creates one Orca Run bound to the dedicated Kernel
+terminal. Managed agents enter it through `worker-start`, which already owns
+Task injection and must not be followed by a second `orchestration dispatch`.
+Command-terminal agents create the same operation Task, then bind their exact
+terminal with `dispatch --return-preamble`; this keeps every Op visible under
+the same durable Kernel hierarchy regardless of launch adapter.
 
 ## The ledger
 
@@ -41,16 +55,15 @@ caller assembles a provider command by hand.
 leases, budgets, reports, contracts, inbox, signals and the hash-chained
 `events` log. The DDL is data — `engine/schema.sql` — opened only through
 `engine/ledger-db.mjs`. A parallel `machine.sqlite` holds only the cross-ledger
-provider-quota arbiter. See [ledger-db](ledger-db.md). No runtime state lives
-under `.starciwork/_local/`; dispatch artifacts are delivered and removed, or
-written to the OS temp dir.
+provider-quota arbiter. See [ledger-db](ledger-db.md). Dispatch artifacts
+stage in the OS temp dir and are removed once delivered.
 
 ## The loop
 
 `modules/kernel/driver-loop.yaml` is the tick the kernel agent runs:
 
 ```text
-survey → plan → enqueue → drive { status → dispatch → wait → settle → retry|incident } → retire
+survey → plan → enqueue → drive { status → dispatch → wait → settle → retry|incident } → finish
 ```
 
 The kernel re-derives the frontier from ledger state each tick — never from
@@ -58,7 +71,7 @@ memory of what it sent. Structural plan divergence against the approved goal
 `opChain` is an incident, not a quiet re-plan. The contracts the loop reads:
 
 - `modules/kernel/start-workflow.yaml` — claim a queued goal, spawn the kernel
-- `modules/kernel/api.yaml` — the eight verbs
+- `modules/kernel/api.yaml` — the complete Kernel API verbs
 - `modules/kernel/dispatch.yaml` — the packet each op is launched with
 - `modules/kernel/verdict-contract.yaml` — what `settle` accepts and rejects
 - `modules/ops/ops/<op>.yaml` — the op brief the packet names ([ops](ops.md))

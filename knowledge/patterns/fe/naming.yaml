@@ -93,7 +93,7 @@ rules:
           "history"
       - id: case-6
         kind: residual
-        when: "Legacy connected and render files both declare AuthenticationPageProps"
+        when: "Existing connected and render files both declare AuthenticationPageProps"
         write: >
           Treat the duplicate as Academy source history, not a pattern. A changed unit names the
           route/connected input separately or keeps it unexported.
@@ -169,7 +169,7 @@ rules:
       - id: case-6
         when: "GraphQL document module"
         write: >
-          A legacy handwritten adapter may use modules/api/graphql/query-course.ts/queryCourse. A generated
+          A handwritten adapter may use modules/api/graphql/query-course.ts/queryCourse. A generated
           operation keeps its generated name and is mapped behind the owning hooks/<domain> entry before
           presentation.
     verification:
@@ -203,7 +203,7 @@ rules:
           const VARIANTS = { primary: "primary", … } as const, const SIZES = { sm: "sm", md: "md",
           lg: "lg" } as const, const SKELETON_CLASS_NAME = … (core/primitive/Button/index.tsx)
       - id: case-4
-        when: "Legacy operation-name enum"
+        when: "Existing operation-name enum"
         write: >
           export enum MutationCvBlocks { Create = "create", … } remains inside modules/api/graphql;
           feature/view code consumes a mapped literal contract.

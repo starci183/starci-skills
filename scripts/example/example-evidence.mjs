@@ -22,8 +22,8 @@ import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveReco
  * `scripts/example/example-verify.mjs` re-runs the same command and compares outcomes, so the assertion needs the
  * command itself on record, not only a human `observation` string, which is kept alongside it for
  * readability). The record's own index.yaml is located under --work by its `id`, its recordDigest is
- * computed exactly as the kernel's own `kernel/reconciliation.mjs` `recordDigests` function computes it
- * (sha256 of the record file's raw bytes - see the digest note below), and the sibling evidence.yaml is
+ * the digest the work-layout contract declares (sha256 of the record file's raw bytes - see the
+ * digest note below), and the sibling evidence.yaml is
  * written in the same shape already used elsewhere in the tree. Any assertion whose command exits
  * non-zero is written with `outcome: fail`, and in that case this script itself exits 1. This script only
  * ever writes evidence.yaml; it never edits a record's own index.yaml or its `state` field.
@@ -73,7 +73,7 @@ function splitAssertion(raw) {
   return {id: raw.slice(0, at), command: raw.slice(at + 1)};
 }
 
-export const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
+const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
   .flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
 
 /** Finds the record's own index.yaml under `workRoot` by matching its authored `id`. */
@@ -88,11 +88,9 @@ function findRecordFile(workRoot, recordId) {
 }
 
 /**
- * sha256 of the record file's raw bytes - exactly the digest kernel/reconciliation.mjs's recordDigests
- * takes over `nodeFileOf(tree, node)` (the record's own authored file). Recomputed inline here rather
- * than imported: recordDigests expects a whole `tree` (node.path/workRoot wiring) this script does not
- * build, so the byte-for-byte sha256 over the record file is the exact operation reused, the same choice
- * scripts/checks/check-example-work.mjs already made for the same reason.
+ * sha256 of the record file's raw bytes - the recordDigest the work-layout contract
+ * (modules/schemas/work-layout.yaml) declares for staleness. Recomputed inline rather
+ * than imported, the same choice scripts/checks/check-example-work.mjs already made.
  */
 function sha256File(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');

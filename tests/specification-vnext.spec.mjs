@@ -41,12 +41,12 @@ test('published JSON Schema accepts every SRS v3 node type and rejects represent
  for(const [spec,field,badValue] of [[srs[0],'actors','text'],[srs[1],'scope',[]],[srs[2],'appliesTo','text'],[srs[3],'transitions','text'],[srs[4],'stages','text']]){const bad=structuredClone(spec);bad.content[field]=badValue;assert.equal(validate(bad),false,`${spec.nodeType}.${field}`);}
 });
 
-test('legacy SRS specification@2 and SDS specification@3 remain valid under unchanged validators',()=>{
+test('prior-version SRS specification@2 and SDS specification@3 remain valid under unchanged validators',()=>{
  assert.deepEqual(validateSpecification(documentSDS()),{ok:true,errors:[]});
  // The compiled examples/nivo-setup-business.json projection was the build output of the deleted examples/nivo-setup-business.yaml
  // (owner ruling: examples/ keeps only the todo-app repositories). tests/fixtures/nested-business/ carries a real
  // starci/specification@2 business document (the deleted nested-business example's SRS leaf), which this test's
- // own name asks for more literally than the retired file did.
+ // own name asks for more literally than the deleted file did.
  const business=parseYaml(fs.readFileSync(new URL('fixtures/nested-business/knowledge/business/srs/documents/update/index.yaml',import.meta.url),'utf8')).extensions.work3.specification;
  assert.deepEqual(validateSpecification(business),{ok:true,errors:[]});
 });
@@ -98,7 +98,7 @@ test('reciprocal typed freshness includes target ancestor Work imports without i
  const d=f.read('module/imports/d/index.yaml');d.dependsOn=['srs-nfr-command'];f.write('module/imports/d/index.yaml',d);result=f.run();assert.equal(result.ok,false);assert.ok(result.errors.some(e=>e.code==='CYCLE'));
 });
 
-test('untouched real legacy workspace retains prior-runtime digest bytes',()=>{
- const legacy=validateWorkspace(fileURLToPath(new URL('fixtures/nested-business/',import.meta.url)));assert.ok(legacy.ok,JSON.stringify(legacy.errors));assert.equal(legacy.nodes.find(n=>n.id==='example.business.srs.documents.update').inputDigest,'deb5060362d0d2377a8ee9fbdd505f2762bd5fb8de6ddc96ed99d8cc24a3c7c5');
+test('untouched real carried-over workspace retains prior-runtime digest bytes',()=>{
+ const carried=validateWorkspace(fileURLToPath(new URL('fixtures/nested-business/',import.meta.url)));assert.ok(carried.ok,JSON.stringify(carried.errors));assert.equal(carried.nodes.find(n=>n.id==='example.business.srs.documents.update').inputDigest,'deb5060362d0d2377a8ee9fbdd505f2762bd5fb8de6ddc96ed99d8cc24a3c7c5');
 });
 

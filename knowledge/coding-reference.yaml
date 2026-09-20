@@ -52,7 +52,7 @@ rules:
   - id: REF-SCOPE-4
     title: No accidental waivers or inherited boilerplate
     kind: mandatory
-    requirement: Applicable adopted rules must hold before acceptance. Legacy source and passing tests do not
+    requirement: Applicable adopted rules must hold before acceptance. Existing source and passing tests do not
       waive them. Historical examples cannot override a revised rule or force obsolete boilerplate. A real
       incompatibility requires an explicit scoped design/lint correction under current authority; do not
       silently suppress the rule or rewrite unrelated product design.
@@ -65,7 +65,7 @@ rules:
       decorator. Every operation in a transaction uses its transaction-scoped manager. Other explicitly
       selected persistence profiles must preserve connection, tenant and atomicity semantics. A real
       persistence port may isolate a boundary; a public Store.manager escape hatch does not. Existing profile
-      lint requiring named managers must be migrated coherently before changing its source pattern.
+      lint requiring named managers must be updated coherently before changing its source pattern.
     rationale: Explicit responsibility and a verified framework profile prevent both inconsistent architecture and
       needless generated layers.
     relatedExamples:
@@ -82,7 +82,7 @@ rules:
       contract/use case at application, reusable capabilities in modules. Direct use cases are the default;
       bus handlers are selected for actual dispatch semantics. Forwarding services, ICQRSHandler and
       configurable module-definition files are not mandatory for every feature. Existing typed public APIs
-      remain intact until an authorized migration."
+      remain intact until an authorized transition."
     rationale: Explicit responsibility and a verified framework profile prevent both inconsistent architecture and
       needless generated layers.
     relatedExamples:

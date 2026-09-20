@@ -1,6 +1,6 @@
-# modules/ops/ops/work.author.yaml - TINKLE-1 pure-yaml port of .claude/ops/work.author/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/work.author.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: work.author
 goal:
@@ -21,7 +21,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -279,7 +279,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Is this node launchable - record mode: real write scope + testable
@@ -299,7 +299,7 @@ business:
   failureModes:
     - SCOPE_UNDETERMINED, CHECK_RUNNER_MISSING, SEAM_UNDETERMINED, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

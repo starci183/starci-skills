@@ -5,24 +5,16 @@ import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
 
-// Inlined from the retired kernel/journal.mjs: these five helpers were the live ledger's only imports from
-// it. The journal-reader half (inspectJournal/openJournal/journalFileFor/migrate) died with
-// scripts/ledger/ledger-migrate.mjs; what remains here is the store vocabulary only.
-const sqliteTuple=text=>String(text).split('.').map(Number);
-export function sqliteAtLeast(actual,minimum){
-  const a=sqliteTuple(actual),b=sqliteTuple(minimum);
-  for(let i=0;i<Math.max(a.length,b.length);i+=1){if((a[i]??0)!==(b[i]??0))return (a[i]??0)>(b[i]??0);}
-  return true;
-}
+// The ledger's small store vocabulary: a token mint and the settled-job set.
 export const newToken=()=>crypto.randomBytes(24).toString('hex');
 /** A job in one of these states holds nothing the runtime still needs from it: its result is recorded or void. */
 export const SETTLED_JOB_STATUSES=['succeeded','failed','cancelled'];
 /**
  * The retention policy of the ledger, in one place: the bound generation keeps ONE state body, its
- * `transition:`/`bind:` checkpoint rows and only the latest `save:` row; a retired generation keeps nothing;
+ * `transition:`/`bind:` checkpoint rows and only the latest `save:` row; a dropped generation keeps nothing;
  * live leases and unsettled jobs are never touched. See compactSnapshots below.
  */
-export const RETENTION={snapshotBodiesKept:1,retiredGenerationRows:0};
+export const RETENTION={snapshotBodiesKept:1,droppedGenerationRows:0};
 /** Give freed pages back to the filesystem where the file was created to allow it; a no-op on an older file. */
 export function reclaimSpace(db){try{db.exec('PRAGMA incremental_vacuum');}catch{}}
 
@@ -46,7 +38,8 @@ export const ledgerFileFor=repoRoot=>{
   if(isRuntimeRoot(root))throw Object.assign(Error(`ledger-root-is-runtime: ${root} is the StarCi runtime, not a Work root; route the project through .workspaces`),{code:'STARCI_LEDGER_ROOT_IS_RUNTIME'});
   return path.join(root,'.starciwork','runtime.sqlite');
 };
-// Same root as engine.mjs's runtimeRootFor, kept local so this module never imports the engine.
+// The per-host runtime state root (%LOCALAPPDATA%/StarCi/runtime, or ~/.local/state/StarCi/runtime),
+// keyed off the environment so a test can repoint it; kept local so this module stands alone.
 const runtimeRootFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime');
 export const machineFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'machine.sqlite');
 export const SNAPSHOT_BODIES_KEPT=RETENTION.snapshotBodiesKept;
@@ -57,9 +50,8 @@ const value=row=>row?{...row,payload:row.payload_json===null?null:JSON.parse(row
 const sha256=text=>crypto.createHash('sha256').update(text).digest('hex');
 const realpathOf=file=>{try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
 const digestOf=(prevDigest,row)=>sha256(`${prevDigest??''}${row.event_id}${row.kind}${row.payload_json??''}${row.created_at}`);
-// The DDL is data now: `schema.sql`/`machine.sql`/`triggers.sql` beside this module are the EXECUTED source
-// of truth (once `kernel/ledger-db.mjs`'s inlined LEDGER_DDL/MACHINE_DDL/EVENTS_DIGEST_TRIGGER strings, read
-// here instead of duplicated). `starci_sha256` must be registered before schema.sql runs: its
+// The DDL is data: `schema.sql`/`machine.sql`/`triggers.sql` beside this module are the EXECUTED source
+// of truth, read here instead of duplicated. `starci_sha256` must be registered before schema.sql runs: its
 // events_digest_chain trigger calls the function on every events INSERT.
 const readEngineSql=name=>fs.readFileSync(new URL(name,import.meta.url),'utf8');
 const SCHEMA_SQL=readEngineSql('schema.sql');
@@ -85,8 +77,8 @@ const runCheckpoint=db=>{
 export function checkpointLedger(handle){need(handle?.db,'checkpointLedger needs a ledger handle');return runCheckpoint(handle.db);}
 
 /**
- * Retention of the ledger, ported whole from journal.mjs: the bound generation keeps one state body, its
- * `transition:`/`bind:` checkpoint rows and only the latest `save:` row; retired generations keep nothing.
+ * Retention of the ledger: the bound generation keeps one state body, its `transition:`/`bind:` checkpoint
+ * rows and only the latest `save:` row; older generations keep nothing.
  */
 export function compactSnapshots(db,{workflowId=null,generation=null,goalIdentity=null,keep=SNAPSHOT_BODIES_KEPT}={}){
   const bound=workflowId&&generation!==null&&goalIdentity!==null;
@@ -104,8 +96,8 @@ export function compactSnapshots(db,{workflowId=null,generation=null,goalIdentit
   return changed;
 }
 /** Drop the settled jobs and events of every generation older than `generation` for one workflow. */
-export function pruneRetiredGenerations(db,{workflowId,generation}){
-  need(workflowId&&Number.isInteger(generation),'pruneRetiredGenerations needs a workflow and its bound generation');
+export function pruneDroppedGenerations(db,{workflowId,generation}){
+  need(workflowId&&Number.isInteger(generation),'pruneDroppedGenerations needs a workflow and its bound generation');
   const settled=SETTLED_JOB_STATUSES.map(()=>'?').join(',');
   const jobs=db.prepare(`DELETE FROM jobs WHERE workflow_id=? AND generation<? AND status IN (${settled}) AND NOT EXISTS (SELECT 1 FROM leases l WHERE l.job_id=jobs.job_id)`).run(workflowId,generation,...SETTLED_JOB_STATUSES).changes;
   const events=db.prepare(`DELETE FROM events WHERE workflow_id=? AND generation<? AND (entity_type<>'job' OR NOT EXISTS (SELECT 1 FROM jobs j WHERE j.job_id=events.entity_id))`).run(workflowId,generation).changes;
@@ -119,13 +111,12 @@ export function liveRows(db,workflowId){
   return {leases,jobs};
 }
 /**
- * Remove every row of a workflow that holds nothing live, then its `workflows` registration — the same
- * semantics as journal.retireWorkflow, extended across the ledger tables that key on workflow_id. With
- * `preserveRuntimeCustody` the latest state body and the newest receipt per runtime file stay, so the
- * `workflows` row must stay too: the kept snapshot references it.
+ * Remove every row of a workflow that holds nothing live, then its `workflows` registration, across every
+ * ledger table that keys on workflow_id. With `preserveRuntimeCustody` the latest state body and the newest
+ * receipt per runtime file stay, so the `workflows` row must stay too: the kept snapshot references it.
  */
-export function retireWorkflow(db,workflowId,{preserveRuntimeCustody=false}={}){
-  need(workflowId,'retireWorkflow needs a workflow id');
+export function finishWorkflow(db,workflowId,{preserveRuntimeCustody=false}={}){
+  need(workflowId,'finishWorkflow needs a workflow id');
   const live=liveRows(db,workflowId);
   if(live.leases.length||live.jobs.length)return {ok:false,workflowId,live,reason:'the workflow still holds live reservations or unsettled jobs'};
   const drop=table=>db.prepare(`DELETE FROM ${table} WHERE workflow_id=?`).run(workflowId).changes;
@@ -180,9 +171,9 @@ export function readInput(db,{workflowId,key}={}){
 export function verifyChain(db,{workflowId}={}){
   need(workflowId,'verifyChain needs a workflow id');
   // The walk starts from the first row this ledger still holds, whatever `prev_digest` that row carries.
-  // Retention (`pruneRetiredGenerations`) legitimately removes a retired generation's rows, and the surviving
+  // Retention (`pruneDroppedGenerations`) legitimately removes a dropped generation's rows, and the surviving
   // head then names a predecessor that is gone - which is the whole point of the link: the truncation stays
-  // visible. Seeding `prev` with `null` instead called every workflow that ever retired a generation broken,
+  // visible. Seeding `prev` with `null` instead called every workflow that ever dropped a generation broken,
   // so `ledger-verify` and the §12 continuation boundary refused every real workflow after its first retry.
   // Everything the chain actually proves is kept: each row's own digest is recomputed (so a tampered or
   // reordered row still fails) and every link inside the retained range must hold. Which history is the agreed
@@ -268,9 +259,9 @@ function migrateLedger(db,{now}){
     seedMeta(db,now);
     return;
   }
-  // A ledger already at LEDGER_VERSION can still predate the `meta` table and the digest-chain trigger: both
-  // were added to LEDGER_DDL without a version bump, so user_version alone cannot tell a fresh v1 file from
-  // one built before either landed. Check the schema itself and bring it up without touching any other row.
+  // A ledger already at LEDGER_VERSION can still predate the `meta` table and the digest-chain trigger:
+  // user_version alone cannot tell a fresh v1 file from one built before either landed. Check the schema
+  // itself and bring it up without touching any other row.
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get()){
     db.exec('BEGIN IMMEDIATE');
     try{db.exec(META_TABLE_DDL);db.exec('COMMIT');}
@@ -371,10 +362,10 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='W
       return value(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));
     },
     ...readAccessors(db),
-    /** The rows of a workflow that are only history now: retired generations go, then freed pages are given back. */
-    retireGenerations({workflowId,generation}){const pruned=transaction(inner=>pruneRetiredGenerations(inner,{workflowId,generation}));reclaimSpace(db);return pruned;},
+    /** The rows of a workflow that are only history now: dropped generations go, then freed pages are given back. */
+    dropGenerations({workflowId,generation}){const pruned=transaction(inner=>pruneDroppedGenerations(inner,{workflowId,generation}));reclaimSpace(db);return pruned;},
     /** Everything of a workflow, when nothing of it is live. */
-    retireWorkflow(workflowId,options={}){const result=transaction(inner=>retireWorkflow(inner,workflowId,options));if(result.ok)reclaimSpace(db);return result;},
+    finishWorkflow(workflowId,options={}){const result=transaction(inner=>finishWorkflow(inner,workflowId,options));if(result.ok)reclaimSpace(db);return result;},
     inputs:{
       put({workflowId,key,goalRevision,bytes,origin,mediaType=null}={}){
         need(workflowId&&key&&Number.isInteger(goalRevision)&&bytes&&origin,'inputs.put needs a workflow, key, goal revision, bytes and origin');

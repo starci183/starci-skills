@@ -119,11 +119,11 @@ const RECORD_DECLARATIONS = [
   {trail: 'assets[].generation.promptPath', base: 'record', what: 'prompt', digestKey: null},
   {trail: 'ui.assets[].generation.promptPath', base: 'record', what: 'prompt', digestKey: null},
   {trail: 'ui.coverage.map[].directionAsset', base: 'record', what: 'asset', digestKey: null},
-  // A superseded direction names the path the retired raster lived at and the digest it had *then*; the
-  // file beside it now holds the newer revision on purpose, so path and digest can never both describe
-  // today's bytes. Its path is still checked (a superseded entry pointing at nothing is a dangling
-  // revision note), its sha256 deliberately is not - the one false-positive class this script found on
-  // the live trees (7 of 37 digest refusals before the digestKey was dropped here).
+  // A superseded direction names the path the replaced raster occupied and the digest it had at that
+  // revision; the file beside it now holds the newer revision on purpose, so path and digest can never
+  // both describe today's bytes. Its path is still checked (a superseded entry pointing at nothing is a
+  // dangling revision note), its sha256 deliberately is not - the one false-positive class this script
+  // found on the live trees (7 of 37 digest refusals before the digestKey was dropped here).
   {trail: 'ui.supersededDirection.path', base: 'repo', what: 'asset', digestKey: null},
   {trail: 'ui.anatomyReview.reviewPath', base: 'record', what: 'review', digestKey: null},
   // An artwork slot borrows the brand's master rather than repeating a `../../..` path: the entry says whose

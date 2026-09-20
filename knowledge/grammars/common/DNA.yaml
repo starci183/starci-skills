@@ -28,8 +28,8 @@ provenance:
     todo-app brand record (rev 3) already cites for that installed file. The snapshot therefore
     describes what a consumer of 0.4.13 actually receives, not a fork of it.
   method: |
-    Every table below is a measurement of the Common entry's own source, taken by
-    ex-testing/lint/scratch/v6-2-dna.mjs (read-only; re-runnable). `digests` is the sha256 of each file
+    Every table below is a measurement of the Common entry's own source, taken by a read-only scratch
+    script that no longer ships in this tree. `digests` is the sha256 of each file
     that measurement read, so a reader can tell whether these tables still describe the tree in front of
     them; a digest that moved means re-capture, not reinterpretation.
       * tokens[] — every custom property named in `src/common/styles.css` outside a comment, keyed by

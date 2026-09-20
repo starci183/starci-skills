@@ -76,10 +76,10 @@ Every declared path must be normalized, in-repository, non-redirecting and cover
 The manifest is the current implementation inventory; inspect each obligation's
 status and actual result instead of treating this prose as a frozen count.
 Explicit owner/public-entry and Grammar boundaries, Nest documentation/import
-syntax, and the implemented Next syntax clauses have executable checks. Legacy
-rules that contradict the adopted standard must be off while their replacement
-obligations remain required. That migration does not waive an unimplemented
-replacement.
+syntax, and the implemented Next syntax clauses have executable checks.
+Installed rules that contradict the adopted standard must be off while their
+replacement obligations remain required. That update does not waive an
+unimplemented replacement.
 
 Remaining `missing` or `conflict` obligations still block conformance. The
 conditional FE world-owner/render boundary, SWR key lifecycle, selected Next
@@ -100,7 +100,7 @@ does not substitute for these finite behavior vectors.
 
 The Nest error-family adapter is selected by `NEST-EXCEPTION-IDENTITY`. Its
 `capability` and `academy-abstract-exception` profiles resolve actual TypeScript
-error identity and the declared profile's constructor rules. Universal legacy
+error identity and the declared profile's constructor rules. Universal
 folder/name/return heuristics are explicitly off under a separate guard; the
 replacement script remains required. A missing error-family declaration is
 unavailable, not permission to accept arbitrary thrown values. See
@@ -110,7 +110,7 @@ unavailable, not permission to accept arbitrary thrown values. See
 Declaring which inputs are required remains a reviewed domain decision; for
 each selected binding, the machine checks that absence reaches a real Error
 before unsafe continuation. An empty declaration does not certify completeness
-of the domain decision. Source adapters and the legacy off guard use the
+of the domain decision. Source adapters and the heuristics-off guard use the
 [source/input distinction](architecture-input-scope.md), retaining configuration
 bytes in evidence without treating them as application contracts.
 

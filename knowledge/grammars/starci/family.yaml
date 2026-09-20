@@ -54,7 +54,7 @@ dna:
     - STARCI_CORE_DNA
     - token names
     - light/dark defaults
-    - legacy spacing aliases
+    - earlier spacing aliases
   bindsSemanticVariables:
     - canvas/background
     - surface

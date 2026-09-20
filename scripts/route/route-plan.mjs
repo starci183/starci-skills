@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// route-plan.mjs — the chain builder (tinkle-11). route-op.mjs picks ONE op;
+// route-plan.mjs — the chain builder. route-op.mjs picks ONE op;
 // this planner chains MANY: S0 survey + S* target -> backward-chain via
 // needs/produces -> topo order -> legality check.
 //
@@ -95,7 +95,7 @@ function loadOps(opsDir) {
         prerequisites: asList(route.prerequisites),
         riskHints: asList(route.riskHints),
       },
-      // business.produces is PROSE (tinkle-10 backfill) — cited when the
+      // business.produces is PROSE — cited when the
       // producesVocabulary table has no entry for this op.
       producesProse: asList(doc?.business?.produces),
     });
@@ -314,7 +314,7 @@ const stageRankOf = op => {
 const EXTERNAL_OPS = new Set(['request.analyze']); // model/kinds.yaml external: true
 
 // Prerequisite phrase -> requirement. route.prerequisites are English; this is
-// the fixed phrase table mapping each observed prerequisite to a chain edge, a
+// the fixed phrase table mapping each declared prerequisite to a chain edge, a
 // state-variable need, or a non-chain condition (recorded on the leg).
 function parsePrerequisite(text, ops) {
   const t = String(text).trim();
@@ -509,12 +509,10 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
 
   // ---- drive the chain from delta vars ----
   for (const v of sstar) {
-    const s0hit = satisfiedByS0(v, s0);
-    if (s0hit?.by === 's0') continue; // already true — delta excludes it
-    satisfyVar(v, { op: '(goal)', legId: '(goal)', needsSatisfiedBy: [], conditions: [], assumed: [] });
+    if (satisfiedByS0(v, s0)?.by === 's0') continue; // already true — delta excludes it
     // when the produced leg extends a done-but-touched surface, the reverify
     // rule (done-record-reverify) is applied in the legality pass below.
-    void s0hit;
+    satisfyVar(v, { op: '(goal)', legId: '(goal)', needsSatisfiedBy: [], conditions: [], assumed: [] });
   }
 
   // ---- injected legs (business rules that needs/produces alone miss) ----
@@ -582,7 +580,7 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
 
 // ------------------------------------------------------------- VALIDATE ----
 
-function topoSort(legs, edges, ops) {
+function topoSort(legs, edges) {
   const indeg = new Map([...legs.keys()].map(k => [k, 0]));
   const adj = new Map([...legs.keys()].map(k => [k, []]));
   for (const [f, t] of edges) {
@@ -626,7 +624,7 @@ function topoSort(legs, edges, ops) {
   return { order, cycle: null };
 }
 
-function legalityCheck(order, legs, edges, ops, s0) {
+function legalityCheck(order, legs, ops, s0) {
   const findings = [];
   const pos = new Map(order.map((l, i) => [l.legId, i]));
   // forward edge: verify-after-implement — a verify leg with no implement leg
@@ -772,7 +770,7 @@ function main() {
   }
 
   // VALIDATE
-  const { order, cycle } = topoSort(legs, edges, ops);
+  const { order, cycle } = topoSort(legs, edges);
   if (!order) {
     const result = { status: 'infeasible', reason: 'cycle in needs/prerequisites', cycle, sstar: sstar.map(v => `${varKey(v)}: ${v.state}`) };
     if (args.json) console.log(JSON.stringify(result, null, 2));
@@ -792,7 +790,7 @@ function main() {
     }
     process.exit(1);
   }
-  const findings = legalityCheck(order, legs, edges, ops, s0);
+  const findings = legalityCheck(order, legs, ops, s0);
 
   const result = {
     status: findings.some(f => f.rule === 'verify-after-implement') ? 'illegal' : 'ok',

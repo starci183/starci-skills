@@ -16,9 +16,11 @@ release:
 terminalFallback:
   when: orchestration.worker-start is unavailable or a plain-command lane is wanted
   command: codex
-  bypassFlag: '--full-auto (or --ask-for-approval never --sandbox danger-full-access for full yolo)'
-  bypassReason: Unattended lanes stall on per-tool permission menus; same rule as qwen --yolo / devin bypass mode.
-  note: 'codex self-update can leave the binary broken (observed 2026-09-20: TUI missing dist files → reinstall fixed). Probe `codex --version` before relying on it.'
+  modelArgs: ['--model', '<model>']
+  effortArgs: ['-c', 'model_reasoning_effort="<effort>"']
+  bypassArgs: ['--ask-for-approval', 'never', '--sandbox', 'danger-full-access']
+  bypassReason: Unattended lanes stall on per-tool permission menus; use the current explicit approval and sandbox flags declared by bypassArgs.
+  note: 'codex self-update can leave the binary broken (TUI missing dist files; a reinstall fixes it). Probe `codex --version` before relying on it.'
 verifiedAt: 2026-09-20
 verifiedAgainst: 'codex v0.155.1'
 forbidden:

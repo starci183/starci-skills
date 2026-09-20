@@ -1,7 +1,7 @@
 schema: starci/json-exceptions@1
 description: >
   Exact relative paths (from this skill root) allowed to remain authored JSON
-  after declarative sources migrate to YAML. No directory wildcards.
+  while declarative sources are YAML. No directory wildcards.
 exceptions:
   - path: engine/yaml-license.json
     reason: >

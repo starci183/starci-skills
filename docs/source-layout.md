@@ -71,15 +71,15 @@ selected-frontend/
 └── src/
 ```
 
-The host bootstrap files must route to `.claude/SKILL.md`. Retired runtime
+The host bootstrap files must route to `.claude/SKILL.md`. Historical runtime
 names such as `.claude-v3`, `.claude_legacy`, `.claude-vip` and
 `.claude-starci-ultimate` are forbidden. A routed source duplicates host
 identity only when it carries a `.claude/SKILL.md` runtime marker or a
 `.workspaces/projects` / `.workspaces/local/routes` registry marker. Routed
-backends also forbid legacy Work roots such as `.work`, `.starci` and
+backends also forbid historical Work roots such as `.work`, `.starci` and
 `.starcitemp`.
 
-In a separate frontend repository, `.starciwork` and every retired runtime or
+In a separate frontend repository, `.starciwork` and every historical runtime or
 Work name are forbidden, and the same runtime/registry identity markers are
 rejected. In an explicitly combined repository, the one backend-owned
 `.starciwork` and explicitly bound host identity are shared, not duplicates.
@@ -90,7 +90,7 @@ the backend, frontend or host; the topology gate does not move, delete or
 assign runtime authority to it. This leaves one runtime identity and one
 product workspace while preserving separately owned project metadata.
 
-For application deployment work, load `knowledge/application-stacks.json` and
+For application deployment work, load `knowledge/application-stacks.yaml` and
 [application stacks](application-stacks.md). One application manifest accounts
 for its backend, frontend and dependencies even when their source repositories
 differ. Repository placement does not establish service ownership or an

@@ -15,9 +15,9 @@
 //      with its typed reason — a miss is an exclusion, never a silent swap.
 //   4. The launch model is the pool's models[difficulty] pin (+ effort).
 //
-// Difficulty vocabulary: easy|medium|hard|insane. Legacy S|M|L|XL spellings
-// (and 'high' for 'hard') are accepted and normalized everywhere a difficulty
-// enters, including the keys of the pools' models/effort maps.
+// Difficulty vocabulary: easy|medium|hard|insane. Alias spellings (s|m|l|xl,
+// small|med|large, 'high' for 'hard') are accepted and normalized everywhere a
+// difficulty enters, including the keys of the pools' models/effort maps.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,8 +26,6 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
-
-export const DIFFICULTIES = ['easy', 'medium', 'hard', 'insane'];
 
 const DIFFICULTY_ALIASES = {
   easy: 'easy', s: 'easy', small: 'easy',
@@ -41,7 +39,7 @@ export function normalizeDifficulty(difficulty) {
   return DIFFICULTY_ALIASES[String(difficulty ?? '').trim().toLowerCase()] ?? null;
 }
 
-export function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
+function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
   const file = path.join(modelsDir, 'runtimes.yaml');
   if (!fs.existsSync(file)) return null;
   return parseYaml(fs.readFileSync(file, 'utf8'));
@@ -79,7 +77,7 @@ export function chainFor({ role, difficulty, runtimes, modelsDir } = {}) {
   const d = normalizeDifficulty(difficulty);
   if (!d) return { chain: [], tierOrder: [], roleOrder: [], error: `unknown difficulty '${difficulty}'` };
   const tiers = rt?.allocation?.tiers ?? {};
-  const tier = tiers[d] ?? tiers[difficulty]; // raw-key fallback for alias-spelled tier names
+  const tier = tiers[d]; // tier keys are the canonical difficulty vocabulary
   const at = `runtimes.yaml allocation.tiers.${d}`;
   let tierOrder, tierSource;
   if (Array.isArray(tier)) { tierOrder = tier; tierSource = at; }
@@ -110,7 +108,7 @@ export function applyBias(chain, bias) {
 // capacity map is caller-supplied live state: capacity[target] =
 // {auth, quota:{state}, running, openIncident}; an absent entry means "no
 // live signal" and passes the capacity gates (unknown is OK — dead is not).
-export function poolRejectionReasons({ pool, target, role, difficulty, capacity, runtimes }) {
+function poolRejectionReasons({ pool, target, role, difficulty, capacity, runtimes }) {
   const reasons = [];
   if (!pool) return [`no runtimes.yaml entry for pool '${target}'`];
   if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role))

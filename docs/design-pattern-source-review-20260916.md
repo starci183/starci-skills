@@ -17,7 +17,7 @@ Nivo's inspected manifests declare Nest `^11.0.1`, TypeORM `^0.3.28`, Next `16.1
 
 ## What the source supports, and what remains to prove
 
-| Observed implementation | Evidence and limit | Next bounded verification |
+| Reference implementation | Evidence and limit | Next bounded verification |
 | --- | --- | --- |
 | Academy separates transport, command/message and handler, with named manager injection | Useful responsibility and connection identity. A forwarding service/base `execute` to `process` bridge does not independently justify an extra layer | Select direct use case or meaningful bus semantics under DP-01/02; verify named DI and transaction identity |
 | Academy community publisher claims rows with a lease and emits in process | `src/modules/bussiness/community/community-outbox-publisher.service.ts` uses a claim query; visible publication settlement is by row ID and local event emission is not durable consumer acknowledgement | DP-05/08: competing claims, stale claim settlement and crash boundaries; define whether this delivery is intentionally best effort |
@@ -35,9 +35,9 @@ Nivo's inspected manifests declare Nest `^11.0.1`, TypeORM `^0.3.28`, Next `16.1
 - A lease or job fence is not a universal fence over an external provider.
 - A unique inbox key prevents duplicate stored identity; it does not automatically make an external or realtime effect atomic.
 - Two transports do not force CQRS. CQRS does not force event sourcing. A single database transaction does not need a distributed saga.
-- A public reference project can contain debt. Its legacy wrappers, empty configuration builders and narrow tests do not become universal obligations.
+- A public reference project can contain debt. Its leftover wrappers, empty configuration builders and narrow tests do not become universal obligations.
 - A new SDS revision is a reason to compute affected proof/implementation scope. It is not authority to delete completion history or rewrite every source file.
 
 ## Outcome for subsequent Nivo work
 
-Start with executable staleness and code-pattern coverage reports. Bind current source and accepted design, then select only affected DP cases. Prioritize effect/receipt crash gaps, competing actors, scoped authority and FE recovery around existing modules. The owner has separately selected Nivo Core as a native development process and the Nivo Control Plane application as a remote API in the existing Tino K3s environment; this is an accepted deployment input outside this scan, not a deployment fact established by the inspected source. Preserve that input through the [remote application API contract](remote-application-api.md) and bind its canonical project deployment declaration before later product work. Product migration and live verification remain future authorized work; this runtime research does not resume them.
+Start with executable staleness and code-pattern coverage reports. Bind current source and accepted design, then select only affected DP cases. Prioritize effect/receipt crash gaps, competing actors, scoped authority and FE recovery around existing modules. The owner has separately selected Nivo Core as a native development process and the Nivo Control Plane application as a remote API in the existing Tino K3s environment; this is an accepted deployment input outside this scan, not a deployment fact established by the inspected source. Preserve that input through the [remote application API contract](remote-application-api.md) and bind its canonical project deployment declaration before later product work. Product source transitions and live verification remain future authorized work; this runtime research does not resume them.

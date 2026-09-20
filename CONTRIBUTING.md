@@ -45,30 +45,29 @@ record and is worse than a red check.
 - **One authority per concept.** A rule lives in exactly one file; other surfaces cite it. If you
   find yourself maintaining the same fact twice, one copy is stale — delete it or generate it.
 - **Canonical paths.** New code imports `engine/`, `modules/`, `modules/schemas/`,
-  `scripts/checks/spec/` — never the retired top-level dirs (`kernel/`, `core/`, `cli/`,
+  `scripts/checks/spec/` — never the former top-level dirs (`kernel/`, `core/`, `cli/`,
   `contracts/`, `schemas/`, `sqlite/`, …).
 - **YAML contracts are data.** `modules/**/*.yaml` files are read by agents and scripts alike;
   keep them declarative — no code, no comments restating the field name.
 - **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not
   visible in the code. Line endings are LF (`.gitattributes` enforces it — the install manifest
   hashes bytes).
-- **State:** all runtime state lives in `.starciwork/runtime.sqlite` via `engine/ledger-db.mjs`.
-  Nothing writes under `.starciwork/_local/`; dispatch artifacts use the OS tmpdir or are deleted
-  after delivery.
+- **State:** all runtime state lives in `.starciwork/runtime.sqlite` via `engine/ledger-db.mjs`;
+  dispatch artifacts use the OS tmpdir or are deleted after delivery.
 
 ## Fleet / lane work
 
 Large changes are executed by parallel lanes with a write-allowlist each:
 
 - A lane touches only its allowlisted paths — it never "fixes" a neighbor's file mid-flight.
-- A lane finishes by writing a report (`ex-testing/lint/<lane>-REPORT.md`) and touching
-  `ex-testing/lint/done/<lane>.done`. No report, no done marker.
+- A lane finishes by submitting its report through the kernel (`api report`) so the ledger records the
+  outcome; no report, the lane is not done.
 - Mass deletions and import rewiring are a separate flip step — lanes must not delete doomed
   directories early.
 
 ## Commit bar
 
-- `npm test` green (or an explicit note on which spec the cut retires).
+- `npm test` green (or an explicit note on which spec the cut drops).
 - `node --check` on every edited `.mjs`.
 - Verify before committing: run the thing you changed, not just the tests that happen to cover it.
 - Do not commit `config.yaml`, `settings.local.json`, `.starciwork/`, `node_modules/` or anything

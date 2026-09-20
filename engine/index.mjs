@@ -1,8 +1,8 @@
 import {parseYaml} from './yaml.mjs';
 // The canonical Work validator is spec-bound: `validateWorkspace`/`validate` invoke the specification
-// validators, which live at their post-cut home `scripts/checks/spec/` (moved there from the retired
-// top-level `specifications/`). This is the one engine -> scripts edge; the spec modules only ever import
-// `engine/yaml.mjs` and `engine/runtime-root.mjs` back, so the graph stays acyclic.
+// validators, which live at `scripts/checks/spec/`. This is the one engine -> scripts edge; the spec
+// modules only ever import `engine/yaml.mjs` and `engine/runtime-root.mjs` back, so the graph stays
+// acyclic.
 import { validateSpecification } from '../scripts/checks/spec/validate.mjs';
 import { validateSDSBindings, SDS_SCHEMA } from '../scripts/checks/spec/sds.mjs';
 import {classifySDSPath,validateSDSMap,SDS_AGGREGATE_SCHEMA} from '../scripts/checks/spec/sds-map.mjs';
@@ -10,36 +10,11 @@ import {classifySRSPath,validateSRSGraph,SRS_AGGREGATE_SCHEMA} from '../scripts/
 import { validateSRSV3Bindings, SRS_V3_SCHEMA } from '../scripts/checks/spec/srs-v3.mjs';
 import { readDistJson } from './runtime-root.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
 export const profiles = Object.freeze(readDistJson('modules', 'schemas', 'profiles.yaml'));
 
-/**
- * Where a sealed evidence bundle waits between being produced and being published into its node's own
- * `evidence/<id>/` folder - which is in git and IS the record. Staging is transient by definition, so it
- * lives where docs/ledger-db.md §9 already puts transient host files, never inside the Work root: a
- * `.starciwork/_local/evidence-staging` does not survive the 1.0.4 cutover (§13), and a staging directory
- * inside canonical Work is a directory the validator then has to be taught to ignore.
- *
- * The segment is a digest of the Work root's own real path, NOT its `workspace.yaml` id: ids are not unique
- * (every fixture in this repository declares a fixed one, and two checkouts of the same project share it),
- * and two Work roots sharing one staging area is how a bundle gets published against the wrong owner. The
- * real path is the identity that is actually unique, and it is stable for the same root across processes,
- * which is what a stage-then-publish handoff needs.
- */
-export function evidenceStagingRoot(workRoot) {
-  const absolute = path.resolve(workRoot);
-  let real = absolute;
-  try { real = fs.realpathSync(absolute); } catch { real = absolute; }
-  // The base is realpath'd here, not at the comparison sites: os.tmpdir() is a symlink on macOS and can be
-  // an 8.3 short path on Windows, and a staging check compares this against fs.realpathSync of a real
-  // directory. Only the base can be resolved - the per-root segment need not exist yet.
-  let base = os.tmpdir();
-  try { base = fs.realpathSync(base); } catch { base = os.tmpdir(); }
-  return path.join(base, 'starci', 'evidence-staging', digest(real.toLowerCase()).slice(0, 16));
-}
 const metadataSchema = readDistJson('modules', 'schemas', 'work.schema.yaml');
 const text = v => typeof v === 'string' && v.trim().length > 0;
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -61,7 +36,7 @@ export function validateWorkspace(root) {
  * Ordinary validation and semantic hashes are unchanged; this grants no writes. */
 export function authoredWorkspace(root,targets) {
   if(!Array.isArray(targets)||!targets.length||new Set(targets).size!==targets.length||!targets.every(text))throw Error('Exact authored target IDs required');
-  return validate(root,null,null,targets);
+  return validate(root,null,targets);
 }
 /** Predict exact leaf completion without changing any file or granting acceptance. */
 export function previewCompletion(root,completions) {
@@ -70,12 +45,7 @@ export function previewCompletion(root,completions) {
     return {...validate(root,structuredClone(completions)),preview:true};
   } catch {return {ok:false,preview:true,errors:[{code:'COMPLETION_PREVIEW',path:'.',message:'Invalid completion preview; no files were changed.'}],warnings:[],nodes:[],resources:[]};}
 }
-/** Validate a sealed, new evidence directory against live Work without publishing it. */
-export function previewEvidence(root,{directory,nodeId,name}) {
-  try {return {...validate(root,null,{directory,nodeId,name}),preview:true};}
-  catch {return {ok:false,preview:true,errors:[{code:'EVIDENCE_PREVIEW',path:'.',message:'Invalid staged evidence; nothing was published.'}],warnings:[],nodes:[],resources:[]};}
-}
-function validate(root,completions=null,candidate=null,authoredTargets=null) {
+function validate(root,completions=null,authoredTargets=null) {
   let authoredBinding,authoredAssets;
   // The product's one brand record, resolved after node discovery. `result()` closes over it, so it
   // is declared here rather than where it is computed: an early ROOT failure still returns a result.
@@ -150,18 +120,15 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   function hasCanonicalNode(dir){
     try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name==='assets'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@2(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
   }
-  const canonicalV2=hasCanonicalNode(absolute);
-  // The runtime's own record at the workspace root, not Work artifacts. 1.0.4 moved every piece of it out of
-  // `_local`: the ledger is `.starciwork/runtime.sqlite` (+ its WAL siblings) with the tracked anchor
-  // `.starciwork/ledger-anchor.json` beside it (docs/ledger-db.md §3, §12), and the kernel's own immutable
-  // validation receipts live under `.starciwork/kernel-evidence/<workflow>/`. All of it is JSON on purpose and
-  // none of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
+  const workV2=hasCanonicalNode(absolute);
+  // The runtime's own record at the workspace root, not Work artifacts: the ledger `runtime.sqlite` (+ its
+  // WAL siblings) with the tracked anchor `ledger-anchor.json` beside it (docs/ledger-db.md §3, §12). None
+  // of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
   // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
   const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json']);
-  // `kernel-strays` is the quarantine `kernel/sync.mjs` moves an untracked stray into, and
-  // `kernel-approvals` holds the scoped delegation mandates (workflows/delegation.mjs). All three used
-  // to live under `_local`, which 1.0.4 retires (docs/ledger-db.md §13); all three are kernel-owned
-  // working state with a real lifetime, not Work records.
+  // `kernel-evidence` holds the kernel's immutable validation receipts, `kernel-strays` quarantines
+  // untracked stray files, and `kernel-approvals` holds the scoped delegation mandates -
+  // kernel-owned working state, not Work records.
   const runtimeCustodyDirectories=new Set(['kernel-evidence','kernel-strays','kernel-approvals']);
   function walk(dir, inAssets=false) {
     let entries;
@@ -175,12 +142,10 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       // to reject symlinks; a fixture named index.yaml is not a child node.
       if(inAssets){if(ent.isDirectory())walk(p,true);continue;}
       if (ent.isDirectory()) {
-        // The two workspace-root underscore directories have distinct contracts: `_local` is excluded runtime
-        // state, while `_resources` is traversed for typed resource metadata and opaque/encrypted payloads.
-        // Every other root underscore directory, and every nested underscore directory, remains invalid.
-        if(dir===absolute&&ent.name==='_local')continue;
+        // `_resources` is traversed for typed resource metadata and opaque/encrypted payloads. Every other
+        // underscore directory is flagged RESERVED_DIRECTORY in a Work v2 tree and walked otherwise.
         if(dir===absolute&&ent.name==='_resources'){walk(p);continue;}
-        if(ent.name.startsWith('_')){if(canonicalV2)reservedDirectories.push(rel(p));else if(!['_local','_workflows','_schema','_archive'].includes(ent.name))walk(p);}
+        if(ent.name.startsWith('_')){if(workV2)reservedDirectories.push(rel(p));else walk(p);}
         else walk(p,ent.name==='assets');
         continue;
       }
@@ -199,29 +164,10 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     }
   }
   walk(absolute);
-  if(candidate) {
-    if(!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate.name))throw Error('Unsafe evidence name');
-    const owner=nodes.find(n=>n.meta.id===candidate.nodeId),stage=fs.realpathSync(candidate.directory);
-    const localStaging=evidenceStagingRoot(absolute);
-    const directLocalStage=path.dirname(stage)===localStaging;
-    if(!owner||fs.lstatSync(candidate.directory).isSymbolicLink()||(within(absolute,stage)&&!directLocalStage)||!fs.statSync(stage).isDirectory())throw Error('Invalid evidence staging ownership');
-    const meta=parseYaml(fs.readFileSync(path.join(stage,'manifest.yaml'),'utf8'));
-    if(meta.nodeId!==candidate.nodeId||!Array.isArray(meta.assets))throw Error('Staged evidence owner mismatch');
-    const allowed=new Set(['manifest.yaml',...meta.assets.filter(a=>a.scope!=='node').map(a=>a.path)]);
-    const scan=dir=>{for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
-      const file=path.join(dir,ent.name),relative=path.relative(stage,file).split(path.sep).join('/');
-      if(ent.isSymbolicLink()||ent.name.startsWith('_')||ent.name==='.git'||ent.name.toLowerCase().endsWith('.json')||ent.name==='manifest.yaml'&&relative!=='manifest.yaml'||['index.yaml','node.yaml','node.md','resource.yaml','accounts.yaml'].includes(ent.name))throw Error('Unsafe staged artifact');
-      if(ent.isDirectory())scan(file);else if(!ent.isFile()||!allowed.has(relative))throw Error('Unsealed staged file');
-    }};scan(stage);
-    const destination=path.join(owner.dir,'evidence',candidate.name);
-    if(fs.existsSync(destination))throw Error('Never overwrite published evidence');
-    const item={meta,body:'',markdown:false,path:rel(path.join(destination,'manifest.yaml')),file:path.join(stage,'manifest.yaml'),dir:stage};
-    register(item,'evidence');evidence.push(item);
-  }
   if(completions)for(const id of Object.keys(completions))if(!nodes.some(n=>n.meta.id===id))issue('COMPLETION_TARGET',id,'Completion preview target does not exist.');
   const nodesByDirectory=new Map();for(const n of nodes){const items=nodesByDirectory.get(n.dir)??[];items.push(n);nodesByDirectory.set(n.dir,items);}for(const [dir,items] of nodesByDirectory)if(items.length>1)issue('NODE_FORMAT_CONFLICT',rel(dir),'A Work folder must contain exactly one node metadata file.');
-  if(canonicalV2){
-    for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work v2 permits only workspace-root _local runtime state and workspace-root _resources typed custody; collocate all other owned YAML records and assets with their node.');
+  if(workV2){
+    for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work v2 permits only workspace-root _resources typed custody; collocate all other owned YAML records and assets with their node.');
     for(const p of jsonFiles)issue('JSON_ARTIFACT',rel(p),'Canonical Work records and results use YAML; JSON files are not accepted inside Work.');
   }
   const stringList = (v,p,label,required=false) => {
@@ -348,7 +294,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     const structured=['businessOverview','business','architecture','ui','implementation','uat','brand'].filter(key=>n.meta[key]!==undefined);
     if(structured.length>1)issue('MODULE_SPEC',n.path,'A module node owns at most one business, architecture, UI, implementation, UAT or brand specification.');
     if(n.meta.business!==undefined&&n.meta.kind!=='business')issue('MODULE_SPEC_OWNER',n.path,'business belongs to a business node.');
-    if(n.meta.businessOverview!==undefined&&(n.meta.kind!=='business-overview'||!(n.path==='business/index.yaml'||/(?:^|\/)business\/overview\/index\.yaml$/.test(n.path))))issue('MODULE_SPEC_OWNER',n.path,'businessOverview belongs to business/overview/index.yaml or the legacy product business/index.yaml, with kind business-overview.');
+    if(n.meta.businessOverview!==undefined&&(n.meta.kind!=='business-overview'||!(n.path==='business/index.yaml'||/(?:^|\/)business\/overview\/index\.yaml$/.test(n.path))))issue('MODULE_SPEC_OWNER',n.path,'businessOverview belongs to business/overview/index.yaml or business/index.yaml, with kind business-overview.');
     if(n.meta.architecture!==undefined&&n.meta.kind!=='architecture')issue('MODULE_SPEC_OWNER',n.path,'architecture belongs to an architecture node.');
     if(n.meta.ui!==undefined&&n.meta.kind!=='ui')issue('MODULE_SPEC_OWNER',n.path,'ui belongs to a UI node.');
     if(n.meta.implementation!==undefined&&n.meta.kind!=='implementation')issue('MODULE_SPEC_OWNER',n.path,'implementation belongs to an implementation node.');
@@ -412,7 +358,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     n.ownedAssets=ownedAssets;
     n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:semanticMetadata(n.meta),body:n.body}));
   }
-  if(canonicalV2)for(const p of accountFiles)if(!ownedAccounts.has(path.resolve(p)))issue('ACCOUNTS_OWNER',rel(p),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
+  if(workV2)for(const p of accountFiles)if(!ownedAccounts.has(path.resolve(p)))issue('ACCOUNTS_OWNER',rel(p),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
   for (const n of nodes) {
     n.deps=n.depIds.map(id=>resolve(id,n,['node'])).filter(Boolean);
     n.refs=n.refIds.map(id=>resolve(id,n,['node','resource'])).filter(Boolean);
@@ -438,7 +384,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     const overviewClassification=splitSds===undefined?null:classifySDSPath(n.path,n.children.length>0);
     if(overviewClassification?.type==='overview'){
       if(n.meta.kind!=='architecture'||n.children.length)issue('SDS_LAYOUT',n.path,'Structured architecture overview is an architecture leaf.');
-      if(spec!==undefined)issue('SDS_DUPLICATE',n.path,'Use either the structured overview or one legacy specification, never both.');
+      if(spec!==undefined)issue('SDS_DUPLICATE',n.path,'Use either the structured overview or one cohesive specification, never both.');
       if(n.meta.sourceRefs?.length)issue('SDS_SOURCE_MAPPING',n.path,'Overview decisions may summarize feasibility but sourceRefs and revision proof belong to Implementation.');
       splitSdsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSds,classification:overviewClassification});
       if(n.meta.state==='done'&&splitSds?.status!=='accepted')issue('SDS_NOT_ACCEPTED',n.path,'A reviewed architecture overview must have status accepted before it can complete.');
@@ -451,7 +397,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if(n.children.length&&spec!==undefined)issue('SDS_BRANCH_PAYLOAD',n.path,'SDS branches aggregate; do not duplicate their descendant design.');
       if(splitSds!==undefined){
         const classification=classifySDSPath(n.path,n.children.length>0);
-        if(spec!==undefined)issue('SDS_DUPLICATE',n.path,'Use either a split SDS section or one legacy specification, never both.');
+        if(spec!==undefined)issue('SDS_DUPLICATE',n.path,'Use either a split SDS section or one cohesive specification, never both.');
         if(!classification)issue('SDS_SECTION_PATH',n.path,'Typed SDS content must live under architecture/sds.');
         else {
           if(n.children.length&&!classification.aggregate)issue('SDS_BRANCH_PAYLOAD',n.path,'A detailed SDS item cannot also aggregate child scopes.');
@@ -459,7 +405,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
           if(n.meta.sourceRefs?.length)issue('SDS_SOURCE_MAPPING',n.path,'SDS is source-independent; sourceRefs and revision proof belong to Implementation.');
           splitSdsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSds,classification});
         }
-      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'New SDS authoring requires a typed source-independent section; readable legacy leaves use starci/specification@3.');
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'New SDS authoring requires a typed source-independent section; cohesive leaves use starci/specification@3.');
       if(!n.children.length&&n.meta.state==='done'&&splitSds!==undefined&&splitSds.status!=='accepted')issue('SDS_NOT_ACCEPTED',n.path,'A reviewed SDS leaf must have status accepted before it can complete.');
     }
     const srsMatch = n.path.match(/^(.*(?:^|\/)business\/)srs\/(?:[^/]+\/)*index\.yaml$/);
@@ -472,14 +418,14 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if(n.children.length&&spec!==undefined)issue('SRS_BRANCH_PAYLOAD',n.path,'SRS branches aggregate descendant requirements; only leaves carry specifications.');
       if(splitSrs!==undefined){
         const classification=classifySRSPath(n.path,n.children.length>0);
-        if(spec!==undefined)issue('SRS_DUPLICATE',n.path,'Use either a split SRS section or one legacy cohesive specification, never both.');
+        if(spec!==undefined)issue('SRS_DUPLICATE',n.path,'Use either a split SRS section or one cohesive specification, never both.');
         if(!classification)issue('SRS_SECTION_PATH',n.path,'Typed SRS content must live under business/srs.');
         else {
           if(n.children.length&&!classification.aggregate)issue('SRS_BRANCH_PAYLOAD',n.path,'A detailed SRS item cannot also aggregate child scopes.');
           if(classification.aggregate&&splitSrs?.schema!==SRS_AGGREGATE_SCHEMA)issue('SRS_AGGREGATE',n.path,'SRS parent indexes use starci/srs-aggregate@1 metadata.');
           splitSrsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSrs,classification});
         }
-      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&!['starci/specification@2',SRS_V3_SCHEMA].includes(spec?.schema))issue('SRS_VERSION',n.path,'New SRS authoring requires a typed split section; readable legacy leaves use starci/specification@2 or starci/srs@3; uninvestigated placeholders cannot complete.');
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&!['starci/specification@2',SRS_V3_SCHEMA].includes(spec?.schema))issue('SRS_VERSION',n.path,'New SRS authoring requires a typed split section; cohesive leaves use starci/specification@2 or starci/srs@3; uninvestigated placeholders cannot complete.');
       if(!n.children.length&&n.meta.state==='done'&&splitSrs!==undefined&&splitSrs.status!=='accepted')issue('SRS_NOT_ACCEPTED',n.path,'A reviewed SRS section must have status accepted before it can complete.');
       if(spec?.schema===SRS_V3_SCHEMA){const suffix=n.path.slice((businessRoot+'srs/').length), expected=suffix.startsWith('functional-requirements/')?'functional-requirement':suffix.startsWith('non-functional-requirements/')?'non-functional-requirement':suffix.startsWith('business-rules/')?'business-rule':suffix.startsWith('data/')?'data':suffix.startsWith('customer-journeys/')?'customer-journey':null;if(!expected||spec.nodeType!==expected)issue('SRS_NODE_TYPE',n.path,'SRS@3 nodeType must match its canonical functional-requirements/non-functional-requirements/business-rules/data/customer-journeys folder.');}
     }
@@ -491,7 +437,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
         const businessInputs = r => r.type === 'node' ? [r,...r.children.flatMap(businessInputs)] : [];
         if(spec.schema===SDS_SCHEMA&&review.ok){
           if(n.children.length)issue('SDS_BRANCH_PAYLOAD',n.path,'SDS payloads belong to leaves.');
-          if(n.meta.sourceRefs?.length||n.meta.architecture!==undefined)issue('SDS_SOURCE_MAPPING',n.path,'Source mapping and legacy duplicate architecture payload belong to Implementation, not SDS.');
+          if(n.meta.sourceRefs?.length||n.meta.architecture!==undefined)issue('SDS_SOURCE_MAPPING',n.path,'Source mapping and duplicate architecture payload belong to Implementation, not SDS.');
           const allowedNodeIds=new Set([...n.effectiveRefs,...n.effectiveDeps].flatMap(businessInputs).map(x=>x.meta.id));
           for(const message of validateSDSBindings(spec,{nodes,allowedNodeIds}))issue('SDS_BINDING',n.path,message);
         }
@@ -560,7 +506,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     const bindings=item=>[...item.deps,...item.refs.filter(r=>item===subject||r.type!=='node'||!within(r.dir,subject.dir))].map(r=>({id:r.meta.id,digest:r.type==='resource'?r.specDigest:digestNode(r)})).sort((a,b)=>a.id.localeCompare(b.id));
     return {workspace:workspaceDigest,spec:specOf(subject),ancestors:ancestors.map(a=>({id:a.meta.id,spec:specOf(a),bindings:bindings(a)})),bindings:bindings(subject)};
   };
-  // Split SRS/SDS payloads use semantic IDs instead of legacy nodeId/itemId
+  // Split SRS/SDS payloads use semantic IDs instead of nodeId/itemId
   // tuples. Resolve those IDs to their exact Work owners for digest freshness,
   // but keep them outside the ordinary Work refs graph so reciprocal design
   // relationships do not manufacture dependency cycles.
@@ -599,7 +545,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     return refs.map(ref=>splitOwners[ref.space].get(ref.id)).filter(ownerId=>text(ownerId)&&ownerId!==node.meta.id).map(nodeId=>({nodeId}));
   };
   // Untagged SDS@3 designRefs predate typed freshness and must not change the
-  // digest of an untouched legacy owner. Split schemas opt in; after that
+  // digest of an untouched non-split owner. Split schemas opt in; after that
   // boundary, all owner context is followed.
   const specificationOwnerRefs=node=>{const spec=node.meta.extensions?.work3?.specification;return [...(spec?.refs??[]),...(spec?.designRefs??[]),...splitSemanticRefs(node)].filter(ref=>text(ref?.nodeId));};
   const specificationSeedRefs=node=>{
@@ -693,7 +639,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       }
     }
     codeRefs(e.meta.codeRefs,e);
-    if(e.meta.sourceIdentity!==undefined){sourceIdentity(e.meta.sourceIdentity,e,e.node,Array.isArray(e.meta.assets)?e.meta.assets:[]);if(e.meta.codeRefs!==undefined)issue('SOURCE_IDENTITY_MIXED',e.path,'Do not mix direct and legacy source proof.');}
+    if(e.meta.sourceIdentity!==undefined){sourceIdentity(e.meta.sourceIdentity,e,e.node,Array.isArray(e.meta.assets)?e.meta.assets:[]);if(e.meta.codeRefs!==undefined)issue('SOURCE_IDENTITY_MIXED',e.path,'Do not mix direct and resource-bound source proof.');}
     e.images=0;
     if(!Array.isArray(e.meta.assets))issue('ASSETS',e.path,'assets must be an array (empty is allowed for non-UI evidence).');
     else for(const asset of e.meta.assets) {
@@ -732,7 +678,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
         (n.meta.kind==='business'&&spec?.schema===SRS_V3_SCHEMA&&spec.op==='business.decide')||
         (n.meta.kind==='business'&&srsSection?.type&&splitSrs?.schema===srsSection.expectedSchema)||
         (n.meta.kind==='architecture'&&sdsSection?.type&&splitSds?.schema===sdsSection.expectedSchema));
-      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to the brand record, current structured Business overview, split source-independent SDS and their readable legacy formats; other profiles require their existing proof.');
+      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to the brand record, current structured Business overview, split source-independent SDS and their readable cohesive formats; other profiles require their existing proof.');
       if(Object.hasOwn(c,'evidence')||Object.hasOwn(c,'codeRefs')||Object.hasOwn(c,'sourceIdentity'))issue('DESIGN_REVIEW_MIXED',n.path,'Design review cannot be mixed with evidence or source completion bindings.');
       const review=c.review,seen=new Set();
       if(!object(review)||review.schema!=='starci/design-review@1'||!text(review.reviewer)||!text(review.authority)||!text(review.reviewedAt)||!/^\d{4}-\d{2}-\d{2}T/.test(review.reviewedAt)||!Number.isFinite(Date.parse(review.reviewedAt)))issue('DESIGN_REVIEW',n.path,'Review needs declared reviewer, actual authority provenance and an ISO review time; the validator does not authenticate them.');
@@ -748,7 +694,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     if(n.meta.kind==='brand')issue('BRAND_DECISION',n.path,'A brand is settled by a collocated review of the rev it decided, never by an execution receipt.');
     const evidenceIds=stringList(c.evidence,n.path,'completion.evidence',true);
     const direct=Object.hasOwn(c,'sourceIdentity');
-    if(direct){sourceIdentity(c.sourceIdentity,n,n);if(c.codeRefs!==undefined)issue('SOURCE_IDENTITY_MIXED',n.path,'Do not mix direct and legacy source proof.');}
+    if(direct){sourceIdentity(c.sourceIdentity,n,n);if(c.codeRefs!==undefined)issue('SOURCE_IDENTITY_MIXED',n.path,'Do not mix direct and resource-bound source proof.');}
     const refs=codeRefs(c.codeRefs,n,!!profile.code&&!direct);
     for(const r of refs)if(object(r)&&!n.effectiveRefs.some(ref=>ref.meta.id===r.repository))issue('UNBOUND_REPOSITORY',n.path,'Completion repository resources must be included in own or inherited node refs.');
     const covered=new Set();

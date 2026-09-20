@@ -7,7 +7,7 @@
 //   node scripts/route/build-ops-registry.mjs --check    # diff only, no write (CI)
 //   node scripts/route/build-ops-registry.mjs --opsDir <dir> [--out <file>]
 //
-// Entry shape is fixed by tinkle/_common.md + tinkle-1: {id, family, goal one-liner,
+// Entry shape: {id, family, goal one-liner,
 // nodeKinds, completionProfile, sideEffects summary, reads/writes scope, route keys,
 // lifecycle position}. Fields absent from a per-op yaml are omitted, never invented.
 
@@ -18,18 +18,7 @@ import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
-// The registry only names machinery roles so an agent knows the catalog is
-// declarative; the engines map covers the retired pre-module sources for history.
-const ENGINES = {
-  'basic-ops.mjs': 'shared operator plumbing helpers used by the contracts below',
-  'contracts.mjs': 'builds the typed request/response contract each op executes under',
-  'generate.mjs': 'emits per-op generated artifacts (not routing)',
-  'select.mjs': 'picks an executionModes sub-contract for ops that declare modes',
-  'validate.mjs': 'validates operator.yaml shape against the op contract schema',
-  'role-authority.mjs': 'maps an op to the roles/models allowed to run it',
-};
-
-// Lifecycle stages (tinkle-1's inference from goal/reads/writes — reading order,
+// Lifecycle stages (inferred from goal/reads/writes — reading order,
 // not a runtime DAG; no op self-dispatches). route.phase[0] maps onto these ids.
 const STAGES = {
   intake: 'classify the request into typed intake/scope facts; zero effects',
@@ -39,7 +28,7 @@ const STAGES = {
   implement: 'write product/test/content/knowledge source inside ceilings',
   verify: 'independent evidence-bound proof; never repairs',
   release: 'publish/deploy/migrate — terminal external effect',
-  operate: 'runtime/service lifecycle, goal maintenance, end-of-life retirement',
+  operate: 'runtime/service lifecycle, goal maintenance, end-of-life closeout',
 };
 
 // Coarse lifecycle terms allowed in route.phase alongside a stage id.
@@ -104,7 +93,7 @@ function main() {
   const out = path.resolve(args.out ?? path.join(opsDir, 'registry.yaml'));
   if (!fs.existsSync(opsDir)) { console.error(`ops catalog missing: ${opsDir}`); process.exit(1); }
 
-  // Per-op files live at <opsDir>/<id>.yaml or <opsDir>/ops/<id>.yaml (tinkle-1 layout).
+  // Per-op files live at <opsDir>/<id>.yaml or <opsDir>/ops/<id>.yaml.
   const files = [opsDir, path.join(opsDir, 'ops')]
     .filter(d => fs.existsSync(d))
     .flatMap(d => fs.readdirSync(d)
@@ -115,7 +104,7 @@ function main() {
   for (const file of files) {
     try {
       const entry = entryFor(path.basename(file), parseYaml(fs.readFileSync(file, 'utf8')));
-      if (!entry.route) problems.push(`${path.basename(file)}: no route: block (required by tinkle/_common.md amendment)`);
+      if (!entry.route) problems.push(`${path.basename(file)}: no route: block`);
       else if (entry.route.phase?.length && !STAGES[entry.route.phase[0]] && !Object.values(COARSE).includes(entry.route.phase[0]))
         problems.push(`${path.basename(file)}: route.phase[0] '${entry.route.phase[0]}' is not a known stage`);
       entries.push(entry);
@@ -124,16 +113,6 @@ function main() {
     }
   }
   entries.sort((a, b) => a.id.localeCompare(b.id));
-
-  // Engines section: warn when an ops/*.mjs exists that is not described.
-  const opsSourceDir = path.join(skillRoot, 'legacy', 'ops');
-  const engines = {};
-  if (fs.existsSync(opsSourceDir)) {
-    for (const f of fs.readdirSync(opsSourceDir).filter(f => f.endsWith('.mjs')).sort()) {
-      engines[f] = ENGINES[f] ?? 'UNDESCRIBED — add a role line in build-ops-registry.mjs ENGINES';
-      if (!ENGINES[f]) problems.push(`engine ${f} has no declared role`);
-    }
-  }
 
   const doc = {
     schema: 'starci/module-ops-registry@1',
@@ -148,7 +127,6 @@ function main() {
     coarsePhases: COARSE,
     count: entries.length,
     ops: entries,
-    engines,
   };
   const body = stringifyYaml(doc);
   const header = [
@@ -174,7 +152,7 @@ function main() {
     }
   } else {
     fs.writeFileSync(out, next);
-    console.log(`wrote ${path.relative(skillRoot, out)} (${entries.length} ops, ${Object.keys(engines).length} engines)`);
+    console.log(`wrote ${path.relative(skillRoot, out)} (${entries.length} ops)`);
   }
   for (const p of problems) console.error(`note: ${p}`);
   if (problems.length && args.check) process.exitCode = 1;

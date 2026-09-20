@@ -63,8 +63,8 @@ topics:
     decides: What the selected design specification must enumerate
     rules: COVERAGE-1
 catalogNotes: |-
-  Five per-topic coverage rules were merged into COVERAGE-1, and a retired address is never reused:
-  retired are `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5`, and `RESPONSIVE-5`.
+  Five per-topic coverage rules were merged into COVERAGE-1, and a closed address is never reused:
+  closed are `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5`, and `RESPONSIVE-5`.
 guidance:
   - id: rule-shape
     requirement: |-

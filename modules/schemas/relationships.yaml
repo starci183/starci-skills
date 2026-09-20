@@ -1,5 +1,5 @@
 # ============================================================================
-# modules/schemas/ — schema relationship map (merged tree, M2)
+# modules/schemas/ — schema relationship map
 # ============================================================================
 # Edges between schemas (who references/governs-whom) and between schemas and
 # subsystems (which engine part a schema binds). Companion to index.yaml.
@@ -12,11 +12,6 @@
 #   supersedes    — newer record generation beside a still-valid older one
 #   mirrors       — documentation twin of an executable contract (drift = bug)
 # Every edge cites the source the claim was read from.
-#
-# M2 merge note: `file:` paths in index.yaml point at modules/schemas/; the
-# `source:` citations below are evidence — they name the file that carried the
-# claim at read time (several still say `modules/schemas/` for verbatim quotes from
-# consumers that the global path rewire will update).
 
 schemaToSchema:
 
@@ -27,11 +22,6 @@ schemaToSchema:
   - {from: application-stacks, to: stacks-layout, type: consumes,
      note: "docs/application-stacks.md: checker reads layout's read-only structural findings plus manifest content; manifest fields are a strict subset of what the layout names",
      source: "docs/application-stacks.md"}
-
-  # --- routing: workspace-routing used to delegate to source-layout ---------
-  - {from: workspace-routing, to: "source-layout (RETIRED)", type: delegates,
-     note: "workspace-routing.yaml still carries sourceLayoutContract: modules/schemas/source-layout.yaml — the file is retired; whether the contract survives as a checks script is the source-layout salvage question (R2 §2 DELETE note). Flagged dangling in index.yaml gaps.",
-     source: "modules/schemas/workspace-routing.yaml"}
 
   # --- work tree: layout delegates each family to its record schema ---------
   - {from: work-layout, to: work-business-rule, type: delegates, note: "shape.br -> schema work/business-rule", source: "modules/schemas/work-layout.yaml"}
@@ -71,9 +61,9 @@ schemaToSchema:
      source: "work-evidence.schema.yaml"}
   - {from: "work-*.schema.yaml (v2 family)", to: work.schema.yaml, type: supersedes,
      note: "v2 unversioned work/<kind> ids supersede the v1 @N kinds for the covered families; the monolith remains authority for work/node@2, work/resource@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1",
-     source: "work.schema.yaml $defs consts vs work-*.schema.yaml consts (observed)"}
+     source: "work.schema.yaml $defs consts vs work-*.schema.yaml consts"}
 
-  # --- kernel chain (post-merge: the goal is a sqlite row; the plan file is
+  # --- kernel chain (the goal is a sqlite row; the plan file is
   #     the only schema'd artifact) ------------------------------------------
   - {from: "goals.json.opChain (ledger row)", to: goal-plan, type: delegates,
      note: "the approved opChain legs are the shape api plan diffs the derived {legs:[{op,paths?,notes?}]} file against",
@@ -84,14 +74,8 @@ schemaToSchema:
   - {from: source-staleness, to: "work-layout + work-*", type: consumes,
      note: "the staleness scan walks canonical Work records the layout/family schemas govern (coverage.mode: canonical-work)",
      source: "scripts/checks/source-staleness.mjs report shape"}
-  # Retired edges (files no longer in the tree — see index.yaml `retired:`):
-  #   goal -> goal-plan, workflow-amendment -> goal, goal-plan -> op-io,
-  #   op-io -> op-report, op-report -> workflow-report,
-  #   orchestration-supervision -> op-report, execution-request ->
-  #   execution-receipt, workflow-state -> ledger-db, ledger-db mirrors
-  #   kernel/ledger-db.mjs (superseded: engine/schema.sql is the loaded DDL).
 
-  # --- spec subsystem (merged from specifications/ in M2) --------------------
+  # --- spec subsystem --------------------------------------------------------
   - {from: specification-contract, to: srs-sections, type: delegates,
      note: "contract.schema.yaml semantics.layout: 'the typed split SRS contract in srs-sections.schema.yaml'",
      source: "modules/schemas/spec/contract.schema.yaml"}
@@ -109,11 +93,11 @@ schemaToSchema:
      source: "modules/schemas/spec/sds-map.schema.yaml businessRefs"}
   - {from: srs-v3, to: srs-sections, type: supersedes,
      note: "split SRS sections supersede the v3 compatibility record for new authoring",
-     source: "modules/schemas/spec/contract.schema.yaml compatibilityBusinessV3.legacy"}
+     source: "modules/schemas/spec/contract.schema.yaml compatibilityBusinessV3.compatibility"}
 
   # --- providers -------------------------------------------------------------
   - {from: orca-call, to: "modules/host/orca/calls.yaml", type: governs,
-     note: "calls.yaml carries schema: starci/orca-calls@1; envelope must emit starci/orca-call-result@1. The schema file itself relocates beside modules/host/orca/ (R2 §2) — pending the providers lane.",
+     note: "calls.yaml carries schema: starci/orca-calls@1; envelope must emit starci/orca-call-result@1",
      source: "modules/host/orca/calls.yaml; scripts/checks/providers.mjs"}
   - {from: profile-registry-v3, to: "modules/models/registry.yaml", type: governs,
      note: "registry.yaml carries schema: starci/profile-registry@3",
@@ -124,8 +108,8 @@ schemaToSchema:
      note: "catalog lists examples; each example's detail is a code-example@1 manifest",
      source: "schema titles/required fields"}
   - {from: knowledge-source, to: knowledge-rule, type: delegates,
-     note: "topics contain rule entries; validated by the retired compile-knowledge projection — kept as contracts of the shipped knowledge/ tree",
-     source: "scripts/compile-knowledge.mjs:39-42 (retired to legacy/builders/)"}
+     note: "topics contain rule entries — contracts of the shipped knowledge/ tree",
+     source: "modules/schemas/knowledge-source.schema.yaml; modules/schemas/knowledge-rule.schema.yaml"}
 
   # --- code-pattern pipeline --------------------------------------------------
   - {from: code-pattern-check, to: code-pattern-profile, type: consumes,
@@ -147,13 +131,13 @@ schemaToSubsystem:
               work-non-functional-requirement, work-customer-journey, work-policy-decision,
               work-data, work-sds-component, work-ui-screen, work-implementation,
               work-uat-flow, work-disposable-accounts, work-evidence]
-    note: "19 files — the largest subsystem. v2 per-record family (pending-build) + v1 monolith + layout."
+    note: "19 files — the largest subsystem. v2 per-record family + v1 monolith + layout."
 
   kernel:           # workflow kernel boundaries
     schemas: [goal-plan]
-    note: "the api plan-file contract is the only kernel record schema left — workflow-state/-report/-amendment, orchestration-supervision, goal and ledger-db all retired with the old engine (index.yaml retired:). The goal itself is a sqlite row + modules/goal/define-goal.yaml."
+    note: "the api plan-file contract is the only kernel record schema — the goal itself is a sqlite row + modules/goal/define-goal.yaml."
 
-  spec:             # SRS/SDS payload contracts (merged from specifications/)
+  spec:             # SRS/SDS payload contracts
     schemas: [specification-contract, sds (specification@3), sds-map, srs-sections, srs-v3]
     note: "modules/schemas/spec/*.schema.yaml — umbrella contract + split-section maps + two compat monoliths; executables live in scripts/checks/spec/."
 
@@ -163,7 +147,7 @@ schemaToSubsystem:
 
   routing:          # host/workspace/source resolution
     schemas: [workspace-routing]
-    note: "source-layout retired with workflows/source-layout.mjs + the bin verb; workspace-routing's sourceLayoutContract pointer is a flagged dangling edge."
+    note: "the rules list in workspace-routing.yaml is the whole routing contract."
 
   stacks:           # .starcistacks deployment knowledge
     schemas: [stacks-layout, application-stacks]
@@ -171,19 +155,19 @@ schemaToSubsystem:
 
   host:             # host call contracts
     schemas: [orca-call]
-    note: "relocates beside modules/host/orca/ (R2 §2); cataloged here until then."
+    note: "the contract document itself lives at modules/host/orca/calls.yaml and carries the schema const."
 
   model:            # model/runtime registry
     schemas: [profile-registry-v3]
-    note: "governs modules/models/registry.yaml; analyzed in depth by modules/models/ (tinkle-2)."
+    note: "governs modules/models/registry.yaml; the model-side detail lives in modules/models/."
 
-  knowledge:        # compiled guidance + examples
+  knowledge:        # authored guidance + examples
     schemas: [knowledge-source, knowledge-rule, code-example-manifest, code-example-catalog]
-    note: "no live validator since compile-knowledge retired to legacy/builders/ — contracts of the shipped knowledge/ tree."
+    note: "read directly as authored sources — contracts of the shipped knowledge/ tree."
 
-  build:            # build/migration helpers
+  build:            # build helpers
     schemas: [json-exceptions]
-    note: "source-only by design — the one file compile-declarative.mjs excludes."
+    note: "source-only by design — the one file no consumer projects."
 
 # ----------------------------------------------------------------------------
 # Reading order for an agent that must WRITE a governed document:

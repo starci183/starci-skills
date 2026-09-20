@@ -14,7 +14,7 @@ commandPrefix:
 environmentStrip:
   - name: ACP_BACKEND
     reason: |-
-      Observed 2026-09-20: ACP_BACKEND=windsurf leaked into terminal environments makes the spawned
+      A leaked ACP_BACKEND=windsurf in terminal environments makes the spawned
       devin agent child pick the wrong backend surface; interactive sessions then exit immediately
       with 'agent child exited: exit code: 0'. The strip must run inside the terminal command before
       devin starts — clearing it in the spawn host does not help a terminal that already inherited it.

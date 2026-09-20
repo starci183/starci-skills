@@ -1,6 +1,6 @@
-# modules/ops/ops/test.author.yaml - TINKLE-1 pure-yaml port of .claude/ops/test.author/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/test.author.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: test.author
 goal:
@@ -49,8 +49,8 @@ reads:
         a second parallel runner and never copy a neighboring test's assertions without the design
         behind them.
   - id: conventions
-    path: knowledge/patterns/fe/test.json + knowledge/patterns/be/test.json +
-      knowledge/coding-reference.json
+    path: knowledge/patterns/fe/test.yaml + knowledge/patterns/be/test.yaml +
+      knowledge/coding-reference.yaml
     purpose:
       en: Read the adopted test conventions - naming, structure, fixture and assertion shape - for
         the selected repository's side of the stack. Authored tests conform to the declared patterns
@@ -68,8 +68,7 @@ reads:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+        permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -213,10 +212,17 @@ proofs:
       en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository,
         and separately retain integration/tested mappings. Report uncommitted or no-change honestly.
 blockers:
+  - code: REQUIREMENT_UNSETTLED
+    condition:
+      en: "The accepted SRS is silent or contradictory about an observable result, actor permission or
+        business effect a required test must assert - report blocked with blocker kind srs-gap and the
+        smallest affected semantic IDs; never invent the expectation."
   - code: DESIGN_GAP
     condition:
-      en: "The design record is silent about an observable behavior a required test must exercise -
-        report blocked with blocker kind sds-gap, never write a test that invents the expectation."
+      en: "The accepted SDS is silent or contradictory about a logical authority boundary, public
+        contract, durable effect or recovery outcome a required test must assert - report blocked with
+        blocker kind sds-gap and the smallest affected semantic IDs; never invent that expectation.
+        Test names, fixture construction and other reversible suite-local mechanics are not spec gaps."
   - code: OUTSIDE_TEST_ALLOWLIST
     condition:
       en: "Authored tests cannot be collected without touching a product file, schema, configuration
@@ -263,7 +269,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Are the tests this slice needs authored inside test-paths-only and proven
@@ -274,15 +280,15 @@ business:
   whenNot:
     - Never touches product code, schema, config or the runner manifest - writes stay inside the test ceiling.
     - Never reports pass/fail of the product - the verify ops own verdicts; collection is this op's proof.
-    - Design silence is an sds-gap, not license to invent an expectation.
+    - Material requirement/design silence is a spec gap, not license to invent an expectation; reversible suite-local mechanics stay in this op.
   consumes:
     - Target assertions; architecture contracts; the repo slice; the existing suite + conventions; adopted test patterns.
   produces:
     - Test files/fixtures inside the test ceiling; authored-tests + collection evidence; scoped commit when authorized.
   failureModes:
-    - DESIGN_GAP (sds-gap), OUTSIDE_TEST_ALLOWLIST (shared-change), RUNNER_UNAVAILABLE, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
+    - REQUIREMENT_UNSETTLED (srs-gap), DESIGN_GAP (sds-gap), OUTSIDE_TEST_ALLOWLIST (shared-change), RUNNER_UNAVAILABLE, AUTHORITY_REQUIRED, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.

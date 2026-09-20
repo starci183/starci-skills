@@ -14,10 +14,10 @@ purpose: |-
   for a (role, difficulty) launch only when the role is in `roles` AND `models` names that difficulty - a pool
   that declares no model for a difficulty is ineligible there, never silently rerouted to another model.
   `effort` pins the per-difficulty effort where the provider exposes one. The canonical difficulty vocabulary
-  is easy|medium|hard|insane; resolvers accept the legacy S|M|L|XL spellings (and 'high' for 'hard').
+  is easy|medium|hard|insane; resolvers accept the S|M|L|XL spellings (and 'high' for 'hard').
 maxParallelOps: 20
 allocation:
-  # workflowRuntimeProfile replaces this compatibility default with adaptive-capacity from validated config.json
+  # The workflow-bound profile applies adaptive capacity from validated config.json; this is the default it overrides.
   policy: prefer-then-overflow
   # A tier may order its runtimes per role. The coding roles keep the tier they always had; decide and plan -
   # the roles Fable and the Codex reasoning model carry - name the reasoning pools first and their downgrade
@@ -151,7 +151,7 @@ roleOfKind:
   docs.author: write
   knowledge.repair: write
   release.deliver: implement
-  scope.retire: implement
+  scope.finish: implement
   runtime.operate: implement
   review.verify: verify
   e2e.verify: verify
@@ -171,7 +171,3 @@ roleOfKind:
   work.author: plan
   implementation.plan: plan
   workspace.manage: plan
-  # ex-test.probe is deliberately absent: an internal dispatch-loop canary
-  # (lifecycle: internal-canary), delete-scheduled with the ex-testing harness -
-  # not workflow vocabulary and never an allocation target. See the note at the
-  # head of kinds.yaml's `kinds:` map.

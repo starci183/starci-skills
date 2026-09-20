@@ -16,7 +16,7 @@ identity:
     reasoning: deepseek-v4-pro-reviewer # qwen.json — "the PREFERRED deep
                                         # independent review"
   tension: >-
-    OBSERVED: the profile descriptions say "preferred" while registry.json
+    The profile descriptions say "preferred" while registry.json
     costPolicy excludes the target from all automatic chains. Resolution: the
     profiles describe intent within the QwenCloud family; the registry's chain
     exclusion is the operative routing rule — preference is realized only through

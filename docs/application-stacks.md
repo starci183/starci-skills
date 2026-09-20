@@ -2,7 +2,7 @@
 
 An application stack is the complete deployment description for one application: frontend, APIs, workers, jobs, datastores, ingress, and every required external dependency. A directory or service count does not prove that the application can run. See [Application runtime configuration and health](application-runtime-config-and-health.md) for the source-to-startup contract shared by host, container and remote placements.
 
-The canonical manifest is `.starcistacks/application-stacks.yaml`, schema `starci/application-stacks`. `schemas/stacks-layout.yaml` governs the TREE this manifest lives inside (which directories exist, which files are required, which are refused); `schemas/application-stacks.schema.yaml` is the machine form of the manifest's own CONTENT, and is a strict subset: every field it requires is a field the layout's authored kit actually uses, and nothing the layout does not name is required. A manifest that still carries the legacy `starci/application-stacks@1` id is accepted and named rather than silently passed or rejected (`STACKS_SCHEMA_LEGACY_ID`); drop the suffix. Development uses Docker Compose. An Ubuntu VPS uses Docker Swarm and `docker stack`. Whole-package Kubernetes deployment is explicitly `deferred` or `supported` with a reason, and its posture must match whether `.starcistacks/k8s/` actually exists.
+The canonical manifest is `.starcistacks/application-stacks.yaml`, schema `starci/application-stacks`. `modules/schemas/stacks-layout.yaml` governs the TREE this manifest lives inside (which directories exist, which files are required, which are refused); `modules/schemas/application-stacks.schema.yaml` is the machine form of the manifest's own CONTENT, and is a strict subset: every field it requires is a field the layout's authored kit actually uses, and nothing the layout does not name is required. Development uses Docker Compose. An Ubuntu VPS uses Docker Swarm and `docker stack`. Whole-package Kubernetes deployment is explicitly `deferred` or `supported` with a reason, and its posture must match whether `.starcistacks/k8s/` actually exists.
 
 ## Manifest shape
 
@@ -20,7 +20,7 @@ Every catalog component id that appears as a rendered Compose or Swarm service n
 
 ## The runbook lives in a file, not the manifest
 
-`runbook` names a file; the checker resolves and reads it. That file's Markdown table must document exactly the same seven commands `schemas/stacks-layout.yaml` promises - `prepare`, `doctor`, `up`, `status`, `logs`, `down`, `verification` - as one row each (`runbook-command-missing` names whichever row is absent). This holds for every environment, VPS included: there is no separate VPS-only command set. The commands are declared and legible; the checker does not execute them.
+`runbook` names a file; the checker resolves and reads it. That file's Markdown table must document exactly the same seven commands `modules/schemas/stacks-layout.yaml` promises - `prepare`, `doctor`, `up`, `status`, `logs`, `down`, `verification` - as one row each (`runbook-command-missing` names whichever row is absent). This holds for every environment, VPS included: there is no separate VPS-only command set. The commands are declared and legible; the checker does not execute them.
 
 ## Secret custody
 
@@ -30,9 +30,8 @@ A secret is `{name, where, recipientPolicy, keyCustody}`. `where` is one relativ
 
 ## Directory shape
 
-These are read-only structural findings shared with `schemas/stacks-layout.yaml`, independent of manifest content:
+These are read-only structural findings shared with `modules/schemas/stacks-layout.yaml`, independent of manifest content:
 
-- `STACKS_LEGACY_DIRECTORY` - a `.stacks` directory exists and `.starcistacks` does not.
 - `STACKS_UNDECLARED_ENVIRONMENT` - a directory under `.starcistacks` (other than `k8s`) is not one of the declaration's environment names.
 - `environment-directory-missing` - a declared environment has no directory.
 - `STACKS_SCRATCH_IN_CANONICAL` - `.starcistacks/tmp` exists; scratch belongs in the OS temp directory.

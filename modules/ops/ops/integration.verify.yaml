@@ -1,6 +1,6 @@
-# modules/ops/ops/integration.verify.yaml - TINKLE-1 pure-yaml port of .claude/ops/integration.verify/operator.yaml
-# The operator contract below is verbatim; the trailing 'business:' block is the added
-# analysis (inference marked where the contract does not state it literally).
+# modules/ops/ops/integration.verify.yaml
+# The operator contract is the authority; the trailing 'business:' block is analysis,
+# inference marked where the contract does not state it literally.
 
 id: integration.verify
 goal:
@@ -23,7 +23,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
@@ -352,7 +352,7 @@ layoutPolicy:
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 
 # ---------------------------------------------------------------------------
-# TINKLE-1 business analysis (not part of the source contract; inference marked).
+# Business analysis (not part of the source contract; inference marked).
 business:
   question: >-
     "Does the declared integration actually work against the real provider's
@@ -373,7 +373,7 @@ business:
     - INTEGRATION_UNDECLARED, CREDENTIAL_MISSING, PROVIDER_UNREACHABLE, CLIENT_UNAVAILABLE, SCOPE_OUTSIDE_ALLOWLIST, DECLARED_DEPENDENCY_UNMET (declared blockers).
     - Invalid/expired credential is blocked/environment + a credential-request record - never a retry with invented secrets.
 # ---------------------------------------------------------------------------
-# route: resolver index (added by tinkle-6 per tinkle/_common.md amendment).
+# route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml
 # lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
 # block alone — an agent never reads the whole contract to route.
