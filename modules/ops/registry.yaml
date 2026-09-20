@@ -4,10 +4,11 @@
 schema: starci/module-ops-registry@1
 generatedBy: scripts/route/build-ops-registry.mjs
 origin:
-  canonicalRegistry: .claude/ops/registry.yaml
-  commonDocument: .claude/ops/common.yaml
-  perOpSources: "modules/ops/ops/<id>.yaml (verbatim operator.yaml port + business: block + route: block)"
-  note: modules/ is a parallel read-model for agents; .claude/ops/ stays authoritative and untouched.
+  canonicalRegistry: .claude/modules/ops/registry.yaml (this generated file)
+  commonDocument: .claude/legacy/ops/common.yaml
+  perOpSources: "modules/ops/ops/<id>.yaml (authored operator contract + business: block + route: block)"
+  note: modules/ops is the authored operator source; legacy/ops/ keeps the retired pre-module engines
+    and sources.
 stages:
   intake: classify the request into typed intake/scope facts; zero effects
   scope: bound the work — scope record, workspace bootstrap, launchable nodes

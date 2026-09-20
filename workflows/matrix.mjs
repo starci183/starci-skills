@@ -1,4 +1,4 @@
-import { selectOperation } from '../ops/select.mjs';
+import { selectOperation } from '../legacy/ops/select.mjs';
 
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const text=x=>typeof x==='string'&&x.trim().length>0;

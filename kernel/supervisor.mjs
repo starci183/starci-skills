@@ -297,7 +297,7 @@ export function supervisorMain(options,{cwd,runner=null}){
   const repoRoot=repositoryRoot(path.resolve(cwd));
   const roots=[repoRoot,path.resolve(cwd)];
   const host=path.resolve(options.host??'');
-  const launcher=path.join(host,'.dist','hosts','orca','launch.mjs');
+  const launcher=path.join(host,'hosts','orca','launch.mjs');
   // One line per round into every ledger root this supervisor covers, so each workflow's view finds its supervisor beside it.
   const logFiles=[...new Set(roots.map(root=>path.join(root,'.starciwork','supervisor.log')))];
   const log=event=>{const line=`${JSON.stringify({at:Date.now(),...event})}

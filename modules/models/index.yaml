@@ -2,8 +2,20 @@
 # Business frame: one page answering "what model targets exist, which file
 # describes each, and which the fleet actually routes automatically."
 # Coverage contract for the coherence sweep: every key of
-# .dist/model/runtimes.json runtimes AND every key of
-# .dist/model/registry.json targets has a profile here.
+# modules/models/runtimes.yaml runtimes AND every key of
+# modules/models/registry.yaml targets has a profile here.
+#
+# Canonical model data (ported from the retired model/ tree, now legacy/model):
+#   capabilities.yaml  — starci/model-capability-policy@1 (kernel/model-policy.mjs)
+#   qualifications.yaml — empty measured-qualification store seed
+#   runtimes.yaml      — provider-window pools + allocation + roleOfKind
+#   registry.yaml      — starci/profile-registry@3 (aliases, targets, operators, supervisors)
+#   kinds.yaml         — starci/kinds@2 operation catalog (kernel/graph.mjs)
+#   records.yaml       — starci/records@1 record catalog (kernel/io.mjs)
+#   hosts.yaml         — starci/hosts@1 host descriptors (hosts/index.mjs)
+#   code-patterns.yaml — starci/code-pattern-profile@1 (scripts/checks/check-scoped-lint.mjs)
+#   claude/codex/qwen/devin.yaml — starci/execution-profiles@1 per-runtime profiles
+#   index.mjs          — the module's single public API (ported from model/index.mjs)
 
 schema: starci/module-models-index@1
 

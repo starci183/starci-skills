@@ -1,0 +1,41 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: br.observability.access-log-shape
+recordDigest: 1f0c1a913858d0ea025b4a419c3c2de813e92037475d6348b7fce6451c8e72ae
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/platform/observability/metrics.service.spec.ts
+      sha256: 7311f01665d04c6ae207e70cc97cb78518bc7ffa9fafe3365d43a080d6d64349
+    - path: src/modules/platform/observability/metrics.service.ts
+      sha256: 52d49dc6862af8345b700c582a71479ccdcbd5d531a2a36e58bfb41775c44cd7
+    - path: src/modules/platform/observability/observability.middleware.spec.ts
+      sha256: 1ed0836dbf3faa377dabcddfdc12fb20b5d136383b3c7b5cbed263a9efb9f166
+    - path: src/modules/platform/observability/observability.middleware.ts
+      sha256: c4251902244faaae162c38e3c164020b164f7fe151ccbc135df75278a715bef0
+    - path: src/modules/platform/observability/observability.module-definition.ts
+      sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
+    - path: src/modules/platform/observability/observability.module.ts
+      sha256: ce16a9c62d03ee2ff4f6b8eff8cc72944f61cbf3c0fe45e6818ebb0e089a9c32
+    - path: src/modules/platform/observability/request-context.ts
+      sha256: 7cf9bdf1b09c573e1038a1d7c0c4f97ce94a42fb500bc521f62f578522aa84b4
+  digest: ab4b45569153813ecb37adb96f36e476fad1ca790c3de340ed8cb57543a008bd
+outcome: pass
+assertions:
+  - id: observability-middleware-spec
+    command: npx jest src/modules/platform/observability/observability.middleware.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/platform/observability/observability.middleware.spec.ts exited 0
+  - id: metrics-service-spec
+    command: npx jest src/modules/platform/observability/metrics.service.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/platform/observability/metrics.service.spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-19T20:59:49.046Z

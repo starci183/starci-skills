@@ -244,6 +244,6 @@ test('an empty plan is checks-only and runs nothing',()=>{
 });
 
 test('the module is listed as a runtime module',()=>{
-  const listed=fs.readFileSync(new URL('../scripts/runtime-modules.txt',import.meta.url),'utf8');
+  const listed=fs.readFileSync(new URL('../legacy/builders/runtime-modules.txt',import.meta.url),'utf8');
   assert.match(listed,/^scripts\/checks\/proof\.mjs$/m);
 });

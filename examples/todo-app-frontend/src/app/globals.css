@@ -10,11 +10,14 @@
  */
 @source "../../node_modules/@starci/grammar/dist";
 
-/* todo-app brand rev 3: the product primary overrides Grammar's default accent. */
+/* todo-app brand rev 3: the product primary overrides Grammar's default accent. The brand
+ * declares the accent's own foreground as --color-black (black on #2F6BFF measures 4.67:1,
+ * white only 4.50:1 and fails the declared 4.5 floor), so the alias is bound here too. */
 :root,
 .grammar-common-root {
   --starci-core-accent: #2F6BFF;
   --accent: var(--starci-core-accent);
+  --accent-foreground: var(--color-black, #000);
 }
 
 body {
@@ -43,6 +46,20 @@ main {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+}
+
+/*
+ * Under the shell's 70rem compact breakpoint the sticky compactNavigation band (z-index 40)
+ * occupies the viewport's bottom edge and painted over the lower corner these controls pin to,
+ * leaving them unreachable on phones. They are lifted clear of the band and layered above it,
+ * so on short pages - where the band rides up with the document end - they still stay visible
+ * and usable.
+ */
+@media (max-width: 69.99rem) {
+  .shell-controls {
+    bottom: calc(1rem + 5rem);
+    z-index: 60;
+  }
 }
 
 .theme-toggle,
@@ -74,5 +91,45 @@ main {
 .theme-toggle-option[aria-pressed='true'],
 .locale-switcher-option[aria-current='true'] {
   background: var(--accent, var(--starci-core-accent));
-  color: var(--accent-foreground, var(--background));
+  /* Brand rev 3 rules black label ink on the primary (black/blue is 4.67:1; white/blue is
+   * 4.50:1 and fails the declared 4.5 floor). */
+  color: var(--color-black, #000);
+}
+
+/*
+ * Disabled and skeleton actions must still paint declared brand tokens. The grammar default fades a
+ * disabled primary button to --disabled-opacity (0.5), and the accent at half strength over the
+ * surface blends to a light blue the brand never declares - the render palette proof reads it as an
+ * off-brand colour (RENDER_CHECK_FAILED, first seen on the notify preferences loading/saving
+ * captures). A pending primary keeps the full accent (the spinner already carries the busy signal);
+ * a disabled or skeleton one paints the muted neutrals, which are tokens.
+ */
+/*
+ * HeroUI's secondary variant labels itself with --accent-soft-foreground, a darker blue
+ * (~#2b52b1) no token in brand rev 3 declares. The direction's final strict ink rule settles
+ * the label's colour: every visible text glyph is dark neutral, only fills, borders,
+ * underlines and selection indicators carry saturated brand colour - so the secondary label
+ * paints the declared foreground token, not a coloured ink.
+ */
+.button--secondary {
+  --button-fg: var(--starci-core-foreground, var(--foreground));
+}
+
+.button[data-pending='true'],
+.button[data-action-pending='true'] {
+  opacity: 1;
+}
+
+.button:disabled:not([data-pending='true']):not([data-action-pending='true']),
+.button[aria-disabled='true']:not([data-pending='true']):not([data-action-pending='true']),
+.button[data-disabled='true']:not([data-pending='true']):not([data-action-pending='true']) {
+  opacity: 1;
+  background: var(--surface-tertiary, var(--starci-core-surface-secondary));
+  color: var(--muted, var(--starci-core-muted));
+}
+
+.button.skeleton,
+.button--primary.skeleton {
+  background: var(--surface-tertiary, var(--starci-core-surface-secondary));
+  color: transparent;
 }

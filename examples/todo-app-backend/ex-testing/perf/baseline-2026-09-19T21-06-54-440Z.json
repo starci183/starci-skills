@@ -1,0 +1,123 @@
+{
+  "generated": "2026-09-19T21:06:54.440Z",
+  "base": "http://localhost:3001",
+  "durationSeconds": 15,
+  "connections": 10,
+  "tool": "autocannon (via npx, k6 not installed on this machine)",
+  "seedAccount": "demo@todo.dev",
+  "journeys": [
+    {
+      "id": "task-list",
+      "note": "fr.task.list — the caller's full task list (~4.1k rows seeded). The resolver paginates nothing; the \"paginated\" brief item is exercised as the heaviest list read the API actually exposes.",
+      "requestsSent": 13284,
+      "throughputRps": 884.94,
+      "latencyMs": {
+        "avg": 10.8,
+        "p50": 11,
+        "p97_5": 16,
+        "p99": 18,
+        "p999": null,
+        "max": 43
+      },
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "errorRate": 0
+    },
+    {
+      "id": "recur-expansion",
+      "note": "upcomingOccurrences on a live every-weekday rule — materialisation + live previewDates computation.",
+      "requestsSent": 12141,
+      "throughputRps": 808.74,
+      "latencyMs": {
+        "avg": 11.87,
+        "p50": 12,
+        "p97_5": 15,
+        "p99": 16,
+        "p999": null,
+        "max": 21
+      },
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "errorRate": 0
+    },
+    {
+      "id": "share-fan-out",
+      "note": "collaborators on a task holding pending+revoked+accepted invitations — the share read path behind every fan-out.",
+      "requestsSent": 18601,
+      "throughputRps": 1239.41,
+      "latencyMs": {
+        "avg": 7.57,
+        "p50": 8,
+        "p97_5": 10,
+        "p99": 11,
+        "p999": null,
+        "max": 15
+      },
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "errorRate": 0
+    },
+    {
+      "id": "notify-digest",
+      "note": "notificationPreferences read — the digest path itself is write-side (digest windows flush on delivery); this is the heaviest notify read the schema exposes.",
+      "requestsSent": 21153,
+      "throughputRps": 1409.54,
+      "latencyMs": {
+        "avg": 6.6,
+        "p50": 7,
+        "p97_5": 9,
+        "p99": 10,
+        "p999": null,
+        "max": 16
+      },
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "errorRate": 0
+    },
+    {
+      "id": "audit-export",
+      "note": "exportMyData — decrypts every audit line naming the caller (468 seeded). The heaviest single read.",
+      "requestsSent": 247,
+      "throughputRps": 15.8,
+      "latencyMs": {
+        "avg": 623.92,
+        "p50": 615,
+        "p97_5": 793,
+        "p99": 938,
+        "p999": null,
+        "max": 1045
+      },
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "errorRate": 0
+    }
+  ],
+  "draftSLOs": {
+    "note": "Draft only — measured, not enforced. Keys are p97_5 because that is the nearest percentile autocannon emits; treat as the p95 line.",
+    "taskList": {
+      "p97_5Ms": 800,
+      "note": "full unbounded list; revisit if pagination lands"
+    },
+    "recurExpansion": {
+      "p97_5Ms": 300
+    },
+    "shareFanOut": {
+      "p97_5Ms": 200
+    },
+    "notifyDigest": {
+      "p97_5Ms": 200
+    },
+    "auditExport": {
+      "p97_5Ms": 1500,
+      "note": "decrypts every line; scales with log size"
+    },
+    "errorRate": {
+      "max": 0.01
+    }
+  }
+}

@@ -1,0 +1,51 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: fr.observability.probes
+recordDigest: 543214340e6d7c1a26edf48afd9cfa0a61504a2ac833a451d9ddc67c9bd92e1e
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/features/todo/http/health/probes/probes-exception.filter.ts
+      sha256: 8817d3fcec6abb95b88a060767f4f1df0fe4a8bc3631de4b1159ad39b339d33d
+    - path: src/features/todo/http/health/probes/probes.controller.spec.ts
+      sha256: 70ea0953a303173a751376f093553949f65e7831c2bfdfdf33b4af8b6c2bc5d1
+    - path: src/features/todo/http/health/probes/probes.controller.ts
+      sha256: 861f1e81f2f59f11f3d158de4c68cd3a950663aecacdd6f875bad1a5784faaf5
+    - path: src/features/todo/http/health/probes/probes.module-definition.ts
+      sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
+    - path: src/features/todo/http/health/probes/probes.module.ts
+      sha256: db679f1e9f8085b8bc280780ed9e5ab12c909246994a58c24fed083cc24d6b12
+    - path: src/modules/platform/observability/metrics.service.spec.ts
+      sha256: 7311f01665d04c6ae207e70cc97cb78518bc7ffa9fafe3365d43a080d6d64349
+    - path: src/modules/platform/observability/metrics.service.ts
+      sha256: 52d49dc6862af8345b700c582a71479ccdcbd5d531a2a36e58bfb41775c44cd7
+    - path: src/modules/platform/observability/observability.middleware.spec.ts
+      sha256: 1ed0836dbf3faa377dabcddfdc12fb20b5d136383b3c7b5cbed263a9efb9f166
+    - path: src/modules/platform/observability/observability.middleware.ts
+      sha256: c4251902244faaae162c38e3c164020b164f7fe151ccbc135df75278a715bef0
+    - path: src/modules/platform/observability/observability.module-definition.ts
+      sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
+    - path: src/modules/platform/observability/observability.module.ts
+      sha256: ce16a9c62d03ee2ff4f6b8eff8cc72944f61cbf3c0fe45e6818ebb0e089a9c32
+    - path: src/modules/platform/observability/request-context.ts
+      sha256: 7cf9bdf1b09c573e1038a1d7c0c4f97ce94a42fb500bc521f62f578522aa84b4
+  digest: 5b256a2c319578a17e2b57e2eb41a6378e93fde17a38e8fef388a4da8c99d67e
+outcome: pass
+assertions:
+  - id: observability-unit-suite
+    command: npx jest src/modules/platform/observability src/features/todo/http/health/probes
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/platform/observability src/features/todo/http/health/probes exited 0
+  - id: probes-e2e
+    command: npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts
+    exit: 0
+    outcome: pass
+    observation: npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-19T21:01:15.524Z

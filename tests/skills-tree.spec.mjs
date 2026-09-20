@@ -46,7 +46,7 @@ test('the workflow-chat skill names only launcher commands that exist and the fl
   for(const flag of ['--accept-critique','--allow-dynamic','--lane','--scope','--host'])assert.ok(launcher.includes(flag),`${flag} is a launcher flag`);
   // The usage block teaches the entry first and names the direct path once underneath, for spawn logs.
   const usage=launcher.slice(launcher.indexOf('function usage()'));
-  assert.ok(usage.indexOf('bin/starci.mjs')<usage.indexOf('.dist/hosts/orca/launch.mjs'),'the entry is printed first');
+  assert.ok(usage.indexOf('bin/starci.mjs')<usage.indexOf('hosts/orca/launch.mjs'),'the entry is printed first');
 });
 
 test('the workflow-chat skill is product-agnostic, forbids writing the store and is routed from the entry for both hosts',()=>{
@@ -59,7 +59,7 @@ test('the workflow-chat skill is product-agnostic, forbids writing the store and
   assert.ok(/host-unsupported/.test(skill)&&/Orca host/.test(skill),'unsupported operations are relayed to the Orca host');
   const entry=read('SKILL.md');
   assert.ok(entry.includes('skills/workflow-chat/SKILL.md'),'the entry routes a chat to the skill');
-  assert.ok(entry.includes('.dist/docs/workflow-chat.md'),'the entry links the owner-facing doc');
+  assert.ok(entry.includes('docs/workflow-chat.md'),'the entry links the owner-facing doc');
   assert.ok(fs.existsSync(path.join(root,'docs/workflow-chat.md')));
   // Codex reads the host AGENTS.md and Claude Code reads CLAUDE.md; both are the same bootstrap and both route
   // to SKILL.md, so the routing line above is what gives the two chats identical behaviour.

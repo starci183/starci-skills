@@ -4,22 +4,23 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {buildFiles} from '../scripts/build-workflows.mjs';
+import {parseYaml} from '../core/yaml.mjs';
+import {payloadFiles} from '../bin/starci-skills.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 
 test('installed stack contract reaches replacing op modes and ships runnable example assets',()=>{
-  const files=buildFiles(root);
+  const files=new Set(payloadFiles(root));
   const consumers={'architecture.decide':[],'backend.implement':[],'interface.implement':[],'work.author':[],
     'runtime.operate':['inspect','serve','service'],'release.deliver':['deploy','migrate'],'review.verify':['delivery','api']};
   for(const [id,modes] of Object.entries(consumers)){
-    const op=JSON.parse(files.get(`ops/${id}/operator.json`));
+    const op=parseYaml(fs.readFileSync(path.join(root,'modules/ops/ops',`${id}.yaml`),'utf8'));
     for(const contract of [op,...modes.map(mode=>op.executionModes[mode])]){
       assert.ok(contract.reads.some(read=>read.id==='application-stacks'),id);
       assert.ok(contract.steps[0].reads.includes('application-stacks'),id);
     }
   }
-  for(const file of ['scripts/checks/stacks.mjs','schemas/application-stacks.schema.json','knowledge/application-stacks.json',
+  for(const file of ['scripts/checks/stacks.mjs','schemas/application-stacks.schema.yaml','knowledge/application-stacks.yaml',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
     ...['gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
@@ -50,15 +51,13 @@ test('stacks CLI refuses missing or malformed evidence without echoing file cont
 test('runtime packaging excludes accidental generated example plaintext and ciphertext',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-package-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-package-'));fs.rmSync(directory,{recursive:true,force:true});});
-  for(const entry of ['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','providers','approvals',
-    'execution','knowledge','contracts','specifications','examples','scripts','core','schemas'])
-    fs.cpSync(path.join(root,entry),path.join(directory,entry),{recursive:true});
+  // Minimal stack-kit fixture: only the authored compose input plus planted materialized/secret files.
   const base='examples/todo-app-backend/.starcistacks/dev/';
-  for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
+  for(const suffix of ['infra/compose/compose.yaml','secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
     const target=path.join(directory,base,suffix);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,'synthetic-credential-must-not-ship');
   }
-  const files=buildFiles(directory);
-  for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml'])assert.equal(files.has(base+suffix),false);
+  const files=new Set(payloadFiles(directory));
+  for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml'])assert.equal(files.has(base+suffix),false,base+suffix);
   assert.ok(files.has(base+'infra/compose/compose.yaml'));
 });

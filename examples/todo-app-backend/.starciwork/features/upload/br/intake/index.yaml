@@ -1,0 +1,24 @@
+schema: work/business-rule
+id: br.upload.intake
+title: Only an allowed shape of file is accepted
+state: done
+statements:
+  - An upload is accepted only when its declared mime is on the configured allowlist and its size sits
+    within the configured byte ceiling.
+  - Validation runs twice on the presigned path - on the declared shape when the intent opens and on
+    the received bytes when the content lands - because a client can declare a small intent and PUT a
+    large body.
+  - A refused intake persists nothing - no metadata row and no stored object.
+acceptance:
+  - id: ac.upload.intake.rejects-mime
+    given: An upload intent or a direct upload
+    when: Its mime is not on the allowlist
+    then:
+      - The upload is refused.
+      - No row and no object are written.
+  - id: ac.upload.intake.rejects-oversize
+    given: An upload intent, presigned fulfilment or direct upload
+    when: The declared or received size exceeds the configured ceiling
+    then:
+      - The upload is refused.
+module: src/modules/integrations/upload

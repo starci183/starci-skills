@@ -7,7 +7,8 @@ assertions:
   - id: ux.sign-in.validation-feedback
     expected: yes
     observed: yes
-    note: The submit button stays disabled while either field is empty (SignInFormView disabled logic).
+    note: The submit button stays disabled while either field is empty
+      (SignInFormView disabled logic).
 assets:
   - path: screens/empty.png
     sha256: 728a1058b8a851c5122aa88d2b745629a63a93b40f61f1be72523a7009b015d8
@@ -32,18 +33,48 @@ files:
     ownedResourcesCreated: []
     ownedResourcesDeleted: []
     verifiedAbsent: []
-    note: This run created no run-owned fixture rows against a database this lane owns; nothing to clean
-      up.
+    note: This run created no run-owned fixture rows against a database this lane
+      owns; nothing to clean up.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.login.sign-in
       title: Sign in, close the browser, come back
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: person
+          action: Sign in with the seeded person.
+          expected: the task list loads for that person
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: person
+          action: See the empty task list.
+          expected: no tasks are listed and no error shows
+          checks:
+            - id: errorFeedback
+              expected: no
+        - order: 3
+          actor: person
+          action: "Close the browser tab and come back (the session token persists in
+            localStorage, read back as an Authorization: Bearer header - never a
+            cookie)."
+          expected: still signed in, same list renders with no re-authentication
+          checks:
+            - id: completion
+              expected: yes
+        - order: 4
+          actor: person
+          action: Submit a wrong password.
+          expected: a single uniform refusal message shows; no account-existence hint
+          checks:
+            - id: errorFeedback
+              expected: yes
+            - id: validation
+              expected: yes
       proves:
         - fr.login.sign-in
         - br.login.password.sign-in
@@ -72,7 +103,8 @@ files:
       - id: ux.sign-in.validation-feedback
         expected: yes
         observed: yes
-        note: The submit button stays disabled while either field is empty (SignInFormView disabled logic).
+        note: The submit button stays disabled while either field is empty
+          (SignInFormView disabled logic).
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.login.sign-in

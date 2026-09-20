@@ -30,3 +30,11 @@ runner rather than a developer's laptop:
 No job needs a GitHub Actions secret: every credential the stack uses is the committed DEMO-ONLY age
 identity at `.starcistacks/dev/runtime/env/demo.agekey` and the `.enc` files it decrypts (see
 `scripts/with-dev-secrets.sh` and `.starcistacks/dev/runtime/env/KEYS.md`).
+
+## Probes and metrics
+
+`GET /health` and `GET /ready` answer the dependency-checked Postgres probe (200 ok / 503), and
+`GET /metrics` serves Prometheus text exposition of per-route request counters and durations. Every
+request carries an `x-request-id` correlation id echoed on the response and written on one structured
+`http.request.completed` log line. See `TESTING.md` for the exact commands and how the dev stack's
+Prometheus service scrapes the api.

@@ -5,7 +5,9 @@ import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {inspectStorage,assertNewStoragePath,isLocalOnlyWorkspace} from '../workflows/storage.mjs';
-import { distPath, requireDist, readDistJson, skillRoot } from '../core/runtime-root.mjs';
+import { skillRoot } from '../core/runtime-root.mjs';
+// Distless: the CLI reads authored YAML sources directly — there is no compiled bundle.
+const sourceYaml = (...parts) => parseYaml(fs.readFileSync(path.join(skillRoot, ...parts), 'utf8'));
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // The workflow commands are not this module's: `bin/starci.mjs` forwards them to the kernel launcher before
@@ -112,14 +114,13 @@ function csv(value, label) {
 }
 
 function catalogue() {
-  const catalog = readDistJson('ops', 'catalog.json');
-  if (catalog.schema !== 'starci/built-ops@1' || !Array.isArray(catalog.ops)) throw new Error('Unsupported operator catalogue.');
-  return catalog;
+  const registry = sourceYaml('modules', 'ops', 'registry.yaml');
+  if (registry.schema !== 'starci/module-ops-registry@1' || !Array.isArray(registry.ops)) throw new Error('Unsupported operator catalogue.');
+  return { schema: registry.schema, ops: registry.ops.map(op => ({ ...op, operator: `${op.id}.yaml` })) };
 }
 
 function readOperatorDocument(relative) {
-  requireDist();
-  const opsRoot = distPath('ops');
+  const opsRoot = path.join(skillRoot, 'modules', 'ops', 'ops');
   if (typeof relative !== 'string' || path.isAbsolute(relative)) throw new Error('Invalid operator document path.');
   const resolved = path.resolve(opsRoot, relative);
   if (!inside(opsRoot, resolved) || !inside(fs.realpathSync(opsRoot), fs.realpathSync(resolved))) throw new Error('Operator document escapes its catalogue.');
@@ -128,9 +129,8 @@ function readOperatorDocument(relative) {
   return fs.readFileSync(resolved, 'utf8');
 }
 
-function readPolicyDocument(relative = 'common.json') {
-  requireDist();
-  const policyRoot = distPath('policy');
+function readPolicyDocument(relative = 'common.yaml') {
+  const policyRoot = path.join(skillRoot, 'legacy', 'ops');
   if (typeof relative !== 'string' || path.isAbsolute(relative)) throw new Error('Invalid policy document path.');
   const resolved = path.resolve(policyRoot, relative);
   if (!inside(policyRoot, resolved) || !inside(fs.realpathSync(policyRoot), fs.realpathSync(resolved))) throw new Error('Policy document escapes its root.');
@@ -140,12 +140,14 @@ function readPolicyDocument(relative = 'common.json') {
 }
 
 function secondaryRoutes() {
-  const map=readDistJson('basic-ops.json'),routes={};
-  for(const operation of map.ops??[]){
-    if(!Array.isArray(operation.secondaryCalls)||!operation.secondaryCalls.length)continue;
-    const authority=readDistJson('ops',operation.id,'secondary.json');
-    routes[operation.id]={maxJobs:authority.maxJobs,calls:authority.calls.map(call=>({
-      op:call.op,role:call.role,parentState:call.parentState,callSite:call.callSite,
+  const opsDir=path.join(skillRoot,'legacy','ops'),routes={};
+  for(const id of fs.readdirSync(opsDir)){
+    const file=path.join(opsDir,id,'secondary.yaml');
+    if(!fs.existsSync(file))continue;
+    const authority=parseYaml(fs.readFileSync(file,'utf8'));
+    if(!Array.isArray(authority.calls)||!authority.calls.length)continue;
+    routes[id]={maxJobs:authority.maxJobs,calls:authority.calls.map(call=>({
+      op:call.op,role:call.role,parentState:call.parentState,callSite:call.callSite??call.matrixCell,
       canCallOthers:call.canCallOthers,canCompleteParent:call.canCompleteParent
     }))};
   }
@@ -258,7 +260,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
     if(command==='approval'){
       const [action,...input]=args;
       if(!['policy','decide'].includes(action))throw Error('Use starci approval policy|decide.');
-      const policy=readDistJson('approvals','policy.json');
+      const policy=sourceYaml('approvals','policy.yaml');
       if(action==='policy'){exactArgs(input,0);emit(policy);return 0;}
       exactArgs(input,1);
       const {decideApproval}=await import('../approvals/policy.mjs');
@@ -270,19 +272,19 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {createWorkflowReceipt,validateWorkflowRequest}=await import('../execution/contracts.mjs');
       const {planWorkflowExecution,inspectWorkflowExecution,createSharedConflictEscalation}=await import('../execution/api.mjs');
       if(action==='map'){
-        exactArgs(input,0);const registry=readDistJson('model','registry.json');
-        emit({schema:'starci/execution-map@1',modes:registry.executionModes,skills:registry.skills,operators:registry.operators,targets:registry.targets,fallback:registry.fallback,approvals:readDistJson('approvals','policy.json'),secondaryRoutes:secondaryRoutes()});return 0;
+        exactArgs(input,0);const registry=sourceYaml('modules','models','registry.yaml');
+        emit({schema:'starci/execution-map@1',modes:registry.executionModes,skills:registry.skills,operators:registry.operators,targets:registry.targets,fallback:registry.fallback,approvals:sourceYaml('approvals','policy.yaml'),secondaryRoutes:secondaryRoutes()});return 0;
       }
       if(action==='create'){
         exactArgs(input,1);const request=dataFile(input[0]);validateWorkflowRequest(request);emit(createWorkflowReceipt(request));return 0;
       }
       if(action==='plan'){
         exactArgs(input,2);const request=dataFile(input[0]);const inventory=csv(input[1],'Ready runtimes');
-        emit(planWorkflowExecution({request,registry:readDistJson('model','registry.json'),inventory}));return 0;
+        emit(planWorkflowExecution({request,registry:sourceYaml('modules','models','registry.yaml'),inventory}));return 0;
       }
       if(action==='resolve'){
         exactArgs(input,3);const request=dataFile(input[0]);const {resolveOperationExecution}=await import('../execution/resolve.mjs');
-        emit(resolveOperationExecution({workflowRequest:request,operationId:input[1],registry:readDistJson('model','registry.json'),inventory:csv(input[2],'Ready runtimes')}));return 0;
+        emit(resolveOperationExecution({workflowRequest:request,operationId:input[1],registry:sourceYaml('modules','models','registry.yaml'),inventory:csv(input[2],'Ready runtimes')}));return 0;
       }
       if(action==='show'||action==='resume'){
         exactArgs(input,2);const result=inspectWorkflowExecution({request:dataFile(input[0]),receipt:dataFile(input[1])});
@@ -398,8 +400,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       if(!localOnly)fs.mkdirSync(root);
       fs.writeFileSync(path.join(root, 'workspace.yaml'), stringifyYaml({ schema: 'work/workspace@1', id: args[2] }), { flag: 'wx' });
       fs.mkdirSync(path.join(root,'_schema'));
-      for(const name of ['work.schema'])fs.writeFileSync(path.join(root,'_schema',name+'.yaml'),stringifyYaml(readDistJson('schemas',name+'.json')));
-      fs.writeFileSync(path.join(root,'_schema/work-layout.yaml'),stringifyYaml(readDistJson('schemas','work-layout.json')));
+      for(const name of ['work.schema','work-layout'])fs.copyFileSync(path.join(skillRoot,'schemas',name+'.yaml'),path.join(root,'_schema',name+'.yaml'));
       // The ledger and its WAL siblings are untracked by design (docs/ledger-db.md §2); `ledger-anchor.json`
       // beside them is tracked ON PURPOSE (§12) - it is the counter-record a re-clone carries, and ignoring
       // it would turn a lost ledger into a silent restart at generation 0 instead of a refusal. `_local/`
@@ -436,8 +437,8 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
     }
     if (['workflows','workflow','route'].includes(command)) {
       exactArgs(args,command==='workflows'?0:1);
-      const read=name=>readDistJson('workflows',name);
-      const catalog=read('catalog.json'),jobs=read('jobs.json'),frontend=read('frontend.json');
+      const read=name=>sourceYaml('workflows',name);
+      const catalog=read('catalog.yaml'),jobs=read('jobs.yaml'),frontend=read('frontend.yaml');
       const {validateWorkflowCatalog}=await import('../workflows/select.mjs');
       const checked=validateWorkflowCatalog(catalog,jobs,frontend);
       if(!checked.ok)throw Error(checked.errors.join('; '));
@@ -463,14 +464,14 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const catalog = catalogue();
       const selected = catalog.ops.find(op => op.id === args[0]);
       if (!selected) throw new Error('Unknown op; use work ops to inspect available IDs.');
-      const operator = JSON.parse(readOperatorDocument(selected.operator));
+      const operator = parseYaml(readOperatorDocument(selected.operator));
       if(args[1]!==undefined) {
-        const {selectOperation}=await import('../ops/select.mjs');
+        const {selectOperation}=await import('../legacy/ops/select.mjs');
         emit(selectOperation(operator,args[1]));
         return 0;
       }
       emit(`Selected op: ${selected.id}. Contract display only; nothing has executed.`);
-      emit(readPolicyDocument('common.json'));
+      emit(readPolicyDocument('common.yaml'));
       emit(JSON.stringify(operator, null, 2));
       return 0;
     }

@@ -1,6 +1,6 @@
 # EXUP wave — upgrade examples toward production bar
 
-Read `.claude/SKILL.md` + `OPENSOURCE-GOAL.md` (repo root) first. Target: `.claude/examples/` must become a template good enough to open-source — real infra, real seeds, real tests, real evidence.
+Read `.claude/SKILL.md` + `.claude/.experiments/OPENSOURCE-GOAL.md` first. Target: `.claude/examples/` must become a template good enough to open-source — real infra, real seeds, real tests, real evidence.
 
 ## Ground truth (measured)
 - todo-app-backend: 117 unit specs, ~13 e2e journeys, coverage lines 94% / branches **55%** (weak), seeds = 2 sql files (thin), 242 UAT artifacts (png+webm), compose infra at `.starcistacks/dev/infra/compose`

@@ -542,5 +542,5 @@ test('a feature is the first two segments of a Work node id, and nothing is inve
 });
 
 test('the module is listed as a runtime module',()=>{
-  assert.match(fs.readFileSync(path.join(root,'scripts','runtime-modules.txt'),'utf8'),/^kernel\/view\.mjs$/m);
+  assert.match(fs.readFileSync(path.join(root,'legacy','builders','runtime-modules.txt'),'utf8'),/^kernel\/view\.mjs$/m);
 });

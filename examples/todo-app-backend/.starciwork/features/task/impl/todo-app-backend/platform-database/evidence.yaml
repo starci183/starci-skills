@@ -7,12 +7,24 @@ recordDigest: c0824a7c94bcdc0b1bcfd3ec50a6ae691f4d4e4beffa4ada98f6dfacc74fbca5
 codeDigest:
   algorithm: sha256
   files:
+    - path: src/features/todo/http/health/health.controller.spec.ts
+      sha256: 1c060fba74efddd59e7ef49d7127e928cd89044527daae6abfd548b60a680e35
     - path: src/features/todo/http/health/health.controller.ts
       sha256: c316d27d4fdb830e760f9e7219fe53d79bcfbfa9e252c9a2e817c77765d0ee64
     - path: src/features/todo/http/health/health.module-definition.ts
       sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
     - path: src/features/todo/http/health/health.module.ts
       sha256: d05453f3b6f1ae0fd71ba216ccf8df4e0ca1f153731420e006accdbd4e04edad
+    - path: src/features/todo/http/health/probes/probes-exception.filter.ts
+      sha256: 8817d3fcec6abb95b88a060767f4f1df0fe4a8bc3631de4b1159ad39b339d33d
+    - path: src/features/todo/http/health/probes/probes.controller.spec.ts
+      sha256: 70ea0953a303173a751376f093553949f65e7831c2bfdfdf33b4af8b6c2bc5d1
+    - path: src/features/todo/http/health/probes/probes.controller.ts
+      sha256: 861f1e81f2f59f11f3d158de4c68cd3a950663aecacdd6f875bad1a5784faaf5
+    - path: src/features/todo/http/health/probes/probes.module-definition.ts
+      sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
+    - path: src/features/todo/http/health/probes/probes.module.ts
+      sha256: db679f1e9f8085b8bc280780ed9e5ab12c909246994a58c24fed083cc24d6b12
     - path: src/modules/platform/databases/postgresql/primary/constants/connection.ts
       sha256: 6591d71475bb022139d02b5169ca114e5bb428db135ecd3562636fc937fe4afa
     - path: src/modules/platform/databases/postgresql/primary/entities/audit-erasure-request.entity.ts
@@ -22,7 +34,7 @@ codeDigest:
     - path: src/modules/platform/databases/postgresql/primary/entities/audit-log-line.entity.ts
       sha256: 23c359bb799fba47752c486a9d06b9b1d38fb94b4a145064f414d09c31c789d3
     - path: src/modules/platform/databases/postgresql/primary/entities/entities.spec.ts
-      sha256: 6d61cacc6a18fdf9556033711211740c1e87f4fee1c456e33c08c30878fa063e
+      sha256: 0715ee88601bbebd9714dc547504baf12468f7f9e55bb0f783bead832ca54628
     - path: src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts
       sha256: ea271588bbbd863d114ddc385c418680caca67d166d11f3667208ba71a0fdd3b
     - path: src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts
@@ -45,8 +57,10 @@ codeDigest:
       sha256: b1b74f23e5861c5b15a936a87ae49c6b2f94237656622236cca64629d1899ac6
     - path: src/modules/platform/databases/postgresql/primary/entities/task.entity.ts
       sha256: 8b5fe75277114fb774b2317c45e68a2bb2b8ff5f02f8febfab1ac8270ab5c0ad
+    - path: src/modules/platform/databases/postgresql/primary/entities/upload.entity.ts
+      sha256: 9eb8bb10325d3eb1ba470daef53095eee3a9ac47aa0923b4bd72898b6c8f2ec1
     - path: src/modules/platform/databases/postgresql/primary/migrations.spec.ts
-      sha256: 0581512e9896ff1b6018e134800581b9533dbfe2375ddcbe203717d28e90213e
+      sha256: 7fb2ca54386c88a3cba47201a690f176338308277a9a77b3d52a4bab0e1021d3
     - path: src/modules/platform/databases/postgresql/primary/migrations/1758160000000-create-sessions-table.ts
       sha256: 10b3cfffe296afa2ecf4db7b15d6abe656810d4b3b2c88c62f3512c03e010106
     - path: src/modules/platform/databases/postgresql/primary/migrations/1758160000001-create-tasks-table.ts
@@ -61,6 +75,8 @@ codeDigest:
       sha256: 93f712e1b124ad2e94910b16f330ec5c0923f94099ea9fb9a6f43f80a64fb91d
     - path: src/modules/platform/databases/postgresql/primary/migrations/1758246000000-create-recur-tables.ts
       sha256: 283d22a8c5003f4f443d9e05b388f877261e5bb290cbc9e53ef7cff3c5b4fba7
+    - path: src/modules/platform/databases/postgresql/primary/migrations/1758300000000-create-uploads-table.ts
+      sha256: ebb9ef4229b1ad6eb13f9a005a8a9e1072a15bb8d4e5b9cfcb6ca047585944ae
     - path: src/modules/platform/databases/postgresql/primary/primary.client.spec.ts
       sha256: 1464030529abd5ebd7ad59bc1facc1bd6a97d1526b78ba2dcda533e6fc10d823
     - path: src/modules/platform/databases/postgresql/primary/primary.client.ts
@@ -72,14 +88,14 @@ codeDigest:
     - path: src/modules/platform/databases/postgresql/primary/primary.module-definition.ts
       sha256: e92de8936dae16a6b4806980cea85f255b0af1060ea6a0580e4ea7d446242071
     - path: src/modules/platform/databases/postgresql/primary/primary.module.spec.ts
-      sha256: 42bbb3d3ea7f216443e0976500dc3a604cb1d8db62ac46706f4f8f4d276f6e21
+      sha256: a561316cb7809f028b5638a2a88351fdc05350fe59ca58ca174834e39841ec59
     - path: src/modules/platform/databases/postgresql/primary/primary.module.ts
-      sha256: a2b95d9a6c05f112ffeb50e65fc302fbf3c6ab642fbf0d90d8bcc5b929e56eb1
+      sha256: cf91c8fd504aa20420dd7838c02a3b3437240b46c80592e7013cf872510f7bde
     - path: src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.spec.ts
       sha256: c278ee405e961e8e2d94b4439c5ca79b6ccc191f0ab97a889f40786d194de8ae
     - path: src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.ts
       sha256: e960e139afde0e236b513d3d18cd1f4941501898569a31c62e3939281ce9a3e2
-  digest: 66f32be67c25532e13fa6a382e8e5d950b8aee5252e35b1a65ddab5673a7f393
+  digest: fbe6cce818f2ea34915c1c9b7a0a3d69512e1ca120357fcdbe61aef28a5fb253
 outcome: pass
 assertions:
   - id: data.task.task
@@ -92,8 +108,13 @@ assertions:
     exit: 0
     outcome: pass
     observation: npx jest src/modules/bussiness/session exited 0
+  - id: primary-module-specs
+    command: npx jest src/modules/platform/databases/postgresql/primary
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/platform/databases/postgresql/primary exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T15:21:16.277Z
+  capturedAt: 2026-09-19T21:05:07.425Z

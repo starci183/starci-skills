@@ -2,7 +2,7 @@
  * goal.md §3 names each runtime pool by its independently-quota'd provider window
  * (`codex-agent`, `claude-agent`, `claude-fable`, `qwen-agent`, `devin-agent`) with the
  * model pinned inside the pool per role. Until the profile merges that naming,
- * `model/runtimes.yaml` keys the same pools by their primary model id
+ * `modules/models/runtimes.yaml` keys the same pools by their primary model id
  * (`gpt-5.6-sol`, `claude-opus`, ...). These helpers resolve either spelling to the
  * key the loaded profile actually uses, so a spec asserts pool identity and never one
  * spelling. Nothing here widens an assertion: `idOf` returns the exact member key,
@@ -67,5 +67,5 @@ export function expectedLeastLoaded(profile,role){
 }
 
 export function loadRuntimeProfile(){
-  return parseYaml(fs.readFileSync(new URL('../../model/runtimes.yaml',import.meta.url),'utf8'));
+  return parseYaml(fs.readFileSync(new URL('../../modules/models/runtimes.yaml',import.meta.url),'utf8'));
 }

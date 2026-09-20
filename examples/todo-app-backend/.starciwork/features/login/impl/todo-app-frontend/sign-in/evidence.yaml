@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.login.todo-app-frontend.sign-in
-recordDigest: 87925c8549b60b847f5187176abb1eef32e86987bf1b7eb16f2a6e7e18c81a9f
+recordDigest: f196ee39d8cbc22a2b8c94301df2485fcf45720d1be77a3ea01b9949e3af595a
 codeDigest:
   algorithm: sha256
   files:
@@ -33,8 +33,15 @@ assertions:
     outcome: pass
     observation: npx vitest run src/components/blocks/sign-in-form src/hooks/auth
       src/modules/api/auth.spec.ts src/modules/api/graphql.spec.ts exited 0
+  - id: render-proof
+    command: node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork
+      --record impl.login.todo-app-frontend.sign-in
+    exit: 0
+    outcome: pass
+    observation: node ../../scripts/example-render-proof.mjs --work
+      examples/todo-app-backend/.starciwork --record impl.login.todo-app-frontend.sign-in exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T13:05:34.702Z
+  capturedAt: 2026-09-19T23:04:58.609Z

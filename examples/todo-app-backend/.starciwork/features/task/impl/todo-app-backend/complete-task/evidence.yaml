@@ -74,12 +74,12 @@ codeDigest:
     - path: src/modules/bussiness/task/task.module.ts
       sha256: 24617550b93232eb6684b9b6a8aac24951da971937c5c1354dd8045711c8f84c
     - path: src/modules/bussiness/task/task.service.spec.ts
-      sha256: 1d045f327d6c53211d749649557e36599b5ba27c26298f0b57feeb9a23f842ac
+      sha256: ff016e0cf2fe87c8e396821cbee72fe3973215e740d7677d4dd70c19458c68ec
     - path: src/modules/bussiness/task/task.service.ts
       sha256: d983a4a891dfec3d295eb66db354e7ef75ab0514aad4d325a03dab91dfc013d4
     - path: src/modules/bussiness/task/types/task-record.ts
       sha256: e7a7719a464f7be1ab8faa18a97991d5c3d7f37bf8cbfac80c0d66eab0a5941c
-  digest: 564399f90643677c185dbfd10675ba327ad7ca6aa10864efed9794c97ae4cf1d
+  digest: 696c8afc144583b9ad2335158724030cb120af8077bb2a8bbea71f37983e23e7
 outcome: pass
 assertions:
   - id: br.task.complete.once
@@ -107,4 +107,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T15:19:46.060Z
+  capturedAt: 2026-09-19T23:22:03.934Z

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import {canonicalTarget} from '../model/index.mjs';
+import {canonicalTarget} from '../modules/models/index.mjs';
 import {openLedger,inspectLedger} from './ledger-db.mjs';
 import {signalRow,setSignal} from './launch.mjs';
 

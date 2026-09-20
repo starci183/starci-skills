@@ -49,6 +49,8 @@ codeDigest:
       sha256: 6b59c285a0a45b7cf8244b0e73a5653e3c7a9d3e232cdb4f60763933a0399c28
     - path: src/features/todo/graphql/queries/plan/plan-usage/plan-usage.resolver.ts
       sha256: ecce8007a7c2b4924d5cf92613e8decaa7e65d43e1b491ec47b802e14da98bf0
+    - path: src/features/todo/http/webhooks/sepay/sepay-webhook.controller.spec.ts
+      sha256: b3630b4116a5824a161f36c6207336772bac7c64f97a112c6258eacf41f08a6d
     - path: src/features/todo/http/webhooks/sepay/sepay-webhook.controller.ts
       sha256: 5862d00db39d5979b0aab7d5840f6ab67da459ffc18821c5a28fcd07b6940662
     - path: src/features/todo/http/webhooks/sepay/sepay-webhook.module-definition.ts
@@ -121,7 +123,7 @@ codeDigest:
       sha256: f8ae2f04c79286f90f231254e556e7c088bdd586a239757bb6601023aee97dc9
     - path: src/modules/integrations/sepay/sepay.module.ts
       sha256: eb83145789af2b7be599c214ce68d842aa3f5fa76401d9e534bb0e2c48d83217
-  digest: 92533c932fc15a7a72a324cf77f106239a09b5e86ca4355780dc894c426bb135
+  digest: 21bce1a55126e47077803edd308bfca52356f7d774ab1f64a16ccb3c30464f8d
 outcome: pass
 assertions:
   - id: br.plan.caps.limit
@@ -170,4 +172,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T15:22:53.329Z
+  capturedAt: 2026-09-19T23:15:50.999Z

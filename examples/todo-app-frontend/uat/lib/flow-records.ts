@@ -15,7 +15,10 @@ export type UatFlowRecord = {
   readonly id: string;
   readonly title: string;
   readonly state: 'todo' | 'done' | string;
-  readonly steps: ReadonlyArray<string>;
+  /** Step entries as the record authors them ({order, actor, action, expected, checks}) - kept as
+   * objects, not String()'d, so the manifest's flows.json carries the steps a reader can act on
+   * instead of "[object Object]" (first seen on run 20260919T183145Z-5c10a673). */
+  readonly steps: ReadonlyArray<unknown>;
   readonly proves: ReadonlyArray<string>;
   readonly blockedBy: ReadonlyArray<{ record: string; because?: string }> | null;
 };
@@ -57,7 +60,7 @@ export const readFlowRecord = (feature: string, flow: string): UatFlowRecord => 
     id: raw.id,
     title: String(raw.title ?? ''),
     state: String(raw.state ?? ''),
-    steps: Array.isArray(raw.steps) ? raw.steps.map(String) : [],
+    steps: Array.isArray(raw.steps) ? raw.steps : [],
     proves: Array.isArray(raw.proves) ? raw.proves.map(String) : [],
     blockedBy: Array.isArray(raw.blockedBy)
       ? raw.blockedBy.map(entry => ({ record: String((entry as any).record), because: (entry as any).because }))

@@ -5,7 +5,7 @@ Read the single [StarCi skill](.claude/SKILL.md) completely before project work 
 
 This directory is the host (`Source`): it owns these bootstrap files, `.claude` and `.workspaces`.
 Resolve the selected project through `.workspaces/projects/<project>/work.json`, following
-[workspace routing](.claude/.dist/schemas/workspace-routing.json), after the skill entry builds the runtime.
+[workspace routing](.claude/schemas/workspace-routing.yaml) - the runtime reads source directly.
 The project's backend owns shared `.starciwork`; its runtime record is the ledger `.starciwork/runtime.sqlite` for both backend and frontend.
 The frontend is a source repository. Entering it does not move Source or create another workspace.
 

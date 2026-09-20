@@ -1,7 +1,9 @@
-import { readDistJson } from '../core/runtime-root.mjs';
+import { parseYaml } from '../core/yaml.mjs';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 export const SDS_SCHEMA = 'starci/specification@3';
-export const sdsSchema = readDistJson('specifications', 'sds.schema.json');
+export const sdsSchema = parseYaml(fs.readFileSync(fileURLToPath(new URL('./sds.schema.yaml', import.meta.url)), 'utf8'));
 const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 // Deliberately only the JSON Schema vocabulary used by the published SDS schema.

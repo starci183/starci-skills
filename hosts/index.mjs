@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {readDistJson} from '../core/runtime-root.mjs';
 import {parseYaml} from '../core/yaml.mjs';
+import {fileURLToPath} from 'node:url';
 
 /**
- * The host model as data. `model/hosts.yaml` declares the whole of what the kernel knows about a host - a
+ * The host model as data. `modules/models/hosts.yaml` declares the whole of what the kernel knows about a host - a
  * name, the capabilities it offers beyond a worktree and a runtime, and whether it runs operations in
  * parallel - and this module is the only code that reads it, exactly as `kernel/graph.mjs` is the only code
- * that reads `model/kinds.yaml`.
+ * that reads `modules/models/kinds.yaml`.
  *
  * The point of moving the two descriptors out of the adapters is that they stop being two constants that can
  * drift: `hosts/orca/calls.mjs` and `hosts/headless/host.mjs` now ask for the same profile, so a host that
@@ -23,8 +23,8 @@ export const HOSTS_PROFILE='starci/hosts@1';
 export const HOST_NAMES=Object.freeze(['orca','headless']);
 /**
  * What the two adapters are when no profile can be read at all. A host must be able to describe itself before
- * a build exists: `hosts/orca/calls.mjs` is imported by the very command that builds `.dist`, and the
- * installer's own doctor run imports the headless host in a tree whose `.dist` is still being written. Falling
+ * a readable profile exists: adapters are imported on paths that run before any profile is guaranteed,
+ * and the installer's own doctor run imports the headless host in a freshly copied tree. Falling
  * back to the values the profile ships keeps that path working, and `tests/hosts.spec.mjs` asserts the
  * fallback and the profile say the same thing, so the duplication cannot become a disagreement.
  */
@@ -40,14 +40,16 @@ const fail=(errors,code,message,detail={})=>{errors.push({code,message,...detail
 let distProfile=null;
 
 /**
- * Load the host profile. Without `profileDir` it is the compiled `.dist/model/hosts.json`, the same way
- * `loadKinds` loads the kind catalog, so the call works from the authored tree and from the `.dist` copy.
- * With `profileDir` the authored YAML (or a fixture) is read directly, which is how the tests and
- * `validateHosts` read a profile that has not been built yet.
+ * Load the host profile. Without `profileDir` it is the authored `modules/models/hosts.yaml`, the same
+ * way `loadKinds` loads the kind catalog. With `profileDir` the YAML (or a fixture) in that directory is
+ * read directly, which is how the tests and `validateHosts` read a profile.
  */
 export function loadHosts({profileDir=null}={}){
   if(!profileDir){
-    if(!distProfile)distProfile=readDistJson('model','hosts.json');
+    if(!distProfile){
+      const source=fileURLToPath(new URL('../modules/models/hosts.yaml',import.meta.url));
+      distProfile=parseYaml(fs.readFileSync(source,'utf8'));
+    }
     return distProfile;
   }
   const dir=path.resolve(profileDir);
@@ -65,7 +67,7 @@ const entryOf=(profile,name)=>plain(profile?.hosts?.[name])?profile.hosts[name]:
 /**
  * One host as the kernel sees it: `{name, capabilities, sequential}` and nothing else, with its own arrays so
  * a caller that keeps the descriptor cannot reach back into the cached profile. A profile that cannot be read
- * - no `.dist` yet, a half-written file - falls back to the built-in values for the two known hosts instead of
+ * - a missing or half-written file - falls back to the built-in values for the two known hosts instead of
  * throwing, because an adapter that cannot describe itself cannot even report the failure. An unknown name is
  * a bug in the caller, so that does throw.
  */

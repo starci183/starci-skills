@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">80% </span>
+                <span class="strong">77.77% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>16/20</span>
+                <span class='fraction'>21/27</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">42.85% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>10/25</span>
+                <span class='fraction'>3/7</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.33% </span>
+                <span class="strong">77.77% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/15</span>
+                <span class='fraction'>21/27</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -78,35 +78,71 @@
 <a name='L13'></a><a href='#L13'>13</a>
 <a name='L14'></a><a href='#L14'>14</a>
 <a name='L15'></a><a href='#L15'>15</a>
-<a name='L16'></a><a href='#L16'>16</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-yes">43x</span>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { DynamicModule, Module } from '@nestjs/common';
-import { PlatformEventBus } from './event-bus.providers';
-import { ConfigurableModuleClass, OPTIONS_TYPE } fr<span class="branch-1 cbranch-no" title="branch not covered" >om './events.module-definition';</span>
-&nbsp;
-/**<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span></span></span></span></span>
- * The platform even<span class="branch-1 cbranch-no" title="branch not covered" >ts</span> mo<span class="branch-2 cbranch-no" title="branch not covered" >dule: every feature that produces or c</span>onsumes a domain event imports this module
- * and depends only on the exported PlatformEventBus port, never on another feature's module.
- */
-@Module({})
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    DynamicModule, Module 
+} from "@nestjs/common"
+import {
+    PlatformEventBus 
+} from "./event-bus.providers"
+import {
+    ConfigurableModul<span class="branch-0 cbranch-no" title="branch not covered" >eClass, OPTIONS_TYPE </span>
+<span class="cstat-no" title="statement not covered" >} from "./events.module-definition"</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+ * The platform events module: every feature that produces or consumes a domain event imports this module
+ * and depends only on the exported Platfor<span class="branch-0 cbranch-no" title="branch not covered" >mEventBus port, never on another feature's module.</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >@Module({</span>
+<span class="cstat-no" title="statement not covered" >})</span>
+/** Nest module wiring the events capability's providers; the app composition root registers it - oth<span class="branch-0 cbranch-no" title="branch not covered" >er mo<span class="branch-0 cbranch-no" title="branch not covered" ></span>dules never import it. */</span>
 export class PlatformEventsModule extends ConfigurableModuleClass {
-  static register(options: typeof OPTIONS_TYPE = {}): DynamicModule {
-    const base = super.register(options);
-    return { ...base, providers: [...(base.providers ?? []), PlatformEventBus], exports: [PlatformEventBus] };
-  }
+    static register(options: typeof OPTIONS_TYPE = {
+    }): DynamicModule {
+        const base = super.register(options)
+        return {
+            ...base, providers: [...(base.providers ?? []),
+                PlatformEventBus], exports: [PlatformEventBus] 
+        }
+    }
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -115,7 +151,7 @@ export class PlatformEventsModule extends ConfigurableModuleClass {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

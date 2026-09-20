@@ -66,16 +66,29 @@ const routePath=(value,roots,{workRelative=false}={})=>{
   return {root:roots[0],relative:normalized};
 };
 
-const compiledCanonRelative=relative=>{
-  const cleanRelative=clean(relative),authored=cleanRelative.match(/^knowledge\/(grammars\/.*|patterns\/fe\/.*|ui\/.*)\.ya?ml$/i),
-    compiled=cleanRelative.match(/^\.dist\/(knowledge\/(?:grammars\/.*|patterns\/fe\/.*|ui\/.*)\.json)$/i);
-  if(authored)return `.dist/knowledge/${authored[1]}.json`;
-  if(compiled)return `.dist/${compiled[1]}`;
-  return null;
+// The sealed payload carries authored `knowledge/**` as-is. A source-spelled reference maps to itself; a
+// public `.json` spelling (compiled `knowledge/<x>.json`, or the old `.dist/knowledge/<x>.json`) may stand
+// for the authored `<x>.yaml`, or `index.yaml` for the `INDEX.json` public name, or an authored `.json`
+// that exists verbatim. Candidates are tried in order against the sealed tree; the trailing `.dist`
+// spellings keep a pin sealed before the migration (compiled JSON only) resolvable.
+const compiledCanonRelatives=relative=>{
+  const cleanRelative=clean(relative),
+    authored=cleanRelative.match(/^knowledge\/(grammars\/.*|patterns\/fe\/.*|ui\/.*)\.ya?ml$/i),
+    publicName=cleanRelative.match(/^(?:\.dist\/)?knowledge\/((?:grammars\/.*|patterns\/fe\/.*|ui\/.*))\.json$/i);
+  if(authored){
+    // Source spelling seals verbatim; the `.dist` compiled name is the pre-migration-pin fallback.
+    const compiledName=cleanRelative.replace(/\.ya?ml$/i,'.json').replace(/\/index\.json$/i,'/INDEX.json');
+    return [cleanRelative,`.dist/${compiledName}`];
+  }
+  if(!publicName)return [];
+  const stem=`knowledge/${publicName[1]}`;
+  const candidates=[`${stem}.json`,`${stem}.yaml`,`${stem}.yml`,`.dist/${stem}.json`];
+  if(/\/index$/i.test(stem))candidates.push(`${stem.slice(0,-'/index'.length)}/index.yaml`);
+  return candidates;
 };
 
-// Build output canonicalizes authored `index.yaml` to `INDEX.json`. Resolve every segment from the sealed
-// directory itself so the mapping remains case-correct and cannot escape through a link or `..` segment.
+// Resolve every segment from the sealed directory itself so the mapping remains case-correct and cannot
+// escape through a link or `..` segment.
 const sealedCanonFile=(root,relative)=>{
   let cursor=path.resolve(root);
   for(const wanted of clean(relative).split('/').filter(Boolean)){
@@ -148,10 +161,10 @@ export function resolveCandidateReferences(op,state,ctx){
       try{routed=routePath(target,roots);}
       catch(error){
         const sourceRoot=runtimeBinding?.sourceRoot,sourceRelative=sourceRoot?rootRelative(sourceRoot,target):null,
-          compiled=sourceRelative===null?null:compiledCanonRelative(sourceRelative);
+          candidates=sourceRelative===null?[]:compiledCanonRelatives(sourceRelative);
         const trustedRelocation=runtimeBinding?.sourceRootTrust==='sealed-runtime-pin';
-        if(!runtimeBinding||!sourceRoot||!compiled||(!trustedRelocation&&!fs.existsSync(target)))throw error;
-        target=sealedCanonFile(runtimeBinding.repoRoot,compiled);
+        if(!runtimeBinding||!sourceRoot||!candidates.length||(!trustedRelocation&&!fs.existsSync(target)))throw error;
+        target=candidates.map(candidate=>sealedCanonFile(runtimeBinding.repoRoot,candidate)).find(Boolean)??null;
         if(!target)throw error;
         routed={root:runtimeBinding,relative:rootRelative(runtimeBinding.repoRoot,target)};
       }

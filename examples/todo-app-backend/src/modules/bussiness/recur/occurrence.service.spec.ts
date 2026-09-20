@@ -11,6 +11,9 @@ import {
     TaskEntity 
 } from "@modules/platform/databases/postgresql/primary/entities/task.entity"
 import {
+    OccurrenceEntity 
+} from "@modules/platform/databases/postgresql/primary/entities/occurrence.entity"
+import {
     createFakeRecurEntityManager 
 } from "./testing/fake-recur-entity-manager"
 import {
@@ -208,5 +211,126 @@ describe("OccurrenceService (sds.recur.occurrence-lifecycle)",
                 } finally {
                     await moduleRef.close()
                 }
+            })
+
+        describe("guard arms (w8 branch depth)",
+            () => {
+                it("findById refuses an unknown occurrence id",
+                    async () => {
+                        const { moduleRef, service } = await buildWithTask("task-1",
+                            "owner-1")
+                        try {
+                            await expect(service.findById("missing")).rejects.toMatchObject({
+                                code: "RECUR_OCCURRENCE_NOT_FOUND_EXCEPTION" 
+                            })
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
+
+                it("complete and skip on an unknown occurrence id refuse before touching anything",
+                    async () => {
+                        const { moduleRef, service } = await buildWithTask("task-1",
+                            "owner-1")
+                        try {
+                            await expect(service.complete("missing",
+                                "owner-1")).rejects.toMatchObject({
+                                code: "RECUR_OCCURRENCE_NOT_FOUND_EXCEPTION" 
+                            })
+                            await expect(service.skip("missing",
+                                "owner-1")).rejects.toMatchObject({
+                                code: "RECUR_OCCURRENCE_NOT_FOUND_EXCEPTION" 
+                            })
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
+
+                it("skipping an already-skipped occurrence is a no-op, matching idempotent-complete",
+                    async () => {
+                        const { moduleRef, service } = await buildWithTask("task-1",
+                            "owner-1")
+                        try {
+                            await service.materialise({
+                                id: "task-1", ruleId: "r1", windowKey: "r1:2026-09-14", localDate: "2026-09-14", dueAtUtc: new Date() 
+                            })
+                            const first = await service.skip("task-1",
+                                "owner-1")
+                            const second = await service.skip("task-1",
+                                "owner-1")
+                            expect(second.status).toBe("skipped")
+                            expect(second.status).toBe(first.status)
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
+
+                it("listByRule returns occurrences sorted by localDate even when stored out of order",
+                    async () => {
+                        const entityManager = createFakeRecurEntityManager()
+                        for (const [taskId, localDate] of [["task-c", "2026-09-16"],
+                            ["task-a", "2026-09-14"],
+                            ["task-b", "2026-09-15"]] as const) {
+                            await entityManager.save(TaskEntity,
+                                {
+                                    id: taskId, owner: "owner-1", title: "x", complete: false, completedAt: null 
+                                })
+                        }
+                        const moduleRef = await Test.createTestingModule({
+                            providers: [
+                                OccurrenceService,
+                                {
+                                    provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
+                                },
+                            ],
+                        }).compile()
+                        const service = moduleRef.get(OccurrenceService)
+                        try {
+                            for (const [taskId, localDate] of [["task-c", "2026-09-16"],
+                                ["task-a", "2026-09-14"],
+                                ["task-b", "2026-09-15"]] as const) {
+                                await service.materialise({
+                                    id: taskId, ruleId: "r1", windowKey: `r1:${localDate}`, localDate, dueAtUtc: new Date() 
+                                })
+                            }
+                            const listed = await service.listByRule("r1")
+                            expect(listed.map(row => row.localDate)).toEqual(["2026-09-14",
+                                "2026-09-15",
+                                "2026-09-16"])
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
+
+                it("an occurrence row whose joined task row is gone reads as not found, never half-shaped",
+                    async () => {
+                        const entityManager = createFakeRecurEntityManager()
+                        const moduleRef = await Test.createTestingModule({
+                            providers: [
+                                OccurrenceService,
+                                {
+                                    provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
+                                },
+                            ],
+                        }).compile()
+                        const service = moduleRef.get(OccurrenceService)
+                        try {
+                            // A raw occurrence row with no tasks row at the same id: the join the
+                            // record contract promises cannot be honoured, so the read refuses.
+                            await entityManager.save(OccurrenceEntity,
+                                {
+                                    id: "orphan-1", ruleId: "r1", windowKey: "r1:2026-09-14", localDate: "2026-09-14", dueAtUtc: new Date(), status: "materialised" 
+                                })
+                            await expect(service.findById("orphan-1")).rejects.toMatchObject({
+                                code: "RECUR_OCCURRENCE_NOT_FOUND_EXCEPTION" 
+                            })
+                            await expect(service.complete("orphan-1",
+                                "owner-1")).rejects.toMatchObject({
+                                code: "RECUR_OCCURRENCE_NOT_FOUND_EXCEPTION" 
+                            })
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
             })
     })

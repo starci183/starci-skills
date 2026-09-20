@@ -15,9 +15,9 @@ test('the public code-pattern command retains typed invalid coverage and exit co
   assert.equal(result.ok, false);
 });
 
-test('compiled public code-pattern entry matches its direct compiled adapter', () => {
+test('public code-pattern entry matches its direct adapter', () => {
   const run = args => spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', windowsHide: true });
-  const direct = run(['.dist/scripts/checks/check-scoped-lint.mjs', '--profile', 'nest']);
+  const direct = run(['scripts/checks/check-scoped-lint.mjs', '--profile', 'nest']);
   const publicCommand = run(['bin/starci.mjs', 'code-patterns', 'check', '--profile', 'nest']);
   assert.equal(direct.status, 2, direct.stderr);
   assert.equal(publicCommand.status, 2, publicCommand.stderr);

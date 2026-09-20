@@ -1,0 +1,17 @@
+schema: work/customer-journey
+id: journey.upload.attach-a-file
+title: A person puts a file on a task and gets it back
+state: done
+crossesFeatures: [login, task, upload]
+steps:
+  - {actor: person, does: "Signs in and opens a presigned intent for a text file", expects: "A PUT door, a signed token header and an expiry."}
+  - {actor: person, does: "PUTs the bytes with the token, then attaches the upload to a task they own", expects: "The upload is ready and linked to the task."}
+  - {actor: person, does: "Lists the task's uploads and downloads the file", expects: "The same bytes come back with the original filename and mime."}
+  - {actor: person, does: "Deletes the upload", expects: "The row and the object are both gone."}
+requirements: [fr.upload.intake, fr.upload.attach, fr.upload.manage]
+
+requiresProof:
+  requirements:
+    forEach: requirements
+  e2e:
+    command: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts

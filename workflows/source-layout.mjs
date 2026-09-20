@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {readDistJson} from '../core/runtime-root.mjs';
+import {parseYaml} from '../core/yaml.mjs';
+import {fileURLToPath} from 'node:url';
 
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const text=value=>typeof value==='string'&&value.trim().length>0;
@@ -37,7 +38,7 @@ function checkEntry(root,role,entry,errors){
  if(entry.type==='json-file')try{JSON.parse(fs.readFileSync(target,'utf8'));}catch{errors.push({role,code:'JSON',path:entry.path,message:'Required JSON file is malformed.'});}
 }
 
-export function validateSourceLayout({host,be,fe,workRoot}={},contract=readDistJson('schemas','source-layout.json')){
+export function validateSourceLayout({host,be,fe,workRoot}={},contract=parseYaml(fs.readFileSync(fileURLToPath(new URL('../schemas/source-layout.yaml',import.meta.url)),'utf8'))){
  validateContract(contract);
  const errors=[],roots={host:realDirectory(host,'host',errors),be:realDirectory(be,'be',errors),fe:realDirectory(fe,'fe',errors)};
  const sharedRepository=sameRoot(roots.be,roots.fe);

@@ -7,36 +7,42 @@ assertions:
   - id: fr.share.invite
     expected: yes
     observed: yes
-    note: Two invitations submitted through ui.share.invite - demo2@todo.dev as editor,
-      uat-20260919T142709Z-5c10a673-viewer@todo.dev as viewer - both render as Pending rows in the
-      collaborator list. The realm seeds only two accounts, so the "third person" viewer is a
-      run-namespaced address with no login; the invitation row itself is real.
+    note: Two invitations submitted through ui.share.invite - demo2@todo.dev as
+      editor, uat-20260919T142709Z-5c10a673-viewer@todo.dev as viewer - both
+      render as Pending rows in the collaborator list. The realm seeds only two
+      accounts, so the "third person" viewer is a run-namespaced address with no
+      login; the invitation row itself is real.
   - id: fr.share.accept
     expected: yes
     observed: not-run
-    note: "No acceptance surface exists in the product: invite publishes no event and sends no email
-      (src/modules/bussiness/share/invite.handler.ts), there is no notifications inbox, no route
-      under src/app serves acceptInvitation, and no query lets an unbound invitee learn the
-      invitationId - collaborators(taskId) returns [] to them (InvitationService.listFor). The
-      shared task can never appear in the invitee list either (tasks is ownership-only). This step's
-      screenshots are the observed absence. Signed in as the invited editor: the run task is absent
-      from their list and the share route renders an empty state with nothing to accept."
+    note: "No acceptance surface exists in the product: invite publishes no event
+      and sends no email (src/modules/bussiness/share/invite.handler.ts), there
+      is no notifications inbox, no route under src/app serves acceptInvitation,
+      and no query lets an unbound invitee learn the invitationId -
+      collaborators(taskId) returns [] to them (InvitationService.listFor). The
+      shared task can never appear in the invitee list either (tasks is
+      ownership-only). This step's screenshots are the observed absence. Signed
+      in as the invited editor: the run task is absent from their list and the
+      share route renders an empty state with nothing to accept."
   - id: br.share.role.permissions
     expected: yes
     observed: not-run
-    note: Depends on an accepted invitation (unreachable above); even post-accept no UI affordance would
-      exist, since a collaborator has no task surface to complete on.
+    note: Depends on an accepted invitation (unreachable above); even post-accept no
+      UI affordance would exist, since a collaborator has no task surface to
+      complete on.
   - id: fr.share.revoke
     expected: yes
     observed: yes
-    note: The owner revoked both pending invitations through the UI (Revoke + window.confirm); each row
-      now reads Revoked. This proves t-revoke-pending only - the record's designed leg revokes an
-      accepted editor, which the missing accept surface makes unreachable.
+    note: The owner revoked both pending invitations through the UI (Revoke +
+      window.confirm); each row now reads Revoked. This proves t-revoke-pending
+      only - the record's designed leg revokes an accepted editor, which the
+      missing accept surface makes unreachable.
   - id: br.share.revoke.on-read
     expected: yes
     observed: not-run
-    note: Depends on an accepted collaborator whose next read is refused; no invitation could be
-      accepted (missing surface above), so there is no bound access for a read to lose.
+    note: Depends on an accepted collaborator whose next read is refused; no
+      invitation could be accepted (missing surface above), so there is no bound
+      access for a read to lose.
 assets:
   - path: screens/owner-signed-in.png
     sha256: b3e45d42038725c5baea17d2f83248cea9f09133598d9e8e8c3954a884b17ec5
@@ -76,52 +82,103 @@ files:
     ownedResourcesCreated:
       - kind: task
         id: uat-20260919T142709Z-5c10a673-share
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
       - kind: invitation
         id: 5fef13bf-3ad2-4c25-87d6-8a6080e2eb49
-        note: Run-owned invitation row for demo2@todo.dev, created through the owner's invite form; id read
-          back from collaborators(taskId).
+        note: Run-owned invitation row for demo2@todo.dev, created through the owner's
+          invite form; id read back from collaborators(taskId).
       - kind: invitation
         id: 3ac926b1-af8b-4392-8cb9-f8774f360d5a
-        note: Run-owned invitation row for uat-20260919T142709Z-5c10a673-viewer@todo.dev, created through
-          the owner's invite form; id read back from collaborators(taskId).
+        note: Run-owned invitation row for
+          uat-20260919T142709Z-5c10a673-viewer@todo.dev, created through the
+          owner's invite form; id read back from collaborators(taskId).
     ownedResourcesDeleted:
       - kind: task
         id: uat-20260919T142709Z-5c10a673-share
         note: Run-owned task row deleted through the UI two-step confirm.
       - kind: invitation
         id: 5fef13bf-3ad2-4c25-87d6-8a6080e2eb49
-        note: Run-owned invitation row for demo2@todo.dev deleted by exact recorded id (psql in
-          compose-postgres-1); task delete does not cascade to invitations.
+        note: Run-owned invitation row for demo2@todo.dev deleted by exact recorded id
+          (psql in compose-postgres-1); task delete does not cascade to
+          invitations.
       - kind: invitation
         id: 3ac926b1-af8b-4392-8cb9-f8774f360d5a
-        note: Run-owned invitation row for uat-20260919T142709Z-5c10a673-viewer@todo.dev deleted by exact
-          recorded id (psql in compose-postgres-1); task delete does not cascade to invitations.
+        note: Run-owned invitation row for uat-20260919T142709Z-5c10a673-viewer@todo.dev
+          deleted by exact recorded id (psql in compose-postgres-1); task delete
+          does not cascade to invitations.
     verifiedAbsent:
       - kind: task
         id: uat-20260919T142709Z-5c10a673-share
-        note: The title resolves to zero elements in the re-read owner list after the confirmed delete.
+        note: The title resolves to zero elements in the re-read owner list after the
+          confirmed delete.
       - kind: invitation
         id: 5fef13bf-3ad2-4c25-87d6-8a6080e2eb49
         note: SELECT count(*) for the recorded id returns 0 after the delete.
       - kind: invitation
         id: 3ac926b1-af8b-4392-8cb9-f8774f360d5a
         note: SELECT count(*) for the recorded id returns 0 after the delete.
-    note: Every run-owned resource this run created was deleted and its absence verified by read-back.
+    note: Every run-owned resource this run created was deleted and its absence
+      verified by read-back.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.share.invite-and-collaborate
       title: Invite an editor, have them complete a task, then revoke them
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: owner
+          action: Sign in as the owner and create a task.
+          expected: the task appears in the owner list
+          checks:
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: owner
+          action: Invite a second person as editor and a third as viewer.
+          expected: both invitations show pending
+          checks:
+            - id: completion
+              expected: yes
+        - order: 3
+          actor: editor
+          action: Sign in as the editor, accept the invitation, and complete the task.
+          expected: the task shows complete
+          checks:
+            - id: completion
+              expected: yes
+        - order: 4
+          actor: viewer
+          action: Sign in as the viewer, accept the invitation, and attempt to complete
+            the task.
+          expected: the attempt is refused
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 5
+          actor: viewer
+          action: Re-read the task.
+          expected: still shows complete, unchanged by the refused attempt
+          checks: []
+        - order: 6
+          actor: owner
+          action: Sign in as the owner and revoke the editor.
+          expected: the editor no longer appears in the collaborator list
+          checks:
+            - id: completion
+              expected: yes
+        - order: 7
+          actor: editor
+          action: Sign in as the editor and read the task again.
+          expected: access is refused
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 8
+          actor: editor
+          action: (same step, no wait) confirm the refusal is immediate.
+          expected: no wait and no background sweep was needed between revoke and refusal
+          checks: []
       proves:
         - fr.share.invite
         - fr.share.accept
@@ -155,15 +212,17 @@ files:
     created:
       - kind: task
         id: uat-20260919T142709Z-5c10a673-share
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
       - kind: invitation
         id: 5fef13bf-3ad2-4c25-87d6-8a6080e2eb49
-        note: Run-owned invitation row for demo2@todo.dev, created through the owner's invite form; id read
-          back from collaborators(taskId).
+        note: Run-owned invitation row for demo2@todo.dev, created through the owner's
+          invite form; id read back from collaborators(taskId).
       - kind: invitation
         id: 3ac926b1-af8b-4392-8cb9-f8774f360d5a
-        note: Run-owned invitation row for uat-20260919T142709Z-5c10a673-viewer@todo.dev, created through
-          the owner's invite form; id read back from collaborators(taskId).
+        note: Run-owned invitation row for
+          uat-20260919T142709Z-5c10a673-viewer@todo.dev, created through the
+          owner's invite form; id read back from collaborators(taskId).
   ux-checks.json:
     schema: starci/uat-ux-checks@1
     flow: uat.share.invite-and-collaborate
@@ -171,37 +230,43 @@ files:
       - id: fr.share.invite
         expected: yes
         observed: yes
-        note: Two invitations submitted through ui.share.invite - demo2@todo.dev as editor,
-          uat-20260919T142709Z-5c10a673-viewer@todo.dev as viewer - both render as Pending rows in
-          the collaborator list. The realm seeds only two accounts, so the "third person" viewer is
-          a run-namespaced address with no login; the invitation row itself is real.
+        note: Two invitations submitted through ui.share.invite - demo2@todo.dev as
+          editor, uat-20260919T142709Z-5c10a673-viewer@todo.dev as viewer - both
+          render as Pending rows in the collaborator list. The realm seeds only
+          two accounts, so the "third person" viewer is a run-namespaced address
+          with no login; the invitation row itself is real.
       - id: fr.share.accept
         expected: yes
         observed: not-run
-        note: "No acceptance surface exists in the product: invite publishes no event and sends no email
-          (src/modules/bussiness/share/invite.handler.ts), there is no notifications inbox, no route
-          under src/app serves acceptInvitation, and no query lets an unbound invitee learn the
-          invitationId - collaborators(taskId) returns [] to them (InvitationService.listFor). The
-          shared task can never appear in the invitee list either (tasks is ownership-only). This
-          step's screenshots are the observed absence. Signed in as the invited editor: the run task
-          is absent from their list and the share route renders an empty state with nothing to
-          accept."
+        note: "No acceptance surface exists in the product: invite publishes no event
+          and sends no email (src/modules/bussiness/share/invite.handler.ts),
+          there is no notifications inbox, no route under src/app serves
+          acceptInvitation, and no query lets an unbound invitee learn the
+          invitationId - collaborators(taskId) returns [] to them
+          (InvitationService.listFor). The shared task can never appear in the
+          invitee list either (tasks is ownership-only). This step's screenshots
+          are the observed absence. Signed in as the invited editor: the run
+          task is absent from their list and the share route renders an empty
+          state with nothing to accept."
       - id: br.share.role.permissions
         expected: yes
         observed: not-run
-        note: Depends on an accepted invitation (unreachable above); even post-accept no UI affordance would
-          exist, since a collaborator has no task surface to complete on.
+        note: Depends on an accepted invitation (unreachable above); even post-accept no
+          UI affordance would exist, since a collaborator has no task surface to
+          complete on.
       - id: fr.share.revoke
         expected: yes
         observed: yes
-        note: The owner revoked both pending invitations through the UI (Revoke + window.confirm); each row
-          now reads Revoked. This proves t-revoke-pending only - the record's designed leg revokes
-          an accepted editor, which the missing accept surface makes unreachable.
+        note: The owner revoked both pending invitations through the UI (Revoke +
+          window.confirm); each row now reads Revoked. This proves
+          t-revoke-pending only - the record's designed leg revokes an accepted
+          editor, which the missing accept surface makes unreachable.
       - id: br.share.revoke.on-read
         expected: yes
         observed: not-run
-        note: Depends on an accepted collaborator whose next read is refused; no invitation could be
-          accepted (missing surface above), so there is no bound access for a read to lose.
+        note: Depends on an accepted collaborator whose next read is refused; no
+          invitation could be accepted (missing surface above), so there is no
+          bound access for a read to lose.
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.share.invite-and-collaborate

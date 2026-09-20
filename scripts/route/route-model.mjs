@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // route-model.mjs — resolve which model target may take a workload, by EXECUTING
 // the declarative rules in modules/models/selection.yaml (the source of truth;
-// a port of .dist/kernel/model-policy.mjs). Ordering facts come from the files
-// selection.yaml cites: .dist/model/runtimes.json (preference/tiers) and
-// .dist/model/qualifications.json (the live evidence store — empty means no
-// measured qualification, so eligible routes are probation or refusal).
+// a port of kernel/model-policy.mjs). Ordering facts come from the files
+// selection.yaml cites: modules/models/runtimes.yaml (preference/tiers) and
+// modules/models/qualifications.yaml (the shipped evidence store — empty means
+// no measured qualification, so eligible routes are probation or refusal).
 //
 // CLI:
 //   node scripts/route/route-model.mjs --kind <kind>
-//       [--role <implement|verify|decide|plan|write>]   (default: kinds.json role)
+//       [--role <implement|verify|decide|plan|write>]   (default: kinds.yaml role)
 //       [--domain <d>] [--risk <low|medium|high|critical>]
 //       [--floor <probation|standard|high|critical>]
 //       [--tools <t>[,<t>...]] [--contextTokens <n>]
@@ -28,7 +28,6 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../core/yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const readJson = p => (fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null);
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
 
 function parseArgs(argv) {
@@ -180,17 +179,17 @@ function loadCandidates(modelsDir) {
 }
 
 // Candidate order sources, in precedence order:
-//   1. registry.json operators[kind].chain — the declared per-op launch chain
-//      ("choosing the first ready runtime/profile", registry.json selection).
-//   2. runtimes.json allocation.preference[role] — within-family suitability,
+//   1. registry.yaml operators[kind].chain — the declared per-op launch chain
+//      ("choosing the first ready runtime/profile", registry.yaml selection).
+//   2. runtimes.yaml allocation.preference[role] — within-family suitability,
 //      used for kinds with no declared chain (kernel functions, unknown kinds).
 // selection.yaml allocationFacts.note: tiers/preference are NOT a workflow
 // provider fallback chain; the declared operator chains decide in a workflow.
 function candidateOrder(kind, role, registry, runtimes) {
   const chain = registry?.operators?.[kind]?.chain;
-  if (Array.isArray(chain) && chain.length) return { order: chain, source: `registry.json operators.${kind}.chain` };
+  if (Array.isArray(chain) && chain.length) return { order: chain, source: `registry.yaml operators.${kind}.chain` };
   const pref = (role && runtimes?.allocation?.preference?.[role]) || runtimes?.allocation?.preference?.implement || [];
-  return { order: pref, source: `runtimes.json allocation.preference[${role ?? 'implement'}]` };
+  return { order: pref, source: `runtimes.yaml allocation.preference[${role ?? 'implement'}]` };
 }
 
 // --- main -------------------------------------------------------------------------
@@ -200,15 +199,15 @@ function main() {
   if (!args.kind) { console.error('--kind is required'); process.exit(2); }
   const modelsDir = path.resolve(args.modelsDir ?? path.join(skillRoot, 'modules', 'models'));
   const rules = loadRules(modelsDir);
-  const kinds = readJson(path.join(skillRoot, '.dist', 'model', 'kinds.json'));
-  const runtimes = readJson(path.join(skillRoot, '.dist', 'model', 'runtimes.json'));
-  const registry = readJson(path.join(skillRoot, '.dist', 'model', 'registry.json'));
-  const quals = readJson(path.join(skillRoot, '.dist', 'model', 'qualifications.json'));
+  const kinds = readYaml(path.join(modelsDir, 'kinds.yaml'));
+  const runtimes = readYaml(path.join(modelsDir, 'runtimes.yaml'));
+  const registry = readYaml(path.join(modelsDir, 'registry.yaml'));
+  const quals = readYaml(path.join(modelsDir, 'qualifications.yaml'));
   const evidenceByRuntime = {};
   for (const rec of quals?.qualifications ?? []) if (rec?.runtimeId) evidenceByRuntime[rec.runtimeId] = rec;
 
   const kindEntry = kinds?.kinds?.[args.kind] ?? null;
-  // Machine checks the op declares: kinds.json checks + the op's own
+  // Machine checks the op declares: kinds.yaml checks + the op's own
   // layoutPolicy.checks (every record-writing op runs e.g. starci-validate).
   const opYaml = readYaml(path.join(skillRoot, 'modules', 'ops', 'ops', `${args.kind}.yaml`));
   const declaredChecks = [...(kindEntry?.checks ?? []), ...(opYaml?.layoutPolicy?.checks ?? [])];
@@ -220,7 +219,7 @@ function main() {
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.id.localeCompare(b.id);
   });
 
-  const chainDeclared = orderSource.startsWith('registry.json');
+  const chainDeclared = orderSource.startsWith('registry.yaml');
   const evaluated = ordered.map(c => {
     // A declared operator chain is a closed set: pools absent from it are not
     // on the op's launch path at all (interface.draw → [codex-agent] only).

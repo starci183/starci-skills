@@ -1,7 +1,7 @@
 schema: work/implementation
 id: impl.share.todo-app-frontend.invite-screen
 title: The invitation screen and its create/revoke controls
-state: todo
+state: done
 repository: todo-app-frontend
 # v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
 # under the [lang] locale segment (locales en|vi), so the dynamic task segment is one level deeper
@@ -16,14 +16,19 @@ owners:
   - {role: leaf, path: src/components/leaves/Link}
   - {role: hooks, path: src/hooks/auth}
 proves: [ui.share.invite]
-blockedBy:
-  - {record: gap.share.render-proof, because: "The real captures under ./assets fail the canonical render checks - entity-list-in-card on the accepted states (3 border-(--separator) items in a ul inside starci-core-surface) and palette-off-brand #97b5ff on the inviting states (~60% of saturated pixels). The defect lives in the page's markup and styles; until captures pass, the done claim is unproven."}
-
 change:
-  rev: 2
+  rev: 3
   kind: editorial
-  at: 2026-09-19T21:30:00.000Z
-  reason: "v7-13: state rescinded done -> todo - the fresh captures v7-9 produced fail
+  at: 2026-09-19T22:40:00.000Z
+  reason: "w10: state restored todo -> done - the isPending button tint that
+    dominated the inviting captures' saturated pixels was the installed theme's
+    blended label ink; globals.css now uses declared tokens (accent primary
+    with black labels, neutral disabled variants), the accepted-state list
+    markup passes entity-list-in-card, all 10 captures were re-shot with the
+    shared convention against a fresh production build, and
+    scripts/example-render-proof.mjs holds for every capture;
+    gap.share.render-proof is closed. Prior narrative kept verbatim: v7-13:
+    state rescinded done -> todo - the fresh captures v7-9 produced fail
     entity-list-in-card (accepted states) and palette-off-brand (#97b5ff on inviting states), so
     the done claim is unproven and the record is held by gap.share.render-proof. The rev-1 build
     description below stands as the record of what was built. Implements ui.share.invite against its settled direction (features/share/ui/invite,

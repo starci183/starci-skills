@@ -1,7 +1,7 @@
 schema: work/gap
 id: gap.audit.render-proof
 title: The privacy captures fail the canonical render checks - impl.audit.todo-app-frontend.privacy cannot claim done
-state: todo
+state: done
 statement: "impl.audit.todo-app-frontend.privacy keeps real captures - 12 PNG+markup pairs,
   six states across desktop-1280 and mobile-390, plus two real export downloads, taken from the
   running product per the interface.implement contract. The artifacts are real; the proof is not.
@@ -16,11 +16,24 @@ statement: "impl.audit.todo-app-frontend.privacy keeps real captures - 12 PNG+ma
   is unproven and the record is held at todo, blockedBy this gap. Repro:
   node scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork --record impl.audit.todo-app-frontend.privacy"
 closedBy: impl.audit.todo-app-frontend.privacy
+verificationSource: authored-claim
+because: "closedBy names impl.audit.todo-app-frontend.privacy, itself done again with a fresh
+  evidence.yaml whose render-proof assertion reruns the canonical
+  scripts/example-render-proof.mjs and now holds for every capture: lane w10 re-captured all 12
+  PNG+HTML states with the shared Playwright convention (deviceScaleFactor 4, LCD/subpixel text
+  disabled) against a fresh production build and fixed the shell-controls layering that had left
+  too little accent-painted content in mobile frames. The gap's closure is a derived fact about
+  that record's own evidence, not a separate command."
 change:
-  rev: 1
-  kind: initial
-  at: 2026-10-12T00:00:00.000Z
-  reason: "Opened by the render-proof wiring (grit item 55): the first pass of the canonical
+  rev: 2
+  kind: editorial
+  at: 2026-09-19T22:45:00.000Z
+  reason: "Closed by lane w10: the off-brand buckets were chroma smearing from the old
+    device-scale-1/LCD-subpixel capture pipeline, not page styles - recapturing with the shared
+    convention plus the .shell-controls z-index fix (compact sticky nav had occluded the
+    accent-painted controls in mobile frames) produced bytes that pass palette-off-brand, and
+    entity-list-in-card now runs and passes. The rev-1 opening narrative below stands verbatim
+    as the record of what was found. Opened by the render-proof wiring (grit item 55): the first pass of the canonical
     checks over the existing real captures surfaced both failures above, and neither can be
     closed by editing checks/*.mjs or fabricating fresh captures - the lane that owns the
     frontend has to re-capture honestly."

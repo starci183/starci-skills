@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.plan.todo-app-frontend.usage
-recordDigest: 4b6bb8731d5f544bb41af8e9a18c932704b5745ebc206303810f25e2c4d54493
+recordDigest: 6d9a2d9de678f762fe7adf6da775e56f8093918ce820129fdcc6941429ad16a2
 codeDigest:
   algorithm: sha256
   files:
@@ -22,10 +22,10 @@ codeDigest:
     - path: src/components/plan/usage-screen/component.spec.tsx
       sha256: 8b5648fed751d5ac80cfd183068368e5d57bae5acf00f51f7758a615d1fb6ae9
     - path: src/components/plan/usage-screen/component.tsx
-      sha256: 35f136c57a6f4b83b02dc82539aedf727ca6cb42cf11aee6c0dbae61f4f34785
+      sha256: e12898c21ce4ddb2f5d8783f219a693f1feec8b6df55d98b162e441542bf866f
     - path: src/components/plan/usage-screen/index.tsx
       sha256: bf5ff0705758f77e4829e05ac91ae57e56aa428ed3aaa70b17d8fc9b2975df5b
-  digest: a59ae80d32fb19064c99f51be5a90940ef2c3e8c25362d0187b17791fd996513
+  digest: ca5e28f735a9267098b254c7e8e6baac8bce29f9a7f08fe9b35059dcb22a28b1
 outcome: pass
 assertions:
   - id: typecheck
@@ -48,8 +48,15 @@ assertions:
     exit: 0
     outcome: pass
     observation: npx next build exited 0
+  - id: render-proof
+    command: node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork
+      --record impl.plan.todo-app-frontend.usage
+    exit: 0
+    outcome: pass
+    observation: node ../../scripts/example-render-proof.mjs --work
+      examples/todo-app-backend/.starciwork --record impl.plan.todo-app-frontend.usage exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:29:19.367Z
+  capturedAt: 2026-09-19T22:44:59.720Z

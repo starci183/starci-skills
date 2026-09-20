@@ -6,9 +6,9 @@ import os from 'node:os';
 import { validateSpecification } from '../specifications/validate.mjs';
 import { validateWorkspace } from '../core/index.mjs';
 import { validateFEHandoff } from '../workflows/frontend.mjs';
-import { validateCatalog } from '../ops/validate.mjs';
+import { validateCatalog } from '../legacy/ops/validate.mjs';
 import { parseYaml } from '../core/yaml.mjs';
-import {outputs} from '../ops/generate.mjs';
+import {outputs} from '../legacy/ops/generate.mjs';
 // The deleted examples/nivo-setup-{business,architecture}.yaml (owner ruling: examples/ keeps only the
 // todo-app repositories) were the only real, fully-populated business/architecture specifications
 // (journeys, serviceCalls, patternDecisions, securityReview, handoff...) in the repo; the current
@@ -126,12 +126,12 @@ test('six-op map is generated from the actual contracts and business journeys fe
 });
 
 test('backend delivery cannot hand off before unit and backend E2E proof', () => {
-  const backend = parseYaml(fs.readFileSync(new URL('../ops/backend.implement/operator.yaml', import.meta.url), 'utf8'));
+  const backend = parseYaml(fs.readFileSync(new URL('../legacy/ops/backend.implement/operator.yaml', import.meta.url), 'utf8'));
   assert.deepEqual(backend.qualityPolicy.checks, ['lint','typecheck','unit','backend-e2e','coverage','build','sonar']);
   assert.equal(backend.qualityPolicy.unitGate, 'scoped-unit-pass-for-tested-revision');
   assert.equal(backend.qualityPolicy.backendE2EGate, 'scoped-backend-e2e-pass-for-tested-revision');
   assert.equal(backend.qualityPolicy.handoffBinding, 'api-contract-runtime-quality-evidence-and-tested-commit');
-  const support = parseYaml(fs.readFileSync(new URL('../ops/interface.implement/secondary.yaml', import.meta.url), 'utf8')).calls.find(call => call.op === 'backend.implement');
+  const support = parseYaml(fs.readFileSync(new URL('../legacy/ops/interface.implement/secondary.yaml', import.meta.url), 'utf8')).calls.find(call => call.op === 'backend.implement');
   for (const field of ['apiContract','runtime','qualityEvidence','testedCommit']) assert.ok(support.outputFields.includes(field));
   for (const criterion of ['backend-unit-pass','backend-e2e-pass']) assert.ok(support.requiredCriteria.includes(criterion));
   for (const mutate of [

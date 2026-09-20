@@ -1,0 +1,25 @@
+schema: work/business-rule
+id: br.observability.access-log-shape
+title: The access line is structured, correlated and secret-free
+state: done
+statements:
+  - Every finished request produces exactly one structured log line carrying requestId, method, route
+    template, status and durationMs - and nothing else.
+  - The request id is the inbound x-request-id when a client sends one and a minted uuid otherwise; it
+    is echoed on the response header and readable downstream through the request context.
+  - Headers, bodies and query strings are never logged by construction, because credentials and tokens
+    ride in them.
+  - The route label is the matched route template, never the concrete path, and unmatched requests
+    collapse to one bounded label so label cardinality cannot be weaponised.
+acceptance:
+  - id: ac.observability.access-log-shape.echoes-id
+    given: A request carrying x-request-id
+    when: The api answers it
+    then:
+      - The response echoes the same id and the access line carries it.
+  - id: ac.observability.access-log-shape.mints-id
+    given: A request with no x-request-id
+    when: The api answers it
+    then:
+      - A fresh id is minted, echoed on the response and carried on the access line.
+module: src/modules/platform/observability

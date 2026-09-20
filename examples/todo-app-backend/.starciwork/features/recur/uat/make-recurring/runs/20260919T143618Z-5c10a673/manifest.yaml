@@ -7,15 +7,16 @@ assertions:
   - id: fr.recur.make-recurring
     expected: yes
     observed: yes
-    note: The weekday/09:00 form submission created rule 240b86a4-f446-44dc-9ec1-5db8daa5fba8 and the
-      screen moved to the active state ("Repeats every weekday at 09:00 ... starting 2026-09-18")
-      with an End rule action.
+    note: The weekday/09:00 form submission created rule
+      240b86a4-f446-44dc-9ec1-5db8daa5fba8 and the screen moved to the active
+      state ("Repeats every weekday at 09:00 ... starting 2026-09-18") with an
+      End rule action.
   - id: fr.recur.see-upcoming
     expected: yes
     observed: yes
-    note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21, 2026-09-22, 2026-09-23,
-      2026-09-24, 2026-09-25, 2026-09-28, 2026-09-29, 2026-09-30, 2026-10-01, 2026-10-02); none of
-      them is a Saturday or Sunday.
+    note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21,
+      2026-09-22, 2026-09-23, 2026-09-24, 2026-09-25, 2026-09-28, 2026-09-29,
+      2026-09-30, 2026-10-01, 2026-10-02); none of them is a Saturday or Sunday.
 assets:
   - path: screens/generation-tick-materialised.png
     sha256: 6598194923ec4ae4b323f6ea7594ad2ef613ce791e31b9d40204360e9ed434f3
@@ -40,14 +41,16 @@ files:
     ownedResourcesCreated:
       - kind: task
         id: uat-20260919T143618Z-5c10a673-recur
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
       - kind: rule
         id: 240b86a4-f446-44dc-9ec1-5db8daa5fba8
-        note: Run-owned recurrence_rules row, id captured from the makeRecurring response.
+        note: Run-owned recurrence_rules row, id captured from the makeRecurring
+          response.
       - kind: occurrence
         id: 20d198cc-9bd5-403d-ab0c-f675ff4e4204
-        note: Occurrence row(s) the generator's real tick materialised for the covered window
-          [2026-09-18..today]; each id is also the backing task row's id.
+        note: Occurrence row(s) the generator's real tick materialised for the covered
+          window [2026-09-18..today]; each id is also the backing task row's id.
     ownedResourcesDeleted: []
     verifiedAbsent: []
     note: Unresolved owned resource(s) remain - see ownedResourcesCreated vs
@@ -58,12 +61,44 @@ files:
       id: uat.recur.make-recurring
       title: Make a task recurring, see its upcoming occurrences, then end it
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: owner
+          action: Sign in as the owner.
+          expected: the task list loads
+          checks: []
+        - order: 2
+          actor: owner
+          action: Turn a task into a rule that fires every weekday at 09:00 in the owner's
+            own time zone.
+          expected: the rule is saved as active
+          checks:
+            - id: completion
+              expected: yes
+        - order: 3
+          actor: owner
+          action: See the upcoming occurrences preview.
+          expected: none of the previewed dates is a weekend date
+          checks: []
+        - order: 4
+          actor: owner
+          action: Wait for (or trigger) a generation run.
+          expected: the day's occurrence appears with status materialised
+          checks:
+            - id: loading
+              expected: yes
+        - order: 5
+          actor: owner
+          action: Complete that occurrence.
+          expected: its status becomes completed
+          checks:
+            - id: completion
+              expected: yes
+        - order: 6
+          actor: owner
+          action: End the rule.
+          expected: the completed occurrence status is unchanged, and no new occurrence
+            appears after the end day
+          checks: []
       proves:
         - fr.recur.make-recurring
         - fr.recur.see-upcoming
@@ -90,14 +125,16 @@ files:
     created:
       - kind: task
         id: uat-20260919T143618Z-5c10a673-recur
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
       - kind: rule
         id: 240b86a4-f446-44dc-9ec1-5db8daa5fba8
-        note: Run-owned recurrence_rules row, id captured from the makeRecurring response.
+        note: Run-owned recurrence_rules row, id captured from the makeRecurring
+          response.
       - kind: occurrence
         id: 20d198cc-9bd5-403d-ab0c-f675ff4e4204
-        note: Occurrence row(s) the generator's real tick materialised for the covered window
-          [2026-09-18..today]; each id is also the backing task row's id.
+        note: Occurrence row(s) the generator's real tick materialised for the covered
+          window [2026-09-18..today]; each id is also the backing task row's id.
   ux-checks.json:
     schema: starci/uat-ux-checks@1
     flow: uat.recur.make-recurring
@@ -105,15 +142,17 @@ files:
       - id: fr.recur.make-recurring
         expected: yes
         observed: yes
-        note: The weekday/09:00 form submission created rule 240b86a4-f446-44dc-9ec1-5db8daa5fba8 and the
-          screen moved to the active state ("Repeats every weekday at 09:00 ... starting
+        note: The weekday/09:00 form submission created rule
+          240b86a4-f446-44dc-9ec1-5db8daa5fba8 and the screen moved to the
+          active state ("Repeats every weekday at 09:00 ... starting
           2026-09-18") with an End rule action.
       - id: fr.recur.see-upcoming
         expected: yes
         observed: yes
-        note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21, 2026-09-22, 2026-09-23,
-          2026-09-24, 2026-09-25, 2026-09-28, 2026-09-29, 2026-09-30, 2026-10-01, 2026-10-02); none
-          of them is a Saturday or Sunday.
+        note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21,
+          2026-09-22, 2026-09-23, 2026-09-24, 2026-09-25, 2026-09-28,
+          2026-09-29, 2026-09-30, 2026-10-01, 2026-10-02); none of them is a
+          Saturday or Sunday.
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.recur.make-recurring
@@ -142,36 +181,41 @@ files:
     # VOID — this run folder must not be relied on
 
 
-    This run's `result.md` reads `Outcome: pass`, but the walk **crashed mid-flow** and is not a
-    pass:
+    This run's `result.md` reads `Outcome: pass`, but the walk **crashed
+    mid-flow** and is not a pass:
 
 
-    - The Playwright test failed at `occurrence-complete-attempted` (a `locator.check()` race
-    against the
+    - The Playwright test failed at `occurrence-complete-attempted` (a
+    `locator.check()` race against the
       task row's controlled checkbox — the click fired the real `completeTask` mutation but the `checked`
       prop only flips after the roundtrip + list refetch, which `check()` did not wait for).
-    - Only the first five `walkStep` checkpoints ran; the end-rule, post-end-stillness and cleanup
-    legs
+    - Only the first five `walkStep` checkpoints ran; the end-rule,
+    post-end-stillness and cleanup legs
       never executed, and `cleanup.json` honestly reports the run-owned rows unresolved (they were
       deleted manually afterwards: rule `240b86a4-f446-44dc-9ec1-5db8daa5fba8`, its occurrence row, and
       both `uat-20260919T143618Z-5c10a673-recur` task rows).
-    - The `pass` label is a harness defect, since fixed in `uat/lib/run-writer.ts`: the outcome was
+    - The `pass` label is a harness defect, since fixed in
+    `uat/lib/run-writer.ts`: the outcome was
       computed from recorded assertions alone and ignored `TestResult.status`, so a crashed walk with
       two passing assertions wrote `Outcome: pass`. The writer now forces `fail` whenever
       `result.status !== 'passed'`.
 
-    The folder is retained append-only (the harness never edits or deletes a previous run). What the
+    The folder is retained append-only (the harness never edits or deletes a
+    previous run). What the
 
-    retained evidence DOES truthfully show: steps 1–4 walked for real — sign-in, task creation,
+    retained evidence DOES truthfully show: steps 1–4 walked for real — sign-in,
+    task creation,
 
-    weekday/09:00 rule `240b86a4-…` activated with a correct all-weekday preview, and a real
-    scheduler
+    weekday/09:00 rule `240b86a4-…` activated with a correct all-weekday
+    preview, and a real scheduler
 
-    tick materialising occurrence `20d198cc-9bd5-403d-ab0c-f675ff4e4204` — and Postgres confirmed
-    the
+    tick materialising occurrence `20d198cc-9bd5-403d-ab0c-f675ff4e4204` — and
+    Postgres confirmed the
 
-    key lane finding: completing that occurrence's backing task row left `occurrences.status` =
+    key lane finding: completing that occurrence's backing task row left
+    `occurrences.status` =
 
-    `materialised`. The superseding run (later `runs/<runId>/`) carries the completed walk and the
+    `materialised`. The superseding run (later `runs/<runId>/`) carries the
+    completed walk and the
 
     honest outcome.

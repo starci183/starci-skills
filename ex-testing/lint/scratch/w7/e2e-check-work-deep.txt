@@ -1,0 +1,9 @@
+SUSPECT examples/todo-app-backend/.starciwork: http routes under /ready serve but no spec record names it [CAPABILITY_WITHOUT_SPEC]
+SUSPECT examples/todo-app-backend/.starciwork: http routes under /metrics serve but no spec record names it [CAPABILITY_WITHOUT_SPEC]
+SUSPECT examples/todo-app-backend/.starciwork: http routes under /uploads serve but no spec record names it [CAPABILITY_WITHOUT_SPEC]
+SUSPECT examples/todo-app-backend/.starciwork: http routes under /webhooks serve but no spec record names it [CAPABILITY_WITHOUT_SPEC]
+INFO    examples/ecommerce-app-be/.starciwork: 17 evidence file(s) carry no cwd/repository/commit stamp - a stale verdict cannot say which input moved [EVIDENCE_CONTEXT_MISSING]
+INFO    examples/ecommerce-app-be/.starciwork: 6 asset payload(s) carry non-work schemas - they are artifacts of their parent record, not records; the base gate should not walk them as such [PAYLOAD_AS_RECORD]
+INFO    examples/todo-app-backend/.starciwork: 123 evidence file(s) carry no cwd/repository/commit stamp - a stale verdict cannot say which input moved [EVIDENCE_CONTEXT_MISSING]
+
+0 refused, 4 suspect, 3 info

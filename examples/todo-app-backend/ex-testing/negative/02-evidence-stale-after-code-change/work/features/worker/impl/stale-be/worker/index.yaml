@@ -1,0 +1,11 @@
+schema: work/implementation
+id: impl.worker.stale-be.worker
+title: The worker implementation, proven against older bytes
+state: done
+repository: stale-be
+owners:
+  - {role: module, path: src/worker}
+proves: [fr.worker.runs]
+verification:
+  - "spec suite green at capture time"
+verificationSource: observed

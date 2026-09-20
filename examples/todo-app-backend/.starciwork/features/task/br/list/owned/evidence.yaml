@@ -64,12 +64,12 @@ codeDigest:
     - path: src/modules/bussiness/task/task.module.ts
       sha256: 24617550b93232eb6684b9b6a8aac24951da971937c5c1354dd8045711c8f84c
     - path: src/modules/bussiness/task/task.service.spec.ts
-      sha256: 1d045f327d6c53211d749649557e36599b5ba27c26298f0b57feeb9a23f842ac
+      sha256: ff016e0cf2fe87c8e396821cbee72fe3973215e740d7677d4dd70c19458c68ec
     - path: src/modules/bussiness/task/task.service.ts
       sha256: d983a4a891dfec3d295eb66db354e7ef75ab0514aad4d325a03dab91dfc013d4
     - path: src/modules/bussiness/task/types/task-record.ts
       sha256: e7a7719a464f7be1ab8faa18a97991d5c3d7f37bf8cbfac80c0d66eab0a5941c
-  digest: 962f9665fc3aa05060b32010c824fc6c6a9e1d1b0744542c86c65f57ded0bc49
+  digest: 1053cb1918152173425c04f35076aa3c35c689be601c9f1b60194f82c3ed7c7c
 outcome: pass
 assertions:
   - id: br.task.list.owned#ac.task.list.owned.excludes-others
@@ -88,4 +88,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:17:05.515Z
+  capturedAt: 2026-09-19T23:21:16.802Z

@@ -29,8 +29,8 @@ env:
   NODE_VERSION: '22'
 
 jobs:
-  # 1) The example tree itself: the runtime's own YAML loader and Work-layout gate, plus the build that
-  #    produces `.dist` (every other job that reads `.dist` runs it again in its own, separate runner).
+  # 1) The example tree itself: the runtime's own YAML loader and Work-layout gate. There is no
+  #    build step — the runtime reads this source tree directly (distless layout).
   records:
     name: records
     runs-on: ubuntu-latest
@@ -44,9 +44,6 @@ jobs:
 
       - name: Install runtime dependencies
         run: npm ci
-
-      - name: Build .dist runtime contracts
-        run: node scripts/ensure-build.mjs
 
       - name: Check example YAML parses under the runtime's own loader
         run: node scripts/checks/check-example-yaml.mjs
@@ -77,10 +74,6 @@ jobs:
       - name: Install runtime dependencies (repo root)
         working-directory: .
         run: npm ci
-
-      - name: Build .dist runtime contracts (repo root)
-        working-directory: .
-        run: node scripts/ensure-build.mjs
 
       - name: Install backend dependencies
         run: npm ci
@@ -152,10 +145,6 @@ jobs:
       - name: Install runtime dependencies (repo root)
         working-directory: .
         run: npm ci
-
-      - name: Build .dist runtime contracts (repo root)
-        working-directory: .
-        run: node scripts/ensure-build.mjs
 
       - name: Install frontend dependencies
         run: npm ci

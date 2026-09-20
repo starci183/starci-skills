@@ -93,7 +93,7 @@ keeps it in the owner repository).
 argv untouched, so no command line a person types names a module path inside the runtime.
 
 ```
-node <skill root>/scripts/ensure-build.mjs
+node <skill root>/bin/starci.mjs doctor --dir <skill root> --quick
 node <skill root>/bin/starci.mjs workflow-goal    --host <skill root> --job "<the owner's prompt>" [--scope f1,f2] [--lane [<name>]]
 node <skill root>/bin/starci.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>[:<tiers>][@<roles>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
 node <skill root>/bin/starci.mjs workflow-answer  --host <skill root> --id <id> --op <ask op or intake op> --choice <n> [--note "<the owner's words>"]

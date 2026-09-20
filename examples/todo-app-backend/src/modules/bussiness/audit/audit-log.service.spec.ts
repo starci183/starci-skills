@@ -320,4 +320,49 @@ describe("AuditLogService",
                         expect(await built.log.exportForPerson("nobody")).toEqual([])
                     })
             })
+
+        describe("readLine resolution arms (w8 branch depth)",
+            () => {
+                it("a line whose keyId never existed in the keystore resolves tombstoned, never throws",
+                    async () => {
+                        const built = await build()
+                        moduleRef = built.moduleRef
+                        // A row naming a keyId no person owns: getKeyMaterial misses, so the read must
+                        // degrade to tombstoned rather than crash the operator read path.
+                        const orphanRow = new AuditLogLineEntity()
+                        orphanRow.at = new Date("2026-09-18T10:00:00.000Z")
+                        orphanRow.action = "task.created"
+                        orphanRow.target = "task-1"
+                        orphanRow.keyId = "key-that-never-existed"
+                        orphanRow.actor = "sealed-blob"
+                        orphanRow.prevHash = "GENESIS"
+                        orphanRow.hash = "0".repeat(64)
+
+                        const resolved = await built.log.readLine(orphanRow)
+
+                        expect(resolved.tombstoned).toBe(true)
+                        expect(resolved.actor).toBeNull()
+                        expect(resolved.action).toBe("task.created")
+                    })
+
+                it("a line whose sealed actor no longer unseals under the live key resolves tombstoned",
+                    async () => {
+                        const built = await build()
+                        moduleRef = built.moduleRef
+                        const { keyId } = await built.keystore.getOrCreateKey("person-1")
+                        const row = new AuditLogLineEntity()
+                        row.at = new Date("2026-09-18T10:00:00.000Z")
+                        row.action = "sign-in"
+                        row.target = null
+                        row.keyId = keyId
+                        row.actor = "not-a-valid-sealed-blob"
+                        row.prevHash = "GENESIS"
+                        row.hash = "0".repeat(64)
+
+                        const resolved = await built.log.readLine(row)
+
+                        expect(resolved.tombstoned).toBe(true)
+                        expect(resolved.actor).toBeNull()
+                    })
+            })
     })

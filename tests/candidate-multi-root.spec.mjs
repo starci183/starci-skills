@@ -337,15 +337,15 @@ test('public retry narrowly re-admits a prelaunch candidate-root refusal and its
 });
 
 test('a non-Git runtime canon is content-bound, read-only and quarantines drift',t=>{
-  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-runtime-root-')),source=repo(path.join(temp,'source'),{'src/app.js':'base\n'}),runtime=path.join(temp,'sealed-runtime'),canon='.dist/knowledge/grammars/index.json';
-  fs.mkdirSync(path.dirname(path.join(runtime,canon)),{recursive:true});fs.writeFileSync(path.join(runtime,canon),'{"schema":"grammar/index@1"}\n');t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-runtime-root-')),source=repo(path.join(temp,'source'),{'src/app.js':'base\n'}),runtime=path.join(temp,'sealed-runtime'),canon='knowledge/grammars/index.yaml';
+  fs.mkdirSync(path.dirname(path.join(runtime,canon)),{recursive:true});fs.writeFileSync(path.join(runtime,canon),'schema: grammar/index@1\n');t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
   const sourceRoot={id:'source',role:'source',repoRoot:source,primary:true,allowlist:['src/**'],references:[],inputPaths:[],oraclePaths:[],ownedDirtyPaths:[],runtimePaths:[],runtimeManagedFiles:[],workerWritable:true,runtimeWritable:false,readOnly:false},
     runtimeRoot={id:'runtime',role:'runtime-input',repoRoot:runtime,primary:false,nonGit:true,allowlist:[],references:[{kind:'file',ref:canon,sourceRef:'old-runtime/knowledge/grammars/index.yaml',rootId:'runtime',path:canon}],inputPaths:[{kind:'file',ref:canon,sourceRef:'old-runtime/knowledge/grammars/index.yaml',rootId:'runtime',path:canon}],oraclePaths:[],ownedDirtyPaths:[],runtimePaths:[],runtimeManagedFiles:[],workerWritable:false,runtimeWritable:false,readOnly:true};
   const identity={workflowId:'wf',opId:'draw',attempt:1,generation:1,jobId:'runtime-root'};
   assert.throws(()=>beginDetectionCandidate({identity,workerRoot:path.join(temp,'bad-worker'),controlRoot:path.join(temp,'bad-control'),roots:[sourceRoot,{...runtimeRoot,allowlist:[canon],workerWritable:true}],git,environmentDigest:'env'}),/read-only candidate root runtime/);
   const roots=[sourceRoot,runtimeRoot],bridge=beginDetectionCandidate({identity,workerRoot:path.join(temp,'worker'),controlRoot:path.join(temp,'control'),roots,bindingDigest:candidateRootBindingDigest(roots),git,environmentDigest:'env'});
   assert.equal(bridge.roots.find(root=>root.id==='runtime').bridge.acceptedHead.startsWith('content:'),true);
-  fs.writeFileSync(path.join(runtime,canon),'{"schema":"tampered"}\n');const frozen=freezeDetectionCandidate(bridge,{git,reportedFiles:[]});
+  fs.writeFileSync(path.join(runtime,canon),'schema: tampered\n');const frozen=freezeDetectionCandidate(bridge,{git,reportedFiles:[]});
   assert.equal(frozen.status,'quarantine');assert.ok(frozen.reasons.includes(`runtime:outside-allowlist:${canon}`));assert.ok(frozen.reasons.includes('runtime:canonical-head-drift'));
 });
 
@@ -355,21 +355,21 @@ test('the complete sealed runtime identity rejects unreferenced modification, ad
   t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
   const create=(name,mutateAfterFreeze=false)=>{
     const root=path.join(temp,name);fs.cpSync(sealed.root,root,{recursive:true});const pin={...sealed,root,sourceRoot:process.cwd()},state={worktree:source,host:process.cwd(),engine:{runtimePin:pin}},
-      work={ledger:{repoRoot:source,workRoot:path.join(source,'.starciwork')},loaded:{nodes:new Map(),list:[]}},op={allowlist:['src/**'],references:[path.join(root,'.dist','knowledge','grammars','INDEX.json')]},
+      work={ledger:{repoRoot:source,workRoot:path.join(source,'.starciwork')},loaded:{nodes:new Map(),list:[]}},op={allowlist:['src/**'],references:[path.join(root,'knowledge','grammars','index.yaml')]},
       resolved=resolveCandidateReferences(op,state,{work}),bound=candidateRootBindings({state,op,work,resolvedReferences:resolved}),controlRoot=path.join(temp,`${name}-control`);
     assert.equal(verifyRuntimePin(pin).ok,true);const bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:name,attempt:1,generation:1,jobId:`job-${name}`},
       workerRoot:path.join(temp,`${name}-worker`),controlRoot,roots:bound.bindings,bindingDigest:bound.bindingDigest,git,environmentDigest:pin.digest});
     if(mutateAfterFreeze){const frozen=freezeDetectionCandidate(bridge,{git,requireReported:true,reportedFiles:[]});assert.equal(frozen.status,'sealed');return {bridge,frozen,pin,root};}
     return {bridge,pin,root};
   };
-  const modified=create('modified');fs.appendFileSync(path.join(modified.root,'.dist','kernel','common.mjs'),'// drift\n');
+  const modified=create('modified');fs.appendFileSync(path.join(modified.root,'kernel','common.mjs'),'// drift\n');
   assert.equal(verifyRuntimePin(modified.pin).ok,false);const modifiedFreeze=freezeDetectionCandidate(modified.bridge,{git,requireReported:true,reportedFiles:[]});
-  assert.equal(modifiedFreeze.status,'quarantine');assert.ok(modifiedFreeze.reasons.some(reason=>reason.includes('runtime:runtime-pin-drift:Runtime pin changed: .dist/kernel/common.mjs')));
-  const added=create('added');fs.writeFileSync(path.join(added.root,'.dist','kernel','undeclared-probe.mjs'),'export default true;\n');
+  assert.equal(modifiedFreeze.status,'quarantine');assert.ok(modifiedFreeze.reasons.some(reason=>reason.includes('runtime:runtime-pin-drift:Runtime pin changed: kernel/common.mjs')));
+  const added=create('added');fs.writeFileSync(path.join(added.root,'kernel','undeclared-probe.mjs'),'export default true;\n');
   assert.equal(verifyRuntimePin(added.pin).ok,false);const addedFreeze=freezeDetectionCandidate(added.bridge,{git,requireReported:true,reportedFiles:[]});
   assert.equal(addedFreeze.status,'quarantine');assert.ok(addedFreeze.reasons.some(reason=>reason.includes('runtime:runtime-pin-drift:Runtime pin contains unsealed files')));
-  const after=create('after-freeze',true);fs.appendFileSync(path.join(after.root,'.dist','kernel','common.mjs'),'// later drift\n');
+  const after=create('after-freeze',true);fs.appendFileSync(path.join(after.root,'kernel','common.mjs'),'// later drift\n');
   const prepared=prepareCandidateIntegration(after.frozen.snapshot,after.frozen.packet,{canonicalRoots:{source, runtime:after.root},git,mode:'detection-canonical'});
-  assert.equal(prepared.status,'quarantine');assert.ok(prepared.reasons.some(reason=>reason.includes('runtime:runtime-pin-drift:Runtime pin changed: .dist/kernel/common.mjs')),
+  assert.equal(prepared.status,'quarantine');assert.ok(prepared.reasons.some(reason=>reason.includes('runtime:runtime-pin-drift:Runtime pin changed: kernel/common.mjs')),
     JSON.stringify({reasons:prepared.reasons,snapshot:after.frozen.snapshot.roots.find(root=>root.id==='runtime')?.runtimePin,packet:after.frozen.packet.roots.find(root=>root.id==='runtime')?.runtimePin}));
 });

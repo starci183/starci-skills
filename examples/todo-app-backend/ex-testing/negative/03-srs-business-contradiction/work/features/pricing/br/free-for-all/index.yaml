@@ -1,0 +1,18 @@
+schema: work/business-rule
+id: br.pricing.free-for-all
+title: The product is free for every account
+state: done
+verificationSource: authored-claim
+because: Fixture carries an authored-claim so the only refusal in this case is the unresolved conflict.
+statements:
+  - Every account may create unlimited active tasks.
+  - No plan may cap, meter or refuse usage.
+conflictsWith:
+  - record: br.pricing.cap-required
+    because: br.pricing.cap-required says every account is capped; this rule says no cap may exist.
+acceptance:
+  - id: ac.pricing.free-for-all.unlimited
+    given: Any account
+    when: It creates any number of tasks
+    then:
+      - Every create succeeds; nothing is ever refused for plan reasons.

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">78.94% </span>
+                <span class="strong">71.42% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>15/19</span>
+                <span class='fraction'>15/21</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">36.36% </span>
+                <span class="strong">42.85% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/22</span>
+                <span class='fraction'>3/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">92.85% </span>
+                <span class="strong">71.42% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>13/14</span>
+                <span class='fraction'>15/21</span>
             </div>
         
             
@@ -75,29 +75,56 @@
 <a name='L10'></a><a href='#L10'>10</a>
 <a name='L11'></a><a href='#L11'>11</a>
 <a name='L12'></a><a href='#L12'>12</a>
-<a name='L13'></a><a href='#L13'>13</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span></td><td class="text"><pre class="prettyprint lang-js">import { Module } from '@nestjs/common';
-import { CqrsModule } from '@nestjs/cqrs';
-import { ConfigurableModuleClass } from './make-rec<span class="branch-1 cbranch-no" title="branch not covered" >urring.module-definition';</span>
-import { MakeRecurringResolver } from './make-recurring.resolver';
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span></span></span></span></span>
-/** SessionService i<span class="branch-1 cbranch-no" title="branch not covered" >s </span>not<span class="branch-2 cbranch-no" title="branch not covered" > imported here: SessionModule is regis</span>tered globally from app.module.ts (see
- * create-task.module.ts's identical comment on the same convention). */
-@Module({
-  imports: [CqrsModule],
-  providers: [MakeRecurringResolver],
-})
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Module 
+} from "@nestjs/common"
+import {
+    CqrsModule 
+} from "@nestjs/cqrs"
+import {
+    ConfigurableModuleClass 
+} from "./make-recurri<span class="branch-0 cbranch-no" title="branch not covered" >ng.module-definition"</span>
+<span class="cstat-no" title="statement not covered" >import {</span>
+<span class="cstat-no" title="statement not covered" >    MakeRecurringResolver </span>
+} from "./make-recurring.resolver"
+&nbsp;
+/** SessionService is not imported here: SessionModule is registered globally from app.module.ts (see
+ * create-task.m<span class="branch-0 cbranch-no" title="branch not covered" >odule.ts's identical comment on the same convention). */</span>
+<span class="cstat-no" title="statement not covered" >@Module({</span>
+<span class="cstat-no" title="statement not covered" >    imports: [CqrsModule],</span>
+<span class="cstat-no" title="statement not covered" >    providers: [MakeRecurringResolver],</span>
+<span class="cstat-no" title="statement not covered" >})</span>
+/** makeRecurring's module: moun<span class="branch-0 cbranch-no" title="branch not covered" >ts Ma<span class="branch-0 cbranch-no" title="branch not covered" ></span>keRecurringResolver; the command handler </span>is discovered app-wide through CqrsModule. */
 export class MakeRecurringSingleMutationModule extends ConfigurableModuleClass {}
 &nbsp;</pre></td></tr></table></pre>
 
@@ -106,7 +133,7 @@ export class MakeRecurringSingleMutationModule extends ConfigurableModuleClass {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../../../../prettify.js"></script>
         <script>

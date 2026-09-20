@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.recur.todo-app-frontend.schedule
-recordDigest: 896a00cc32a05c602a43183b842b3a14abf3b52642a31cea21d6f033e46d320f
+recordDigest: 93e0ce0da9cbbe8d6c93959c025cf275f8ae09fdfd4b459b534ee53f1c66a7d9
 codeDigest:
   algorithm: sha256
   files:
@@ -12,7 +12,7 @@ codeDigest:
     - path: src/app/[lang]/recur/recur.css
       sha256: 3c9c57749df38997b3b8ead1db6a0d98f739ad196999cc0293486752e9a26ee8
     - path: src/components/recur/classNames.ts
-      sha256: 4f84ae46596f7421f019d27b63a60be44fe29a2dd59ea4c6693a8e2dd7831a46
+      sha256: 11227cd74c61219b8aedcc01ff3e6d3ea262560f53f3bffce97db3460910ea48
     - path: src/components/recur/end-rule-confirm.tsx
       sha256: 0264cc71c9300a22be0bae478d662505b062417add7167d91c46484460808df5
     - path: src/components/recur/index.tsx
@@ -26,10 +26,10 @@ codeDigest:
     - path: src/components/recur/schedule.tsx
       sha256: 490b30082cbf5fb418bbf8ef3b4329d0f25ddb0455e4e2decf9edbca9f50f20c
     - path: src/components/recur/upcoming-list.tsx
-      sha256: 385b78c96e4bcb0af59aa22e0365f936a07850737882101bde37b54bb1146678
+      sha256: bf68edb939a1f5715ae0adfada87528ace5ba5cfd0f3a0819241080a29de9d32
     - path: src/components/recur/workspace.tsx
       sha256: 979f4551b5db56e6455ffa5fdeaa3b5b068491a4dcd60b93913fcfad67d300dc
-  digest: 6f18373c15c9c1fecce78642da2297d49a7810b0585675da2b0ef174872e6ea9
+  digest: b4a36352de52f464cf5fa0131843739eab610a9a7c8b2d6a1e801593c54ab688
 outcome: pass
 assertions:
   - id: typecheck
@@ -47,8 +47,15 @@ assertions:
     exit: 0
     outcome: pass
     observation: npm run build exited 0
+  - id: render-proof
+    command: node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork
+      --record impl.recur.todo-app-frontend.schedule
+    exit: 0
+    outcome: pass
+    observation: node ../../scripts/example-render-proof.mjs --work
+      examples/todo-app-backend/.starciwork --record impl.recur.todo-app-frontend.schedule exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:29:47.113Z
+  capturedAt: 2026-09-19T22:49:49.378Z

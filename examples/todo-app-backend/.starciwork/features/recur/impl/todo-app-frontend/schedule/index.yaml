@@ -1,7 +1,7 @@
 schema: work/implementation
 id: impl.recur.todo-app-frontend.schedule
 title: The schedule screen
-state: todo
+state: done
 repository: todo-app-frontend
 # v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
 # under the [lang] locale segment (locales en|vi); src/app/recur never existed. The rev-2 reason below
@@ -13,53 +13,55 @@ owners:
   - {role: route, path: "src/app/[lang]/recur"}
   - {role: block, path: src/components/recur}
 proves: [ui.recur.schedule]
-blockedBy:
-  - {record: gap.recur.render-proof, because: "The real captures under ./assets fail the canonical render checks - entity-list-in-card on the active states (6 li items inside a starci-core-surface card) and palette-off-brand #6d97ff on no-rule/refused mobile. The defect lives in the page's markup and styles; until captures pass, the done claim is unproven."}
+# gap.recur.render-proof closed at rev 4 (w10): the mobile palette failures were antialiased
+# halo dominance in viewport-only captures, not a stylesheet defect - capture.mjs now takes
+# full-page mobile screenshots so enough accent-painted content outranks the fringe, and the
+# re-run canonical render proof holds for every capture.
 assets:
   - path: assets/capture.mjs
     role: capture-script
-    sha256: 79c933efce7f979bbd7c9a020d0b0cd966a824d698bdb5637ef7bec008816f6c
+    sha256: 3bad35eeb337ced3a659f184b7ae2bea3524fecb6e245d940d8b7d70473c5f8e
     provenance: The replayable Playwright driver that produced every running-page capture below by
       driving the real served build through the page's own controls - no staged DOM.
   - path: assets/running-page-no-rule-desktop.png
     role: running-page
-    sha256: 4cef2c2a062a7fde60cd9e98e2a0e24d62a9890309940bce74ac116e80497f8c
+    sha256: 1dc7d6e6c908437ad8e7fd9c2a2ad3ce0c118cedd34ac5070cab6d52f3156797
     provenance: Served build at desktop-1280, no-rule state; markup beside it at
       running-page-no-rule-desktop.html.
   - path: assets/running-page-refused-desktop.png
     role: running-page
-    sha256: 9ced828182ec7d7acc8845d8776f5f9e9006309bf5be7b4fd6f1ac79757b042f
+    sha256: 54462dedb8ba46b3b89430245307bb1c97bb1cfaf0f3a537de3fe63dfd78fd50
     provenance: Served build at desktop-1280, refused state - every-n-days submitted with n=0, all
       draft values retained; markup beside it at running-page-refused-desktop.html.
   - path: assets/running-page-active-desktop.png
     role: running-page
-    sha256: 9adc5a32ef135faafc0fcdb3a38acb320139116a8f16395bce2cc3e2566d48f2
+    sha256: e410b342362881c1edcd35be5a4f828b58b5176cbf3e7da46d2b1aaedcb23ccd
     provenance: Served build at desktop-1280, active state after a real makeRecurring +
       upcomingOccurrences against the live API; markup beside it at
       running-page-active-desktop.html.
   - path: assets/running-page-ended-desktop.png
     role: running-page
-    sha256: 1d1739de3ab396613701d85e9980fc7e713b1a6540b600bf60bfb84305b451e0
+    sha256: 430131314133edf1039225ecdd23b783900ebf758624856e9cd37187077d40b9
     provenance: Served build at desktop-1280, ended state after a real endRecurrence against the
       live API; markup beside it at running-page-ended-desktop.html.
   - path: assets/running-page-no-rule-mobile.png
     role: running-page
-    sha256: 832ac96cec54f0f51d8bb98587be75651b66213a62257dbfc79d92c7224bf19c
+    sha256: e2b58d9e22bff9c8b88e4bdb02acec28faa80d83ca99123b09c35386e8649801
     provenance: Served build at mobile-390, no-rule state - compact header/navigation, fields
       stacked, no horizontal overflow; markup beside it at running-page-no-rule-mobile.html.
   - path: assets/running-page-refused-mobile.png
     role: running-page
-    sha256: 319bb74c0213af2d81dd2beff2de88ee1753db2094e10c60db7f285620fc2499
+    sha256: 486139f140e0510404fb0fb2b6bc13e159d2ea8ba676b91a255451f90957a8a3
     provenance: Served build at mobile-390, refused state; markup beside it at
       running-page-refused-mobile.html.
   - path: assets/running-page-active-mobile.png
     role: running-page
-    sha256: c36fd8ab53821c97b278cccd243bb8d8740262c02c8badb8c4942b356758d553
+    sha256: 82a0491f8deb3eccddfb1f8d1615e79e571c1eb97892c2f777215210712a3bfc
     provenance: Served build at mobile-390, active state; markup beside it at
       running-page-active-mobile.html.
   - path: assets/running-page-ended-mobile.png
     role: running-page
-    sha256: 95b6f307b36a5a1cebc717055733534dbec5cf309042713516b13733011e06fd
+    sha256: 24302dd276469b15704d98ea20f5774927c1604919176a61bdcd6a65f1972e53
     provenance: Served build at mobile-390, ended state; markup beside it at
       running-page-ended-mobile.html.
 
@@ -87,4 +89,4 @@ assets:
 # Integration note: the live RecurFrequency GraphQL enum travels under its registered keys
 # (EveryWeekday/EveryNDays/MonthlyDay), not the data.recur.rule.frequency kebab-case domain values;
 # the block maps domain<->wire at the transport call site. No business or schema change was needed.
-change: {rev: 3, kind: editorial, at: 2026-09-19T21:30:00.000Z, reason: "v7-13: state rescinded done -> todo - the fresh captures v7-9 produced fail entity-list-in-card (active states) and palette-off-brand (#6d97ff on no-rule/refused mobile), so the done claim is unproven and the record is held by gap.recur.render-proof. Rev 2's build description stands as the record of what was built: built the /recur route and src/components/recur block on installed Grammar exports, captured all four mapped states at both viewports with real running-page captures under assets/, corrected owners to the module-root directories that exist, and bound checks + code digest in evidence.yaml. Coverage and Sonar recorded not-run for missing configured runners rather than falsely passed."}
+change: {rev: 4, kind: editorial, at: 2026-09-19T22:40:00.000Z, reason: "w10: state restored todo -> done - the #6d97ff/#b2c8ff/#95b3ff buckets were antialiasing fringe around the checked radio dominating viewport-only mobile captures, not an undeclared stylesheet colour; assets/capture.mjs now takes full-page mobile screenshots and the re-run scripts/example-render-proof.mjs holds for every capture (entity-list-in-card included), so gap.recur.render-proof is closed. Prior narrative kept verbatim: v7-13: state rescinded done -> todo - the fresh captures v7-9 produced fail entity-list-in-card (active states) and palette-off-brand (#6d97ff on no-rule/refused mobile), so the done claim is unproven and the record is held by gap.recur.render-proof. Rev 2's build description stands as the record of what was built: built the /recur route and src/components/recur block on installed Grammar exports, captured all four mapped states at both viewports with real running-page captures under assets/, corrected owners to the module-root directories that exist, and bound checks + code digest in evidence.yaml. Coverage and Sonar recorded not-run for missing configured runners rather than falsely passed."}

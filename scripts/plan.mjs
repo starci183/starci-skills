@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
-import { readDistJson, distPath, requireDist } from '../core/runtime-root.mjs';
+import { skillRoot } from '../core/runtime-root.mjs';
 import {validatePlan,planAreas} from '../workflows/plan.mjs';
 import {assertNewStoragePath} from '../workflows/storage.mjs';
 import {autoASAPWindow} from '../workflows/auto.mjs';
-const catalog=readDistJson('workflows','catalog.json');
+const catalog=parseYaml(fs.readFileSync(path.join(skillRoot,'workflows','catalog.yaml'),'utf8'));
 const clean=x=>String(x).replaceAll('|','\\|').replace(/\r?\n/g,' ');
 export function renderPlan(plan){
  validatePlan(plan,catalog);
@@ -45,7 +45,7 @@ export function createBundle(plan,destination){
  for(const [p,doc]of Object.entries(docs)){const file=path.join(dir,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(doc),{flag:'wx'});}return dir;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- try{const [command,input,destination]=process.argv.slice(2);if(command==='template'){requireDist();process.stdout.write(stringifyYaml(JSON.parse(fs.readFileSync(distPath('workflows','plan.template.json')))));}
+ try{const [command,input,destination]=process.argv.slice(2);if(command==='template'){process.stdout.write(fs.readFileSync(path.join(skillRoot,'workflows','plan.template.yaml'),'utf8'));}
  else {const data=parseYaml(fs.readFileSync(input,'utf8'));const plan=data.plan??data;if(command==='create'&&destination)process.stdout.write(createBundle(plan,destination)+'\n');else if(command==='render')process.stdout.write(renderPlan(plan));else throw Error('Use plan.mjs template | create <filled-plan.yaml> <new-plan-directory> | render <plan-or-goal.yaml>');}}
  catch(e){process.stderr.write(e.message+'\n');process.exitCode=1;}
 }

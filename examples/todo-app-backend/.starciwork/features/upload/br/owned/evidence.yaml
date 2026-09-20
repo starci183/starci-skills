@@ -1,0 +1,44 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: br.upload.owned
+recordDigest: 999ffc35e2392e778fbc4aad9dbb9368b2a52c6e57c4c2980a3e235c8830e334
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/integrations/upload/local-storage.adapter.spec.ts
+      sha256: c3273bc88776552750cfd0b517ff784c20b4e32ad7d5bc0459497fd37eeb0e96
+    - path: src/modules/integrations/upload/local-storage.adapter.ts
+      sha256: efb3e9962d1768c54de945aad38aacba8875be0f9a386d9cc44b126e1694b28c
+    - path: src/modules/integrations/upload/noop-virus-scan.adapter.ts
+      sha256: 82cd6c7992f149afe605cd3478795453fd16aeeb613959a1667777c6c62e2919
+    - path: src/modules/integrations/upload/upload-token.spec.ts
+      sha256: 92ee4765d87ba70976573fd209e952938512672c1560ab06fbddd3291183627b
+    - path: src/modules/integrations/upload/upload-token.ts
+      sha256: 16a83ee13b3b0a005ad7df47ace71e0afdf307ae4d8e2f57cbc7235802445b78
+    - path: src/modules/integrations/upload/upload.contracts.ts
+      sha256: ea7e7c27b1226edc82a564a99aa2f33407d19d752789a75ed0e65ca18bbaedfa
+    - path: src/modules/integrations/upload/upload.module-definition.ts
+      sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
+    - path: src/modules/integrations/upload/upload.module.spec.ts
+      sha256: edd14266439976b336788960d20905e38292417503d2885ad3604ce73baca033
+    - path: src/modules/integrations/upload/upload.module.ts
+      sha256: f5cf214222600bea4b502788ce58f6a1cf31207372e1e2b25071c22ecda06000
+    - path: src/modules/integrations/upload/upload.service.spec.ts
+      sha256: d864ebad4736a4d163c6597abd8906b4e1b22c12830035807d338f67effdcb5d
+    - path: src/modules/integrations/upload/upload.service.ts
+      sha256: 391de988514a713c9c883fed71cdc6ccb65dfce7e0e6ce31f12ee785b9197484
+  digest: 62380dd5209a6b664f3fcd64653006de2b08aff8d37ba90ebdada505f6ddf2be
+outcome: pass
+assertions:
+  - id: upload-service-spec
+    command: npx jest src/modules/integrations/upload/upload.service.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/integrations/upload/upload.service.spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-19T20:59:14.997Z

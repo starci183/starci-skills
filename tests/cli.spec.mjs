@@ -19,7 +19,7 @@ function temporary(t) {
   return root;
 }
 
-// `install()` copies the whole payload and rebuilds .dist (~6s). Several tests only need a
+// `install()` copies the whole source payload (~seconds). Several tests only need a
 // freshly-installed root to spawn or import the relocated CLI from; none of them assert anything
 // about the *process* of installing. Build the payload once here and clone the (path-independent,
 // verified-relocatable) result per test with fs.cpSync, which is roughly an order of magnitude
@@ -270,10 +270,10 @@ test('installed workspace.manage forward-test authors only scoped todo planning 
   installInto(root);
   const installedCLI = path.join(root, '.claude/bin/starci-skills.mjs');
   const invoke = (...args) => spawnSync(process.execPath, [installedCLI, 'work', ...args], { cwd: root, encoding: 'utf8', windowsHide: true });
-  const catalog = JSON.parse(fs.readFileSync(path.join(root, '.claude/.dist/ops/catalog.json'), 'utf8'));
+  const catalog = parseYaml(fs.readFileSync(path.join(root, '.claude/modules/ops/registry.yaml'), 'utf8'));
   const selected = catalog.ops.find(op => op.id === 'workspace.manage');
   assert.ok(selected, 'actual installed catalogue must resolve the selected op');
-  for (const relative of ['SKILL.md', 'README.md', '.dist/policy/common.json', `.dist/ops/${selected.operator}`, '.dist/schemas/work.schema.json']) {
+  for (const relative of ['SKILL.md', 'README.md', 'modules/ops/registry.yaml', `modules/ops/ops/${selected.id}.yaml`, 'schemas/work.schema.yaml']) {
     assert.ok(fs.readFileSync(path.join(root, '.claude', relative), 'utf8').length > 100, `missing installed authority: ${relative}`);
   }
   const workRoot = path.join(root, '.starciwork');

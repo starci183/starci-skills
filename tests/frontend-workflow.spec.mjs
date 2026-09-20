@@ -7,7 +7,6 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { initialize, advance, inspect, validateMatrix, validateInput, digest, definition, repair, support, resume } from '../workflows/frontend.mjs';
-import { build } from '../scripts/build-workflows.mjs';
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const clone = x => structuredClone(x);
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -135,7 +134,7 @@ test('relocated workflow executes without source checkout or native agent dispat
   fs.cpSync(path.join(packageRoot, 'contracts'), path.join(relocated, 'contracts'), { recursive: true });
   fs.cpSync(path.join(packageRoot, 'kernel'), path.join(relocated, 'kernel'), { recursive: true });
   fs.cpSync(path.join(packageRoot, 'core'), path.join(relocated, 'core'), { recursive: true });
-  fs.cpSync(path.join(packageRoot, '.dist'), path.join(relocated, '.dist'), { recursive: true });
+  for (const dir of ['modules', 'providers', 'hosts', 'execution', 'approvals', 'knowledge', 'models', 'legacy']) if (fs.existsSync(path.join(packageRoot, dir))) fs.cpSync(path.join(packageRoot, dir), path.join(relocated, dir), { recursive: true });
   fs.mkdirSync(path.join(relocated,'scripts'));
   fs.copyFileSync(path.join(packageRoot,'scripts/config.mjs'),path.join(relocated,'scripts/config.mjs'));
   if (fs.existsSync(path.join(packageRoot,'config.example.yaml'))) fs.copyFileSync(path.join(packageRoot,'config.example.yaml'),path.join(relocated,'config.example.yaml'));
@@ -187,28 +186,6 @@ test('one primary admits three disjoint secondaries, refuses a fourth and waits 
   }
   assert.equal(request(x.root).step, 2);
 });
-test('compiled JSON is reproducible and remains valid after relocation', t => {
-  assert.equal(build({ check: true }).ok, true);
-  const x = fixture(t), destination = path.join(x.parent, '.dist');
-  fs.cpSync(path.join(packageRoot, '.dist'), destination, { recursive: true });
-  const manifest = read(path.join(destination, 'manifest.json'));
-  for (const entry of manifest.files) {
-    const bytes = fs.readFileSync(path.join(destination, entry.path));
-    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), entry.sha256);
-    if (entry.path.endsWith('.json')) JSON.parse(bytes.toString('utf8'));
-  }
-  assert.ok(manifest.files.some(entry=>entry.path === 'workflows/lifecycle.mjs'));
-  const role = read(path.join(destination, 'ops/backend.implement/authority.json'));
-  assert.equal(Object.hasOwn(role, 'secondary'), false);
-  const caller = read(path.join(destination, 'ops/interface.implement/secondary.json'));
-  assert.equal(caller.owner, 'interface.implement');
-  assert.equal(caller.maxDefinitions, 3);
-  assert.deepEqual(caller.calls.map(c => c.op), ['architecture.decide','backend.implement']);
-  assert.ok(caller.calls.every(call => call.businessChanged === false && call.canCallOthers === false));
-  const backendCaller = read(path.join(destination, 'ops/backend.implement/secondary.json'));
-  assert.deepEqual(backendCaller.calls.map(call => call.op), ['architecture.decide']);
-});
-
 test('Claude decorative assets stay deferred through FE to UAT; missing functional art and fake ready assets block', t => {
   const x=fixture(t,{runtime:'claude',profile:'opus',imageGenerationAvailable:false});
   advance(x.root,draw(x));

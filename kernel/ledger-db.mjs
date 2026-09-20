@@ -18,6 +18,7 @@ export const MACHINE_VERSION=1;
  * resolved the runtime as its own Work root and quietly opened a SECOND ledger there. One was found holding
  * a live workflow's id. A parallel record is worse than no record, so this refuses by name instead.
  */
+// The second clause recognizes a payload sealed before the distless migration; new payloads carry kernel/ directly.
 const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'bin','starci.mjs'))
   &&(fs.existsSync(path.join(root,'kernel','ledger-db.mjs'))||fs.existsSync(path.join(root,'.dist','kernel','ledger-db.mjs')));
 export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));

@@ -1,0 +1,558 @@
+schema: starci/profile-registry@3
+runtimes:
+  - codex
+  - claude
+  - qwen
+  - devin
+aliases:
+  openai: codex
+  anthropic: claude
+  qwencloud: qwen
+  alibaba: qwen
+  deepseek: qwen
+  cognition: devin
+executionModes:
+  solo:
+    hosts: [codex, claude, orca]
+    controlPlane: current-chat-session
+    operationAgent: isolated-background-agent
+    maxConcurrentOperationAgents: 3
+    isolation: isolated-per-operation
+    worktree: current-session-worktree
+    scheduling: dependency-dag
+    fanOutWithinOperation: forbidden
+  orchestrated:
+    controlPlane: orca
+    bootstrapHosts: [codex, claude, orca]
+    bootstrapRole: retain-user-designated-coordinator
+    coordinatorAgent: current-user-designated-session
+    coordinatorAuthority: owns-approved-boundaries-and-review
+    workers: [codex, claude, qwen, devin]
+    workflowWrapperAgent: deterministic-workflow-kernel
+    workflowManagerAuthority: sole-state-writer-and-operation-dag
+    workflowManagerReportsTo: active-user-designated-coordinator
+    workflowManagerExecutionPolicy: typed-kernel-loop
+    higherLayerSubstitution: forbidden
+    operationAgent: supervised-native-agent-in-workflow-worktree
+    maxConcurrentOperationAgents: 3
+    isolation: isolated-per-operation
+    worktree: isolated-child-per-workflow-attempt
+    scheduling: dependency-dag
+    fanOutWithinOperation: forbidden
+agentArchitecture:
+  levels: [user-coordinator, workflow-kernel, operation-agent]
+  flexibleLayers: [user-coordinator]
+  isolationBoundary: operation
+  wrapperResponsibilities: [resolve-dependencies, normalize-input, resolve-agent-chain, validate-output, route-output, retry-no-effect]
+  operationMapping: one-operation-instance-one-agent
+  concreteAgentBinding: provider-profile-model
+orchestration:
+  runtime: orca
+  owner: source-host
+  defaultOperationTarget: qwen-agent
+  workspaceRouting: .workspaces/projects/<project>/work.json
+  approvalPolicy: approvals/policy.json
+  approvalMode: accepted-brief-then-auto
+  dispatch: The current user-designated coordinator remains the coordinator, including when it is an external
+    Codex or Claude chat driving Orca. It creates an isolated child worktree for each ready workflow and starts
+    the deterministic workflow kernel there; no replacement Coordinator or state-owning Workflow Manager agent
+    is forced. The kernel is the sole workflow-state writer and launches one isolated agent for each ready
+    operation using the first eligible target in that operation's chain. The coordinator and kernel never
+    implement, repair or test on behalf of an operation agent.
+defaults:
+  codex:
+    working: gpt-5.6-sol
+    reasoning: gpt-6-astra
+  claude:
+    working: opus
+    reasoning: fable-5.1
+  qwen:
+    working: qwen3.8-flash-worker
+    reasoning: qwen3.8-flash-reviewer
+  devin:
+    working: devin-worker
+    reasoning: devin-reviewer
+reasoningOps:
+  - decision.prepare
+  - provision.ask
+  - business.decide
+  - architecture.decide
+  - review.verify
+  - work.author
+  - request.analyze
+  - scope.define
+  - goal.revise
+targets:
+  # Pool targets are named by the provider-window pool of modules/models/runtimes.yaml; `requestedModel` stays the
+  # implement-role model of the pool's models map for compatibility with consumers that read one model.
+  codex-agent:
+    runtime: codex
+    requestedModel: gpt-5.6-luna
+    profiles:
+      working: gpt-5.6-luna
+      reasoning: gpt-6-astra
+    orcaLaunch:
+      kind: managed-agent
+      agent: codex
+  # Launch-only target: an explicit `--model gpt-5.6-luna` request still reaches the model, while the alias
+  # below routes every canonical/allocation reference into the codex-agent provider window.
+  gpt-5.6-luna:
+    runtime: codex
+    requestedModel: gpt-5.6-luna
+    profiles:
+      working: gpt-5.6-luna
+      reasoning: gpt-5.6-luna-reviewer
+    orcaLaunch:
+      kind: managed-agent
+      agent: codex
+  claude-agent:
+    runtime: claude
+    requestedModel: claude-opus-5
+    profiles:
+      working: opus
+      reasoning: opus-reviewer
+    orcaLaunch:
+      kind: managed-agent
+      agent: claude
+  claude-fable:
+    runtime: claude
+    requestedModel: null
+    headlessModel: claude-fable-5-1
+    profiles:
+      reasoning: fable-5.1
+    orcaLaunch:
+      kind: managed-agent
+      agent: claude
+  qwen-agent:
+    runtime: qwen
+    requestedModel: qwen3.8-flash
+    profiles:
+      working: qwen3.8-flash-worker
+      reasoning: qwen3.8-flash-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      reasoningCommand: qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      dispatch: return-preamble-and-send
+      adapter: qwen
+      nestedAgents: forbidden
+  qwen3.8-max:
+    runtime: qwen
+    requestedModel: qwen3.8-max
+    profiles:
+      working: qwen3.8-max-worker
+      reasoning: qwen3.8-max-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen --model qwen3.8-max --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      dispatch: return-preamble-and-send
+      adapter: qwen
+      nestedAgents: forbidden
+  deepseek-v4-pro:
+    runtime: qwen
+    requestedModel: deepseek-v4-pro
+    profiles:
+      working: deepseek-v4-pro-worker
+      reasoning: deepseek-v4-pro-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen --model deepseek-v4-pro --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      dispatch: return-preamble-and-send
+      adapter: qwen
+      nestedAgents: forbidden
+  devin-agent:
+    runtime: devin
+    requestedModel: swe-2-max
+    executionHosts: [orca]
+    profiles:
+      working: devin-worker
+      reasoning: devin-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false
+      reasoningCommand: devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false
+      dispatch: return-preamble-and-send
+      adapter: devin
+      nestedAgents: forbidden
+      capacityGate: explicit-workflow-quota
+targetAliases:
+  qwen-qwen3.8-flash-worker: qwen-agent
+  qwen-qwen3.8-flash-reviewer: qwen-agent
+  codex-gpt-5.6-sol: codex-agent
+  codex-gpt-5.6-sol-reviewer: codex-agent
+  codex-gpt-5.6-luna: codex-agent
+  codex-gpt-5.6-luna-reviewer: codex-agent
+  codex-gpt-6-astra: codex-agent
+  codex-gpt-6-astra-reviewer: codex-agent
+  qwen-qwen3.8-max-worker: qwen3.8-max
+  qwen-qwen3.8-max-reviewer: qwen3.8-max
+  qwen-deepseek-v4-pro-worker: deepseek-v4-pro
+  qwen-deepseek-v4-pro-reviewer: deepseek-v4-pro
+  devin-devin-worker: devin-agent
+  devin-devin-reviewer: devin-agent
+  # Retired per-model pool ids resolve to the provider-window pool that carries them now, so live workflow
+  # quota entries and journal references keep landing on the right window.
+  gpt-5.6-luna: codex-agent
+  gpt-5.6-sol: codex-agent
+  gpt-6-astra: codex-agent
+  claude-opus: claude-agent
+  claude-fable-5.1: claude-fable
+  qwen3.8-flash: qwen-agent
+skills:
+  starci:
+    chains:
+      working:
+        - qwen-agent
+        - devin-agent
+        - claude-agent
+        - codex-agent
+      reasoning:
+        - claude-fable
+        - codex-agent
+supervisors:
+  schema: starci/supervisor-chains@1
+  note: Persistent native agents that only decide, dispatch and wait. Session stability outranks
+    model depth here, so the working Claude profile leads and Codex Sol is the managed fallback.
+  planCoordinator:
+    chain: [claude-agent, codex-agent]
+    effort: high
+  workflowMonitor:
+    chain: [claude-agent, codex-agent]
+    effort: high
+operators:
+  architecture.decide:
+    skill: starci
+    # Fable first, then its downgrade: the Codex pool's reasoning model and the Claude pool last, so a full or
+    # exhausted top tier moves the decision down instead of stalling it.
+    chain: [claude-fable, codex-agent, claude-agent]
+    environments:
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  backend.implement:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  brand.decide:
+    skill: starci
+    # A decide operation that also produces bytes: when the product has no mascot, this op generates one
+    # placeholder with the image model, and only the Codex runtime carries one ($imagegen). So the chain leads
+    # with Codex for the launch - the same reason interface.draw is Codex-first - and then falls back to the
+    # runtimes that actually own the decide role, which decide the identity and defer the artwork with a brief.
+    chain: [codex-agent, claude-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+  decision.prepare:
+    skill: starci
+    # Preparing the owner's decision is a reasoning task; the Codex pool's reasoning model first to spare
+    # Fable's week, Fable when it is out, and the downgrade under both of them: the Claude pool.
+    chain: [codex-agent, claude-fable, claude-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+  docs.author:
+    skill: starci
+    # Authoring reference docs is write-role work over the record tree: the full writing chain.
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  provision.ask:
+    skill: starci
+    # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order,
+    # the same downgrade.
+    chain: [codex-agent, claude-fable, claude-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+  business.decide:
+    skill: starci
+    # The same downgrade the architecture decision takes: Fable, the Codex pool's reasoning model, the Claude pool.
+    chain: [claude-fable, codex-agent, claude-agent]
+    environments:
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  content.generate:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  code.refactor:
+    skill: starci
+    # Restructuring code under a behaviour invariant is implementation work: the full coding chain.
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  e2e.verify:
+    skill: starci
+    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+  integration.verify:
+    skill: starci
+    # A live call to a real provider is the same kind of work as the API proof: run code, read the response
+    # back, keep the output. So it carries the same verify-role chain e2e.verify does.
+    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+  grammar.update:
+    skill: starci
+    # Growing the installed grammar is code, stories, tests, a published version and a canon entry, so it runs on
+    # the strongest coding runtimes first and never on the image model: nothing here is drawn.
+    chain: [claude-agent, codex-agent, devin-agent]
+    environments:
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+  goal.revise:
+    skill: starci
+    # Revising a live goal is a decision about the work, not work on it: the reasoning chain.
+    chain: [codex-agent, claude-fable, claude-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+  interface.asset:
+    skill: starci
+    # Generating the artwork a candidate embeds needs the same image model the drawing used, so the chain is
+    # the same single Codex link: a runtime that cannot render an image cannot carry this operation at all.
+    chain: [codex-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+  interface.draw:
+    skill: starci
+    # Drawing invokes built-in ImageGen, so it uses the one operation runtime whose host tool contract exposes
+    # that invocation. The tool does not expose model selection; this chain is agent routing, not an image-model claim.
+    chain: [codex-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+  interface.implement:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  knowledge.repair:
+    skill: starci
+    chain: [claude-agent, codex-agent, qwen-agent, devin-agent]
+    environments:
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+  perf.verify:
+    skill: starci
+    # Measuring a performance budget is the same proof shape as the security audit: the verify chain.
+    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+  release.deliver:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  request.analyze:
+    skill: starci
+    # Turning a raw request into a scoped, checkable goal is planning work: the reasoning chain, the cheap pool never.
+    chain: [claude-fable, codex-agent, claude-agent]
+    environments:
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  review.verify:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-fable, codex-agent, claude-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  runtime.operate:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  scope.retire:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  scope.define:
+    skill: starci
+    # Cutting a goal into bounded nodes is a decision about the work: the reasoning chain.
+    chain: [codex-agent, claude-fable, claude-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+  security.verify:
+    skill: starci
+    # Auditing code against the security baseline is the same proof shape as the API proof: the verify chain.
+    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+  task.execute:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  test.author:
+    skill: starci
+    # Authoring the regression check a behaviour-invariant change is measured against is implementation work:
+    # the full coding chain.
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  uat.verify:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  work.author:
+    skill: starci
+    # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every
+    # later operation is measured against: it runs on the strongest reasoning runtimes first and never on the
+    # cheap pool, and it downgrades to the Claude pool rather than waiting for a week to reset.
+    chain: [claude-fable, codex-agent, claude-agent]
+    environments:
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  workspace.manage:
+    skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+fallback:
+  allowedReasons:
+    - unavailable
+    - quota-exhausted
+    - rate-limited
+    - startup-failure
+    - unsupported
+  requiredEffectState: none
+  blockedReasons:
+    - permission-denied
+    - user-checkpoint
+    - business-ambiguity
+    - safety-block
+    - partial-or-unknown-effects
+selection: |-
+  Orca supplies the observed external-agent inventory. Resolve the selected skill and
+  operator chain from top to bottom, choosing the first ready runtime/profile. Fall through only
+  after an allowed failure with verified no-effect state. This policy never installs an agent,
+  authenticates a provider, grants tools or expands the workflow authority. The Claude and Codex pools use
+  managed-agent launch (worker-start). The Qwen pool uses the command-terminal launch declared on
+  its target: the canonical launcher creates one terminal per attempt running the declared `qwen`
+  command, waits for the rendered input prompt, obtains the Task preamble with `dispatch
+  --return-preamble`, submits it with `terminal send` and verifies the submission, then attests the
+  Dispatch assignee and the rendered model; Orca 1.4.188's native qwen-code adapter cannot deliver a
+  prompt to Qwen Code 0.23.3. Qwen 3.8 Max and DeepSeek command terminals stay out of automatic
+  chains; every command excludes the Qwen `agent` tool.
+costPolicy: |-
+  Runtime pools are provider quota windows: the Codex pool carries gpt-5.6-sol for the working roles and
+  gpt-6-astra for the reasoning ones, the Claude pool carries claude-opus-5 for every role, Claude Fable keeps
+  its own weekly window, the Qwen pool carries qwen3.8-flash, and Devin stays closed until an owner grants
+  slots. General bounded implementation, verification, content and maintenance operations run the established
+  Qwen/Devin/Claude/Codex pool order. Deep reasoning (business.decide, architecture.decide) runs Claude Fable
+  first and the Codex pool's reasoning model second. Independent review runs the Qwen pool's reviewer first,
+  Claude Fable second and the Codex pool third, with the Claude pool as the declared downgrade.
+  work.author reads a Work record, its neighbours and the code an implementation would
+  touch, so it carries the `plan` role and leads with Claude Fable, then the Codex pool's reasoning model; the
+  Claude pool stays in its chain as the launchable fallback even though the allocator prefers the plan-role runtimes.
+  brand.decide is the mirror of that case: it carries the `write` role, and the op also generates a placeholder
+  mascot when the product has none; only the Codex pool carries an image generator, so that target leads its
+  chain as the launchable candidate and the Claude pool follows and defers the artwork with a concrete brief.
+  interface.draw invokes built-in ImageGen for a small representative set and therefore carries the single
+  Codex route whose host contract exposes that tool. This route names the operation agent, not an
+  image-model version: tool model selection is not exposed. interface.asset re-renders the artwork that drawing
+  approved and therefore carries the same single image-capable route, with no deferral fallback - a deferred
+  slot is exactly what this operation exists to close. grammar.update is the opposite case: it grows the
+  installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
+  entry - so it carries the execution `implement` role but drops the image model entirely and leads with
+  the Claude pool, then the Codex pool; nothing in it is drawn, and a publish is irreversible, so the chain is
+  limited to declared coding runtimes. knowledge.repair edits
+  this runtime and therefore leads with the Claude pool. Plan Coordinator and Workflow Monitor supervisors lead with the Claude pool and
+  fall back to the Codex pool. Every automatic chain contains only managed-agent or return-preamble
+  command-terminal candidates and
+  advances only after a verified no-effect failure. DeepSeek V4 Pro and Qwen 3.8 Max remain installed
+  explicit or user-approved exception targets but are excluded from automatic chains; Orca
+  worker-start cannot carry a Qwen model override, so a Qwen candidate always inherits the verified
+  runtime configuration. Command-terminal agents disable nested agents and have explicit turn,
+  wall-time and tool-call ceilings; a ceiling stop is a failed attempt and never proof of completion.
+  Never infer price or quality superiority from a subscription label; benchmark bounded
+  representative operations before proposing another routing change. A native worker is released
+  after its exact worker_done result is accepted; the workflow child remains until integration is
+  complete. In runtime 5.0 the chain no longer decides who runs an operation - `modules/models/runtimes.yaml`
+  does, by role preference - so every operator's `environments` must declare every runtime that carries
+  that operation's role and owns a profile for it, and the chain lists exactly those targets so
+  `candidateFor` can answer with a launch shape for whichever runtime the allocator picked. A pool
+  whose models map names no model for an operation's role (Fable reasons but cannot implement, so it cannot
+  take a `backend.implement`) stays out of that operator and is excluded from allocation by `restrictTo`.
+assetFallback: When image generation is unavailable, reuse verified assets first; Claude may leave
+  decorative image slots blank with a concrete deferred brief. Never mark missing artwork generated
+  or satisfy a functional criterion with a blank slot.
+examples:
+  codexFrontend:
+    runtime: codex
+    profile: gpt-5.6-sol
+    model: gpt-5.6-sol
+    imageGenerationAvailable: true
+  claudeFrontend:
+    runtime: claude
+    profile: opus
+    model: claude-opus-5
+    imageGenerationAvailable: false
+  orcaInterfaceImplementation:
+    skill: starci
+    op: interface.implement
+    availableRuntimes:
+      - codex
+      - claude
+      - qwen
+examplesNote: Examples of frontend context.execution only. Set availability from observed host
+  tools, never copy true as proof. Declared exact models still require effective runtime attestation.
+  Orca resolves ordered skill/operator candidates from observed readiness instead.

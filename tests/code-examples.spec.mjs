@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {transformSync} from 'esbuild';
-import {compileKnowledge} from '../scripts/compile-knowledge.mjs';
+import {compileKnowledge} from '../legacy/builders/compile-knowledge.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

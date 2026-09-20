@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">80% </span>
+                <span class="strong">84.37% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>16/20</span>
+                <span class='fraction'>27/32</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">42.85% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>10/25</span>
+                <span class='fraction'>3/7</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.33% </span>
+                <span class="strong">84.37% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/15</span>
+                <span class='fraction'>27/32</span>
             </div>
         
             
@@ -85,49 +85,79 @@
 <a name='L20'></a><a href='#L20'>20</a>
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
-<a name='L23'></a><a href='#L23'>23</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-yes">32x</span>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">32x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span></td><td class="text"><pre class="prettyprint lang-js">import { DynamicModule, Module } from '@nestjs/common';
-import { ConfigurableModuleClass, OPTIONS_TYPE } from './keycloak.module-definition';
-import { KeycloakClient } from './keycloak.client';<span class="branch-1 cbranch-no" title="branch not covered" ></span>
-&nbsp;
-/**<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span></span></span></span></span>
- * integration.login<span class="branch-1 cbranch-no" title="branch not covered" >.k</span>eyc<span class="branch-2 cbranch-no" title="branch not covered" >loak: the one Keycloak client, registe</span>red the way nivo registers every
- * capability - `register()` returning a DynamicModule built on the shared isGlobal module-definition.
- * No `imports: [ConfigModule]` here: `ConfigModule` is registered globally from `app.module.ts`
- * (`ConfigModule.register({ isGlobal: true })`), so `AppConfigService` is already visible to
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    DynamicModule, Module 
+} from "@nestjs/common"
+import {
+    ConfigurableModuleClass, OPTIONS_TYPE 
+} from "./keycloak.module-definition"
+im<span class="branch-0 cbranch-no" title="branch not covered" >port {</span>
+<span class="cstat-no" title="statement not covered" >    KeycloakClient </span>
+<span class="cstat-no" title="statement not covered" >} from "./keycloak.client"</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+ * integration.login.keycloak: the one Keycloak client, registered the way nivo registers every
+ * capability - `register()` returning a DynamicModule bu<span class="branch-0 cbranch-no" title="branch not covered" >ilt on the shared isGlobal module-definition.</span>
+<span class="cstat-no" title="statement not covered" > * No `imports: [ConfigModule]` here: `ConfigModule` is registered globally from `app.module.ts`</span>
+ * (`ConfigModule.register<span class="branch-0 cbranch-no" title="branch not covered" >({ is<span class="branch-0 cbranch-no" title="branch not covered" ></span>Global: true })`), so `AppConfigService` </span>is already visible to
  * `KeycloakClient` without this module declaring the dependency itself.
  */
-@Module({})
+@Module({
+})
+/** Nest module wiring the keycloak capability's providers; the app composition root registers it - other modules never import it. */
 export class KeycloakModule extends ConfigurableModuleClass {
-  static register(options: typeof OPTIONS_TYPE = {}): DynamicModule {
-    const base = super.register(options);
-    return {
-      ...base,
-      providers: [...(base.providers ?? []), KeycloakClient],
-      exports: [KeycloakClient],
-    };
-  }
+    static register(options: typeof OPTIONS_TYPE = {
+    }): DynamicModule {
+        const base = super.register(options)
+        return {
+            ...base,
+            providers: [...(base.providers ?? []),
+                KeycloakClient],
+            exports: [KeycloakClient],
+        }
+    }
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -136,7 +166,7 @@ export class KeycloakModule extends ConfigurableModuleClass {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

@@ -39,7 +39,7 @@ Six statements hold the release together. Every section below is one of them mad
    Objections and overlaps alike are read leniently, because a goal that goes uncritiqued costs more than a
    row the kernel could not shape.
 3. **Input and output are explicit.** Every operation kind and every record kind declares what it reads and
-   what it produces, as data in `model/kinds.yaml` and `model/records.yaml`; the op catalog, the kind graph,
+   what it produces, as data in `modules/models/kinds.yaml` and `modules/models/records.yaml`; the op catalog, the kind graph,
    the contract and the validator are held to the same declaration by `validateGraph` and `ops/validate.mjs`.
    Duplicates and conflicts between records are matched against these declarations.
 4. **Adding a feature is a reconciliation with three cases.** Reference what a decided record already holds,
@@ -64,7 +64,7 @@ Six statements hold the release together. Every section below is one of them mad
 ## 2. Records: what a Work record is derived from
 
 A **record kind** is what a file in the Work tree or the product is, independent of the operation that wrote
-it. `model/records.yaml` (`starci/records@1`) is the closed catalog; `kernel/io.mjs` reads it, nothing else
+it. `modules/models/records.yaml` (`starci/records@1`) is the closed catalog; `kernel/io.mjs` reads it, nothing else
 does. `layout` is the path patterns `recordKindOfPath` matches, read most-specific-first; `nodeKinds` is
 which Work node kinds carry a record of this kind, which is not the same question as which record a node's
 own `index.yaml` is.
@@ -103,7 +103,7 @@ derived from itself would make every restatement of it legal by declaration).
 
 ## 3. Kinds: what an operation reads and what it produces
 
-`model/kinds.yaml` (`starci/kinds@2`) replaces the single `mutates` list of 5.1 with two lists over the
+`modules/models/kinds.yaml` (`starci/kinds@2`) replaces the single `mutates` list of 5.1 with two lists over the
 record catalog, and the kernel, the contract and the validator read them instead of keeping sets of their
 own. This is the shipped table, entry for entry:
 
@@ -568,7 +568,7 @@ own tab at the moment it needs it.
 ## 6. The host model
 
 A host is three facts and no more: a name, what it offers beyond a worktree and a runtime, and whether it
-runs operations in parallel. `model/hosts.yaml` (`starci/hosts@1`) declares them and `hosts/index.mjs` is the
+runs operations in parallel. `modules/models/hosts.yaml` (`starci/hosts@1`) declares them and `hosts/index.mjs` is the
 only code that loads it (`loadHosts`, `hostDescriptor`, `validateHosts`, `assertHosts`).
 
 | host | capabilities | sequential |
@@ -578,10 +578,10 @@ only code that loads it (`loadHosts`, `hostDescriptor`, `validateHosts`, `assert
 
 The emptiness of the headless list is the contract that makes `host-unsupported` mechanical instead of a
 judgement. `hosts/orca/calls.mjs` and `hosts/headless/host.mjs` ask the profile for their own descriptor and
-carry the shipped values only as `BUILT_IN_HOSTS`, the fallback for a tree whose `.dist` is not built yet - a
+carry the shipped values only as `BUILT_IN_HOSTS`, the fallback for a tree whose model sources are not readable yet - a
 host must be able to describe itself before a build exists, and `tests/hosts.spec.mjs` asserts the fallback
 and the profile say the same thing so the duplication cannot become a disagreement. `validateHosts` checks
-every offered capability against the `capabilities` vocabulary of `model/kinds.yaml` - the same vocabulary a
+every offered capability against the `capabilities` vocabulary of `modules/models/kinds.yaml` - the same vocabulary a
 kind's `needs` is drawn from - because a capability nobody can ask for is a promise a host silently fails to
 keep.
 
@@ -690,7 +690,7 @@ tree leaves the section out rather than guessing.
 
 **A proof remembers the rules it was proven under.** `markDone` writes
 `extensions.work3.kernel.contractDigest` **and `contractKind`** - the digest of everything a proof of that
-kind rests on (`contractDigestOf({kind, kindRecord, operator, rules})`: the `model/kinds.yaml` entry, the
+kind rests on (`contractDigestOf({kind, kindRecord, operator, rules})`: the `modules/models/kinds.yaml` entry, the
 operator contract it launched through and `VALIDATOR_RULES`, in a canonical form with stable key order at
 every depth), and the name of the operation kind the digest was taken for. The ledger sync compares it on
 every read (`reopenStaleProofs`): a node whose stored digest is not the current one is reopened
@@ -740,7 +740,7 @@ is one behaviour reports `done` with `cut: none` and the kernel runs it exactly 
 Afterwards the tree is re-read: the children are the schedulable nodes (`cut-authored {node, children, seam}`),
 the parent is no candidate at all, and each child is **ordinary build work** — `backend.implement` or
 `frontend.implement` with a small allowlist, never a new kind. `allocation.fanOut {seamFirst: true,
-maxPerGroup: 9}` in `model/runtimes.yaml` keeps the seam alone in its group and bounds one parent to nine of
+maxPerGroup: 9}` in `modules/models/runtimes.yaml` keeps the seam alone in its group and bounds one parent to nine of
 the ten slots. And the proof is the group's, once: `e2e.verify` then `review.verify` are planned for the parent
 when every child's build step is accepted, on a runtime none of the children used, judged against the parent's
 group acceptance; a frontend group gets one `uat.verify` at the parent — every flow walked on the rendered
@@ -757,20 +757,20 @@ One concept, one folder, a name that says what it holds:
 
 | folder | holds | was |
 | --- | --- | --- |
-| `model/` | the declared data the runtime runs on: `records.yaml`, `kinds.yaml`, `hosts.yaml`, `runtimes.yaml`, `registry.yaml`, the provider profiles; no code | `profiles/` |
+| `modules/models/` | the declared data the runtime runs on: `records.yaml`, `kinds.yaml`, `hosts.yaml`, `runtimes.yaml`, `registry.yaml`, the provider profiles; no code | `profiles/` |
 | `ops/` | one folder per operation kind, `operator.yaml` with its reads, writes, steps, proofs and blockers, plus the generator and `validate.mjs` | unchanged |
 | `kernel/` | the control loop by concern: `kernel.mjs` (loop, phases, CLI seams), `common.mjs` (what every concern shares), `goal.mjs`, `intake.mjs`, `owner.mjs`, `io.mjs`, `reconciliation.mjs`, `graph.mjs`, `ledger.mjs`, `sync.mjs`, `routing.mjs`, `contract.mjs`, `schedule.mjs`, `budget.mjs`, `loads.mjs`, `lanes.mjs`, `chains.mjs`, `terminals.mjs`, `verify.mjs`, `guards.mjs`, `store.mjs`, `view.mjs`, `reports.mjs`, `supervisor.mjs` | `execution/workflow-kernel.mjs` and its satellites |
 | `hosts/` | `index.mjs` (the host model as data) and the two adapters `orca/` and `headless/`, behind one `invoke` surface | `execution/orca-*.mjs` |
 | `models/` | the model functions and the headless providers (`functions.mjs`) | `execution/llm-functions.mjs` |
 | `scripts/checks/` | machine checks over bytes: `brand.mjs`, `render.mjs`, `proof.mjs` | `execution/brand-checks.mjs`, `execution/verify-proof.mjs` |
 | `tests/` | the regression suite, one spec per concern; every rule in this document names its test in §12 | unchanged |
-| `bin/starci.mjs` | the one command line: `workflow-*` forwarded to the launcher, `render check` / `brand check` and every CLI command | `.dist/execution/orca-supervised-launch.mjs` |
+| `bin/starci.mjs` | the one command line: `workflow-*` forwarded to the launcher, `render check` / `brand check` and every CLI command | `execution/orca-supervised-launch.mjs` (built) |
 
 Left where they are, because their names already say what they hold: `workflows/` and `approvals/` (the Plan
 route and its job catalog), `providers/` (the provider contracts), `core/`, `schemas/`, `specifications/`,
 `contracts/` (the Work tree contract and its validator), `knowledge/`, `cli/`, `scripts/`, `upgrades/` (the
-per-version operator notes), `docs/`, and `execution/` (the 4.x Plan-route execution modes only). `.dist`
-mirrors the source tree.
+per-version operator notes), `docs/`, and `execution/` (the 4.x Plan-route execution modes only). The
+runtime reads these sources directly; no build mirror exists.
 
 ## 10. What changed from 5.1, and why
 
@@ -782,12 +782,12 @@ mirrors the source tree.
 | the critic's rule is a formula | the critic answers `overlaps` with the cases it can see; the formula is in no contract and no prompt |
 | `credentialNeed`, `openOwnerAsk`, `answerOwnerQuestion` inside the 318 KB kernel | `kernel/owner.mjs` |
 | the goal critique, the intake and the ledger sync inside the kernel | `kernel/goal.mjs`, `kernel/intake.mjs`, `kernel/sync.mjs`, over `kernel/common.mjs` |
-| the two host descriptors as frozen objects in two adapters | `model/hosts.yaml` read by `hosts/index.mjs`; the adapters keep them only as the pre-build fallback |
+| the two host descriptors as frozen objects in two adapters | `modules/models/hosts.yaml` read by `hosts/index.mjs`; the adapters keep them only as the pre-build fallback |
 | an external system proven by whatever ran | a declared `integration` record, an `integration` node, a live proof, and evidence that says what it proved against |
 | a completion bound to its record only | a completion bound to the declaration it was accepted under (`contractDigest`, `contractKind`) |
 | brand rules in prose only | ImageGen directions carry prompt/tool provenance; actual implementation captures retain markup for named `COLLECTION-*`, `BRAND-*` checks |
-| `profiles/`, `execution/` | `model/`, `kernel/`, `hosts/`, `models/`, `scripts/checks/` |
-| `.dist/execution/orca-supervised-launch.mjs` on every command line | `node <skill>/bin/starci.mjs <command>` |
+| `profiles/`, `execution/` | `modules/models/`, `kernel/`, `hosts/`, `models/`, `scripts/checks/` |
+| the built execution launcher on every command line | `node <skill>/bin/starci.mjs <command>` |
 | the pre-release version tag | `5.0.0-plus` |
 
 What is deliberately unchanged: the kernel's seams (`invoke`, `runHeadless`, the allocator, the kind graph),

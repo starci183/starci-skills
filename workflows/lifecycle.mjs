@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace,previewCompletion} from '../core/index.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
-import { readDistJson } from '../core/runtime-root.mjs';
+
 import {resolveExecutionChain} from '../kernel/chains.mjs';
 import {fileURLToPath} from 'node:url';
 import {validBackendRun} from './select.mjs';
@@ -22,11 +22,13 @@ const same=(a,b)=>digest(a)===digest(b);
 const list=x=>Array.isArray(x)&&x.length>0&&x.every(text)&&new Set(x).size===x.length;
 const inside=(root,file)=>{const r=path.relative(root,file);return r!== '..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
 const requireThat=(ok,message)=>{if(!ok)throw Error(message);};
-const catalog=readDistJson('workflows','catalog.json');
-const jobs=readDistJson('workflows','jobs.json');
-export function resolveProjectSkillPath(moduleUrl=import.meta.url){const base=fileURLToPath(new URL('../',moduleUrl));const candidate=path.join(path.basename(base)==='.dist'?path.dirname(base):base,'SKILL.md');requireThat(fs.existsSync(candidate)&&fs.statSync(candidate).isFile(),'Project StarCi SKILL.md is missing beside this runtime');return fs.realpathSync(candidate);}
+// Distless: authored YAML beside this module is the contract; no compiled tree is read.
+const workflowData=name=>parseYaml(fs.readFileSync(fileURLToPath(new URL(`./${name}.yaml`,import.meta.url)),'utf8'));
+const catalog=workflowData('catalog');
+const jobs=workflowData('jobs');
+export function resolveProjectSkillPath(moduleUrl=import.meta.url){const base=fileURLToPath(new URL('../',moduleUrl));const candidate=path.join(base,'SKILL.md');requireThat(fs.existsSync(candidate)&&fs.statSync(candidate).isFile(),'Project StarCi SKILL.md is missing beside this runtime');return fs.realpathSync(candidate);}
 const projectSkillPath=resolveProjectSkillPath();
-const matrix=(id,operation)=>{if(id==='implement-frontend')return readDistJson('workflows','matrix.json').rows;const workflow=jobs.workflows.find(w=>w.id===id);if(!workflow)return undefined;const rows=structuredClone(workflow.matrix);if(workflow.operations){requireThat(workflow.operations.includes(operation),'Select exactly one supported workflow operation');rows[0][0].operation=operation;}return rows;};
+const matrix=(id,operation)=>{if(id==='implement-frontend')return workflowData('matrix').rows;const workflow=jobs.workflows.find(w=>w.id===id);if(!workflow)return undefined;const rows=structuredClone(workflow.matrix);if(workflow.operations){requireThat(workflow.operations.includes(operation),'Select exactly one supported workflow operation');rows[0][0].operation=operation;}return rows;};
 export function workStatus(root){
  requireThat(text(root)&&path.isAbsolute(root),'An absolute Work root is required');
  if(!fs.existsSync(root)||isLocalOnlyWorkspace(root))return {status:'missing',route:'prepare-work'};

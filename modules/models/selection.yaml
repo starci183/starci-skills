@@ -1,9 +1,9 @@
 # selection.yaml — how the runtime decides WHICH model may take WHICH workload.
 #
-# Declarative port of .dist/kernel/model-policy.mjs. Every rule names the mjs
+# Declarative port of kernel/model-policy.mjs. Every rule names the mjs
 # function it comes from; where the mjs is the ONLY source of a rule it is cited
 # as `source: model-policy.mjs::<fn>`. Allocation-order facts that live in
-# .dist/model/runtimes.json and registry.json are in `allocationFacts` and cite
+# modules/models/runtimes.yaml and registry.yaml are in `allocationFacts` and cite
 # those files instead.
 #
 # The one-sentence business rule (capabilities.json): a model NAME is an
@@ -14,13 +14,13 @@
 
 schema: starci/module-model-selection@1
 sources:
-  - .dist/kernel/model-policy.mjs
-  - .dist/model/runtimes.json
-  - .dist/model/registry.json
-  - .dist/model/capabilities.json
-  - .dist/model/qualifications.json
-  - .dist/docs/model-catalog.md
-  - .dist/docs/model-functions.md
+  - kernel/model-policy.mjs
+  - modules/models/runtimes.yaml
+  - modules/models/registry.yaml
+  - modules/models/capabilities.yaml
+  - modules/models/qualifications.yaml
+  - docs/model-catalog.md
+  - docs/model-functions.md
 
 # ---------------------------------------------------------------------------
 # 1. Vocabularies and ladders
@@ -148,7 +148,7 @@ qualificationGates:
     - The policy file must be schema 'starci/model-capability-policy@1' or loading THROWS ('Model capability policy is unavailable').
     - Each qualification record's receipt.artifact.path must resolve INSIDE the declared qualification root (realpath check, prefix-bound); outside paths are silently skipped.
     - The artifact bytes are re-hashed; sha256 must equal receipt.artifact.sha256. Records passing both are stored as evidenceByRuntime[runtimeId] with verified:true. Anything else never reaches the gate.
-    - Current store (.dist/model/qualifications.json) is EMPTY — no model is certified by shipping the package; "empty records mean no measured qualification".
+    - Current store (modules/models/qualifications.yaml) is EMPTY — no model is certified by shipping the package; "empty records mean no measured qualification".
 
 # ---------------------------------------------------------------------------
 # 5. The probation path — mode 'probation', scoped never manufactured

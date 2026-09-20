@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">82.6% </span>
+                <span class="strong">84.84% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>19/23</span>
+                <span class='fraction'>28/33</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.62% </span>
+                <span class="strong">70% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>17/29</span>
+                <span class='fraction'>7/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">94.11% </span>
+                <span class="strong">84.84% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>16/17</span>
+                <span class='fraction'>28/33</span>
             </div>
         
             
@@ -85,49 +85,82 @@
 <a name='L20'></a><a href='#L20'>20</a>
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
-<a name='L23'></a><a href='#L23'>23</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">425x</span>
-<span class="cline-any cline-yes">425x</span>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">425x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">340x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">85x</span></td><td class="text"><pre class="prettyprint lang-js">import { Column, Entity, PrimaryColumn } from 'typeorm';
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Column, Entity, PrimaryColumn 
+} from "typeorm"
 &nbsp;
-/**<span class="branch-0 cbranch-no" title="branch not covered" ></span>
- * data.notify.preference: at most one row per (personId, channel) pair. `unsubscribed: true` suppresses
- * every <span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>future notifi<span class="cstat-no" title="statement not covered" >cation on that channel</span> until it is s<span class="cstat-no" title="statement not covered" >et back to false (br.no<span class="cstat-no" title="statement not covered" >tify.unsubscribe.honored).</span></span></span>
- * `digestWindowMinutes` <span class="branch-2 cbranch-no" title="branch not covered" >overrides decision.notify.digest-windo</span>w's default when set; null means "use the
- * default".
- */
-@Ent<span class="missing-if-branch" title="else path not taken" >E</span>ity({ name: 'notify_preferences' })
+/**
+ * data.notify.preference: at most one row per (personId, channel) pair. `unsubscribed: true` suppress<span class="branch-0 cbranch-no" title="branch not covered" >es</span>
+ * every future notification on that channel until it is set back to false (br.notify.unsubscribe.honored).
+ * `digestWindowMinutes` overrides decision.notify.digest-window's default when set; <span class="branch-0 cbranch-no" title="branch not covered" >null means "use the</span>
+<span class="cstat-no" title="statement not covered" > * default".</span>
+<span class="cstat-no" title="statement not covered" > */</span>
+<span class="cstat-no" title="statement not covered" >@Entity({</span>
+<span class="cstat-no" title="statement not covered" >    name: "notify_preferences" </span>
+<span class="cstat-no" title="statement not covered" >})</span>
+/** TypeORM entity mapped to the notify preference row on the primary database; services rea<span class="branch-0 cbranch-no" title="branch not covered" >ch it through the entity manager, not a r</span>epository. */
 export class NotifyPreferenceEntity {
-  @PrimaryColumn('text', { name: 'person_id' })
-  personId!: string;
+  @PrimaryColumn("text",
+      {
+          name: "person_id" 
+      })
+      personId!: string
 &nbsp;
-  @PrimaryColumn('text')
-  channel!: string;
+  @PrimaryColumn("text")
+      channel!: string
 &nbsp;
-  @Column('boolean')
-  unsubscribed!: boolean;
+  @Column("boolean")
+      unsubscribed!: boolean
 &nbsp;
-  @Column('integer', { name: 'digest_window_minutes', nullable: true })
-  digestWindowMinutes!: number | null;
+  @Column("integer",
+      {
+          name: "digest_window_minutes", nullable: true 
+      })
+      digestWindowMinutes!: number | null
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -136,7 +169,7 @@ export class NotifyPreferenceEntity {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../../../../prettify.js"></script>
         <script>

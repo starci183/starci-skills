@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
-import { readDistJson } from '../core/runtime-root.mjs';
+import { parseYaml } from '../core/yaml.mjs';
+import { fileURLToPath } from 'node:url';
 import {verifyPresentation} from './presentation.mjs';
 import {typed} from './typed.mjs';
 import {verifyWorkResult,scopedWorkStatus,inRunWorkReady} from './work-binding.mjs';
@@ -13,9 +14,10 @@ const text=x=>typeof x==='string'&&x.trim().length>0;
 const list=x=>Array.isArray(x)&&x.length>0&&x.every(text)&&new Set(x).size===x.length;
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
-const catalog=readDistJson('workflows','catalog.json');
-const jobs=readDistJson('workflows','jobs.json');
-const frontend=readDistJson('workflows','matrix.json');
+const workflowData=name=>parseYaml(fs.readFileSync(fileURLToPath(new URL(`./${name}.yaml`,import.meta.url)),'utf8'));
+const catalog=workflowData('catalog');
+const jobs=workflowData('jobs');
+const frontend=workflowData('matrix');
 
 /** Function-only boundary: never evaluated during module initialization.
  * The admitted nested producer must be backend, so it cannot recurse into FE. */

@@ -1,0 +1,23 @@
+schema: work/business-rule
+id: br.upload.lifecycle
+title: An upload is pending until its bytes land, then ready
+state: done
+statements:
+  - An upload row is pending from intent until content is stored and the content scan accepts it; only
+    a ready upload may be attached, listed as an attachment or downloaded.
+  - A scan rejection deletes the stored object and leaves the row pending, so refused bytes never
+    linger behind metadata.
+  - Deleting an upload removes the stored object and the row together; the object goes first so a
+    surviving file never outlives the metadata that names it.
+acceptance:
+  - id: ac.upload.lifecycle.pending-cannot-attach
+    given: An upload whose content never arrived
+    when: It is attached to a task or read
+    then:
+      - The call is refused with the not-ready refusal.
+  - id: ac.upload.lifecycle.rejection-cleans-up
+    given: A stored object the scan hook refuses
+    when: The scan throws the rejection
+    then:
+      - The object is deleted and the row stays pending.
+module: src/modules/integrations/upload

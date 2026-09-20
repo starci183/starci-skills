@@ -230,8 +230,12 @@ export function createStore({repoRoot,id}){
     writeReport({dispatchId,opId=null,attempt=null,generation=null,outcome=null,report=null,fromTerminal=null}={}){
       const dispatch=required(dispatchId,'dispatch id'),resolved=outcome??(plain(report)?report.outcome:null);
       need(resolved,'writeReport needs an outcome');
+      // A rewrite under the same dispatch is a NEW report, not the consumed one again: `consumed_at` binds the
+      // applied bytes, so it resets exactly when report_json changes. Without the reset a worker that reported
+      // `blocked`, was answered, and reported `done` under its one dispatch would have the done row still marked
+      // consumed - and without the consumed row the kernel would apply the blocked report every tick.
       bound().prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,created_at) VALUES(?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(workflow_id,dispatch_id) DO UPDATE SET op_id=COALESCE(excluded.op_id,reports.op_id),attempt=COALESCE(excluded.attempt,reports.attempt),generation=COALESCE(excluded.generation,reports.generation),outcome=excluded.outcome,report_json=excluded.report_json,from_terminal=COALESCE(excluded.from_terminal,reports.from_terminal),created_at=excluded.created_at`)
+        ON CONFLICT(workflow_id,dispatch_id) DO UPDATE SET op_id=COALESCE(excluded.op_id,reports.op_id),attempt=COALESCE(excluded.attempt,reports.attempt),generation=COALESCE(excluded.generation,reports.generation),outcome=excluded.outcome,report_json=excluded.report_json,from_terminal=COALESCE(excluded.from_terminal,reports.from_terminal),created_at=excluded.created_at,consumed_at=CASE WHEN excluded.report_json<>reports.report_json THEN NULL ELSE reports.consumed_at END`)
         .run(workflowId,dispatch,opId,attempt,generation,resolved,json(report),fromTerminal,now());
       return {dispatchId:dispatch,outcome:resolved};
     },

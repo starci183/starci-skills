@@ -46,6 +46,9 @@ import {
 import {
     TaskEntity 
 } from "./task.entity"
+import {
+    UploadEntity 
+} from "./upload.entity"
 
 type EntityClass = new () => object;
 
@@ -411,6 +414,35 @@ const ENTITY_SCHEMA: Array<EntitySpecRow> = [
         unique: [],
         defaults: {
             gateway: "sepay", currency: "VND", status: "pending" 
+        },
+    },
+    {
+        entity: UploadEntity,
+        table: "uploads",
+        columns: [
+            ["id",
+                "text"],
+            ["owner",
+                "text"],
+            ["task_id",
+                "text"],
+            ["filename",
+                "text"],
+            ["mime",
+                "text"],
+            ["size_bytes",
+                "integer"],
+            ["storage_key",
+                "text"],
+            ["status",
+                "text"],
+            ["created_at",
+                "timestamptz"],
+        ],
+        primary: ["id"],
+        nullable: ["task_id"],
+        unique: [],
+        defaults: {
         },
     },
 ]

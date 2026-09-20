@@ -1,0 +1,29 @@
+schema: work/functional-requirement
+id: fr.upload.intake
+title: Get a file's bytes into the product
+state: done
+actors: [owner]
+trigger: The owner wants to attach a file and has the bytes.
+mainFlow:
+  - The owner opens an upload intent naming filename, mime and size, and receives a presigned PUT
+    contract - a door, a method, a signed token header and an expiry.
+  - The owner PUTs the bytes to that door with the token; the api stores and scans the object and the
+    upload becomes ready.
+  - Alternatively the owner POSTs the bytes directly and the same store-and-scan path answers a ready
+    upload in one step.
+exceptionFlows:
+  - A mime outside the allowlist or a size over the cap is refused before anything is written.
+  - A missing, wrong, expired or already-consumed upload token refuses the PUT before a byte is stored.
+  - A content scan that rejects the object deletes the stored bytes and leaves the upload pending.
+postconditions:
+  - A ready upload row exists whose storage object holds exactly the received bytes.
+composes:
+  - {rule: br.upload.intake, module: src/modules/integrations/upload}
+  - {rule: br.upload.lifecycle, module: src/modules/integrations/upload}
+refs: [br.upload.owned]
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts

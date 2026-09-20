@@ -1,0 +1,12 @@
+schema: work/functional-requirement
+id: fr.worker.runs
+title: The worker runs
+state: done
+verificationSource: authored-claim
+because: Fixture carries an authored-claim so the only refusal in this case is the stale codeDigest.
+actors: [system]
+trigger: The schedule fires.
+mainFlow:
+  - The worker does its work.
+postconditions:
+  - The work is done.

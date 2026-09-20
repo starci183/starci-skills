@@ -94,4 +94,9 @@ describe("DedupeService",
                 const found = await service.findById(admitted.record.id)
                 expect(found?.digestGroupId).toBe("group-1")
             })
+
+        it("findById returns null for an unknown notification id (w8 branch depth)",
+            async () => {
+                expect(await service.findById("missing")).toBeNull()
+            })
     })

@@ -46,7 +46,7 @@ import {superviseOnce} from '../kernel/supervisor.mjs';
 const fixture=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-life-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;};
 function pinAt(root){
   const sourceRoot=path.join(root,'source');
-  for(const file of ['.dist/kernel/kernel.mjs','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md','package.json','SKILL.md','docs/supervision-templates/op.md']){
+  for(const file of ['kernel/kernel.mjs','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md','package.json','SKILL.md','docs/supervision-templates/op.md']){
     const target=path.join(sourceRoot,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,'synthetic pin fixture\n');
   }
   return sealRuntime({sourceRoot,buildsRoot:path.join(root,'builds'),version:'1.0.0'});
@@ -55,9 +55,9 @@ function pinAt(root){
 test('runtime pin reuses identical bytes and rejects changed or unsealed executables',t=>{
   const root=fixture(t),pin=pinAt(root);
   assert.equal(verifyRuntimePin(pin).ok,true);assert.deepEqual(pinAt(root),pin);
-  fs.writeFileSync(path.join(pin.root,'.dist','injected.mjs'),'unexpected');
+  fs.writeFileSync(path.join(pin.root,'injected.mjs'),'unexpected');
   assert.match(verifyRuntimePin(pin).reason,/unsealed/);
-  fs.rmSync(path.join(pin.root,'.dist','injected.mjs'));
+  fs.rmSync(path.join(pin.root,'injected.mjs'));
   fs.appendFileSync(path.join(pin.root,'bin','starci.mjs'),'drift');
   assert.match(verifyRuntimePin(pin).reason,/changed/);
 });

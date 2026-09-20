@@ -4,6 +4,12 @@ import {
 import {
     readFileSync 
 } from "node:fs"
+import {
+    tmpdir 
+} from "node:os"
+import {
+    join 
+} from "node:path"
 
 const DEFAULT_SESSION_TTL_DAYS = 30
 const DEFAULT_KEYCLOAK_TOKEN_URL = "http://localhost:8089/realms/todo/protocol/openid-connect/token"
@@ -16,6 +22,21 @@ const DEFAULT_SMTP_PORT = 1025
 const DEFAULT_SMTP_FROM = "notify@todo.dev"
 const DEFAULT_REDIS_URL = "redis://localhost:6379"
 const DEFAULT_SEPAY_BASE_URL = "https://my.sepay.vn"
+/** integration.upload.local's content ceiling: 10 MiB per object, the same class of bound nivo sets on
+ * attachment intake - large enough for task attachments, small enough that a direct upload stays a
+ * memory-bounded buffer and a presigned PUT never parks a giant object on the volume. */
+const DEFAULT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+const DEFAULT_UPLOAD_ALLOWED_MIMES = ["text/plain",
+    "application/pdf",
+    "image/png",
+    "image/jpeg"]
+/** integration.upload.local: the signing material behind presigned PUT tokens. DEMO-ONLY fallback - a
+ * real deployment names a decrypted file through UPLOAD_SIGNING_SECRET_FILE, same *_FILE convention as
+ * the SePay credentials. */
+const DEFAULT_UPLOAD_SIGNING_SECRET = "todo-upload-demo-signing-secret"
+/** integration.upload.local: how long a presigned PUT token stays valid - short-lived on purpose, the
+ * same 5-minute window a provider presign would carry. */
+const DEFAULT_UPLOAD_PRESIGN_TTL_MS = 5 * 60 * 1000
 /** integration.plan.sepay's paid-plan price: a fixed catalog item (data.plan.plan), not owner-configurable. */
 const PAID_PLAN_PRICE_MINOR_UNITS = 99000
 const PAID_PLAN_CURRENCY = "VND"
@@ -79,6 +100,37 @@ export class AppConfigService {
 
     getSepayBaseUrl(): string {
         return process.env.SEPAY_BASE_URL ?? DEFAULT_SEPAY_BASE_URL
+    }
+
+    /** integration.upload.local: where the local storage adapter writes objects. Defaults to an
+   * os-level temp dir so neither the dev host run nor an e2e api child ever writes into the source
+   * tree; a dev compose volume (or a later minio swap) is just a different value for UPLOAD_DIR. */
+    getUploadStorageDir(): string {
+        return process.env.UPLOAD_DIR ?? join(tmpdir(),
+            "todo-app-uploads")
+    }
+
+    getUploadMaxBytes(): number {
+        const raw = process.env.UPLOAD_MAX_BYTES
+        return raw ? Number(raw) : DEFAULT_UPLOAD_MAX_BYTES
+    }
+
+    /** The mime allowlist intake validation refuses outside of; UPLOAD_ALLOWED_MIMES overrides as a
+   * comma-separated list. */
+    getUploadAllowedMimes(): Array<string> {
+        const raw = process.env.UPLOAD_ALLOWED_MIMES
+        return raw ? raw.split(",").map(mime => mime.trim()).filter(Boolean) : [...DEFAULT_UPLOAD_ALLOWED_MIMES]
+    }
+
+    /** Signing material for presigned PUT tokens; DEMO-ONLY literal fallback so the dev/e2e stacks run
+   * without a decrypted file, exactly the graceful-empty shape getSepayApiKey documents. */
+    getUploadSigningSecret(): string {
+        return this.readSecretFile(process.env.UPLOAD_SIGNING_SECRET_FILE) || DEFAULT_UPLOAD_SIGNING_SECRET
+    }
+
+    getUploadPresignTtlMs(): number {
+        const raw = process.env.UPLOAD_PRESIGN_TTL_MS
+        return raw ? Number(raw) : DEFAULT_UPLOAD_PRESIGN_TTL_MS
     }
 
     /** integration.plan.sepay's credential: SEPAY_API_KEY_FILE names a decrypted file path (see

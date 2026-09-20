@@ -89,7 +89,7 @@ test('workflow amendment schema and runtime validator accept the same bounded ov
 test('profile registry keeps the user coordinator, deterministic kernel and operation-agent boundary', () => {
   const ajv = new Ajv2020({strict: true});
   const schema = parseYaml(fs.readFileSync(new URL('../schemas/profile-registry-v3.schema.yaml', import.meta.url), 'utf8'));
-  const registry = parseYaml(fs.readFileSync(new URL('../model/registry.yaml', import.meta.url), 'utf8'));
+  const registry = parseYaml(fs.readFileSync(new URL('../modules/models/registry.yaml', import.meta.url), 'utf8'));
   const validate = ajv.compile(schema);
   assert.equal(validate(registry), true, JSON.stringify(validate.errors));
   assert.equal(registry.agentArchitecture.isolationBoundary, 'operation');
@@ -99,7 +99,7 @@ test('profile registry keeps the user coordinator, deterministic kernel and oper
 
 test('profile registry accepts only a nonempty explicit headless model override', () => {
   const schema = parseYaml(fs.readFileSync(new URL('../schemas/profile-registry-v3.schema.yaml', import.meta.url), 'utf8'));
-  const registry = parseYaml(fs.readFileSync(new URL('../model/registry.yaml', import.meta.url), 'utf8'));
+  const registry = parseYaml(fs.readFileSync(new URL('../modules/models/registry.yaml', import.meta.url), 'utf8'));
   const validate = new Ajv2020({strict: true}).compile(schema);
   assert.equal(validate(registry), true, JSON.stringify(validate.errors));
   assert.equal(registry.targets['claude-fable'].headlessModel, 'claude-fable-5-1');

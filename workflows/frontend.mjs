@@ -1,18 +1,21 @@
 import { validateJourneys } from '../contracts/journeys.mjs';
 import { validateAssets } from '../contracts/assets.mjs';
-import { selectProfile } from '../kernel/chains.mjs';
-import { distPath, requireDist, readDistJson } from '../core/runtime-root.mjs';
+import { resolveModel as selectProfile } from '../modules/models/index.mjs';
+import { authorityFor } from '../legacy/ops/role-authority.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../core/yaml.mjs';
 
-requireDist();
-const home = distPath('workflows');
-export const workflow = readDistJson('workflows', 'frontend.json');
-export const matrix = JSON.parse(fs.readFileSync(path.join(home, workflow.matrix), 'utf8'));
-export const transitions = JSON.parse(fs.readFileSync(path.join(home, workflow.transitions), 'utf8'));
-export const contracts = JSON.parse(fs.readFileSync(path.join(home, workflow.contracts), 'utf8'));
+// Distless: the authored YAML in this directory is the contract; `matrix`/`transitions`/`contracts`
+// still carry their historical `.json` names, resolved here as the `.yaml` sources.
+const home = path.dirname(fileURLToPath(import.meta.url));
+const sourceYaml = name => parseYaml(fs.readFileSync(path.join(home, name.replace(/\.json$/i, '.yaml')), 'utf8'));
+export const workflow = sourceYaml('frontend.yaml');
+export const matrix = sourceYaml(workflow.matrix);
+export const transitions = sourceYaml(workflow.transitions);
+export const contracts = sourceYaml(workflow.contracts);
 export const definition = { ...workflow, matrix: matrix.rows };
 const stages = ['draw', 'implement', 'uat'];
 const ops = ['interface.draw', 'interface.implement', 'uat.verify'];
@@ -335,9 +338,15 @@ export function repair(directory, diagnosis) {
     return { transition: 'repair', step: index + 1, op: request.op, request: reqPath(root, index), instruction: path.join(folder, 'instruction.json') };
   });
 }
+// Distless: no compiled ops/*.json exists. authority.json is computed on the fly by
+// legacy/ops/role-authority.mjs::authorityFor(operator.yaml); secondary.json is the
+// authored legacy/ops/<op>/secondary.yaml. The historical names are kept as arguments.
 function authority(op, name = 'authority.json') {
-  const directory = fs.existsSync(path.resolve(home, '../ops')) ? path.resolve(home, '../ops') : path.resolve(home, '../ops');
-  return readJSON(path.join(directory, op, name));
+  const directory = path.resolve(home, '../legacy/ops');
+  if (name === 'authority.json') {
+    return authorityFor(parseYaml(fs.readFileSync(path.join(directory, op, 'operator.yaml'), 'utf8')));
+  }
+  return parseYaml(fs.readFileSync(path.join(directory, op, name.replace(/\.json$/i, '.yaml')), 'utf8'));
 }
 function secondaryPolicy(parentOp, childOp) {
   const parent = authority(parentOp);

@@ -246,4 +246,85 @@ describe("AuditErasureService",
                 expect(refused?.state).toBe("refused")
                 expect(await built.keystore.getKeyIdForPerson("person-1")).not.toBeNull() // key untouched
             })
+
+        describe("state-machine guard arms (w8 branch depth)",
+            () => {
+                const seedRow = (manager: ReturnType<typeof createFakeAuditEntityManager>,
+                    requestId: string,
+                    state: string,
+                    personId: string | null = "person-1") => {
+                    manager._rowsFor(AuditErasureRequestEntity).push({
+                        requestId,
+                        personId,
+                        state,
+                        requestedAt: new Date(),
+                        verifiedAt: state === "verified" ? new Date() : null,
+                        refusedAt: state === "refused" ? new Date() : null,
+                        executingAt: null,
+                        completedAt: state === "complete" ? new Date() : null,
+                    })
+                }
+
+                it("execute() on a still-requested (unverified) request refuses, naming the expected state",
+                    async () => {
+                        const built = await build()
+                        moduleRef = built.moduleRef
+                        seedRow(built.manager,
+                            "req-unverified",
+                            "requested")
+
+                        await expect(built.erasure.execute("req-unverified",
+                            "person-1")).rejects.toMatchObject({
+                            code: "ERASURE_REQUEST_INVALID_STATE_EXCEPTION",
+                            metadata: {
+                                state: "requested", expected: "verified" 
+                            },
+                        })
+                    })
+
+                it("execute() on a refused request refuses the same way - refused is terminal",
+                    async () => {
+                        const built = await build()
+                        moduleRef = built.moduleRef
+                        seedRow(built.manager,
+                            "req-refused",
+                            "refused")
+
+                        await expect(built.erasure.execute("req-refused",
+                            "person-1")).rejects.toMatchObject({
+                            code: "ERASURE_REQUEST_INVALID_STATE_EXCEPTION",
+                            metadata: {
+                                state: "refused" 
+                            },
+                        })
+                    })
+
+                it("confirm() on an already-verified request refuses - t-verify only runs once",
+                    async () => {
+                        const built = await build()
+                        moduleRef = built.moduleRef
+                        seedRow(built.manager,
+                            "req-verified",
+                            "verified")
+
+                        await expect(built.erasure.confirm("req-verified",
+                            "person-1")).rejects.toMatchObject({
+                            code: "ERASURE_REQUEST_INVALID_STATE_EXCEPTION",
+                            metadata: {
+                                state: "verified", expected: "requested" 
+                            },
+                        })
+                    })
+
+                it("confirm() on an unknown request id is not found before any state check",
+                    async () => {
+                        const built = await build()
+                        moduleRef = built.moduleRef
+
+                        await expect(built.erasure.confirm("missing",
+                            "person-1")).rejects.toMatchObject({
+                            code: "ERASURE_REQUEST_NOT_FOUND_EXCEPTION",
+                        })
+                    })
+            })
     })

@@ -220,7 +220,7 @@ the seam of a group runs alone and at most `allocation.fanOut.maxPerGroup` of it
 ## Lanes and routes
 
 One Work node is not one operation. It is a **lane**: the ordered kinds it travels before its ledger entry may
-be called done. `model/kinds.yaml` declares the catalog and the lanes; `kernel/graph.mjs` reads it
+be called done. `modules/models/kinds.yaml` declares the catalog and the lanes; `kernel/graph.mjs` reads it
 (`laneFor`, `nextKind`, `routeFor`, `roleOf`, `familyOf`, `isReadOnly`, `describeLane`, `validateGraph`), and the
 kernel only walks what it answers. Adding "frontend work is drawn before it is coded, and proved by a UAT run"
 is a profile edit, not a patch to the control loop.
@@ -298,9 +298,8 @@ to each question, and the kernel asks for it in four places:
 
 A path that is not a record at all - the workspace file, a `_resources` or `_local` entry, the runtime state
 the kernel keeps - answers `null` and is never a finding: the kernel's own state files are not the
-operation's output. `ctx.kindsProfile` is the profile to read the mapping against; `null` is the compiled
-one, and a caller running the kernel against an authored or a fixture profile hands that one in instead of
-rebuilding `.dist` for it.
+operation's output. `ctx.kindsProfile` is the profile to read the mapping against; `null` is the default
+authored profile, and a caller running the kernel against an authored or a fixture profile hands that one in instead.
 
 ## Phases
 
@@ -502,7 +501,7 @@ file plus every `brand/assets/**` path beside it.
 Which operations read both is no longer a set the kernel keeps. `kindsReadingBrand()` asks the catalog for
 the kinds whose `reads` names `brand` - today `interface.draw`, `interface.asset`, `frontend.implement`,
 `uat.verify`, `grammar.update` - so settling one more kind inside the identity is an edit to
-`model/kinds.yaml` rather than to the control loop. They are what `brand.decide` exists for, so for each of
+`modules/models/kinds.yaml` rather than to the control loop. They are what `brand.decide` exists for, so for each of
 them the kernel:
 
 - **references the brand.** `deriveWorkOp` adds the grammar canon and `brandReferences(loaded)` to the op's
@@ -1009,7 +1008,7 @@ integration node carries `proof.boundary: live`), `fake` (it appears only in ano
 `## Integrations`.
 
 **Bound to its rules.** `contractDigestOf({kind, kindRecord, operator, rules})` is the canonical sha-256 of
-everything a proof of one kind rests on - the `model/kinds.yaml` entry, the operator contract it launched
+everything a proof of one kind rests on - the `modules/models/kinds.yaml` entry, the operator contract it launched
 through, and `VALIDATOR_RULES` - with stable key order at every depth, so a digest written today and one
 computed tomorrow compare byte for byte. `contractDigestFor(kind)` is the kernel's default seam
 (`ctx.contractDigest`); a kind the catalog does not carry answers `null` and binds nothing. On acceptance
@@ -1472,11 +1471,11 @@ check (`op-readmitted`). Every untracked stray that carries an error and that no
 
 The kernel runs on a **host**, and it reads exactly three things about it: a name, the capabilities it offers
 and whether it runs operations in parallel (`hostDescriptorOf(orca)`). Those three facts are declared per host
-in `model/hosts.yaml` and loaded by `hosts/index.mjs` (`loadHosts`, `hostDescriptor`, `validateHosts`), so the
+in `modules/models/hosts.yaml` and loaded by `hosts/index.mjs` (`loadHosts`, `hostDescriptor`, `validateHosts`), so the
 two adapters read one source instead of each holding a constant, and `validateHosts` checks every offered
-capability against the `capabilities` vocabulary of `model/kinds.yaml` - the same vocabulary a kind's `needs`
-is drawn from. Each adapter keeps the shipped values as the fallback for a tree with no `.dist` yet: a host
-must be able to describe itself before a build exists. Two hosts exist.
+capability against the `capabilities` vocabulary of `modules/models/kinds.yaml` - the same vocabulary a kind's `needs`
+is drawn from. Each adapter keeps the shipped values as the fallback for a tree whose model sources are not readable yet: a host
+must be able to describe itself before sources load. Two hosts exist.
 
 - **Orca** - `hosts/orca/calls.mjs`, `ORCA_HOST = {name:'orca', capabilities:['design-tool'], sequential:false}`:
   the multi-agent IDE with terminals, a dispatch mailbox and a run coordinator, the runner every command always had.
@@ -1524,7 +1523,7 @@ settles it and relaunches on another runtime, as for any dead worker), a live pi
 exited: the kernel's answer is recorded as undelivered, the op is relaunched, and the answer travels in the
 contract of that next attempt (`## Answer to the question you asked earlier`) - on every host alike.
 
-**Capabilities.** `model/kinds.yaml` may give a kind `needs: [<capability>]` from the closed vocabulary
+**Capabilities.** `modules/models/kinds.yaml` may give a kind `needs: [<capability>]` from the closed vocabulary
 `capabilities` (`design-tool`; `CAPABILITIES` in `kernel/graph.mjs`, `needsOf(kind)`). Both `interface.draw`
 and `interface.asset` need `design-tool`, the built-in ImageGen surface only Orca declares. `interface.draw`
 records the actual tool invocation and never infers a model identity the tool did not expose. At schedule time an op whose kind
@@ -1577,7 +1576,7 @@ node <skill root>/bin/starci.mjs brand check <work root> [--source <repository r
 | --- | --- | --- |
 | raise the run-time op budget or change the allocation of a running workflow | `workflow-approve --id <w> --allow-dynamic N` / `--allocation ...` | queued in `<store>/inbox/`, applied at the next tick (`inbox-applied`); a new allocation ends the loop with `stopped: restart: allocation changed` and the supervisor starts the kernel again within a minute |
 | resume a workflow that finished `blocked` after you answered its questions | `workflow-approve --id <w>` (with `--allow-dynamic` / `--allocation` as needed) | `resumed-after-block`: the finish is cleared, the supervisor starts a kernel |
-| ship a new runtime build | `npm run build` | every running kernel notices its module changed (`build-changed`), ends cleanly and is restarted by the supervisor on the new code |
+| ship a new runtime source update | update the installed `.claude` | every running kernel notices its module changed (`build-changed`), ends cleanly and is restarted by the supervisor on the new code |
 | pause/checkpoint a workflow | `workflow-stop --id <w>` (writes `stop.flag` and updates a managed section in backend-owned `workflows/<w>.md`) | `stopped: stop flag` at the next tick; after the controller exits, `workflow-run` first adopts/reconciles exact durable identities under the controller lock, then verifies the continuation boundary and removes the flag; never clear a lease merely because a PID is absent |
 | read a workflow | `workflow-status --id <w>` | read-only |
 | clean up the worktree of a workflow that merged | `workflow-lane-close --id <w>` | `orca worktree rm --force` on the lane, branch preserved (`lane-closed`); refused while the kernel is alive or the lane is unmerged |
@@ -1592,7 +1591,7 @@ worktree, one row.
 
 ## The provider quota is probed, not guessed
 
-The supervisor follows the build exactly as the kernels do: a rebuilt launcher (`npm run build`) is seen at the
+The supervisor follows the build exactly as the kernels do: a replaced launcher is seen at the
 next round, a successor is started from the same command line and this one leaves (`supervisor-rebuilt`), so no
 build needs a hand restart to take effect.
 

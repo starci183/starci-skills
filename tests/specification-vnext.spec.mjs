@@ -13,7 +13,6 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
-import {acquirePublishLock} from '../scripts/runtime-compile/stage.mjs';
 
 const schemaValidator=file=>new Ajv2020({allErrors:true,strict:false}).compile(parseYaml(fs.readFileSync(new URL(file,import.meta.url),'utf8')));
 
@@ -44,7 +43,7 @@ test('published JSON Schema accepts every SRS v3 node type and rejects represent
 
 test('legacy SRS specification@2 and SDS specification@3 remain valid under unchanged validators',()=>{
  assert.deepEqual(validateSpecification(documentSDS()),{ok:true,errors:[]});
- // .dist/examples/nivo-setup-business.json was the build output of the deleted examples/nivo-setup-business.yaml
+ // The compiled examples/nivo-setup-business.json projection was the build output of the deleted examples/nivo-setup-business.yaml
  // (owner ruling: examples/ keeps only the todo-app repositories). tests/fixtures/nested-business/ carries a real
  // starci/specification@2 business document (the deleted nested-business example's SRS leaf), which this test's
  // own name asks for more literally than the retired file did.
@@ -103,9 +102,3 @@ test('untouched real legacy workspace retains prior-runtime digest bytes',()=>{
  const legacy=validateWorkspace(fileURLToPath(new URL('fixtures/nested-business/',import.meta.url)));assert.ok(legacy.ok,JSON.stringify(legacy.errors));assert.equal(legacy.nodes.find(n=>n.id==='example.business.srs.documents.update').inputDigest,'deb5060362d0d2377a8ee9fbdd505f2762bd5fb8de6ddc96ed99d8cc24a3c7c5');
 });
 
-test('dist publication lock preserves stale, live and ambiguous owners for explicit offline recovery',t=>{
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-publish-lock-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const lock=path.join(dir,'.dist.publish-lock'),deadToken='dead-owner',deadClaim=`${lock}.claim-999999-${deadToken}`,owner={schema:'starci/dist-publish-lock@1',pid:999999,token:deadToken,startedAt:Date.now()-60000,claim:deadClaim};fs.writeFileSync(deadClaim,JSON.stringify(owner));fs.linkSync(deadClaim,lock);
- assert.throws(()=>acquirePublishLock(lock,{timeoutMs:10}),error=>/owner PID 999999, token dead-owner/.test(error.message)&&/Stop all publishers/.test(error.message)&&/offline/.test(error.message));assert.deepEqual(JSON.parse(fs.readFileSync(lock,'utf8')),owner);assert.ok(fs.existsSync(deadClaim));fs.unlinkSync(lock);fs.unlinkSync(deadClaim);
- fs.writeFileSync(lock,'malformed');assert.throws(()=>acquirePublishLock(lock,{timeoutMs:10}),/malformed or ambiguous owner metadata/);assert.equal(fs.readFileSync(lock,'utf8'),'malformed');fs.unlinkSync(lock);
- const liveClaim=`${lock}.claim-${process.pid}-live`,live={schema:'starci/dist-publish-lock@1',pid:process.pid,token:'live',startedAt:Date.now()-60000,claim:liveClaim};fs.writeFileSync(liveClaim,JSON.stringify(live));fs.linkSync(liveClaim,lock);assert.throws(()=>acquirePublishLock(lock,{timeoutMs:10}),/owner PID/);assert.deepEqual(JSON.parse(fs.readFileSync(lock,'utf8')),live);
-});

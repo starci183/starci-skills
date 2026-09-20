@@ -1,0 +1,448 @@
+# ============================================================================
+# TINKLE-9 / WAVE2-w1 — modules/kernel/driver-loop.yaml
+# Brief: ex-testing/briefs/tinkle/tinkle-9.md + ex-testing/briefs/wave2/w1.md.
+#
+# The reasoned half of the kernel: what the ONE long-lived [Kernel] agent does
+# every tick of a project's life — settle a verdict, pick the next leg, route
+# the op and the model, dispatch, wait for the next verdict. Declarative rules
+# only; every rule cites the kernel function that owns it. Nothing here
+# executes — kernel/*.mjs is the spine; this file is what an agent reads to
+# reason like it.
+#
+# Operating model (w1): .claude runs purely on Orca.
+#   chat          = goal creator + trigger only. The owner prompt lands here;
+#                   it spawns the kernel and is never an agent layer above it.
+#   [Kernel] <p>  = ONE agent per project, LONG-LIVED. plan -> dispatch ->
+#                   settle -> re-plan. Terminal title `[Kernel] <project>`
+#                   (kernel/supervisor.mjs startKernel, title literal line ~97).
+#   [Op] <name>   = 1 op = 1 EPHEMERAL agent, spawned per dispatch through an
+#                   Orca terminal, dies when its verdict settles. Terminal title
+#                   `[Op] <op-or-task>` (fleet naming rule, ex-testing/
+#                   FLEET-STARCI.md; kernel/terminals.mjs sweepStaleTerminals).
+#
+# Sources (all under .claude/, relative to the skill root):
+#   kernel/kernel.mjs        — the loop itself: "schedule, launch, accept a
+#                              report, route what it implies, run the gates,
+#                              finish" (head comment ~line 91); rank(), pulse()
+#   kernel/engine.mjs        — enrollEngine, createEngineRuntime, reserveOperation,
+#                              reservationPhase, settled, settleStoppedOperation,
+#                              incident(), rank(), pending()
+#   kernel/dispatcher.mjs    — planDispatch: file/lease/group rules for one
+#                              tick's launch set
+#   kernel/supervisor.mjs    — one kernel per workflow; health window, restart
+#   kernel/terminals.mjs     — reconcileWithOrca, infrastructureCause,
+#                              writeLastWordsReport, INFRA_RESTART_LIMIT,
+#                              sweepStaleTerminals, RESTART_LIMIT (common.mjs)
+#   kernel/launch.mjs        — LAUNCH_WINDOW_MS, kernel-lock startup phases
+#   kernel/goal.mjs          — reviseGoal, validateGoalRevision,
+#                              propagateInvalidation, adoptReportRev
+#   kernel/owner-requests.mjs— owner request projection; applyOwnerAction
+#   model/kinds.yaml         — routes: bounded outcome routing table
+#   modules/goal/legality.yaml — ambiguity ladder, backward edges, split rules
+#   modules/models/selection.yaml — the model routing rules (route-model)
+#   ex-testing/watchdog{,-v2}.sh, watch-v3.sh, FLEET-STARCI.md — the observed
+#                              prototype this module encodes
+# ============================================================================
+
+schema: starci/module-kernel-driver-loop@1
+
+about:
+  kind: kernel-driver-loop
+  businessQuestion: >-
+    "Given an approved goal and a fleet of ephemeral op agents, what does the
+    kernel do on each tick — which leg goes next, to whom, on which model —
+    and which decisions is it never allowed to take alone?"
+  businessAnswer: >-
+    The kernel is a state machine with a pulse. Each tick it settles every
+    verdict that arrived, re-derives the frontier from the goal's state
+    variables (never from memory of what it sent), launches only what the
+    dispatch plan proves parallel-safe, and stops — it waits — when nothing is
+    both ready and legal. It decides order and assignment; it never decides
+    scope, identity or authority.
+  sources:
+    - kernel/kernel.mjs
+    - kernel/engine.mjs
+    - kernel/dispatcher.mjs
+
+# ============================================================================
+# 1 — THE TICK. One iteration of the driver loop, in order. The kernel never
+#    skips ahead: a verdict it has not settled is a verdict the next pick does
+#    not know about.
+# ============================================================================
+tick:
+  order:
+    - settle    # read every verdict/report that landed; re-run its checks
+    - pick      # rank the ready legs; plan this tick's launch set
+    - route     # route-op (which op kind) + route-model (which runtime)
+    - dispatch  # reserve the durable lease, then spawn the [Op] agent
+    - wait      # subscribe to verdicts; poll liveness; do nothing else
+  citation: "kernel/kernel.mjs head comment: 'schedule, launch, accept a report, route what it implies, run the gates, finish'"
+
+  settle:
+    rule: >-
+      A verdict is the FIRST thing consumed each tick, never the last thing
+      remembered from the previous one. The report file is the source of
+      truth; the Orca message is only the wake-up signal (kernel/reports.mjs
+      head comment).
+    neverTrust: >-
+      `done` is never taken on trust — the kernel re-runs the operation's own
+      checks itself and commits only what it could reproduce; changed files
+      are computed from git, not read from the report
+      (kernel/kernel.mjs ~88; kernel/verify.mjs changedFiles,
+      attributedFiles, validateAccepted, recordVerdict).
+    durableHalf: >-
+      On the enrolled path the settle is a ledger transaction:
+      engine.settled() completes the durable job and releases its machine
+      lease refs (kernel/engine.mjs settled, machineRefs, releaseRefs);
+      jobs.complete drops the lease rows (kernel/jobs.mjs). A report that
+      cannot bind the exact {workflowId, opId, attempt, generation,
+      leaseToken} is rejected, not partially accepted (settled()'s `exact`
+      check; 'stale operation settlement fence').
+    prototypeNote: >-
+      Fleet prototype equivalent: the driver polls ex-testing/lint/done/*.done
+      markers and reads the lane's *-REPORT.md; the marker is the wake-up, the
+      report the verdict. Same discipline: file first, signal second.
+
+  pick:
+    rule: >-
+      The next leg is COMPUTED from state, never remembered. rank() orders the
+      ready ops by critical-path depth and unlock count
+      (kernel/engine.mjs rank -> kernel/scheduler.mjs rankJobs);
+      planDispatch() then decides which of them may share the tick
+      (kernel/dispatcher.mjs).
+    stateMachine: >-
+      Op lifecycle: ready -> (lease reserved) -> running|answering ->
+      done|blocked|cancelled|failed; an op holding a lease is never
+      re-launched — 'the operation already holds its durable reservation; the
+      engine settles it, not a new launch' (dispatcher.mjs planDispatch).
+      Statuses in IN_FLIGHT=['running','answering'] hold slots;
+      SETTLED=['done','blocked','cancelled'] free them.
+    launchSet: >-
+      planDispatch returns {launch, cut, wait, reasons}. An op launches only
+      when ALL THREE levels pass: file (no write/write or write/read overlap
+      with anything in flight — opScopes/firstConflict), lease (no contested
+      capacity-1 resource — canonical-writer:*, runtime-projection:*,
+      machine:* — firstLease/writerKeys), group (seam runs alone and first;
+      siblings bounded by allocation.fanOut.maxPerGroup — fanOutReason).
+      An op past the cut bounds (CUT_FILES/CUT_ASSERTIONS/CUT_COMPONENTS) is
+      not launched at all — it is cut into disjoint children
+      (cutSizeReason -> sync.mjs cutOversizedOps).
+    starvation: >-
+      'no runtime with the <role> role and a free slot' is a wait reason, not
+      a failure; maxParallelOps (DEFAULT_MAX_PARALLEL_OPS) bounds the fleet.
+
+  route:
+    routeOp: >-
+      Which op kind a workload needs resolves against the route: blocks of
+      modules/ops/ops/*.yaml — {nodeKinds, phase, intent[], prerequisites[]}
+      matched by scripts/route/route-op.mjs; the output is pick + reasons +
+      yaml path citations, deterministic. The agent never reads a whole op
+      contract to route (tinkle/_common.md amendment).
+    routeModel: >-
+      Which runtime may take the dispatch resolves against
+      modules/models/selection.yaml — the source of truth for eligibility
+      (risk/qualityFloor ladders, probation gates, highKinds exclusions),
+      executed by scripts/route/route-model.mjs; on the durable path the same
+      decision is eligibleModelSelection (kernel/engine.mjs): eligibility
+      first, then budget ordering — budget never makes a model eligible.
+    verifyIsolation: >-
+      A verify op is allocated AWAY from the runtime that implemented the
+      slice (dispatcher.mjs verifyAvoids: review.verify avoids the runtimes of
+      every op sharing its ledgerIds).
+
+  dispatch:
+    rule: >-
+      Dispatch is two committed facts, not one hope: (1) the durable
+      reservation — reserveOperation writes the operation job row with
+      reservationProtocol 'intent-v1' + expectedResources and takes the lease
+      (kernel/engine.mjs reserveOperation; admission.reserve ttlMs 10min);
+      (2) the launch — beginLaunchIntent records operation-launch-intent, the
+      spawn lands, launched() flips the job to running with worker_id=dispatch
+      and records operation-launched.
+    spawnForm: >-
+      On Orca the launch is a supervised native agent: terminal-create with
+      title `[Op] <op-or-task>`, the op contract delivered as the task
+      (kernel/supervisor.mjs startKernel shows the terminal-create /
+      terminal-read / terminal-send sequence for the kernel itself;
+      kernel/kernel.mjs launchWithCandidate/startOperation for ops).
+      One op = one agent: an operation never fans out into several agents.
+    packet: "the full spawn contract is modules/kernel/dispatch.yaml"
+    reservationPhases: >-
+      reservationPhase() is the launch-time truth: absent -> reserved ->
+      effect-intent -> launched -> settled; anything else is 'unknown' and
+      stops the launch — the kernel never guesses past an unreadable
+      reservation (kernel/engine.mjs reservationPhase, beginLaunchIntent).
+
+  wait:
+    rule: >-
+      Between settle and the next event the kernel WAITS — it does not poll
+      for work to invent. pulse() renews live leases, expires dead ones, and
+      reconciles pure model jobs (kernel/engine.mjs pulse; admission.renew /
+      admission.expire); reconcileWithOrca runs on a cadence
+      (RECONCILE_EVERY=10 ticks, kernel/terminals.mjs).
+    boundary: >-
+      Waiting is itself supervised: a kernel whose event log is silent past
+      the health window is restarted by the supervisor (see supervision
+      below). The wait is where the failure detectors live — failureHandling
+      section.
+
+# ============================================================================
+# 2 — VERDICT HANDLING. What the driver does with each settled verdict.
+#    `outcome` is the op's report; `verdict` is the kernel's judgement of it.
+#    The closed route table is model/kinds.yaml routes: — first match wins,
+#    an explicit `from` stands before `any`, `limit` bounds one route per
+#    node group, and past the limit the workflow asks the user.
+# ============================================================================
+verdictTable:
+  # The report outcome enum and blocker vocabulary: kernel/reports.mjs
+  # OUTCOMES=['done','partial','failed','ask','blocked'],
+  # BLOCKER_KINDS=['shared-change','srs-gap','sds-gap','interface-gap',
+  #                'brand-gap','grammar-gap','environment','authority'].
+
+  - verdict: pass           # report done AND kernel re-ran the checks green
+    driverDoes: "settle the op; mark its produces: variables established; pick the next leg"
+    route: "no route fires — the chain advances"
+    citation: "verify.mjs validateAccepted/recordVerdict; kinds.yaml lanes advance on done"
+
+  - verdict: fail           # outcome failed, or done the kernel could not reproduce
+    driverDoes: >-
+      Route by the table: outcome failed -> `same` kind again (limit 3,
+      retry); a report the kernel could not reproduce -> verdict rejected ->
+      `same` (limit 2, retry); uat/e2e/perf red -> lane.build repair (limit 3,
+      reopen); review findings -> lane.build repair (limit 3, settle);
+      gate-failed -> lane.build gate repair (limit 3, settle); partial ->
+      `same` carrying open items (limit 5, retry).
+    budget: >-
+      RETRY_LIMIT=3, RESTART_LIMIT=3, RESUME_LIMIT=5, VERIFY_ROUNDS=3,
+      GATE_ROUNDS=3, LAUNCH_LIMIT=3 (kernel/common.mjs). Route limits are per
+      node group; incident() fingerprints progress so repeated identical
+      evidence is not progress — a runtime swap alone never resets the budget
+      (kernel/engine.mjs incident; scheduler.mjs progressExhausted, ~6).
+    exhausted: "past the limit -> the workflow asks the user (route `then: needUser` is explicit per row)"
+    citation: "model/kinds.yaml routes; kernel/common.mjs limits"
+
+  - verdict: blocked        # typed blocker, or ask
+    driverDoes: >-
+      Route by blocker kind: srs-gap -> business.revise; sds-gap ->
+      architecture.revise; interface-gap -> interface.draw; brand-gap ->
+      brand.decide; grammar-gap -> grammar.update; test-gap -> test.author
+      (each limit 2, reopen); shared-change -> scoped build of the owning kind
+      (limit 3, pause); environment -> needUser (limit 1); authority ->
+      needUser (limit 1); outcome ask -> needUser (limit 1 — the kernel may
+      answer only from the options the question offered, never an invented one).
+    provisionAsk: >-
+      Owner-bound needs go through provision.ask / decision.prepare and are
+      projected to the owner as owner requests (kernel/owner-requests.mjs
+      deriveOwnerRequests; kinds: information, credential, account, access,
+      consent, authority, business-decision, irreversible-confirmation). A
+      credential ask parks its requesters and settles by PRESENCE — the op is
+      'running' with no dispatch, no runtime, no slot (kernel/kernel.mjs
+      ~975; kernel/fill.mjs settleCredentialPresence).
+    citation: "model/kinds.yaml routes; kernel/reports.mjs BLOCKER_KINDS; ops/provision.ask/operator.yaml"
+
+  - verdict: suspicion      # mid-flight wrongness — the 'cấn cấn' signal
+    driverDoes: >-
+      Not an exception — a backward edge. The finding travels BACK to the
+      boundary that owns it and the work re-runs forward with fresh evidence:
+      propagateInvalidation marks every derivation on the changed section
+      stale; adoptReportRev admits an old report into the new rev only when
+      digests are identical (kernel/goal.mjs).
+    route: >-
+      Three levels (modules/goal/legality.yaml backwardEdges.suspicionLevels):
+      spec-conflict-in-scope -> the owning revise route (srs-gap ->
+      business.revise etc., or goal.revise for a goal-level conflict);
+      scope-expansion -> re-run scope.define, then provision.ask if authority
+      widens; identity-wrong -> provision.ask ALWAYS.
+    citation: "modules/goal/legality.yaml backwardEdges; kernel/goal.mjs reviseGoal/propagateInvalidation; CLAUDE.md work-correction policy"
+
+# ============================================================================
+# 3 — RE-PLAN TRIGGERS. When the driver stops following the plan and makes a
+#    new one. Re-planning is re-measurement, not a rescue mode.
+# ============================================================================
+replanTriggers:
+  - trigger: s0-measured-wrong
+    when: >-
+      A survey assumption turns out false mid-flight — an op discovers the
+      record it was given contradicts reality, or a `done` surface it must
+      extend has drifted (its verified variable is DEP_STALE).
+    driverDoes: >-
+      Re-run the decomposition from the corrected S₀: SURVEY -> GAP -> CHAIN
+      (modules/goal/anatomy.yaml; legality.yaml existingSurfaceRules). The
+      delta shrinks or the chain re-routes; evidence derived from the stale
+      premise is marked stale and re-proven, never asserted fresh
+      (propagateInvalidation; scripts/checks/check-work-deep.mjs DEP_STALE).
+    citation: "modules/goal/legality.yaml existingSurfaceRules + backwardEdges; kernel/goal.mjs"
+
+  - trigger: goal-identity-wrong
+    when: "the discovery is that the goal itself is the wrong goal — wrong workflow, feature or product boundary"
+    driverDoes: >-
+      ESCALATE — always provision.ask, never self-decide. The spine forbids
+      the quiet fix: validateGoalRevision rejects a revision that changes the
+      workflow identity, and an amendment binds baseGoalIdentity
+      (kernel/goal.mjs). A wrong identity voids every downstream derivation —
+      every op, question, decision and report is bound to the goalRev that
+      produced it (kernel/ask.mjs goalRevOf).
+    neverAlone: "the single hardest rule in this module: identity is the owner's"
+    citation: "modules/goal/legality.yaml ambiguityRules INTENT rung + backwardEdges identity-wrong"
+
+  - trigger: retry-budget-exhausted
+    when: "a route's limit fired its last allowed time for a node group"
+    driverDoes: "the route's own `then: needUser` fires — the workflow stops for the user with the failure history attached"
+    citation: "model/kinds.yaml routes purpose lines; kernel/engine.mjs incident/progressExhausted"
+
+  - trigger: goal-completes
+    when: "every leg settled and the gates ran"
+    driverDoes: "evaluate goal metrics (kernel/goal.mjs evaluateGoalMetrics/goalMetricsOf); write the final workflow report into the ledger; the kernel's job ends — the chat only ever hears the verdict"
+    citation: "kernel/kernel.mjs 'run the gates, finish'; kernel/reports.mjs WORKFLOW_REPORT"
+
+# ============================================================================
+# 4 — ESCALATION LADDER. What the driver may decide alone vs must ask the
+#    owner. Ordered by the cost of being wrong (legality.yaml ambiguityRules).
+# ============================================================================
+escalation:
+  driverAlone:
+    - kind: ORDER
+      scope: "which ready leg goes first, which runtime takes it, whether two ops share a tick"
+      basis: "route: prerequisites + lane order + planDispatch disjointness; a wrong order costs reruns only"
+      record: "assumptions land on the goal (`assumed:`) so a later revision can see they were guesses"
+    - kind: RETRY
+      scope: "re-dispatch inside a route's limit, with the failure named back"
+      basis: "kinds.yaml routes + common.mjs budgets"
+    - kind: REPAIR-ROUTE
+      scope: "red proof / gap blocker -> the revise/build kind the route table names"
+      basis: "the route table is closed — the driver matches, it does not improvise"
+  mustAskOwner:
+    - kind: INTENT
+      why: "S* cannot be formed — a wrong identity voids all downstream evidence"
+      via: provision.ask
+    - kind: SCOPE-WIDENING
+      why: "scope is the owner's contract; AUTHORITY_WIDENING is a declared blocker that becomes an owner decision"
+      via: "scope.define proposal -> provision.ask / decision.prepare"
+    - kind: IDENTITY-WRONG
+      why: "validateGoalRevision structurally rejects it; the only legal move is the owner question"
+      via: provision.ask
+    - kind: ENVIRONMENT / AUTHORITY blocker
+      why: "route limit 1, `then: needUser` — not an operation's to fix, never auto-retried"
+      via: needUser
+    - kind: BUDGET-EXHAUSTED
+      why: "every route past its limit asks the user"
+      via: needUser
+  citation: "modules/goal/legality.yaml ambiguityRules; model/kinds.yaml routes; kernel/owner-requests.mjs OWNER_REQUEST_KINDS"
+
+# ============================================================================
+# 5 — FAILURE HANDLING, AS OBSERVED IN PRACTICE (w1). The fleet prototype ran
+#    this loop by hand for months; these are the failure shapes it actually
+#    met, and the detector + respawn rule each one maps to. The durable spine
+#    has since codified each of them — both are cited.
+# ============================================================================
+failureHandling:
+
+  agentChildExit:
+    symptom: >-
+      The spawned agent's process is gone but no verdict arrived — the
+      terminal shows a bare shell ('exited', `PS D:\>`), or the screen still
+      says WORKING while nothing moves.
+    detection-output-staleness: >-
+      The prototype's watchdog polls `orca terminal read --screen` per lane
+      and classifies the last lines: NEED-TRUST / NEED-PERM / CRASH / WORKING /
+      DONE / IDLE? / EXITED / UNKNOWN (ex-testing/watchdog-v2.sh). WORKING
+      with an UNCHANGED context meter ('Context: Nk / Mk tokens (P%)') for
+      >=5-8 minutes is STALL? — output staleness is the child-exit detector:
+      a live agent's context never stops moving (watchdog.sh stall>=5min;
+      watchdog-v2.sh stall>=8min; watch-v3.sh IDLE counter>=8 polls).
+    detection-durable: >-
+      reconcileWithOrca settles an op believed running whose Dispatch Orca no
+      longer lists and whose terminal is gone: 'dead: no worker and no
+      terminal' (kernel/terminals.mjs). Before it is called dead the Dispatch
+      is asked for its last words — dispatchLastWords; a worker that finished
+      but could not reach the report command gets its report written by
+      writeLastWordsReport and judged on the normal path — except 'done',
+      which is never honoured from last words because it owes checks the
+      kernel never saw.
+    protoNote: "fleet equivalent: EXITED state ('shell only') -> respawn the lane; STALL? -> investigate then respawn"
+
+  respawnPolicy:
+    ownFault: >-
+      A dead agent with no infrastructure cause and nothing to say: the op
+      returns to ready, dispatch/terminal cleared, restarts++ — past
+      RESTART_LIMIT=3 it is blocked and the owner is told
+      (kernel/terminals.mjs reconcileWithOrca; kernel/common.mjs
+      RESTART_LIMIT). Same shape as the prototype: kill the lane's process,
+      re-brief with the failure named, relaunch — never silently continue a
+      half-dead agent.
+    infrastructureFault: >-
+      A death the op did not cause does not spend its restarts:
+      infrastructureCause() names MODULE_NOT_FOUND / report-command ENOENT,
+      agent_prompt_stalled (task never delivered), session_not_reported,
+      terminal closed under a live worker. These charge infraRestarts, bound
+      by INFRA_RESTART_LIMIT=12, then blocked + needUser
+      (kernel/terminals.mjs). Prototype equivalent: 'kill its cli-entry.js
+      process, set the env var, relaunch' (FLEET-STARCI.md ops notes).
+    neverRespawn: >-
+      Never respawn over an unsettled lease — the durable attempt is settled
+      FIRST while the writer fence is still held (settleStoppedOperation,
+      kernel/engine.mjs); an op whose stop cannot be reconciled is
+      quarantined, not requeued (terminals.mjs ~286). Never re-bind a Run a
+      second time — a repeated run-use invalidates every live Dispatch
+      (bindRun comment, terminals.mjs ~338).
+
+  permissionStall:
+    symptom: >-
+      The agent is parked on a human gate: 'trust the authors' (NEED-TRUST),
+      a permission menu 'approve once / always allow / bypass mode'
+      (NEED-PERM), or an interactive prompt that will never answer itself.
+    rule: >-
+      A permission stall is not work and not failure — it is an unanswered
+      precondition. The watchdog raises it as an event for the driver/owner;
+      the lane makes no progress until it is answered (watchdog-v2.sh
+      NEED-TRUST/NEED-PERM -> EVENT). Prevention beats handling: spawn lines
+      that pre-answer the gate — `devin --permission-mode dangerous`,
+      `qwen --yolo`, trust answered once at spawn (FLEET-STARCI.md ops notes).
+    credentialShape: >-
+      On the durable spine a credential need never stalls a worker at all:
+      the ask becomes a provision request projected to the owner, the op
+      waits by presence with no runtime held (see verdictTable.blocked).
+      The chat relays the kernel's questions verbatim — it does not answer
+      for the kernel (workflow-chat rule; w1 operating model).
+
+  kernelDeath:
+    symptom: "the [Kernel] agent/process itself is gone or silent"
+    detection: >-
+      supervisor.mjs inspectWorkflow reads last event time + kernel-lock
+      signal; supervisorAction restarts a kernel silent past the health
+      window (DEFAULT_HEALTH_MS=25min) and starts one that has no process;
+      the kernel-lock row's phases (launching / launching-child /
+      launching-native / running) bound a dead launch to LAUNCH_WINDOW_MS=10min
+      (kernel/launch.mjs startupRowHolds).
+    respawn: >-
+      startKernel re-opens the `[Kernel] <id>` coordinator terminal and
+      re-sends the workflow-run command; stale coordinator terminals of the
+      dead kernel are closed by handle first
+      (closeStaleCoordinatorTerminals). On a rebuilt launcher the supervisor
+      respawns itself (supervisor-rebuilt) — no build needs a hand restart.
+    singleton: >-
+      One kernel per workflow, one supervisor per ledger — kernel-lock and
+      supervisor-lock signal rows are the claims (kernel/launch.mjs
+      reserveStartup/acquireStartup/claimSupervisor). Two kernels for one
+      workflow is the corruption this exists to prevent.
+    note: >-
+      w1 model: on Orca the [Kernel] agent plays this role toward its [Op]
+      children — it IS the supervisor of its own dispatches; the program
+      supervisor supervises the kernel in turn.
+
+# ============================================================================
+# 6 — SUPERVISION CHAIN. Who watches whom.
+# ============================================================================
+supervision:
+  chain: >-
+    owner chat (trigger only) -> [Kernel] agent (one per project, long-lived)
+    -> [Op] agents (one per op, ephemeral). Above the kernel: the supervisor
+    program (kernel/supervisor.mjs superviseForever — claim, poll, act,
+    sleep; exits only when no approved workflow is unfinished). Beside the
+    kernel: nothing — there is no Coordinator and no per-module Monitor
+    (kernel/kernel.mjs ~87).
+  auditTrail: >-
+    Every transition is an event in the ledger (kernel/ledger-db.mjs events
+    table, hash-chained — verifyChain); the human-readable trace.log renders
+    pick/settle/block/defer lines when debug is on (kernel/trace.mjs —
+    'the tracer renders, it never decides').

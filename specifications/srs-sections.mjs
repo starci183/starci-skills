@@ -1,8 +1,10 @@
-import {readDistJson} from '../core/runtime-root.mjs';
+import {parseYaml} from '../core/yaml.mjs';
+import fs from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {normalizePolicyOptions} from '../core/policy-options.mjs';
 
 export const SRS_AGGREGATE_SCHEMA='starci/srs-aggregate@1';
-export const SRS_SECTION_CONTRACT=readDistJson('specifications','srs-sections.json');
+export const SRS_SECTION_CONTRACT=parseYaml(fs.readFileSync(fileURLToPath(new URL('./srs-sections.yaml',import.meta.url)),'utf8'));
 export const SRS_SECTION_SCHEMAS=Object.freeze(Object.fromEntries(Object.values(SRS_SECTION_CONTRACT.sections).map(section=>[section.type,section.schema])));
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const text=value=>typeof value==='string'&&value.trim().length>0;

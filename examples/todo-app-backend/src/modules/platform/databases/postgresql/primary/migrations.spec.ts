@@ -25,6 +25,9 @@ import {
 import {
     CreateRecurTables1758246000000 
 } from "./migrations/1758246000000-create-recur-tables"
+import {
+    CreateUploadsTable1758300000000 
+} from "./migrations/1758300000000-create-uploads-table"
 
 type MigrationClass = new () => MigrationInterface;
 
@@ -36,6 +39,7 @@ const ALL_MIGRATIONS: Array<MigrationClass> = [
     CreateNotifyTables1758210000000,
     CreateAuditTables1758246000000,
     CreateRecurTables1758246000000,
+    CreateUploadsTable1758300000000,
 ]
 
 /**
@@ -240,6 +244,23 @@ describe("primary migrations",
                         "DROP TABLE IF EXISTS occurrences",
                         "DROP TABLE IF EXISTS recurrence_rules",
                     ])
+                } finally {
+                    await moduleRef.close()
+                }
+            })
+
+        it("CreateUploadsTable: up creates uploads + owner/task indexes, down drops the table",
+            async () => {
+                const { moduleRef, migration } = await boot(CreateUploadsTable1758300000000)
+                try {
+                    expect(await issuedSql(migration,
+                        "up")).toEqual([
+                        "CREATE TABLE IF NOT EXISTS uploads ( id text PRIMARY KEY, owner text NOT NULL, task_id text, filename text NOT NULL, mime text NOT NULL, size_bytes integer NOT NULL, storage_key text NOT NULL, status text NOT NULL DEFAULT 'pending', created_at timestamptz NOT NULL )",
+                        "CREATE INDEX IF NOT EXISTS uploads_owner_idx ON uploads (owner)",
+                        "CREATE INDEX IF NOT EXISTS uploads_task_id_idx ON uploads (task_id)",
+                    ])
+                    expect(await issuedSql(migration,
+                        "down")).toEqual(["DROP TABLE IF EXISTS uploads"])
                 } finally {
                     await moduleRef.close()
                 }

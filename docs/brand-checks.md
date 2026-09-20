@@ -125,12 +125,12 @@ is nothing proven.
 
 ### 6. `tokens-in-grammar`
 
-**Inputs:** `brand.identity.family`, `knowledge/grammars/<family>/DNA.yaml` (`DNA.json` once built).
+**Inputs:** `brand.identity.family`, `knowledge/grammars/<family>/DNA.yaml` in authored YAML.
 
 A brand overrides real tokens; it never invents names. Every `color.tokens[].token` must be a token name the
 family's DNA declares. A name the grammar does not carry would style nothing, and the record would read as
-applied while the product looked untouched. The grammar root defaults to the host's canon, preferring the
-built `.dist` copy, as ordinary runtime does. The check skips, with the reason, when the brand declares no
+applied while the product looked untouched. The grammar root defaults to the host's canon, reading the source `knowledge/` tree
+directly, as ordinary runtime does. The check skips, with the reason, when the brand declares no
 family or the host carries no DNA snapshot for it — an unreadable canon proves nothing either way.
 
 ## Render checks

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">80.64% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>20/24</span>
+                <span class='fraction'>25/31</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.62% </span>
+                <span class="strong">70% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>17/29</span>
+                <span class='fraction'>7/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">94.44% </span>
+                <span class="strong">80.64% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>17/18</span>
+                <span class='fraction'>25/31</span>
             </div>
         
             
@@ -86,51 +86,75 @@
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
 <a name='L23'></a><a href='#L23'>23</a>
-<a name='L24'></a><a href='#L24'>24</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">510x</span>
-<span class="cline-any cline-yes">510x</span>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">510x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">425x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-yes">85x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Column, Entity, PrimaryColumn } from 'typeorm';
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">144x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Column, Entity, PrimaryColumn 
+} from "typeorm"
 &nbsp;
-/**<span class="branch-0 cbranch-no" title="branch not covered" ></span>
+/**
  * data.task.task: owner is bound at creation and never rewritten; completedAt is set if and only if
- * comple<span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>te is true. T<span class="cstat-no" title="statement not covered" >his is the TypeORM sha</span>pe of that row<span class="cstat-no" title="statement not covered" >, owned by the platform<span class="cstat-no" title="statement not covered" > database module.</span></span></span>
- */<span class="branch-2 cbranch-no" title="branch not covered" ></span>
-@Entity({ name: 'tasks' })
-export class TaskEntity {
-  @P<span class="missing-if-branch" title="else path not taken" >E</span>rimaryColumn('text')
-  id!: string;
+<span class="branch-0 cbranch-no" title="branch not covered" > * complete is true. This is the TypeORM shape of that </span>row, owned by the platform database module.
+ */
+@Entity({
+    name: "tasks" 
+})
+/** TypeORM entity mapped to the task row on the primary datab<span class="branch-0 cbranch-no" title="branch not covered" >ase; services reach it through the entity manager, not a repository. */</span>
+<span class="cstat-no" title="statement not covered" >export class TaskEntity {</span>
+<span class="cstat-no" title="statement not covered" >  @PrimaryColumn("text")</span>
+<span class="cstat-no" title="statement not covered" >      id!: string</span>
+<span class="cstat-no" title="statement not covered" ></span>
+  @Column("text")
+      owner!: <span class="branch-0 cbranch-no" title="branch not covered" >string</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  @Column("text")</span>
+      title!: string
 &nbsp;
-  @Column('text')
-  owner!: string;
+  @Column("boolean")
+      complete!: boolean
 &nbsp;
-  @Column('text')
-  title!: string;
-&nbsp;
-  @Column('boolean')
-  complete!: boolean;
-&nbsp;
-  @Column('timestamptz', { name: 'completed_at', nullable: true })
-  completedAt!: Date | null;
+  @Column("timestamptz",
+      {
+          name: "completed_at", nullable: true 
+      })
+      completedAt!: Date | null
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -139,7 +163,7 @@ export class TaskEntity {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../../../../prettify.js"></script>
         <script>

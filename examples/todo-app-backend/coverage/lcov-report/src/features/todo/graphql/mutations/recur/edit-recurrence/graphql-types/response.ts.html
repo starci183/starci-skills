@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">85.71% </span>
+                <span class="strong">80.76% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>24/28</span>
+                <span class='fraction'>21/26</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.62% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>17/29</span>
+                <span class='fraction'>6/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.45% </span>
+                <span class="strong">80.76% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>21/22</span>
+                <span class='fraction'>21/26</span>
             </div>
         
             
@@ -86,52 +86,61 @@
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
 <a name='L23'></a><a href='#L23'>23</a>
-<a name='L24'></a><a href='#L24'>24</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">3x</span></td><td class="text"><pre class="prettyprint lang-js">import { Field, ID, ObjectType } from '@nestjs/graphql';
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Field, ID, ObjectType 
+} from "@nestjs/graphql"
 &nbsp;
-@ObjectType()<span class="branch-0 cbranch-no" title="branch not covered" ></span>
-export class EditRecurrenceResponse {
-  @Field(<span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>() =&gt; ID)<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ></span></span></span></span>
-  ruleId!: string;<span class="branch-2 cbranch-no" title="branch not covered" ></span>
+@ObjectType()
+/** The rule's new shape after the edit: ruleId, frequency, timeZone, time. */
+export class <span class="branch-0 cbranch-no" title="branch not covered" >EditRecurrenceResponse {</span>
+<span class="cstat-no" title="statement not covered" >  @Field(() =&gt; ID)</span>
+      ruleId!: string
 &nbsp;
   @Field()
-  fr<span class="missing-if-branch" title="else path not taken" >E</span>equency!: string;
+      frequency!: string
 &nbsp;
   @Field()
-  timeZone!: string;
+      timeZone!: string
 &nbsp;
   @Field()
-  time!: string;
+      time!: string
 &nbsp;
-  constructor(ruleId: string, frequency: string, timeZone: string, time: string) {
-    this.ruleId = ruleId;
-    this.frequency = frequency;
-    this.timeZone = timeZone;
-    this.time = time;
-  }
-}
+  constructor(ruleId: st<span class="branch-0 cbranch-no" title="branch not covered" >ring, frequency: string, timeZone: string, time: string) {</span>
+<span class="cstat-no" title="statement not covered" >      this.ruleId = ruleId</span>
+<span class="cstat-no" title="statement not covered" >      this.frequency = frequency</span>
+<span class="cstat-no" title="statement not covered" >      this.timeZone = timeZone</span>
+      this.time = time
+<span class="branch-0 cbranch-no" title="branch not covered" >  }</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -139,7 +148,7 @@ export class EditRecurrenceResponse {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../../../../../prettify.js"></script>
         <script>

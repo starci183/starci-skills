@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
-import { readDistJson, skillRoot } from '../core/runtime-root.mjs';
+import { skillRoot } from '../core/runtime-root.mjs';
+import { parseYaml } from '../core/yaml.mjs';
+import { fileURLToPath } from 'node:url';
 import {validatePlan} from './plan.mjs';
 import {hasDelegatedAcceptance} from './delegation.mjs';
 import {scopedWorkStatus} from './work-binding.mjs';
@@ -9,7 +11,7 @@ import {verifyProducerCells,verifyProducerResult,hasDirectProducerAcceptance} fr
 const digest=x=>sha256(canonicalJSON(x));
 const text=x=>typeof x==='string'&&x.trim().length>0;
 const requireThat=(ok,message)=>{if(!ok)throw Error(message);};
-const catalog=readDistJson('workflows','catalog.json');
+const catalog=parseYaml(fs.readFileSync(fileURLToPath(new URL('./catalog.yaml',import.meta.url)),'utf8'));
 const allowed=new Set(['analyze-request','prepare-work','define-business','design-architecture','design-interface','implement-backend','implement-frontend','verify-flows','review-code','produce-content']);
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
 const runtimeRoot=fs.realpathSync(skillRoot);

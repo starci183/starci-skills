@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {distPath, skillRoot} from '../core/runtime-root.mjs';
+import {skillRoot} from '../core/runtime-root.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 import {kindsReading, laneFor, readsOf, writesOf} from './graph.mjs';
 
@@ -9,20 +9,20 @@ import {kindsReading, laneFor, readsOf, writesOf} from './graph.mjs';
  * actually touches. Before 5-plus the kernel kept its own sets for this - which kinds are "design kinds" and
  * therefore get the brand record, which operation settles a decision node, which operation completes a Work
  * record - and each set drifted from the catalog on its own schedule. Here there is one answer to each
- * question, read from `model/records.yaml` and `model/kinds.yaml`: what a file IS (`recordKindOfPath`), what
+ * question, read from `modules/models/records.yaml` and `modules/models/kinds.yaml`: what a file IS (`recordKindOfPath`), what
  * an operation may cite and produce (`ioPayload`, `ioBlock`), what it produced that it never declared
  * (`undeclaredWrites`), and which kind the graph names for a scope or a node kind (`intakeKindFor`,
  * `decisionKindFor`, `kindsReadingBrand`).
  *
  * Everything here is a pure function of the two profiles; the only I/O is `loadRecords`. That matters
  * because the same answers are needed in three places that cannot share a process - the contract the
- * operation is given, the check the kernel runs on its report, and the catalog validation that runs during
- * a bootstrap build before `.dist` exists.
+ * operation is given, the check the kernel runs on its report, and the catalog validation the
+ * authoring checks run on the source tree.
  */
 export const RECORDS_SCHEMA='starci/records@1';
 
 /**
- * The closed catalog, in the order `model/records.yaml` declares it. `validateRecords` refuses a profile
+ * The closed catalog, in the order `modules/models/records.yaml` declares it. `validateRecords` refuses a profile
  * that adds to this list or drops from it, exactly as `KINDS` closes the operation catalog.
  */
 export const RECORD_KINDS=Object.freeze(['record','srs','sds','decision','brand','design','asset','code','grammar','evidence','runtime','integration']);
@@ -42,23 +42,18 @@ const listOf=value=>Array.isArray(value)?value.filter(item=>typeof item==='strin
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const slash=value=>String(value).replaceAll('\\','/').replace(/^\.\//,'');
 
-let distProfile=null;
+let sourceProfile=null;
 
 /**
- * Load the record catalog. Without `profileDir` it is the compiled `.dist/model/records.json`, exactly as
- * `loadKinds` loads the operation catalog - and, when `.dist` has not been published yet, the authored
- * `model/records.yaml` beside this module, because `ops/validate.mjs` needs this catalog during the very
- * build that publishes `.dist`. With `profileDir` the authored YAML (or a fixture) is read directly.
+ * Load the record catalog. Without `profileDir` it is the authored `modules/models/records.yaml`,
+ * exactly as `loadKinds` loads the operation catalog - there is no compiled `.dist` form; the
+ * source YAML is the runtime input `legacy/ops/validate.mjs` also reads. With `profileDir` the authored
+ * YAML (or a fixture) is read directly.
  */
 export function loadRecords({profileDir=null}={}){
   if(!profileDir){
-    if(!distProfile){
-      const compiled=distPath('model','records.json');
-      distProfile=fs.existsSync(compiled)
-        ?JSON.parse(fs.readFileSync(compiled,'utf8'))
-        :readRecordsFrom(path.join(skillRoot,'model'));
-    }
-    return distProfile;
+    if(!sourceProfile)sourceProfile=readRecordsFrom(path.join(skillRoot,'modules','models'));
+    return sourceProfile;
   }
   return readRecordsFrom(path.resolve(profileDir));
 }
@@ -245,7 +240,7 @@ export function decisionKindFor(nodeKind,{profile=null}={}){
 
 /**
  * The 5.1 map of decision node kind -> deciding operation. It survives only as the fallback of a kernel whose
- * kinds profile cannot be read at all (a tree whose `.dist` is not built yet still has to load); with a
+ * kinds profile cannot be read at all; with a
  * profile present `decisionKindFor` answers from the lanes and this table is never consulted.
  */
 export const DECISION_OPERATION=Object.freeze({architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide',brand:'brand.decide'});

@@ -8,7 +8,7 @@ import {parseYaml, stringifyYaml} from '../core/yaml.mjs';
 
 const skillRoot = path.resolve(import.meta.dirname, '..');
 const examplesRoot = path.join(skillRoot, 'knowledge', 'code-examples');
-const compilerFile = path.join(skillRoot, 'scripts', 'compile-knowledge.mjs');
+const compilerFile = path.join(skillRoot, 'legacy', 'builders', 'compile-knowledge.mjs');
 
 function readManifest(exampleDir) {
   const file = path.join(exampleDir, 'index.yaml');
@@ -60,7 +60,7 @@ function write(dir, relative, body) {
 }
 
 async function loadCompile() {
-  assert.equal(fs.existsSync(compilerFile), true, 'scripts/compile-knowledge.mjs is required');
+  assert.equal(fs.existsSync(compilerFile), true, 'legacy/builders/compile-knowledge.mjs is required');
   const mod = await import(pathToFileURL(compilerFile).href);
   assert.equal(typeof mod.compileKnowledge, 'function');
   return mod.compileKnowledge;

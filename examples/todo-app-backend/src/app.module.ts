@@ -23,6 +23,12 @@ import {
     NotifyQueueModule 
 } from "@modules/integrations/notify-queue/notify-queue.module"
 import {
+    UploadModule 
+} from "@modules/integrations/upload/upload.module"
+import {
+    ObservabilityModule 
+} from "@modules/platform/observability/observability.module"
+import {
     SessionModule 
 } from "@modules/bussiness/session/session.module"
 import {
@@ -49,6 +55,12 @@ import {
 import {
     HealthModule 
 } from "./features/todo/http/health/health.module"
+import {
+    ProbesModule 
+} from "./features/todo/http/health/probes/probes.module"
+import {
+    UploadHttpModule 
+} from "./features/todo/http/upload/upload.module"
 import {
     SepayWebhookModule 
 } from "./features/todo/http/webhooks/sepay/sepay-webhook.module"
@@ -92,6 +104,12 @@ import {
         NotifyQueueModule.register({
             isGlobal: true 
         }),
+        UploadModule.register({
+            isGlobal: true 
+        }),
+        ObservabilityModule.register({
+            isGlobal: true 
+        }),
         TaskModule.register(),
         ShareModule.register(),
         RecurModule.register(),
@@ -100,7 +118,9 @@ import {
         PlanModule.register(),
         TodoGraphqlModule,
         HealthModule.register(),
+        ProbesModule.register(),
         SepayWebhookModule.register(),
+        UploadHttpModule.register(),
     ],
 })
 /** Root composition module: registers every owned capability and global integration once. */

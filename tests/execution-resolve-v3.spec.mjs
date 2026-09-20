@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
 import {flattenOperationCandidates, resolveOperationExecution} from '../execution/resolve.mjs';
 
-const registry = parseYaml(fs.readFileSync(new URL('../model/registry.yaml', import.meta.url), 'utf8'));
+const registry = parseYaml(fs.readFileSync(new URL('../modules/models/registry.yaml', import.meta.url), 'utf8'));
 const request = (operation = 'interface.implement') => ({
   apiVersion: 'starci.workflow/v1', kind: 'WorkflowRequest',
   metadata: {workflowId: 'workflow-1', project: 'academy'},
@@ -24,7 +24,7 @@ test('resolver preserves each exact operator chain and its environment metadata'
   assert.deepEqual(backend.map(value => value.target), [
     'qwen-agent', 'devin-agent', 'claude-agent', 'codex-agent'
   ]);
-  // Every runtime that carries the verify role in model/runtimes.yaml is declared here, so the
+  // Every runtime that carries the verify role in modules/models/runtimes.yaml is declared here, so the
   // allocator can hand review.verify to any of them and still obtain a launch shape.
   const review = flattenOperationCandidates({operation: 'review.verify', registry});
   assert.deepEqual(review.map(value => value.target), [

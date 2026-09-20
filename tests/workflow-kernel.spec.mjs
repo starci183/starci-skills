@@ -36,7 +36,7 @@ import {GOAL_SPIN_LIMIT,adoptReportRev,applyInbox,evaluateGoalMetrics,goalMetric
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
-const runtimeProfile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
+const runtimeProfile=parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml',import.meta.url),'utf8'));
 // A repo-relative fixture path would leak `.starciwork/_local/runtime/orca-dispatch-ctx_*.md` launch
 // artifacts into the real `fixtures/` tree; the worktree lives under a per-file temp root instead. The root
 // must stay inside this checkout: `buildOperationLaunch` hands Orca a path RELATIVE to the process cwd, and
@@ -166,8 +166,10 @@ function scriptedOrca({store,scripts,run='run_wf'}){
     'worker-stop':args=>json(0,{ok:true,result:{state:'stopped',dispatchId:flag(args,'dispatch')}}),
     check:args=>{
       if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[]}});
-      // The blocking wait: every live operation that still has a scripted report finishes now.
-      const existing=live.size?new Set(store.readReports().map(item=>item.dispatchId)):new Set();
+      // The blocking wait: every live operation that still has a scripted report finishes now. A dispatch whose
+      // earlier report the kernel already consumed (a refused blocker it was answered for, a downgraded claim)
+      // may report again under the same dispatch - the file model's "report gone" is the row's consumed_at.
+      const existing=live.size?new Set(store.readReports().filter(item=>item.consumedAt===null).map(item=>item.dispatchId)):new Set();
       for(const dispatch of live.values()){
         const queue=scripts[dispatch.op];
         if(!queue?.length||existing.has(dispatch.id))continue;
@@ -559,6 +561,9 @@ test('kernel restart refuses ungrounded input recovery before launching or readi
   try{
     const {store,state}=harness;approve(store,state);state.run='run_wf';state.from='term_kernel';
     state.inputs={...state.inputs,phase:'ready'};
+    // The recovery is grounded in the approved goal's own refs; with the goal record gone (the 1.0.3 fixture
+    // removed store.paths.goalJson - the goal is now a `goals` row) there is nothing to ground it in.
+    store.ledger.db.prepare('DELETE FROM goals WHERE workflow_id=?').run(store.id);
     const collided=structuredClone(state.inputs),ops=structuredClone(state.ops);
     harness.run({refreshPreparation:()=>{throw Error('A refused resume cannot reach downstream input consumers');}});
     assert.equal(state.finished.outcome,'blocked');assert.equal(state.finished.reason,'workflow input references require runtime repair');
@@ -1282,8 +1287,12 @@ test('a launched audit with a Work node leaves every canonical Work byte unchang
     const raw=auditPlan().ops[0];harness.state.ops=[toOp({...raw,id:auditId,nodeId:subject.id,ledgerIds:[subject.id]},0)];
     approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
     const workRoot=path.join(harness.repo,'.starciwork'),snapshot=()=>{
+      // Canonical Work bytes are the records, not the workflow's own ledger: since the 1.0.4 ledger the
+      // runtime keeps runtime.sqlite (+shm/wal) and ledger-anchor.json beside the records, and a launched
+      // audit legitimately checkpoints there without touching a Work byte.
+      const runtimeFiles=new Set(['runtime.sqlite','runtime.sqlite-shm','runtime.sqlite-wal','ledger-anchor.json']);
       const rows=[];const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
-        if(dir===workRoot&&entry.name==='_local')continue;
+        if(dir===workRoot&&(entry.name==='_local'||runtimeFiles.has(entry.name)))continue;
         const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else rows.push([path.relative(workRoot,file).replaceAll('\\','/'),fs.readFileSync(file).toString('base64')]);}};
       walk(workRoot);return rows;
     };
@@ -3616,9 +3625,9 @@ test('a persisted launcher this build no longer has is replaced by the one it ha
   try{
     const store=harness.store,state=harness.state;
     state.host=path.resolve('.');
-    state.launcher='D:/Repositories/somewhere/.claude/.dist/execution/orca-supervised-launch.mjs';
+    state.launcher='D:/Repositories/somewhere/.claude/execution/orca-supervised-launch.mjs';
     assert.equal(relocateLauncher(store,state),true);
-    assert.equal(state.launcher,path.resolve('.dist/hosts/orca/launch.mjs').replaceAll('\\','/'));
+    assert.equal(state.launcher,path.resolve('hosts/orca/launch.mjs').replaceAll('\\','/'));
     const moved=events(store).find(event=>event.event==='launcher-relocated');
     assert.match(moved.from,/orca-supervised-launch\.mjs$/);
     state.launcher='L.mjs';
@@ -4385,7 +4394,7 @@ test('reconcile settles a live dispatch no operation names, and a repeated anoma
  */
 const lastFailure=value=>JSON.stringify(value);
 const reportBody='I removed the unrelated helper and wrote the decision record. The prescribed tree validator passed, '
-  +'but the contract report command failed with MODULE_NOT_FOUND for D:/repo/.dist/execution/orca-supervised-launch.mjs';
+  +'but the contract report command failed with MODULE_NOT_FOUND for D:/repo/execution/orca-supervised-launch.mjs';
 
 test('a dispatch that left last words is not dead: the worker report becomes the op\'s own report, and the body comes back as its finding',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});
@@ -4459,7 +4468,7 @@ test('the infrastructure causes are the ones the runtime owns; a failure of the 
   assert.match(infrastructureCause('worker-start failed: agent_prompt_stalled'),/never delivered/);
   assert.match(infrastructureCause('session_not_reported'),/never reported/);
   assert.match(infrastructureCause('the agent terminal was closed by Orca'),/closed the terminal/);
-  assert.match(infrastructureCause('spawn ENOENT D:/repo/.dist/execution/orca-supervised-launch.mjs'),/not on disk/);
+  assert.match(infrastructureCause('spawn ENOENT D:/repo/execution/orca-supervised-launch.mjs'),/not on disk/);
   assert.match(infrastructureCause('ENOENT L.mjs',{launcher:'D:/repo/L.mjs'}),/not on disk \(ENOENT L\.mjs\)/);
   assert.equal(infrastructureCause('npx vitest run sales exited 1'),null);
   assert.equal(infrastructureCause('ENOENT ./fixtures/orders.json'),null,'a file the operation\'s own work is missing is the operation\'s');
@@ -4648,12 +4657,15 @@ test('the kernel holds its launch in the repository runtime ledger and clears th
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
     const file=harness.store.ledgerFile;
-    const allocator=createAllocator({runtimes:runtimeProfile,now:()=>Date.UTC(2026,8,12,9),
+    // The allocator's frozen day is the ledger's day too: `usedToday` is a per-day counter that rolls over on
+    // a new UTC day, so the reader must share the clock or it reads a rolled-zero view on any other date.
+    const clock=()=>Date.UTC(2026,8,12,9);
+    const allocator=createAllocator({runtimes:runtimeProfile,now:clock,
       shared:{path:file,workflow:harness.store.id}});
     harness.run({allocator,maxIterations:1});
     const launched=events(harness.store).find(event=>event.event==='launched');
     assert.equal(launched.op,'op-intake');
-    const ledger=()=>readLoads({path:file,workflow:harness.store.id});
+    const ledger=()=>readLoads({path:file,workflow:harness.store.id,now:clock});
     assert.equal(ledger().schema,'starci/runtime-loads@1');
     assert.deepEqual(ledger().runtimes[launched.runtime].live.map(item=>[item.workflow,item.op]),
       [[harness.store.id,'op-intake']]);

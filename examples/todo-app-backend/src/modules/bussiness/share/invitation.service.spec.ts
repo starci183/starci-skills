@@ -274,6 +274,79 @@ describe("InvitationService",
                 expect(reinvited.role).toBe("editor")
             })
 
+        describe("guard arms (w8 branch depth)",
+            () => {
+                it("data.share.invitation invariant: a second invite over an accepted pair is refused too",
+                    async () => {
+                        const invited = await service.invite("owner-1",
+                            "task-1",
+                            "collab@example.com",
+                            "viewer")
+                        await service.accept("person-1",
+                            invited.id,
+                            "collab@example.com")
+                        await expect(service.invite("owner-1",
+                            "task-1",
+                            "collab@example.com",
+                            "editor")).rejects.toMatchObject({
+                            code: "SHARE_INVITATION_ALREADY_EXISTS_EXCEPTION",
+                        })
+                    })
+
+                it("re-inviting a revoked row re-opens it pending and clears the stale person binding",
+                    async () => {
+                        const invited = await service.invite("owner-1",
+                            "task-1",
+                            "collab@example.com",
+                            "editor")
+                        await service.accept("person-1",
+                            invited.id,
+                            "collab@example.com")
+                        await service.revoke("owner-1",
+                            invited.id)
+                        // t-revoke-accepted leaves personId bound on the row while the cache is cleared;
+                        // the re-invite must scrub that stale binding before the row goes pending again.
+                        const reinvited = await service.invite("owner-1",
+                            "task-1",
+                            "collab@example.com",
+                            "viewer")
+                        expect(reinvited.id).toBe(invited.id)
+                        expect(reinvited.status).toBe("pending")
+                        expect(reinvited.personId).toBeNull()
+                        expect(reinvited.acceptedAt).toBeNull()
+                        expect(reinvited.revokedAt).toBeNull()
+                        expect(cache.roleOf("task-1",
+                            "person-1").role).toBeNull()
+                    })
+
+                it("revoking an already-expired invitation is refused as already closed",
+                    async () => {
+                        const invited = await service.invite("owner-1",
+                            "task-1",
+                            "collab@example.com",
+                            "viewer")
+                        await backdateSentAt(invited.id,
+                            20)
+                        await expect(service.revoke("owner-1",
+                            invited.id)).rejects.toMatchObject({
+                            code: "SHARE_INVITATION_ALREADY_CLOSED_EXCEPTION",
+                        })
+                    })
+
+                it("accept and revoke both refuse an unknown invitation id",
+                    async () => {
+                        await expect(service.accept("person-1",
+                            "missing",
+                            "collab@example.com")).rejects.toMatchObject({
+                            code: "SHARE_INVITATION_NOT_FOUND_EXCEPTION",
+                        })
+                        await expect(service.revoke("owner-1",
+                            "missing")).rejects.toMatchObject({
+                            code: "SHARE_INVITATION_NOT_FOUND_EXCEPTION",
+                        })
+                    })
+            })
+
         async function backdateSentAt(invitationId: string, days: number): Promise<void> {
             const row = await entityManager.findOneBy(ShareInvitationEntity,
                 {

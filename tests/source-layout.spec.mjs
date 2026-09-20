@@ -35,8 +35,9 @@ test('malformed manifests and retired host versions are rejected',t=>{const f=fi
 test('CLI resolves the host outside .claude even when executed through compiled runtime',async t=>{
  const f=fixture(t),chunks=[],runtime=path.join(f.host,'.claude');
  // Use an actual installed layout; a maintenance checkout's parent is not necessarily a host.
- fs.cpSync(path.join(skillRoot,'.dist'),path.join(runtime,'.dist'),{recursive:true});
- const {main}=await import(pathToFileURL(path.join(runtime,'.dist/cli/main.mjs')).href);
+ for(const dir of ['cli','core','scripts','modules','workflows','contracts','schemas','specifications','hosts','providers','execution','approvals','models','kernel','knowledge','upgrades','bin'])fs.cpSync(path.join(skillRoot,dir),path.join(runtime,dir),{recursive:true});
+ for(const file of ['SKILL.md','package.json','config.example.yaml'])if(fs.existsSync(path.join(skillRoot,file)))fs.copyFileSync(path.join(skillRoot,file),path.join(runtime,file));
+ const {main}=await import(pathToFileURL(path.join(runtime,'cli/main.mjs')).href);
  const code=await main(['source-layout',f.be,f.fe],{out:value=>chunks.push(value),err:value=>chunks.push(value)});
  const result=JSON.parse(chunks.join(''));
  assert.equal(code,0,JSON.stringify(result.errors));

@@ -1,0 +1,6 @@
+schema: work/feature
+id: observability
+title: Seeing what the api is doing
+description: Probes an orchestrator can trust - liveness, readiness, Prometheus metrics - and one
+  structured, request-correlated log line per request that never carries a secret. Every record of
+  this feature lives under this directory.

@@ -1,6 +1,6 @@
 # Code pattern enforcement
 
-`model/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. Generated `.dist/model/code-patterns.json` is the runtime form.
+`modules/models/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. Generated `modules/models/code-patterns.yaml` is the runtime form.
 
 ## Public command and operation
 

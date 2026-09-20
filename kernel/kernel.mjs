@@ -532,7 +532,7 @@ export function reconcileLegacyCoordinatorLease(state,op,{orca,store,verifyPin=v
   if(op.launch?.stopReason!==LEGACY_COORDINATOR_ERROR)return {ok:false,reason:'unrecognized legacy launch rejection'};
   if(op.lease.workflowId!==state.id||op.lease.opId!==op.id||op.lease.generation!==state.engine?.generation)return {ok:false,reason:'durable lease identity does not match workflow operation generation'};
   const checked=verifyPin(state.engine?.runtimePin);if(!checked.ok)return {ok:false,reason:`runtime pin rejected: ${checked.reason}`};
-  let source;try{source=readFile(path.join(state.engine.runtimePin.root,'.dist','hosts','orca','launch.mjs'));}catch(error){return {ok:false,reason:`pinned launcher source unavailable: ${error.message}`};}
+  let source;try{source=readFile(path.join(state.engine.runtimePin.root,'hosts','orca','launch.mjs'));}catch{try{source=readFile(path.join(state.engine.runtimePin.root,'.dist','hosts','orca','launch.mjs'));}catch(error){return {ok:false,reason:`pinned launcher source unavailable: ${error.message}`};}}
   const sourceHash=hashSource(source);if(sourceHash!==REVIEWED_LEGACY_COORDINATOR_LAUNCH_SHA256)return {ok:false,reason:`pinned launcher hash ${sourceHash} is not the reviewed legacy no-effect module`};
   let shown;try{shown=orca.invoke('run-show',{id:state.run},{cwd:state.worktree});}catch(error){return {ok:false,reason:`run attestation unavailable: ${error.message}`};}
   const observedRun=shown?.outcome==='ok'?getPath(shown.receipt,'result.run'):null,coordinator=observedRun?.coordinator_handle??null;
@@ -2464,7 +2464,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     // cover it is not evidence that this op wrote it. `attributedFiles` keeps the files the op itself reported,
     // over every attempt it made, so its own uncommitted work from an earlier attempt still counts.
     // `ctx.kindsProfile` is the profile to read it against: null is the compiled one, and a caller that runs the
-    // kernel against an authored or a fixture profile hands that one in instead of rebuilding `.dist` for it.
+    // kernel against an authored or a fixture profile hands that one in instead of the canonical catalog.
     const kindVerdict=producedKindVerdict(op,files,ctx),produced=kindVerdict.produced,undeclared=kindVerdict.undeclared;
     if(!kindVerdict.ok){
       const finding=`record-kind validation was unavailable: ${kindVerdict.error}`;
@@ -2862,7 +2862,10 @@ export function restoreDeferredReportOperation(op,before,error){
 
 export function acceptReports(orca,store,state,ctx){
   // The report file is the source of truth: a report whose Orca signal failed to send is still a report.
-  const reports=store.readReports().filter(report=>report?.dispatch&&report?.outcome);
+  // A row `archiveOpReport` already consumed - a refused blocker the op was answered for - is never applied a
+  // second time; `answering` flips the op back to `running` under the same dispatch, and an unconsumed-only
+  // match is what keeps the refusal a one-time event instead of one per iteration.
+  const reports=store.readReports().filter(report=>report?.dispatch&&report?.outcome&&report.consumedAt==null);
   const actions=[];
   for(const op of state.ops.filter(item=>item.status==='running')){
     const report=reports.find(item=>item.dispatch===op.dispatch);
@@ -4290,7 +4293,7 @@ export function awaitLaunch(source,{wait=sleepSync,timeoutMs=LAUNCH_WAIT_MS,inte
 }
 
 const hostOf=(options,repoRoot)=>path.resolve(options.host??path.join(repoRoot,'.claude'));
-const launcherOf=host=>slash(path.join(host,'.dist','hosts','orca','launch.mjs'));
+const launcherOf=host=>slash(path.join(host,'hosts','orca','launch.mjs'));
 /**
  * The launcher a workflow persisted is the file its contracts tell every op to report through. A build that
  * lays the runtime out differently leaves that path behind, and a workflow that started under the old layout
@@ -4664,7 +4667,7 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
     const candidateRoot=options['candidate-root']?validateCandidateRoot(options['candidate-root']):state.engine?.candidateRoot??null;
     if(isEnrolled(state)&&store.readEvents().some(event=>event.event==='legacy-coordinator-no-effect-proved')){
       const runtimeRoot=path.dirname(state.engine.machineFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
-        policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
+        policyFile:path.join(skillRoot,'modules','models','capabilities.yaml'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
       const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']} )});
       try{refundLegacyCoordinatorProbations(store,state,refundRuntime);}finally{refundRuntime.close();}
     }
@@ -4863,7 +4866,7 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
       // The generations this retry retires give back the probation their unfinished attempts consumed.
       if(state.modelEligibility?.probationScopes){
         const runtimeRoot=path.dirname(state.engine.machineFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
-          policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
+          policyFile:path.join(skillRoot,'modules','models','capabilities.yaml'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
         const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']})});
         try{refundRetiredGenerationProbations(store,state,refundRuntime,{generation:engine.generation});}finally{refundRuntime.close();}
       }
@@ -4962,7 +4965,7 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
     let modelPolicy=null;
     if(isEnrolled(state)){
       const root=path.dirname(state.engine.machineFile);fs.mkdirSync(root,{recursive:true});
-      modelPolicy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),
+      modelPolicy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,policyFile:path.join(skillRoot,'modules','models','capabilities.yaml'),
         qualificationsFile:path.join(root,'model-qualifications.json'),probationsFile:path.join(root,'model-probations.json'),root});
     }
     const eligibility=modelPolicy?((job,runtime)=>{

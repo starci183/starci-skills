@@ -1,0 +1,21 @@
+schema: work/functional-requirement
+id: fr.observability.probes
+title: An orchestrator probes the api's health, readiness and metrics
+state: done
+actors: [machine]
+trigger: A kubelet, load balancer or prometheus scraper calls the api's probe doors.
+mainFlow:
+  - GET /health and GET /ready answer ok while the primary postgres dependency answers.
+  - GET /metrics answers the Prometheus text exposition of every request the api has served.
+exceptionFlows:
+  - When postgres cannot be reached, /health and /ready answer 503 rather than a false ok.
+postconditions:
+  - A scrape of /metrics shows the probes themselves counted under their route labels.
+composes:
+  - {rule: br.observability.probe-answers, module: src/modules/platform/observability}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts

@@ -3,7 +3,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
 import {ORCA_HOST} from '../hosts/orca/calls.mjs';
-import {canonicalTarget} from '../model/index.mjs';
+import {canonicalTarget} from '../modules/models/index.mjs';
 import {resolveLedgerRoot} from './routing.mjs';
 import * as graph from './graph.mjs';
 import {DECISION_OPERATION} from './io.mjs';
@@ -31,7 +31,7 @@ export const LEDGER_MODES=['work','plan'];
 export const WORK_LEDGER='work';
 /**
  * Work kind -> the operation kind that executes it. This is the fallback only: the lane of the node
- * (`model/kinds.yaml` through `kernel/graph.mjs`) decides the kind of every step, and this map is
+ * (`modules/models/kinds.yaml` through `kernel/graph.mjs`) decides the kind of every step, and this map is
  * what a tree whose kind graph cannot be read falls back to. Decision kinds are answered, never launched.
  */
 export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',e2e:'e2e.verify',operations:'runtime.operate'};
@@ -45,7 +45,7 @@ export const BRAND_KIND='brand';
 export const BRAND_DECIDE='brand.decide';
 /**
  * Kinds the graph names that the operator registry still launches under their 4.x operator id. The graph is
- * the kernel's vocabulary (roles, lanes, routes); `ops/registry.yaml` is the launchable operator set, and the
+ * the kernel's vocabulary (roles, lanes, routes); `modules/ops/registry.yaml` is the launchable operator set, and the
  * two are allowed to differ - a lane step is resolved to a launchable operator here, once, at the launch seam.
  */
 export const LAUNCH_OPERATOR={'frontend.implement':'interface.implement','architecture.revise':'architecture.decide'};
@@ -464,10 +464,9 @@ export function describeNode(api,repoRoot,node){
 export function grammarReferences(root=skillRoot){
   // The whole canon, not a shortlist: every grammar family file, every frontend pattern, every UI rule the host carries.
   const found=[],authored=path.join(root,'knowledge');
-  // A sealed runtime deliberately contains compiled JSON only. Operations derived after the pin must read that
-  // exact canon, while operations authored before enrollment retain their YAML provenance and are translated by
-  // the candidate root resolver to the corresponding sealed bytes.
-  const compiled=!fs.existsSync(authored),knowledge=compiled?path.join(root,'.dist','knowledge'):authored,extension=compiled?/\.json$/i:/\.ya?ml$/i;
+  // A payload sealed by the distless runtime carries authored knowledge/** (YAML and authored JSON alike).
+  // The `.dist` branch remains only to recognize a payload sealed before the migration.
+  const compiled=!fs.existsSync(authored),knowledge=compiled?path.join(root,'.dist','knowledge'):authored,extension=compiled?/\.json$/i:/\.(ya?ml|json)$/i;
   const walk=dir=>{try{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else if(extension.test(entry.name))found.push(slash(file));}}catch{}};
   for(const relative of [['grammars'],['patterns','fe'],['ui']])walk(path.join(knowledge,...relative));
   return unique(found).sort();

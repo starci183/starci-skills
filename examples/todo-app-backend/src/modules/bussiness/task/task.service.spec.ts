@@ -127,4 +127,35 @@ describe("TaskService",
                 expect(reopened.complete).toBe(false)
                 expect(reopened.completedAt).toBeNull()
             })
+
+        describe("missing-row guards (w8 branch depth)",
+            () => {
+                it("complete, reopen and delete all refuse an unknown task id before any authority check",
+                    async () => {
+                        await expect(service.complete("missing",
+                            "owner-1")).rejects.toMatchObject({
+                            code: "TASK_NOT_FOUND_EXCEPTION" 
+                        })
+                        await expect(service.reopen("missing",
+                            "owner-1")).rejects.toMatchObject({
+                            code: "TASK_NOT_FOUND_EXCEPTION" 
+                        })
+                        await expect(service.delete("missing",
+                            "owner-1")).rejects.toMatchObject({
+                            code: "TASK_NOT_FOUND_EXCEPTION" 
+                        })
+                    })
+
+                it("a reopen on an already-open task leaves it open with no completedAt",
+                    async () => {
+                        const record = await service.create("owner-1",
+                            "Ship it")
+
+                        const reopened = await service.reopen(record.id,
+                            "owner-1")
+
+                        expect(reopened.complete).toBe(false)
+                        expect(reopened.completedAt).toBeNull()
+                    })
+            })
     })

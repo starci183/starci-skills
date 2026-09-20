@@ -74,7 +74,7 @@ codeDigest:
     - path: src/modules/bussiness/task/task.module.ts
       sha256: 24617550b93232eb6684b9b6a8aac24951da971937c5c1354dd8045711c8f84c
     - path: src/modules/bussiness/task/task.service.spec.ts
-      sha256: 1d045f327d6c53211d749649557e36599b5ba27c26298f0b57feeb9a23f842ac
+      sha256: ff016e0cf2fe87c8e396821cbee72fe3973215e740d7677d4dd70c19458c68ec
     - path: src/modules/bussiness/task/task.service.ts
       sha256: d983a4a891dfec3d295eb66db354e7ef75ab0514aad4d325a03dab91dfc013d4
     - path: src/modules/bussiness/task/types/task-record.ts
@@ -93,7 +93,7 @@ codeDigest:
       sha256: 1a33c48209127ee38425089a097b40ef035addd191d0889af1cfd94386121cc2
     - path: src/modules/platform/events/events.types.ts
       sha256: dee7f5e48e713553f9bf990f4ff1cc3dc8b4a60b53ada1dcd91b30edca79f7f1
-  digest: 7ac7aede409869ff097dcefcb064f307b7b1f0d43217baabe2e0842a836c3ea3
+  digest: 50a25cb2bf340031db4141421fa5862fc48fa79b536a24df092f545e4c55ab36
 outcome: pass
 assertions:
   - id: event.task.deleted
@@ -106,4 +106,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T15:21:57.384Z
+  capturedAt: 2026-09-19T23:21:39.189Z

@@ -540,7 +540,7 @@ export function fallbackGoalMarkdown(state){
 
 /**
  * Run the shipped Work validator and return its projection. The binary is resolved from the skill root, so
- * the same call works whether the kernel runs from the authored tree or from its `.dist` copy; `work-ledger`
+ * the same call works whether the kernel runs from the authored tree or from a sealed payload of it; `work-ledger`
  * takes this as its injected `validate` instead of guessing the host layout.
  */
 export function validateWorkTree({repoRoot,workRoot=null}={}){

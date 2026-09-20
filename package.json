@@ -11,7 +11,6 @@
     "starci": "bin/starci.mjs"
   },
   "files": [
-    ".dist/",
     "bin/",
     "init/",
     "skills/",
@@ -19,8 +18,8 @@
     "config.example.yaml",
     "knowledge/",
     "workflows/",
-    "ops/",
-    "model/",
+    "legacy/ops/",
+    "modules/",
     "kernel/",
     "hosts/",
     "models/",
@@ -73,17 +72,7 @@
   },
   "scripts": {
     "test": "node --test tests/*.spec.mjs",
-    "starci": "node bin/starci.mjs",
-    "prepack": "npm run build && npm run build:check",
-    "build": "node scripts/build-workflows.mjs",
-    "build:check": "node scripts/build-workflows.mjs --check",
-    "build:declarative": "node scripts/compile-declarative.mjs",
-    "build:declarative:check": "node scripts/compile-declarative.mjs --check",
-    "build:knowledge": "node scripts/compile-knowledge.mjs",
-    "build:knowledge:check": "node scripts/compile-knowledge.mjs --check",
-    "build:ensure": "node scripts/ensure-build.mjs",
-    "build:sites": "node scripts/build-docs.mjs && npm --prefix sites/skills run build && npm --prefix sites/docs run build && node scripts/assemble-site.mjs",
-    "build:yaml": "node scripts/build-yaml.mjs"
+    "starci": "node bin/starci.mjs"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",

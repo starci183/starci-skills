@@ -1,34 +1,32 @@
-# Runtime distribution (source-built `.dist`)
+# Runtime distribution (source runtime)
 
-Published packages ship **sources and compilers**, not a prebuilt `.dist`. Install and update build agent-facing contracts on the target host, then verify before recording success.
+Published packages ship **sources only**. There is no build step and no generated contract bundle: install and update copy the authored tree, verify it in place, then record success.
 
 ## Install and update flow
 
 1. Copy the declared `package.json` `files` payload into `<host>/.claude`.
 2. Preserve locally changed or unowned files on update (unless `--force`).
-3. Ensure installed `.claude/.gitignore` contains `/.dist/` (and staging helpers `/.dist.staging/`, `/.dist.previous/`, plus `/config.json` when needed).
-4. Build from that installed tree with `scripts/build-workflows.mjs` (operator and knowledge compilation are required inside this single build; publish uses staging then rename so a failed build does not leave a partial current bundle). Never generate JSON mirrors into the source tree.
-5. Verify with `scripts/build-workflows.mjs --check`.
-6. Only then write `.starci-skills.json` with the new version and file hashes.
+3. Ensure installed `.claude/.gitignore` contains `/config.json` (older installs may still list retired staging entries).
+4. Verify the installed source tree (doctor contract checks).
+5. Only then write `.starci-skills.json` with the new version and file hashes.
 
-A failed generate/build/check does **not** record a successful install or version bump. Do not force-add `.dist` to Git; the repository and installed runtime ignore `/.dist/` (and staging dirs).
+A failed copy or verify does **not** record a successful install or version bump.
 
-## Commands that trigger a build
+## Commands
 
 | Context | Command |
 | --- | --- |
-| Install / update | `npx starci init\|update --dir <host>` (builds inside the installed tree) |
-| Maintainer checkout | `npm run build` / `npm run build:check` |
-| Session preflight | `node scripts/ensure-build.mjs` |
-| Knowledge only | `node scripts/compile-knowledge.mjs` / `--check` |
+| Install / update | `npx starci init\|update --dir <host>` |
+| Maintainer checkout | `npm test` |
+| Verification | `starci doctor --dir <host> --quick` |
 
-See [knowledge YAML](knowledge-yaml.md) for authored sources versus generated JSON, and [releasing](releasing.md) for packing without publishing `.dist`.
+See [knowledge YAML](knowledge-yaml.md) for authored knowledge sources, and [releasing](releasing.md) for packing.
 
 ## Recovery after an interrupted install
 
-If copy finished but build/verify failed, `.starci-skills.json` is absent or still on the prior version, and `.dist` may be partial.
+If copy finished but verification failed, `.starci-skills.json` is absent or still on the prior version, and the installed tree may be partial.
 
 1. Inspect `<host>/.claude` and the installer error (do not treat a partial tree as healthy).
-2. From the installed tree, run `node scripts/ensure-build.mjs` or re-run `starci update --dir <host>` / `starci init --dir <host>` from the same reviewed package.
-3. Confirm `.claude/.dist/manifest.json` exists and `starci doctor --dir <host> --quick` passes.
+2. Re-run `starci update --dir <host>` / `starci init --dir <host>` from the same reviewed package.
+3. Confirm `starci doctor --dir <host> --quick` passes.
 4. Keep local modifications reported by update; use `--force` only after backup and review.

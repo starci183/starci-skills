@@ -63,9 +63,22 @@ export function evaluateModelEligibility({runtime,evidence,probation=null,worklo
 }
 
 function readRecord(file,{optional=false,fallback=null}={}){try{const bytes=fs.readFileSync(file);return {bytes,value:file.endsWith('.json')?JSON.parse(bytes):parseYaml(bytes.toString('utf8'))};}catch(error){if(optional&&error.code==='ENOENT')return {bytes:null,value:fallback};throw error;}}
+/**
+ * Canonical model records are the authored `modules/models/*.yaml` — there is no compiled `.dist` form.
+ * A caller still naming `.dist/model/<name>.json` resolves to the same record name under
+ * `modules/models/`; every other path (fixtures, the per-workflow runtimeRoot stores) is honored as given.
+ */
+const modelSourceFile=(file,fallback)=>{
+  const text=clean(file);
+  if(!text)return fallback;
+  const match=/(?:^|[\\/])\.dist[\\/]model[\\/]([^\\/]+?)\.json$/i.exec(text);
+  return match?path.join(skillRoot,'modules','models',`${match[1]}.yaml`):text;
+};
 /** Load only evaluator receipts whose artifact hash resolves inside the declared qualification root. */
-export function loadModelEligibilityContext({policyFile,qualificationsFile,probationsFile=null,root=path.dirname(qualificationsFile)}={}){
-  const policy=readRecord(policyFile).value,records=readRecord(qualificationsFile,{optional:true,fallback:{qualifications:[]}}).value,base=fs.realpathSync(path.resolve(root)),accepted={};
+export function loadModelEligibilityContext({policyFile=null,qualificationsFile,probationsFile=null,root=path.dirname(qualificationsFile)}={}){
+  const policy=readRecord(modelSourceFile(policyFile,path.join(skillRoot,'modules','models','capabilities.yaml'))).value,
+    records=readRecord(modelSourceFile(qualificationsFile,qualificationsFile),{optional:true,fallback:{qualifications:[]}}).value,
+    base=fs.realpathSync(path.resolve(root)),accepted={};
   if(policy?.schema!=='starci/model-capability-policy@1')throw Error('Model capability policy is unavailable');
   for(const record of list(records?.qualifications??records)){
     const artifact=record?.receipt?.artifact,relative=clean(artifact?.path),candidate=path.resolve(base,relative);
@@ -74,7 +87,7 @@ export function loadModelEligibilityContext({policyFile,qualificationsFile,proba
     if(sha256(bytes)!==clean(artifact.sha256))continue;
     const id=clean(record.runtimeId);if(id)accepted[id]={...record,verified:true};
   }
-  const probation=probationsFile?readRecord(probationsFile,{optional:true,fallback:{}}).value:{};
+  const probation=probationsFile?readRecord(modelSourceFile(probationsFile,probationsFile),{optional:true,fallback:{}}).value:{};
   return {policy,evidenceByRuntime:accepted,probationByRuntime:plain(probation?.probations)?probation.probations:plain(probation)?probation:{},
     eligibility:(job,runtime)=>evaluateModelEligibility({runtime,evidence:accepted[runtime.id],probation:(plain(probation?.probations)?probation.probations:probation)?.[runtime.id],workload:job,role:job.role})};
 }
@@ -228,3 +241,4 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {parseYaml} from '../core/yaml.mjs';
+import {skillRoot} from '../core/runtime-root.mjs';

@@ -1,7 +1,7 @@
 schema: work/implementation
 id: impl.notify.todo-app-frontend.preferences
 title: The notification preferences screen - email digest control and unsubscribe link
-state: todo
+state: done
 repository: todo-app-frontend
 # v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
 # under the [lang] locale segment (locales en|vi); src/app/notify never existed. The extent is
@@ -11,14 +11,19 @@ owners:
   - {role: route, path: "src/app/[lang]/notify"}
   - {role: block, path: src/components/notify}
 proves: [ui.notify.preferences]
-blockedBy:
-  - {record: gap.notify.render-proof, because: "The real captures under ./assets fail the canonical render checks - palette-off-brand on #92b0fa (loading/saving states, ~50% of saturated pixels) and #90a4d5/#acbde7 (unsubscribe-link) match no declared brand token. The defect lives in the page's own styles; until captures pass, the done claim is unproven."}
-
 change:
-  rev: 2
+  rev: 3
   kind: editorial
-  at: 2026-09-19T21:30:00.000Z
-  reason: "v7-13: state rescinded done -> todo - the fresh captures v7-9 produced fail
+  at: 2026-09-19T22:40:00.000Z
+  reason: "w10: state restored todo -> done - the palette failures were real
+    style defects (undeclared accent blends on loading/saving, disabled-opacity
+    blended label ink on unsubscribe-link, and shell controls occluded by the
+    compact sticky nav). globals.css now uses declared neutral tokens for
+    disabled variants and dark neutral ink for secondary labels, and
+    .shell-controls sits above the nav. All 12 states were re-captured with the
+    shared convention and scripts/example-render-proof.mjs holds for every
+    capture; gap.notify.render-proof is closed. Prior narrative kept verbatim:
+    v7-13: state rescinded done -> todo - the fresh captures v7-9 produced fail
     palette-off-brand on six of twelve captures (#92b0fa on loading/saving, #90a4d5 and #acbde7 on
     unsubscribe-link), so the done claim is unproven and the record is held by
     gap.notify.render-proof. The rev-1 build description below stands as the record of what was

@@ -1,0 +1,34 @@
+(node:56352) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a frontend workflow binds the Work tree its backend owns and takes only the frontend nodes (385.7335ms)
+✔ the accepted slice is recorded and committed in the owner, names the frontend repository, and the tree still validates (3895.3969ms)
+✔ a workflow refuses to start on a shared ledger that carries changes the kernel does not own (1044.5831ms)
+✔ the launcher commands reach one workflow directory in the owner, from the frontend worktree (781.7273ms)
+✖ public retry and pinned enrolled run preserve accepted history while settling frontend source and backend Work roots (4241.2604ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11726.8903
+
+✖ failing tests:
+
+test at tests\workflow-kernel-shared-ledger.spec.mjs:476:1
+✖ public retry and pinned enrolled run preserve accepted history while settling frontend source and backend Work roots (4241.2604ms)
+  AssertionError [ERR_ASSERTION]: {"finished":{"schema":"starci/workflow-kernel@1","command":"workflow-run","id":"20260912-120000-shared-ledger","dir":"C:\\Users\\Hi\\AppData\\Local\\Temp\\starci-shared-ledger-KRHtkj\\demo-backend\\.starciwork\\runtime.sqlite","phase":"finished","ledgerMode":"work","finished":{"outcome":"blocked","reason":"goal metrics unmet and no applicable op can address them: ledger:demo.sales.implementation.frontend.receipt is planned; ledger:demo.sales.ui is planned","report":true},"lane":null,"ledger":["demo.sales.implementation.frontend.receipt=planned","demo.sales.ui=planned"],"ledgerSummary":{"scope":null,"total":4,"eligible":4,"states":{"todo":4},"kinds":{"brand":{"total":1,"eligible":1,"states":{"todo":1}},"implementation":{"total":2,"eligible":2,"states":{"todo":2}},"ui":{"total":1,"eligible":1,"states":{"todo":1}}},"executableEligible":["demo.sales.implementation.backend.intake","demo.sales.implementation.frontend.receipt","demo.sales.ui"],"decisionEligible":["demo.brand"]},"needUser":[{"op":"demo.sales.ui","kind":"environment","code":"candidate-root-binding","detail":"demo.sales.ui cannot bind its candidate roots and inputs: candidate path is outside the accepted routed roots: C:/Users/Hi/AppData/Local/Temp/starci-shared-ledger-KRHtkj/authored-runtime/knowledge/patterns/fe/architecture-check.yaml"},{"kind":"goal-gap","code":"goal-metrics-unmet","detail":"goal metrics unmet and no operation can still address them: ledger:demo.sales.implementation.frontend.receipt is planned; ledger:demo.sales.ui is planned"}],"head":"6b17a1c3ef636471272f6526d44798a5ade6fe3d","iterations":1,"ledgerRoot":"C:/Users/Hi/AppData/Local/Temp/starci-shared-ledger-KRHtkj/demo-backend/.starciwork","ledgerShared":true,"ledgerOwner":"demo-backend"},"needUser":[{"op":"demo.sales.ui","kind":"environment","code":"candidate-root-binding","detail":"demo.sales.ui cannot bind its candidate roots and inputs: candidate path is outside the accepted routed roots: C:/Users/Hi/AppData/Local/Temp/starci-shared-ledger-KRHtkj/authored-runtime/knowledge/patterns/fe/architecture-check.yaml"},{"kind":"goal-gap","code":"goal-metrics-unmet","detail":"goal metrics unmet and no operation can still address them: ledger:demo.sales.implementation.frontend.receipt is planned; ledger:demo.sales.ui is planned"}],"ops":[["accepted-before-retry","backend.implement","done",null,null,[],[],null],["demo.sales.ui","interface.draw","blocked",null,"candidate-root-binding",[],[{"name":"sales-surfaces-drawn","command":"node starci.mjs validate .starciwork"},{"name":"work-valid","command":"node C:/Users/Hi/AppData/Local/Temp/starci-shared-ledger-KRHtkj/builds/38fe944b07e510a7f3e2fd445ed0fcf173834936dc5c14edea479c669972e8d0/bin/starci.mjs validate C:/Users/Hi/AppData/Local/Temp/starci-shared-ledger-KRHtkj/demo-backend/.starciwork","runtimePrepared":true}],null]],"events":[]}
+  
+  'blocked' !== 'done'
+  
+      at TestContext.<anonymous> (file:///D:/Repositories/starci-academy-backend/.claude/tests/workflow-kernel-shared-ledger.spec.mjs:584:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'done',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

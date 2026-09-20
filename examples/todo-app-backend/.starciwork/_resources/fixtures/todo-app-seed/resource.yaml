@@ -5,15 +5,26 @@ schema: work/resource
 id: fixture.todo-app.seed
 kind: fixture
 owner: todo-app-backend
-revision: dev/seeds@2026-09-18
+revision: dev/seeds@2026-09-20
 schemaFiles:
   - .starcistacks/dev/seeds/01-schema.sql
 seedFiles:
   - .starcistacks/dev/seeds/02-tasks.sql
+  - .starcistacks/dev/seeds/03-plan.sql
+  - .starcistacks/dev/seeds/04-recur.sql
+  - .starcistacks/dev/seeds/05-share.sql
+  - .starcistacks/dev/seeds/06-notify.sql
+  - .starcistacks/dev/seeds/07-audit.sql
+  - .starcistacks/dev/seeds/08-sessions.sql
+  - .starcistacks/dev/seeds/volume/10-volume-tasks.sql
 preconditions:
-  - table tasks exists with columns id, owner, title, complete
+  - all 14 migration-owned tables exist (schema mirrors migrations, all statements idempotent)
+  - task/invitation/rule/session/subscription/notify/audit rows only under the uat-* namespace
+  - free-cap boundary owners present: uat-cap-below (19 open), uat-cap-at (20 open), uat-paid (25 open)
+  - audit_log_lines carries a valid GENESIS-rooted hash chain when seeded onto an empty table
 namespace: owner LIKE 'uat-%'
 details:
   seedsOnlyPrerequisites: true
-  neverSeeds: the outcome under test (a completed erasure, a fired cap, a materialised occurrence, an
-    accepted invitation)
+  idempotent: every data file upserts on primary keys; re-running converges seed-owned rows
+  neverSeeds: the outcome under test (a completed or executing erasure, a fired cap, a materialised
+    occurrence, an accepted invitation)

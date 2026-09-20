@@ -64,6 +64,9 @@ import {
 import {
     TaskEntity 
 } from "./entities/task.entity"
+import {
+    UploadEntity 
+} from "./entities/upload.entity"
 
 /**
  * PostgresqlPrimaryModule.register() cannot be compiled in a unit spec - TypeOrmCoreModule would open
@@ -161,6 +164,7 @@ describe("PostgresqlPrimaryModule",
                     AuditErasureRequestEntity,
                     SubscriptionEntity,
                     PaymentIntentEntity,
+                    UploadEntity,
                 ])
             })
     })

@@ -23,4 +23,10 @@ features:
   - id: recur
     directory: features/recur
     description: A task that comes back on a schedule the owner set.
+  - id: upload
+    directory: features/upload
+    description: A file attached to a task.
+  - id: observability
+    directory: features/observability
+    description: Probes, metrics and request-correlated logging for the api itself.
 

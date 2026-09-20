@@ -2,7 +2,7 @@
 
 StarCi owns the browser-testing instructions; project tests own their scenarios.
 Do not commit browser executables, node_modules or browser caches into the skill,
-its .dist bundle, or the product. The browser package and installed browser revision
+its runtime bundle, or the product. The browser package and installed browser revision
 must match. Do not depend on an arbitrary globally installed Playwright executable.
 
 Before FE/UAT work, inspect the project's existing locked Playwright dependency and

@@ -67,6 +67,9 @@ import {
 import {
     PaymentIntentEntity 
 } from "./entities/payment-intent.entity"
+import {
+    UploadEntity 
+} from "./entities/upload.entity"
 
 /**
  * integration.login.postgres / data.task.task: this is the one platform database module, under nivo's
@@ -108,6 +111,7 @@ export class PostgresqlPrimaryModule extends ConfigurableModuleClass {
                             AuditErasureRequestEntity,
                             SubscriptionEntity,
                             PaymentIntentEntity,
+                            UploadEntity,
                         ],
                         migrations: [join(__dirname,
                             "migrations",

@@ -28,31 +28,15 @@ const SKIP_DIR_NAMES = new Set([
   'coverage',
   // Synthetic checker fixtures under tests/fixtures must not pollute the skill-root walk.
   'tests',
+  // ex-testing holds fleet-lane briefs, lint reports and scratch; it is not authored skill source.
+  'ex-testing',
 ]);
 
 /**
- * Generated JSON that currently may still sit outside `.dist`.
- * Not authored; excluded from the allowlist check until relocated to `.dist` only.
+ * Generated JSON that is runtime output, not authored declarative source. The retired `.dist`
+ * projections are gone; what remains is site build output regenerated from source YAML.
  */
 export const GENERATED = Object.freeze([
-  'docs/catalog.json',
-  'ops/architecture.decide/authority.json',
-  'ops/backend.implement/authority.json',
-  'ops/basic-ops.json',
-  'ops/business.decide/authority.json',
-  'ops/catalog.json',
-  'ops/consolidation.json',
-  'ops/content.generate/authority.json',
-  'ops/interface.draw/authority.json',
-  'ops/interface.implement/authority.json',
-  'ops/knowledge.repair/authority.json',
-  'ops/release.deliver/authority.json',
-  'ops/review.verify/authority.json',
-  'ops/runtime.operate/authority.json',
-  'ops/scope.retire/authority.json',
-  'ops/task.execute/authority.json',
-  'ops/uat.verify/authority.json',
-  'ops/workspace.manage/authority.json',
   'sites/skills/src/catalog.generated.json',
 ]);
 

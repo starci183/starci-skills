@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { test, before, after } from 'node:test';
 import { init, update, doctor, PAYLOAD } from '../bin/starci-skills.mjs';
 import { validateWorkspace } from '../core/index.mjs';
+import { parseYaml } from '../core/yaml.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const quiet = () => {};
@@ -254,9 +255,9 @@ test('linked host instructions and manifest cannot redirect installer writes out
 test('packaged v3 references survive relocation; malformed commands do not create a workflow', t => {
   const root = hostFromGolden(t);
   assert.ok(PAYLOAD.includes('core'));
-  const catalog = JSON.parse(read(root, '.claude/.dist/ops/catalog.json'));
+  const catalog = parseYaml(read(root, '.claude/modules/ops/registry.yaml'));
   assert.ok(catalog.ops.some(op => op.id === 'workspace.manage'));
-  for (const op of catalog.ops) assert.ok(fs.existsSync(path.resolve(root, '.claude/.dist/ops', op.operator)), op.id);
+  for (const op of catalog.ops) assert.ok(fs.existsSync(path.resolve(root, '.claude/modules/ops/ops', `${op.id}.yaml`)), op.id);
   const before = fs.readdirSync(root).sort();
   for (const args of [['run-everything'], ['op', 'nonexistent'], ['init']]) {
     const result = work(root, args);
@@ -308,10 +309,10 @@ test('doctor fails closed on an invalid durable install protocol marker', t => {
 test('doctor rejects an all-skipped runner even when its process exits successfully', t => {
   t.diagnostic('doctor spawns real node --test runs on the installed copy on purpose; this test only trims its own setup cost');
   const root = hostFromGolden(t, { bootstrap: false });
-  put(root, '.claude/tests/ops.spec.mjs', "import test from 'node:test'; test.skip('unexecuted check', () => {});\n");
+  put(root, '.claude/tests/consolidation.spec.mjs', "import test from 'node:test'; test.skip('unexecuted check', () => {});\n");
   const output = [];
   assert.equal(doctor({ dir: root, quick: true }, value => output.push(value)), 1, output.join('\n'));
-  assert.ok(output.some(line => line.startsWith('FAIL tests/ops.spec.mjs:')), output.join('\n'));
+  assert.ok(output.some(line => line.startsWith('FAIL tests/consolidation.spec.mjs:')), output.join('\n'));
 });
 
 function ownRetired(root, relative, text, kept = false) {
@@ -360,7 +361,7 @@ test('a fresh install carries the 5-plus runtime roots and an update sheds the f
   const root = hostFromGolden(t);
   // The renamed tree must actually arrive: one file from each root the release introduced, so an install that
   // shipped the package.json `files` list without one of them fails here instead of at the first workflow.
-  for (const relative of ['.claude/kernel/kernel.mjs', '.claude/model/kinds.yaml', '.claude/model/hosts.yaml',
+  for (const relative of ['.claude/kernel/kernel.mjs', '.claude/modules/models/kinds.yaml', '.claude/modules/models/hosts.yaml',
     '.claude/hosts/index.mjs', '.claude/hosts/orca/launch.mjs', '.claude/models/functions.mjs', '.claude/scripts/checks/brand.mjs']) {
     assert.ok(fs.existsSync(path.join(root, relative)), relative);
   }
@@ -378,7 +379,7 @@ test('a fresh install carries the 5-plus runtime roots and an update sheds the f
   assert.equal(fs.existsSync(path.join(root, '.claude/profiles/kinds.yaml')), false);
   assert.equal(read(root, '.claude/profiles/local.yaml'), 'edited by the owner');
   // The roots that replaced it are live payload, so the same update leaves every one of them in place.
-  for (const relative of ['.claude/kernel/kernel.mjs', '.claude/model/hosts.yaml', '.claude/hosts/orca/launch.mjs']) {
+  for (const relative of ['.claude/kernel/kernel.mjs', '.claude/modules/models/hosts.yaml', '.claude/hosts/orca/launch.mjs']) {
     assert.ok(fs.existsSync(path.join(root, relative)), relative);
   }
   assert.equal(result.removedRetired.some(relative => /^(model|kernel|hosts|models|checks|execution)\//.test(relative)), false);
@@ -476,8 +477,8 @@ test('source and relocated payload contain only current runtime, presets and dom
   assert.match(read(root,'.claude/SKILL.md'),/^name: starci$/m);
   // The install carries exactly the operators the source publishes - counted from the source, so adding one
   // operator is one edit in ops/registry.yaml and not a number repeated across the suite.
-  assert.deepEqual(JSON.parse(read(root, '.claude/.dist/ops/catalog.json')).ops.map(op => op.id).sort(),
-    JSON.parse(fs.readFileSync(path.join(packageRoot, '.dist/ops/catalog.json'), 'utf8')).ops.map(op => op.id).sort());
+  assert.deepEqual(parseYaml(read(root, '.claude/modules/ops/registry.yaml')).ops.map(op => op.id).sort(),
+    parseYaml(fs.readFileSync(path.join(packageRoot, 'modules/ops/registry.yaml'), 'utf8')).ops.map(op => op.id).sort());
 });
 
 test('a 300-piece multi-repository tree accepts a new unfinished domain without restructuring', t => {
@@ -504,10 +505,12 @@ test('a 300-piece multi-repository tree accepts a new unfinished domain without 
   assert.equal(result.nodes.some(node => node.effectiveState === 'done'), false);
 });
 
-test('init verifies the packaged compiled runtime before recording success; failed update does not bump version', t => {
+test('init installs the source payload and records success; update preserves local edits', t => {
   const root = host(t);
   const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
-  assert.equal(pkg.files.includes('.dist') || pkg.files.includes('.dist/'), true);
+  assert.equal(pkg.files.includes('.dist') || pkg.files.includes('.dist/'), false);
+  assert.ok(pkg.files.includes('modules/'));
+  assert.equal(pkg.files.includes('legacy/'), false);
   assert.ok(pkg.files.includes('core/'));
   assert.ok(pkg.files.includes('scripts/'));
   assert.ok(pkg.files.includes('schemas/'));
@@ -520,19 +523,23 @@ test('init verifies the packaged compiled runtime before recording success; fail
   assert.match(ignore, /^\/\.dist\.staging\/$/m);
   assert.match(ignore, /^\/\.dist\.previous\/$/m);
   assert.match(ignore, /^\/config\.json$/m);
-  assert.ok(fs.existsSync(path.join(root, '.claude/.dist/manifest.json')));
+  assert.ok(fs.existsSync(path.join(root, '.claude/modules/ops/registry.yaml')));
   assert.ok(fs.existsSync(path.join(root, '.claude/core/yaml.mjs')));
   const manifestPath = path.join(root, '.claude/.starci-skills.json');
   const written = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   assert.equal(written.version, pkg.version);
-  assert.equal(Object.keys(written.files).some(rel => rel.startsWith('.dist/')), true);
-  const check = spawnSync(process.execPath, [path.join(root, '.claude/scripts/build-workflows.mjs'), '--check'], {
+  assert.equal(Object.keys(written.files).some(rel => rel.startsWith('modules/ops/')), true);
+  // Distless install: the payload is the runnable source, so there is no build output to produce
+  // or verify - the installed CLI reads the source tree directly.
+  assert.equal(fs.existsSync(path.join(root, '.claude', '.dist')), false);
+  const check = spawnSync(process.execPath, [path.join(root, '.claude/cli/main.mjs'), 'workflows'], {
     cwd: path.join(root, '.claude'), encoding: 'utf8', windowsHide: true,
   });
   assert.equal(check.status, 0, check.stderr + check.stdout);
-  assert.equal(JSON.parse(check.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1)).ok, true);
-  const before = fs.readFileSync(manifestPath, 'utf8');
-  fs.writeFileSync(path.join(root, '.claude/ops/task.execute/operator.yaml'), '{broken');
-  assert.throws(() => update({ dir: root }, quiet), /Installed runtime (build|verification) failed/);
-  assert.equal(fs.readFileSync(manifestPath, 'utf8'), before);
+  // A locally changed current-payload file is kept by update and recorded in the manifest, never
+  // rebuilt over - there is no compile step that would reject it.
+  const changed = 'modules/ops/ops/task.execute.yaml';
+  fs.writeFileSync(path.join(root, '.claude', changed), '{broken');
+  const written2 = update({ dir: root }, quiet);
+  assert.ok(written2.keptLocal.includes(changed));
 });

@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.audit.todo-app-frontend.privacy
-recordDigest: 17fc92e81a93a9844e7d3577a2b7df9c54d24fdfdb6fb2ec2d2a4b9ca47f57be
+recordDigest: 237a4a8e5ef49d36a98d27d22f5203da7cd68efd2058796799a719df32f78635
 codeDigest:
   algorithm: sha256
   files:
@@ -73,14 +73,14 @@ assertions:
       export',j);}}if(!ok)process.exit(1);console.log('12 state captures + 2 real export downloads
       verified');" exited 0
   - id: render-proof
-    command: node ../../scripts/example-render-proof.mjs --work ../todo-app-backend/.starciwork --record
-      impl.audit.todo-app-frontend.privacy
-    exit: 1
-    outcome: fail
-    observation: node ../../scripts/example-render-proof.mjs --work ../todo-app-backend/.starciwork
-      --record impl.audit.todo-app-frontend.privacy exited 1
+    command: node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork
+      --record impl.audit.todo-app-frontend.privacy
+    exit: 0
+    outcome: pass
+    observation: node ../../scripts/example-render-proof.mjs --work
+      examples/todo-app-backend/.starciwork --record impl.audit.todo-app-frontend.privacy exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:16:40.453Z
+  capturedAt: 2026-09-19T22:43:42.748Z

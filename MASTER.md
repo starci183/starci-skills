@@ -1,5 +1,10 @@
 # MASTER - refactor plan for `.claude`
 
+> Status 2026-09-20: execution has moved to the consolidated wave2 lanes under
+> `ex-testing/briefs/wave2/` toward the distless target in `.experiments/OPENSOURCE-GOAL.md`
+> (VERSION `1.0.0-alpha.1`). This file remains the measure; where it says `.dist`, read the
+> canonical source path — the distless wave removes the build entirely.
+
 Written 2026-09-18 from a read of the whole tree at `main` c0326fe6. The owner's ruling stands:
 **the example is the standard; `.claude` refactors to follow it.** This file is the plan, the
 measure and the order. It is not runtime content: nothing loads it, no gate reads it, and it is
@@ -114,7 +119,7 @@ Goal: a reader meets one entry, one tree map, one doc per concept, no generation
 
 | Step | Done when |
 | --- | --- |
-| E1 `SKILL.md` rewrite | ≤ 200 lines of short paragraphs; one route table (question / flash / standalone / plan / enrolled); every paragraph links its authority (`.dist/docs/*`, `model/*`, `schemas/*`); no "1.0 vs 5-plus", no "compatibility paragraph above", no "lifecycle correction" |
+| E1 `SKILL.md` rewrite | ≤ 200 lines of short paragraphs; one route table (question / flash / standalone / plan / enrolled); every paragraph links its authority (`docs/*`, `modules/*`, `schemas/*`); no "1.0 vs 5-plus", no "compatibility paragraph above", no "lifecycle correction" |
 | E2 `INDEX.yaml` folders match disk | `runtime/`, `mcp/`, `notes/`, `fixtures/` either listed with a purpose or removed from the package |
 | E3 docs by concept | merge the six dated plans/handovers into the concept doc they describe or into `upgrades/<version>.md`; target one doc per concept: goal, kinds, records, layout, ledger, allocation, hosts, checks, execution contract, chat host, upgrade |
 | E4 root notes leave | `goal.md` → `docs/goal.md` (the one goal doc) or `upgrades/`; `FANOUT-NOTES`, `PARALLEL-WRITERS-NOTES`, `SUITE-FINDINGS`, `notes/s*` → their facts into the owning doc or spec, files deleted |
@@ -170,7 +175,7 @@ WS-A (example)  ──►  WS-B (layout/catalog/validator)  ──►  WS-C (ope
   the script becomes a thin caller or is deleted.
 - Kinds keep their names from `model/kinds.yaml`; operator directories rename to match.
 - Nothing in `execution/` gains new behaviour; it is wired or retired in D4.
-- `.dist` layout is untouched by this plan; a moved source moves its compiled path with it.
+- `.dist` is deleted by the distless wave (tinkle-14..23, consolidated into wave2 w3/w4/w5/w7): the runtime reads the source tree directly, so a moved source IS the moved artifact. This clause superseded the original "`.dist` untouched" assumption.
 - Dated documents are not deleted from history; they are folded and removed from the package.
 
 ## 6. Out of scope

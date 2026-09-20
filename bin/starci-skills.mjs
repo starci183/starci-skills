@@ -64,8 +64,13 @@ const DIRECT_TASK_PROMPT_ENTRY = `${ENTRY_MARKER}
 Use the single [StarCi skill](.claude/SKILL.md) to select one workflow from .claude/workflows/catalog.json.
 Use direct-task for ad hoc work that does not fit a specialized workflow. Keep the selected matrix
 within three sequential rows and three parallel primary cells; verify requested outcomes before advancing.
-Questions may stay read-only. Check/build .dist first. Preserve existing scope, evidence and user changes.
+Questions may stay read-only. Preserve existing scope, evidence and user changes.
 <!-- /starci:prompt-entry -->`;
+// The same direct-task entry as the build era wrote it, kept only so `update` recognizes and replaces
+// it. It is never installed: the runtime reads source directly, there is nothing to build first.
+const BUILD_ERA_DIRECT_TASK_ENTRY = DIRECT_TASK_PROMPT_ENTRY.replace(
+  'Questions may stay read-only.',
+  'Questions may stay read-only. Check/build .dist first.');
 
 const PREVIOUS_BOOTSTRAP = `# StarCi agent bootstrap
 
@@ -150,20 +155,44 @@ function parseArgs(argv) {
   return out;
 }
 
+// `docs/` and `examples/` ship only authored reference files, matching the retired build's payload
+// rules. An `examples/<name>/` stack kit (its `.starcistacks/` tree plus sibling `scripts/`, `gateway/`
+// and `.gitignore` support files) additionally ships shell/config/Dockerfile inputs — but never
+// materialized runtime or generated output, never a plaintext secret beside its sealed `.enc`
+// counterpart, and never a `.mjs` automation source.
+const stackKitPath = (relative) => /^examples\/[^/]+\/(\.starcistacks(\/|$)|scripts\/|gateway\/|\.gitignore$)/.test(relative);
+const payloadDocAllowed = (root, relative) => {
+  if (stackKitPath(relative)) {
+    if (/\/(runtime|generated|\.runtime|node_modules)(\/|$)/.test(relative)) return false;
+    const absolute = path.join(root, relative);
+    if (!relative.endsWith('.enc') && existsSync(absolute + '.enc')) return false;
+    if (/\.mjs$/.test(relative)) return false;
+    return /\.(md|ya?ml|tsx?|png|svg|sh|ps1|conf)$/.test(relative)
+      || ['Dockerfile', '.gitignore', '.dockerignore'].includes(path.basename(relative));
+  }
+  if (/^examples\/[^/]+\.ya?ml$/.test(relative)) return false;
+  return /\.(md|ya?ml|tsx?|png|svg)$/.test(relative);
+};
+const PAYLOAD_DOC_ROOT = /^(examples|docs)\//;
+const payloadFileAllowed = (root, relative) => !PAYLOAD_DOC_ROOT.test(relative) || payloadDocAllowed(root, relative);
+
 function walk(root, rel = '') {
   const abs = path.join(root, rel);
   if (!existsSync(abs)) return [];
-  if (statSync(abs).isFile()) return [rel];
+  if (statSync(abs).isFile()) return payloadFileAllowed(root, rel) ? [rel] : [];
   const out = [];
   for (const e of readdirSync(abs, { withFileTypes: true })) {
     const next = rel ? `${rel}/${e.name}` : e.name;
+    // Match npm payload semantics: dependency trees and VCS internals never ship, and a
+    // junction/symlink entry is not ours to copy (a fixture may carry one inside node_modules).
+    if (e.isSymbolicLink() || e.name === 'node_modules' || e.name === '.git') continue;
     if (e.isDirectory()) out.push(...walk(root, next));
-    else out.push(next);
+    else if (payloadFileAllowed(root, next)) out.push(next);
   }
   return out;
 }
 const sha = (file) => createHash('sha256').update(readFileSync(file).toString('utf8').replace(/\r\n/g, '\n')).digest('hex');
-const payloadFiles = (root) => PAYLOAD.flatMap((p) => walk(root, p)).sort();
+export const payloadFiles = (root) => PAYLOAD.flatMap((p) => walk(root, p)).sort();
 const hashTree = (root) => Object.fromEntries(payloadFiles(root).map((rel) => [rel, sha(path.join(root, rel))]));
 
 function readManifest(target) {
@@ -213,13 +242,13 @@ function bootstrapPlan(repo, profile) {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    const customProtocol = [PROMPT_ENTRY, PLAN_STORAGE_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    const customProtocol = [PROMPT_ENTRY, PLAN_STORAGE_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, BUILD_ERA_DIRECT_TASK_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
     if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
       throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
     }
     const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
     const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
-    for (const known of [BOOTSTRAP, PLAN_STORAGE_BOOTSTRAP, SPLIT_STORAGE_BOOTSTRAP, PRE_RENAME_BOOTSTRAP, PREVIOUS_BOOTSTRAP, ...[PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, LEGACY_PROMPT_ENTRY].map(entry => PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, entry)), BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
+    for (const known of [BOOTSTRAP, PLAN_STORAGE_BOOTSTRAP, SPLIT_STORAGE_BOOTSTRAP, PRE_RENAME_BOOTSTRAP, PREVIOUS_BOOTSTRAP, ...[PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, LEGACY_PROMPT_ENTRY, BUILD_ERA_DIRECT_TASK_ENTRY].map(entry => PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, entry)), BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
@@ -228,7 +257,7 @@ function bootstrapPlan(repo, profile) {
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, PLAN_STORAGE_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, PLAN_STORAGE_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, BUILD_ERA_DIRECT_TASK_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
       return { name, file, text: current.replace(managed, entry), action: 'updated' };
     }
@@ -378,29 +407,11 @@ function ensureInstalledDistIgnore(target) {
   appendFileSync(ignore, `${current && !current.endsWith('\n') ? '\n' : ''}${missing.join('\n')}\n`);
 }
 
-function runInstalledBuildStep(target, script, args = []) {
-  const result = spawnSync(process.execPath, [path.join(target, script), ...args], {
-    cwd: target, encoding: 'utf8', windowsHide: true
-  });
-  if (result.error || result.status !== 0) {
-    const detail = [result.error?.message, result.stderr, result.stdout].filter(Boolean).join('\n').trim();
-    throw new Error(`Installed runtime build failed (${script}${args.length ? ` ${args.join(' ')}` : ''}): ${detail || 'non-zero exit'}`);
-  }
-  return result;
-}
-
-function buildInstalledRuntime(target) {
-  // Always build the installed source, never trust a publisher-copied `.dist`.
-  // Record success only after generate + write + check all succeed.
+function prepareInstalledRuntime(target) {
+  // Distless runtime: the installed payload IS the runnable source — there is no build step to
+  // run and no generated bundle to verify. Keeping a stale `.dist` ignored still protects trees upgraded
+  // from a build-era version.
   ensureInstalledDistIgnore(target);
-  runInstalledBuildStep(target, 'scripts/build-workflows.mjs');
-  const check = runInstalledBuildStep(target, 'scripts/build-workflows.mjs', ['--check']);
-  try {
-    const report = JSON.parse((check.stdout || '').trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}');
-    if (report.ok !== true) throw new Error(JSON.stringify(report));
-  } catch (error) {
-    throw new Error(`Installed runtime verification failed (scripts/build-workflows.mjs --check): ${error.message}`);
-  }
 }
 
 export function init(opts, log = console.log) {
@@ -424,7 +435,7 @@ export function init(opts, log = console.log) {
   const localIgnore = path.join(target, '.gitignore');
   if (!existsSync(localIgnore) || !readFileSync(localIgnore,'utf8').split(/\r?\n/).includes('/config.json')) appendFileSync(localIgnore, '\n/config.json\n');
   const retired = retireOwnedFiles(target, retirement);
-  buildInstalledRuntime(target);
+  prepareInstalledRuntime(target);
   const written = writeManifest(target, [], profile, hostPlan ? profile : manifest?.bootstrapProfile ?? null);
   log(`installed ${pkg.name}@${pkg.version} into ${target} (${Object.keys(written.files).length} files)`);
   if (hostPlan) writeBootstraps(repo, log, hostPlan);
@@ -488,7 +499,7 @@ export function update(opts, log = console.log) {
     kept.push(rel);
   }
   const retired = retireOwnedFiles(target, retirement);
-  buildInstalledRuntime(target);
+  prepareInstalledRuntime(target);
   const written = writeManifest(target, kept, profile, hostPlan ? profile : manifest.bootstrapProfile ?? null);
   log(`updated ${manifest.name}@${manifest.version} -> ${pkg.name}@${pkg.version} in ${target}`);
   // A version that asks something of the operator says so once, here, where they are looking. An update that
@@ -513,7 +524,7 @@ export function doctor(opts, log = console.log) {
     throw new Error('installed current workflow protocol is incomplete: missing cli/main.mjs; refusing fallback to legacy validation');
   }
   if (existsSync(path.join(target, 'cli', 'main.mjs'))) {
-    const tests = opts.quick ? ['ops.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs'] : ['ops.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
+    const tests = opts.quick ? ['consolidation.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs'] : ['consolidation.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
     if (manifest) {
       const drift = Object.entries(manifest.files).filter(([rel, hash]) => !existsSync(path.join(target, rel)) || sha(path.join(target, rel)) !== hash);
       log(`${manifest.name}@${manifest.version}; ${drift.length} file(s) changed or missing since install`);
@@ -554,15 +565,15 @@ const HELP = `${pkg.name} ${pkg.version}
   npx ${pkg.name} impact <work-root> <id> | stale <work-root> | plan <plan.yaml>
   npx ${pkg.name} audit-legacy <legacy-root>
 
-init    copies source payload into <repo>/.claude, builds/verifies local .dist, then records the
+init    copies the runnable source payload into <repo>/.claude, then records the
         install manifest. Adds the StarCi entry once to CLAUDE.md and AGENTS.md while preserving
         custom instructions. Project data lives in backend .starciwork, whose runtime record is the
         ledger .starciwork/runtime.sqlite; a Plan bundle goes in a directory you name, and evidence
         staging is transient and outside Work. FE is source only. Refuses a .claude it did not
-        install unless --force; --no-bootstrap keeps host files unchanged. A failed build does
-        not record a successful install/version.
+        install unless --force; --no-bootstrap keeps host files unchanged.
 update  replaces current runtime paths; locally changed current files are kept unless --force.
-        Rebuilds and verifies .dist from the installed source before recording the new version.
+        The runtime reads the installed source directly; no build step runs before recording
+        the new version.
         Retired manifest-owned unchanged files are removed; changed or unowned files are preserved.
         Personal settings, product .starciwork and legacy data are never cleanup targets.
         A major upgrade requires --upgrade-major; no existing .worktrees data is migrated/deleted.

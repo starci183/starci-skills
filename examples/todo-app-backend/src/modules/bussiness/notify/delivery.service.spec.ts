@@ -187,4 +187,72 @@ describe("DeliveryService",
                     "notif-2"])
                 expect(smtp.sent).toHaveLength(1)
             })
+
+        describe("batch membership arms (w8 branch depth)",
+            () => {
+                it("a suppressed attempt inside the batch is skipped, not failed - only queued members dispatch",
+                    async () => {
+                        const now = new Date("2026-09-18T06:10:00.000Z")
+                        await service.admit("notif-suppressed",
+                            new Date("2026-09-18T06:00:00.000Z"),
+                            true)
+                        await service.admit("notif-queued",
+                            new Date("2026-09-18T06:00:01.000Z"),
+                            false)
+
+                        const result = await service.dispatchBatch(["notif-suppressed",
+                            "notif-queued"],
+                        now,
+                        {
+                            to: "owner@todo.dev", subject: "x", body: "y" 
+                        })
+
+                        expect(result.delivered).toEqual(["notif-queued"])
+                        const suppressed = await service.findById("notif-suppressed")
+                        expect(suppressed?.state).toBe("suppressed")
+                        expect(suppressed?.attempt).toBe(0)
+                    })
+
+                it("a batch of only unknown or non-queued ids sends nothing and reports empty buckets",
+                    async () => {
+                        const result = await service.dispatchBatch(["never-existed"],
+                            new Date("2026-09-18T06:10:00.000Z"),
+                            {
+                                to: "owner@todo.dev", subject: "x", body: "y" 
+                            })
+
+                        expect(result).toEqual({
+                            delivered: [], retried: [], bounced: [] 
+                        })
+                        expect(smtp.sent).toHaveLength(0)
+                    })
+
+                it("a retry keeps the original startedAt instead of resetting it",
+                    async () => {
+                        smtp.failTransientFor("owner@todo.dev")
+                        const t0 = new Date("2026-09-18T06:00:00.000Z")
+                        const t1 = new Date("2026-09-18T06:10:00.000Z")
+                        await service.admit("notif-1",
+                            t0,
+                            false)
+                        await service.dispatchBatch(["notif-1"],
+                            t1,
+                            {
+                                to: "owner@todo.dev", subject: "x", body: "y" 
+                            })
+                        const afterFirst = await service.findById("notif-1")
+                        expect(afterFirst?.state).toBe("queued")
+
+                        smtp.clearFailuresFor("owner@todo.dev")
+                        await service.dispatchBatch(["notif-1"],
+                            new Date("2026-09-18T06:10:31.000Z"),
+                            {
+                                to: "owner@todo.dev", subject: "x", body: "y" 
+                            })
+                        const retried = await service.findById("notif-1")
+                        expect(retried?.state).toBe("delivered")
+                        expect(retried?.startedAt).toEqual(afterFirst?.startedAt)
+                        expect(retried?.attempt).toBe(2)
+                    })
+            })
     })

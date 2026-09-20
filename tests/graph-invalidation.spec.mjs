@@ -5,7 +5,7 @@ import {parseYaml} from '../core/yaml.mjs';
 import {GOAL_PREDICATE,KIND_GRAPH,assertGraph,familyOf,goalMetricRequired,kindList,kindRecord,laneById,nextKind,
   propagateInvalidation,readsOf,roleOf,routeFor,skippedKinds,validateGraph,writesOf} from '../kernel/graph.mjs';
 
-const read=name=>parseYaml(fs.readFileSync(new URL(`../model/${name}`,import.meta.url),'utf8'));
+const read=name=>parseYaml(fs.readFileSync(new URL(`../modules/models/${name}`,import.meta.url),'utf8'));
 const profile=read('kinds.yaml');
 const records=read('records.yaml');
 const codes=errors=>errors.map(error=>error.code);

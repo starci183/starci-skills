@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.notify.todo-app-frontend.preferences
-recordDigest: 864524a228da83227a906afe307976c05d258079defca9d5144c5dfddc7e922b
+recordDigest: 72f5449ea87fcece310df9727a9e96065110633b06b841860e7d812f9386cc00
 codeDigest:
   algorithm: sha256
   files:
@@ -80,8 +80,16 @@ assertions:
       refused=fs.readFileSync(p+'preferences-refused-desktop-1280.html','utf8');if(!refused.includes('We
       could')){ok=false;console.log('refused markup lacks refusal
       sentence');}if(!ok)process.exit(1);console.log('12 state captures verified');" exited 0
+  - id: render-proof
+    command: node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork
+      --record impl.notify.todo-app-frontend.preferences
+    exit: 0
+    outcome: pass
+    observation: node ../../scripts/example-render-proof.mjs --work
+      examples/todo-app-backend/.starciwork --record impl.notify.todo-app-frontend.preferences
+      exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:30:21.420Z
+  capturedAt: 2026-09-19T22:44:22.360Z

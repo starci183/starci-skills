@@ -22,10 +22,10 @@ codeDigest:
     - path: src/components/plan/usage-screen/component.spec.tsx
       sha256: 8b5648fed751d5ac80cfd183068368e5d57bae5acf00f51f7758a615d1fb6ae9
     - path: src/components/plan/usage-screen/component.tsx
-      sha256: 35f136c57a6f4b83b02dc82539aedf727ca6cb42cf11aee6c0dbae61f4f34785
+      sha256: e12898c21ce4ddb2f5d8783f219a693f1feec8b6df55d98b162e441542bf866f
     - path: src/components/plan/usage-screen/index.tsx
       sha256: bf5ff0705758f77e4829e05ac91ae57e56aa428ed3aaa70b17d8fc9b2975df5b
-  digest: a59ae80d32fb19064c99f51be5a90940ef2c3e8c25362d0187b17791fd996513
+  digest: ca5e28f735a9267098b254c7e8e6baac8bce29f9a7f08fe9b35059dcb22a28b1
 outcome: pass
 assertions:
   - id: render-proof
@@ -39,4 +39,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:42:42.795Z
+  capturedAt: 2026-09-19T22:52:47.961Z

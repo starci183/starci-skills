@@ -252,7 +252,7 @@ send progress prompts, restart healthy operations or surface unchanged state to 
 user. The child remains responsible for reaching its own terminal event.
 
 The canonical machine-readable contract is authored in
-`workflows/supervision.yaml`, compiled to `.dist/workflows/supervision.json`, and
+`workflows/supervision.yaml`, read directly from source, and
 enforced by `execution/supervision.mjs`. Authored policy contains no run-specific
 identifiers. Each bound Plan stores its current cursor, message/delivery identities,
 attempt identity and liveness timestamps under excluded `_local` runtime state.

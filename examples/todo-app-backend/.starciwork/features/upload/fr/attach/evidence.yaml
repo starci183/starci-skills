@@ -1,0 +1,73 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: fr.upload.attach
+recordDigest: 913f4ca490a377ef806dede8bb9bd5fa7016769257eaf3fc2212e8f585b56e75
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/features/todo/http/upload/upload-exception.filter.ts
+      sha256: 00ebf35aba15da6652378a8462e6c98f5975ea8f9d46765e7ff0634b1fbbd233
+    - path: src/features/todo/http/upload/upload.controller.ts
+      sha256: 36774d7c85b8247bfac590fb08dbeff7d1504567142afdee5df4b2193c1bebaf
+    - path: src/features/todo/http/upload/upload.module-definition.ts
+      sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
+    - path: src/features/todo/http/upload/upload.module.ts
+      sha256: f18ec11b2cf8e46114f87e3ec6827f6ec94427202e6a9c1b51307939f948b54a
+    - path: src/modules/integrations/upload/local-storage.adapter.spec.ts
+      sha256: c3273bc88776552750cfd0b517ff784c20b4e32ad7d5bc0459497fd37eeb0e96
+    - path: src/modules/integrations/upload/local-storage.adapter.ts
+      sha256: efb3e9962d1768c54de945aad38aacba8875be0f9a386d9cc44b126e1694b28c
+    - path: src/modules/integrations/upload/noop-virus-scan.adapter.ts
+      sha256: 82cd6c7992f149afe605cd3478795453fd16aeeb613959a1667777c6c62e2919
+    - path: src/modules/integrations/upload/upload-token.spec.ts
+      sha256: 92ee4765d87ba70976573fd209e952938512672c1560ab06fbddd3291183627b
+    - path: src/modules/integrations/upload/upload-token.ts
+      sha256: 16a83ee13b3b0a005ad7df47ace71e0afdf307ae4d8e2f57cbc7235802445b78
+    - path: src/modules/integrations/upload/upload.contracts.ts
+      sha256: ea7e7c27b1226edc82a564a99aa2f33407d19d752789a75ed0e65ca18bbaedfa
+    - path: src/modules/integrations/upload/upload.module-definition.ts
+      sha256: 2c19403a5b043b17bdb7a010ab288453d6dfa9a42e0b21f4e046125a9b323ccf
+    - path: src/modules/integrations/upload/upload.module.spec.ts
+      sha256: edd14266439976b336788960d20905e38292417503d2885ad3604ce73baca033
+    - path: src/modules/integrations/upload/upload.module.ts
+      sha256: f5cf214222600bea4b502788ce58f6a1cf31207372e1e2b25071c22ecda06000
+    - path: src/modules/integrations/upload/upload.service.spec.ts
+      sha256: d864ebad4736a4d163c6597abd8906b4e1b22c12830035807d338f67effdcb5d
+    - path: src/modules/integrations/upload/upload.service.ts
+      sha256: 391de988514a713c9c883fed71cdc6ccb65dfce7e0e6ce31f12ee785b9197484
+    - path: src/modules/shared/exceptions/errors/upload/upload-forbidden.ts
+      sha256: 1d117a4cf968d107dabdcddfc5873df45b1df6a7932d12f29f60c13adf488a1e
+    - path: src/modules/shared/exceptions/errors/upload/upload-mime-not-allowed.ts
+      sha256: 8d21fe2aa6a36de8f111152ec9cef4652c902542d401d40c13da35d84580fe4c
+    - path: src/modules/shared/exceptions/errors/upload/upload-not-found.ts
+      sha256: 20d7dd6f8e67d04cf8734c80891e022c25d2ae91bf4ab54255223cac3d96d27f
+    - path: src/modules/shared/exceptions/errors/upload/upload-not-ready.ts
+      sha256: 961530ead6e26bbc581f04345828674c7f9a5e2abe6be4ef7083e7adcb72a6dc
+    - path: src/modules/shared/exceptions/errors/upload/upload-scan-rejected.ts
+      sha256: f5f2c1ee89b40e6c70c4b2d06cb723336807e128018899ae162dd0598e554bea
+    - path: src/modules/shared/exceptions/errors/upload/upload-storage-unavailable.ts
+      sha256: 4967862575284cf844261084b9e9036e6a53b006efbf8a8d78e0d7f7c0845e6e
+    - path: src/modules/shared/exceptions/errors/upload/upload-token-invalid.ts
+      sha256: 8d98ab4da461d945344ca588241e44cc71dab9e6cab6a1e4ccf78cbbc53bf144
+    - path: src/modules/shared/exceptions/errors/upload/upload-too-large.ts
+      sha256: fbdedcd94fe8b855180bb247f8a53b179c1d59c5376d2f3ceed1c867dda4b734
+  digest: 92861994ddfc8e03acb7125ff084f46e188a207e5b642ccd52f92608c377c68a
+outcome: pass
+assertions:
+  - id: upload-unit-suite
+    command: npx jest src/modules/integrations/upload
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/integrations/upload exited 0
+  - id: upload-journey-e2e
+    command: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts
+    exit: 0
+    outcome: pass
+    observation: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-19T21:01:09.079Z

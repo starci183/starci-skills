@@ -1,5 +1,5 @@
 import type { FormEvent } from "react"
-import { Badge, Button, Input, PageContainer, SurfaceCard, SurfaceListCard, Text, TextAction, WorkspaceShell } from "@starci/grammar/common"
+import { Badge, Button, Input, PageContainer, SurfaceCard, Text, TextAction, WorkspaceShell } from "@starci/grammar/common"
 import type { Collaborator, ShareRole } from "@/modules/api/share"
 import { Heading } from "@/components/leaves/Heading"
 import { Link } from "@/components/leaves/Link"
@@ -9,6 +9,7 @@ import {
     SHARE_BODY_CLASS_NAME,
     SHARE_BREADCRUMB_CLASS_NAME,
     SHARE_COLLABORATOR_HEADER_CLASS_NAME,
+    SHARE_COLLABORATOR_SECTION_CLASS_NAME,
     SHARE_COLLABORATOR_ROW_CLASS_NAME,
     SHARE_COLLABORATOR_ROWS_CLASS_NAME,
     SHARE_COMPACT_BAR_CLASS_NAME,
@@ -236,10 +237,13 @@ export const ShareInviteView = (props: ShareInviteViewProps) => {
                         ) : null}
 
                         {props.collaborators.length === 0 ? null : (
-                            <SurfaceListCard
-                                label={copy.collaborators}
-                                footer={<Text tone="muted" size="sm">{copy.pendingExpiry}</Text>}
-                            >
+                            /* A collection of collaborators is a page section with a heading, never
+                             * a card: SurfaceListCard's shell carries `starci-core-surface`, and a
+                             * repeated-row list under that class is exactly what the canon render
+                             * check refuses (entity-list-in-card - a card is one item). The plain
+                             * labelled section is the same convention task-list's collection uses. */
+                            <section aria-label={copy.collaborators} className={SHARE_COLLABORATOR_SECTION_CLASS_NAME}>
+                                <Heading level={2}>{copy.collaborators}</Heading>
                                 <div className={SHARE_COLLABORATOR_HEADER_CLASS_NAME}>
                                     <Text as="span" tone="muted" size="sm" weight="medium">{copy.columnPerson}</Text>
                                     <Text as="span" tone="muted" size="sm" weight="medium">{copy.columnAccess}</Text>
@@ -266,7 +270,8 @@ export const ShareInviteView = (props: ShareInviteViewProps) => {
                                         </li>
                                     ))}
                                 </ul>
-                            </SurfaceListCard>
+                                <Text tone="muted" size="sm">{copy.pendingExpiry}</Text>
+                            </section>
                         )}
 
                         <footer className={SHARE_FOOTER_LINKS_CLASS_NAME}>

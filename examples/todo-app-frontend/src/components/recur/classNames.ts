@@ -108,3 +108,13 @@ export const SUMMARY_STACK_CLASS_NAME = cn("flex", "flex-col", "gap-4", "items-s
 
 /** The end-rule confirmation copy and its two actions. */
 export const END_CONFIRM_CLASS_NAME = cn("flex", "flex-col", "gap-3", "items-start")
+
+/**
+ * The upcoming-occurrences collection's page section - a labelled section, not a card: a list of
+ * repeated entities inside a `starci-core-surface` ancestor is exactly what the canon render check
+ * refuses (entity-list-in-card), so the rows sit in a plain section like the task list's.
+ */
+export const UPCOMING_LIST_SECTION_CLASS_NAME = cn("flex", "flex-col", "gap-2")
+
+/** The occurrence rows: one list, divider-separated. */
+export const UPCOMING_LIST_ROWS_CLASS_NAME = cn("flex", "flex-col", "divide-y", "divide-[var(--border)]", "list-none", "p-0", "m-0")

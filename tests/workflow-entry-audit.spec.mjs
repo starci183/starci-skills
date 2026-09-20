@@ -86,6 +86,6 @@ test('backend job requires distinct unit and backend E2E acceptance before front
 
 test('catalog skill path resolves to the actual project skill',()=>{
   const actual=fs.realpathSync(fileURLToPath(new URL('../SKILL.md',import.meta.url)));
-  const fromDist=fs.realpathSync(fileURLToPath(new URL(catalog.skill,new URL('../.dist/workflows/catalog.json',import.meta.url))));
+  const fromDist=fs.realpathSync(fileURLToPath(new URL(catalog.skill,new URL('../workflows/catalog.yaml',import.meta.url))));
   assert.equal(fromDist,actual);
 });

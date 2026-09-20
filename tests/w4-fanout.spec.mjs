@@ -135,7 +135,7 @@ test('the children of one cut allocate independently and spread across pools by 
 });
 
 test('a hard-difficulty child never lands on a sol-tier model as first choice',()=>{
-  const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
+  const profile=parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml',import.meta.url),'utf8'));
   const allocator=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,16,9)});
   const pick=allocator.allocate('backend.implement',{difficulty:'hard',job:{opId:'op.C.1'}});
   assert.ok(pick.ok,pick.reason);
@@ -180,7 +180,7 @@ test('a child that dies for good blocks the parent and cancels the siblings that
 /* ------------------------------------------------------------------ quota aliases merge by MAX */
 
 test('quota slots naming the same pool through aliases merge by MAX, not last-write-wins',()=>{
-  const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
+  const profile=parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml',import.meta.url),'utf8'));
   // `gpt-5.6-luna` and `gpt-5.6-sol` are retired spellings of the codex-agent pool: the granted capacity is
   // the largest of the aliases, and a zero on an unused spelling cannot close the slots another was given.
   const grown=applyQuota(profile,{slots:{'gpt-5.6-luna':7,'codex-agent':5}});

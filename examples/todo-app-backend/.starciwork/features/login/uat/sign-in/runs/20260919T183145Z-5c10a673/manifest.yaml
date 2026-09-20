@@ -3,7 +3,7 @@ id: uat.login.sign-in.runs.20260919T183145Z-5c10a673
 nodeId: uat.login.sign-in
 inputDigest: dc1ef715c18fe44e72704eb5751b459a0739bccddaa9cd1507371ddd5e1bfd7b
 outcome: partial-pass
-assertions: &a1
+assertions:
   - id: ux.sign-in.validation-feedback
     expected: yes
     observed: yes
@@ -69,10 +69,40 @@ files:
       id: uat.login.sign-in
       title: Sign in, close the browser, come back
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: person
+          action: Sign in with the seeded person.
+          expected: the task list loads for that person
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: person
+          action: See the empty task list.
+          expected: no tasks are listed and no error shows
+          checks:
+            - id: errorFeedback
+              expected: no
+        - order: 3
+          actor: person
+          action: "Close the browser tab and come back (the session token persists in
+            localStorage, read back as an Authorization: Bearer header - never a
+            cookie)."
+          expected: still signed in, same list renders with no re-authentication
+          checks:
+            - id: completion
+              expected: yes
+        - order: 4
+          actor: person
+          action: Submit a wrong password.
+          expected: a single uniform refusal message shows; no account-existence hint
+          checks:
+            - id: errorFeedback
+              expected: yes
+            - id: validation
+              expected: yes
       proves:
         - fr.login.sign-in
         - br.login.password.sign-in
@@ -101,7 +131,34 @@ files:
   ux-checks.json:
     schema: starci/uat-ux-checks@1
     flow: uat.login.sign-in
-    checks: *a1
+    checks:
+      - id: ux.sign-in.validation-feedback
+        expected: yes
+        observed: yes
+        note: The submit button stays disabled while either field is empty
+          (SignInFormView disabled logic).
+      - id: fr.login.sign-in
+        expected: yes
+        observed: not-run
+        note: A successful sign-in writes a session row to Postgres.
+          UAT_LIVE_LOGIN_AUTHORIZED is not true in this environment, so this
+          step is not-run here rather than attempted against infrastructure this
+          run does not own.
+      - id: br.login.session.restores
+        expected: yes
+        observed: not-run
+        note: Depends on the real signed-in session from fr.login.sign-in above; not-run
+          for the same reason.
+      - id: ux.sign-in.error-feedback
+        expected: yes
+        observed: not-run
+        note: No response observed from /graphql within the timeout; the API origin did
+          not answer.
+      - id: br.login.password.sign-in
+        expected: yes
+        observed: not-run
+        note: "Same reason: no backend response to compare against a normalized refusal
+          message."
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.login.sign-in

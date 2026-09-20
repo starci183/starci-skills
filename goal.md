@@ -1,13 +1,19 @@
 # .claude runtime goal
 
+> Status 2026-09-20: this is the 2026-09 session goal. The living target state for the
+> `1.0.0-alpha.1` distless runtime is `.experiments/OPENSOURCE-GOAL.md` (draft until its S* rows
+> hold). Where this file says `model/` or `ops/`, read `modules/models/` and `modules/ops/ops/` —
+> the catalogs moved there; the old dirs land in `legacy/`.
+
 Make the StarCi `.claude` runtime complete and defect-free, so workflows run autonomously to a
 verified goal instead of stalling at `finished: blocked`.
 
 ## Done means
 
-- Every operation kind sits in one canonical catalog (`model/kinds.yaml`) with a declared family,
-  role, record reads/writes and report contract; every executable operator (`ops/`) is either wired
-  to a kind or explicitly marked ad-hoc. No orphan operators, no name drift.
+- Every operation kind sits in one canonical catalog (`modules/models/kinds.yaml`) with a declared
+  family, role, record reads/writes and report contract; every executable operator
+  (`modules/ops/ops/`) is either wired to a kind or explicitly marked ad-hoc. No orphan operators,
+  no name drift.
 - Workflows are goal-driven end to end (see below): intake in a chat app → frozen goal → kernel loop
   → verified completion.
 - `devin-agent` is a first-class peer runtime (swe-2-max, paid tier) for implement/verify/write,

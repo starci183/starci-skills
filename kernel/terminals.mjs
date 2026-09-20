@@ -204,7 +204,7 @@ export function infrastructureCause(text,{launcher=null}={}){
   const value=String(text??'');
   for(const [pattern,cause] of INFRASTRUCTURE)if(pattern.test(value))return cause;
   const name=launcher?path.basename(String(launcher)):null;
-  if(/ENOENT/i.test(value)&&(/orca-supervised-launch|\.dist[\\/]/i.test(value)||(name&&value.includes(name))))
+  if(/ENOENT/i.test(value)&&(/orca-supervised-launch|\.dist[\\/]|hosts[\\/]orca[\\/]launch\.mjs/i.test(value)||(name&&value.includes(name))))
     return `the report command is not on disk (ENOENT ${name??'launcher'})`;
   return null;
 }

@@ -1,0 +1,24 @@
+schema: work/functional-requirement
+id: fr.upload.manage
+title: List, download and delete a task's uploads
+state: done
+actors: [owner]
+trigger: The owner works with the files already on a task.
+mainFlow:
+  - The owner lists the uploads attached to a task they own.
+  - The owner downloads an upload's bytes back, with its stored mime and filename on the response.
+  - The owner deletes an upload; the object and the metadata row go together.
+exceptionFlows:
+  - A stranger's list or read is refused the same way a missing id is - existence leaks nothing.
+  - Deleting what is already gone is a not-found, not a silent success.
+postconditions:
+  - After delete, neither the row nor the stored object remains.
+composes:
+  - {rule: br.upload.owned, module: src/modules/integrations/upload}
+  - {rule: br.upload.lifecycle, module: src/modules/integrations/upload}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts

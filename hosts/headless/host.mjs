@@ -4,7 +4,7 @@ import {spawn as spawnChild,spawnSync} from 'node:child_process';
 import {RESULT_SCHEMA,buildArgs,classifyReceipt,loadOrcaCalls,verifyLiveSchema} from '../orca/calls.mjs';
 import {hostDescriptor} from '../index.mjs';
 import {HEADLESS_PROVIDERS} from '../../models/functions.mjs';
-import {canonicalTarget} from '../../model/index.mjs';
+import {canonicalTarget} from '../../modules/models/index.mjs';
 import {repositoryRoot} from '../../kernel/reports.mjs';
 
 /**
@@ -33,7 +33,7 @@ import {repositoryRoot} from '../../kernel/reports.mjs';
  */
 export const HEADLESS_TABLE='starci/headless-table@1';
 /**
- * The three facts the kernel reads about this host, declared in `model/hosts.yaml` and read here through
+ * The three facts the kernel reads about this host, declared in `modules/models/hosts.yaml` and read here through
  * `hostDescriptor` so this adapter and `hosts/orca/calls.mjs` describe the host model from one source. It is
  * read once at module load and frozen: a descriptor that changed under a running kernel would change what
  * `host-unsupported` means halfway through a workflow. When no profile can be read the built-in values answer,

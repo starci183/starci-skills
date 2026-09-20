@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {selectOperation} from '../ops/select.mjs';
-import {validateCatalog} from '../ops/validate.mjs';
+import {selectOperation} from '../legacy/ops/select.mjs';
+import {validateCatalog} from '../legacy/ops/validate.mjs';
 import {validateJobMatrices} from '../workflows/matrix.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 const json=name=>JSON.parse(fs.readFileSync(new URL(name,import.meta.url),'utf8'));
 const yaml=name=>parseYaml(fs.readFileSync(new URL(name,import.meta.url),'utf8'));
-import {outputs} from '../ops/generate.mjs';
+import {outputs} from '../legacy/ops/generate.mjs';
 const catalogue=JSON.parse(outputs().get('catalog.json'));
-const registry=yaml('../ops/registry.yaml');
+const registry=yaml('../legacy/ops/registry.yaml');
 import {readWorkflow} from './helpers/read-public.mjs';
 const matrices=readWorkflow('jobs.json');
 const contract=id=>catalogue.ops.find(o=>o.id===id).contract;
@@ -45,7 +45,7 @@ test('the complete jobs replace the old catalogue, each is classified once, and 
 test('English-only YAML is the maintained operator source with no runtime mirrors',()=>{
   function inspect(value){if(Array.isArray(value))value.forEach(inspect);else if(value&&typeof value==='object')for(const[k,v]of Object.entries(value)){assert.notEqual(k,'vi');assert.notEqual(k,'mirror');assert.equal(k.endsWith('Vi'),false);inspect(v);}}
   inspect(catalogue);
-  for(const id of registry.ops){const authored=yaml(`../ops/${id}/operator.yaml`);assert.equal(authored.id,id);inspect(authored);assert.equal(fs.existsSync(new URL(`../ops/${id}.vi.md`,import.meta.url)),false);}
+  for(const id of registry.ops){const authored=yaml(`../legacy/ops/${id}/operator.yaml`);assert.equal(authored.id,id);inspect(authored);assert.equal(fs.existsSync(new URL(`../ops/${id}.vi.md`,import.meta.url)),false);}
   const changed=structuredClone(catalogue);changed.ops[0].contract.goal.vi='retired';assert.equal(validateCatalog(changed).ok,false);
 });
 test('operation selection cannot default, combine permissions or reuse a different completion profile',()=>{

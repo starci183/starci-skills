@@ -14,7 +14,8 @@ records:
     schema: work/business-rule
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.audit.log-line
@@ -30,7 +31,8 @@ records:
     schema: work/business-rule
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -42,7 +44,8 @@ records:
     schema: work/business-rule
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -57,7 +60,8 @@ records:
     schema: work/business-rule
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - br.audit.erasure.right
@@ -113,7 +117,8 @@ records:
     schema: work/business-rule
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - contract.notify.new-device-signal
@@ -130,7 +135,8 @@ records:
     schema: work/business-rule
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.notify.notification
@@ -144,7 +150,8 @@ records:
     schema: work/business-rule
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -154,7 +161,8 @@ records:
     schema: work/business-rule
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -162,6 +170,22 @@ records:
         - sds.notify.delivery-lifecycle
       composes:
         - fr.notify.unsubscribe
+  br.observability.access-log-shape:
+    schema: work/business-rule
+    feature: observability
+    state: done
+    effectiveState: done
+    usedBy:
+      composes:
+        - fr.observability.request-logging
+  br.observability.probe-answers:
+    schema: work/business-rule
+    feature: observability
+    state: done
+    effectiveState: done
+    usedBy:
+      composes:
+        - fr.observability.probes
   br.plan.active-scope:
     schema: work/business-rule
     feature: plan
@@ -224,7 +248,8 @@ records:
     schema: work/business-rule
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.recur.occurrence
@@ -236,7 +261,8 @@ records:
     schema: work/business-rule
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.recur.occurrence
@@ -246,7 +272,8 @@ records:
     schema: work/business-rule
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.recur.rule
@@ -258,7 +285,8 @@ records:
     schema: work/business-rule
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.recur.occurrence
@@ -269,7 +297,8 @@ records:
     schema: work/business-rule
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.recur.rule
@@ -280,7 +309,8 @@ records:
     schema: work/business-rule
     feature: share
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - contract.share.completion-guard-for-task
@@ -288,7 +318,8 @@ records:
     schema: work/business-rule
     feature: share
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.share.invitation
@@ -302,7 +333,8 @@ records:
     schema: work/business-rule
     feature: share
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - contract.share.completion-guard-for-task
@@ -317,7 +349,8 @@ records:
     schema: work/business-rule
     feature: share
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - contract.share.completion-guard-for-task
@@ -332,7 +365,8 @@ records:
     schema: work/business-rule
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.task.task
@@ -344,7 +378,8 @@ records:
     schema: work/business-rule
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - br.plan.active-scope
@@ -357,7 +392,8 @@ records:
     schema: work/business-rule
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - br.plan.active-scope
@@ -376,6 +412,7 @@ records:
         - contract.login.identity-for-task
         - contract.share.completion-guard-for-task
         - data.task.task
+        - fr.upload.attach
         - sds.task.ownership-guard
       composes:
         - fr.task.complete
@@ -397,10 +434,43 @@ records:
     schema: work/business-rule
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       composes:
         - fr.task.create
+  br.upload.intake:
+    schema: work/business-rule
+    feature: upload
+    state: done
+    effectiveState: done
+    usedBy:
+      composes:
+        - fr.upload.intake
+  br.upload.lifecycle:
+    schema: work/business-rule
+    feature: upload
+    state: done
+    effectiveState: done
+    usedBy:
+      refs:
+        - data.upload.upload
+      composes:
+        - fr.upload.attach
+        - fr.upload.intake
+        - fr.upload.manage
+  br.upload.owned:
+    schema: work/business-rule
+    feature: upload
+    state: done
+    effectiveState: done
+    usedBy:
+      refs:
+        - data.upload.upload
+        - fr.upload.intake
+      composes:
+        - fr.upload.attach
+        - fr.upload.manage
   brand:
     schema: work/brand
     feature: null
@@ -449,7 +519,8 @@ records:
     schema: work/contract
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - fr.task.create
@@ -575,6 +646,11 @@ records:
     usedBy:
       extends:
         - data.recur.occurrence
+  data.upload.upload:
+    schema: work/data
+    feature: upload
+    state: done
+    effectiveState: done
   decision.audit.deleted-task-target:
     schema: work/policy-decision
     feature: audit
@@ -711,7 +787,8 @@ records:
     schema: work/event
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       subscribes:
         - fr.audit.log.append
@@ -730,7 +807,8 @@ records:
     schema: work/event
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - fr.task.delete
@@ -772,7 +850,8 @@ records:
     schema: work/functional-requirement
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   fr.login.sign-in:
     schema: work/functional-requirement
     feature: login
@@ -830,6 +909,16 @@ records:
     usedBy:
       refs:
         - ui.notify.preferences
+  fr.observability.probes:
+    schema: work/functional-requirement
+    feature: observability
+    state: done
+    effectiveState: done
+  fr.observability.request-logging:
+    schema: work/functional-requirement
+    feature: observability
+    state: done
+    effectiveState: done
   fr.plan.downgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1045,7 +1134,8 @@ records:
     schema: work/functional-requirement
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - event.task.created
@@ -1078,6 +1168,21 @@ records:
     feature: task
     state: todo
     effectiveState: todo
+  fr.upload.attach:
+    schema: work/functional-requirement
+    feature: upload
+    state: done
+    effectiveState: done
+  fr.upload.intake:
+    schema: work/functional-requirement
+    feature: upload
+    state: done
+    effectiveState: done
+  fr.upload.manage:
+    schema: work/functional-requirement
+    feature: upload
+    state: done
+    effectiveState: done
   gap.audit.direction-not-drawn:
     schema: work/gap
     feature: audit
@@ -1105,11 +1210,8 @@ records:
   gap.audit.render-proof:
     schema: work/gap
     feature: audit
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - impl.audit.todo-app-frontend.privacy
+    state: done
+    effectiveState: done
   gap.audit.unbuilt-module:
     schema: work/gap
     feature: audit
@@ -1164,11 +1266,8 @@ records:
   gap.notify.render-proof:
     schema: work/gap
     feature: notify
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - impl.notify.todo-app-frontend.preferences
+    state: done
+    effectiveState: done
   gap.notify.smtp-host-unreachable:
     schema: work/gap
     feature: notify
@@ -1220,11 +1319,8 @@ records:
   gap.plan.render-proof:
     schema: work/gap
     feature: plan
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - impl.plan.todo-app-frontend.usage
+    state: done
+    effectiveState: done
   gap.plan.sepay-not-reachable:
     schema: work/gap
     feature: plan
@@ -1258,11 +1354,8 @@ records:
   gap.recur.render-proof:
     schema: work/gap
     feature: recur
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - impl.recur.todo-app-frontend.schedule
+    state: done
+    effectiveState: done
   gap.recur.unbuilt-module:
     schema: work/gap
     feature: recur
@@ -1298,11 +1391,8 @@ records:
   gap.share.render-proof:
     schema: work/gap
     feature: share
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - impl.share.todo-app-frontend.invite-screen
+    state: done
+    effectiveState: done
   gap.share.unbuilt-module:
     schema: work/gap
     feature: share
@@ -1358,30 +1448,25 @@ records:
     schema: work/implementation
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.audit.todo-app-backend.log:
     schema: work/implementation
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.audit.todo-app-backend.operator-read:
     schema: work/implementation
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.audit.todo-app-frontend.privacy:
     schema: work/implementation
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.render-proof
-        rootKind: gap
-        cyclic: false
-        because: "The render-proof wiring ran checks/render.mjs over this record's real captures and the
-          proof does not hold: all 12 PNGs fail palette-off-brand and entity-list-in-card cannot run
-          because the brand's identity family `common` has no DNA snapshot on this host - exactly
-          the absence gap.audit.render-proof names. Rev 2's reason below records the details."
+    state: done
+    effectiveState: done
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1396,104 +1481,87 @@ records:
     schema: work/implementation
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.notify.todo-app-frontend.preferences:
     schema: work/implementation
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.render-proof
-        rootKind: gap
-        cyclic: false
-        because: "The real captures under ./assets fail the canonical render checks - palette-off-brand on
-          #92b0fa (loading/saving states, ~50% of saturated pixels) and #90a4d5/#acbde7
-          (unsubscribe-link) match no declared brand token. The defect lives in the page's own
-          styles; until captures pass, the done claim is unproven."
+    state: done
+    effectiveState: done
+  impl.observability.todo-app-backend.observability:
+    schema: work/implementation
+    feature: observability
+    state: done
+    effectiveState: done
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.plan.todo-app-frontend.usage:
     schema: work/implementation
     feature: plan
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.plan.render-proof
-        rootKind: gap
-        cyclic: false
-        because: "The real captures under ./assets fail the canonical render checks - entity-list-in-card on
-          running-page (3-7 repeated starci-core-text items inside a starci-core-surface card) and
-          palette-off-brand #2a52b4 on the at-cap state. The defect lives in the page's markup and
-          styles; until captures pass, the done claim is unproven."
+    state: done
+    effectiveState: done
   impl.recur.todo-app-backend.engine:
     schema: work/implementation
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.recur.todo-app-frontend.schedule:
     schema: work/implementation
     feature: recur
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.recur.render-proof
-        rootKind: gap
-        cyclic: false
-        because: "The real captures under ./assets fail the canonical render checks - entity-list-in-card on
-          the active states (6 li items inside a starci-core-surface card) and palette-off-brand
-          #6d97ff on no-rule/refused mobile. The defect lives in the page's markup and styles; until
-          captures pass, the done claim is unproven."
+    state: done
+    effectiveState: done
   impl.share.todo-app-backend.access:
     schema: work/implementation
     feature: share
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.share.todo-app-backend.invitations:
     schema: work/implementation
     feature: share
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.share.todo-app-frontend.invite-screen:
     schema: work/implementation
     feature: share
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.share.render-proof
-        rootKind: gap
-        cyclic: false
-        because: "The real captures under ./assets fail the canonical render checks - entity-list-in-card on
-          the accepted states (3 border-(--separator) items in a ul inside starci-core-surface) and
-          palette-off-brand #97b5ff on the inviting states (~60% of saturated pixels). The defect
-          lives in the page's markup and styles; until captures pass, the done claim is unproven."
+    state: done
+    effectiveState: done
   impl.task.todo-app-backend.complete-task:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.create-task:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.delete-task:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.list:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.ownership:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.platform-database:
     schema: work/implementation
     feature: task
@@ -1508,10 +1576,16 @@ records:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.task.todo-app-frontend.task-list:
     schema: work/implementation
     feature: task
+    state: done
+    effectiveState: done
+  impl.upload.todo-app-backend.upload:
+    schema: work/implementation
+    feature: upload
     state: done
     effectiveState: done
   integration.login.keycloak:
@@ -1682,6 +1756,11 @@ records:
     feature: task
     state: todo
     effectiveState: todo
+  journey.upload.attach-a-file:
+    schema: work/customer-journey
+    feature: upload
+    state: done
+    effectiveState: done
   login:
     schema: work/feature
     feature: login
@@ -1764,6 +1843,11 @@ records:
     feature: notify
     state: null
     effectiveState: null
+  observability:
+    schema: work/feature
+    feature: observability
+    state: null
+    effectiveState: null
   plan:
     schema: work/feature
     feature: plan
@@ -1778,12 +1862,14 @@ records:
     schema: work/sds-component
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   sds.audit.log-chain:
     schema: work/sds-component
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       dependsOn:
         - sds.audit.erasure-request
@@ -1800,7 +1886,8 @@ records:
     schema: work/sds-component
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - integration.notify.queue
@@ -1856,7 +1943,8 @@ records:
     schema: work/sds-component
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - integration.recur.scheduler
@@ -1864,17 +1952,20 @@ records:
     schema: work/sds-component
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   sds.share.invitation-lifecycle:
     schema: work/sds-component
     feature: share
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   sds.task.completion-state:
     schema: work/sds-component
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
     usedBy:
       refs:
         - data.recur.occurrence
@@ -1882,7 +1973,8 @@ records:
     schema: work/sds-component
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   share:
     schema: work/feature
     feature: share
@@ -1951,6 +2043,11 @@ records:
     state: null
     effectiveState: null
   uat.login.sign-in.runs.20260919T112508Z-5c10a673:
+    schema: starci/uat-run-manifest@1
+    feature: login
+    state: null
+    effectiveState: null
+  uat.login.sign-in.runs.20260919T183145Z-5c10a673:
     schema: starci/uat-run-manifest@1
     feature: login
     state: null
@@ -2154,19 +2251,24 @@ records:
     feature: task
     state: done
     effectiveState: done
+  upload:
+    schema: work/feature
+    feature: upload
+    state: null
+    effectiveState: null
 tally:
   overall:
-    done: 143
-    todo: 33
-    stale: 1
-    blocked: 37
-    total: 214
+    done: 119
+    todo: 28
+    stale: 49
+    blocked: 32
+    total: 228
   byFeature:
     audit:
-      done: 25
-      todo: 4
-      stale: 0
-      blocked: 3
+      done: 17
+      todo: 3
+      stale: 10
+      blocked: 2
       total: 32
     login:
       done: 17
@@ -2175,35 +2277,47 @@ tally:
       blocked: 2
       total: 24
     notify:
-      done: 19
-      todo: 7
-      stale: 0
-      blocked: 7
+      done: 15
+      todo: 6
+      stale: 6
+      blocked: 6
       total: 33
+    observability:
+      done: 5
+      todo: 0
+      stale: 0
+      blocked: 0
+      total: 5
     plan:
       done: 17
-      todo: 4
-      stale: 0
-      blocked: 10
+      todo: 3
+      stale: 2
+      blocked: 9
       total: 31
     recur:
-      done: 19
-      todo: 3
-      stale: 0
-      blocked: 7
+      done: 13
+      todo: 2
+      stale: 8
+      blocked: 6
       total: 29
     share:
-      done: 19
-      todo: 3
-      stale: 0
-      blocked: 5
+      done: 14
+      todo: 2
+      stale: 7
+      blocked: 4
       total: 27
     task:
-      done: 27
+      done: 12
       todo: 7
-      stale: 1
+      stale: 16
       blocked: 3
       total: 38
+    upload:
+      done: 9
+      todo: 0
+      stale: 0
+      blocked: 0
+      total: 9
   gaps:
     - id: gap.audit.direction-not-drawn
       feature: audit
@@ -2227,7 +2341,7 @@ tally:
         - decision.audit.operator-role
     - id: gap.audit.render-proof
       feature: audit
-      state: todo
+      state: done
       closedBy:
         - impl.audit.todo-app-frontend.privacy
     - id: gap.audit.unbuilt-module
@@ -2272,7 +2386,7 @@ tally:
         - event.login.new-device-signin
     - id: gap.notify.render-proof
       feature: notify
-      state: todo
+      state: done
       closedBy:
         - impl.notify.todo-app-frontend.preferences
     - id: gap.notify.smtp-host-unreachable
@@ -2312,7 +2426,7 @@ tally:
         - nfr.plan.cap-check.latency
     - id: gap.plan.render-proof
       feature: plan
-      state: todo
+      state: done
       closedBy:
         - impl.plan.todo-app-frontend.usage
     - id: gap.plan.sepay-not-reachable
@@ -2337,7 +2451,7 @@ tally:
         - uat.recur.make-recurring
     - id: gap.recur.render-proof
       feature: recur
-      state: todo
+      state: done
       closedBy:
         - impl.recur.todo-app-frontend.schedule
     - id: gap.recur.unbuilt-module
@@ -2366,7 +2480,7 @@ tally:
         - nfr.share.revoke.read-latency
     - id: gap.share.render-proof
       feature: share
-      state: todo
+      state: done
       closedBy:
         - impl.share.todo-app-frontend.invite-screen
     - id: gap.share.unbuilt-module
@@ -2419,10 +2533,6 @@ frontier:
   - id: gap.audit.live-proof
     feature: audit
     title: No uat.verify run has produced a live run for audit.right-to-be-forgotten
-  - id: gap.audit.render-proof
-    feature: audit
-    title: The privacy captures fail the canonical render checks - impl.audit.todo-app-frontend.privacy
-      cannot claim done
   - id: contract.login.identity-for-task
     feature: login
     title: How task learns who the actor is
@@ -2448,10 +2558,6 @@ frontier:
   - id: gap.notify.new-device-event
     feature: notify
     title: login never emits a new-device sign-in signal today
-  - id: gap.notify.render-proof
-    feature: notify
-    title: The preferences captures fail the canonical render checks -
-      impl.notify.todo-app-frontend.preferences cannot claim done
   - id: gap.notify.smtp-host-unreachable
     feature: notify
     title: No dev SMTP host is declared or reachable for a live send
@@ -2467,10 +2573,6 @@ frontier:
   - id: gap.plan.no-load-harness
     feature: plan
     title: No k6 load-test harness exists to measure the cap check's latency
-  - id: gap.plan.render-proof
-    feature: plan
-    title: The usage captures fail the canonical render checks - impl.plan.todo-app-frontend.usage
-      cannot claim done
   - id: gap.plan.sepay-not-reachable
     feature: plan
     title: No live run has completed a checkout against the real SePay sandbox
@@ -2478,10 +2580,6 @@ frontier:
     feature: recur
     title: No passing uat.verify run for recur.make-recurring - the product has no occurrence-completion
       door
-  - id: gap.recur.render-proof
-    feature: recur
-    title: The schedule captures fail the canonical render checks -
-      impl.recur.todo-app-frontend.schedule cannot claim done
   - id: nfr.recur.generation.timeliness
     feature: recur
     title: A due occurrence is materialised close to its due instant
@@ -2491,10 +2589,6 @@ frontier:
   - id: gap.share.load-proof
     feature: share
     title: No k6 run has measured nfr.share.revoke.read-latency against the live stack
-  - id: gap.share.render-proof
-    feature: share
-    title: The invite-screen captures fail the canonical render checks -
-      impl.share.todo-app-frontend.invite-screen cannot claim done
   - id: contract.task.list-for-dashboard
     feature: task
     title: What a dashboard may read about a person's tasks
@@ -2724,6 +2818,18 @@ unclassifiedEdges:
   - from: impl.notify.todo-app-frontend.preferences
     field: proves
     target: ui.notify.preferences
+  - from: impl.observability.todo-app-backend.observability
+    field: proves
+    target: br.observability.access-log-shape
+  - from: impl.observability.todo-app-backend.observability
+    field: proves
+    target: br.observability.probe-answers
+  - from: impl.observability.todo-app-backend.observability
+    field: proves
+    target: fr.observability.probes
+  - from: impl.observability.todo-app-backend.observability
+    field: proves
+    target: fr.observability.request-logging
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: br.plan.active-scope
@@ -2841,6 +2947,27 @@ unclassifiedEdges:
   - from: impl.task.todo-app-frontend.task-list
     field: proves
     target: ui.task.list
+  - from: impl.upload.todo-app-backend.upload
+    field: proves
+    target: br.upload.intake
+  - from: impl.upload.todo-app-backend.upload
+    field: proves
+    target: br.upload.lifecycle
+  - from: impl.upload.todo-app-backend.upload
+    field: proves
+    target: br.upload.owned
+  - from: impl.upload.todo-app-backend.upload
+    field: proves
+    target: data.upload.upload
+  - from: impl.upload.todo-app-backend.upload
+    field: proves
+    target: fr.upload.attach
+  - from: impl.upload.todo-app-backend.upload
+    field: proves
+    target: fr.upload.intake
+  - from: impl.upload.todo-app-backend.upload
+    field: proves
+    target: fr.upload.manage
   - from: journey.audit.right-to-be-forgotten
     field: requirements
     target: fr.audit.erasure.complete
@@ -2901,6 +3028,15 @@ unclassifiedEdges:
   - from: journey.task.first-task
     field: requirements
     target: fr.task.create
+  - from: journey.upload.attach-a-file
+    field: requirements
+    target: fr.upload.attach
+  - from: journey.upload.attach-a-file
+    field: requirements
+    target: fr.upload.intake
+  - from: journey.upload.attach-a-file
+    field: requirements
+    target: fr.upload.manage
   - from: uat.audit.right-to-be-forgotten
     field: proves
     target: fr.audit.erasure.complete
@@ -3292,6 +3428,63 @@ unclassifiedEdges:
     field: files.walk.json.flow
     target: uat.login.sign-in
   - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
+    field: nodeId
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: assertions.id
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: assertions.id
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: assertions.id
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.cleanup.json.flow
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.flows.json.flow.id
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.flows.json.flow.proves
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.flows.json.flow.proves
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.flows.json.flow.proves
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.readback.json.flow
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.readback.json.notRun
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.readback.json.notRun
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.readback.json.notRun
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.run-ledger.json.flow
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.ux-checks.json.checks.id
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.ux-checks.json.checks.id
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.ux-checks.json.checks.id
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.ux-checks.json.flow
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
+    field: files.walk.json.flow
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
     field: nodeId
     target: uat.login.sign-in
   - from: uat.notify.digest-and-unsubscribe

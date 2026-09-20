@@ -1,9 +1,9 @@
 -- ============================================================================
 -- schema.sql — the ledger DB `.starciwork/runtime.sqlite` (schema
 -- `starci/ledger-db@1`, LEDGER_VERSION=1), extracted VERBATIM from
--- `.dist/kernel/ledger-db.mjs` (const LEDGER_DDL, META_TABLE_DDL,
--- EVENTS_DIGEST_TRIGGER) and cross-checked against `.dist/docs/ledger-db.md` §4
--- and `.dist/schemas/ledger-db.schema.json`.
+-- `kernel/ledger-db.mjs` (const LEDGER_DDL, META_TABLE_DDL,
+-- EVENTS_DIGEST_TRIGGER) and cross-checked against `docs/ledger-db.md` §4
+-- and `schemas/ledger-db.schema.yaml`.
 --
 -- Business frame (docs/ledger-db.md §1/§2): one SQLite file per Work-root
 -- repository owns EVERYTHING a workflow needs to continue, to be audited and to

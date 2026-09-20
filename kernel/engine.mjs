@@ -6,7 +6,7 @@ import {hasReplayableStagedResult} from './job-worker.mjs';
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {ADAPTIVE_CAPACITY,OWNER_PREFERENCE_MULTIPLIER,loadRuntimes} from './schedule.mjs';
-import {canonicalTarget} from '../model/index.mjs';
+import {canonicalTarget} from '../modules/models/index.mjs';
 import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,maxConcurrentWriters,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot,scopeMatches} from './candidate-bridge.mjs';
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
@@ -18,10 +18,8 @@ import {ENGINE_SCHEMA,hasNumberedEngineMarker,isEnrolled,kindRole,predatesEngine
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
 import {pidAlive,readLoads} from './loads.mjs';
-import {readDistJson} from '../core/runtime-root.mjs';
-
-/** The engine version is the package version: one build, one name. */
-export const ENGINE_VERSION=readDistJson('manifest.json').version;
+/** The engine version is the package version: one source tree, one name. */
+export const ENGINE_VERSION=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;
 export {ENGINE_SCHEMA,hasNumberedEngineMarker,isEnrolled,predatesEngineSchema,sealedRuntimeOf};
 export const isJobPending=error=>error?.code==='STARCI_JOB_PENDING';
 export function deferJob(result){

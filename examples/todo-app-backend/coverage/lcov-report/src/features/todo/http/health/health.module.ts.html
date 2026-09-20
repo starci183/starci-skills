@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/21</span>
+                <span class='fraction'>0/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/23</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>0/22</span>
             </div>
         
             
@@ -75,38 +75,68 @@
 <a name='L10'></a><a href='#L10'>10</a>
 <a name='L11'></a><a href='#L11'>11</a>
 <a name='L12'></a><a href='#L12'>12</a>
-<a name='L13'></a><a href='#L13'>13</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { DynamicModule, Module } from '@nestjs/common';
-import { Postgres<span class="cstat-no" title="statement not covered" >qlPrimaryModule } from '@modu<span class="fstat-no" title="function not covered" >le</span>s/platform/databases/postgresql/primary';</span>
-import { Con<span class="cstat-no" title="statement not covered" >figurableModuleCl</span>ass, <span class="cstat-no" title="statement not covered" >OPTIONS_TYPE } from './health.module-definition';</span>
-impo<span class="cstat-no" title="statement not covered" >rt { HealthController } from './health.controller';<span class="cstat-no" title="statement not covered" ></span></span>
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ></span></span></span></span>
-@Mod<span class="cstat-no" title="statement not covered" >ule({})</span>
-export class HealthModule extends ConfigurableModuleClass {
-<span class="cstat-no" title="statement not covered" >  static register(options: typeof OPTIONS_TYPE = {}): DynamicMo</span>dule {
-<span class="cstat-no" title="statement not covered" >    const base = super.register</span>(options);
-    return { ...b<span class="cstat-no" title="statement not covered" >ase, imports: [PostgresqlP</span>rimaryModule.register()], controllers: [HealthController] };
-  }<span class="cstat-no" title="statement not covered" ></span>
-}<span class="cstat-no" title="statement not covered" ></span>
-<span class="cstat-no" title="statement not covered" ></span></pre></td></tr></table></pre>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >import {</span></span></span>
+<span class="cstat-no" title="statement not covered" >    DynamicModule, Module </span>
+<span class="cstat-no" title="statement not covered" >} from "@nestjs/common"</span>
+<span class="cstat-no" title="statement not covered" >import {</span>
+<span class="cstat-no" title="statement not covered" >    ConfigurableModuleClass, OPTIONS_TYPE </span>
+<span class="cstat-no" title="statement not covered" >} from "./health.module-definition"</span>
+<span class="cstat-no" title="statement not covered" >import {</span>
+<span class="cstat-no" title="statement not covered" >    HealthController </span>
+<span class="cstat-no" title="statement not covered" >} from "./health.controller"</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >@Module({</span>
+<span class="cstat-no" title="statement not covered" >})</span>
+<span class="cstat-no" title="statement not covered" >/** Mounts HealthController beside its feature; the primary postgres module it probes is global from `app.module.ts`. */</span>
+<span class="cstat-no" title="statement not covered" >export class HealthModule extends ConfigurableModuleClass {</span>
+<span class="cstat-no" title="statement not covered" >    static register(options: typeof OPTIONS_TYPE = {</span>
+<span class="cstat-no" title="statement not covered" >    }): DynamicModule {</span>
+<span class="cstat-no" title="statement not covered" >        const base = super.register(options)</span>
+<span class="cstat-no" title="statement not covered" >        return {</span>
+<span class="cstat-no" title="statement not covered" >            ...base, controllers: [HealthController] </span>
+<span class="cstat-no" title="statement not covered" >        }</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >}</span>
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../../prettify.js"></script>
         <script>

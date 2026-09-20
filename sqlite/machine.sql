@@ -1,8 +1,8 @@
 -- ============================================================================
 -- machine.sql — the machine arbiter `%LOCALAPPDATA%/StarCi/runtime/machine.sqlite`
 -- (schema `starci/machine-db@1`, MACHINE_VERSION=1), extracted VERBATIM from
--- `.dist/kernel/ledger-db.mjs` (const MACHINE_DDL) and checked against
--- `.dist/docs/ledger-db.md` §5.
+-- `kernel/ledger-db.mjs` (const MACHINE_DDL) and checked against
+-- `docs/ledger-db.md` §5.
 --
 -- WHY A SECOND FILE (§1/§2/§6): one transaction cannot span two SQLite files, and
 -- repo fences are per-ledger — but `ai/*` provider quota and `machine:*` budgets

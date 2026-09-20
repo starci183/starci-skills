@@ -29,8 +29,7 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
   node <skill root>/bin/starci.mjs <command> --host <skill root> ...
   ```
 
-  Run `node <skill root>/scripts/ensure-build.mjs` first when `.dist` is missing or stale, because the
-  launcher and the kernel execute from `.dist`, not from source.
+  The launcher and the kernel execute from source directly; there is no build step to run first.
 - Keep the workflow id from the `workflow-goal` record (`id`, `dir`); every later command names it with
   `--id`, and `dir` is where every file you read lives.
 

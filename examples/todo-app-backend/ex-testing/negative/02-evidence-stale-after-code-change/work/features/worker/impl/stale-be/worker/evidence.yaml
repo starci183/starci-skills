@@ -1,0 +1,22 @@
+# Negative-corpus fixture: the record digest is honest (it matches this record's current bytes), but
+# the codeDigest still stamps the OLD bytes of src/worker/index.ts - the code moved after the proof.
+schema: work/evidence
+record: impl.worker.stale-be.worker
+recordDigest: 8a5769d0481d6039267661b3f40c5f3ba098f4ef3bf93dd57ca66b8cf477f1a0
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/worker/index.ts
+      sha256: 1905191e84c40cf99c7475e7f916999e012034f9c08c6d05d641561a1ca81442
+  digest: 0000000000000000000000000000000000000000000000000000000000000001
+outcome: pass
+assertions:
+  - id: suite-green-at-capture
+    command: "npm test -- worker (ran 2026-01-01, before the v2 rewrite)"
+    exit: 0
+    outcome: pass
+provenance:
+  actor: negative-corpus
+  tool: captured-then-code-moved
+  environment: local
+  capturedAt: 2026-01-01T00:00:00.000Z

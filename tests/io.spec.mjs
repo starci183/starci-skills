@@ -5,7 +5,7 @@ import {parseYaml} from '../core/yaml.mjs';
 import {RECORD_KINDS,RECORDS_SCHEMA,decisionKindFor,intakeKindFor,ioBlock,ioPayload,kindsReadingBrand,loadRecords,
   recordKindOfPath,recordReads,undeclaredWrites,validateRecords} from '../kernel/io.mjs';
 
-const read=name=>parseYaml(fs.readFileSync(new URL(`../model/${name}`,import.meta.url),'utf8'));
+const read=name=>parseYaml(fs.readFileSync(new URL(`../modules/models/${name}`,import.meta.url),'utf8'));
 const records=read('records.yaml');
 const profile=read('kinds.yaml');
 const clone=()=>structuredClone(records);
@@ -36,10 +36,9 @@ test('the record catalog is the closed list, validates, and compiles to what the
   assert.deepEqual(recordReads('runtime',{records}),['code']);
   // A runtime is a fact about a machine, recorded in the node that operates it; no path in the tree is one.
   assert.deepEqual(records.records.runtime.layout,[]);
-  const dist=new URL('../.dist/model/records.json',import.meta.url);
-  if(!fs.existsSync(dist))return;
-  assert.deepEqual(JSON.parse(fs.readFileSync(dist,'utf8')),records);
-  assert.deepEqual(loadRecords(),records,'the compiled catalog is the authored one');
+  const canon=parseYaml(fs.readFileSync(new URL('../modules/models/records.yaml',import.meta.url),'utf8'));
+  assert.deepEqual(canon,records);
+  assert.deepEqual(loadRecords(),records,'the catalog the kernel reads is the authored one');
 });
 
 test('a record catalog that is wrong is rejected with its named error, never silently repaired',()=>{

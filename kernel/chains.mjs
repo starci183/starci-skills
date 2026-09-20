@@ -1,13 +1,13 @@
 /**
  * kernel/chains.mjs — execution-chain resolution for the kernel.
  *
- * The kernel's chain logic lives here, not in `model/`: it reads the registry's
- * `operators`/`targets` through `model/index.mjs` and turns them into the
- * ordered candidates an orchestrator may launch. `model/` answers "what model";
+ * The kernel's chain logic lives here, not in `modules/models/`: it reads the registry's
+ * `operators`/`targets` through `modules/models/index.mjs` and turns them into the
+ * ordered candidates an orchestrator may launch. `modules/models/` answers "what model";
  * this module answers "which target, in what order".
  */
 
-import {registry, runtimes, normalizeRuntime, canonicalTarget, resolveModel} from '../model/index.mjs';
+import {registry, runtimes, normalizeRuntime, canonicalTarget, resolveModel} from '../modules/models/index.mjs';
 import {loadConfig} from '../scripts/config.mjs';
 
 const isPlainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -123,7 +123,7 @@ export function selectExecutionTarget({
   const attempted = new Map();
   for (const attempt of attempts) {
     const target = typeof attempt?.target === 'string' ? canonicalTarget(attempt.target) : null;
-    need(plain(attempt) && target && !attempted.has(target), 'Invalid execution attempt');
+    need(isPlainObject(attempt) && target && !attempted.has(target), 'Invalid execution attempt');
     need(
       attempt.effectState === registry.fallback.requiredEffectState,
       'Unsafe fallback after partial or unknown effects'

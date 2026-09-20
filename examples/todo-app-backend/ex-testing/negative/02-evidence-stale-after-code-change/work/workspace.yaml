@@ -1,0 +1,7 @@
+schema: work/workspace
+id: stale-app
+project: stale-app
+description: Minimal workspace for the stale-evidence negative case.
+repositories:
+  - role: be
+    name: stale-be

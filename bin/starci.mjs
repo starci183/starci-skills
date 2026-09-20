@@ -63,7 +63,7 @@ machine checks (read-only; they judge bytes, not claims):
 const args=process.argv.slice(2);
 const command=args[0]??'help';
 if (LAUNCHER_COMMANDS.includes(command)) {
-  const {main}=await import('../.dist/hosts/orca/launch.mjs');
+  const {main}=await import('../hosts/orca/launch.mjs');
   try {
     // A text view prints as text; everything else is the record it always was.
     const output=await main(args);
@@ -83,8 +83,8 @@ if (LAUNCHER_COMMANDS.includes(command)) {
   process.exitCode=result.status??1;
 } else if(command==='workspace') {
   if(args[1]!=='init') {console.error('starci: use workspace init <work-root> --id <workspace-id>');process.exitCode=1;}
-  else {const {main}=await import('../.dist/cli/main.mjs');process.exitCode=await main(args.slice(1));}
+  else {const {main}=await import('../cli/main.mjs');process.exitCode=await main(args.slice(1));}
 } else {
-  const {main}=await import('../.dist/cli/main.mjs');
+  const {main}=await import('../cli/main.mjs');
   process.exitCode=await main(args);
 }

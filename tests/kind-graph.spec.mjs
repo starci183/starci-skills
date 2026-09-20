@@ -7,12 +7,12 @@ import {BLOCKERS,CAPABILITIES,KINDS,KIND_GRAPH,LANE_BUILD,OUTCOMES,RECORDS,SAME,
   predicatesOf,readsOf,reportsOf,roleOf,routeFor,routeList,validateGraph,writesOf} from '../kernel/graph.mjs';
 import {RECORD_KINDS} from '../kernel/io.mjs';
 
-const read=name=>parseYaml(fs.readFileSync(new URL(`../model/${name}`,import.meta.url),'utf8'));
+const read=name=>parseYaml(fs.readFileSync(new URL(`../modules/models/${name}`,import.meta.url),'utf8'));
 const profile=read('kinds.yaml');
 const runtimes=read('runtimes.yaml');
 const records=read('records.yaml');
-const operators=fs.readdirSync(new URL('../ops/',import.meta.url),{withFileTypes:true})
-  .filter(entry=>entry.isDirectory()).map(entry=>entry.name);
+const operators=fs.readdirSync(new URL('../legacy/ops/',import.meta.url),{withFileTypes:true})
+  .filter(entry=>entry.isDirectory()&&fs.existsSync(new URL(`../legacy/ops/${entry.name}/operator.yaml`,import.meta.url))).map(entry=>entry.name);
 const codes=errors=>errors.map(error=>error.code);
 const clone=()=>structuredClone(profile);
 // The shipped runtime profile still keys `roleOfKind` by names the catalog does not declare
@@ -434,16 +434,14 @@ test('an invalid profile is rejected with a named error, never silently repaired
   assert.throws(()=>roleOf('frontend.build',{profile}),/Unknown operation kind/);
 });
 
-test('the compiled profile is the one the kernel will read at run time',()=>{
-  const dist=new URL('../.dist/model/kinds.json',import.meta.url);
-  if(!fs.existsSync(dist))return;
-  const compiled=JSON.parse(fs.readFileSync(dist,'utf8'));
-  assert.deepEqual(compiled,profile);
-  assert.deepEqual(validateGraph(compiled,{runtimes:allocatable,operators,records}),[]);
+test('the canonical profile is the one the kernel reads at run time',()=>{
+  const canon=parseYaml(fs.readFileSync(new URL('../modules/models/kinds.yaml',import.meta.url),'utf8'));
+  assert.deepEqual(canon,profile);
+  assert.deepEqual(validateGraph(canon,{runtimes:allocatable,operators,records}),[]);
 });
 
 test('every kind declares what it reads and what it produces, over the one record catalog',()=>{
-  // The vocabulary for both lists is `model/records.yaml`; the profile does not keep a second copy of it.
+  // The vocabulary for both lists is `modules/models/records.yaml`; the profile does not keep a second copy of it.
   assert.deepEqual([...RECORDS],[...RECORD_KINDS]);
   assert.equal(Object.hasOwn(profile.vocabularies,'mutates'),false,'`mutates` was replaced by reads and writes');
   for(const kind of KINDS){

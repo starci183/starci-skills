@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 const skillRoot = path.resolve(import.meta.dirname, '..');
 const checkerFile = path.join(skillRoot, 'scripts', 'checks', 'check-json-exceptions.mjs');
 const allowlistFile = path.join(skillRoot, 'schemas', 'json-exceptions.yaml');
-const offenderFixture = path.join(import.meta.dirname, 'fixtures', 'yaml-dist', 'json-exceptions-offender');
+const offenderFixture = path.join(skillRoot, 'legacy', 'builders', 'tests', 'fixtures', 'yaml-dist', 'json-exceptions-offender');
 
 assert.equal(fs.existsSync(checkerFile), true, 'scripts/checks/check-json-exceptions.mjs is required');
 assert.equal(fs.existsSync(allowlistFile), true, 'schemas/json-exceptions.yaml is required');

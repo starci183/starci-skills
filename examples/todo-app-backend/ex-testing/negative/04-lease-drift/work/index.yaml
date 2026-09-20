@@ -1,0 +1,7 @@
+schema: work/catalog
+id: lease-case
+description: Negative-corpus fixture tree - a uat flow whose run ledgers disagree.
+features:
+  - id: lease
+    directory: features/lease
+    description: Lease drift feature

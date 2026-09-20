@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">81.81% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>18/22</span>
+                <span class='fraction'>14/21</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.62% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>17/29</span>
+                <span class='fraction'>6/9</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.75% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>15/16</span>
+                <span class='fraction'>14/21</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -79,38 +79,53 @@
 <a name='L14'></a><a href='#L14'>14</a>
 <a name='L15'></a><a href='#L15'>15</a>
 <a name='L16'></a><a href='#L16'>16</a>
-<a name='L17'></a><a href='#L17'>17</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span></td><td class="text"><pre class="prettyprint lang-js">import { Field, InputType } from '@nestjs/graphql';
-import { IsEmail, IsString, MinLength } from 'class-validator';
-<span class="branch-0 cbranch-no" title="branch not covered" ></span>
-/** transport/graphql boundary representation for signIn - a runtime-validated class, not an interface,
- * becaus<span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>e class-valid<span class="cstat-no" title="statement not covered" >ator's decorators need</span> real runtime <span class="cstat-no" title="statement not covered" >metadata to enforce any<span class="cstat-no" title="statement not covered" >thing at all. */</span></span></span>
-@InputType()<span class="branch-2 cbranch-no" title="branch not covered" ></span>
-export class SignInInput {
-  @Field()
-  @I<span class="missing-if-branch" title="else path not taken" >E</span>sEmail()
-  email!: string;
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Field, InputType 
+} from "@nestjs/graphql"
+import {
+    IsEmail, IsString, MinLength 
+} from "class-validator"
 &nbsp;
+/** transport/graphql boundary representati<span class="branch-0 cbranch-no" title="branch not covered" >on for signIn - a runtime-validated class, not an inte</span>rface,
+ * because class-validator's decorators need real runtime metadata to enforce anything at all. */
+@InputType()
+/** signIn's credentials<span class="branch-0 cbranch-no" title="branch not covered" >: account email and password, validated at the transport boundary. */</span>
+<span class="cstat-no" title="statement not covered" >export class SignInInput {</span>
+<span class="cstat-no" title="statement not covered" >  @Field()</span>
+<span class="cstat-no" title="statement not covered" >  @IsEmail()</span>
+<span class="cstat-no" title="statement not covered" >      email!: string</span>
+<span class="cstat-no" title="statement not covered" ></span>
   @Field()
   @IsString()
-  @MinLength(1)
-  password!: string;
-}
+  @Min<span class="branch-0 cbranch-no" title="branch not covered" >Length(1)</span>
+<span class="cstat-no" title="statement not covered" >      password!: string</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -118,7 +133,7 @@ export class SignInInput {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../../../../../prettify.js"></script>
         <script>

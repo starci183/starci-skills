@@ -18,9 +18,9 @@ import { parseYaml, stringifyYaml } from '../../core/yaml.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
-// Engines in ops/*.mjs stay executable elsewhere; the registry only names their
+// Engines in legacy/ops/*.mjs stay executable elsewhere; the registry only names their
 // role so an agent knows the catalog is declarative and where the machinery is.
-// Source: .claude/ops/*.mjs file headers + tinkle-1 brief.
+// Source: legacy/ops/*.mjs file headers + tinkle-1 brief.
 const ENGINES = {
   'basic-ops.mjs': 'shared operator plumbing helpers used by the contracts below',
   'contracts.mjs': 'builds the typed request/response contract each op executes under',
@@ -127,7 +127,7 @@ function main() {
   entries.sort((a, b) => a.id.localeCompare(b.id));
 
   // Engines section: warn when an ops/*.mjs exists that is not described.
-  const opsSourceDir = path.join(skillRoot, 'ops');
+  const opsSourceDir = path.join(skillRoot, 'legacy', 'ops');
   const engines = {};
   if (fs.existsSync(opsSourceDir)) {
     for (const f of fs.readdirSync(opsSourceDir).filter(f => f.endsWith('.mjs')).sort()) {
@@ -140,10 +140,10 @@ function main() {
     schema: 'starci/module-ops-registry@1',
     generatedBy: 'scripts/route/build-ops-registry.mjs',
     origin: {
-      canonicalRegistry: '.claude/ops/registry.yaml',
-      commonDocument: '.claude/ops/common.yaml',
-      perOpSources: 'modules/ops/ops/<id>.yaml (verbatim operator.yaml port + business: block + route: block)',
-      note: 'modules/ is a parallel read-model for agents; .claude/ops/ stays authoritative and untouched.',
+      canonicalRegistry: '.claude/modules/ops/registry.yaml (this generated file)',
+      commonDocument: '.claude/legacy/ops/common.yaml',
+      perOpSources: 'modules/ops/ops/<id>.yaml (authored operator contract + business: block + route: block)',
+      note: 'modules/ops is the authored operator source; legacy/ops/ keeps the retired pre-module engines and sources.',
     },
     stages: STAGES,
     coarsePhases: COARSE,

@@ -33,7 +33,7 @@ For implementation, backend changes must establish API/unit/E2E evidence before 
 | Requests, receipts and delivery | `workflows/lifecycle.mjs` |
 | Durable metadata and proof | `core/`, `schemas/` |
 | Domain execution constraints | `ops/<operator>/operator.yaml` |
-| Generated agent-facing contracts | `.dist/` |
+| Agent-facing contracts | authored YAML under `modules/`, `schemas/` and `workflows/` |
 
 The CLI exposes local setup, inspection and validation. It is not a headless autonomous agent runner. Existing `work/*` wire IDs are retained, while the public product and command are StarCi.
 

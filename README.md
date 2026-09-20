@@ -16,7 +16,9 @@ StarCi provides:
 
 StarCi is a local supervised delivery system. Its deterministic kernel owns workflow state, authority, evidence and effects; bounded model functions choose only kernel-offered actions, and operation agents execute one approved contract at a time. Provider access comes from configured local agent hosts rather than a StarCi API key.
 
-**StarCi 1.0:** open source under MIT, not yet published to npm · **Requirements:** Node.js 22.13+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
+**StarCi `1.0.0-alpha.1`** (see `VERSION`): open source under MIT, not yet published to npm · **Requirements:** Node.js 22.13+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
+
+**Alpha status:** this tree is the canonical distless layout — the runtime reads `kernel/`, `modules/`, `schemas/*.yaml`, `scripts/{checks,route}/` and `docs/` sources directly; there is no `.dist` build. Drafts and experiments live under [.experiments/](.experiments/README.md) and are not part of the official contract until promoted (see [.experiments/OPENSOURCE-GOAL.md](.experiments/OPENSOURCE-GOAL.md) for the 1.0.0 release bar). The operating model is one long-lived `[Kernel]` agent per project dispatching one ephemeral `[Op]` agent per operation; chat is the trigger only.
 
 [Quick start](#quick-start) · [First project](#first-project) · [Execution modes](#execution-modes) · [CLI](#cli) · [Documentation](#documentation)
 
@@ -30,7 +32,6 @@ Clone the repository into a tooling directory, separate from the host you want t
 git clone https://github.com/starci183/starci-skills.git
 cd starci-skills
 npm ci
-npm run build
 node bin/starci.mjs init --dir /absolute/path/to/agent-host
 node bin/starci.mjs doctor --dir /absolute/path/to/agent-host --quick
 ```
@@ -42,7 +43,7 @@ node bin/starci.mjs init --dir "D:/Projects/agent-host"
 node bin/starci.mjs doctor --dir "D:/Projects/agent-host" --quick
 ```
 
-Start with an empty test host. The installer writes **source** into `.claude`, builds and verifies local `.dist`, then records the install manifest only after that check succeeds. It adds managed bootstrap sections to `AGENTS.md` and `CLAUDE.md`, preserves custom instructions and refuses conflicting bootstrap protocols. It does **not** install global skills, create your business requirements or change frontend source. See [runtime distribution](docs/runtime-distribution.md).
+Start with an empty test host. The installer writes the canonical **source** tree into `.claude` — no build step, the runtime reads it directly — then verifies the install and records the install manifest only after that check succeeds. It adds managed bootstrap sections to `AGENTS.md` and `CLAUDE.md`, preserves custom instructions and refuses conflicting bootstrap protocols. It does **not** install global skills, create your business requirements or change frontend source. See [runtime distribution](docs/runtime-distribution.md).
 
 ### Install an archive with npx
 
@@ -153,12 +154,13 @@ The runtime is laid out by concept, one folder per concern:
 
 | folder | holds |
 | --- | --- |
-| `model/` | the declared data the runtime runs on — record kinds, operation kinds, hosts, runtimes, the registry; no code |
+| `modules/` | the declared data the runtime runs on — record kinds, operation manifests (`modules/ops/ops/*.yaml`), model selection rules, hosts, runtimes, the generated registry; pure YAML, no code |
 | `kernel/` | the control loop, split by the reason each file exists |
 | `hosts/` | the host model as data, and the two adapters behind one call surface |
 | `models/` | the model functions and their headless providers |
 | `scripts/checks/` | machine checks over bytes — the brand record, a drawing's capture and markup, a proof bundle |
-| `ops/` | one operator contract per operation kind |
+| `scripts/route/` | deterministic selection — `route-op.mjs`/`route-model.mjs` resolve the `route:` keys and rules declared in `modules/` |
+| `legacy/` | superseded trees (the old `ops/` operator dirs and `model/` catalog) kept for recovery; nothing live reads it |
 
 **One command line.** Everything is `node <host>/.claude/bin/starci.mjs <command>`; no instruction ever names a module path inside the runtime.
 
@@ -189,7 +191,7 @@ Public branding and command: **StarCi / `starci`**, not `work`. Internal `work/*
 
 ## Updating and migrating
 
-Use `starci update --dir <host>` from a reviewed build, then run `doctor`. Update rebuilds and verifies `.dist` before recording the new version; a failed build does not claim success. Do not use `--force` as a routine update strategy: review local changes and back up first. A runtime update does not migrate product data. Interrupted install recovery is in [runtime distribution](docs/runtime-distribution.md).
+Use `starci update --dir <host>` from a reviewed tree, then run `doctor`. Update verifies the installed source tree before recording the new version; a failed verification does not claim success. Do not use `--force` as a routine update strategy: review local changes and back up first. A runtime update does not migrate product data. Interrupted install recovery is in [runtime distribution](docs/runtime-distribution.md).
 
 For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp` state belongs inside `.starciwork/_local`. Stop concurrent writers, back up, preserve receipt bytes, migrate bindings and validate before resuming. Renaming a directory does not transfer an old approval to a new absolute path. Follow the [migration guide](docs/migration.md); do not delete unfinished plans as temporary junk.
 
@@ -206,7 +208,7 @@ For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp
 ## Documentation
 
 - [Install, update, bind and troubleshoot](docs/installation.md)
-- [Source-built `.dist` install and recovery](docs/runtime-distribution.md)
+- [Source install and recovery](docs/runtime-distribution.md)
 - [Architecture and delivery lifecycle](docs/architecture.md)
 - [Directory rename and legacy compatibility](docs/migration.md)
 - [CLI reference](docs/cli.md)
@@ -217,33 +219,30 @@ For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp
 - [The workflow kernel](docs/workflow-kernel.md) · [operation kinds, lanes and routes](docs/kinds.md) · [running a workflow from a chat](docs/workflow-chat.md)
 - [What an operator of an installed runtime must do after an update](upgrades/index.yaml)
 - [The todo-app standard: how to read `examples/todo-app-backend` and `examples/todo-app-frontend`](docs/examples/todo-app-standard.md)
-- [Todo-app grit ledger: where the runtime lied, blocked legitimate code, or had no home for a real need](docs/examples/todo-app-grit.md)
+- [Todo-app grit ledger: where the runtime lied, blocked legitimate code, or had no home for a real need](legacy/docs/examples/todo-app-grit.md)
 
-Agent instructions live in [SKILL.md](SKILL.md); humans do not need to preload the entire knowledge catalog. Runtime maintenance rules live in [UPDATE.json](UPDATE.json). [README.json](README.json) is a machine-readable summary, not the user guide.
+Agent instructions live in [SKILL.md](SKILL.md); humans do not need to preload the entire knowledge catalog. Runtime maintenance rules live in [UPDATE.yaml](UPDATE.yaml). [README.yaml](README.yaml) is a machine-readable summary, not the user guide.
 
-## Knowledge sources versus `.dist`
+## Canonical sources — no `.dist`
 
-Development references under `knowledge/` are authored primarily as YAML (`schema: starci/knowledge-source@1` and example manifests). Multi-file TypeScript examples live beside their `index.yaml`. The compiler writes agent-facing JSON under `.dist/knowledge/`, mapping `index.yaml` → `INDEX.json` and keeping stable public names such as `knowledge/coding-reference.json` for operator references and `SKILL.md`.
+Development references under `knowledge/` are authored primarily as YAML (`schema: starci/knowledge-source@1` and example manifests). Multi-file TypeScript examples live beside their `index.yaml`. The YAML is what agents read — names such as `knowledge/coding-reference.yaml` are the canonical references used by operators and `SKILL.md`.
 
-Declarative sources use YAML; duplicate JSON/YAML authority is rejected. Only explicitly allowlisted, format-required JSON remains. Do not hand-edit `.dist`. Packages exclude `.dist`; install/update and `node scripts/ensure-build.mjs` build it. Runtime CLI, contracts, knowledge and supporting documentation resolve from `.dist`. See [knowledge YAML authoring](docs/knowledge-yaml.md) and [runtime distribution](docs/runtime-distribution.md).
+Declarative sources use YAML; duplicate JSON/YAML authority is rejected. Only explicitly allowlisted, format-required JSON remains. There is no `.dist` tree and no build step: runtime CLI, contracts, knowledge and documentation resolve the source files in this repository directly. See [knowledge YAML authoring](docs/knowledge-yaml.md) and [runtime distribution](docs/runtime-distribution.md).
 
 Browser workflows require a working browser runner, not bundled browser binaries. Follow [browser setup](docs/browser-testing.md). Business/Architecture and backend-only workflows do not require a browser installation.
 
 ## Contributing
 
-Read [UPDATE.json](UPDATE.json) before changing runtime contracts. Update each contract and its consumers together, preserve unrelated edits and add regression tests for both valid behavior and rejected unsafe cases.
+Read [UPDATE.yaml](UPDATE.yaml) before changing runtime contracts. Update each contract and its consumers together, preserve unrelated edits and add regression tests for both valid behavior and rejected unsafe cases.
 
 ```sh
 npm ci
-node scripts/compile-knowledge.mjs
-npm run build
 npm test
-node scripts/compile-knowledge.mjs --check
-npm run build:check
-node scripts/ensure-build.mjs
+node scripts/checks/check-example-yaml.mjs
+node scripts/checks/check-example-work.mjs
 ```
 
-For documentation sites, install their build dependencies and follow [the release guide](docs/releasing.md). Verify the packaged runtime in an isolated host before distribution. Generated `.dist` files should come from the build, not manual edits. Never include project records, local configuration, credentials, `worktrees/` or site caches in a package, and never `git add -f` `.dist`.
+For documentation sites, install their build dependencies and follow [the release guide](docs/releasing.md). Verify the packaged runtime in an isolated host before distribution. Never include project records, local configuration, credentials, `worktrees/` or site caches in a package.
 
 ## Limits
 

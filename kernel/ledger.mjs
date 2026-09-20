@@ -873,7 +873,7 @@ const canonical=value=>{
 };
 
 /**
- * The digest of the rules an operation of this kind is held to: its `model/kinds.yaml` entry, its operator
+ * The digest of the rules an operation of this kind is held to: its `modules/models/kinds.yaml` entry, its operator
  * contract and the validator rules that judge it. The kernel supplies all three - this module owns only the
  * canonical form, so a digest written today and a digest computed tomorrow compare byte for byte.
  */

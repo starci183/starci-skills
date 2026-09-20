@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {readDistJson} from '../../core/runtime-root.mjs';
+import {skillRoot} from '../../core/runtime-root.mjs';
+import {parseYaml} from '../../core/yaml.mjs';
 import {resolveExecutionChain} from '../../kernel/chains.mjs';
 import {createOrcaCalls,defaultOrcaExecutable,getPath} from './calls.mjs';
 import {HOST_ENV,createHeadlessHost,headlessRoot} from '../headless/host.mjs';
@@ -116,8 +117,14 @@ function worktreeMatches(workerShow,expectedPath){
   return normalize(actual)===normalize(expectedPath)?{ok:true}:{ok:false,reason:`Worker worktree mismatch: expected ${expectedPath}, received ${actual}`};
 }
 
-/** Supervisor chains come from model/registry.json; every candidate must be a managed agent. */
-export function resolveSupervisorChain(role,registry=readDistJson('model','registry.json')){
+// Distless: authored YAML is the contract. `model/*.json` became `modules/models/*.yaml`;
+// provider adapters stay under `providers/orca/adapters/*.yaml`.
+const modelYaml=name=>{if(!/^[a-z0-9._-]+$/i.test(name))throw Error(`Invalid model record name: ${name}`);return parseYaml(fs.readFileSync(path.join(skillRoot,'modules','models',`${name}.yaml`),'utf8'));};
+const registryYaml=()=>modelYaml('registry');
+const orcaAdapterYaml=name=>{if(!/^[a-z0-9._-]+$/i.test(name))throw Error(`Invalid Orca adapter name: ${name}`);return parseYaml(fs.readFileSync(path.join(skillRoot,'providers','orca','adapters',`${name}.yaml`),'utf8'));};
+
+/** Supervisor chains come from modules/models/registry.yaml; every candidate must be a managed agent. */
+export function resolveSupervisorChain(role,registry=registryYaml()){
   const chain=registry?.supervisors?.[role]?.chain;
   need(Array.isArray(chain)&&chain.length,`Supervisor chain is missing for ${role}`);
   const effort=registry.supervisors[role].effort??null;
@@ -126,14 +133,14 @@ export function resolveSupervisorChain(role,registry=readDistJson('model','regis
     need(plain(route)&&route.orcaLaunch?.kind==='managed-agent',`Supervisor target must be a managed agent: ${target}`);
     const runtime=registry.aliases?.[route.runtime]??route.runtime;
     const profileId=route.profiles?.working??route.profiles?.reasoning;
-    const profile=readDistJson('model',`${runtime}.json`).profiles?.[profileId];
+    const profile=modelYaml(runtime).profiles?.[profileId];
     need(plain(profile),`Unknown supervisor profile: ${target}`);
     return {priority,target,runtime,profile:profileId,model:profile.model??route.requestedModel??null,effort:profile.model||route.requestedModel?effort:null,orcaLaunch:structuredClone(route.orcaLaunch)};
   });
 }
 
 /** Parse `--skip target:reason[,target:reason]` into registry-allowed no-effect attempts. */
-export function parseSkip(value,chain,registry=readDistJson('model','registry.json')){
+export function parseSkip(value,chain,registry=registryYaml()){
   if(value===undefined||value===null||value==='')return [];
   const allowed=registry.fallback.allowedReasons;
   return String(value).split(',').filter(Boolean).map(entry=>{
@@ -462,7 +469,7 @@ export function notifyTerminal(orca,{cwd,terminal,file,text,wait=sleepSync}){
 /** Command-terminal launch: one terminal per attempt, Task delivered by dispatch --return-preamble + terminal send. */
 function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,wait=sleepSync}){
   const adapterName=required(candidate.selection?.orcaLaunch?.adapter,'command-terminal adapter');
-  const adapter=readDistJson('providers','orca','adapters',`${adapterName}.json`);
+  const adapter=orcaAdapterYaml(adapterName);
   const prefixContract=adapter.commandPrefix??adapter.credentialRefresh??{};
   const prefix=process.platform==='win32'?(prefixContract.win32??''):(prefixContract.posix??'');
   const created=orca.invoke('terminal-create',{...candidate.terminalParams,command:`${prefix}${candidate.terminalParams.command}`},{cwd});
@@ -714,7 +721,7 @@ export function startOperation(input,{orca=createOrcaCalls(),wait,candidates=nul
  */
 function usage(){return `Usage (the one command line; <skill root> is the installed .claude directory):
   node <skill root>/bin/starci.mjs <command> ... - and the same command run directly is
-  node <skill root>/.dist/hosts/orca/launch.mjs <command> ...
+  node <skill root>/hosts/orca/launch.mjs <command> ...
 
   node bin/starci.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--skip <target:reason[,target:reason]>] [--dry-run]
     --skip records a Monitor-verified no-effect failure for a chain target (reason from registry fallback.allowedReasons) so the chain starts at the next candidate
@@ -813,7 +820,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   Every command accepts --host-adapter orca|headless (default orca; headless when STARCI_HOST=headless). The
   headless host runs the same kernel without Orca: operations are one-at-a-time claude -p / codex exec
   processes in the worktree, reports reach the kernel through a mailbox file, and a kind that needs a host
-  capability the headless host lacks (interface.asset needs design-tool, which model/hosts.yaml declares only
+  capability the headless host lacks (interface.asset needs design-tool, which modules/models/hosts.yaml declares only
   for the Orca host) is refused as host-unsupported.`;}
 
 const KERNEL_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-tail','workflow-ops','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];

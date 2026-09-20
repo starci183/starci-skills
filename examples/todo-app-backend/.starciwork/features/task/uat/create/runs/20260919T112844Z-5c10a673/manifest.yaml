@@ -7,12 +7,14 @@ assertions:
   - id: fr.task.create
     expected: yes
     observed: yes
-    note: The created task's own title (uat-20260919T112844Z-5c10a673-task) appears in the owner's list.
+    note: The created task's own title (uat-20260919T112844Z-5c10a673-task) appears
+      in the owner's list.
   - id: br.task.single-owner
     expected: yes
     observed: yes
-    note: The stranger's task list has no row for "uat-20260919T112844Z-5c10a673-task", so no delete
-      affordance for it exists to click.
+    note: The stranger's task list has no row for
+      "uat-20260919T112844Z-5c10a673-task", so no delete affordance for it
+      exists to click.
 assets:
   - path: screens/owner-signed-in.png
     sha256: 4fc84318865a53c0f1b5073ce5dffb3836201fbc3a880466f5840bdd4b720d01
@@ -46,7 +48,8 @@ files:
     ownedResourcesCreated:
       - kind: task
         id: uat-20260919T112844Z-5c10a673-task
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
     ownedResourcesDeleted:
       - kind: task
         id: uat-20260919T112844Z-5c10a673-task
@@ -54,19 +57,51 @@ files:
     verifiedAbsent:
       - kind: task
         id: uat-20260919T112844Z-5c10a673-task
-        note: The title resolves to zero elements in the re-read owner list after the confirmed delete.
-    note: Every run-owned resource this run created was deleted and its absence verified by read-back.
+        note: The title resolves to zero elements in the re-read owner list after the
+          confirmed delete.
+    note: Every run-owned resource this run created was deleted and its absence
+      verified by read-back.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.task.create
       title: Create a task, and fail to delete somebody else's
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: owner
+          action: Sign in as the owner.
+          expected: the task list loads
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: owner
+          action: Create a task with a title.
+          expected: the task is created and appears in the list
+          checks:
+            - id: completion
+              expected: yes
+            - id: validation
+              expected: no
+        - order: 3
+          actor: owner
+          action: Read the list.
+          expected: exactly that one task is shown
+          checks: []
+        - order: 4
+          actor: stranger
+          action: Sign in as the stranger and attempt to delete it.
+          expected: the delete is refused
+          checks:
+            - id: errorFeedback
+              expected: yes
+        - order: 5
+          actor: owner
+          action: Read the owner's list again.
+          expected: the task is still present, unchanged
+          checks: []
       proves:
         - fr.task.create
         - br.task.single-owner
@@ -92,7 +127,8 @@ files:
     created:
       - kind: task
         id: uat-20260919T112844Z-5c10a673-task
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
   ux-checks.json:
     schema: starci/uat-ux-checks@1
     flow: uat.task.create
@@ -100,12 +136,14 @@ files:
       - id: fr.task.create
         expected: yes
         observed: yes
-        note: The created task's own title (uat-20260919T112844Z-5c10a673-task) appears in the owner's list.
+        note: The created task's own title (uat-20260919T112844Z-5c10a673-task) appears
+          in the owner's list.
       - id: br.task.single-owner
         expected: yes
         observed: yes
-        note: The stranger's task list has no row for "uat-20260919T112844Z-5c10a673-task", so no delete
-          affordance for it exists to click.
+        note: The stranger's task list has no row for
+          "uat-20260919T112844Z-5c10a673-task", so no delete affordance for it
+          exists to click.
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.task.create

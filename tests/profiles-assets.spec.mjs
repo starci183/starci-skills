@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../kernel/chains.mjs';
-import {readPublicJson} from './helpers/read-public.mjs';
+import {resolveExecutionChain,selectExecutionTarget} from '../kernel/chains.mjs';
+import {resolveModel as selectProfile} from '../modules/models/index.mjs';
+import {readPublicJson,readModel} from './helpers/read-public.mjs';
 import {validateAssets} from '../contracts/assets.mjs';
+import fs from 'node:fs';
+import {parseYaml} from '../core/yaml.mjs';
 
 const qwenLaunch={kind:'command-terminal',command:'qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false',dispatch:'return-preamble-and-send',adapter:'qwen',nestedAgents:'forbidden'};
 
@@ -30,7 +33,7 @@ test('active roles select Codex, Claude, Qwen or explicitly admitted Devin witho
   assert.throws(()=>selectProfile({runtime:'unknown',op:'interface.implement'}));
 });
 test('every operator has an ordered external-agent chain and skill-level defaults remain usable',()=>{
-  const registry=readPublicJson('model/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
+  const registry=readModel('registry'),ops=parseYaml(fs.readFileSync(new URL('../modules/ops/registry.yaml',import.meta.url),'utf8')).ops.map(x=>x.id);
   assert.equal(registry.schema,'starci/profile-registry@3');
   assert.deepEqual(registry.agentArchitecture.levels,['user-coordinator','workflow-kernel','operation-agent']);
   assert.equal(registry.agentArchitecture.isolationBoundary,'operation');
@@ -166,7 +169,7 @@ test('general execution runs the Qwen/Devin/Claude/Codex pool order; the Codex p
   // Fable first, then the Codex pool's reasoning model, then the downgrade each of them has: the Claude pool.
   assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable','codex-agent','claude-agent']);
   assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable','codex-agent','claude-agent']);
-  const ops=Object.keys(readPublicJson('model/registry.json').operators);
+  const ops=Object.keys(readModel('registry').operators);
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;
     assert.ok(!chain.some(candidate=>['qwen3.8-max','deepseek-v4-pro'].includes(candidate.model)),op);

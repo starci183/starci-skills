@@ -7,45 +7,51 @@ assertions:
   - id: fr.recur.make-recurring
     expected: yes
     observed: yes
-    note: The weekday/09:00 form submission created rule e48d3b93-13aa-469c-8ae0-2db3502e50f2 and the
-      screen moved to the active state ("Repeats every weekday at 09:00 ... starting 2026-09-18")
-      with an End rule action.
+    note: The weekday/09:00 form submission created rule
+      e48d3b93-13aa-469c-8ae0-2db3502e50f2 and the screen moved to the active
+      state ("Repeats every weekday at 09:00 ... starting 2026-09-18") with an
+      End rule action.
   - id: fr.recur.see-upcoming
     expected: yes
     observed: yes
-    note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21, 2026-09-22, 2026-09-23,
-      2026-09-24, 2026-09-25, 2026-09-28, 2026-09-29, 2026-09-30, 2026-10-01, 2026-10-02); none of
-      them is a Saturday or Sunday.
+    note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21,
+      2026-09-22, 2026-09-23, 2026-09-24, 2026-09-25, 2026-09-28, 2026-09-29,
+      2026-09-30, 2026-10-01, 2026-10-02); none of them is a Saturday or Sunday.
   - id: br.recur.occurrence.owned-by-rule-owner
     expected: yes
     observed: no
-    note: "Step 5 of this record (\"complete that occurrence ... its status becomes completed\") has no
-      door in the served product: the schedule screen's occurrence rows are read-only
-      (StaticStateRow, no action), the public GraphQL schema registers no
-      completeOccurrence/skipOccurrence mutation (OccurrenceService.complete exists but is internal
-      CQRS only), and completing the occurrence's backing task row through the task list set
-      tasks.complete yet left the occurrence's own status reading \"materialised\" on this ended
-      screen - the app cannot produce the designed outcome."
+    note: "Step 5 of this record (\"complete that occurrence ... its status becomes
+      completed\") has no door in the served product: the schedule screen's
+      occurrence rows are read-only (StaticStateRow, no action), the public
+      GraphQL schema registers no completeOccurrence/skipOccurrence mutation
+      (OccurrenceService.complete exists but is internal CQRS only), and
+      completing the occurrence's backing task row through the task list set
+      tasks.complete yet left the occurrence's own status reading
+      \"materialised\" on this ended screen - the app cannot produce the
+      designed outcome."
   - id: br.recur.ending.preserves-history
     expected: yes
     observed: yes
-    note: 'After ending, the upcoming card kept all 1 materialised row(s) (status shown: materialised)
-      and shows no preview ("Nothing upcoming" + the ended note). The completed/skipped-preservation
-      half of the rule stays unproven here because no completed occurrence could be produced - see
-      the missing complete door above.'
+    note: 'After ending, the upcoming card kept all 1 materialised row(s) (status
+      shown: materialised) and shows no preview ("Nothing upcoming" + the ended
+      note). The completed/skipped-preservation half of the rule stays unproven
+      here because no completed occurrence could be produced - see the missing
+      complete door above.'
   - id: br.recur.generation.once
     expected: yes
     observed: yes
-    note: 1 occurrence(s) materialised for the covered window; a re-read across the next tick boundary
-      still shows exactly 1 row(s) for rule e48d3b93-13aa-469c-8ae0-2db3502e50f2 - no second
-      occurrence was written for any already-covered date.
+    note: 1 occurrence(s) materialised for the covered window; a re-read across the
+      next tick boundary still shows exactly 1 row(s) for rule
+      e48d3b93-13aa-469c-8ae0-2db3502e50f2 - no second occurrence was written
+      for any already-covered date.
   - id: fr.recur.end-rule
     expected: yes
     observed: yes
-    note: The rule ended through the screen's own two-step confirm; endRecurrence's response named rule
-      e48d3b93-13aa-469c-8ae0-2db3502e50f2 (this run's rule); the ended state shows no preview
-      ("Nothing upcoming" + the ended note) and the post-boundary re-read returned 1 materialised
-      row(s), preview 0 - nothing dated after the end day was generated in-window.
+    note: The rule ended through the screen's own two-step confirm; endRecurrence's
+      response named rule e48d3b93-13aa-469c-8ae0-2db3502e50f2 (this run's
+      rule); the ended state shows no preview ("Nothing upcoming" + the ended
+      note) and the post-boundary re-read returned 1 materialised row(s),
+      preview 0 - nothing dated after the end day was generated in-window.
 assets:
   - path: screens/owner-signed-in.png
     sha256: 069f287603fa325592bfa4aa59f81bc9463fa4a5b35e65eb3bf11012d421b7a8
@@ -97,25 +103,29 @@ files:
     ownedResourcesCreated:
       - kind: task
         id: uat-20260919T150331Z-5c10a673-recur
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
       - kind: rule
         id: e48d3b93-13aa-469c-8ae0-2db3502e50f2
-        note: Run-owned recurrence_rules row, id captured from the makeRecurring response.
+        note: Run-owned recurrence_rules row, id captured from the makeRecurring
+          response.
       - kind: occurrence
         id: 648fbdb1-9b5f-4181-a328-dde8e5778d15
-        note: Occurrence row(s) the generator's real tick materialised for the covered window
-          [2026-09-18..today]; each id is also the backing task row's id.
+        note: Occurrence row(s) the generator's real tick materialised for the covered
+          window [2026-09-18..today]; each id is also the backing task row's id.
     ownedResourcesDeleted:
       - kind: task
         id: uat-20260919T150331Z-5c10a673-recur
-        note: All 2 run-titled task row(s) deleted through the UI's two-step confirm on /tasks.
+        note: All 2 run-titled task row(s) deleted through the UI's two-step confirm on
+          /tasks.
       - kind: rule
         id: e48d3b93-13aa-469c-8ae0-2db3502e50f2
-        note: Run-owned recurrence_rules row deleted by recorded id via the stack's Postgres (the product
-          exposes no rule-delete door).
+        note: Run-owned recurrence_rules row deleted by recorded id via the stack's
+          Postgres (the product exposes no rule-delete door).
       - kind: occurrence
         id: 648fbdb1-9b5f-4181-a328-dde8e5778d15
-        note: Run-owned occurrences row(s) deleted by recorded rule_id via the stack's Postgres.
+        note: Run-owned occurrences row(s) deleted by recorded rule_id via the stack's
+          Postgres.
     verifiedAbsent:
       - kind: task
         id: uat-20260919T150331Z-5c10a673-recur
@@ -126,19 +136,52 @@ files:
       - kind: occurrence
         id: 648fbdb1-9b5f-4181-a328-dde8e5778d15
         note: SELECT count(*) for the rule's occurrence rows returns 0.
-    note: Every run-owned resource this run created was deleted and its absence verified by read-back.
+    note: Every run-owned resource this run created was deleted and its absence
+      verified by read-back.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.recur.make-recurring
       title: Make a task recurring, see its upcoming occurrences, then end it
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: owner
+          action: Sign in as the owner.
+          expected: the task list loads
+          checks: []
+        - order: 2
+          actor: owner
+          action: Turn a task into a rule that fires every weekday at 09:00 in the owner's
+            own time zone.
+          expected: the rule is saved as active
+          checks:
+            - id: completion
+              expected: yes
+        - order: 3
+          actor: owner
+          action: See the upcoming occurrences preview.
+          expected: none of the previewed dates is a weekend date
+          checks: []
+        - order: 4
+          actor: owner
+          action: Wait for (or trigger) a generation run.
+          expected: the day's occurrence appears with status materialised
+          checks:
+            - id: loading
+              expected: yes
+        - order: 5
+          actor: owner
+          action: Complete that occurrence.
+          expected: its status becomes completed
+          checks:
+            - id: completion
+              expected: yes
+        - order: 6
+          actor: owner
+          action: End the rule.
+          expected: the completed occurrence status is unchanged, and no new occurrence
+            appears after the end day
+          checks: []
       proves:
         - fr.recur.make-recurring
         - fr.recur.see-upcoming
@@ -169,14 +212,16 @@ files:
     created:
       - kind: task
         id: uat-20260919T150331Z-5c10a673-recur
-        note: Run-owned task row created through the UI, identified by its unique run-scoped title.
+        note: Run-owned task row created through the UI, identified by its unique
+          run-scoped title.
       - kind: rule
         id: e48d3b93-13aa-469c-8ae0-2db3502e50f2
-        note: Run-owned recurrence_rules row, id captured from the makeRecurring response.
+        note: Run-owned recurrence_rules row, id captured from the makeRecurring
+          response.
       - kind: occurrence
         id: 648fbdb1-9b5f-4181-a328-dde8e5778d15
-        note: Occurrence row(s) the generator's real tick materialised for the covered window
-          [2026-09-18..today]; each id is also the backing task row's id.
+        note: Occurrence row(s) the generator's real tick materialised for the covered
+          window [2026-09-18..today]; each id is also the backing task row's id.
   ux-checks.json:
     schema: starci/uat-ux-checks@1
     flow: uat.recur.make-recurring
@@ -184,45 +229,53 @@ files:
       - id: fr.recur.make-recurring
         expected: yes
         observed: yes
-        note: The weekday/09:00 form submission created rule e48d3b93-13aa-469c-8ae0-2db3502e50f2 and the
-          screen moved to the active state ("Repeats every weekday at 09:00 ... starting
+        note: The weekday/09:00 form submission created rule
+          e48d3b93-13aa-469c-8ae0-2db3502e50f2 and the screen moved to the
+          active state ("Repeats every weekday at 09:00 ... starting
           2026-09-18") with an End rule action.
       - id: fr.recur.see-upcoming
         expected: yes
         observed: yes
-        note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21, 2026-09-22, 2026-09-23,
-          2026-09-24, 2026-09-25, 2026-09-28, 2026-09-29, 2026-09-30, 2026-10-01, 2026-10-02); none
-          of them is a Saturday or Sunday.
+        note: The upcoming card lists 10 live-computed preview date(s) (2026-09-21,
+          2026-09-22, 2026-09-23, 2026-09-24, 2026-09-25, 2026-09-28,
+          2026-09-29, 2026-09-30, 2026-10-01, 2026-10-02); none of them is a
+          Saturday or Sunday.
       - id: br.recur.occurrence.owned-by-rule-owner
         expected: yes
         observed: no
-        note: "Step 5 of this record (\"complete that occurrence ... its status becomes completed\") has no
-          door in the served product: the schedule screen's occurrence rows are read-only
-          (StaticStateRow, no action), the public GraphQL schema registers no
-          completeOccurrence/skipOccurrence mutation (OccurrenceService.complete exists but is
-          internal CQRS only), and completing the occurrence's backing task row through the task
-          list set tasks.complete yet left the occurrence's own status reading \"materialised\" on
-          this ended screen - the app cannot produce the designed outcome."
+        note: "Step 5 of this record (\"complete that occurrence ... its status becomes
+          completed\") has no door in the served product: the schedule screen's
+          occurrence rows are read-only (StaticStateRow, no action), the public
+          GraphQL schema registers no completeOccurrence/skipOccurrence mutation
+          (OccurrenceService.complete exists but is internal CQRS only), and
+          completing the occurrence's backing task row through the task list set
+          tasks.complete yet left the occurrence's own status reading
+          \"materialised\" on this ended screen - the app cannot produce the
+          designed outcome."
       - id: br.recur.ending.preserves-history
         expected: yes
         observed: yes
-        note: 'After ending, the upcoming card kept all 1 materialised row(s) (status shown: materialised)
-          and shows no preview ("Nothing upcoming" + the ended note). The
-          completed/skipped-preservation half of the rule stays unproven here because no completed
-          occurrence could be produced - see the missing complete door above.'
+        note: 'After ending, the upcoming card kept all 1 materialised row(s) (status
+          shown: materialised) and shows no preview ("Nothing upcoming" + the
+          ended note). The completed/skipped-preservation half of the rule stays
+          unproven here because no completed occurrence could be produced - see
+          the missing complete door above.'
       - id: br.recur.generation.once
         expected: yes
         observed: yes
-        note: 1 occurrence(s) materialised for the covered window; a re-read across the next tick boundary
-          still shows exactly 1 row(s) for rule e48d3b93-13aa-469c-8ae0-2db3502e50f2 - no second
-          occurrence was written for any already-covered date.
+        note: 1 occurrence(s) materialised for the covered window; a re-read across the
+          next tick boundary still shows exactly 1 row(s) for rule
+          e48d3b93-13aa-469c-8ae0-2db3502e50f2 - no second occurrence was
+          written for any already-covered date.
       - id: fr.recur.end-rule
         expected: yes
         observed: yes
-        note: The rule ended through the screen's own two-step confirm; endRecurrence's response named rule
-          e48d3b93-13aa-469c-8ae0-2db3502e50f2 (this run's rule); the ended state shows no preview
-          ("Nothing upcoming" + the ended note) and the post-boundary re-read returned 1
-          materialised row(s), preview 0 - nothing dated after the end day was generated in-window.
+        note: The rule ended through the screen's own two-step confirm; endRecurrence's
+          response named rule e48d3b93-13aa-469c-8ae0-2db3502e50f2 (this run's
+          rule); the ended state shows no preview ("Nothing upcoming" + the
+          ended note) and the post-boundary re-read returned 1 materialised
+          row(s), preview 0 - nothing dated after the end day was generated
+          in-window.
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.recur.make-recurring

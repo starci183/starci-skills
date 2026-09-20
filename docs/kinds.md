@@ -276,8 +276,8 @@ two named kinds (`route-cycle`).
 ## The module
 
 `kernel/graph.mjs` is pure apart from `loadKinds`, which reads the compiled
-`.dist/model/kinds.json` exactly as `loadRuntimes` reads the allocator profile (or an authored
-`model/kinds.yaml` when given a `profileDir`).
+`modules/models/kinds.yaml` exactly as `loadRuntimes` reads the allocator profile (or an authored
+profile directory when given a `profileDir`).
 
 | export | signature | answers |
 | --- | --- | --- |

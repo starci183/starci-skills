@@ -1,5 +1,5 @@
 import {readDistJson} from '../core/runtime-root.mjs';
-import {canonicalTarget} from '../model/index.mjs';
+import {canonicalTarget} from '../modules/models/index.mjs';
 import {resolveExecutionChain} from './chains.mjs';
 import {roleOf} from './graph.mjs';
 import {SERVICE_OBSERVATION_MS,SHARED_COOLING_KINDS,createLoadsLedger} from './loads.mjs';
@@ -651,7 +651,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       const chain=resolveExecutionChain({skill:'starci',op:kind}).candidates;
       const supported=chain.filter(candidate=>candidate.executionHosts.includes(executionHost));
       const found=supported.find(candidate=>candidate.target===canonicalTarget(target));
-      need(found,`Runtime target ${target} is not launchable for ${kind} on ${executionHost}; that operation's environments offer ${supported.map(candidate=>candidate.target).join(', ')||'nothing'}. Add the target to the operation's environments in model/registry.yaml, or allocate with restrictTo: launchableTargets('${kind}').`);
+      need(found,`Runtime target ${target} is not launchable for ${kind} on ${executionHost}; that operation's environments offer ${supported.map(candidate=>candidate.target).join(', ')||'nothing'}. Add the target to the operation's environments in modules/models/registry.yaml, or allocate with restrictTo: launchableTargets('${kind}').`);
       return found;
     }
   };

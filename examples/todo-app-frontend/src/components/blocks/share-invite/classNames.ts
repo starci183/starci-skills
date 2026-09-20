@@ -18,6 +18,10 @@ export const SHARE_RADIO_ROW_CLASS_NAME = cn("flex", "items-center", "gap-2")
 /** The radio's own accent comes from the product token, not an app-local colour. */
 export const SHARE_RADIO_INPUT_CLASS_NAME = cn("h-4", "w-4", "accent-(--accent)")
 
+/** The collaborator collection's page section - labelled, not carded: a repeated-row list inside a
+ * `starci-core-surface` ancestor is the entity-list-in-card refusal the canon render check names. */
+export const SHARE_COLLABORATOR_SECTION_CLASS_NAME = cn("flex", "flex-col", "gap-2")
+
 /** The collection's column header strip: muted surface, same tracks as the rows beneath it. */
 export const SHARE_COLLABORATOR_HEADER_CLASS_NAME = cn(
     "grid", "grid-cols-[minmax(0px,2fr)_minmax(0px,1fr)_minmax(0px,1fr)_auto]", "items-center", "gap-4",

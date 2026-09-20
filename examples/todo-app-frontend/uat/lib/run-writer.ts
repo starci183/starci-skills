@@ -93,7 +93,11 @@ export default class RunWriter implements Reporter {
     // screens/, videos/}, so these six payloads fold into manifest.yaml under `files:` - keyed by
     // their former sidecar filename - instead of each getting its own loose file.
     const walkObj = { schema: 'starci/uat-walk@1', flow: record.id, steps: walkEntries };
-    const uxChecksObj = { schema: 'starci/uat-ux-checks@1', flow: record.id, checks: assertions };
+    // `assertions` also lands verbatim on the manifest's top level; hand the folded ux-checks
+    // payload its own copy or the yaml emitter dedupes the shared reference into an anchor/alias
+    // pair, and the runtime YAML loader (alias resolution disabled) then refuses the manifest
+    // outright - first seen on run 20260919T183145Z-5c10a673.
+    const uxChecksObj = { schema: 'starci/uat-ux-checks@1', flow: record.id, checks: assertions.map(a => ({ ...a })) };
     const flowsObj = {
       schema: 'starci/uat-flows@1',
       flow: { id: record.id, title: record.title, steps: record.steps, proves: record.proves },

@@ -1,0 +1,23 @@
+schema: work/functional-requirement
+id: fr.observability.request-logging
+title: Every request leaves one correlated, secret-free log line
+state: done
+actors: [machine]
+trigger: Any request reaches the api.
+mainFlow:
+  - The request-id middleware honours or mints the correlation id, echoes it on the response and runs
+    the request inside the request context.
+  - On response finish, one structured http.request.completed line is written and one counter and
+    duration observation lands in the metrics registry.
+exceptionFlows:
+  - A request that matched no route is still logged and counted, under the bounded unmatched label.
+postconditions:
+  - The log line and the metrics labels agree on the same request id, route template and status.
+composes:
+  - {rule: br.observability.access-log-shape, module: src/modules/platform/observability}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts

@@ -361,7 +361,7 @@ test('kernel input reconciliation preserves approved input refs across page, hel
     assert.deepEqual(state.inputs.filter(item=>item.kind==='sds').map(item=>item.ref),['features/demo/architecture/index.yaml'],'owning design repair retains its input');
     f.store.saveState(state);
     // kernel/view.mjs still reads `.starciwork/_local/workflows/<id>/state.json` directly and has not
-    // been ported to the ledger yet (see notes/w2-s9.md) - `buildView` cannot read a 1.0.4 workflow at
+    // been ported to the ledger yet (see legacy/notes/w2-s9.md) - `buildView` cannot read a 1.0.4 workflow at
     // all, so this only asserts what this cluster owns: the surface `reconcileWorkflowInputs` itself wrote.
     assert.deepEqual(f.store.loadState().ownerInputs,state.ownerInputs,'the persisted state carries the same owner surface it returned');
     return result;

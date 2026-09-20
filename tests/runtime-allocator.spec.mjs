@@ -10,7 +10,7 @@ import {RUNTIME_LOADS,readLoads} from '../kernel/loads.mjs';
 import {ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
 import {setSignal} from '../kernel/launch.mjs';
 
-const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
+const profile=parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml',import.meta.url),'utf8'));
 const clock=start=>{const box={at:start};return {now:()=>box.at,advance:ms=>{box.at+=ms;}};};
 
 test('owner allocation preserves adaptive policy and may constrain exact operation roles',()=>{

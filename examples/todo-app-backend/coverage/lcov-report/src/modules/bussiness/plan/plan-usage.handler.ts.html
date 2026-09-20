@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">87.09% </span>
+                <span class="strong">89.13% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>27/31</span>
+                <span class='fraction'>41/46</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">51.61% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/31</span>
+                <span class='fraction'>4/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.83% </span>
+                <span class="strong">89.13% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>23/24</span>
+                <span class='fraction'>41/46</span>
             </div>
         
             
@@ -91,61 +91,115 @@
 <a name='L26'></a><a href='#L26'>26</a>
 <a name='L27'></a><a href='#L27'>27</a>
 <a name='L28'></a><a href='#L28'>28</a>
-<a name='L29'></a><a href='#L29'>29</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Injectable } from '@nestjs/common';
-import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { TaskService } from '@modules/bussiness/tas<span class="branch-1 cbranch-no" title="branch not covered" >k';</span>
-import { SubscriptionService } from './subscription.service';
-import { <span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>PlanUsageQuer<span class="cstat-no" title="statement not covered" >y, PlanUsageQueryResul</span>t } from './pl<span class="cstat-no" title="statement not covered" >an-usage.query';<span class="cstat-no" title="statement not covered" ></span></span></span>
-<span class="branch-2 cbranch-no" title="branch not covered" ><span class="branch-1 cbranch-no" title="branch not covered" ></span></span>
-/**
- * fr.plan.usage.view: the owner's effective plan is read (t-revert-on-read) and their active task count
- * i<span class="missing-if-branch" title="else path not taken" >E</span>s computed (br.plan.active-scope) - the same two reads PlanCapGuardPolicy makes, so "the count shown
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Injectable 
+} from "@nestjs/common"
+import {
+    QueryHandler 
+} from "@nestjs/cqrs"
+import {
+    AbstractQueryHandler 
+} from "@modules/pl<span class="branch-0 cbranch-no" title="branch not covered" >atform/cqrs/abstract-handler"</span>
+<span class="cstat-no" title="statement not covered" >import {</span>
+<span class="cstat-no" title="statement not covered" >    TaskService </span>
+} from "../task/task.service"
+import {
+    SubscriptionService 
+} from "./subscription.service"
+import {
+    PlanUsageQuery, PlanUsageQueryResult 
+} from ".<span class="branch-0 cbranch-no" title="branch not covered" >/plan-usage.query"</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >/**</span>
+<span class="cstat-no" title="statement not covered" > * fr.plan.usage.view: the owner's effective plan is read (t-revert-on-read) and their active task count</span>
+ * is computed (br.plan.active-scope) - <span class="branch-0 cbranch-no" title="branch not covered" >the s<span class="branch-0 cbranch-no" title="branch not covered" ></span>ame two reads PlanCapGuardPolicy makes, s</span>o "the count shown
  * always matches what the cap guard would compute for the same person at that moment" (the record's own
  * postcondition) holds by construction rather than by keeping two computations in sync by hand.
  */
 @Injectable()
 @QueryHandler(PlanUsageQuery)
-export class PlanUsageHandler implements IQueryHandler&lt;PlanUsageQuery, PlanUsageQueryResult&gt; {
-  constructor(
+/** Decorated CQRS query handler; the bus dispatches to it and process() does the work (the abstract base keeps execute() a template). */
+export class PlanUsageHandler extends AbstractQueryHandler&lt;PlanUsageQuery, PlanUsageQueryResult&gt; {
+    constructor(
     private readonly subscriptionService: SubscriptionService,
     private readonly taskService: TaskService,
-  ) {}
+    ) {
+        super()
+    }
 &nbsp;
-  async execute(query: PlanUsageQuery): Promise&lt;PlanUsageQueryResult&gt; {
-    const { ownerId } = query.params;
-    const plan = await this.subscriptionService.readEffectivePlan(ownerId);
-    const owned = await this.taskService.listOwnedBy(ownerId);
-    const activeCount = owned.filter(task =&gt; !task.complete).length;
-    return { plan: plan.id, cap: plan.taskCap ?? null, activeCount };
-  }
+    protected override async process(query: PlanUsageQuery): Promise&lt;PlanUsageQueryResult&gt; {
+        const { ownerId } = query.params
+        const plan = await this.subscriptionService.readEffectivePlan(ownerId)
+        const owned = await this.taskService.listOwnedBy(ownerId)
+        const activeCount = owned.filter(task =&gt; !task.complete).length
+        return {
+            plan: plan.id, cap: plan.taskCap ?? null, activeCount 
+        }
+    }
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -154,7 +208,7 @@ export class PlanUsageHandler implements IQueryHandler&lt;PlanUsageQuery, PlanUs
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

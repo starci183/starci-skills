@@ -1,0 +1,7 @@
+schema: work/catalog
+id: fake
+description: Negative-corpus fixture tree - a minimal catalog owning one feature of forged proof.
+features:
+  - id: fake
+    directory: features/fake
+    description: A feature whose records claim proof they never earned.

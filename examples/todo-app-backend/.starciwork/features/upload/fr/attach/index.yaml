@@ -1,0 +1,25 @@
+schema: work/functional-requirement
+id: fr.upload.attach
+title: Attach an upload to a task
+state: done
+actors: [owner]
+trigger: The owner points a ready upload at a task.
+mainFlow:
+  - The owner names the upload and the task.
+  - The upload's metadata row is linked to the task; the bytes never move.
+exceptionFlows:
+  - A pending upload cannot attach - an intent nobody fulfilled is not an attachment.
+  - A task the caller does not own refuses the attach, as does an upload the caller does not own.
+  - A task that does not exist answers the task's own not-found refusal.
+postconditions:
+  - The upload's taskId names the task.
+composes:
+  - {rule: br.upload.owned, module: src/modules/integrations/upload}
+  - {rule: br.upload.lifecycle, module: src/modules/integrations/upload}
+refs: [br.task.single-owner]
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertRuntimeImportClosure } from '../scripts/runtime-compile/import-closure.mjs';
+import { assertRuntimeImportClosure } from '../legacy/builders/runtime-compile/import-closure.mjs';
 
 const files = entries => new Map(entries.map(([name, source]) => [name, Buffer.from(source)]));
 

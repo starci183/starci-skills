@@ -1,0 +1,15 @@
+=== 01-record-fake-provenby ===
+records=5 refs=5 evidence=1 payloads=0
+RESULT: pass
+=== 02-evidence-stale-after-code-change ===
+records=5 refs=3 evidence=1 payloads=0
+REFUSED examples/todo-app-backend/ex-testing/negative/02-evidence-stale-after-code-change/work/features/worker/impl/stale-be/worker/evidence.yaml: codeDigest 1 no longer matches the code currently under impl.worker.stale-be.worker's owners/module (now ef7239cdac8fcfe5f993c9937a9364a7a692995764187ceb6a4d70d9d634f053); refused unless it carries stale: true [CODE_DIGEST_STALE]
+RESULT: 1 refused
+=== 03-srs-business-contradiction ===
+records=5 refs=6 evidence=0 payloads=0
+RESULT: pass
+=== 04-lease-drift ===
+records=5 refs=3 evidence=0 payloads=2
+INFO examples/todo-app-backend/ex-testing/negative/04-lease-drift/work/features/lease/uat/drift/runs/2026-09-01T000000Z-a1/manifest.yaml: schema starci/uat-run-manifest@1 is an artifact payload, not a work record [PAYLOAD_SKIPPED]
+INFO examples/todo-app-backend/ex-testing/negative/04-lease-drift/work/features/lease/uat/drift/runs/2026-09-02T000000Z-b2/manifest.yaml: schema starci/uat-run-manifest@1 is an artifact payload, not a work record [PAYLOAD_SKIPPED]
+RESULT: pass

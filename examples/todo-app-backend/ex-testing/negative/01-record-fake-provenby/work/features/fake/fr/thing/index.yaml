@@ -1,0 +1,16 @@
+schema: work/functional-requirement
+id: fr.fake.thing
+title: The thing the ghost claims to prove
+state: done
+verificationSource: authored-claim
+because: Fixture carries an authored-claim so the only refusal in this case is the fake provenance.
+# provenBy is a kernel-derived field; authoring it by hand is itself a refusal (PROVENBY_AUTHORED),
+# and naming a todo prover is a false proof claim (PROVENBY_TARGET_NOT_DONE). This is the case defect.
+provenBy:
+  uat: [uat.fake.ghost]
+actors: [person]
+trigger: The person does the thing.
+mainFlow:
+  - The thing happens.
+postconditions:
+  - The thing is done.

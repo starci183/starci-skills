@@ -148,9 +148,24 @@ const personId = psql(`select person_id from sessions where token = '${token}'`)
 if (!personId) throw new Error('could not resolve the demo person id from the session row');
 console.log('person', personId);
 
+/**
+ * The person's subscription row is snapshotted before the paid-unlimited staging touches it and
+ * restored verbatim afterwards. (An earlier revision upserted plan='paid' on conflict(person_id)
+ * and only deleted the staging id on cleanup, which silently left the demo person paid when a
+ * pre-existing row carried a different id - planUsage then read cap null and the free-plan
+ * states could not be staged.)
+ */
+const originalSubscription = psql(
+  `select coalesce(plan || '|' || status, '') from subscriptions where person_id = '${personId}'`);
+
 const cleanup = async () => {
   seedActive(personId)(0);
-  psql(`delete from subscriptions where id = 'v79-plan-subscription'`);
+  if (originalSubscription) {
+    const [plan, status] = originalSubscription.split('|');
+    psql(`update subscriptions set plan = '${plan}', status = '${status}' where person_id = '${personId}'`);
+  } else {
+    psql(`delete from subscriptions where id = 'v79-plan-subscription'`);
+  }
 };
 
 try {
@@ -185,16 +200,25 @@ try {
   await shot(page, 'under-cap');
   await context.close();
 
-  // paid-unlimited: the subscription row this script owns and deletes again.
-  psql(`insert into subscriptions (id, person_id, plan, status)
-        values ('v79-plan-subscription', '${personId}', 'paid', 'active')
-        on conflict (person_id) do update set plan = 'paid', status = 'active'`);
+  // paid-unlimited: stage paid on the person's own subscription row; cleanup() restores the
+  // snapshotted plan/status (or deletes the staging row when none existed before).
+  if (originalSubscription) {
+    psql(`update subscriptions set plan = 'paid', status = 'active' where person_id = '${personId}'`);
+  } else {
+    psql(`insert into subscriptions (id, person_id, plan, status)
+          values ('v79-plan-subscription', '${personId}', 'paid', 'active')`);
+  }
   ({ context, page } = await open(browser, token));
   await page.goto(`${WEB}/plan/usage`, { waitUntil: 'networkidle' });
   await page.getByText('Paid plan').waitFor();
   await shot(page, 'paid-unlimited');
   await context.close();
-  psql(`delete from subscriptions where id = 'v79-plan-subscription'`);
+  if (originalSubscription) {
+    const [plan, status] = originalSubscription.split('|');
+    psql(`update subscriptions set plan = '${plan}', status = '${status}' where person_id = '${personId}'`);
+  } else {
+    psql(`delete from subscriptions where id = 'v79-plan-subscription'`);
+  }
 
   // refused: no session token at all, so the page paints its own read refusal.
   ({ context, page } = await open(browser, null));

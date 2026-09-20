@@ -1,0 +1,23 @@
+schema: work/business-rule
+id: br.upload.owned
+title: An upload answers only to the person who made it
+state: done
+statements:
+  - Attach, list, download and delete each verify the caller owns the upload row - and for attach and
+    list, that the caller also owns the named task.
+  - A stranger's read of a missing or foreign id gets the same not-found or forbidden refusal, so
+    existence itself is not leaked through a different answer.
+  - The presigned data plane is the one exception by design - the signed, expiring upload token is the
+    credential there, exactly like a provider presigned URL needs no session.
+acceptance:
+  - id: ac.upload.owned.stranger-refused
+    given: An upload owned by one person
+    when: Another person reads, attaches or deletes it
+    then:
+      - The call is refused.
+  - id: ac.upload.owned.token-is-credential
+    given: A pending upload intent and its issued token
+    when: A request presents a wrong or already-consumed token on the content door
+    then:
+      - The fulfilment is refused and nothing is stored.
+module: src/modules/integrations/upload

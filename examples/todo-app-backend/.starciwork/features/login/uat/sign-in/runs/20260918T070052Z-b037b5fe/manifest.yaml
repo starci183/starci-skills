@@ -7,24 +7,29 @@ assertions:
   - id: ux.sign-in.validation-feedback
     expected: yes
     observed: yes
-    note: The submit button stays disabled while either field is empty (SignInFormView disabled logic).
+    note: The submit button stays disabled while either field is empty
+      (SignInFormView disabled logic).
   - id: fr.login.sign-in
     expected: yes
     observed: not-run
-    note: A successful sign-in writes a session row to the shared, other-lane-owned Postgres. This lane
-      is authorized only for the read-only wrong-password check below, so this step is not-run here.
+    note: A successful sign-in writes a session row to the shared, other-lane-owned
+      Postgres. This lane is authorized only for the read-only wrong-password
+      check below, so this step is not-run here.
   - id: br.login.session.restores
     expected: yes
     observed: not-run
-    note: Depends on the real signed-in session from fr.login.sign-in above; not-run for the same reason.
+    note: Depends on the real signed-in session from fr.login.sign-in above; not-run
+      for the same reason.
   - id: ux.sign-in.error-feedback
     expected: yes
     observed: not-run
-    note: No response observed from /auth/sign-in within the timeout; the API origin did not answer.
+    note: No response observed from /auth/sign-in within the timeout; the API origin
+      did not answer.
   - id: br.login.password.sign-in
     expected: yes
     observed: not-run
-    note: "Same reason: no backend response to compare against a normalized refusal message."
+    note: "Same reason: no backend response to compare against a normalized refusal
+      message."
 assets:
   - path: screens/empty.png
     sha256: a456eec1975a6b71944e49ec31c085f2a76e0fb2de27a03d636674b6f561e1e8
@@ -54,18 +59,48 @@ files:
     flow: uat.login.sign-in
     ownedResourcesCreated: []
     ownedResourcesDeleted: []
-    note: This run created no run-owned fixture rows against a database this lane owns; nothing to clean
-      up.
+    note: This run created no run-owned fixture rows against a database this lane
+      owns; nothing to clean up.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.login.sign-in
       title: Sign in, close the browser, come back
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: person
+          action: Sign in with the seeded person.
+          expected: the task list loads for that person
+          checks:
+            - id: loading
+              expected: yes
+            - id: completion
+              expected: yes
+        - order: 2
+          actor: person
+          action: See the empty task list.
+          expected: no tasks are listed and no error shows
+          checks:
+            - id: errorFeedback
+              expected: no
+        - order: 3
+          actor: person
+          action: "Close the browser tab and come back (the session token persists in
+            localStorage, read back as an Authorization: Bearer header - never a
+            cookie)."
+          expected: still signed in, same list renders with no re-authentication
+          checks:
+            - id: completion
+              expected: yes
+        - order: 4
+          actor: person
+          action: Submit a wrong password.
+          expected: a single uniform refusal message shows; no account-existence hint
+          checks:
+            - id: errorFeedback
+              expected: yes
+            - id: validation
+              expected: yes
       proves:
         - fr.login.sign-in
         - br.login.password.sign-in
@@ -98,26 +133,29 @@ files:
       - id: ux.sign-in.validation-feedback
         expected: yes
         observed: yes
-        note: The submit button stays disabled while either field is empty (SignInFormView disabled logic).
+        note: The submit button stays disabled while either field is empty
+          (SignInFormView disabled logic).
       - id: fr.login.sign-in
         expected: yes
         observed: not-run
-        note: A successful sign-in writes a session row to the shared, other-lane-owned Postgres. This lane
-          is authorized only for the read-only wrong-password check below, so this step is not-run
-          here.
+        note: A successful sign-in writes a session row to the shared, other-lane-owned
+          Postgres. This lane is authorized only for the read-only
+          wrong-password check below, so this step is not-run here.
       - id: br.login.session.restores
         expected: yes
         observed: not-run
-        note: Depends on the real signed-in session from fr.login.sign-in above; not-run for the same
-          reason.
+        note: Depends on the real signed-in session from fr.login.sign-in above; not-run
+          for the same reason.
       - id: ux.sign-in.error-feedback
         expected: yes
         observed: not-run
-        note: No response observed from /auth/sign-in within the timeout; the API origin did not answer.
+        note: No response observed from /auth/sign-in within the timeout; the API origin
+          did not answer.
       - id: br.login.password.sign-in
         expected: yes
         observed: not-run
-        note: "Same reason: no backend response to compare against a normalized refusal message."
+        note: "Same reason: no backend response to compare against a normalized refusal
+          message."
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.login.sign-in

@@ -26,7 +26,7 @@ codeDigest:
     - path: src/modules/bussiness/share/completion-authority.ts
       sha256: 1cf993f642e3389ab677cc78aa3bfc60173ab8056eda3eabf8386f5c5b49ec47
     - path: src/modules/bussiness/share/invitation.service.spec.ts
-      sha256: 0166d8924852f2d8f80f88745e735b189ec3148593de9e846e3a912ce977ef92
+      sha256: 1f03f56be718414be3c762e53de09079f60b78f9d3701355c9fb7f50461fd613
     - path: src/modules/bussiness/share/invitation.service.ts
       sha256: 3267ad8c2a4b84e5893c68bc6552b9d18f29969a00c16c44c1ac25596b31ef20
     - path: src/modules/bussiness/share/invite.command.ts
@@ -55,7 +55,7 @@ codeDigest:
       sha256: 63e2b85cd97f576751e9b6ee8a9ca3d0a6726846bcf046574ca095cb66bc4afd
     - path: src/modules/bussiness/share/types/invitation-record.ts
       sha256: ba8f9ada2044a9c80d0834868ca06ae3ce6513944cef7feee6f5adf6500f319b
-  digest: 6dda88b1d959a4fb84903a00a7a658037f476ec4991b691a933d77489330947a
+  digest: 98dfdb9452c73475521fc1a204c43be25851977b0a83751e723cdf30fbfe32c8
 outcome: pass
 assertions:
   - id: expires-after-14-days
@@ -82,4 +82,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:28:14.140Z
+  capturedAt: 2026-09-19T23:19:24.249Z

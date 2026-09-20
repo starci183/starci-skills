@@ -1,0 +1,6 @@
+schema: starci/model-qualifications@1
+purpose: >-
+  No model is certified by its name or by shipping this package. Install independently measured, scoped
+  evaluation receipts in the local qualification store. Empty records mean no measured qualification;
+  bounded local probation, when applicable, remains explicitly probation.
+qualifications: []

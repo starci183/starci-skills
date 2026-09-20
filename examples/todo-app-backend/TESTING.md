@@ -25,7 +25,7 @@ npx jest -t "refuses"                 # one test name
 npm run test:coverage       # jest --coverage -> coverage/lcov.info (+ text summary)
 ```
 
-`collectCoverageFrom` covers all `src/**/*.ts` except specs and `main.ts`. The lcov artifact is what codecov consumes (flag `todo-be`).
+`collectCoverageFrom` covers all `src/**/*.ts` except specs and `main.ts`. Coverage is measured with the V8 provider (`coverageProvider: 'v8'` in `jest.config.js`) — istanbul under `ts-jest` inflates branch totals with transpiler-emitted helper branches (`__awaiter`/`__generator`/`__spreadArray`), which made the branch number meaningless. The lcov artifact is what codecov consumes (flag `todo-be`).
 
 ## E2E tests
 
@@ -68,6 +68,37 @@ describe('area/flow - one A->Z journey', () => {
 
 - Import from the `../../infra` barrel (`src/tests/infra/index.ts`), never deep paths.
 - Available services: `E2EStackService` (ports/urls/teardown report), `E2EHttpService` (axios clients per user, bearer option), `E2EGraphqlService` (ApolloClient per user - the app's public surface is GraphQL), `E2EAuthService` (register/signIn/revoke/deleteAccount via public doors), `E2EDbService` (out-of-band seed/verify only - never shortcut the flow under test).
+
+## Observability
+
+The api exposes three anonymous probe doors plus per-request structured logging:
+
+- `GET /health` - dependency-checked health: 200 `{ "status": "ok" }` while primary Postgres answers, 503 when it cannot. The e2e stack's boot probe waits on this door.
+- `GET /ready` - the explicit readiness name for orchestrators; same postgres dependency check as `/health`.
+- `GET /metrics` - Prometheus text exposition: `http_requests_total{method,route,status}` counters and `http_request_duration_ms_{sum,count}` summaries. Route labels are the matched route template (`/uploads/:uploadId/content`), never concrete ids; unmatched paths collapse to `route="unmatched"`.
+- Every response echoes `x-request-id` - the inbound value when sent, a minted uuid otherwise. Each finished request writes one structured `http.request.completed` line (requestId, method, route, status, durationMs; never headers, body or query, so no secret can ride it).
+
+```bash
+curl -s localhost:3001/ready
+curl -s localhost:3001/metrics | findstr http_requests_total   # or: grep http_requests_total
+curl -si -H "x-request-id: demo-1" localhost:3001/health | findstr x-request-id
+```
+
+In the dev stack, Prometheus (`.starcistacks/dev/infra/compose/prometheus.yaml`) is already configured to scrape `api:3001` every 15s. It reaches the api when the api runs under the `app` compose profile (`docker compose --profile app up`); when the api runs on the host (`npm run start`), query `localhost:3001/metrics` directly or point a scrape target at `host.docker.internal:3001`. The Prometheus UI is at `http://localhost:9090` - query `http_requests_total` to see the counters.
+
+The e2e suite covers these doors over the real stack:
+
+```bash
+npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts
+```
+
+## Uploads
+
+Task attachments live behind the upload capability (`src/modules/integrations/upload`): presigned intents (`POST /uploads/intents` -> `PUT /uploads/<id>/content` with `x-upload-token`), a direct `POST /uploads`, attach/list/download/delete for the owner, size+mime validation, a storage port (local filesystem adapter in dev; S3/minio implements the same port) and a virus-scan port (noop adapter ships the contract). The e2e journey covers the whole lifecycle over the real stack:
+
+```bash
+npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts
+```
 
 ## Lint & typecheck
 

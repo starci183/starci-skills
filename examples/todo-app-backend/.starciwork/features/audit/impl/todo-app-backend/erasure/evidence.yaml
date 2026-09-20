@@ -34,7 +34,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/append-log-line.handler.ts
       sha256: 091c9a70a8a90fe6ec9ed030d5ac3b3dd41b5befbb2d5270b802d180f327a0bf
     - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      sha256: eb2605f0e6e720f3a3f973feecdcd4c09b5538ae2ba41bcbeb6c0b4bfac097bd
+      sha256: eced8460bc4ab6e074babb2da465cd6dd6c7a682bacdba0b99f2b49e17015aeb
     - path: src/modules/bussiness/audit/audit-erasure.service.ts
       sha256: a4b36693f4a2189c731eb60ecacff92b91fb39f443d1403d945536b6dbde62c4
     - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
@@ -52,7 +52,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/audit-log.query.ts
       sha256: 20b2b52ae4d85bd54ace16e46a6439e2e2efce82e36bacb77e514a2d4dc2bf01
     - path: src/modules/bussiness/audit/audit-log.service.spec.ts
-      sha256: f14481d4f9ec91e7c35659e7f4eeab40927fdef91ba15996f1c2c8b3659c59f4
+      sha256: 32d8a24a4917446c6e38a2c05a6d96d51016c596787298ff6811c4c0d54df268
     - path: src/modules/bussiness/audit/audit-log.service.ts
       sha256: 70ef463bd316c0860154a44edc9ebee9d6711733a32472311a5644157754224f
     - path: src/modules/bussiness/audit/audit-operator-read.ts
@@ -95,7 +95,7 @@ codeDigest:
       sha256: 56bdf0a467ab20094eaa91fec2a4052081b2f1a27fe39846b8f956e67786b762
     - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
       sha256: a69b044f18ff64b6c457cf4c3ffa0e3b0c3af57a58f0d0d2ca98228dc4fcc1eb
-  digest: a487267f7da3a5aa2374280679e1e4fda3780053ba8231d74464ddcb0e650ec8
+  digest: 0bcc09ceb731b827df94426c0aa8a7c5414bf2edc39c45b8655ec8aab12cd23f
 outcome: pass
 assertions:
   - id: br.audit.erasure.right
@@ -135,4 +135,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T15:18:50.411Z
+  capturedAt: 2026-09-19T23:12:08.505Z

@@ -1,7 +1,7 @@
 # StarCi 5.0 plan: a kernel runs the workflow, models only decide
 
-Status: in progress. Supersedes the supervision protocol of `v4.1-supervision-plan.md` and the
-orchestration layers of `v4-plan.md`. The typed Orca call contract, the settlement rules and the
+Status: in progress. Supersedes the supervision protocol of `legacy/docs/v4.1-supervision-plan.md` and the
+orchestration layers of `../legacy/docs/v4-plan.md`. The typed Orca call contract, the settlement rules and the
 operation report schema from 4.x survive unchanged; the control loop above them does not.
 
 ## 1. Why 5.0

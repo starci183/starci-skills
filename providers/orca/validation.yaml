@@ -12,7 +12,7 @@ liveDiscovery:
 preflight:
   - orca status --json
   - orca agent-context --json
-  - node .dist/hosts/orca/launch.mjs verify
+  - node hosts/orca/launch.mjs verify
   - orca skills get orca-cli --json
   - orca skills get orchestration --json
 callContract:

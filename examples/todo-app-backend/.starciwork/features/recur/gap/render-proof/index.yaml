@@ -1,7 +1,7 @@
 schema: work/gap
 id: gap.recur.render-proof
 title: The schedule captures fail the canonical render checks - impl.recur.todo-app-frontend.schedule cannot claim done
-state: todo
+state: done
 statement: "impl.recur.todo-app-frontend.schedule keeps real captures - the no-rule, refused,
   active and ended states at desktop-1280 and mobile-390, produced by ./assets/capture.mjs
   driving the served build against the live API (real makeRecurring / upcomingOccurrences /
@@ -15,10 +15,23 @@ statement: "impl.recur.todo-app-frontend.schedule keeps real captures - the no-r
   todo, blockedBy this gap. Repro: node scripts/example-render-proof.mjs --work
   examples/todo-app-backend/.starciwork --record impl.recur.todo-app-frontend.schedule"
 closedBy: impl.recur.todo-app-frontend.schedule
+verificationSource: authored-claim
+because: "closedBy names impl.recur.todo-app-frontend.schedule, itself done again with a fresh
+  evidence.yaml whose render-proof assertion reruns the canonical
+  scripts/example-render-proof.mjs and now holds for every capture: lane w10 traced the #6d97ff
+  mobile buckets to antialiased halo dominance in viewport-only screenshots, changed
+  assets/capture.mjs to full-page mobile captures, and re-shot all eight states with the shared
+  convention; entity-list-in-card and palette-off-brand pass on the fresh markup and bytes.
+  The gap's closure is a derived fact about that record's own evidence, not a separate
+  command."
 change:
-  rev: 1
-  kind: initial
-  at: 2026-09-19T21:30:00.000Z
-  reason: "Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
+  rev: 2
+  kind: editorial
+  at: 2026-09-19T22:45:00.000Z
+  reason: "Closed by lane w10: the #6d97ff/#b2c8ff/#95b3ff buckets were antialiasing fringe
+    around the checked radio dominating viewport-only mobile captures - full-page mobile
+    screenshots give the declared accent enough pixel share to outrank the fringe, and the
+    re-run canonical proof holds for every capture. The rev-1 opening narrative below stands
+    verbatim. Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
     palette failures above on real markup and bytes. Neither editing checks/*.mjs nor staging
     captures can close this - the rendered page itself violates the design system's laws."

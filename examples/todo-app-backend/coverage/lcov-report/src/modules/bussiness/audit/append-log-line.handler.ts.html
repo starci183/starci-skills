@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.61% </span>
+                <span class="strong">89.18% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>22/26</span>
+                <span class='fraction'>33/37</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">51.61% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/31</span>
+                <span class='fraction'>4/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95% </span>
+                <span class="strong">89.18% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>19/20</span>
+                <span class='fraction'>33/37</span>
             </div>
         
             
@@ -80,39 +80,99 @@
 <a name='L15'></a><a href='#L15'>15</a>
 <a name='L16'></a><a href='#L16'>16</a>
 <a name='L17'></a><a href='#L17'>17</a>
-<a name='L18'></a><a href='#L18'>18</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span></td><td class="text"><pre class="prettyprint lang-js">import { Injectable } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { AuditLogService } from './audit-log.servic<span class="branch-1 cbranch-no" title="branch not covered" >e';</span>
-import { AppendLogLineCommand, AppendLogLineCommandResult } from './append-log-line.command';
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span></span></span></span></span>
-/** fr.audit.log.app<span class="branch-1 cbranch-no" title="branch not covered" >en</span>d /<span class="branch-2 cbranch-no" title="branch not covered" > sds.audit.log-chain's t-append. */</span>
-@Injectable()
-@CommandHandler(AppendLogLineCommand)
-expo<span class="missing-if-branch" title="else path not taken" >E</span>rt class AppendLogLineHandler implements ICommandHandler&lt;AppendLogLineCommand, AppendLogLineCommandResult&gt; {
-  constructor(private readonly logService: AuditLogService) {}
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Injectable 
+} from "@nestjs/common"
+import {
+    CommandHandler 
+} from "@nestjs/cqrs"
+import {
+    AbstractCommandHandler 
+} from "@module<span class="branch-0 cbranch-no" title="branch not covered" >s/platform/cqrs/abstract-handler"</span>
+<span class="cstat-no" title="statement not covered" >import {</span>
+<span class="cstat-no" title="statement not covered" >    AuditLogService </span>
+} from "./audit-log.service"
+import {
+    AppendLogLineCommand, AppendLogLineCommandResult 
+} from "./append-log-line.command"
 &nbsp;
-  async execute(command: AppendLogLineCommand): Promise&lt;AppendLogLineCommandResult&gt; {
-    const { params } = command;
-    const line = await this.logService.append(params.actorId, params.action, params.target ?? null);
-    return { lineId: line.id };
-  }
+/** fr.audit.log.app<span class="branch-0 cbranch-no" title="branch not covered" >end / sds.audit.log-chain's t-append. */</span>
+<span class="cstat-no" title="statement not covered" >@Injectable()</span>
+<span class="cstat-no" title="statement not covered" >@CommandHandler(AppendLogLineCommand)</span>
+/** Decorated CQRS command handler; the bus dispatches to it and process() d<span class="branch-0 cbranch-no" title="branch not covered" >oes t<span class="branch-0 cbranch-no" title="branch not covered" ></span>he work (the abstract base keeps execute(</span>) a template). */
+export class AppendLogLineHandler extends AbstractCommandHandler&lt;AppendLogLineCommand, AppendLogLineCommandResult&gt; {
+    constructor(
+    private readonly logService: AuditLogService,
+    ) {
+        super()
+    }
+&nbsp;
+    protected override async process(command: AppendLogLineCommand): Promise&lt;AppendLogLineCommandResult&gt; {
+        const { params } = command
+        const line = await this.logService.append(params.actorId,
+            params.action,
+            params.target ?? null)
+        return {
+            lineId: line.id 
+        }
+    }
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -121,7 +181,7 @@ expo<span class="missing-if-branch" title="else path not taken" >E</span>rt clas
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

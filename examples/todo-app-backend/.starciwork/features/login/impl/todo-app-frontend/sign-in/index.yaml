@@ -18,67 +18,67 @@ proves: [ui.login.sign-in]
 assets:
   - path: assets/sign-in-empty-desktop-1280.png
     role: capture
-    sha256: 384ccde5315c8934cc83df9b0d8a052a38eac0173a4fcbae6c0f2d25eaa64750
+    sha256: 49c908cbe8dc42ff7d912b57a3d0ebd7124e5ee786e92b44449f3c3aec6250d1
     provenance: Running-page screenshot of /sign-in served by the production build (next start), empty state, desktop-1280 viewport.
   - path: assets/sign-in-empty-desktop-1280.html
     role: markup
-    sha256: a4292a47840fbdb749f4aa884b394ccad0ebf9f7133f446088f225e304099a81
+    sha256: 65244a5d9969fe22bba487be6c49860749ca97f59578c810a7452052e6f50352
     provenance: Rendered DOM markup kept beside the empty desktop-1280 capture.
   - path: assets/sign-in-empty-mobile-390.png
     role: capture
-    sha256: f9aaab12b05fd46d64fa893d27b1e2768628b01820da53f3b9b2a0d45a536816
+    sha256: 48c98ba5fcd7b1e6cfb919073114d5b036ec7b4609c0ff951486e555ee4810af
     provenance: Running-page screenshot of /sign-in served by the production build (next start), empty state, mobile-390 viewport.
   - path: assets/sign-in-empty-mobile-390.html
     role: markup
-    sha256: a4292a47840fbdb749f4aa884b394ccad0ebf9f7133f446088f225e304099a81
+    sha256: 65244a5d9969fe22bba487be6c49860749ca97f59578c810a7452052e6f50352
     provenance: Rendered DOM markup kept beside the empty mobile-390 capture.
   - path: assets/sign-in-filled-desktop-1280.png
     role: capture
-    sha256: 8061ec9eb0f2fd222cd91976312f76e212ad35433969297788bafd0b568a4971
+    sha256: 5f9bca2b0ecb132f24618192ffc0d205e6b77457dac42dd1940b39131c9c3b3e
     provenance: Running-page screenshot of /sign-in served by the production build (next start), filled state, desktop-1280 viewport.
   - path: assets/sign-in-filled-desktop-1280.html
     role: markup
-    sha256: 9db6398f95205cae53b7ae5140d17f4c76051dd5518da71c0ff45df41a7854ce
+    sha256: 1635c6e62fb6309ef2eddbab3f15a7e3bcebc9ca225a5e4fe40546ae10369063
     provenance: Rendered DOM markup kept beside the filled desktop-1280 capture.
   - path: assets/sign-in-filled-mobile-390.png
     role: capture
-    sha256: 3fc8ed867a801cf61e11aef356d263b6b85579d5105a477a04496f714ecbec79
+    sha256: 1e5ceb202bb324fc886f18c2fbb5596d77ba3d16963f1b80706cdef479e5368c
     provenance: Running-page screenshot of /sign-in served by the production build (next start), filled state, mobile-390 viewport.
   - path: assets/sign-in-filled-mobile-390.html
     role: markup
-    sha256: 9db6398f95205cae53b7ae5140d17f4c76051dd5518da71c0ff45df41a7854ce
+    sha256: 1635c6e62fb6309ef2eddbab3f15a7e3bcebc9ca225a5e4fe40546ae10369063
     provenance: Rendered DOM markup kept beside the filled mobile-390 capture.
   - path: assets/sign-in-working-desktop-1280.png
     role: capture
-    sha256: a6e132a31fe390061fc5e991fb092e120be389c59776f01fca0cc7884cb145a5
+    sha256: aa94868f4b63bd663e249c76d48bcd6fbc2b2bb0ec3a92c1b9c3ef05417f72c8
     provenance: Running-page screenshot of /sign-in served by the production build (next start), working state (submit held in flight), desktop-1280 viewport.
   - path: assets/sign-in-working-desktop-1280.html
     role: markup
-    sha256: 0851a1a23682623776283d44281a01d103799edec1a11fd5f62a0668809e1ac7
+    sha256: f35729bbbefbbaf4fc20d4baf210ae8a661bc677faf8e6b3866e56c950583cbc
     provenance: Rendered DOM markup kept beside the working desktop-1280 capture.
   - path: assets/sign-in-working-mobile-390.png
     role: capture
-    sha256: 3bd7dfccf8f1548cc10393c1b7f3b98a4b2580cdceb773b47da20bd7928540a4
+    sha256: 8a1dbd61dd59cfe8d9f2391088120902a10097473423e24010619fcd161b0232
     provenance: Running-page screenshot of /sign-in served by the production build (next start), working state (submit held in flight), mobile-390 viewport.
   - path: assets/sign-in-working-mobile-390.html
     role: markup
-    sha256: 0851a1a23682623776283d44281a01d103799edec1a11fd5f62a0668809e1ac7
+    sha256: 3182fa875614295edd59bf42181f6a020e03ef1af8672fe661950d814b14ef7c
     provenance: Rendered DOM markup kept beside the working mobile-390 capture.
   - path: assets/sign-in-refused-desktop-1280.png
     role: capture
-    sha256: cc9a6273759c5492615db114079db38b95c8388d81b8d18a5cc160ff75b44241
+    sha256: 7e5e2ae883d3a55f040804ab35435209cc6f845f1cbc2f78463552bfd1fca83b
     provenance: Running-page screenshot of /sign-in served by the production build (next start), refused state (UNAUTHENTICATED reply), desktop-1280 viewport.
   - path: assets/sign-in-refused-desktop-1280.html
     role: markup
-    sha256: 3d488522581172a6dffe0fee6c1cb614cd8fefae79986f1ce4d81e0ff0ddcdf5
+    sha256: 26fa4f8126b0b6f3352611ce02290f433a84fca2da9013ec3048cc9e74acd847
     provenance: Rendered DOM markup kept beside the refused desktop-1280 capture.
   - path: assets/sign-in-refused-mobile-390.png
     role: capture
-    sha256: 25542af156cc92a957c131263f878e28fd708a78578f7acb7ce10f08f8dd25ab
+    sha256: e70705a517df7aea50dbd4ec0924365fa6165b2ba39bf3c7b276a9bac487e60f
     provenance: Running-page screenshot of /sign-in served by the production build (next start), refused state (UNAUTHENTICATED reply), mobile-390 viewport.
   - path: assets/sign-in-refused-mobile-390.html
     role: markup
-    sha256: 3d488522581172a6dffe0fee6c1cb614cd8fefae79986f1ce4d81e0ff0ddcdf5
+    sha256: 48fdec6ccffab80b017ca1c94aa51de67d143bb3d5668668df32ee4e28b76f03
     provenance: Rendered DOM markup kept beside the refused mobile-390 capture.
 observations:
   - Captures were taken against the production build served by `next start` (localhost:3199) via
@@ -98,10 +98,17 @@ observations:
 # block the owners name now render the settled direction, proven by the captures under assets/ and
 # the replayable commands in evidence.yaml.
 change:
-  rev: 2
-  kind: clarifying
-  at: 2026-09-18T14:25:00.000Z
-  reason: "Implemented the settled ui.login.sign-in direction: /sign-in now renders the split-screen
+  rev: 3
+  kind: editorial
+  at: 2026-09-19T22:45:00.000Z
+  reason: "w10: all eight running-page captures re-shot with the shared convention (Playwright
+    --disable-lcd-text --disable-font-subpixel-positioning, deviceScaleFactor 4) against a fresh
+    `next build` + `next start` server, after the globals.css button-ink corrections; the asset
+    sha256s above name the new bytes, evidence.yaml was regenerated with a render-proof
+    assertion (scripts/example-render-proof.mjs) that now holds for every capture, and the
+    stale flows.json `[object Object]` step placeholders in this flow's run manifests were
+    repaired from the record's own authored steps. Prior narrative kept verbatim: Implemented
+    the settled ui.login.sign-in direction: /sign-in now renders the split-screen
     auth shell through Grammar primitives (PrimaryRailLayout with collapsedOrder primary-first,
     MediaFrame over the brand turtle master's own bytes served by the turtle-master.png route
     handler, SurfaceCard/Input/Button/TextAction furniture) across all four states with the uniform

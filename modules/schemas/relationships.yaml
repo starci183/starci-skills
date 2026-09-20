@@ -113,7 +113,7 @@ schemaToSchema:
      note: "catalog lists examples; each example's detail is a code-example@1 manifest",
      source: "schema titles/required fields"}
   - {from: knowledge-source, to: knowledge-rule, type: delegates,
-     note: "topics contain rule entries; both validated by compile-knowledge before .dist projection",
+     note: "topics contain rule entries; both validated by compile-knowledge (legacy/builders/) in the retired projection pipeline",
      source: "scripts/compile-knowledge.mjs:39-42"}
 
   # --- code-pattern pipeline --------------------------------------------------
@@ -173,7 +173,7 @@ schemaToSubsystem:
 
   knowledge:        # compiled guidance + examples
     schemas: [knowledge-source, knowledge-rule, code-example-manifest, code-example-catalog]
-    note: "validated by compile-knowledge.mjs before projection into .dist/knowledge/."
+    note: "validated by compile-knowledge.mjs (legacy/builders/) in the retired projection pipeline."
 
   build:            # build/migration helpers
     schemas: [json-exceptions]
@@ -183,5 +183,5 @@ schemaToSubsystem:
 # Reading order for an agent that must WRITE a governed document:
 #   1. find the subsystem above -> 2. open the schema file named in index.yaml
 #   -> 3. check distState (pending-build sources still bind — the yaml IS authority)
-#   -> 4. never satisfy a schema by copying a .dist artifact back as a source.
+#   -> 4. never satisfy a schema by copying a generated artifact back as a source.
 # ----------------------------------------------------------------------------

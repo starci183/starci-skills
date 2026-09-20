@@ -28,8 +28,8 @@ const INTAKE='demo.sales.implementation.backend.intake';
 const PAGE='app/receipt/page.tsx';
 const slash=value=>String(value).replaceAll('\\','/');
 const stageSealableRuntime=(sourceRoot,target)=>{
-  const required=['.dist','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs',
-    'init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md','package.json','SKILL.md','docs/supervision-templates/op.md','knowledge/grammars'];
+  const required=['kernel','bin/starci.mjs','bin/starci-skills.mjs','scripts','config.json','core',
+    'init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md','package.json','SKILL.md','docs/supervision-templates/op.md','knowledge','modules','hosts','models','cli','specifications','contracts','providers','execution','approvals','workflows','schemas'];
   for(const relative of required){const source=path.join(sourceRoot,...relative.split('/')),destination=path.join(target,...relative.split('/'));
     fs.mkdirSync(path.dirname(destination),{recursive:true});fs.cpSync(source,destination,{recursive:true});}
   return target;
@@ -515,9 +515,9 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   assert.equal(run.store.signal.get(run.state.id,'stop'),null,'the retry clears the stop signal that paused the workflow');
 
   const nonce=`shared-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`),
-    pinnedEngine=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','engine.mjs')).href}?${nonce}`),
-    pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','store.mjs')).href}?${nonce}`);
+  const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'kernel','kernel.mjs')).href}?${nonce}`),
+    pinnedEngine=await import(`${pathToFileURL(path.join(pin.root,'kernel','engine.mjs')).href}?${nonce}`),
+    pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'kernel','store.mjs')).href}?${nonce}`);
   const pinnedStore=pinnedStoreModule.createStore({repoRoot:run.owner,id:run.state.id}),engineState=pinnedStore.loadState(),
     gitAdapter=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options});
   t.after(()=>pinnedStore.close());
@@ -588,8 +588,8 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   assert.ok(runtime.candidateBridge(drawn).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/knowledge/grammars/')&&!reference.sourceRef.includes('/.dist/')),
     'the pre-pin drawing retains its authored canon provenance');
   assert.deepEqual(candidateRoots.get(implemented.id),['source','work','runtime']);assert.equal(implemented.candidate?.status,'sealed');
-  assert.ok(runtime.candidateBridge(implemented).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/.dist/knowledge/grammars/')),
-    'the frontend operation derived by the pinned kernel retains compiled canon');
+  assert.ok(runtime.candidateBridge(implemented).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/knowledge/grammars/')),
+    'the frontend operation derived by the pinned kernel retains the authored canon');
   assert.equal(writerRows.get(`${implemented.id}:worker`),2);assert.equal(writerRows.get(`${implemented.id}:final`),0);
   for(const op of final.ops.filter(item=>item.status==='done'&&item.id!==accepted.id)){
     assert.ok(observedCustody.has(`contracts/${op.id}`),`contract custody for ${op.id}; found ${JSON.stringify([...observedCustody])}`);

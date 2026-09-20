@@ -1,7 +1,7 @@
 schema: work/implementation
 id: impl.plan.todo-app-frontend.usage
 title: The usage screen and its upgrade action
-state: todo
+state: done
 repository: todo-app-frontend
 # v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
 # under the [lang] locale segment (locales en|vi); src/app/plan never existed, so the rev-3 reason's
@@ -12,15 +12,18 @@ owners:
   - {role: route, path: "src/app/[lang]/plan"}
   - {role: module, path: src/components/plan}
 proves: [ui.plan.usage]
-blockedBy:
-  - {record: gap.plan.render-proof, because: "The real captures under ./assets fail the canonical render checks - entity-list-in-card on running-page (3-7 repeated starci-core-text items inside a starci-core-surface card) and palette-off-brand #2a52b4 on the at-cap state. The defect lives in the page's markup and styles; until captures pass, the done claim is unproven."}
-verification: []
-verificationSource: authored-claim
 change:
-  rev: 4
+  rev: 5
   kind: editorial
-  at: 2026-09-19T21:30:00.000Z
-  reason: "v7-13: state rescinded done -> todo - the fresh captures v7-9 produced fail
+  at: 2026-09-19T22:40:00.000Z
+  reason: "w10: state restored todo -> done - the #2a52b4 off-brand pixels were
+    HeroUI's --accent-soft-foreground on secondary button labels; globals.css
+    now keeps secondary labels on the declared dark neutral ink, and the list
+    markup passed entity-list-in-card on the re-capture. All states were
+    re-captured with the shared convention against a fresh production build and
+    scripts/example-render-proof.mjs holds for every capture;
+    gap.plan.render-proof is closed. Prior narrative kept verbatim: v7-13:
+    state rescinded done -> todo - the fresh captures v7-9 produced fail
     entity-list-in-card and palette-off-brand, so the done claim is unproven and the record is
     held by gap.plan.render-proof. The rev-3 build description below stands as the record of
     what was built. Built and rendered-proofed ui.plan.usage against the live dev stack. Owners are the real

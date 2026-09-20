@@ -1,0 +1,4 @@
+schema: work/feature
+id: worker
+title: The worker feature
+description: Negative-corpus fixture.

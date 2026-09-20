@@ -44,8 +44,13 @@ const OUT_DIR = process.env.CAPTURE_DIR ?? here;
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800, fullPage: true },
-  { name: 'mobile', width: 390, height: 844, fullPage: false },
+  // Mobile keeps the declared 390 width and stays a plain viewport shot (no stitch - the sticky
+  // compactNavigation would paint mid-page). The height is grown to the document's scroll height
+  // once the state has settled (see shot()), capped so a runaway page cannot blow up the raster;
+  // a tall phone frames the whole form, primary action included, instead of cropping it.
+  { name: 'mobile', width: 390, height: 844, fullPage: false, growToDocument: true },
 ];
+const MOBILE_MAX_HEIGHT = 1600;
 
 const gql = async (query, variables, token) => {
   const res = await fetch(API, {
@@ -95,7 +100,7 @@ const settle = async page => {
   await page.waitForTimeout(250);
 };
 
-const shot = async (page, name, fullPage) => {
+const shot = async (page, name, viewport) => {
   mkdirSync(OUT_DIR, { recursive: true });
   // The Next.js dev-tools overlay is build tooling, not product chrome; it is removed so the
   // capture shows only the implemented surface.
@@ -106,7 +111,18 @@ const shot = async (page, name, fullPage) => {
   // viewport-pinned chrome, and a full-page stitch would paint it mid-document over the form.
   await page.evaluate(() => window.scrollTo(0, 0));
   await settle(page);
-  await page.screenshot({ path: path.join(OUT_DIR, `running-page-${name}.png`), fullPage });
+  if (viewport.growToDocument) {
+    const height = Math.min(
+      Math.max(await page.evaluate(() => document.documentElement.scrollHeight), viewport.height),
+      MOBILE_MAX_HEIGHT,
+    );
+    if (height !== viewport.height) {
+      await page.setViewportSize({ width: viewport.width, height });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await settle(page);
+    }
+  }
+  await page.screenshot({ path: path.join(OUT_DIR, `running-page-${name}.png`), fullPage: viewport.fullPage });
   writeFileSync(path.join(OUT_DIR, `running-page-${name}.html`), await page.content());
   console.log(`captured running-page-${name}.png`);
 };
@@ -128,7 +144,7 @@ for (const viewport of VIEWPORTS) {
     // --- no-rule ---
     await page.goto(PAGE_URL, { waitUntil: 'networkidle' });
     await page.getByRole('radio', { name: 'Every N days' }).waitFor();
-    await shot(page, `no-rule-${viewport.name}`, viewport.fullPage);
+    await shot(page, `no-rule-${viewport.name}`, viewport);
 
     // --- refused: every-n-days with n=0, the direction's retained draft ---
     await page.getByRole('radio', { name: 'Every N days' }).check();
@@ -138,19 +154,19 @@ for (const viewport of VIEWPORTS) {
     await page.getByLabel('Start date').fill('2026-09-21');
     await page.getByRole('button', { name: 'Save schedule' }).click();
     await page.getByText('Enter a number of days greater than zero.').waitFor();
-    await shot(page, `refused-${viewport.name}`, viewport.fullPage);
+    await shot(page, `refused-${viewport.name}`, viewport);
 
     // --- active: the same make-recurring form saved with a valid n=2 against the live API ---
     await page.getByLabel('Every (days)').fill('2');
     await page.getByRole('button', { name: 'Save schedule' }).click();
     await page.getByText('Upcoming occurrences').waitFor();
-    await shot(page, `active-${viewport.name}`, viewport.fullPage);
+    await shot(page, `active-${viewport.name}`, viewport);
 
     // --- ended: End rule confirmed in place ---
     await page.getByRole('button', { name: 'End rule' }).click();
     await page.getByRole('button', { name: 'End rule', exact: true }).last().click();
     await page.getByText('Nothing upcoming').waitFor();
-    await shot(page, `ended-${viewport.name}`, viewport.fullPage);
+    await shot(page, `ended-${viewport.name}`, viewport);
 
     await context.close();
     // Leave no fixture behind: the rule is already ended, so the task is this run's only row.

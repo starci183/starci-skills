@@ -7,9 +7,9 @@ import {BUILT_IN_HOSTS,HOSTS_PROFILE,HOST_NAMES,assertHosts,hostDescriptor,loadH
 import {ORCA_HOST} from '../hosts/orca/calls.mjs';
 import {HEADLESS_HOST} from '../hosts/headless/host.mjs';
 
-// The host model is declared data: `model/hosts.yaml` is the whole of what the kernel knows about a host, and
+// The host model is declared data: `modules/models/hosts.yaml` is the whole of what the kernel knows about a host, and
 // the two adapters read their own descriptor from it instead of each holding a constant that can drift.
-const read=name=>parseYaml(fs.readFileSync(new URL(`../model/${name}`,import.meta.url),'utf8'));
+const read=name=>parseYaml(fs.readFileSync(new URL(`../modules/models/${name}`,import.meta.url),'utf8'));
 const profile=read('hosts.yaml');
 const kinds=read('kinds.yaml');
 const codes=errors=>errors.map(error=>error.code);
@@ -43,7 +43,7 @@ test('each adapter describes itself exactly as the profile declares it',()=>{
   for(const name of HOST_NAMES){
     assert.deepEqual(hostDescriptor(name,{profile}),{name,capabilities:[...profile.hosts[name].capabilities],sequential:profile.hosts[name].sequential});
     // The built-in fallback is what an adapter answers with before a build exists; it may never say something
-    // else than the profile, or a host would describe itself differently depending on whether `.dist` is there.
+    // else than the profile, or a host would describe itself differently depending on whether the model sources loaded.
     assert.deepEqual(plainHost(BUILT_IN_HOSTS[name]),hostDescriptor(name,{profile}));
   }
   // A descriptor owns its own array: a caller that keeps one cannot reach back into the cached profile.
@@ -54,8 +54,8 @@ test('each adapter describes itself exactly as the profile declares it',()=>{
 });
 
 test('the authored profile is loaded from its directory and a bad profile is rejected by code',()=>{
-  assert.deepEqual(loadHosts({profileDir:path.join(import.meta.dirname,'..','model')}),profile);
-  // The compiled copy is what the runtime reads, so the build must carry the new profile into `.dist`.
+  assert.deepEqual(loadHosts({profileDir:path.join(import.meta.dirname,'..','modules','models')}),profile);
+  // The authored profile is what the runtime reads; there is no compiled copy to drift from it.
   assert.deepEqual(loadHosts(),JSON.parse(JSON.stringify(profile)));
   assert.deepEqual(codes(validateHosts({schema:HOSTS_PROFILE},{kinds})),['host-shape']);
   assert.deepEqual(codes(validateHosts({schema:'starci/hosts@9',hosts:profile.hosts},{kinds})),['profile-schema']);

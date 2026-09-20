@@ -82,7 +82,7 @@ let replacedFetch: typeof fetch | undefined
  */
 export const serveGraphQL = (routes: Readonly<Record<string, WireRoute>>): Wire => {
     const calls: Array<WireCall> = []
-    const fetchStub = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    const fetchStub = vi.fn<typeof fetch>(async (_input, init) => {
         const body = JSON.parse(String((init as RequestInit).body)) as { query: string; variables?: WireVariables }
         const headers = (init as RequestInit).headers as Record<string, string>
         const authorization = headers.authorization ?? headers.Authorization
@@ -105,15 +105,18 @@ export const serveGraphQL = (routes: Readonly<Record<string, WireRoute>>): Wire 
         if ("network" in reply) {
             throw new Error("the network never carried this request")
         }
-        return {
-            json: async () =>
-                "data" in reply
-                    ? { data: { [call.operation]: reply.data } }
-                    : { errors: [{ message: reply.reason, extensions: { code: reply.code } }] },
-        }
+        // A real Response, not a look-alike: the transport reads `response.json()`, and the stub
+        // staying inside `typeof fetch` is what lets `global.fetch = fetchStub` hold without a cast.
+        const payload = "data" in reply
+            ? { data: { [call.operation]: reply.data } }
+            : { errors: [{ message: reply.reason, extensions: { code: reply.code } }] }
+        return new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+        })
     })
     replacedFetch ??= global.fetch
-    global.fetch = fetchStub as unknown as typeof fetch
+    global.fetch = fetchStub
     return {
         calls,
         callsFor: operation => calls.filter(call => call.operation === operation),
@@ -218,7 +221,14 @@ export const issuedObjectUrls = (): Array<string> => ISSUED.map(entry => entry.u
 export const readObjectUrl = async (url: string): Promise<string> => {
     const issued = ISSUED.find(entry => entry.url === url)
     if (issued === undefined) throw new Error(`No object URL "${url}" was issued by this journey.`)
-    return issued.blob.text()
+    // jsdom's Blob predates the async readers; FileReader is the same browser seam either way.
+    if (typeof issued.blob.text === "function") return issued.blob.text()
+    return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => reject(reader.error)
+        reader.readAsText(issued.blob)
+    })
 }
 
 /** Whether the app revoked `url` once the download was handed over. */

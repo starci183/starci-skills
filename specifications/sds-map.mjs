@@ -1,6 +1,8 @@
-import {readDistJson} from '../core/runtime-root.mjs';
+import {parseYaml} from '../core/yaml.mjs';
+import fs from 'node:fs';
+import {fileURLToPath} from 'node:url';
 
-export const SDS_MAP_CONTRACT=readDistJson('specifications','sds-map.json');
+export const SDS_MAP_CONTRACT=parseYaml(fs.readFileSync(fileURLToPath(new URL('./sds-map.yaml',import.meta.url)),'utf8'));
 export const SDS_AGGREGATE_SCHEMA=SDS_MAP_CONTRACT.aggregateSchema;
 export const SDS_MAP_SCHEMAS=Object.freeze(Object.fromEntries([SDS_MAP_CONTRACT.overview,...Object.values(SDS_MAP_CONTRACT.sections)].map(section=>[section.type,section.schema])));
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);

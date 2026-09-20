@@ -6,24 +6,30 @@ import {readDistJson} from '../../core/runtime-root.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** Prefer `.dist` public JSON; fall back to authored YAML for build-adjacent tests. */
+/** Read a public contract document; `.json` spellings resolve to the authored YAML source. */
 export function readPublicJson(...parts) {
-  const dist = path.join(repository, '.dist', ...parts);
-  if (fs.existsSync(dist)) return JSON.parse(fs.readFileSync(dist, 'utf8'));
   return readDistJson(...parts);
 }
 
 export function readExample(name) {
-  const base = name.replace(/\.json$/i, '');
-  const dist = path.join(repository, '.dist', 'examples', `${base}.json`);
-  if (fs.existsSync(dist)) return JSON.parse(fs.readFileSync(dist, 'utf8'));
-  const yaml = path.join(repository, 'examples', `${base}.yaml`);
-  if (fs.existsSync(yaml)) return parseYaml(fs.readFileSync(yaml, 'utf8'));
+  const base = name.replace(/\.(json|ya?ml)$/i, '');
+  for (const candidate of [`examples/${base}.yaml`, `examples/${base}.json`]) {
+    const file = path.join(repository, candidate);
+    if (!fs.existsSync(file)) continue;
+    const text = fs.readFileSync(file, 'utf8');
+    return /\.ya?ml$/i.test(file) ? parseYaml(text) : JSON.parse(text);
+  }
   throw Error(`Missing example ${name}`);
 }
 
 export function readWorkflow(name) {
   return readPublicJson('workflows', name.endsWith('.json') ? name : `${name}.json`);
+}
+
+/** Canonical model record: `modules/models/<name>.yaml` — there is no compiled form. */
+export function readModel(name) {
+  const base = name.replace(/\.(yaml|yml|json)$/i, '');
+  return parseYaml(fs.readFileSync(path.join(repository, 'modules', 'models', `${base}.yaml`), 'utf8'));
 }
 
 export {repository};

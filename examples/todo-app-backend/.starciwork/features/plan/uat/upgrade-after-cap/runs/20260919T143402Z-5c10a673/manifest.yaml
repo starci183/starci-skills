@@ -7,49 +7,56 @@ assertions:
   - id: fr.plan.usage.view
     expected: yes
     observed: yes
-    note: "planUsage rendered data-state=\"at-cap\" with the cap (20) named in the cap sentence and the
-      \"Upgrade plan\" action present. This is the record's step-1 expectation: the usage screen
-      shows the at-cap state."
+    note: "planUsage rendered data-state=\"at-cap\" with the cap (20) named in the
+      cap sentence and the \"Upgrade plan\" action present. This is the record's
+      step-1 expectation: the usage screen shows the at-cap state."
   - id: br.plan.caps.limit#ac.plan.caps.limit.refuses-over-cap
     expected: yes
     observed: yes
-    note: 'The 21th create was refused before anything was written: PLAN_CAP_EXCEEDED - "The free plan
-      holds at most 20 active tasks. Upgrade at /plan/usage to create more." - naming the cap of 20
-      and the upgrade path /plan/usage. The title never appears in the list and a correctly-headed
-      tasks read-back returns no such row.'
+    note: 'The 21th create was refused before anything was written:
+      PLAN_CAP_EXCEEDED - "The free plan holds at most 20 active tasks. Upgrade
+      at /plan/usage to create more." - naming the cap of 20 and the upgrade
+      path /plan/usage. The title never appears in the list and a
+      correctly-headed tasks read-back returns no such row.'
   - id: ux.plan.create-refusal-feedback
     expected: yes
     observed: no
-    note: "The task screen renders no error feedback for the refused create: TaskListBlock.onCreate
-      drops the mutation rejection (src/components/blocks/task-list/index.tsx never reads
-      createTask.error), the submitted title stays in the input and no alert or banner appears -
-      matching ui.task.list's own state vocabulary (empty, one-task, many-tasks, refused-for-read),
-      which names no create-refusal state. The cap-and-upgrade naming a person can actually read is
-      on /plan/usage, which the previous step walked."
+    note: "The task screen renders no error feedback for the refused create:
+      TaskListBlock.onCreate drops the mutation rejection
+      (src/components/blocks/task-list/index.tsx never reads createTask.error),
+      the submitted title stays in the input and no alert or banner appears -
+      matching ui.task.list's own state vocabulary (empty, one-task, many-tasks,
+      refused-for-read), which names no create-refusal state. The
+      cap-and-upgrade naming a person can actually read is on /plan/usage, which
+      the previous step walked."
   - id: ux.plan.checkout-refusal-surface
     expected: yes
     observed: yes
-    note: "The at-cap surface's \"Upgrade plan\" action was exercised; the app's own upgradePlan call
-      answered SePay create-intent failed: empty body (HTTP 404; no credential is configured;
-      https://my.sepay.vn). The surface rendered its checkout-refusal sentence; psql read-back:
-      payment_intents 0 -> 0, subscription status free -> free (unchanged - the refused start wrote
-      nothing, matching UpgradePlanHandler's gateway-call-first ordering)."
+    note: "The at-cap surface's \"Upgrade plan\" action was exercised; the app's own
+      upgradePlan call answered SePay create-intent failed: empty body (HTTP
+      404; no credential is configured; https://my.sepay.vn). The surface
+      rendered its checkout-refusal sentence; psql read-back: payment_intents 0
+      -> 0, subscription status free -> free (unchanged - the refused start
+      wrote nothing, matching UpgradePlanHandler's gateway-call-first
+      ordering)."
   - id: fr.plan.upgrade
     expected: yes
     observed: not-run
-    note: "The record's checkout leg - complete at the gateway sandbox, webhook confirms, the cap lifts,
-      the 21st task lands - is not walked: the owner directive forbids simulating the signed
-      webhook, and the live leg cannot complete (the app's own call above carried the gateway's real
-      answer). The upgrade-path surface the app does serve - the at-cap sentence and the exercised
-      Upgrade action's refusal - is what this run proves."
+    note: "The record's checkout leg - complete at the gateway sandbox, webhook
+      confirms, the cap lifts, the 21st task lands - is not walked: the owner
+      directive forbids simulating the signed webhook, and the live leg cannot
+      complete (the app's own call above carried the gateway's real answer). The
+      upgrade-path surface the app does serve - the at-cap sentence and the
+      exercised Upgrade action's refusal - is what this run proves."
   - id: integration.plan.sepay
     expected: yes
     observed: not-run
-    note: "The live SePay leg stays unproven (gap.plan.sepay-not-reachable): this run's upgradePlan call
-      returned \"SePay create-intent failed: empty body (HTTP 404; no credential is configured;
-      https://my.sepay.vn)\", matching the gap's measured absences - no real credential is
-      configured and the create-intent route is not served by the provider. No webhook was simulated
-      and no fake gateway stood in."
+    note: "The live SePay leg stays unproven (gap.plan.sepay-not-reachable): this
+      run's upgradePlan call returned \"SePay create-intent failed: empty body
+      (HTTP 404; no credential is configured; https://my.sepay.vn)\", matching
+      the gap's measured absences - no real credential is configured and the
+      create-intent route is not served by the provider. No webhook was
+      simulated and no fake gateway stood in."
 assets:
   - path: screens/owner-signed-in.png
     sha256: 0dcc72c416f06ce7a41477c276ad11d2d1b9af95cd72a06c794da63f270bc1c7
@@ -89,238 +96,329 @@ files:
     ownedResourcesCreated:
       - kind: task
         id: b49bb0ec-10b8-48fc-89fd-4edbb202d7fe
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-01" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-01" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 1c2b7cd2-b011-4bd6-b341-8a6f5a62fc74
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-02" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-02" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 6b8e7dc8-5bf1-45b3-a2e2-bacafb66aed7
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-03" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-03" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 367855de-f2dd-41f1-9f6a-02c90e566ae8
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-04" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-04" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: cd0fa894-0df7-4ba9-9b55-f3fa757fcf50
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-05" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-05" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: a9137239-a9b7-4b6f-9010-65bd86eb1ea7
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-06" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-06" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 9f251487-027f-4737-9e0f-b476c3e0c747
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-07" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-07" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 35747d69-0eee-4789-9e0b-9edb1fb4e6f9
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-08" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-08" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 6389d2ce-2156-4bdf-bc7d-eaea9f60fe93
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-09" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-09" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 2c726d77-7b93-4001-a02e-a9820b734e0d
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-10" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-10" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: c213c61c-abab-4f2a-9083-c87e6ac92adb
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-11" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-11" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: eeabf974-8efa-4372-8bdb-3fbeb74afca4
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-12" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-12" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 353608a9-a793-4f6d-b5f1-2c459505fb0b
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-13" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-13" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 586ece64-5d8e-486f-9455-c5b7dd18ef4c
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-14" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-14" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: bc52cac7-01cb-4b83-944c-5158b13fde40
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-15" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-15" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: ae711b36-fd83-4466-ac35-c7873207ae5f
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-16" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-16" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 672f94b4-afef-443e-8982-01653a23a05e
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-17" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-17" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 9e0f6113-5ebc-4a90-8e63-ce4315af8e80
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-18" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-18" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 7a60ac57-aeb5-41da-be95-1fbc3ec8d1c7
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-19" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-19" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 1c094a56-a796-4c1b-b76c-d073690c5cfc
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-20" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-20" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
     ownedResourcesDeleted:
       - kind: task
         id: b49bb0ec-10b8-48fc-89fd-4edbb202d7fe
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 1c2b7cd2-b011-4bd6-b341-8a6f5a62fc74
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 6b8e7dc8-5bf1-45b3-a2e2-bacafb66aed7
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 367855de-f2dd-41f1-9f6a-02c90e566ae8
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: cd0fa894-0df7-4ba9-9b55-f3fa757fcf50
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: a9137239-a9b7-4b6f-9010-65bd86eb1ea7
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 9f251487-027f-4737-9e0f-b476c3e0c747
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 35747d69-0eee-4789-9e0b-9edb1fb4e6f9
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 6389d2ce-2156-4bdf-bc7d-eaea9f60fe93
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 2c726d77-7b93-4001-a02e-a9820b734e0d
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: c213c61c-abab-4f2a-9083-c87e6ac92adb
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: eeabf974-8efa-4372-8bdb-3fbeb74afca4
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 353608a9-a793-4f6d-b5f1-2c459505fb0b
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 586ece64-5d8e-486f-9455-c5b7dd18ef4c
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: bc52cac7-01cb-4b83-944c-5158b13fde40
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: ae711b36-fd83-4466-ac35-c7873207ae5f
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 672f94b4-afef-443e-8982-01653a23a05e
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 9e0f6113-5ebc-4a90-8e63-ce4315af8e80
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 7a60ac57-aeb5-41da-be95-1fbc3ec8d1c7
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
       - kind: task
         id: 1c094a56-a796-4c1b-b76c-d073690c5cfc
-        note: Run-owned seed row deleted by its recorded id through the app's own deleteTask mutation.
+        note: Run-owned seed row deleted by its recorded id through the app's own
+          deleteTask mutation.
     verifiedAbsent:
       - kind: task
         id: b49bb0ec-10b8-48fc-89fd-4edbb202d7fe
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 1c2b7cd2-b011-4bd6-b341-8a6f5a62fc74
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 6b8e7dc8-5bf1-45b3-a2e2-bacafb66aed7
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 367855de-f2dd-41f1-9f6a-02c90e566ae8
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: cd0fa894-0df7-4ba9-9b55-f3fa757fcf50
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: a9137239-a9b7-4b6f-9010-65bd86eb1ea7
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 9f251487-027f-4737-9e0f-b476c3e0c747
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 35747d69-0eee-4789-9e0b-9edb1fb4e6f9
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 6389d2ce-2156-4bdf-bc7d-eaea9f60fe93
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 2c726d77-7b93-4001-a02e-a9820b734e0d
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: c213c61c-abab-4f2a-9083-c87e6ac92adb
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: eeabf974-8efa-4372-8bdb-3fbeb74afca4
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 353608a9-a793-4f6d-b5f1-2c459505fb0b
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 586ece64-5d8e-486f-9455-c5b7dd18ef4c
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: bc52cac7-01cb-4b83-944c-5158b13fde40
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: ae711b36-fd83-4466-ac35-c7873207ae5f
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 672f94b4-afef-443e-8982-01653a23a05e
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 9e0f6113-5ebc-4a90-8e63-ce4315af8e80
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 7a60ac57-aeb5-41da-be95-1fbc3ec8d1c7
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
       - kind: task
         id: 1c094a56-a796-4c1b-b76c-d073690c5cfc
-        note: A correctly-headed tasks read-back lists no run-owned row after the delete.
-    note: Every run-owned resource this run created was deleted and its absence verified by read-back.
+        note: A correctly-headed tasks read-back lists no run-owned row after the
+          delete.
+    note: Every run-owned resource this run created was deleted and its absence
+      verified by read-back.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.plan.upgrade-after-cap
       title: Hit the cap, get refused, upgrade, create past it
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: owner-at-cap
+          action: Sign in as an owner already at 20 active tasks.
+          expected: the usage screen shows the at-cap state
+          checks: []
+        - order: 2
+          actor: owner-at-cap
+          action: Attempt to create a 21st task.
+          expected: the create is refused, naming the cap and the upgrade path
+          checks:
+            - id: errorFeedback
+              expected: yes
+            - id: validation
+              expected: yes
+        - order: 3
+          actor: owner-at-cap
+          action: Start checkout for the paid plan and complete it at the gateway sandbox.
+          expected: the gateway acknowledges the payment
+          checks:
+            - id: loading
+              expected: yes
+        - order: 4
+          actor: owner-at-cap
+          action: Return to the app once the gateway acknowledges.
+          expected: the usage screen shows no cap
+          checks:
+            - id: completion
+              expected: yes
+        - order: 5
+          actor: owner-at-cap
+          action: Create the 21st task.
+          expected: it appears in the list
+          checks:
+            - id: completion
+              expected: yes
       proves: []
   readback.json:
     schema: starci/uat-readback@1
@@ -346,104 +444,124 @@ files:
     created:
       - kind: task
         id: b49bb0ec-10b8-48fc-89fd-4edbb202d7fe
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-01" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-01" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 1c2b7cd2-b011-4bd6-b341-8a6f5a62fc74
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-02" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-02" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 6b8e7dc8-5bf1-45b3-a2e2-bacafb66aed7
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-03" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-03" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 367855de-f2dd-41f1-9f6a-02c90e566ae8
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-04" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-04" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: cd0fa894-0df7-4ba9-9b55-f3fa757fcf50
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-05" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-05" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: a9137239-a9b7-4b6f-9010-65bd86eb1ea7
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-06" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-06" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 9f251487-027f-4737-9e0f-b476c3e0c747
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-07" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-07" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 35747d69-0eee-4789-9e0b-9edb1fb4e6f9
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-08" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-08" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 6389d2ce-2156-4bdf-bc7d-eaea9f60fe93
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-09" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-09" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 2c726d77-7b93-4001-a02e-a9820b734e0d
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-10" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-10" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: c213c61c-abab-4f2a-9083-c87e6ac92adb
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-11" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-11" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: eeabf974-8efa-4372-8bdb-3fbeb74afca4
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-12" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-12" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 353608a9-a793-4f6d-b5f1-2c459505fb0b
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-13" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-13" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 586ece64-5d8e-486f-9455-c5b7dd18ef4c
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-14" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-14" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: bc52cac7-01cb-4b83-944c-5158b13fde40
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-15" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-15" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: ae711b36-fd83-4466-ac35-c7873207ae5f
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-16" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-16" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 672f94b4-afef-443e-8982-01653a23a05e
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-17" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-17" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 9e0f6113-5ebc-4a90-8e63-ce4315af8e80
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-18" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-18" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 7a60ac57-aeb5-41da-be95-1fbc3ec8d1c7
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-19" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-19" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
       - kind: task
         id: 1c094a56-a796-4c1b-b76c-d073690c5cfc
-        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-20" created through the app's own
-          createTask mutation - the record's declared "seed 20 active task rows for the owner"
-          effect, written through the real door, not SQL.
+        note: Run-owned seed row "uat-20260919T143402Z-5c10a673-cap-20" created through
+          the app's own createTask mutation - the record's declared "seed 20
+          active task rows for the owner" effect, written through the real door,
+          not SQL.
   ux-checks.json:
     schema: starci/uat-ux-checks@1
     flow: uat.plan.upgrade-after-cap
@@ -451,49 +569,57 @@ files:
       - id: fr.plan.usage.view
         expected: yes
         observed: yes
-        note: "planUsage rendered data-state=\"at-cap\" with the cap (20) named in the cap sentence and the
-          \"Upgrade plan\" action present. This is the record's step-1 expectation: the usage screen
-          shows the at-cap state."
+        note: "planUsage rendered data-state=\"at-cap\" with the cap (20) named in the
+          cap sentence and the \"Upgrade plan\" action present. This is the
+          record's step-1 expectation: the usage screen shows the at-cap state."
       - id: ac.plan.caps.limit.refuses-over-cap
         expected: yes
         observed: yes
-        note: 'The 21th create was refused before anything was written: PLAN_CAP_EXCEEDED - "The free plan
-          holds at most 20 active tasks. Upgrade at /plan/usage to create more." - naming the cap of
-          20 and the upgrade path /plan/usage. The title never appears in the list and a
+        note: 'The 21th create was refused before anything was written:
+          PLAN_CAP_EXCEEDED - "The free plan holds at most 20 active tasks.
+          Upgrade at /plan/usage to create more." - naming the cap of 20 and the
+          upgrade path /plan/usage. The title never appears in the list and a
           correctly-headed tasks read-back returns no such row.'
       - id: ux.plan.create-refusal-feedback
         expected: yes
         observed: no
-        note: "The task screen renders no error feedback for the refused create: TaskListBlock.onCreate
-          drops the mutation rejection (src/components/blocks/task-list/index.tsx never reads
-          createTask.error), the submitted title stays in the input and no alert or banner appears -
-          matching ui.task.list's own state vocabulary (empty, one-task, many-tasks,
-          refused-for-read), which names no create-refusal state. The cap-and-upgrade naming a
-          person can actually read is on /plan/usage, which the previous step walked."
+        note: "The task screen renders no error feedback for the refused create:
+          TaskListBlock.onCreate drops the mutation rejection
+          (src/components/blocks/task-list/index.tsx never reads
+          createTask.error), the submitted title stays in the input and no alert
+          or banner appears - matching ui.task.list's own state vocabulary
+          (empty, one-task, many-tasks, refused-for-read), which names no
+          create-refusal state. The cap-and-upgrade naming a person can actually
+          read is on /plan/usage, which the previous step walked."
       - id: ux.plan.checkout-refusal-surface
         expected: yes
         observed: yes
-        note: "The at-cap surface's \"Upgrade plan\" action was exercised; the app's own upgradePlan call
-          answered SePay create-intent failed: empty body (HTTP 404; no credential is configured;
-          https://my.sepay.vn). The surface rendered its checkout-refusal sentence; psql read-back:
-          payment_intents 0 -> 0, subscription status free -> free (unchanged - the refused start
-          wrote nothing, matching UpgradePlanHandler's gateway-call-first ordering)."
+        note: "The at-cap surface's \"Upgrade plan\" action was exercised; the app's own
+          upgradePlan call answered SePay create-intent failed: empty body (HTTP
+          404; no credential is configured; https://my.sepay.vn). The surface
+          rendered its checkout-refusal sentence; psql read-back:
+          payment_intents 0 -> 0, subscription status free -> free (unchanged -
+          the refused start wrote nothing, matching UpgradePlanHandler's
+          gateway-call-first ordering)."
       - id: fr.plan.upgrade
         expected: yes
         observed: not-run
-        note: "The record's checkout leg - complete at the gateway sandbox, webhook confirms, the cap lifts,
-          the 21st task lands - is not walked: the owner directive forbids simulating the signed
-          webhook, and the live leg cannot complete (the app's own call above carried the gateway's
-          real answer). The upgrade-path surface the app does serve - the at-cap sentence and the
-          exercised Upgrade action's refusal - is what this run proves."
+        note: "The record's checkout leg - complete at the gateway sandbox, webhook
+          confirms, the cap lifts, the 21st task lands - is not walked: the
+          owner directive forbids simulating the signed webhook, and the live
+          leg cannot complete (the app's own call above carried the gateway's
+          real answer). The upgrade-path surface the app does serve - the at-cap
+          sentence and the exercised Upgrade action's refusal - is what this run
+          proves."
       - id: integration.plan.sepay
         expected: yes
         observed: not-run
-        note: "The live SePay leg stays unproven (gap.plan.sepay-not-reachable): this run's upgradePlan call
-          returned \"SePay create-intent failed: empty body (HTTP 404; no credential is configured;
-          https://my.sepay.vn)\", matching the gap's measured absences - no real credential is
-          configured and the create-intent route is not served by the provider. No webhook was
-          simulated and no fake gateway stood in."
+        note: "The live SePay leg stays unproven (gap.plan.sepay-not-reachable): this
+          run's upgradePlan call returned \"SePay create-intent failed: empty
+          body (HTTP 404; no credential is configured; https://my.sepay.vn)\",
+          matching the gap's measured absences - no real credential is
+          configured and the create-intent route is not served by the provider.
+          No webhook was simulated and no fake gateway stood in."
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.plan.upgrade-after-cap

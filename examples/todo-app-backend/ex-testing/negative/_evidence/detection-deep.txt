@@ -1,0 +1,24 @@
+=== 01-record-fake-provenby ===
+REFUSE  examples/todo-app-backend/ex-testing/negative/01-record-fake-provenby/work/features/fake/fr/thing/index.yaml: fr.fake.thing carries a hand-authored provenBy - provenance is derived from done records' proves edges, never written down by hand [PROVENBY_AUTHORED]
+REFUSE  examples/todo-app-backend/ex-testing/negative/01-record-fake-provenby/work/features/fake/fr/thing/index.yaml: fr.fake.thing claims proof by uat.fake.ghost, which is todo - a false proof claim [PROVENBY_TARGET_NOT_DONE]
+INFO    examples/todo-app-backend/ex-testing/negative/01-record-fake-provenby/work: no _derived/deep-baseline.json - DEP_STALE and NORM_UNRECORDED skipped; run --write-baseline after a verified-clean pass [NO_BASELINE]
+INFO    examples/todo-app-backend/ex-testing/negative/01-record-fake-provenby/work: 1 evidence file(s) carry no cwd/repository/commit stamp - a stale verdict cannot say which input moved [EVIDENCE_CONTEXT_MISSING]
+
+2 refused, 0 suspect, 2 info
+exit=1
+=== 02-evidence-stale-after-code-change ===
+INFO    examples/todo-app-backend/ex-testing/negative/02-evidence-stale-after-code-change/work: no _derived/deep-baseline.json - DEP_STALE and NORM_UNRECORDED skipped; run --write-baseline after a verified-clean pass [NO_BASELINE]
+INFO    examples/todo-app-backend/ex-testing/negative/02-evidence-stale-after-code-change/work: 1 evidence file(s) carry no cwd/repository/commit stamp - a stale verdict cannot say which input moved [EVIDENCE_CONTEXT_MISSING]
+
+0 refused, 0 suspect, 2 info
+exit=0
+=== 03-srs-business-contradiction ===
+INFO    examples/todo-app-backend/ex-testing/negative/03-srs-business-contradiction/work: no _derived/deep-baseline.json - DEP_STALE and NORM_UNRECORDED skipped; run --write-baseline after a verified-clean pass [NO_BASELINE]
+
+0 refused, 0 suspect, 1 info
+exit=0
+=== 04-lease-drift ===
+INFO    examples/todo-app-backend/ex-testing/negative/04-lease-drift/work: no _derived/deep-baseline.json - DEP_STALE and NORM_UNRECORDED skipped; run --write-baseline after a verified-clean pass [NO_BASELINE]
+
+0 refused, 0 suspect, 1 info
+exit=0

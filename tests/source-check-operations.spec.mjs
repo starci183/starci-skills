@@ -4,12 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
-import {selectOperation} from '../ops/select.mjs';
-import {outputs} from '../ops/generate.mjs';
-import {validateCatalog} from '../ops/validate.mjs';
+import {selectOperation} from '../legacy/ops/select.mjs';
+import {outputs} from '../legacy/ops/generate.mjs';
+import {validateCatalog} from '../legacy/ops/validate.mjs';
 import {approveGoal,presentGoal,propose,requestCell,validateGoal} from '../workflows/lifecycle.mjs';
 
-const contract=parseYaml(fs.readFileSync(new URL('../ops/review.verify/operator.yaml',import.meta.url),'utf8'));
+const contract=parseYaml(fs.readFileSync(new URL('../legacy/ops/review.verify/operator.yaml',import.meta.url),'utf8'));
 
 test('review-code goals select delivery, stale, or lint contracts without inventing another job',()=>{
   const goal={schema:'starci/goal@1',id:'source-audit',originalRequest:'Inspect source freshness',requestId:'source-request',

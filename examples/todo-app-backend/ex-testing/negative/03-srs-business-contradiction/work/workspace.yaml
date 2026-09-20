@@ -1,0 +1,7 @@
+schema: work/workspace
+id: conflict-app
+project: conflict-app
+description: Minimal workspace for the business-contradiction negative case.
+repositories:
+  - role: be
+    name: conflict-be

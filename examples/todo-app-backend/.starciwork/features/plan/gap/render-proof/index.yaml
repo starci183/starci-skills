@@ -1,7 +1,7 @@
 schema: work/gap
 id: gap.plan.render-proof
 title: The usage captures fail the canonical render checks - impl.plan.todo-app-frontend.usage cannot claim done
-state: todo
+state: done
 statement: "impl.plan.todo-app-frontend.usage keeps real captures - the running page across
   under-cap, at-cap and upgrade states at desktop and mobile, produced from the served build.
   The artifacts are real; the proof is not. Run through checks/render.mjs, entity-list-in-card
@@ -14,10 +14,21 @@ statement: "impl.plan.todo-app-frontend.usage keeps real captures - the running 
   todo, blockedBy this gap. Repro: node scripts/example-render-proof.mjs --work
   examples/todo-app-backend/.starciwork --record impl.plan.todo-app-frontend.usage"
 closedBy: impl.plan.todo-app-frontend.usage
+verificationSource: authored-claim
+because: "closedBy names impl.plan.todo-app-frontend.usage, itself done again with a fresh
+  evidence.yaml whose render-proof assertion reruns the canonical
+  scripts/example-render-proof.mjs and now holds for every capture: lane w10 removed the
+  undeclared #2a52b4 (HeroUI's accent-soft-foreground) from secondary button labels in
+  globals.css and re-captured all states with the shared convention; entity-list-in-card and
+  palette-off-brand pass on the fresh markup and bytes. The gap's closure is a derived fact
+  about that record's own evidence, not a separate command."
 change:
-  rev: 1
-  kind: initial
-  at: 2026-09-19T21:30:00.000Z
-  reason: "Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
+  rev: 2
+  kind: editorial
+  at: 2026-09-19T22:45:00.000Z
+  reason: "Closed by lane w10: the #2a52b4 bucket was HeroUI's --accent-soft-foreground used as
+    visible label ink on secondary buttons - globals.css now keeps secondary labels on the
+    declared dark neutral treatment, and the re-captured markup satisfies entity-list-in-card.
+    The rev-1 opening narrative below stands verbatim. Opened at the v7-13 gate close: v7-9's honest recapture surfaced the anatomy and
     palette failures above on real markup and bytes. Neither editing checks/*.mjs nor staging
     captures can close this - the rendered page itself violates the design system's laws."

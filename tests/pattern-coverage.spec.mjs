@@ -11,10 +11,10 @@ import {parseYaml} from '../core/yaml.mjs';
  *
  * A. knowledge/patterns/{fe,be}/ records: every authored rule maps to an executable check
  *    (a script obligation routed into scripts/checks/code-patterns/, an ESLint obligation or an
- *    architecture obligation of model/code-patterns.yaml) or carries an explicit manual
+ *    architecture obligation of modules/models/code-patterns.yaml) or carries an explicit manual
  *    marker with a reason (an authored `check: manual`, a nonempty verification.manual
  *    list, or a profile semanticOnly entry with rationale+guidance).
- * B. .starciwork record classes (model/records.yaml): every class maps to a schema file
+ * B. .starciwork record classes (modules/models/records.yaml): every class maps to a schema file
  *    plus a runnable validator, or is marked external/embedded with the reason.
  * C. .stacks env/service files: every file under a repository .stacks/ is the manifest,
  *    referenced by the manifest (scripts/checks/stacks.mjs bounds-checks each reference), or a
@@ -35,7 +35,7 @@ const root=path.resolve(import.meta.dirname,'..');
 const read=relpath=>fs.readFileSync(path.join(root,relpath),'utf8');
 const yaml=relpath=>parseYaml(read(relpath));
 
-const catalog=yaml('model/code-patterns.yaml');
+const catalog=yaml('modules/models/code-patterns.yaml');
 const scriptSource=read('scripts/checks/check-scoped-lint.mjs');
 
 // The adapter table of check-scoped-lint.mjs routes script ruleIds into scripts/checks/code-patterns/.
@@ -131,7 +131,7 @@ test('the script-coverage gap is exactly the known set - comment/folder/function
 
 // ---------------------------------------------------------------- B. .starciwork record classes
 
-const records=yaml('model/records.yaml');
+const records=yaml('modules/models/records.yaml');
 const workSchema=yaml('schemas/work.schema.yaml');
 const schemaFile=relpath=>fs.existsSync(path.join(root,relpath));
 const hasDef=name=>Boolean(workSchema?.$defs?.[name]);
@@ -148,7 +148,7 @@ const RECORD_CLASS_COVERAGE={
   design:{schemas:['schemas/work.schema.yaml:$defs.uiSpec'],validator:'core/index.mjs:validateWorkspace'},
   asset:{schemas:['schemas/work.schema.yaml:$defs.asset','schemas/work.schema.yaml:$defs.nodeAsset'],validator:'core/index.mjs:validateWorkspace'},
   code:{schemas:[],validator:null,external:'repository-bound product source (layout repository:**), verified by the operations of its lane, never a .starciwork file'},
-  grammar:{schemas:['schemas/knowledge-source.schema.yaml','schemas/knowledge-rule.schema.yaml'],validator:'scripts/compile-knowledge.mjs (knowledge/grammars/**)',external:'grammar:** package files are product-bound; only the authored knowledge side is tree-checked'},
+  grammar:{schemas:['schemas/knowledge-source.schema.yaml','schemas/knowledge-rule.schema.yaml'],validator:'legacy/builders/compile-knowledge.mjs (knowledge/grammars/**)',external:'grammar:** package files are product-bound; only the authored knowledge side is tree-checked'},
   evidence:{schemas:['schemas/work.schema.yaml:$defs.evidence'],validator:'core/index.mjs:validateWorkspace'},
   runtime:{schemas:['schemas/work.schema.yaml:$defs.node'],validator:'core/index.mjs:validateWorkspace',embedded:'declared, never written as a file: carried inside the operations node record (records.yaml)'},
   integration:{schemas:['schemas/work.schema.yaml:$defs.integrationDeclaration'],validator:'core/index.mjs:validateWorkspace + integration.verify op'}
@@ -228,55 +228,60 @@ test('every .stacks env/service file is manifest-referenced or an accounted arti
   assert.deepEqual(uncoveredFiles,[],'every env/service file under .stacks/ must be referenced by the manifest (scripts/checks/stacks.mjs bounds-checks it) or be a non-service artifact');
 });
 
-// ---------------------------------------------------------------- D. run-state layout (.starciwork/_local/workflows/<id>/)
+// ----------------------------------------------------- D. run-state layout (.starciwork/runtime.sqlite ledger)
 
 const posix=value=>String(value??'').split(path.sep).join('/');
 
 /**
- * The .claude-owned runtime tree. Every artifact class a workflow persists declares its
- * schema (a const, a rendered template or an internal format), the writer/validator that
- * owns it, and the module token proving the writer is still live. `outside` marks the one
- * declared path that legitimately sits outside _local: the public continuation projection.
+ * The .claude-owned runtime record. Run state is rows in `.starciwork/runtime.sqlite`, never files
+ * under `_local/` - that tree is retired kernel authority. Every artifact class a workflow persists
+ * declares its schema (a const, a rendered template or an internal format), the writer/validator that
+ * owns it, and the module token proving the writer is still live. `outside` marks the one artifact
+ * that legitimately stays a file: the public continuation projection at `workflows/<id>.md`. Retired
+ * `_local` filenames survive only as housekeeping declarations in candidate-bridge.
  */
 const RUN_STATE_ARTIFACTS=[
-  {file:'state.json',schema:'starci/workflow-state@1',validator:'store.saveState schema pin + loadState',source:['kernel/store.mjs','WORKFLOW_STATE']},
-  {file:'events.jsonl',schema:'append-only seq-numbered JSONL',validator:'store.appendEvent assigns seq; readEvents replays',source:['kernel/store.mjs','appendEvent']},
-  {file:'goal.md',schema:'rendered markdown projection',validator:'kernel/goal.mjs goal writers',source:['kernel/goal.mjs','paths.goal']},
-  {file:'goal.json',schema:'starci/workflow-goal@1',validator:'kernel/goal.mjs goalPhase/workGoalPhase',source:['kernel/goal.mjs','goalJson']},
-  {file:'reports/<dispatch>.json',schema:'starci/op-report@1 | starci/workflow-report@1',validator:'kernel/reports.mjs validateReport + store.readReports',source:['kernel/reports.mjs','OP_REPORT']},
+  {file:'state_snapshots rows',schema:'starci/workflow-state@1',validator:'store.saveState schema pin + loadState',source:['kernel/store.mjs','WORKFLOW_STATE']},
+  {file:'events rows',schema:'append-only seq-numbered ledger rows',validator:'store.appendEvent assigns seq; readEvents replays',source:['kernel/store.mjs','appendEvent']},
+  {file:'goals row',schema:'starci/workflow-goal@1',validator:'kernel/goal.mjs goal writers over store.setGoal',source:['kernel/goal.mjs','goalJson']},
+  {file:'reports rows',schema:'starci/op-report@1 | starci/workflow-report@1',validator:'kernel/reports.mjs validateReport + store.writeReport/readReports',source:['kernel/reports.mjs','OP_REPORT']},
   {file:'reports/wait-state.json',schema:'internal wait-state record',validator:'housekeeping-declared runtime file',source:['kernel/candidate-bridge.mjs','wait-state.json']},
-  {file:'contracts/<op>.md',schema:'rendered contract template',validator:'kernel renderContract via store.contractPath',source:['kernel/kernel.mjs','contractPath']},
-  {file:'checks/<op>.json',schema:'worker check-result list',validator:'kernel checks intake via store.checksPath',source:['kernel/kernel.mjs','checksPath']},
-  {file:'checks/<op>-kernel.json',schema:'starci/workflow-kernel-checks@1',validator:'kernel kernel-check writer',source:['kernel/kernel.mjs','workflow-kernel-checks@1']},
-  {file:'checks/<op>-audit.json',schema:'starci/audit-measurement@1',validator:'kernel audit writer',source:['kernel/kernel.mjs','audit-measurement@1']},
+  {file:'contracts rows',schema:'rendered contract markdown',validator:'store.writeContract/readContract',source:['kernel/store.mjs','writeContract']},
+  {file:'checks rows',schema:'worker check-result list',validator:'store.writeChecks/readChecks',source:['kernel/store.mjs','writeChecks']},
+  {file:'kernel check result',schema:'starci/workflow-kernel-checks@1',validator:'kernel kernel-check writer',source:['kernel/kernel.mjs','workflow-kernel-checks@1']},
+  {file:'audit measurement',schema:'starci/audit-measurement@1',validator:'kernel audit writer',source:['kernel/kernel.mjs','audit-measurement@1']},
   {file:'checks/<op>.credential-request.json',schema:'credential-request record',validator:'housekeeping-declared runtime file',source:['kernel/candidate-bridge.mjs','credential-request.json']},
-  {file:'inbox/*.json',schema:'starci/job@1 owner-action or kernel command',validator:'kernel queueInbox/applyInbox',source:['kernel/kernel.mjs','queueInbox']},
-  {file:'final-report.json',schema:'starci/workflow-final-report@1',validator:'kernel finish writer',source:['kernel/common.mjs','FINAL_REPORT']},
-  {file:'launch.json',schema:'launch hand-off record',validator:'kernel awaitLaunch',source:['kernel/kernel.mjs','awaitLaunch']},
+  {file:'inbox rows',schema:'starci/job@1 owner-action or kernel command',validator:'kernel queueInbox/applyInbox over store.inbox',source:['kernel/kernel.mjs','queueInbox']},
+  {file:'final report signal',schema:'starci/workflow-final-report@1',validator:'kernel finish writer; paths.final is a ledger URI',source:['kernel/common.mjs','FINAL_REPORT']},
+  {file:'launch signal',schema:'launch hand-off record',validator:'kernel awaitLaunch reads the launch signal or a named file',source:['kernel/kernel.mjs','awaitLaunch']},
   {file:'kernel.lock + stop.flag',schema:'control files',validator:'kernel lock/stop protocol',source:['kernel/candidate-bridge.mjs','kernel.lock']},
   {file:'supervisor.lock/.log + runtime-loads.json + runtime-budget.json',schema:'shared supervisor ledgers',validator:'housekeeping-declared runtime files',source:['kernel/candidate-bridge.mjs','runtime-budget.json']},
-  {file:'workflows/<id>.md (repository root)',schema:'managed continuation section',validator:'candidate-bridge runtimeManagedFiles',source:['kernel/store.mjs','continuation'],outside:true},
+  {file:'workflows/<id>.md (repository root)',schema:'managed continuation section',validator:'store.continuation + acknowledgeRuntimeFile',source:['kernel/store.mjs','continuation'],outside:true},
 ];
 
-test('every _local/workflows/<id>/ run-state artifact binds a schema and a live writer/validator at a declared path',async t=>{
+test('every workflow run-state artifact binds a schema and a live writer/validator in the ledger store',async t=>{
   const {createStore,WORKFLOW_STATE,RUNTIME_FILE_WRITE}=await import('../kernel/store.mjs');
   const {FINAL_REPORT,GOAL_RECORD}=await import('../kernel/common.mjs');
   const {OP_REPORT,WORKFLOW_REPORT,validateReport}=await import('../kernel/reports.mjs');
-  const {queueInbox,awaitLaunch}=await import('../kernel/kernel.mjs');
+  const {queueInbox}=await import('../kernel/kernel.mjs');
   for(const [name,value] of Object.entries({WORKFLOW_STATE,GOAL_RECORD,FINAL_REPORT,OP_REPORT,WORKFLOW_REPORT,RUNTIME_FILE_WRITE}))
     assert.match(value,/^starci\//,`${name} must be a live schema const`);
 
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-runstate-'));
   t.after(()=>{try{fs.rmSync(dir,{recursive:true,force:true});}catch{}});
   const store=createStore({repoRoot:dir,id:'wf-coverage'});
-  const localRoot=posix(path.join(dir,'.starciwork','_local','workflows','wf-coverage'));
-  for(const [key,file] of Object.entries(store.paths)){
-    const normal=posix(file);
-    if(key==='continuation')assert.equal(normal,posix(path.join(dir,'workflows','wf-coverage.md')));
-    else assert.ok(normal.startsWith(`${localRoot}/`),`${key} escapes the declared run-state directory: ${normal}`);
-  }
-  for(const sub of ['reports','contracts','checks','inbox'])
-    assert.ok(fs.statSync(store.paths[sub]).isDirectory(),`${sub}/ must be created under the run-state directory`);
+  // No `_local` directory is created: the workflow record lives in `.starciwork/runtime.sqlite`.
+  assert.equal(store.dir,null);
+  assert.equal(posix(store.ledgerFile),posix(path.join(dir,'.starciwork','runtime.sqlite')));
+  assert.equal(fs.existsSync(path.join(dir,'.starciwork','_local')),false);
+  // `paths.*` is retired except the continuation projection (the one file that stays on disk, in the
+  // repo not `_local`) and the final-report ledger URI; every other key fails loudly with its name.
+  assert.equal(posix(store.paths.continuation),posix(path.join(dir,'workflows','wf-coverage.md')));
+  assert.equal(store.paths.final,`ledger://final-report/wf-coverage`);
+  for(const key of ['state','events','reports','contracts','checks','inbox','launch','goal'])
+    assert.throws(()=>store.paths[key],/store-paths-removed/,key);
+  for(const method of ['reportPath','contractPath','checksPath'])
+    assert.throws(()=>store[method]('x'),/store-paths-removed/,method);
 
   // Writers validate. A state carrying any other schema is refused before it lands.
   assert.throws(()=>store.saveState({schema:'starci/bogus@1',id:'wf-coverage'}),new RegExp(WORKFLOW_STATE));
@@ -286,21 +291,20 @@ test('every _local/workflows/<id>/ run-state artifact binds a schema and a live 
   store.appendEvent({event:'coverage-a'});store.appendEvent({event:'coverage-b'});
   const events=store.readEvents();
   assert.ok(events.length>=2&&events.at(-1).seq===events.at(-2).seq+1,'events must round-trip in seq order');
-  // Inbox commands land only inside the declared inbox.
+  // Inbox commands are ledger rows the kernel applies, never files.
   const queued=queueInbox(store,{kind:'approve'});
-  assert.ok(posix(queued).startsWith(`${localRoot}/inbox/`),'queueInbox must write inside the declared inbox/');
-  // Report artifacts are schema-checked on read and on write.
+  assert.equal(store.inbox.pending().length,1);
+  assert.ok(store.inbox.settle(queued.id,'applied'));
+  assert.equal(store.inbox.pending().length,0);
+  // Reports are schema-checked and round-trip through the ledger, not files.
   assert.ok(validateReport({schema:'starci/bogus@1',outcome:'done'}).errors.some(error=>error.includes('Unsupported report schema')));
-  fs.writeFileSync(store.reportPath('d1'),JSON.stringify({schema:OP_REPORT,outcome:'done',summary:'x',files:[],checks:[],open:[]}));
-  fs.writeFileSync(store.reportPath('bad'),'{not json');
-  const reports=store.readReports();
-  assert.deepEqual(reports.map(report=>report.schema),[OP_REPORT],'readReports replays only schema-valid report files');
-  // launch.json is the declared hand-off awaitLaunch reads.
-  fs.writeFileSync(store.paths.launch,JSON.stringify({from:'terminal-7'}));
-  assert.equal(awaitLaunch(store.paths.launch).from,'terminal-7');
-  // Contract and check artifacts address their own declared directories.
-  assert.ok(posix(store.contractPath('op1')).startsWith(`${localRoot}/contracts/`));
-  assert.ok(posix(store.checksPath('op1')).startsWith(`${localRoot}/checks/`));
+  store.writeReport({dispatchId:'d1',report:{schema:OP_REPORT,outcome:'done',summary:'x',files:[],checks:[],open:[]}});
+  assert.deepEqual(store.readReports().map(report=>report.schema),[OP_REPORT]);
+  // Contracts and checks address their own ledger rows.
+  store.writeContract({opId:'op1',markdown:'# contract'});
+  assert.equal(store.readContract('op1').markdown,'# contract');
+  store.writeChecks({opId:'op1',checks:[{name:'coverage-check'}]});
+  assert.deepEqual(store.readChecks('op1'),[{name:'coverage-check'}]);
 
   const missing=[];
   for(const row of RUN_STATE_ARTIFACTS){
@@ -332,7 +336,9 @@ test('undeclared writes under _local quarantine the candidate; declared run-stat
   fs.writeFileSync(path.join(local,'rogue.json'),'{}\n');
   const frozen=freezeDetectionCandidate(bridge,{git,housekeeping:{workflowId:'wfc',opId:'opx'}});
   assert.equal(frozen.status,'quarantine','an undeclared _local write must quarantine the candidate');
-  assert.ok(frozen.reasons.includes('outside-allowlist:.starciwork/_local/workflows/wfc/rogue.json'));
+  // Any `.starciwork` write outside the op's allowlist touches the workflow record's custody boundary:
+  // it is `custody-path-touched`, never ordinary outside-allowlist scope drift.
+  assert.ok(frozen.reasons.includes('custody-path-touched:.starciwork/_local/workflows/wfc/rogue.json'),frozen.reasons.join('\n'));
   for(const declared of ['state.json','events.jsonl','checks/opx.json']){
     assert.ok(frozen.housekeepingObserved.includes(`.starciwork/_local/workflows/wfc/${declared}`),`${declared} is declared run state - housekeeping, not a candidate change`);
     assert.equal(frozen.observedFiles.includes(`.starciwork/_local/workflows/wfc/${declared}`),false);
@@ -344,7 +350,7 @@ test('undeclared writes under _local quarantine the candidate; declared run-stat
 const NODE=(kind,meta='')=>`schema: work/node@2\nid: demo.coverage.${kind}\nkind: ${kind}\nrequired: true\n${meta}`;
 
 /**
- * Every feature record class (model/records.yaml) binds a schema def and the runnable
+ * Every feature record class (modules/models/records.yaml) binds a schema def and the runnable
  * validator at its declared path. `cases` are executable: a record written outside the
  * declared layout must make core/index.mjs emit the named issue code. Classes with no
  * file path of their own carry external/embedded/custody with the reason.

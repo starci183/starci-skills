@@ -10,29 +10,29 @@
 # drift impossible to persist; the hash chain makes history tamper visible; the
 # anchor file (ledger-anchor.json, git-tracked) proves WHICH history is agreed.
 #
-# source of truth for statements: .dist/kernel/ledger-db.mjs + the kernel files
-# cited per query; contract doc: .dist/docs/ledger-db.md.
+# source of truth for statements: kernel/ledger-db.mjs + the kernel files
+# cited per query; contract doc: docs/ledger-db.md.
 
 schema: starci/module-ledger-db-index@1
 sources:
-  - .dist/kernel/ledger-db.mjs      # DDL + handles + two-phase reserve + verify
-  - .dist/docs/ledger-db.md         # keystone contract (§1-§13)
-  - .dist/kernel/journal.mjs        # retired journal; shared helpers it still exports
-  - .dist/kernel/store.mjs          # the store API whose backing IS this DB
-  - .dist/kernel/admission.mjs      # fences, budgets, expire
-  - .dist/kernel/jobs.mjs           # queue + settlement transaction
-  - .dist/kernel/job-worker.mjs     # durable job wrapper (claim shapes, staged results)
-  - .dist/kernel/job-bridge.mjs     # bridge enqueue/replay
-  - .dist/kernel/engine.mjs         # retry/reconcile/provider-loads/intent-v1 binding
-  - .dist/kernel/continuation.mjs   # continuation boundary reads
-  - .dist/kernel/launch.mjs         # signals (locks as rows)
-  - .dist/kernel/loads.mjs          # runtime_loads
-  - .dist/kernel/candidate-bridge.mjs  # custody receipts via events
-  - .dist/kernel/terminals.mjs / supervisor.mjs / owner.mjs / kernel.mjs
-  - .dist/hosts/orca/launch.mjs     # ledger-verify/anchor/retire verbs
-  - .dist/scripts/ledger-migrate.mjs
-  - .dist/schemas/ledger-db.schema.json  # column-catalog contract (documentation schema)
-  - .dist/kernel/ledger.mjs         # NOT this DB — the Work-tree ledger (yaml nodes); see design.yaml naming trap
+  - kernel/ledger-db.mjs      # DDL + handles + two-phase reserve + verify
+  - docs/ledger-db.md         # keystone contract (§1-§13)
+  - kernel/journal.mjs        # retired journal; shared helpers it still exports
+  - kernel/store.mjs          # the store API whose backing IS this DB
+  - kernel/admission.mjs      # fences, budgets, expire
+  - kernel/jobs.mjs           # queue + settlement transaction
+  - kernel/job-worker.mjs     # durable job wrapper (claim shapes, staged results)
+  - kernel/job-bridge.mjs     # bridge enqueue/replay
+  - kernel/engine.mjs         # retry/reconcile/provider-loads/intent-v1 binding
+  - kernel/continuation.mjs   # continuation boundary reads
+  - kernel/launch.mjs         # signals (locks as rows)
+  - kernel/loads.mjs          # runtime_loads
+  - kernel/candidate-bridge.mjs  # custody receipts via events
+  - kernel/terminals.mjs / supervisor.mjs / owner.mjs / kernel.mjs
+  - hosts/orca/launch.mjs     # ledger-verify/anchor/retire verbs
+  - scripts/ledger-migrate.mjs
+  - schemas/ledger-db.schema.yaml  # column-catalog contract (documentation schema)
+  - kernel/ledger.mjs         # NOT this DB — the Work-tree ledger (yaml nodes); see design.yaml naming trap
 
 files:
   schema.sql:   "ledger DDL verbatim (19 tables, 6 indexes, 3 triggers); per-table comment = what decision the row lets the kernel make"

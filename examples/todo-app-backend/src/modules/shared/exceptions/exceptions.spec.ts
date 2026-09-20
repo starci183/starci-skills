@@ -114,6 +114,30 @@ import {
 import {
     TaskTitleRequiredException 
 } from "./errors/task/task-title-required"
+import {
+    UploadForbiddenException 
+} from "./errors/upload/upload-forbidden"
+import {
+    UploadMimeNotAllowedException 
+} from "./errors/upload/upload-mime-not-allowed"
+import {
+    UploadNotFoundException 
+} from "./errors/upload/upload-not-found"
+import {
+    UploadNotReadyException 
+} from "./errors/upload/upload-not-ready"
+import {
+    UploadScanRejectedException 
+} from "./errors/upload/upload-scan-rejected"
+import {
+    UploadStorageUnavailableException 
+} from "./errors/upload/upload-storage-unavailable"
+import {
+    UploadTokenInvalidException 
+} from "./errors/upload/upload-token-invalid"
+import {
+    UploadTooLargeException 
+} from "./errors/upload/upload-too-large"
 
 interface ExceptionCase {
   readonly make: () => AbstractException;
@@ -404,6 +428,78 @@ const cases: Array<ExceptionCase> = [
     },
     {
         make: () => new PlanWebhookUnauthorizedException(), code: "PLAN_WEBHOOK_UNAUTHORIZED_EXCEPTION" 
+    },
+    {
+        make: () => new UploadNotFoundException({
+            uploadId: "u-1" 
+        }),
+        code: "UPLOAD_NOT_FOUND_EXCEPTION",
+        metadata: {
+            uploadId: "u-1" 
+        },
+    },
+    {
+        make: () => new UploadForbiddenException({
+            uploadId: "u-1", actorId: "p-2" 
+        }),
+        code: "UPLOAD_FORBIDDEN_EXCEPTION",
+        metadata: {
+            uploadId: "u-1", actorId: "p-2" 
+        },
+    },
+    {
+        make: () => new UploadTooLargeException({
+            sizeBytes: 11, maxBytes: 10 
+        }),
+        code: "UPLOAD_TOO_LARGE_EXCEPTION",
+        metadata: {
+            sizeBytes: 11, maxBytes: 10 
+        },
+    },
+    {
+        make: () => new UploadMimeNotAllowedException({
+            mime: "application/x-msdownload" 
+        }),
+        code: "UPLOAD_MIME_NOT_ALLOWED_EXCEPTION",
+        metadata: {
+            mime: "application/x-msdownload" 
+        },
+    },
+    {
+        make: () => new UploadTokenInvalidException({
+            uploadId: "u-1", reason: "expired" 
+        }),
+        code: "UPLOAD_TOKEN_INVALID_EXCEPTION",
+        metadata: {
+            uploadId: "u-1", reason: "expired" 
+        },
+    },
+    {
+        make: () => new UploadNotReadyException({
+            uploadId: "u-1" 
+        }),
+        code: "UPLOAD_NOT_READY_EXCEPTION",
+        metadata: {
+            uploadId: "u-1" 
+        },
+    },
+    {
+        make: () => new UploadScanRejectedException({
+            uploadId: "u-1", reason: "signature-match" 
+        }),
+        code: "UPLOAD_SCAN_REJECTED_EXCEPTION",
+        metadata: {
+            uploadId: "u-1", reason: "signature-match" 
+        },
+    },
+    {
+        make: () => new UploadStorageUnavailableException({
+            reason: "key-escape" 
+        }),
+        code: "UPLOAD_STORAGE_UNAVAILABLE_EXCEPTION",
+        metadata: {
+            reason: "key-escape" 
+        },
     },
 ]
 

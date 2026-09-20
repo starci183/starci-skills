@@ -26,7 +26,7 @@ import {GOAL_POOLS,POOL_OF_MODEL,GOAL_POOL_CAPS,GOAL_MAX_PARALLEL_OPS,poolOf,idO
  * `enrollEngine` opens its own ledger handle and hands it to `store.bindJournal`, which the store keeps
  * as its durable binding; `store.close()` only closes the handle it opened itself, and nothing ever closes
  * the one `enrollEngine` opened (kernel/engine.mjs and kernel/store.mjs, not owned by this stream - see
- * notes/w2-s9.md, "kernel/engine.mjs leaks the durable ledger handle enrollEngine opens"). Windows refuses
+ * legacy/notes/w2-s9.md, "kernel/engine.mjs leaks the durable ledger handle enrollEngine opens"). Windows refuses
  * to delete a directory with any file still open under it, and no amount of retrying closes a handle
  * nothing ever releases, so cleanup after such a test tolerates that specific, external, known leak rather
  * than asserting a defect this stream does not own.
@@ -34,14 +34,14 @@ import {GOAL_POOLS,POOL_OF_MODEL,GOAL_POOL_CAPS,GOAL_MAX_PARALLEL_OPS,poolOf,idO
 const rmSyncTolerant=target=>{try{fs.rmSync(target,{recursive:true,force:true});}
   catch(error){if(process.platform!=='win32'||error?.code!=='EPERM')throw error;}};
 const profile=loadRuntimeProfile();
-const kinds=parseYaml(fs.readFileSync(new URL('../model/kinds.yaml',import.meta.url),'utf8'));
-const opsDirs=fs.readdirSync(new URL('../ops',import.meta.url),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);
-const opsRegistry=parseYaml(fs.readFileSync(new URL('../ops/registry.yaml',import.meta.url),'utf8'));
+const kinds=parseYaml(fs.readFileSync(new URL('../modules/models/kinds.yaml',import.meta.url),'utf8'));
+const opsDirs=fs.readdirSync(new URL('../legacy/ops',import.meta.url),{withFileTypes:true}).filter(entry=>entry.isDirectory()&&fs.existsSync(new URL(`../legacy/ops/${entry.name}/operator.yaml`,import.meta.url))).map(entry=>entry.name);
+const opsRegistry=parseYaml(fs.readFileSync(new URL('../legacy/ops/registry.yaml',import.meta.url),'utf8'));
 const SOL=idOf(profile.runtimes,'gpt-5.6-sol');
 const NAMING=namingOf(profile);
 
 test('the canonical catalog is one closed list: kinds.yaml keys equal KINDS, fully declared',()=>{
-  assert.deepEqual(Object.keys(kinds.kinds).sort(),[...KINDS].sort(),'model/kinds.yaml and kernel/graph.mjs KINDS must be the same closed catalog');
+  assert.deepEqual(Object.keys(kinds.kinds).sort(),[...KINDS].sort(),'modules/models/kinds.yaml and kernel/graph.mjs KINDS must be the same closed catalog');
   for(const kind of KINDS){
     const record=kindRecord(kind);
     assert.ok(FAMILIES.includes(record.family),`${kind}: family ${record.family} must be one of ${FAMILIES}`);
@@ -99,8 +99,8 @@ test('interface.draw and interface.asset allow only the image route: one candida
     assert.equal(chain.candidates.length,1,`${op} must have exactly one launch candidate`);
     const candidate=chain.candidates[0];
     assert.equal(poolOf(candidate.target),'codex-agent',`${op} must resolve inside the codex pool`);
-    // model/registry.yaml: the ImageGen tool call names the operation agent, not an image-model version, so
-    // the resolved model is whatever model/runtimes.yaml pins codex-agent's `write` role to.
+    // modules/models/registry.yaml: the ImageGen tool call names the operation agent, not an image-model version, so
+    // the resolved model is whatever modules/models/runtimes.yaml pins codex-agent's `write` role to.
     assert.equal(candidate.model,profile.runtimes[SOL].models.write,`${op} is pinned to the codex pool's write model`);
     assert.equal(idOf(profile.runtimes,candidate.target),SOL);
   }
@@ -316,14 +316,23 @@ test('parallel ASAP saturates every granted pool to the global ceiling, capped p
   assert.ok(over.blocked.length&&over.blocked.every(item=>item.reason),'every saturated pool names why it cannot take the operation');
 });
 
-test('owner weights are both the quota grant and the target share; the named order leads capacity heuristics',()=>{
+test('owner weights are both the quota grant and the target share; the deficit pick leads capacity heuristics',()=>{
+  // Goal §4: the granted slots are the target share, and the pick among ready runtimes is the largest
+  // targetShare - inFlight deficit; the owner-named order is the tie-break, never the fill order
+  // (tests/runtime-allocator.spec.mjs proves the same contract for beta=1,alpha=4).
   const weighted={...saturatingProfile(),allocation:{policy:PREFER_THEN_OVERFLOW}};
   const allocator=createAllocator({runtimes:weighted,quota:parseQuota('qwen-agent=1,codex-agent=5,claude-agent=4,devin-agent=10'),now:()=>Date.UTC(2026,8,12,9)});
   const first=allocator.allocate('x.implement');
-  assert.equal(first.runtime,'qwen-agent','the owner-named order leads the fill, not the largest pool');
-  const second=allocator.allocate('x.implement');
-  assert.equal(second.runtime,'codex-agent','a full preferred pool overflows down the owner order, not to the biggest free pool');
-  assert.equal(second.overflowed,true,'overflow past the first owner choice is named on the receipt');
+  assert.equal(first.runtime,'devin-agent','the largest target share is the largest deficit, not the first name in the owner list');
+  assert.equal(first.targetShare,10,'the owner weight is the target share on the receipt');
+  assert.equal(first.deficit,10);
+  // The weight keeps leading until its deficit meets the next share's: devin-agent's 10-share outranks
+  // codex-agent's 5 until both stand at 5, and there the owner-named order is the tie-break.
+  for(let index=1;index<5;index+=1)
+    assert.equal(allocator.allocate('x.implement').runtime,'devin-agent',`devin-agent's deficit still leads at ${index}`);
+  const tie=allocator.allocate('x.implement');
+  assert.equal(tie.runtime,'codex-agent','at a 5:5 deficit tie the owner-named order (qwen,codex,claude,devin) decides');
+  assert.equal(allocator.allocate('x.implement').runtime,'devin-agent','the still-larger deficit resumes the lead after the tie');
   const review=allocator.review('x.implement');
   assert.equal(review.ready.find(item=>item.runtime==='devin-agent')?.slots,10,'the owner weight is also the grant that opened the gated pool');
 });

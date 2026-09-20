@@ -10,19 +10,19 @@
 # will dispatch to get there; the goal is what makes "there" checkable.
 #
 # Sources (all under .claude/, relative to the skill root):
-#   .dist/kernel/goal.mjs        — goalPhase, goalFromLedger, approve, reviseGoal,
+#   kernel/goal.mjs        — goalPhase, goalFromLedger, approve, reviseGoal,
 #                                  validateGoalRevision, diffGoalSections,
 #                                  propagateInvalidation, adoptReportRev,
 #                                  noteGoalMetrics, GOAL_SPIN_LIMIT, applyWorkflowAmendment
-#   .dist/kernel/owner.mjs       — openOwnerAsk, ASK_KINDS, STOP_KINDS,
+#   kernel/owner.mjs       — openOwnerAsk, ASK_KINDS, STOP_KINDS,
 #                                  PROVISION_KINDS, stopReasonFor, openConflictDecision
-#   .dist/kernel/owner-requests.mjs — owner-request projections, applyOwnerAction
-#   .dist/kernel/sync.mjs        — designGate, lane step derivation, cutOpFor
-#   .dist/kernel/ask.mjs         — goalRevOf (rev binding on every derivation)
-#   .dist/schemas/goal.schema.json   — starci/goal@1 record shape
-#   .dist/schemas/goal-plan.json     — plan-ledger goal form (done/ledger/ops/risks/questions)
-#   .dist/docs/workflow-kernel.md    — goal phase narrative
-#   .dist/docs/scoped-approval.md    — the owner-only approval gate
+#   kernel/owner-requests.mjs — owner-request projections, applyOwnerAction
+#   kernel/sync.mjs        — designGate, lane step derivation, cutOpFor
+#   kernel/ask.mjs         — goalRevOf (rev binding on every derivation)
+#   schemas/goal.schema.yaml   — starci/goal@1 record shape
+#   schemas/goal-plan.yaml     — plan-ledger goal form (done/ledger/ops/risks/questions)
+#   docs/workflow-kernel.md    — goal phase narrative
+#   docs/scoped-approval.md    — the owner-only approval gate
 #   model/kinds.yaml               — lanes (nodeKind -> ordered steps), routes, kinds
 #   modules/ops/registry.yaml      — generated stage/coarsePhase index (read-only)
 #
@@ -44,8 +44,8 @@ about:
     rendering); it is the frozen record every operation, question, decision and
     report is bound to by rev, and against which the kernel evaluates done.
   sources:
-    - .dist/schemas/goal.schema.json
-    - .dist/kernel/goal.mjs
+    - schemas/goal.schema.yaml
+    - kernel/goal.mjs
 
 # ----------------------------------------------------------------------------
 # STATE MODEL — the frame the whole module reads the world through.
@@ -71,7 +71,7 @@ stateModel:
     A goal IS a target-state expression S* over those variables:
     "thêm tính năng A" -> {feature.A: exists ∧ proven}. The done: metrics are
     the machine-checkable form of S* — evaluateGoalMetrics literally evaluates
-    the ledger/operation/gate variables against it (.dist/kernel/goal.mjs).
+    the ledger/operation/gate variables against it (kernel/goal.mjs).
   currentState: >-
     S₀ is what SURVEY measures — which .starciwork records already own the
     touched paths and what state they are in (see existing.yaml). Decomposition
@@ -82,8 +82,8 @@ stateModel:
     already-done surface shortens the chain automatically (existing.yaml
     extend-vs-add).
   sources:
-    - .dist/kernel/goal.mjs (evaluateGoalMetrics, deriveGoalMetrics)
-    - .dist/kernel/ledger.mjs (record states, disjoint, inScope)
+    - kernel/goal.mjs (evaluateGoalMetrics, deriveGoalMetrics)
+    - kernel/ledger.mjs (record states, disjoint, inScope)
     - scripts/checks/check-work-deep.mjs (normDigest/DEP_STALE — staleness of a done variable)
     - modules/goal/existing.yaml
 
@@ -135,11 +135,11 @@ decomposition:
     `sds: decided` variable is actually invalid) -> re-run from step 2 with
     corrected S₀ -> new chain. There is no separate rollback logic;
     propagateInvalidation is the kernel's mark of which variables went stale
-    (.dist/kernel/goal.mjs; legality.yaml backwardEdges).
+    (kernel/goal.mjs; legality.yaml backwardEdges).
   sources:
-    - .dist/kernel/goal.mjs
-    - .dist/kernel/ledger.mjs
-    - .dist/kernel/intake.mjs (reconciliation: reference/conflict/new)
+    - kernel/goal.mjs
+    - kernel/ledger.mjs
+    - kernel/intake.mjs (reconciliation: reference/conflict/new)
     - scripts/checks/check-work-deep.mjs (DEP_STALE)
     - modules/goal/legality.yaml, modules/goal/existing.yaml, modules/goal/archetypes.yaml
 
@@ -151,7 +151,7 @@ identity:
   files:
     goalJson: .starciwork/_local/workflows/<workflow>/goal.json   # machine contract
     goalMd:   .starciwork/_local/workflows/<workflow>/goal.md     # human rendering only
-  requiredFields:  # .dist/schemas/goal.schema.json `required`
+  requiredFields:  # schemas/goal.schema.yaml `required`
     - schema          # const starci/goal@1
     - id
     - workflow
@@ -167,26 +167,26 @@ identity:
     - workTargets
   rev: >-
     Integer revision counter. `goalRevOf(state)` = state.goalRev ?? goal.rev ??
-    goal.json rev ?? 1 (.dist/kernel/ask.mjs). Set at approval; every derivation
+    goal.json rev ?? 1 (kernel/ask.mjs). Set at approval; every derivation
     binds it. A revision is rev+1 exactly — never a skip, never a rewrite
-    (reviseGoal, .dist/kernel/goal.mjs).
+    (reviseGoal, kernel/goal.mjs).
   digest: >-
     `state.goalDigest` = stateGoalIdentity(state), frozen before the first
-    revision (.dist/kernel/goal.mjs). The amendment's `baseGoalIdentity` must
+    revision (kernel/goal.mjs). The amendment's `baseGoalIdentity` must
     match it — an amendment cannot redirect a workflow to a different goal.
   immutability: >-
     Goal/workflow identity cannot change during revision:
     validateGoalRevision rejects a revision that changes the workflow identity
-    (.dist/kernel/goal.mjs). A wrong identity is therefore never an edit — see
+    (kernel/goal.mjs). A wrong identity is therefore never an edit — see
     legality.yaml ambiguity.intent (it is an owner question, always).
-  source: .dist/kernel/goal.mjs, .dist/kernel/ask.mjs, .dist/schemas/goal.schema.json
+  source: kernel/goal.mjs, kernel/ask.mjs, schemas/goal.schema.yaml
 
 # ----------------------------------------------------------------------------
 # DERIVATION — where a goal comes from. Two ledger modes, one phase.
 # ----------------------------------------------------------------------------
 derivation:
   phase: >-
-    `goalPhase(state)` runs BEFORE the human approval gate (.dist/kernel/goal.mjs).
+    `goalPhase(state)` runs BEFORE the human approval gate (kernel/goal.mjs).
     It either derives the goal from the Work ledger or has the model assess one,
     then writes goal.json + goal.md, critique, prerequisites, questions, risks,
     planned operations and the definition-of-done data, and lands the workflow
@@ -199,10 +199,10 @@ derivation:
       later derived per node from its lane (model/kinds.yaml lanes:).
     plan: >-
       `state.ledgerMode === 'plan'`: `assessGoal` fills the plan form
-      (.dist/schemas/goal-plan.json): done, ledger, ops, risks, questions.
+      (schemas/goal-plan.yaml): done, ledger, ops, risks, questions.
       Only plan kinds may appear — PLAN_OP_KINDS = the kinds whose writes
       stay inside {code, runtime, evidence, asset} or nothing
-      (.dist/models/functions.mjs). Record-writing kinds (business.decide,
+      (models/functions.mjs). Record-writing kinds (business.decide,
       architecture.decide, work.author, scope.define, goal.revise, ...)
       never appear on a plan ledger — a plan has no Work tree to write.
   intakeNote: >-
@@ -210,9 +210,9 @@ derivation:
     runs it and hands the kernel a finished scope statement; no lane, route or
     scheduler may dispatch it inside the workflow.
   sources:
-    - .dist/kernel/goal.mjs (goalPhase, goalFromLedger)
-    - .dist/models/functions.mjs (PLAN_OP_KINDS, plan form)
-    - .dist/schemas/goal-plan.json
+    - kernel/goal.mjs (goalPhase, goalFromLedger)
+    - models/functions.mjs (PLAN_OP_KINDS, plan form)
+    - schemas/goal-plan.yaml
     - model/kinds.yaml (request.analyze external)
 
 # ----------------------------------------------------------------------------
@@ -223,17 +223,17 @@ definitionOfDone:
     `done:` block of checkable metrics: {id, kind: ledger|operation|gate, ref,
     expect[]}. deriveGoalMetrics supplies the defaults — every ledger item
     verified/preexisting/out-of-repository, every gate passed, every
-    kernel-derived op settled (.dist/kernel/goal.mjs).
+    kernel-derived op settled (kernel/goal.mjs).
   evaluation: >-
     evaluateGoalMetrics -> {rev, ok, metrics, gaps, unevaluable}. Approval
     refuses when the metrics cannot be evaluated; validateGoalRevision requires
     the revised goal keep a nonempty, checkable done block whose metrics resolve
-    against the revised goal (.dist/kernel/goal.mjs).
+    against the revised goal (kernel/goal.mjs).
   spinGuard: >-
     GOAL_SPIN_LIMIT = 5: settled dispatches that change no done metric raise a
     goal-stall needUser — motion without progress on the contract is a stop,
-    not more dispatching (noteGoalMetrics, .dist/kernel/goal.mjs).
-  source: .dist/kernel/goal.mjs
+    not more dispatching (noteGoalMetrics, kernel/goal.mjs).
+  source: kernel/goal.mjs
 
 # ----------------------------------------------------------------------------
 # CRITIQUE — the model's challenge before anything is frozen.
@@ -252,18 +252,18 @@ critique:
     planCritiquePrerequisites plans intake ops for missing features;
     planCritiqueDecisions plans decision asks for decisive hidden-decisions.
     critique === 'not-attempted' blocks approval (goalApprovalBlocks,
-    .dist/kernel/goal.mjs).
-  source: .dist/kernel/goal.mjs (critiqueGoalPhase, planCritique*)
+    kernel/goal.mjs).
+  source: kernel/goal.mjs (critiqueGoalPhase, planCritique*)
 
 # ----------------------------------------------------------------------------
 # APPROVAL — the freeze. Owner-only.
 # ----------------------------------------------------------------------------
 approval:
   gate: >-
-    `approve` is the owner-only gate (.dist/docs/scoped-approval.md). It freezes
+    `approve` is the owner-only gate (docs/scoped-approval.md). It freezes
     the goal at `state.goalRev`, evaluates the done metrics, and refuses when
     they are unevaluable.
-  blocks:  # goalApprovalBlocks (.dist/kernel/goal.mjs)
+  blocks:  # goalApprovalBlocks (kernel/goal.mjs)
     - no definitionOfDone
     - grounds assessment === 'none'
     - critique === 'not-attempted'
@@ -273,14 +273,14 @@ approval:
     apply to — a goal that was never approved cannot be revised, only replaced
     upstream.
   sources:
-    - .dist/kernel/goal.mjs (approve, goalApprovalBlocks)
-    - .dist/docs/scoped-approval.md
+    - kernel/goal.mjs (approve, goalApprovalBlocks)
+    - docs/scoped-approval.md
 
 # ----------------------------------------------------------------------------
 # REVISION — goal.revise: the typed way a frozen goal changes.
 # ----------------------------------------------------------------------------
 revision:
-  rpc: goal_amend / reviseGoal        # .dist/kernel/goal.mjs exports
+  rpc: goal_amend / reviseGoal        # kernel/goal.mjs exports
   op: goal.revise                     # modules/ops/ops/goal.revise.yaml
   prerequisites: "an approved goal exists"   # route block
   rules:
@@ -298,7 +298,7 @@ revision:
       propagateInvalidation marks every derivation that depended on a changed
       section stale — op.goalStale {rev, changed}, ledger item.goalStale,
       decision.goalStale. Stale evidence remains history; it no longer
-      certifies the changed input (.dist/docs/work-verification.md).
+      certifies the changed input (docs/work-verification.md).
     inFlight: >-
       opInputDigests (spec digest + goal digest + record digests) re-validate
       in-flight ops at settle: adoptReportRev adopts a report into the new rev
@@ -315,17 +315,17 @@ revision:
     marked stale, and the work re-runs from the affected boundary producing
     fresh evidence (CLAUDE.md work-correction policy).
   sources:
-    - .dist/kernel/goal.mjs (reviseGoal, validateGoalRevision, diffGoalSections,
+    - kernel/goal.mjs (reviseGoal, validateGoalRevision, diffGoalSections,
       propagateInvalidation, adoptReportRev, reopenStaleOp)
     - modules/ops/ops/goal.revise.yaml
     - CLAUDE.md (work-correction policy)
-    - .dist/docs/work-verification.md
+    - docs/work-verification.md
 
 # ----------------------------------------------------------------------------
 # AMENDMENT — owner-authored change bound to the frozen identity.
 # ----------------------------------------------------------------------------
 amendment:
-  record: starci/workflow-amendment@1   # applyWorkflowAmendment, .dist/kernel/goal.mjs
+  record: starci/workflow-amendment@1   # applyWorkflowAmendment, kernel/goal.mjs
   binding: >-
     `baseGoalIdentity` must equal stateGoalIdentity(state) — the amendment
     applies to THIS goal's frozen digest or it is not this workflow's amendment.
@@ -350,13 +350,13 @@ amendment:
   idempotence: >-
     Keyed by digest; a replayed amendment is recognised, not re-applied. The
     original approval record is never rewritten.
-  source: .dist/kernel/goal.mjs (applyWorkflowAmendment, effectPathCovered)
+  source: kernel/goal.mjs (applyWorkflowAmendment, effectPathCovered)
 
 # ----------------------------------------------------------------------------
 # QUESTIONS — how the goal talks to the owner mid-flight.
 # ----------------------------------------------------------------------------
 questions:
-  askKinds: [decision.prepare, provision.ask]      # ASK_KINDS, .dist/kernel/owner.mjs
+  askKinds: [decision.prepare, provision.ask]      # ASK_KINDS, kernel/owner.mjs
   rule: >-
     The runtime prepares a decision; the owner takes it. The kernel never
     answers for the owner — and it never invents an answer it was not offered
@@ -365,12 +365,12 @@ questions:
   stopBehaviour: >-
     A question whose stop reason is a provision or an irreversible effect opens
     a `provision.ask` and PAUSES the requester — there is nothing honest to do
-    until the owner acts (openOwnerAsk, .dist/kernel/owner.mjs).
+    until the owner acts (openOwnerAsk, kernel/owner.mjs).
   provisionalBehaviour: >-
     Every other question opens `decision.prepare`; the requester waits only on
     the ask op (dependsOn) and resumes on the runtime's own recommendation as a
     PROVISIONAL answer. The owner overturns it later; a different answer
-    reopens what was built on it (.dist/kernel/owner.mjs header + openOwnerAsk).
+    reopens what was built on it (kernel/owner.mjs header + openOwnerAsk).
   enrolledMode: >-
     When the workflow is enrolled (engine or explicit), every non-mechanical
     question is ownerRequired — the provisional path closes (openOwnerAsk).
@@ -378,7 +378,7 @@ questions:
     openConflictDecision takes an intake-recorded conflict as a decision
     record with numbered options and one recommendation — provisionally, the
     same way; the workflow never finishes blocked over a conflict the runtime
-    can take a side on (.dist/kernel/owner.mjs).
+    can take a side on (kernel/owner.mjs).
   projections: >-
     owner-requests.mjs projects the canonical ask ops into owner-facing request
     kinds: information, credential, account, access, consent, authority,
@@ -387,8 +387,8 @@ questions:
     receipts — a credential is "verified" only after the integration.verify it
     feeds reports done+pass (verifyAcceptedIntegrationOwnerRequests).
   sources:
-    - .dist/kernel/owner.mjs
-    - .dist/kernel/owner-requests.mjs
+    - kernel/owner.mjs
+    - kernel/owner-requests.mjs
 
 # ----------------------------------------------------------------------------
 # DERIVATION CHAIN — how the goal becomes ops (the resolver's side).
@@ -399,10 +399,10 @@ opChain:
     lane's ordered `steps` are the node's op chain; `optionalWhen` predicates
     (node.hasNoArtworkSlots, goal.requiresSecurity, goal.requiresPerf) read the
     done metrics to skip steps. designGate holds a frontend build until the
-    feature's `ui` node is done (.dist/kernel/sync.mjs). A node too big for one
+    feature's `ui` node is done (kernel/sync.mjs). A node too big for one
     op is cut by implementation.plan into disjoint-scope children — seam first,
-    then one observable behaviour each (cutOpFor, .dist/kernel/sync.mjs;
-    .dist/docs/op-granularity.md).
+    then one observable behaviour each (cutOpFor, kernel/sync.mjs;
+    docs/op-granularity.md).
   planLedger: >-
     The model proposes the ops array directly (goal-plan.json): unique ids,
     same-plan dependsOn, acyclic, every ledger item referenced unless already
@@ -412,13 +412,13 @@ opChain:
   routingNotChosen: >-
     Models fill operation content; they do not choose the next step, the repair
     kind, or the retry count. Outcomes route through model/kinds.yaml `routes:`
-    and .dist/kernel/graph.mjs — closed, data-driven, first match wins.
+    and kernel/graph.mjs — closed, data-driven, first match wins.
   sources:
     - model/kinds.yaml (lanes, routes, kinds)
-    - .dist/kernel/sync.mjs (designGate, cutOpFor)
-    - .dist/kernel/graph.mjs
-    - .dist/schemas/goal-plan.json
-    - .dist/docs/op-granularity.md
+    - kernel/sync.mjs (designGate, cutOpFor)
+    - kernel/graph.mjs
+    - schemas/goal-plan.yaml
+    - docs/op-granularity.md
 
 # ----------------------------------------------------------------------------
 # WHAT A GOAL IS NOT — boundaries that keep the contract honest.

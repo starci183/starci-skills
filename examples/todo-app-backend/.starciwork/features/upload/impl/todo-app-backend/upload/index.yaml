@@ -1,0 +1,12 @@
+schema: work/implementation
+id: impl.upload.todo-app-backend.upload
+title: The upload capability and its HTTP door
+state: done
+repository: todo-app-backend
+owners:
+  - {role: module, path: src/modules/integrations/upload}
+  - {role: module, path: src/features/todo/http/upload}
+  - {role: module, path: src/modules/shared/exceptions/errors/upload}
+revision: 7e5851e54492205eb35683391da779f990f0dd2
+proves: [fr.upload.intake, fr.upload.attach, fr.upload.manage, br.upload.intake, br.upload.owned,
+  br.upload.lifecycle, data.upload.upload]

@@ -37,6 +37,9 @@ import {
 import {
     FakeNotifyQueueClient 
 } from "@modules/integrations/notify-queue/testing/fake-notify-queue.client"
+import {
+    NotifyDeliveryAttemptEntity 
+} from "@modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity"
 
 async function buildNotify() {
     const smtp = new FakeNotifySmtpClient()
@@ -248,5 +251,89 @@ describe("NotifyService",
                 } finally {
                     await moduleRef.close()
                 }
+            })
+
+        describe("job and rendering arms (w8 branch depth)",
+            () => {
+                it("a queue job with neither known prefix is skipped without failing the tick",
+                    async () => {
+                        const { moduleRef, notify, queue, smtp } = await buildNotify()
+                        try {
+                            await queue.enqueue("bogus:whatever",
+                                Date.now() - 1)
+                            await notify.runDueJobs(new Date())
+                            expect(smtp.sent).toHaveLength(0)
+                            expect(queue.has("bogus:whatever")).toBe(false)
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
+
+                it("a flush job for an unknown or already-flushed window is a no-op",
+                    async () => {
+                        const { moduleRef, notify, queue, smtp } = await buildNotify()
+                        try {
+                            await queue.enqueue("flush:window-that-never-existed",
+                                Date.now() - 1)
+                            await notify.runDueJobs(new Date())
+                            expect(smtp.sent).toHaveLength(0)
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
+
+                it("a non-task-complete kind renders the generic subject, and a missing taskId renders empty",
+                    async () => {
+                        const { moduleRef, notify, smtp } = await buildNotify()
+                        try {
+                            const t0 = new Date("2026-09-18T06:00:00.000Z")
+                            await notify.admit({
+                                kind: "share-invite", sourceEventId: "evt-s1", recipientId: "owner-1", channel: "email", payload: {
+                                    invitationId: "inv-1" 
+                                } 
+                            },
+                            t0)
+                            await notify.runDueJobs(new Date("2026-09-18T06:20:00.000Z"))
+                            expect(smtp.sent).toHaveLength(1)
+                            expect(smtp.sent[0].subject).toContain("Notification")
+                            expect(smtp.sent[0].body).toContain("share-invite")
+                            expect(smtp.sent[0].body).toContain("inv-1")
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
+
+                it("a dedupe hit whose delivery attempt row is gone reports the queued fallback, not a crash",
+                    async () => {
+                        const {
+                            moduleRef, notify, delivery 
+                        } = await buildNotify()
+                        try {
+                            const input = {
+                                kind: "task-complete", sourceEventId: "evt-9", recipientId: "owner-1", channel: "email", payload: {
+                                    taskId: "task-9" 
+                                } 
+                            }
+                            const first = await notify.admit(input,
+                                new Date("2026-09-18T06:00:00.000Z"))
+                            expect(first.isNew).toBe(true)
+
+                            // Simulate a lost attempt row: the second admission must still answer
+                            // coherently (queued) rather than reading undefined state.
+                            const entityManager = moduleRef.get<{
+                                delete(target: unknown, criteria: string): Promise<void>;
+                            }>(getEntityManagerToken(POSTGRESQL_PRIMARY))
+                            await entityManager.delete(NotifyDeliveryAttemptEntity,
+                                first.notificationId)
+                            expect(await delivery.findById(first.notificationId)).toBeNull()
+
+                            const second = await notify.admit(input,
+                                new Date("2026-09-18T06:00:01.000Z"))
+                            expect(second.isNew).toBe(false)
+                            expect(second.deliveryState).toBe("queued")
+                        } finally {
+                            await moduleRef.close()
+                        }
+                    })
             })
     })

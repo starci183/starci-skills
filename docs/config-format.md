@@ -1,6 +1,6 @@
 # Local config format
 
-StarCi keeps **local runtime preferences** in ignored `config.json` at the skill root. That file is never bundled into `.dist` and is not overwritten by install/update when it already exists.
+StarCi keeps **local runtime preferences** in ignored `config.json` at the skill root. That file is host-local state, never part of the shipped source payload, and is not overwritten by install/update when it already exists.
 
 ## Example source
 
@@ -18,13 +18,11 @@ StarCi keeps **local runtime preferences** in ignored `config.json` at the skill
 2. If absent, resolve the example in this order under the same `root`:
    - `config.example.yaml` (preferred authored source)
    - `config.example.json` (legacy mirror)
-   - `.dist/config.example.json` (built projection after `ensure-build`)
 3. Write a new `config.json` as pretty-printed JSON with the validated example values (`wx` create-only).
 
 Existing user `config.json` files are never rewritten by example updates. The loader translates the former
 `supervisor`, `validator` and `critique` sections into the current in-memory pools and role map, so an existing local
-file keeps working without becoming another authored format. Build projects the example into
-`.dist/config.example.json` for runtime packaging; that projection is not a second authored source.
+file keeps working without becoming another authored format.
 
 ## Shape
 
@@ -69,7 +67,7 @@ The former `providers` array remains readable for compatibility: its first item 
 
 | Path | Decision |
 | --- | --- |
-| `docs/catalog.json` | **Generated** by `scripts/build-docs.mjs` (also feeds `sites/skills/src/catalog.generated.json`). Do not author a parallel `docs/catalog.yaml`. |
+| `sites/skills/src/catalog.generated.json` | **Generated** by `sites/skills/scripts/generate-data.mjs` from authored YAML. Do not author a parallel `docs/catalog.yaml`. |
 | `README.yaml` / `INDEX.yaml` / `UPDATE.yaml` / `core/README.yaml` | Authored declarative metadata; YAML is the preferred source. JSON mirrors remain until a later delete pass. |
-| `examples/*.yaml` (`nivo-setup-*`, `nivo-service-routing`) | Authored structured examples; YAML preferred. JSON mirrors remain until a later delete pass. Build projects them to `.dist/examples/*.json`. |
+| `examples/*.yaml` (`nivo-setup-*`, `nivo-service-routing`) | Authored structured examples; YAML preferred. JSON mirrors remain until a later delete pass. |
 | `fixtures/forward-goal-report.yaml` | Authored synthetic evaluation narrative (`starci/fixture-report@1`), not an exact JSON wire fixture under test. Converted to YAML. Executable replay uses `fixtures/forward-goal/draft/**` (Work YAML). |

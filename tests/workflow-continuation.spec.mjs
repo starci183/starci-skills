@@ -245,9 +245,9 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
   assert.ok(store.readEvents().some(event=>event.event==='workflow-retried'),'the retry is on the record while the workflow is live');
 
   const nonce=`positive-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`);
-  const pinnedEngine=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','engine.mjs')).href}?${nonce}`);
-  const pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','store.mjs')).href}?${nonce}`);
+  const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'kernel','kernel.mjs')).href}?${nonce}`);
+  const pinnedEngine=await import(`${pathToFileURL(path.join(pin.root,'kernel','engine.mjs')).href}?${nonce}`);
+  const pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'kernel','store.mjs')).href}?${nonce}`);
   pinnedStore=pinnedStoreModule.createStore({repoRoot:root,id:current.id});const engineState=pinnedStore.loadState();
   runtime=pinnedEngine.createEngineRuntime({store:pinnedStore,state:engineState,git,candidateBase:path.join(temp,'candidates'),
     eligibility:()=>({eligible:true,mode:'qualified'}),spawnChild:()=>{throw Error('the fake host owns native execution in this fixture');}});

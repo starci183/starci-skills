@@ -14,13 +14,13 @@
 #   modules/ops/ops/*.yaml        — route blocks (nodeKinds, phase, intent, prerequisites, riskHints)
 #   modules/ops/registry.yaml     — generated stage index: intake > scope > decide > direct > implement > verify > release > operate
 #   model/kinds.yaml              — lanes (nodeKind -> ordered steps), routes, kind catalog
-#   .dist/kernel/sync.mjs         — designGate, cutOpFor (fan-out + seam-first)
-#   .dist/kernel/ledger.mjs       — disjoint(allowlist) path-prefix coverage
-#   .dist/kernel/common.mjs       — allowlistsOverlap
-#   .dist/docs/op-granularity.md  — seam-first cut, one behaviour per child, serial fallback
-#   .dist/docs/work-ledger.md     — .starciwork ownership: one index.yaml per scope folder
-#   .dist/docs/work-verification.md — verify is read-only; layers of proof
-#   .dist/models/functions.mjs    — PLAN_OP_KINDS (plan-ledger kinds may only write code/runtime/evidence/asset or nothing)
+#   kernel/sync.mjs         — designGate, cutOpFor (fan-out + seam-first)
+#   kernel/ledger.mjs       — disjoint(allowlist) path-prefix coverage
+#   kernel/common.mjs       — allowlistsOverlap
+#   docs/op-granularity.md  — seam-first cut, one behaviour per child, serial fallback
+#   docs/work-ledger.md     — .starciwork ownership: one index.yaml per scope folder
+#   docs/work-verification.md — verify is read-only; layers of proof
+#   models/functions.mjs    — PLAN_OP_KINDS (plan-ledger kinds may only write code/runtime/evidence/asset or nothing)
 #
 # Convention: "leg" = one operation in the proposed chain. For each leg the
 # entry says why it is there — or, in the exclusions list, why it is NOT.
@@ -83,7 +83,7 @@ legRationale:
     requires "business.decide done (accepted SRS)".
   draw: >-
     interface.draw is the `direct`-phase leg that produces the ui design record
-    the frontend lane's designGate waits on (.dist/kernel/sync.mjs). Route
+    the frontend lane's designGate waits on (kernel/sync.mjs). Route
     prerequisites: business + architecture + brand decisions.
   implement: >-
     interface.implement (operator) / frontend.implement (kind) and
@@ -92,12 +92,12 @@ legRationale:
   workAuthor: >-
     work.author authors or remaps Work records (prerequisite: "scope defined").
     On a refactor it re-anchors the record's source mapping to the moved code —
-    without it the evidence pins the old identity (.dist/docs/work-verification.md
+    without it the evidence pins the old identity (docs/work-verification.md
     currentCodeMap / sourceIdentity).
   verify: >-
     uat.verify / e2e.verify / integration.verify / review.verify / perf.verify
     are proof legs. They report findings and never repair
-    (.dist/docs/work-verification.md); their repairs route through lanes/routes.
+    (docs/work-verification.md); their repairs route through lanes/routes.
   ask: >-
     provision.ask (stop kinds) / decision.prepare (provisional) are the owner
     legs — see anatomy.yaml questions.
@@ -235,7 +235,7 @@ archetypes:
       blocked/environment -> environment-needs-the-user (needUser), and the
       credential ask only settles 'verified' AFTER integration.verify reports
       done+pass (verifyAcceptedIntegrationOwnerRequests,
-      .dist/kernel/owner-requests.mjs). "Settles inprogress if custody missing"
+      kernel/owner-requests.mjs). "Settles inprogress if custody missing"
       = the op stays live, waiting on the owner; it never fakes the proof.
     exclusions:
       - {op: interface.draw, why: "unless the integration also ships UI — then this archetype COMPOSES with feature-build-with-ui (priors compose; the union is confirmed leg by leg)"}
@@ -327,13 +327,13 @@ archetypes:
       - {op: scope.define,    leg: scopeDefine, note: "bounds ALL siblings before any is built — the disjointness is checked against this scope"}
       - {op: business.decide / architecture.decide, leg: decide, note: "shared records settle ONCE before the split — the seam children read them"}
       - {op: implementation.plan, leg: decide, note: "the seam cut: one child owns what all others would touch, runs ALONE and first (allocation.fanOut seamFirst)"}
-      - {op: <sibling builds>, leg: implement, note: "each sibling gets its own op chain, own agent, own worktree — .dist/docs/op-granularity.md + lanes.mjs worktree isolation"}
+      - {op: <sibling builds>, leg: implement, note: "each sibling gets its own op chain, own agent, own worktree — docs/op-granularity.md + lanes.mjs worktree isolation"}
       - {op: integration.verify, leg: verify, note: "the JOIN at the parent — one proof the siblings compose, run on the parent after all children done"}
       - {op: review.verify,      leg: verify, note: "parent-tier read of the assembled group"}
     joinRule: >-
       The parent keeps the join operations. Sibling chains never verify each
       other — groupAssertions at the parent, proven once on a different runtime
-      from the children (.dist/docs/op-granularity.md).
+      from the children (docs/op-granularity.md).
     serialFallback: >-
       If the scopes cannot be made disjoint — a path every sibling must touch,
       a seam that cannot be isolated — the goal does NOT fan out. It runs
@@ -375,4 +375,4 @@ composition:
   sources:
     - model/kinds.yaml
     - modules/ops/ops/*.yaml
-    - .dist/models/functions.mjs
+    - models/functions.mjs

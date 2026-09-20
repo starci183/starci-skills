@@ -1,0 +1,23 @@
+schema: work/business-rule
+id: br.observability.probe-answers
+title: A probe's answer reflects the dependency it names
+state: done
+statements:
+  - "/health keeps its established answer - ok only while the primary postgres answers, 503 when it
+    cannot - and the e2e stack's boot probe already treats it as the dependency-checked door."
+  - "/ready carries the explicit readiness name for orchestrators - ok only while the same primary
+    postgres dependency answers."
+  - /metrics answers the request counters and duration summary in Prometheus text exposition, and is
+    counted like every other request only after it has answered.
+acceptance:
+  - id: ac.observability.probe-answers.ready-up
+    given: The api running with postgres reachable
+    when: GET /ready arrives
+    then:
+      - It answers 200 with status ok.
+  - id: ac.observability.probe-answers.ready-down
+    given: The api running with postgres unreachable
+    when: GET /ready arrives
+    then:
+      - It answers the postgres-unavailable refusal, mapped to 503.
+module: [src/modules/platform/observability, src/features/todo/http/health]

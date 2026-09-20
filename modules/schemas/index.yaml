@@ -3,33 +3,27 @@
 # ============================================================================
 # Lane brief: ex-testing/briefs/tinkle/tinkle-3.md + _common.md.
 #
-# FINDING: a canon source tree exists outside .dist — `schemas/*.yaml` at the
-# skill root is where every schema is AUTHORED. `.dist/schemas/*.json` is its
-# compiled projection. So this file maps schema id -> authored source -> .dist
-# artifact -> what it governs. Nothing is copied; this is a map, not a mirror.
+# FINDING (updated for the distless wave, w7): `schemas/*.yaml` at the skill
+# root is where every schema is AUTHORED and is read DIRECTLY by the runtime —
+# the former compiled JSON projection was deleted with the rest of the build
+# pipeline (the projecting builders live retired under legacy/builders/). So
+# this file maps schema id -> authored source -> what it governs. Nothing is
+# copied; this is a map, not a mirror.
 #
-# Output-location note (deliberate deviation from the brief's literal text):
-# the brief says "produce .claude/schemas/", but `schemas/` IS the canon source
-# and `scripts/compile-declarative.mjs` projects every yaml in it into .dist
-# (only json-exceptions.yaml is excluded). Writing this catalog there would
-# publish it as `.dist/schemas/index.json` inside the sealed runtime contract
-# tree. The TINKLE mission is `.claude/modules/`, so this catalog lives at
-# `modules/schemas/` beside `modules/ops/` (tinkle-1) and `modules/models/`
-# (tinkle-2). tinkle-5's check "schemas/index.yaml" resolves here.
+# Output-location note (deliberate deviation from the original brief's literal
+# text): the brief said "produce .claude/schemas/", but `schemas/` IS the canon
+# source — this catalog is an analysis artifact, not a schema. The TINKLE
+# mission is `.claude/modules/`, so this catalog lives at `modules/schemas/`
+# beside `modules/ops/` (tinkle-1) and `modules/models/` (tinkle-2).
+# tinkle-5's check "schemas/index.yaml" resolves here.
 #
-# Verified 2026-09-19 with `node scripts/compile-declarative.mjs --check`:
-# 21 of 44 projected sources are stale vs .dist — the 17 work-*.schema.yaml
-# (Work v2 record schemas, authored 2026-09-19) have NO .dist artifact yet,
-# and 4 sources (application-stacks, source-layout, stacks-layout,
-# work-layout) differ from their artifacts. `ensure-build` rebuilds on demand;
-# the entries below mark the actual state, not the intended one.
+# Historical note: verified 2026-09-19 against the retired projection — 21 of
+# 44 projected sources were stale vs their artifacts at that time. The
+# projection is gone now; the authored YAML is the only authority.
 
 about:
   kind: schema-catalog
-  authoredTree: schemas/            # YAML sources; the only place to edit a schema
-  compiledTree: .dist/schemas/      # JSON artifacts; read by runtime code, never edited by hand
-  projection: scripts/compile-declarative.mjs collectDeclarativeTree(dir='schemas', exclude=[json-exceptions.yaml])
-  naming: "*.schema.yaml -> .dist/schemas/*.schema.json ; other *.yaml -> .dist/schemas/*.json"
+  authoredTree: schemas/            # YAML sources; the only place to read or edit a schema
   dialects:
     json-schema: "draft 2020-12 with $schema/$id/$defs — machine-checkable shape (ajv-style consumers)"
     prose-contract: "schema:/purpose:/fields:/rules: YAML — a contract an agent reads and honours; no validator executes it"
@@ -37,10 +31,7 @@ about:
     A governed record names its schema in its own `schema:` field (e.g. schema: work/business-rule,
     schema: starci/orca-calls@1). The catalog `id` below is that const — the value a record would carry —
     not the file name.
-  states:
-    present: .dist artifact exists and matches its source today
-    stale-content: artifact exists but differs from the current source (rebuild pending)
-    pending-build: source authored, no .dist artifact yet (all 17 Work v2 record schemas)
+  sourceOnly:
     excluded: deliberately source-only (json-exceptions.yaml)
 
 schemas:
@@ -51,8 +42,6 @@ schemas:
 
   - id: starci/work-layout@3
     file: schemas/work-layout.yaml
-    dist: .dist/schemas/work-layout.json
-    distState: stale-content
     dialect: prose-contract
     subsystem: work-tree
     governs: >-
@@ -74,8 +63,6 @@ schemas:
 
   - id: urn:work:metadata:1
     file: schemas/work.schema.yaml
-    dist: .dist/schemas/work.schema.json
-    distState: present
     dialect: json-schema
     subsystem: work-tree
     governs: >-
@@ -98,8 +85,6 @@ schemas:
 
   - id: work/workspace
     file: schemas/work-workspace.schema.yaml
-    dist: .dist/schemas/work-workspace.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "The tree's own identity record — which project and which repositories this .starciwork serves."
@@ -113,8 +98,6 @@ schemas:
 
   - id: work/catalog
     file: schemas/work-catalog.schema.yaml
-    dist: .dist/schemas/work-catalog.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "The product catalog — the one place that says which features exist and where their records live."
@@ -128,8 +111,6 @@ schemas:
 
   - id: work/feature
     file: schemas/work-feature.schema.yaml
-    dist: .dist/schemas/work-feature.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "A feature's own record — names the feature; every rule/requirement/screen/impl/flow lives under its directory."
@@ -143,8 +124,6 @@ schemas:
 
   - id: work/brand
     file: schemas/work-brand.schema.yaml
-    dist: .dist/schemas/work-brand.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "The product's brand as ONE root record beside features/ — identity inputs every feature shares."
@@ -158,8 +137,6 @@ schemas:
 
   - id: work/business-rule
     file: schemas/work-business-rule.schema.yaml
-    dist: .dist/schemas/work-business-rule.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "One business rule — true whatever screen or endpoint it surfaces on; owns appliesTo/module/blockedBy."
@@ -174,8 +151,6 @@ schemas:
 
   - id: work/acceptance-criterion
     file: schemas/work-acceptance-criterion.schema.yaml
-    dist: .dist/schemas/work-acceptance-criterion.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "One checkable consequence of a business rule, given/when/then — the unit of proof, not of work."
@@ -189,8 +164,6 @@ schemas:
 
   - id: work/functional-requirement
     file: schemas/work-functional-requirement.schema.yaml
-    dist: .dist/schemas/work-functional-requirement.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "One thing a person can do with the product end to end; authors requiresProof."
@@ -204,8 +177,6 @@ schemas:
 
   - id: work/non-functional-requirement
     file: schemas/work-non-functional-requirement.schema.yaml
-    dist: .dist/schemas/work-non-functional-requirement.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "A quality the product must hold — speed, safety, availability — expressed so it can be checked; requiresProof."
@@ -219,8 +190,6 @@ schemas:
 
   - id: work/customer-journey
     file: schemas/work-customer-journey.schema.yaml
-    dist: .dist/schemas/work-customer-journey.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "What a person does in order across however many features it takes — steps phrased as the person's actions and expectations; requiresProof."
@@ -234,8 +203,6 @@ schemas:
 
   - id: work/policy-decision
     file: schemas/work-policy-decision.schema.yaml
-    dist: .dist/schemas/work-policy-decision.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "An unanswered product question written down as a record (tension.records names the disagreeing sides)."
@@ -249,8 +216,6 @@ schemas:
 
   - id: work/data
     file: schemas/work-data.schema.yaml
-    dist: .dist/schemas/work-data.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "One thing the product stores, in product terms: field list PLUS invariants true of every instance forever."
@@ -264,8 +229,6 @@ schemas:
 
   - id: work/sds-component
     file: schemas/work-sds-component.schema.yaml
-    dist: .dist/schemas/work-sds-component.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "One piece of intended technical design — responsibilities and allowed dependencies; a done one must name owners [{role,path}] whose paths are module-root directories that exist; requiresProof."
@@ -281,8 +244,6 @@ schemas:
 
   - id: work/ui-screen
     file: schemas/work-ui-screen.schema.yaml
-    dist: .dist/schemas/work-ui-screen.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "One screen and EVERY state it can be in — the state list is the point; a screen specified only happy-path gets built only happy-path."
@@ -296,8 +257,6 @@ schemas:
 
   - id: work/implementation
     file: schemas/work-implementation.schema.yaml
-    dist: .dist/schemas/work-implementation.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "A module of real code where it actually lives, the records it `proves`, a pinned revision, and verificationSource (kernel-observed vs hand-written)."
@@ -311,8 +270,6 @@ schemas:
 
   - id: work/uat-flow
     file: schemas/work-uat-flow.schema.yaml
-    dist: .dist/schemas/work-uat-flow.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "A walk performed against the RUNNING product — steps a person can follow; `proves` is the authored forward edge to demonstrated records."
@@ -326,8 +283,6 @@ schemas:
 
   - id: work/disposable-accounts
     file: schemas/work-disposable-accounts.schema.yaml
-    dist: .dist/schemas/work-disposable-accounts.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "Synthetic sign-in identities collocated with the uat-flow that uses them — a record whose whole purpose is a prohibition."
@@ -341,8 +296,6 @@ schemas:
 
   - id: work/evidence
     file: schemas/work-evidence.schema.yaml
-    dist: .dist/schemas/work-evidence.schema.json
-    distState: pending-build
     dialect: json-schema
     subsystem: work-tree
     governs: "What was observed, when, by whom, against which record/source version — carries recordDigest so expiry is computed not noticed; stale-marked, never rewritten or deleted."
@@ -360,8 +313,6 @@ schemas:
 
   - id: "starci/workflow-state@1 (state.engine sub-record starci/engine@1)"
     file: schemas/workflow-state.schema.yaml
-    dist: .dist/schemas/workflow-state.schema.json
-    distState: present
     dialect: json-schema
     subsystem: kernel
     governs: "The durable engine sub-record inside workflow state — how an enrolled workflow names its store. 1.0.4: engine.ledgerFile (runtime.sqlite) replaces deprecated engine.journalFile; a state with neither reads ledger-unmigrated and is refused until ledger-migrate."
@@ -375,8 +326,6 @@ schemas:
 
   - id: starci/ledger-db-catalog@1
     file: schemas/ledger-db.schema.yaml
-    dist: .dist/schemas/ledger-db.schema.json
-    distState: present
     dialect: json-schema (documentation schema)
     subsystem: kernel
     governs: "Column catalog for .starciwork/runtime.sqlite (starci/ledger-db@1, LEDGER_VERSION=1) and machine.sqlite — mirrors the CREATE TABLE contract in docs/ledger-db.md §4/§5."
@@ -390,8 +339,6 @@ schemas:
 
   - id: starci/goal@1
     file: schemas/goal.schema.yaml
-    dist: .dist/schemas/goal.schema.json
-    distState: present
     dialect: json-schema
     subsystem: kernel
     governs: "The standalone workflow goal record — originalRequest, finalOutcome, scope, criteria, businessChanges, impacts, resourceEffects, cells, workTargets."
@@ -405,8 +352,6 @@ schemas:
 
   - id: starci/goal-plan@1
     file: schemas/goal-plan.yaml
-    dist: .dist/schemas/goal-plan.json
-    distState: present
     dialect: prose-contract
     subsystem: kernel
     governs: "The assessGoal answer shape: definitionOfDone, ledger[{id,title,inputRef,status}], ops[{id,kind,goal,ledgerIds,allowlist,references,checks,acceptance,dependsOn}], risks, questions."
@@ -420,8 +365,6 @@ schemas:
 
   - id: starci/op-io@1
     file: schemas/op-io.yaml
-    dist: .dist/schemas/op-io.json
-    distState: present
     dialect: prose-contract
     subsystem: ops
     governs: "Input/output form of EVERY operation kind plus the deterministic result policy the supervisor applies (LLM fills inputs; op produces outputs inside starci/op-report@1; supervisor asks a model only where policy says `decide`)."
@@ -435,8 +378,6 @@ schemas:
 
   - id: starci/op-report@1
     file: schemas/op-report.schema.yaml
-    dist: .dist/schemas/op-report.schema.json
-    distState: present
     dialect: prose-contract
     subsystem: ops
     governs: "The single typed outcome of one operation attempt — outcome(done|partial|failed|ask|blocked), run/task/dispatch ids, files (all inside allowlist), checks with exitCodes, open/question/blocker; signal derived from outcome, never chosen."
@@ -450,8 +391,6 @@ schemas:
 
   - id: starci/workflow-report@1
     file: schemas/workflow-report.schema.yaml
-    dist: .dist/schemas/workflow-report.schema.json
-    distState: present
     dialect: prose-contract
     subsystem: kernel
     governs: "Monitor->Coordinator boundary: same outcomes/signals as op-report plus branch+head (required for done/partial), gates[{name,status}], files = union of accepted op reports."
@@ -465,8 +404,6 @@ schemas:
 
   - id: starci/workflow-amendment@1
     file: schemas/workflow-amendment.schema.yaml
-    dist: .dist/schemas/workflow-amendment.schema.json
-    distState: present
     dialect: json-schema
     subsystem: kernel
     governs: "An owner-authorized clarification of an ALREADY approved goal — binds baseGoalIdentity + owner provenance + coordinator application decision; never rewrites approval/evidence/effects."
@@ -480,8 +417,6 @@ schemas:
 
   - id: starci/orchestration-supervision@1 (this file is the schema-doc starci/orchestration-supervision-schema@1)
     file: schemas/orchestration-supervision.yaml
-    dist: .dist/schemas/orchestration-supervision.json
-    distState: present
     dialect: prose-contract
     subsystem: kernel
     governs: "Supervision runtime-state contract — runtime.json fields (runId, workflowTaskId, dispatchId, attempt, heartbeat, deadline, processedMessages, pendingAcknowledgements) + messageIdentity rules (messageId idempotent, deliveryId ack-after-processing, stale attempts cannot advance the DAG)."
@@ -495,8 +430,6 @@ schemas:
 
   - id: starci/source-staleness-report@1
     file: schemas/source-staleness.schema.yaml
-    dist: .dist/schemas/source-staleness.schema.json
-    distState: present
     dialect: json-schema
     subsystem: gate
     governs: "The deterministic staleness report — workRoot, targets, baselineDigest, clean, coverage{mode:canonical-work,closure,selectedNodeIds,sourceBindings}, limitations, impactGraph, currentInputs{work,repositories[head/dirty/originDigest/snapshotDigest]}, subjects, findings, reportDigest."
@@ -514,8 +447,6 @@ schemas:
 
   - id: starci.workflow/v1 WorkflowRequest + starci.execution requests (oneOf)
     file: schemas/execution-request.schema.yaml
-    dist: .dist/schemas/execution-request.schema.json
-    distState: present
     dialect: json-schema
     subsystem: engine
     governs: "Execution admission input — source{repository,baseRef}, operations[{id,operation,dependsOn,gate,capabilities}], controlPlane orca, mode solo|orchestrated."
@@ -529,8 +460,6 @@ schemas:
 
   - id: starci.execution/v1 WorkflowReceipt
     file: schemas/execution-receipt.schema.yaml
-    dist: .dist/schemas/execution-receipt.schema.json
-    distState: present
     dialect: json-schema
     subsystem: engine
     governs: "The engine's resumable receipt — metadata{workflowId,project}, status(pending|running|completed|failed|blocked), operations[] one-to-one with the request, in order."
@@ -548,8 +477,6 @@ schemas:
 
   - id: starci/orca-calls@1 (emits starci/orca-call-result@1)
     file: schemas/orca-call.schema.yaml
-    dist: .dist/schemas/orca-call.schema.json
-    distState: present
     dialect: json-schema
     subsystem: providers
     governs: "The complete Orca public-command contract — provider orca, api, liveSchema{call:agent-context,schemaVersion:1,compare:[command,flags],onMismatch:stop-before-effects-and-request-runtime-contract-upgrade}, envelope, defaults, idempotency, calls, forbiddenCalls, recoveries."
@@ -567,8 +494,6 @@ schemas:
 
   - id: starci/workspace-routing@1
     file: schemas/workspace-routing.yaml
-    dist: .dist/schemas/workspace-routing.json
-    distState: present
     dialect: prose-contract
     subsystem: routing
     governs: "Project binding resolution — .claude+.workspaces host pair, registry .workspaces/projects/<project>/work.json, one canonical .starciwork per project, features under features/<feature>/, rules against copying the host into routed sources."
@@ -582,8 +507,6 @@ schemas:
 
   - id: starci/source-layout@1
     file: schemas/source-layout.yaml
-    dist: .dist/schemas/source-layout.json
-    distState: stale-content
     dialect: prose-contract
     subsystem: routing
     governs: "Required/forbidden filesystem facts per role — host(.git, AGENTS.md, CLAUDE.md, .claude/SKILL.md, .workspaces/projects), backend-owned canonical Work, frontend manifests — rejects duplicate runtime identities and misplaced Work trees."
@@ -601,8 +524,6 @@ schemas:
 
   - id: starci/stacks-layout@1
     file: schemas/stacks-layout.yaml
-    dist: .dist/schemas/stacks-layout.json
-    distState: stale-content
     dialect: prose-contract
     subsystem: stacks
     governs: "The .starcistacks TREE contract — root <repo>/.starcistacks, declaration application-stacks.yaml, environment-name-as-directory identity, required/refused files, runbook's seven commands (prepare/doctor/up/status/logs/down/verification), rendered-vs-authored distinction."
@@ -616,13 +537,11 @@ schemas:
 
   - id: starci/application-stacks (legacy starci/application-stacks@1 accepted, STACKS_SCHEMA_LEGACY_ID)
     file: schemas/application-stacks.schema.yaml
-    dist: .dist/schemas/application-stacks.schema.json
-    distState: stale-content
     dialect: json-schema
     subsystem: stacks
     governs: "Manifest CONTENT — sources, components, environments, k8s posture; static repository-owned inventory for reproducible environments; strict subset of what the layout's kit uses."
     binds: <repo>/.starcistacks/application-stacks.yaml
-    usedBy: [scripts/checks/stacks.mjs (loads BOTH compiled .dist schema and source yaml), docs/application-stacks.md]
+    usedBy: [scripts/checks/stacks.mjs (loads the source yaml schema), docs/application-stacks.md]
     business:
       question: "Is this stack declaration structurally complete — components, environments, custody, runbook?"
       whenNeeded: Validating a stack manifest before deploy work; declares intent, never proves a stack ran.
@@ -635,12 +554,10 @@ schemas:
 
   - id: starci/knowledge-source@1
     file: schemas/knowledge-source.schema.yaml
-    dist: .dist/schemas/knowledge-source.schema.json
-    distState: present
     dialect: json-schema
     subsystem: knowledge
     governs: "One authored knowledge topic — id, title, purpose, appliesTo, related/families/observations."
-    binds: knowledge/**/*.yaml topic files (compiled by compile-knowledge.mjs into .dist/knowledge/)
+    binds: knowledge/**/*.yaml topic files (formerly compiled by compile-knowledge.mjs, now read as authored sources)
     usedBy: [scripts/compile-knowledge.mjs loadAuthoredSchema — validates each topic before projection]
     business:
       question: "Is this authored guidance a well-formed knowledge topic the compiler can ship?"
@@ -650,8 +567,6 @@ schemas:
 
   - id: starci/knowledge-rule@1
     file: schemas/knowledge-rule.schema.yaml
-    dist: .dist/schemas/knowledge-rule.schema.json
-    distState: present
     dialect: json-schema
     subsystem: knowledge
     governs: "A knowledge rule record — id, title, kind (+ lenient additionalProperties)."
@@ -665,8 +580,6 @@ schemas:
 
   - id: starci/code-example@1
     file: schemas/code-example-manifest.schema.yaml
-    dist: .dist/schemas/code-example-manifest.schema.json
-    distState: present
     dialect: json-schema
     subsystem: knowledge
     governs: "A code example manifest — id, title, purpose, appliesTo, relatedRules, files, entrypoint, adapt, dependencies, verification, provenance."
@@ -680,8 +593,6 @@ schemas:
 
   - id: starci/code-example-catalog@1 (enum also accepts starci/code-examples-catalog@1)
     file: schemas/code-example-catalog.schema.yaml
-    dist: .dist/schemas/code-example-catalog.schema.json
-    distState: present
     dialect: json-schema
     subsystem: knowledge
     governs: "The catalog listing code examples — schema/title/purpose/examples[]."
@@ -699,8 +610,6 @@ schemas:
 
   - id: starci/code-pattern-profile@1
     file: schemas/code-pattern-profile.schema.yaml
-    dist: .dist/schemas/code-pattern-profile.schema.json
-    distState: present
     dialect: json-schema
     subsystem: gate
     governs: "The profile registry for pattern checks — required profiles nest + next, each declaring its rule set (per #/$defs/profile)."
@@ -714,8 +623,6 @@ schemas:
 
   - id: starci/code-pattern-check@1
     file: schemas/code-pattern-check.schema.yaml
-    dist: .dist/schemas/code-pattern-check.schema.json
-    distState: present
     dialect: json-schema
     subsystem: gate
     governs: "The aggregated pattern-check REPORT — profile, repository, ok, status(clean|findings|unavailable|invalid), inventoryDigest, canon{name,version,digest,files}, tooling, inputs, machineResults, coverage, obligations, files, issues, limitations, reportDigest."
@@ -733,8 +640,6 @@ schemas:
 
   - id: "(evidence profiles map — no schema: const; projected as schemas/profiles.json)"
     file: schemas/profiles.yaml
-    dist: .dist/schemas/profiles.json
-    distState: present
     dialect: prose-data
     subsystem: gate
     governs: "Completion-evidence capability per node kind — business/architecture/implementation/uat/uat.ui/uat.ux/release each declare which proof kinds they support (assertions, code, uat, image, behavior)."
@@ -748,8 +653,6 @@ schemas:
 
   - id: starci/profile-registry@3
     file: schemas/profile-registry-v3.schema.yaml
-    dist: .dist/schemas/profile-registry-v3.schema.json
-    distState: present
     dialect: json-schema
     subsystem: model
     governs: "The model/runtime registry contract — runtimes[], aliases, executionModes{solo,orchestrated}, agentArchitecture, defaults, targets, skills, operators, fallback."
@@ -767,8 +670,6 @@ schemas:
 
   - id: starci/json-exceptions@1
     file: schemas/json-exceptions.yaml
-    dist: (none — excluded from projection by compile-declarative.mjs)
-    distState: excluded
     dialect: prose-data
     subsystem: build
     governs: "Exact relative paths allowed to remain authored JSON after the YAML migration — no directory wildcards; each entry carries a reason."
@@ -792,8 +693,6 @@ gaps:
 
 coverage:
   authoredFiles: 45
-  projectedToDist: 44          # all but json-exceptions.yaml
-  distPresentFresh: 23
-  distStaleContent: 4          # application-stacks, source-layout, stacks-layout, work-layout
-  distMissing: 17              # every work-*.schema.yaml (Work v2 record schemas)
-  verification: "node scripts/compile-declarative.mjs --check on 2026-09-19 — stale list quoted in the report"
+  projection: retired          # the compiled projection was deleted in the distless wave; sources are read directly
+  historicalSnapshot: "2026-09-19, before retirement: 44 projected sources (all but json-exceptions.yaml), 23 fresh, 4 stale-content (application-stacks, source-layout, stacks-layout, work-layout), 17 pending (every work-*.schema.yaml)"
+  verification: "modules/schemas coverage re-verified 2026-09-20 by w7: all 45 schemas/*.yaml indexed, none missing"

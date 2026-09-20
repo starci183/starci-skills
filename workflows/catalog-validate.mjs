@@ -1,7 +1,7 @@
 const plain = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 const exact = (x, keys, optional = []) => plain(x) && keys.every(k => Object.hasOwn(x, k)) && Object.keys(x).every(k => [...keys, ...optional].includes(k));
 
-/** Structural catalog checks only; safe to import during source builds before `.dist` exists. */
+/** Structural catalog checks only; safe to import without any built artifact. */
 export function validateWorkflowCatalog(catalog, jobs, frontend) {
   const errors = [];
   const skillOk = catalog?.skill === '../SKILL.md' || catalog?.skill === '../../SKILL.md';

@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">78.94% </span>
+                <span class="strong">91.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>15/19</span>
+                <span class='fraction'>22/24</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">36.36% </span>
+                <span class="strong">42.85% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/22</span>
+                <span class='fraction'>3/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">92.85% </span>
+                <span class="strong">91.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>13/14</span>
+                <span class='fraction'>22/24</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -78,35 +78,62 @@
 <a name='L13'></a><a href='#L13'>13</a>
 <a name='L14'></a><a href='#L14'>14</a>
 <a name='L15'></a><a href='#L15'>15</a>
-<a name='L16'></a><a href='#L16'>16</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Module } from '@nestjs/common';
-import { CqrsModule } from '@nestjs/cqrs';
-import { ConfigurableModuleClass } from './plan-usa<span class="branch-1 cbranch-no" title="branch not covered" >ge.module-definition';</span>
-import { PlanUsageResolver } from './plan-usage.resolver';
-<span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span></span></span></span></span>
-/** Neither SessionS<span class="branch-1 cbranch-no" title="branch not covered" >er</span>vic<span class="branch-2 cbranch-no" title="branch not covered" >e nor PlanModule is imported here: Ses</span>sionModule is registered globally from
- * app.module.ts (create-task.module.ts's own comment), and PlanModule is registered once from
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+    Module 
+} from "@nestjs/common"
+import {
+    CqrsModule 
+} from "@nestjs/cqrs"
+import {
+    ConfigurableModuleClass 
+} from "./plan-usage.m<span class="branch-0 cbranch-no" title="branch not covered" >odule-definition"</span>
+<span class="cstat-no" title="statement not covered" >import {</span>
+<span class="cstat-no" title="statement not covered" >    PlanUsageResolver </span>
+} from "./plan-usage.resolver"
+&nbsp;
+/** Neither SessionService nor PlanModule is imported here: SessionModule is registered globally from
+ * app.module.ts (create-tas<span class="branch-0 cbranch-no" title="branch not covered" >k.module.ts's own comment), and PlanModule is registered once from</span>
  * app.module.ts too - its @QueryHandler(PlanUsageQuery) is discovered by @nestjs/cqrs's app-wide
- * explorer once PlanModule is anywhere in the compiled module graph, exactly how list-tasks.module.ts
+ * e<span class="branch-0 cbranch-no" title="branch not covered" >xplor<span class="branch-0 cbranch-no" title="branch not covered" ></span>er once PlanModule is anywhere in the com</span>piled module graph, exactly how list-tasks.module.ts
  * reaches ListTasksHandler without importing TaskModule itself. */
 @Module({
-  imports: [CqrsModule],
-  providers: [PlanUsageResolver],
+    imports: [CqrsModule],
+    providers: [PlanUsageResolver],
 })
+/** usage's module: mounts PlanUsageResolver; the query handler is discovered app-wide through CqrsModule. */
 export class PlanUsageSingleQueryModule extends ConfigurableModuleClass {}
 &nbsp;</pre></td></tr></table></pre>
 
@@ -115,7 +142,7 @@ export class PlanUsageSingleQueryModule extends ConfigurableModuleClass {}
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-19T05:24:43.726Z
+                at 2026-09-19T20:52:37.425Z
             </div>
         <script src="../../../../../../../prettify.js"></script>
         <script>

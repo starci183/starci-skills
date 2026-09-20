@@ -7,27 +7,27 @@ assertions:
   - id: br.notify.digest.window
     expected: yes
     observed: not-run
-    note: Every step needs a real session and real task completions on the shared, other-lane-owned
-      Postgres; this lane is not authorized to create them, so this flow is not attempted in this
-      environment.
+    note: Every step needs a real session and real task completions on the shared,
+      other-lane-owned Postgres; this lane is not authorized to create them, so
+      this flow is not attempted in this environment.
   - id: fr.notify.digest
     expected: yes
     observed: not-run
-    note: Every step needs a real session and real task completions on the shared, other-lane-owned
-      Postgres; this lane is not authorized to create them, so this flow is not attempted in this
-      environment.
+    note: Every step needs a real session and real task completions on the shared,
+      other-lane-owned Postgres; this lane is not authorized to create them, so
+      this flow is not attempted in this environment.
   - id: fr.notify.unsubscribe
     expected: yes
     observed: not-run
-    note: Every step needs a real session and real task completions on the shared, other-lane-owned
-      Postgres; this lane is not authorized to create them, so this flow is not attempted in this
-      environment.
+    note: Every step needs a real session and real task completions on the shared,
+      other-lane-owned Postgres; this lane is not authorized to create them, so
+      this flow is not attempted in this environment.
   - id: br.notify.unsubscribe.honored
     expected: yes
     observed: not-run
-    note: Every step needs a real session and real task completions on the shared, other-lane-owned
-      Postgres; this lane is not authorized to create them, so this flow is not attempted in this
-      environment.
+    note: Every step needs a real session and real task completions on the shared,
+      other-lane-owned Postgres; this lane is not authorized to create them, so
+      this flow is not attempted in this environment.
 assets:
   - path: screens/screenshot.png
     sha256: 3878570f4a62a0d65f57cf1754e0269e56ec797f4e36e26b44c172eb6e800401
@@ -49,20 +49,49 @@ files:
     ownedResourcesCreated: []
     ownedResourcesDeleted: []
     verifiedAbsent: []
-    note: This run created no run-owned fixture rows against a database this lane owns; nothing to clean
-      up.
+    note: This run created no run-owned fixture rows against a database this lane
+      owns; nothing to clean up.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.notify.digest-and-unsubscribe
-      title: Two events settle into one digest, then an unsubscribe silences the next one
+      title: Two events settle into one digest, then an unsubscribe silences the next
+        one
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: owner
+          action: Sign in as the owner.
+          expected: the preferences screen is reachable
+          checks: []
+        - order: 2
+          actor: owner
+          action: Trigger two notify-worthy events for the owner inside one digest window.
+          expected: both events are recorded for the window
+          checks: []
+        - order: 3
+          actor: owner
+          action: Read the owner's inbox.
+          expected: exactly one message covers both events
+          checks:
+            - id: completion
+              expected: yes
+        - order: 4
+          actor: owner
+          action: Unsubscribe from email in the preferences screen.
+          expected: the preference is saved as unsubscribed
+          checks:
+            - id: completion
+              expected: yes
+        - order: 5
+          actor: owner
+          action: Trigger a third notify-worthy event.
+          expected: the event is recorded
+          checks: []
+        - order: 6
+          actor: owner
+          action: Confirm no new message arrives for it.
+          expected: the inbox is unchanged since step 3
+          checks: []
       proves:
         - fr.notify.digest
         - fr.notify.unsubscribe
@@ -95,27 +124,27 @@ files:
       - id: br.notify.digest.window
         expected: yes
         observed: not-run
-        note: Every step needs a real session and real task completions on the shared, other-lane-owned
-          Postgres; this lane is not authorized to create them, so this flow is not attempted in
-          this environment.
+        note: Every step needs a real session and real task completions on the shared,
+          other-lane-owned Postgres; this lane is not authorized to create them,
+          so this flow is not attempted in this environment.
       - id: fr.notify.digest
         expected: yes
         observed: not-run
-        note: Every step needs a real session and real task completions on the shared, other-lane-owned
-          Postgres; this lane is not authorized to create them, so this flow is not attempted in
-          this environment.
+        note: Every step needs a real session and real task completions on the shared,
+          other-lane-owned Postgres; this lane is not authorized to create them,
+          so this flow is not attempted in this environment.
       - id: fr.notify.unsubscribe
         expected: yes
         observed: not-run
-        note: Every step needs a real session and real task completions on the shared, other-lane-owned
-          Postgres; this lane is not authorized to create them, so this flow is not attempted in
-          this environment.
+        note: Every step needs a real session and real task completions on the shared,
+          other-lane-owned Postgres; this lane is not authorized to create them,
+          so this flow is not attempted in this environment.
       - id: br.notify.unsubscribe.honored
         expected: yes
         observed: not-run
-        note: Every step needs a real session and real task completions on the shared, other-lane-owned
-          Postgres; this lane is not authorized to create them, so this flow is not attempted in
-          this environment.
+        note: Every step needs a real session and real task completions on the shared,
+          other-lane-owned Postgres; this lane is not authorized to create them,
+          so this flow is not attempted in this environment.
   walk.json:
     schema: starci/uat-walk@1
     flow: uat.notify.digest-and-unsubscribe

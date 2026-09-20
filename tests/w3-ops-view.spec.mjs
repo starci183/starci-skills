@@ -10,7 +10,7 @@ const MIN=60_000;
 const ago=minutes=>NOW-minutes*MIN;
 
 /**
- * A synthetic runtime profile, shaped exactly like `loadRuntimes()`'s `.dist/model/runtimes.json`: one map of
+ * A synthetic runtime profile, shaped exactly like `loadRuntimes()`'s `modules/models/runtimes.yaml`: one map of
  * pools pinning a model per role, plus the `roleOfKind` fallback the allocator reads for kinds the graph does
  * not carry. Injected so the spec never depends on what the build resolved.
  */

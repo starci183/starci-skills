@@ -1,0 +1,251 @@
+#!/usr/bin/env node
+// dispatch-op.mjs — build the dispatch packet for one op and (optionally) spawn
+// the `[Op] <id>` Orca terminal that executes it (tinkle-12). One op = one
+// ephemeral shell agent; the kernel driver is the caller.
+//
+// Packet contract per ex-testing/briefs/tinkle/tinkle-9.md `dispatch.yaml`
+// (modules/kernel/ has NOT landed yet — assumption flagged in output):
+//   packet:
+//     op: <id>
+//     brief: modules/ops/ops/<id>.yaml
+//     context: {records: [...], owned_paths: [...]}
+//     constraints: {model, budget, lease}
+//     returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string}
+//
+// Spawn path reconciled with the REAL orca CLI (verified live, 2026-09):
+//   orca terminal create --worktree <selector> --title "[Op] <id>" --command "<text>" --json
+//     -> result.terminal.handle   (providers/orca/calls.yaml terminal-create)
+//   orca terminal send --terminal <handle> --text "<prompt>" --enter --json
+//   Command-terminal launch only (qwen/devin profiles); managed-agent profiles
+//   (claude/codex) launch through `orca orchestration worker-start` and refuse
+//   --spawn here — see providers/orca/index.yaml managedFallback.
+//
+// CLI:
+//   node scripts/route/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
+//       [--model <target>] [--budget <n>] [--lease <token>] [--worktree <sel>]
+//       [--dry-run | --spawn] [--json]
+//   --spawn requires --lease (the lease binds the agent's writes to the job).
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../core/yaml.mjs';
+import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example-ownership.mjs';
+
+const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+const ORCA = process.platform === 'win32' ? 'orca.cmd' : 'orca';
+const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
+
+function usage(code) {
+  console.error(`use: node scripts/route/dispatch-op.mjs --op <id>
+    [--records a,b] [--state <.starciwork dir>] [--model <target>] [--budget <n>]
+    [--lease <token>] [--worktree <selector>] [--dry-run | --spawn] [--json]`);
+  process.exit(code);
+}
+
+function parseArgs(argv) {
+  const a = { records: [] };
+  const take = () => {
+    const v = argv[++parseArgs.i];
+    if (v === undefined) usage(2);
+    return v;
+  };
+  for (parseArgs.i = 0; parseArgs.i < argv.length; parseArgs.i++) {
+    const k = argv[parseArgs.i];
+    if (k === '--op') a.op = take();
+    else if (k === '--records') a.records.push(...take().split(','));
+    else if (k === '--state') a.state = take();
+    else if (k === '--model') a.model = take();
+    else if (k === '--budget') a.budget = take();
+    else if (k === '--lease') a.lease = take();
+    else if (k === '--worktree') a.worktree = take();
+    else if (k === '--dry-run') a.dryRun = true;
+    else if (k === '--spawn') a.spawn = true;
+    else if (k === '--json') a.json = true;
+    else if (k === '--help' || k === '-h') usage(0);
+    else usage(2);
+  }
+  a.records = [...new Set(a.records.map(s => s.trim()).filter(Boolean))];
+  return a;
+}
+
+const walk = dir => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true })
+  .flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]) : []);
+
+/** Resolve the record list to owned paths via the example-ownership helpers —
+ *  the same ownership resolution check scripts use, so the allowlist the packet
+ *  carries is the ownership the tree actually declares. */
+function resolveOwnedPaths(records, stateDir) {
+  if (!stateDir) return { ownedPaths: [], note: 'no --state given — owned_paths empty; the kernel must fill them before a real dispatch' };
+  const workRoot = path.resolve(stateDir);
+  if (!fs.existsSync(workRoot)) return { ownedPaths: [], error: `state dir missing: ${workRoot}` };
+  const recordsById = loadRecords(workRoot, walk);
+  const workspaceDoc = readWorkspace(workRoot);
+  const ownedPaths = [];
+  const missing = [];
+  for (const rid of records) {
+    const rec = recordsById.get(rid);
+    if (!rec) { missing.push(rid); continue; }
+    for (const d of resolveOwnedDirs(rid, rec, recordsById, workspaceDoc, workRoot)) {
+      ownedPaths.push({ record: rid, path: d.rel.replaceAll('\\', '/'), via: d.via, exists: fs.existsSync(d.abs) });
+    }
+  }
+  return { ownedPaths, missing: missing.length ? missing : undefined };
+}
+
+/** modules/models/profiles/<target>.yaml -> launch.orca {kind, command}. */
+function resolveModel(target, modelsDir) {
+  const file = path.join(modelsDir, 'profiles', `${target}.yaml`);
+  if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
+  const doc = parseYaml(fs.readFileSync(file, 'utf8'));
+  const orca = doc?.launch?.orca ?? {};
+  return {
+    target, provider: doc?.provider ?? null,
+    kind: orca.kind ?? 'unknown',
+    command: orca.command ?? null,
+    profile: path.relative(skillRoot, file),
+  };
+}
+
+function buildPrompt(packet) {
+  // Compact prompt the shell agent receives (tinkle-12): op id, brief path,
+  // records, owned_paths, verdict contract path, and the return instruction.
+  const lines = [
+    `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel.`,
+    `brief: ${packet.brief}  (read it first — it is your contract)`,
+    `records: ${packet.context.records.join(', ') || '(none bound)'}`,
+    `owned_paths: ${[...new Set(packet.context.owned_paths.map(p => p.path))].join(', ') || '(per brief write-ceiling)'}`,
+    `   only owned_paths may be modified; anything else is out of scope.`,
+    `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
+    `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${VERDICT_CONTRACT}`,
+    `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
+  ];
+  return lines.join('\n');
+}
+
+function orcaRun(args) {
+  const r = spawnSync(ORCA, args, { encoding: 'utf8', timeout: 120000 });
+  return { status: r.status, error: r.error?.message, stdout: r.stdout?.trim(), stderr: r.stderr?.trim() };
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args.op) usage(2);
+  const modelsDir = path.join(skillRoot, 'modules', 'models');
+  const briefRel = `modules/ops/ops/${args.op}.yaml`;
+  const briefAbs = path.join(skillRoot, briefRel);
+  if (!fs.existsSync(briefAbs)) {
+    console.error(`unknown op '${args.op}' — no brief at ${briefRel}`);
+    process.exit(1);
+  }
+  const opDoc = parseYaml(fs.readFileSync(briefAbs, 'utf8'));
+  const model = resolveModel(args.model ?? 'qwen-agent', modelsDir); // orchestrationDefault: qwen-agent
+  if (model.error) { console.error(model.error); process.exit(1); }
+
+  const owned = resolveOwnedPaths(args.records, args.state);
+  const contractPresent = fs.existsSync(path.join(skillRoot, VERDICT_CONTRACT));
+
+  const packet = {
+    op: args.op,
+    brief: briefRel,
+    context: {
+      records: args.records,
+      owned_paths: owned.ownedPaths,
+      ...(owned.missing ? { recordsNotFound: owned.missing } : {}),
+      ...(owned.note ? { note: owned.note } : {}),
+      ...(owned.error ? { error: owned.error } : {}),
+    },
+    constraints: {
+      model: model.target,
+      provider: model.provider,
+      budget: args.budget ?? null,
+      lease: args.lease ?? null,
+    },
+    returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
+  };
+
+  const prompt = buildPrompt(packet);
+  const title = `[Op] ${args.op}`;
+  const worktree = args.worktree ?? 'active';
+
+  // Spawn sequence per modules/kernel/dispatch.yaml spawnMechanics +
+  // providers/orca/index.yaml calls: create -> read (readiness/prompt landed)
+  // -> send the prompt text.
+  const orcaCommands = model.kind === 'command-terminal'
+    ? [
+      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', model.command, '--json'] },
+      { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle-from-create>', '--screen', '--json'],
+        note: 'readiness — verify the prompt landed before sending; a long typed command can leave Enter un-landed (dispatch.yaml launchWindow)' },
+      { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle-from-create>', '--text', prompt, '--enter', '--json'] },
+    ]
+    : [
+      { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<operation-task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--model', '<resolved-model-id>', '--json'],
+        note: `${model.target} launches as a managed agent (profile launch.orca.kind=${model.kind}) — providers/orca/index.yaml managedFallback; needs an orchestration Task id, not terminal create` },
+    ];
+
+  const result = {
+    packet,
+    prompt,
+    orca: {
+      worktree, title,
+      launchKind: model.kind,
+      profile: model.profile,
+      commands: orcaCommands.map(c => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`.replace(prompt, '<prompt>'), note: c.note })),
+      contractPresent,
+      ...(contractPresent ? {} : { assumption: `${VERDICT_CONTRACT} not landed yet (tinkle-9 in flight) — packet coded against brief spec ex-testing/briefs/tinkle/tinkle-9.md` }),
+    },
+    opContext: { riskHints: opDoc?.route?.riskHints ?? [], goal: opDoc?.goal?.en ?? opDoc?.goal ?? null },
+  };
+
+  if (args.spawn) {
+    if (!args.lease) { console.error('--spawn requires --lease <token> (the lease binds writes to the job identity)'); process.exit(2); }
+    if (model.kind !== 'command-terminal') {
+      console.error(`--spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`);
+      process.exit(1);
+    }
+    const create = orcaRun(orcaCommands[0].argv);
+    result.spawn = { create: { status: create.status, error: create.error, stdout: create.stdout, stderr: create.stderr } };
+    let handle = null;
+    try { handle = JSON.parse(create.stdout)?.result?.terminal?.handle ?? null; } catch { /* fall through */ }
+    if (create.status !== 0 || !handle) {
+      result.spawn.ok = false;
+      result.spawn.reason = !handle ? 'no result.terminal.handle in create receipt' : `orca exited ${create.status}`;
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(1);
+    }
+    // readiness read (awaitPrompt) — confirm the prompt rendered before sending
+    const readArgv = ['terminal', 'read', '--terminal', handle, '--screen', '--json'];
+    const read = orcaRun(readArgv);
+    result.spawn.read = { status: read.status, error: read.error, tail: read.stdout?.slice(-400) };
+    const sendArgv = ['terminal', 'send', '--terminal', handle, '--text', prompt, '--enter', '--json'];
+    const send = orcaRun(sendArgv);
+    result.spawn.ok = send.status === 0;
+    result.spawn.handle = handle;
+    result.spawn.send = { status: send.status, error: send.error, stdout: send.stdout, stderr: send.stderr };
+    console.log(JSON.stringify(result, null, 2));
+    if (!result.spawn.ok) process.exit(1);
+    return;
+  }
+
+  // --dry-run (also the default when neither flag is passed — never spawn silently)
+  if (!args.dryRun && !args.spawn) result.note = 'no --spawn: dry-run output';
+  if (args.json) { console.log(JSON.stringify(result, null, 2)); return; }
+  console.log(`PACKET op=${packet.op}`);
+  console.log(`  brief: ${packet.brief}`);
+  console.log(`  records: ${packet.context.records.join(', ') || '(none)'}`);
+  for (const p of packet.context.owned_paths) console.log(`  owned_path: ${p.path}  (record ${p.record}, via ${p.via}${p.exists ? '' : ', MISSING-ON-DISK'})`);
+  if (packet.context.recordsNotFound) console.log(`  records not in tree: ${packet.context.recordsNotFound.join(', ')}`);
+  if (packet.context.note) console.log(`  note: ${packet.context.note}`);
+  console.log(`  constraints: model=${model.target} (${model.kind}) budget=${packet.constraints.budget ?? '-'} lease=${packet.constraints.lease ?? '-'}`);
+  console.log(`  returns: verdict pass|fail|blocked + evidence[] + suspicion?  (contract ${VERDICT_CONTRACT}${contractPresent ? '' : ' — NOT LANDED, assumed'})`);
+  console.log('orca commands:');
+  for (const c of result.orca.commands) {
+    console.log(`  $ ${c.cli}`);
+    if (c.note) console.log(`    note: ${c.note}`);
+  }
+  console.log('prompt the agent receives:');
+  for (const line of prompt.split('\n')) console.log(`  | ${line}`);
+}
+
+main();

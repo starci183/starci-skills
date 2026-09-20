@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {readDistJson} from '../../core/runtime-root.mjs';
+import {parseYaml} from '../../core/yaml.mjs';
+import fs from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {hostDescriptor} from '../index.mjs';
 
 /**
@@ -13,14 +15,14 @@ export const defaultOrcaExecutable=process.platform==='win32'?'orca.exe':'orca';
 /**
  * What the Orca host is to the kernel: its name, the capabilities an operation kind may `need` (Orca carries
  * the design tooling artwork is drawn with), and that it runs operations in parallel. The three facts are
- * declared in `model/hosts.yaml` and read here through `hostDescriptor`, so this adapter and
+ * declared in `modules/models/hosts.yaml` and read here through `hostDescriptor`, so this adapter and
  * `hosts/headless/host.mjs` cannot describe the host model differently; the kernel reads nothing else about a
  * host.
  *
  * It is read once at module load and frozen, because a descriptor that changed under a running kernel would
  * change what `host-unsupported` means halfway through a workflow. `hostDescriptor` answers from the built-in
  * values when no profile can be read: a host must be able to describe itself before a build exists, and this
- * module is imported by the very command line that produces `.dist`.
+ * module is imported on early bootstrap paths before any profile is guaranteed.
  */
 export const ORCA_HOST=Object.freeze({...hostDescriptor('orca'),capabilities:Object.freeze(hostDescriptor('orca').capabilities)});
 
@@ -28,7 +30,7 @@ const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const text=value=>typeof value==='string'&&value.trim().length>0;
 
-export function loadOrcaCalls(){return readDistJson('providers','orca','calls.json');}
+export function loadOrcaCalls(){return parseYaml(fs.readFileSync(fileURLToPath(new URL('../../providers/orca/calls.yaml',import.meta.url)),'utf8'));}
 
 export function getPath(value,dotted){
   let current=value;

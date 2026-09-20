@@ -1,0 +1,11 @@
+schema: work/implementation
+id: impl.fake.fake-be.ghost
+title: The ghost implementation
+state: done
+repository: fake-be
+owners:
+  - {role: module, path: src/ghost}
+proves: [fr.fake.thing]
+verification:
+  - "the suite never ran - this line is the fixture's lie"
+verificationSource: observed

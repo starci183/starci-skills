@@ -1,0 +1,11 @@
+# .experiments/ — 1.0.0-alpha staging
+
+Everything in here is **experimental**. Drafts live here, get validated by
+practice, and either promote into the canonical tree or get deleted. Nothing in
+this folder is part of the official contract yet.
+
+Promotion path: `draft here → proven by practice → encoded into modules/,
+scripts/, schemas/ → this file shrinks or the entry leaves a pointer`.
+
+Version: see `../VERSION` (`1.0.0-alpha.1`). Alpha ends when OPENSOURCE-GOAL
+S* rows hold with fresh evidence — then contracts freeze for `1.0.0`.

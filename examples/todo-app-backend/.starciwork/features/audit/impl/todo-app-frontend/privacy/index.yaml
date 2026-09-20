@@ -1,9 +1,7 @@
 schema: work/implementation
 id: impl.audit.todo-app-frontend.privacy
 title: The privacy screen - export data, request erasure
-state: todo
-blockedBy:
-  - {record: gap.audit.render-proof, because: "The render-proof wiring ran checks/render.mjs over this record's real captures and the proof does not hold: all 12 PNGs fail palette-off-brand and entity-list-in-card cannot run because the brand's identity family `common` has no DNA snapshot on this host - exactly the absence gap.audit.render-proof names. Rev 2's reason below records the details."}
+state: done
 repository: todo-app-frontend
 # v7-3 (2026-09-19): route corrected to the directory that exists. Every page route in this app sits
 # under the [lang] locale segment (locales en|vi); src/app/audit never existed, so the rev-1 narrative
@@ -16,10 +14,17 @@ owners:
 proves: [ui.audit.privacy]
 
 change:
-  rev: 2
-  kind: breaking
-  at: 2026-10-12T00:00:00.000Z
-  reason: "Done -> todo: the render-proof wiring (grit item 55) ran the canonical checks in
+  rev: 3
+  kind: editorial
+  at: 2026-09-19T22:40:00.000Z
+  reason: "w10: state restored todo -> done - the lane re-captured all 12 PNG+HTML
+    states with the shared convention (Playwright --disable-lcd-text
+    --disable-font-subpixel-positioning, deviceScaleFactor 4) against a fresh
+    `next build` + `next start` server, raised .shell-controls above the compact
+    sticky nav in src/app/globals.css so mobile frames keep accent-painted
+    controls, and re-ran scripts/example-render-proof.mjs: render/brand proof
+    holds for every capture, so gap.audit.render-proof is closed. The prior
+    narrative is kept verbatim: Done -> todo: the render-proof wiring (grit item 55) ran the canonical checks in
     checks/render.mjs over this record's real captures for the first time, and the proof does not
     hold. All 12 PNGs fail palette-off-brand - the captures carry lossy-compression chroma smearing
     whose dominant colours match no brand token - and entity-list-in-card cannot run because the

@@ -1,0 +1,7 @@
+check-example-work EXIT=1
+check-work-deep EXIT=0
+check-work-artifacts EXIT=1
+check-work-consistency EXIT=1
+check-work-surfaces EXIT=1
+check-work-history EXIT=1
+check-example-yaml EXIT=1

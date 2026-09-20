@@ -1,5 +1,11 @@
 import {canonicalJSON,sha256} from '../core/index.mjs';
-import {readDistJson} from '../core/runtime-root.mjs';
+import {skillRoot} from '../core/runtime-root.mjs';
+import {parseYaml} from '../core/yaml.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// Distless: authored YAML is the contract.
+const sourceYaml=(...parts)=>parseYaml(fs.readFileSync(path.join(skillRoot,...parts),'utf8'));
 import {requireProviderContracts} from '../providers/validate.mjs';
 
 const POLICY_SCHEMA='starci/orchestration-supervision@1';
@@ -34,7 +40,7 @@ export function planOperationAgentLaunch({taskId,worktree,selection,operation,sc
     const command=text(selection.orcaLaunch.command,'command-terminal command');
     const adapterName=text(selection.orcaLaunch.adapter,'command-terminal adapter');
     need(selection.orcaLaunch.nestedAgents==='forbidden','Command-terminal launch must forbid provider-native nested agents');
-    const adapter=readDistJson('providers','orca','adapters',`${adapterName}.json`);
+    const adapter=sourceYaml('providers','orca','adapters',`${adapterName}.yaml`);
     for(const required of adapter.commandRequirements??[])need(command.includes(required),`Command-terminal launch is missing required command fragment: ${required}`);
     return {
       schema:'starci/orca-operation-launch@1',mode:'command-terminal',displayName,
@@ -167,7 +173,7 @@ export function validateSupervisionPolicy(policy){
 }
 
 export function loadSupervisionPolicy(){
-  const policy=readDistJson('workflows','supervision.json');
+  const policy=sourceYaml('workflows','supervision.yaml');
   const checked=validateSupervisionPolicy(policy);
   need(checked.ok,checked.errors.join('; '));
   return policy;

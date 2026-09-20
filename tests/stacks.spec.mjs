@@ -190,14 +190,13 @@ test('rejects primitive, oversized, and unknown manifest shapes without throwing
   f.write();f.manifest.unrecognized=true;f.write();assert.ok(f.check().errors.some(x=>x.code==='schema-shape-invalid'&&x.message==='unknown field'));
 });
 
-test('executes from a relocated installed payload using only its compiled schema JSON',async t=>{
+test('executes from a relocated installed payload using its authored schema YAML',async t=>{
   const f=fixture(t),payload=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stack-runtime-'));t.after(()=>fs.rmSync(payload,{recursive:true,force:true}));
-  const dist=path.join(payload,'.dist');fs.mkdirSync(path.join(dist,'scripts','checks'),{recursive:true});fs.mkdirSync(path.join(dist,'core'),{recursive:true});fs.mkdirSync(path.join(dist,'schemas'),{recursive:true});
+  const dist=path.join(payload,'payload');fs.mkdirSync(path.join(dist,'scripts','checks'),{recursive:true});fs.mkdirSync(path.join(dist,'core'),{recursive:true});fs.mkdirSync(path.join(dist,'schemas'),{recursive:true});
   fs.copyFileSync(new URL('../scripts/checks/stacks.mjs',import.meta.url),path.join(dist,'scripts','checks','stacks.mjs'));fs.copyFileSync(new URL('../core/yaml.mjs',import.meta.url),path.join(dist,'core','yaml.mjs'));
-  const schema=parseYaml(fs.readFileSync(new URL('../schemas/application-stacks.schema.yaml',import.meta.url),'utf8'));fs.writeFileSync(path.join(dist,'schemas','application-stacks.schema.json'),JSON.stringify(schema));
-  assert.equal(fs.existsSync(path.join(dist,'schemas','application-stacks.schema.yaml')),false);
+  fs.copyFileSync(new URL('../schemas/application-stacks.schema.yaml',import.meta.url),path.join(dist,'schemas','application-stacks.schema.yaml'));
   const {pathToFileURL}=await import('node:url');
-  const relocated=await import(`${pathToFileURL(path.join(payload,'.dist','scripts','checks','stacks.mjs')).href}?relocated=${Date.now()}`);
+  const relocated=await import(`${pathToFileURL(path.join(dist,'scripts','checks','stacks.mjs')).href}?relocated=${Date.now()}`);
   const result=relocated.checkApplicationStacks({repoRoot:f.root,environment:'dev',deploymentModelFile:f.modelFile});assert.equal(result.ok,true,result.errors.map(x=>x.code).join(','));
 });
 

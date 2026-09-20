@@ -52,15 +52,15 @@ test('root binding identity changes when Work ownership or read-only reference m
 test('sealed runtime canon is discovered and only the workflow-bound authored runtime can translate pre-pin references',t=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-runtime-ref-')),repo=path.join(temp,'code'),host=path.join(temp,'runtime-source'),pin=path.join(temp,'sealed');
   t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));fs.mkdirSync(repo,{recursive:true});
-  const authored=path.join(host,'knowledge','grammars','index.yaml'),compiled=path.join(pin,'.dist','knowledge','grammars','INDEX.json');
+  const authored=path.join(host,'knowledge','grammars','index.yaml'),compiled=path.join(pin,'knowledge','grammars','index.yaml');
   fs.mkdirSync(path.dirname(authored),{recursive:true});fs.writeFileSync(authored,'schema: grammar/index@1\n');
-  fs.mkdirSync(path.dirname(compiled),{recursive:true});fs.writeFileSync(compiled,'{"schema":"grammar/index@1"}\n');
+  fs.mkdirSync(path.dirname(compiled),{recursive:true});fs.writeFileSync(compiled,'schema: grammar/index@1\n');
   const state={worktree:repo,host,engine:{runtimePin:{root:pin}}},ctx={work:{ledger:{repoRoot:repo,workRoot:path.join(repo,'.starciwork')},loaded:{nodes:new Map(),list:[]}}};
   assert.deepEqual(grammarReferences(pin),[compiled.replaceAll('\\','/')]);
   const translated=candidateReferences({references:[authored]},state,ctx)[0];
-  assert.deepEqual([translated.rootId,translated.ref,translated.sourceRef],['runtime','.dist/knowledge/grammars/INDEX.json',authored.replaceAll('\\','/')]);
+  assert.deepEqual([translated.rootId,translated.ref,translated.sourceRef],['runtime','knowledge/grammars/index.yaml',authored.replaceAll('\\','/')]);
   const derived=candidateReferences({references:grammarReferences(pin)},state,ctx)[0];
-  assert.deepEqual([derived.rootId,derived.ref,derived.sourceRef],['runtime','.dist/knowledge/grammars/INDEX.json',compiled.replaceAll('\\','/')]);
+  assert.deepEqual([derived.rootId,derived.ref,derived.sourceRef],['runtime','knowledge/grammars/index.yaml',compiled.replaceAll('\\','/')]);
   const foreign=path.join(temp,'unrelated','knowledge','grammars','index.yaml');
   assert.throws(()=>candidateReferences({references:[foreign]},state,ctx),/outside the accepted routed roots/);
   assert.throws(()=>candidateRootBindings({state,work:ctx.work,op:{allowlist:[compiled]}}),/cannot write the read-only runtime-input root/);

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {parseYaml} from '../../core/yaml.mjs';
-import {distRoot,skillRoot} from '../../core/runtime-root.mjs';
+import {skillRoot} from '../../core/runtime-root.mjs';
 
 /**
  * The brand is proven, not stated. A brand record says what the product's colour, mascot and icon law is;
@@ -275,10 +275,9 @@ function lookupToken(sources,token){
 // The brand record and the grammar canon.
 // ---------------------------------------------------------------------------
 
-/** The grammar canon the host installs. `.dist` wins when it exists: ordinary runtime reads built contracts. */
+/** The grammar canon the host installs: authored YAML under `knowledge/grammars`, read directly. */
 export function defaultGrammarRoot(){
-  const built=path.join(distRoot,'knowledge','grammars');
-  return fs.existsSync(built)?built:path.join(skillRoot,'knowledge','grammars');
+  return path.join(skillRoot,'knowledge','grammars');
 }
 
 /**

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {skillRoot,readDistJson} from '../core/runtime-root.mjs';
+import {skillRoot} from '../core/runtime-root.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 
 export const configRoot=skillRoot;
@@ -11,8 +11,8 @@ export const DEFAULT_NON_OPERATION_MODELS={planner:'fable-astra',kernelManager:'
 export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const defaults=()=>({pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...DEFAULT_NON_OPERATION_MODELS},selection:'quota-aware'});
-function runtimeProfile(){const source=fileURLToPath(new URL('../model/runtimes.yaml',import.meta.url));return fs.existsSync(source)?parseYaml(fs.readFileSync(source,'utf8')):readDistJson('model','runtimes.json');}
-function targetAliases(){const source=fileURLToPath(new URL('../model/registry.yaml',import.meta.url));try{const registry=fs.existsSync(source)?parseYaml(fs.readFileSync(source,'utf8')):readDistJson('model','registry.json');return registry?.targetAliases??{};}catch{return {};}}
+function runtimeProfile(){const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));if(!fs.existsSync(source))throw Error('Missing modules/models/runtimes.yaml');return parseYaml(fs.readFileSync(source,'utf8'));}
+function targetAliases(){const source=fileURLToPath(new URL('../modules/models/registry.yaml',import.meta.url));try{const registry=fs.existsSync(source)?parseYaml(fs.readFileSync(source,'utf8')):null;return registry?.targetAliases??{};}catch{return {};}}
 // A legacy config names the retired per-model pools; each id resolves to the provider-window pool that carries
 // it now, so `critique.runtimes: [claude-opus, gpt-5.6-sol]` still identifies the opus-sol pair.
 const canonical=id=>targetAliases()[id]??id;
@@ -70,6 +70,6 @@ export function configuredAllocationPolicy(config=loadConfig()){
 /** @deprecated Compatibility accessor; only the first entry is an owner preference, never a try chain. */
 export const configuredProviderOrder=(config=loadConfig())=>{const policy=configuredAllocationPolicy(config);return policy?.preferredProvider?[policy.preferredProvider]:[];};
 export const nonOperationModels=(role,config=loadConfig())=>{if(!Object.hasOwn(NON_OPERATION_ROLES,role))throw Error(`Unknown non-operation model role ${role}`);return effectiveNonOperationModels(config)[role].runtimes;};
-function readExample(root=configRoot){const yaml=path.join(root,'config.example.yaml');if(fs.existsSync(yaml))return validateConfig(migrateLegacy(parseYaml(fs.readFileSync(yaml,'utf8'))));const json=path.join(root,'config.example.json');if(fs.existsSync(json))return validateConfig(migrateLegacy(JSON.parse(fs.readFileSync(json,'utf8'))));const fromDist=path.join(root,'.dist','config.example.json');if(fs.existsSync(fromDist))return validateConfig(migrateLegacy(JSON.parse(fs.readFileSync(fromDist,'utf8'))));throw Error('Missing config.example.yaml (or legacy config.example.json)');}
+function readExample(root=configRoot){const yaml=path.join(root,'config.example.yaml');if(fs.existsSync(yaml))return validateConfig(migrateLegacy(parseYaml(fs.readFileSync(yaml,'utf8'))));const json=path.join(root,'config.example.json');if(fs.existsSync(json))return validateConfig(migrateLegacy(JSON.parse(fs.readFileSync(json,'utf8'))));throw Error('Missing config.example.yaml (or legacy config.example.json)');}
 export function loadConfig(root=configRoot,{initialize=false}={}){const file=path.join(root,'config.json');if(initialize&&!fs.existsSync(file)){const example=readExample(root);try{fs.writeFileSync(file,JSON.stringify(example,null,2)+'\n',{flag:'wx'});}catch(error){if(error.code!=='EEXIST')throw error;}}if(fs.existsSync(file))return validateConfig(migrateLegacy(JSON.parse(fs.readFileSync(file,'utf8'))));return readExample(root);}
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){try{process.stdout.write(JSON.stringify(loadConfig(configRoot,{initialize:true}))+'\n');}catch(error){process.stderr.write(error.message+'\n');process.exitCode=1;}}

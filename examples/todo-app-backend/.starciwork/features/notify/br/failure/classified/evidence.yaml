@@ -8,11 +8,11 @@ codeDigest:
   algorithm: sha256
   files:
     - path: src/modules/bussiness/notify/dedupe.service.spec.ts
-      sha256: a5cf1a359305c6c3557168424e81e001d94da2156c22f3f1b333ccf6a26e7e4d
+      sha256: e2879a39b7ed85c025354251631f18d0b55de12332f62e8cc5846438672ca76e
     - path: src/modules/bussiness/notify/dedupe.service.ts
       sha256: 1c008c411947acf12034cb0f619a8663179b4de117cee10a1d65cec328d5df77
     - path: src/modules/bussiness/notify/delivery.service.spec.ts
-      sha256: 004c8a68e570ba65b23fbd065f763434da800e2aec2556f1827d4e4157ef066b
+      sha256: c1f98d0e29d35e488624dd502ed5d6f52da28625d4a32b4a314aae5f92a04e23
     - path: src/modules/bussiness/notify/delivery.service.ts
       sha256: 10c57729f6a8c052a167a795929e734aadef2e782eab276b6668cec0acbbf7cb
     - path: src/modules/bussiness/notify/digest.service.spec.ts
@@ -38,7 +38,7 @@ codeDigest:
     - path: src/modules/bussiness/notify/notify.scheduler.ts
       sha256: 6b6170aa257745b60b52f5131fec716f553d01758df27771e4cc73b3857475af
     - path: src/modules/bussiness/notify/notify.service.spec.ts
-      sha256: 3a8dcc87f407f2e34a1aa72b60757b9c16ff90cd43a8410aab2ca9012ca75019
+      sha256: 0c1451b59973cf80a1a49588a1dcf9535d81e568e4c24ff07be50c534c90f71c
     - path: src/modules/bussiness/notify/notify.service.ts
       sha256: c47497c0378ee9fdddc9b8546699efa9f533d596fa58af29bf82db13ddf72889
     - path: src/modules/bussiness/notify/preferences.service.spec.ts
@@ -69,7 +69,7 @@ codeDigest:
       sha256: 53a64661c87bd932e22689eca05746899a292f00f858ca8892a522b81cf540d4
     - path: src/modules/bussiness/notify/update-notification-preferences.handler.ts
       sha256: 7b30887dfaba380024c4ab64b2f2d70284391aedc259469d64234706fa783751
-  digest: aad957fa6a8471cf978babe7843c9c610995842fc3a801258b0c5966c1fac0fa
+  digest: 3f2683daf6f4b62a38549b515f0e8468839f18abf6b50e61d95c8bd49dfd7d7f
 outcome: pass
 assertions:
   - id: retries-transient
@@ -91,4 +91,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T13:06:17.252Z
+  capturedAt: 2026-09-19T23:13:21.287Z

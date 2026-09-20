@@ -1,0 +1,19 @@
+schema: work/data
+id: data.upload.upload
+title: Upload
+state: done
+fields:
+  - {name: id, type: text, required: true, note: "Opaque uuid, minted at intent or direct intake."}
+  - {name: owner, type: text, required: true, note: Bound at intake and never rewritten.}
+  - {name: taskId, type: text, required: false, note: Null until attach points the upload at a task.}
+  - {name: filename, type: text, required: true}
+  - {name: mime, type: text, required: true}
+  - {name: sizeBytes, type: integer, required: true}
+  - {name: storageKey, type: text, required: true, note: "uploads/<id>, minted server-side - never client input."}
+  - {name: status, type: text, required: true, default: pending, note: pending | ready}
+  - {name: createdAt, type: timestamp, required: true}
+invariants:
+  - owner is never null and never changes for a given id.
+  - status is ready only after the object is stored and the scan accepts it.
+  - storageKey is derived from the id alone, so no client-controlled value reaches the storage adapter.
+refs: [br.upload.owned, br.upload.lifecycle]

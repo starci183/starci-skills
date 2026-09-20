@@ -3,18 +3,18 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.share.todo-app-frontend.invite-screen
-recordDigest: c69ad6c273f11be86bab8bd7311f4e62b79296721be34522d164be27d2cb8c6a
+recordDigest: 44d556008cb0ce4cbbe7a41a75901922db1aed0d317f565f0b385acb598aa3fb
 codeDigest:
   algorithm: sha256
   files:
     - path: src/app/[lang]/tasks/[taskId]/share/page.tsx
       sha256: dc69ddc23674ee48b48ad349d82cbb7b02c99dd29b3eeb8b3ae5d9a53f644145
     - path: src/components/blocks/share-invite/classNames.ts
-      sha256: 3327cf3ccada00cd65e90f9a4a4648f815b91b37aee970c4009ff00ae62e30d5
+      sha256: 20b2eac736c5ad633840e0d32c0e66f83a9d4e97dbd8cdd1693e37ac20bcabd5
     - path: src/components/blocks/share-invite/component.spec.tsx
       sha256: ddb9a167633f67299f9d29ec8ce88dd8a3796d3e6104f3b03810df05952a2e1b
     - path: src/components/blocks/share-invite/component.tsx
-      sha256: 30e262050103c0ff79e80ac6f99f789c147cd29afac62c210c94418986193fa3
+      sha256: 19cf4a264c571a7d93283d8c2650095a966d1bfab8de1580e053da9e52c8b139
     - path: src/components/blocks/share-invite/index.tsx
       sha256: 3e7652a096a6b9f5a37d50b284a084ac934912648a3384c6b72342594bba79af
     - path: src/components/leaves/Link/index.tsx
@@ -59,7 +59,7 @@ codeDigest:
       sha256: a4f0afd0944b23188a7802cfcede489fdc6a0b9902b3ed7367242a5e40b12d7d
     - path: src/modules/api/write-feedback.ts
       sha256: 933cd8c301cb13ce6e4df6322a5adf921914a08d834f55ae3e8439b920b5fa74
-  digest: f7ab343e2ed2992c4bd72ce87fa10b2e7895e118891d5db02e752049e0c4feac
+  digest: ba46996ae6c11c928a6f091571fec66951fc2c23223c312b0270bc76f46a4f50
 outcome: fail
 assertions:
   - id: typecheck
@@ -86,11 +86,11 @@ assertions:
     command: node -e "require('fs').rmSync('.next',{recursive:true,force:true})" && node
       ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config
       architecture.json --all
-    exit: 2
+    exit: 1
     outcome: fail
     observation: node -e "require('fs').rmSync('.next',{recursive:true,force:true})" && node
       ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config
-      architecture.json --all exited 2
+      architecture.json --all exited 1
   - id: captures
     command: node verify-captures.mjs assets
     exit: 0
@@ -98,9 +98,9 @@ assertions:
     observation: node verify-captures.mjs assets exited 0
   - id: render-entity-list-in-card
     command: node verify-captures.mjs entity-list
-    exit: 1
-    outcome: fail
-    observation: node verify-captures.mjs entity-list exited 1
+    exit: 0
+    outcome: pass
+    observation: node verify-captures.mjs entity-list exited 0
   - id: render-primary-absent
     command: node verify-captures.mjs primary
     exit: 0
@@ -108,16 +108,24 @@ assertions:
     observation: node verify-captures.mjs primary exited 0
   - id: render-palette-off-brand
     command: node verify-captures.mjs palette
-    exit: 1
-    outcome: fail
-    observation: node verify-captures.mjs palette exited 1
+    exit: 0
+    outcome: pass
+    observation: node verify-captures.mjs palette exited 0
   - id: build
     command: npx next build
     exit: 0
     outcome: pass
     observation: npx next build exited 0
+  - id: render-proof
+    command: node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork
+      --record impl.share.todo-app-frontend.invite-screen
+    exit: 0
+    outcome: pass
+    observation: node ../../scripts/example-render-proof.mjs --work
+      examples/todo-app-backend/.starciwork --record impl.share.todo-app-frontend.invite-screen
+      exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T14:32:12.699Z
+  capturedAt: 2026-09-19T22:46:43.275Z

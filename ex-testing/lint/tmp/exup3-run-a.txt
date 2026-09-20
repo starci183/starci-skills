@@ -1,0 +1,68 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mD:/Repositories/starci-academy-backend/.claude/examples/todo-app-frontend[39m
+
+(node:40388) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72100) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:66704) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72516) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72520) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:72632) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14864) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:68632) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60788) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34616) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60352) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:59656) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61348) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:69868) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14268) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71392) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ [32m✓[39m src/modules/api/graphql.spec.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+(node:25616) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:62152) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:65128) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ [32m✓[39m src/modules/api/share.spec.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+ [32m✓[39m src/modules/api/tasks.spec.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/modules/api/auth.spec.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/components/plan/api.spec.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32m✓[39m src/hooks/auth/useSignIn.spec.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 22[2mms[22m[39m
+ [32m✓[39m src/components/login/sign-in/index.spec.tsx [2m([22m[2m1 test[22m[2m)[22m[90m 170[2mms[22m[39m
+ [32m✓[39m src/components/blocks/sign-in-form/component.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 337[2mms[22m[39m
+ [32m✓[39m src/features/pages/tasks/index.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 374[2mms[22m[39m
+ [32m✓[39m src/components/login/sign-in/component.spec.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 443[2mms[22m[39m
+ [32m✓[39m src/components/recur/schedule-screen.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 383[2mms[22m[39m
+ [32m✓[39m src/components/plan/usage-screen/component.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 485[2mms[22m[39m
+ [32m✓[39m src/components/blocks/task-list/component.spec.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 571[2mms[22m[39m
+ [32m✓[39m src/components/notify/preferences/component.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 576[2mms[22m[39m
+ [32m✓[39m src/components/audit/privacy/component.spec.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 693[2mms[22m[39m
+ [32m✓[39m src/components/blocks/share-invite/component.spec.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 747[2mms[22m[39m
+ [32m✓[39m src/components/pages/SignInPage/journey.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 945[2mms[22m[39m
+ [32m✓[39m src/components/pages/TasksPage/journey.spec.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 1072[2mms[22m[39m
+   [33m[2m✓[22m[39m ui.task.list journey: the served tasks screen over the real transport[2m > [22mreads the viewer's own rows and sends them with the viewer's own session [33m340[2mms[22m[39m
+ [32m✓[39m src/components/pages/TaskSharePage/journey.spec.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 1578[2mms[22m[39m
+   [33m[2m✓[22m[39m ui.share.invite journey: the served share screen over the real transport[2m > [22mnames the task the route addresses and reads its invitations with the reader's own session [33m301[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m19 passed[39m[22m[90m (19)[39m
+[2m      Tests [22m [1m[32m134 passed[39m[22m[90m (134)[39m
+[2m   Start at [22m 03:02:58
+[2m   Duration [22m 6.54s[2m (transform 3.91s, setup 5.26s, collect 38.47s, tests 8.44s, environment 21.55s, prepare 2.71s)[22m
+

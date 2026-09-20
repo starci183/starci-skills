@@ -26,32 +26,32 @@
 #   unreconciled-pending are impossible to persist — enforced by FKs, CHECKs and
 #   three triggers, not by callers being careful.
 #
-# source: .dist/kernel/ledger-db.mjs (DDL, handles, reserveTwoPhase/releaseTwoPhase,
-#   verifyChain/verifyAnchor, retention), .dist/docs/ledger-db.md (§1-§13),
-#   .dist/schemas/ledger-db.schema.json (column catalog contract)
+# source: kernel/ledger-db.mjs (DDL, handles, reserveTwoPhase/releaseTwoPhase,
+#   verifyChain/verifyAnchor, retention), docs/ledger-db.md (§1-§13),
+#   schemas/ledger-db.schema.yaml (column catalog contract)
 
 schema: starci/module-ledger-db-design@1
 sources:
-  - .dist/kernel/ledger-db.mjs
-  - .dist/kernel/store.mjs
-  - .dist/kernel/journal.mjs        # retired journal; shared helpers + retention ported whole
-  - .dist/kernel/admission.mjs
-  - .dist/kernel/jobs.mjs
-  - .dist/kernel/job-worker.mjs
-  - .dist/kernel/job-bridge.mjs
-  - .dist/kernel/engine.mjs
-  - .dist/kernel/continuation.mjs
-  - .dist/kernel/launch.mjs
-  - .dist/kernel/loads.mjs
-  - .dist/kernel/candidate-bridge.mjs
-  - .dist/kernel/terminals.mjs
-  - .dist/kernel/supervisor.mjs
-  - .dist/kernel/owner.mjs
-  - .dist/kernel/kernel.mjs
-  - .dist/hosts/orca/launch.mjs
-  - .dist/scripts/ledger-migrate.mjs
-  - .dist/docs/ledger-db.md
-  - .dist/schemas/ledger-db.schema.json
+  - kernel/ledger-db.mjs
+  - kernel/store.mjs
+  - kernel/journal.mjs        # retired journal; shared helpers + retention ported whole
+  - kernel/admission.mjs
+  - kernel/jobs.mjs
+  - kernel/job-worker.mjs
+  - kernel/job-bridge.mjs
+  - kernel/engine.mjs
+  - kernel/continuation.mjs
+  - kernel/launch.mjs
+  - kernel/loads.mjs
+  - kernel/candidate-bridge.mjs
+  - kernel/terminals.mjs
+  - kernel/supervisor.mjs
+  - kernel/owner.mjs
+  - kernel/kernel.mjs
+  - hosts/orca/launch.mjs
+  - scripts/ledger-migrate.mjs
+  - docs/ledger-db.md
+  - schemas/ledger-db.schema.yaml
 
 # ---------------------------------------------------------------------------
 # naming trap, recorded once: kernel/ledger.mjs is the WORK-TREE ledger API

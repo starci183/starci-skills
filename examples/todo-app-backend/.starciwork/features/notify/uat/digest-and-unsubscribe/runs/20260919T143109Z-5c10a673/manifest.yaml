@@ -25,20 +25,49 @@ files:
     ownedResourcesCreated: []
     ownedResourcesDeleted: []
     verifiedAbsent: []
-    note: This run created no run-owned fixture rows against a database this lane owns; nothing to clean
-      up.
+    note: This run created no run-owned fixture rows against a database this lane
+      owns; nothing to clean up.
   flows.json:
     schema: starci/uat-flows@1
     flow:
       id: uat.notify.digest-and-unsubscribe
-      title: Two events settle into one digest, then an unsubscribe silences the next one
+      title: Two events settle into one digest, then an unsubscribe silences the next
+        one
       steps:
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
-        - "[object Object]"
+        - order: 1
+          actor: owner
+          action: Sign in as the owner.
+          expected: the preferences screen is reachable
+          checks: []
+        - order: 2
+          actor: owner
+          action: Trigger two notify-worthy events for the owner inside one digest window.
+          expected: both events are recorded for the window
+          checks: []
+        - order: 3
+          actor: owner
+          action: Read the owner's inbox.
+          expected: exactly one message covers both events
+          checks:
+            - id: completion
+              expected: yes
+        - order: 4
+          actor: owner
+          action: Unsubscribe from email in the preferences screen.
+          expected: the preference is saved as unsubscribed
+          checks:
+            - id: completion
+              expected: yes
+        - order: 5
+          actor: owner
+          action: Trigger a third notify-worthy event.
+          expected: the event is recorded
+          checks: []
+        - order: 6
+          actor: owner
+          action: Confirm no new message arrives for it.
+          expected: the inbox is unchanged since step 3
+          checks: []
       proves:
         - fr.notify.digest
         - fr.notify.unsubscribe

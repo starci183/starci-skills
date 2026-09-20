@@ -8,7 +8,7 @@ import {parseYaml} from '../core/yaml.mjs';
 import {RECORD_KINDS, loadRecords, recordReads} from './io.mjs';
 
 /**
- * The workflow brain as data. `model/kinds.yaml` declares three things and this module is the only code
+ * The workflow brain as data. `modules/models/kinds.yaml` declares three things and this module is the only code
  * that reads them: the complete catalog of operation kinds (family, allocator role, the records each reads
  * and produces, what each may report), the mandatory lane every ledger node walks, and the bounded routes an
  * outcome may take. Everything here is a pure function of that profile; the only I/O is `loadKinds`.
@@ -26,9 +26,10 @@ import {RECORD_KINDS, loadRecords, recordReads} from './io.mjs';
 export const KIND_GRAPH='starci/kind-graph@1';
 /**
  * The catalog before a profile can be loaded. `KINDS` (declared below, after `kindList`) is the loaded
- * catalog itself - the compiled profile when `.dist` can be read, this baseline when it cannot (a tree whose
- * `.dist` is not built yet still has to resolve kinds). It survives as the fallback only: the catalog lives
- * in `model/kinds.yaml`, and nothing here refuses a profile for adding to it or dropping from it.
+ * catalog itself - the authored profile when `modules/models/kinds.yaml` can be read, this baseline when it
+ * cannot (a tree still has to resolve kinds before the catalog is in hand). It survives as the fallback only:
+ * the catalog lives in `modules/models/kinds.yaml`, and nothing here refuses a profile for adding to it or
+ * dropping from it.
  */
 const BASELINE_KINDS=['decision.prepare','provision.ask','business.decide','business.revise','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
   'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','integration.verify','review.verify','work.author','implementation.plan'];
@@ -61,18 +62,18 @@ const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const listOf=value=>Array.isArray(value)?value.filter(item=>typeof item==='string'):[];
 
-let distProfile=null;
+let sourceProfile=null;
 
 /**
- * Load the catalog. Without `profileDir` it is the compiled `.dist/model/kinds.json`, exactly as
- * `loadRuntimes` loads the allocator's profile, so the same call works from the authored tree and from the
- * `.dist` copy. With `profileDir` the authored YAML (or a fixture) is read directly, which is how the tests
- * and `validateGraph` read a profile that has not been built yet.
+ * Load the catalog. Without `profileDir` it is the authored `modules/models/kinds.yaml`, exactly as
+ * `loadRuntimes` loads the allocator's profile, so the same call works from the authored tree and from a
+ * sealed payload of it. With `profileDir` the authored YAML (or a fixture) is read directly, which is how
+ * the tests and `validateGraph` read a profile outside the canonical catalog.
  */
 export function loadKinds({profileDir=null}={}){
   if(!profileDir){
-    if(!distProfile)distProfile=readDistJson('model','kinds.json');
-    return distProfile;
+    if(!sourceProfile)sourceProfile=readDistJson('model','kinds.json');
+    return sourceProfile;
   }
   const dir=path.resolve(profileDir);
   for(const name of ['kinds.yaml','kinds.yml']){
@@ -103,7 +104,7 @@ const stepsOf=lane=>Array.isArray(lane?.steps)?lane.steps.map(step=>typeof step=
 /** Every kind the loaded profile catalogues, in catalog order. */
 export function kindList({profile=null}={}){return Object.keys(profileOf(profile).kinds);}
 /**
- * The operation kinds of the loaded catalog: `kindList()` on the compiled profile when `.dist` can be read,
+ * The operation kinds of the loaded catalog: `kindList()` on the authored profile when it can be read,
  * `BASELINE_KINDS` before it can. Kernel callers that keep this list (`routeKind` answers a route's named
  * kind through it) follow the catalog as it grows - a kind the profile adds needs no edit here.
  */

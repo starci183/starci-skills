@@ -12,4 +12,6 @@ export enum LogEvent {
     RECUR_GENERATION_TICK_FAILED = "recur.generation-tick.failed",
     /** A notify dispatch tick threw - the tick is fire-and-forget, so the failure is logged and the next interval retries on its own. */
     NOTIFY_DISPATCH_TICK_FAILED = "notify.dispatch-tick.failed",
+    /** One HTTP request finished - the access log's single event; requestId, method, route, status and durationMs ride in data, never headers or bodies, so the line can never carry a secret. */
+    HTTP_REQUEST_COMPLETED = "http.request.completed",
 }

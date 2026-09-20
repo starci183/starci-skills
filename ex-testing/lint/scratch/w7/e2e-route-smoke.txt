@@ -1,0 +1,85 @@
+=== route-op --intent direction --nodeKind ui ===
+PICK interface.draw  (score 12)
+  yaml: modules\ops\ops\interface.draw.yaml
+  breakdown: nodeKind(ui):+10  intent(direction):+2
+  prerequisites: business.decide done, architecture.decide done, brand.decide done
+  riskHints: host-tool-required:image_gen.imagegen
+  goal: Establish an image-first interface direction before frontend implementation. Select the smallest useful representative set of critical scree
+runners-up:
+  interface.asset  (score 10)  nodeKind(ui):+10
+  work.author  (score 10)  nodeKind(ui):+10
+EXIT=0
+
+=== route-op no-match (should exit 1) ===
+NO ROUTE — zero candidates matched.
+  - no op scored on the given keys
+  - no kind given
+  - nodeKind 'nonexistent' matched no route.nodeKinds
+  - no phase given
+  - intent [nonsense] matched no route.intent
+EXIT=1
+
+=== route-model --kind backend.implement ===
+workload: kind=backend.implement role=implement risk=medium floor=standard tools=[] ctx=0
+assumed: approved=true local noExternalEffects=true strictMachineGates=true freshIndependentReview=true
+PICK qwen-agent  model=qwen3.8-flash  mode=probation
+  rule: decisionFlow.probation-fallback: no qualification evidence; scoped probation admitted
+  order: registry.yaml operators.backend.implement.chain
+fallback chain:
+  -> devin-agent (swe-2-max) [probation]
+  -> claude-agent (claude-opus-5) [probation]
+  -> codex-agent (gpt-5.6-luna) [probation]
+  note: probation admits exactly one target for one durable job; fallbackChain lists order, not parallel admission
+EXIT=0
+
+=== route-model --kind integration.verify (high-risk, no qualification -> refuse) ===
+workload: kind=integration.verify role=verify risk=high floor=high tools=[] ctx=0  ELEVATED
+assumed: approved=true local noExternalEffects=true strictMachineGates=true freshIndependentReview=true
+REFUSAL — decisionFlow.verdict: no eligible model
+  codex-agent: model qualification evidence is missing; probation cannot satisfy elevated quality or risk; workload shape is not probation-eligible (needs machine checks + fresh review, or a kernel function)
+  claude-agent: model qualification evidence is missing; probation cannot satisfy elevated quality or risk; workload shape is not probation-eligible (needs machine checks + fresh review, or a kernel function)
+  qwen-agent: model qualification evidence is missing; probation cannot satisfy elevated quality or risk; workload shape is not probation-eligible (needs machine checks + fresh review, or a kernel function)
+  devin-agent: model qualification evidence is missing; probation cannot satisfy elevated quality or risk; workload shape is not probation-eligible (needs machine checks + fresh review, or a kernel function)
+  claude-fable: pool is not on the declared chain for integration.verify
+EXIT=1
+
+=== route-plan --target 'ui.X: verified' ===
+S*: ui.X: verified
+S0: not surveyed (no --state; use --simulate to pin S0=empty explicitly)
+delta: ui.X: verified
+chain:
+  1. request.analyze  [external]
+  2. scope.define
+       produces: scope.X: defined
+       needs <- request.analyze (request analyzed)
+  3. business.decide
+       needs <- scope.define produces scope.X: defined
+  4. architecture.decide
+       needs <- business.decide (business.decide done (accepted SRS))
+  5. brand.decide
+       needs <- scope.define produces scope.X: defined
+  6. interface.draw
+       needs <- business.decide (business.decide done)
+       needs <- architecture.decide (architecture.decide done)
+       needs <- brand.decide (brand.decide done)
+  7. work.author  [injected]
+       needs <- scope.define produces scope.X: defined
+  8. interface.implement
+       produces: impl.X: done
+       needs <- interface.draw (interface.draw done)
+       needs <- architecture.decide (architecture.decide done)
+       needs <- work.author (records authored)
+  9. uat.verify
+       produces: ui.X: verified
+       needs <- interface.implement produces impl.X: done (frontend)
+       condition: served build assumed — runtime.operate leg if the stack is not already up
+  10. review.verify  [injected]
+       needs <- interface.implement (implement leg)
+       needs <- interface.implement (a delivery to inspect)
+parse: explicit --target vars
+EXIT=0
+
+=== route-plan infeasible (should exit 1) ===
+INFEASIBLE — no chain produces:
+  bogus.var: nowhere  (needed by (goal))
+EXIT=1

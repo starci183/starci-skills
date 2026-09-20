@@ -1,15 +1,21 @@
-import {readDistJson} from '../core/runtime-root.mjs';
+import {skillRoot} from '../core/runtime-root.mjs';
+import {parseYaml} from '../core/yaml.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
+// Distless: provider contracts are authored YAML; references keep their historical `.json` names,
+// resolved here to the `.yaml` source with the same stem.
+const sourceYaml=(...parts)=>parseYaml(fs.readFileSync(path.join(skillRoot,...parts),'utf8'));
 const readProviderRef=reference=>{
   if(typeof reference!=='string'||!reference.endsWith('.json')||reference.includes('..'))throw Error(`Invalid provider reference: ${reference}`);
-  return readDistJson('providers',...reference.split('/'));
+  return sourceYaml('providers',...reference.replace(/\.json$/i,'.yaml').split('/'));
 };
 
 /** Load the compiled provider catalog and every contract referenced by one provider. */
 export function loadProviderContract(provider){
-  const catalog=readDistJson('providers','catalog.json');
+  const catalog=sourceYaml('providers','catalog.yaml');
   const entry=catalog?.providers?.[provider];
   if(!plain(entry))throw Error(`Unknown provider: ${provider}`);
   const loaded={catalog};
@@ -25,7 +31,7 @@ export function loadProviderContract(provider){
 /** Validate the executable provider tree before an operation launch is planned. */
 export function validateProviderContracts(){
   const errors=[];
-  const catalog=readDistJson('providers','catalog.json');
+  const catalog=sourceYaml('providers','catalog.yaml');
   add(errors,catalog?.schema==='starci/provider-catalog@1','Unsupported provider catalog');
   add(errors,catalog?.selection?.orchestrated==='orca','Orchestrated mode must resolve to Orca');
   add(errors,Array.isArray(catalog?.selection?.solo)&&['codex','claude','orca'].every(value=>catalog.selection.solo.includes(value)),'Solo provider selection is incomplete');
@@ -94,7 +100,7 @@ export function validateProviderContracts(){
   add(errors,devin?.forbidden?.includes('provider-native-subagent')&&devin?.forbidden?.includes('cloud-handoff')&&devin?.forbidden?.includes('inferred-underlying-model'),'Devin adapter must forbid nested/cloud handoff and inferred model identity');
   add(errors,orca.index?.operationAgent?.devin?.launch==='command-terminal'&&orca.index?.operationAgent?.devin?.capacityAuthority==='explicit-workflow-quota'&&orca.index?.operationAgent?.devin?.quotaTelemetry==='launch-status','Orca index must keep Devin closed until explicit workflow capacity exists');
   add(errors,orca.index?.operationAgent?.devin?.agent===devin?.agent&&orca.index?.operationAgent?.devin?.model===devin?.model,'Orca index and Devin adapter identities disagree');
-  for(const [name,target] of Object.entries(readDistJson('model','registry.json').targets||{})){
+  for(const [name,target] of Object.entries(sourceYaml('modules','models','registry.yaml').targets||{})){
     if(target?.orcaLaunch?.kind!=='command-terminal')continue;
     const adapterName=target.orcaLaunch.adapter,adapter=orca.adapters?.[adapterName];
     add(errors,typeof adapterName==='string'&&plain(adapter),`Command terminal ${name} must name a declared Orca adapter`);
