@@ -8,7 +8,7 @@ goal:
     Ask the owner for the one thing only they can give - a credential, an account on an outside system, a
     dataset, a legal authority, or the go-ahead for an irreversible effect - exactly named, in this operation's
     own workflow, and wait for it. Credential input belongs to the kernel's Orca GUI after official-documentation
-    preparation; no model agent asks for a value. Headless hosts retain the hidden identity fill prompt.
+    preparation; no model agent asks for a value.
     This operation verifies only that the provision is present.
 nodeKinds:
   - business
@@ -54,8 +54,8 @@ steps:
       en: >-
         For a credential, return the exact declared requirement to the kernel; do not open an input terminal,
         ask the owner to compose a command, or wait for a "set" reply. The workflow owns the researched form
-        in Orca and resumes its satisfied requesters automatically; a headless host uses identity fill, which
-        reads hidden stdin and never prints it. For anything else, ask in this terminal and wait for the owner
+        in Orca and resumes its satisfied requesters automatically.
+        For anything else, ask in this terminal and wait for the owner
         to reply "provided" once it exists. Wait as long as the contract lets you.
   - reads:
       - question
@@ -77,7 +77,7 @@ proofs:
         stubbed, defaulted or skipped in its place.
   - id: asked-in-the-workflow
     requirement:
-      en: The workflow provided a researched credential form in Orca (hidden fill prompt when headless), or
+      en: The workflow provided a researched credential form in Orca, or
         asked for the non-credential provision in this operation's terminal before any report.
   - id: no-secret
     requirement:
@@ -110,7 +110,7 @@ business:
     - When presence must be checked (e.g., a sealed credential variable exists in custody) before an effect is attempted.
   whenNot:
     - Not for decisions - decision.prepare prepares those provisionally without waiting.
-    - Never asks for a credential value in a terminal or model context - the kernel's Orca GUI or headless hidden fill owns secret entry.
+    - Never asks for a credential value in a terminal or model context - the kernel's Orca GUI owns secret entry.
     - Presence is not provider validity - a present-but-expired credential is still a failure downstream.
   consumes:
     - The question as raised; environment facts (variable name + custody - never the value).

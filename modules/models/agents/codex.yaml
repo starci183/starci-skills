@@ -18,7 +18,6 @@ terminalFallback:
   command: codex
   bypassFlag: '--full-auto (or --ask-for-approval never --sandbox danger-full-access for full yolo)'
   bypassReason: Unattended lanes stall on per-tool permission menus; same rule as qwen --yolo / devin bypass mode.
-  headless: 'codex exec "<prompt>" runs non-interactively.'
   note: 'codex self-update can leave the binary broken (observed 2026-09-20: TUI missing dist files → reinstall fixed). Probe `codex --version` before relying on it.'
 verifiedAt: 2026-09-20
 verifiedAgainst: 'codex v0.155.1'
@@ -42,3 +41,6 @@ capabilities:
       - plan-coordinator
       - workflow-coordinator
       - operation-fallback
+quota:
+  probe: orca-account
+  window: weekly

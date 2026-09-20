@@ -307,7 +307,7 @@ blockers:
         The declared identity custody holds no value under the exact variable the declaration names.
         After official research and executable setup, report blocked with reason environment, the slug
         and that variable name so the kernel presents its workflow-owned form in Orca or hidden fill
-        prompt on a headless host. Missing sops or a host decryption key is a setup failure: repair it
+        prompt in Orca. Missing sops or a host decryption key is a setup failure: repair it
         within authority or report its actual environment/authority boundary, never ask for another
         provider credential to fix it. Never invent, default, substitute or skip a key, fall back to an
         environment variable, or replace the provider with a stand-in to proceed.

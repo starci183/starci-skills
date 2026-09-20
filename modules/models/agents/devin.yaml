@@ -64,7 +64,6 @@ release:
   then: terminal.close
 bypassMode:
   interactive: 'At a permission menu, send "5" + Enter (Switch to bypass mode) — equivalent of qwen --yolo for the session.'
-  headless: 'devin -p "<prompt>" runs non-interactively and exits when done; used when the TUI child is unhealthy.'
 knownFailures:
   - signal: 'Agent connection lost: agent child exited: exit code: 0'
     meaning: The spawned agent child process died; queued sends will not be processed.
@@ -91,3 +90,6 @@ forbidden:
   - reuse-existing-terminal
   - unsupervised-retain-as-success
   - inferred-underlying-model
+quota:
+  probe: cli:devin-auth
+  window: none

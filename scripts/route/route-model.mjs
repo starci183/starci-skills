@@ -16,10 +16,15 @@
 //       [--unapproved]          workflow not approved (probation forbidden)
 //       [--no-review]           no fresh independent review planned
 //       [--no-checks]           op declares no machine checks
-//       [--difficulty <easy|medium|hard>]   (with --plan) which allocation tier to preview
+//       [--difficulty <easy|medium|hard|insane>]   (with --plan) which allocation
+//                               tier to preview; legacy S|M|L|XL spellings accepted
+//       [--prefer <pool>[,<pool>...]] [--avoid <pool>[,<pool>...]]
+//                               bounded pool bias over the walked chain (prefer
+//                               hoists, avoid removes; never bypasses eligibility)
 //       [--plan]                what-if view: walk the runtimes.yaml difficulty tier
-//                               instead of the declared operator chain; missing or
-//                               stale qualification evidence is ANNOTATED, not fatal
+//                               (∩ per-role preference) instead of the declared
+//                               operator chain; missing or stale qualification
+//                               evidence is ANNOTATED, not fatal
 //       [--json] [--modelsDir <dir>] [--verbose]
 //
 // Prints: picked target (+model for the role), the rule that fired, the ordered
@@ -37,6 +42,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel } from '../agent/models.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
@@ -125,7 +131,7 @@ function capacityDrift(candidates, runtimes) {
 }
 
 function parseArgs(argv) {
-  const a = { tools: [] };
+  const a = { tools: [], prefer: [], avoid: [] };
   const take = i => {
     const v = argv[i + 1];
     if (v === undefined) { console.error(`missing value for ${argv[i]}`); process.exit(2); }
@@ -145,6 +151,8 @@ function parseArgs(argv) {
     else if (k === '--no-review') a.review = false;
     else if (k === '--no-checks') a.checks = false;
     else if (k === '--difficulty') a.difficulty = take(i), i++;
+    else if (k === '--prefer') a.prefer.push(...take(i).split(',')), i++;
+    else if (k === '--avoid') a.avoid.push(...take(i).split(',')), i++;
     else if (k === '--plan') a.plan = true;
     else if (k === '--json') a.json = true;
     else if (k === '--verbose') a.verbose = true;
@@ -152,6 +160,10 @@ function parseArgs(argv) {
     else { console.error(`unknown arg ${k}`); process.exit(2); }
   }
   a.tools = [...new Set(a.tools.map(s => s.trim()).filter(Boolean))].sort();
+  a.prefer = [...new Set(a.prefer.map(s => s.trim()).filter(Boolean))];
+  a.avoid = [...new Set(a.avoid.map(s => s.trim()).filter(Boolean))];
+  a.bias = (a.prefer.length || a.avoid.length) ? { prefer: a.prefer, avoid: a.avoid } : null;
+  if (a.difficulty != null) a.difficulty = normalizeDifficulty(a.difficulty) ?? a.difficulty;
   return a;
 }
 
@@ -267,7 +279,6 @@ function loadCandidates(modelsDir) {
       id: pool.target, target: profile?.target ?? pool.target,
       provider: profile?.provider ?? pool.provider,
       roles: profile?.capacity?.roles ?? pool.roles ?? [],
-      models: profile?.capacity?.models ?? {},
       profileMaxParallel: profile?.capacity?.maxParallel ?? null, // stale-prone copy — drift-checked vs runtimes.yaml
       profile: pool.profile ?? `profiles/${pool.target}.yaml`,
     });
@@ -298,7 +309,7 @@ function candidateOrder(kind, role, registry, runtimes) {
 // annotated rather than allowed to fail the pick. Nothing is admitted, launched or
 // written; this is a view, not a route.
 
-const PLAN_COLD_MINUTES = { easy: 15, medium: 45, hard: 90 };
+const PLAN_COLD_MINUTES = { easy: 15, medium: 45, hard: 90, insane: 180 };
 // Failures that mean "no usable evidence" rather than "evidence proved unfit":
 // a pick may still be previewed past these, annotated.
 const PLAN_EVIDENCE_ABSENT = new Set([
@@ -307,13 +318,15 @@ const PLAN_EVIDENCE_ABSENT = new Set([
   'qualification date is invalid',
 ]);
 
-function planChain(runtimes, difficulty, role) {
-  const tier = runtimes?.allocation?.tiers?.[difficulty];
-  const at = `runtimes.yaml allocation.tiers.${difficulty}`;
-  if (!tier) return { chain: [], source: `${at} (missing)` };
-  if (Array.isArray(tier)) return { chain: tier, source: at };
-  if (role && Array.isArray(tier[role])) return { chain: tier[role], source: `${at}.${role}` };
-  return { chain: tier.default ?? [], source: `${at}.default` };
+// The (role, difficulty) chain is shared with scripts/agent/models.mjs: pools
+// in BOTH the tier order and the per-role preference, tier position outer
+// sort, then --prefer/--avoid bias applied (hoist/remove — never eligibility).
+function planChain(runtimes, difficulty, role, bias) {
+  const { chain, tierSource } = chainFor({ role, difficulty, runtimes });
+  const biased = applyBias(chain, bias);
+  const src = `${tierSource} ∩ allocation.preference[${role ?? '(none)'}]` +
+    (bias ? ' + bias' : '');
+  return { chain: biased, source: src };
 }
 
 function planEvidenceNote(evidence, qr) {
@@ -324,20 +337,27 @@ function planEvidenceNote(evidence, qr) {
   return null;
 }
 
-function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, profileCap = {}) {
+function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty, profileCap = {}) {
   const probationReasons = probationAdmissionReasons(w, rules);
   return chain.map(id => {
     const rt = runtimes?.runtimes?.[id] ?? null;
     if (!rt) return { id, target: id, status: 'rejected', structural: true, reasons: ['no runtimes.yaml entry for this pool'] };
-    const model = (w.role && rt.models?.[w.role]) || rt.target || id;
+    // The launch model is the pool's per-difficulty pin (runtimes.yaml
+    // models[difficulty]); a pool without that pin is structurally off this
+    // chain, the same gate models.mjs::selectPool applies.
+    const lm = resolveLaunchModel(id, difficulty, { runtimes });
+    const model = lm.modelId ?? rt.target ?? id;
     const pf = preflightFor(rt);
     const base = { id, target: rt.target ?? id, provider: rt.provider ?? null, model, maxParallel: rt.maxParallel ?? null,
+      effort: lm.effort ?? null,
       preflight: pf.probes, ...(pf.declared ? { preflightDeclared: pf.declared } : {}) };
     const pc = profileCap[id];
     if (pc != null && rt.maxParallel != null && Number(pc) !== Number(rt.maxParallel))
       base.capacityDrift = `profile pins maxParallel ${pc}; runtimes.yaml declares ${rt.maxParallel} (runtimes.yaml wins)`;
     if (w.role && rt.roles?.length && !rt.roles.includes(w.role))
       return { ...base, status: 'rejected', structural: true, reasons: [`pool does not serve role '${w.role}'`] };
+    if (lm.error)
+      return { ...base, status: 'rejected', structural: true, reasons: [lm.error] };
     const evidence = evidenceByRuntime[id];
     const qr = qualificationReasons({ provider: rt.provider, model, target: rt.target ?? id, version: null }, evidence, w, rules);
     const note = planEvidenceNote(evidence, qr);
@@ -348,8 +368,8 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, profileCap
 }
 
 function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profileCap = {}) {
-  const { chain, source } = planChain(runtimes, args.difficulty, w.role);
-  const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, profileCap);
+  const { chain, source } = planChain(runtimes, args.difficulty, w.role, args.bias);
+  const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty, profileCap);
   // Pickable = not structurally off the chain, and any rejection rests only on
   // absent/stale evidence (annotation, not a real disqualification) — the point
   // of plan mode is "who takes this once qualification exists". Probation
@@ -387,13 +407,14 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profil
       candidates: evaluated.map(c => ({
         target: c.target, provider: c.provider, model: c.model,
         maxParallel: c.maxParallel, status: c.status,
+        ...(c.effort ? { effort: c.effort } : {}),
         preflight: c.preflight, ...(c.preflightDeclared ? { preflightDeclared: c.preflightDeclared } : {}),
         ...(c.capacityDrift ? { capacityDrift: c.capacityDrift } : {}),
         ...(c.note ? { evidence: c.note } : {}), ...(c.reasons?.length ? { reasons: c.reasons } : {}),
       })),
       ...(owner.drift?.length ? { capacityDrift: owner.drift } : {}),
       pick: primary
-        ? { primary: { target: primary.target, model: primary.model, status: primary.status }, reason: reasonFor(primary),
+        ? { primary: { target: primary.target, model: primary.model, status: primary.status, ...(primary.effort ? { effort: primary.effort } : {}) }, reason: reasonFor(primary),
             fallbacks: fallbacks.map(c => ({ target: c.target, model: c.model, status: c.status })) }
         : null,
       estimate,
@@ -478,7 +499,7 @@ async function main() {
   owner.drift = capacityDrift(candidates, runtimes);
   const profileCap = Object.fromEntries(candidates.map(c => [c.id, c.profileMaxParallel]));
   if (args.plan) {
-    if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard>'); process.exit(2); }
+    if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard|insane>'); process.exit(2); }
     runPlan(args, rules, runtimes, w, evidenceByRuntime, owner, profileCap);
     return;
   }
@@ -491,6 +512,10 @@ async function main() {
     order = cfgMembers;
     orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;
   }
+  // --prefer/--avoid: the same bounded pool bias models.mjs::applyBias applies —
+  // prefer hoists, avoid removes; eligibility gates below are untouched.
+  const declaredOrder = order;
+  if (args.bias) { order = applyBias(order, args.bias); orderSource += ' + bias(--prefer/--avoid)'; }
   const ordered = [...candidates].sort((a, b) => {
     const pa = preferredProvider && a.provider === preferredProvider ? 0 : 1;
     const pb = preferredProvider && b.provider === preferredProvider ? 0 : 1;
@@ -504,10 +529,14 @@ async function main() {
     // closed set: pools absent from it are not on the launch path at all
     // (interface.draw → [codex-agent] only; kernelManager → its pool only).
     if (chainDeclared && !order.includes(c.id))
-      return { c, eligible: false, mode: null, reasons: [`pool is not on the declared chain for ${args.kind} (${orderSource})`] };
+      return { c, eligible: false, mode: null, reasons: [
+        args.bias?.avoid?.includes(c.id) && declaredOrder.includes(c.id)
+          ? `pool removed by --avoid bias`
+          : `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
     if (w.role && c.roles.length && !c.roles.includes(w.role))
       return { c, eligible: false, mode: null, reasons: [`pool does not serve role '${w.role}'`] };
-    const qr = qualificationReasons({ provider: c.provider, model: c.models[w.role] ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
+    const lm = resolveLaunchModel(c.id, args.difficulty ?? 'medium', { runtimes });
+    const qr = qualificationReasons({ provider: c.provider, model: lm.modelId ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
     if (!qr.length) return { c, eligible: true, mode: 'qualified', reasons: [] };
     const pr = probationAdmissionReasons(w, rules);
     if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr };
@@ -527,7 +556,7 @@ async function main() {
   } else { pickedSet = []; rule = 'decisionFlow.verdict: no eligible model'; }
 
   const pick = pickedSet[0] ?? null;
-  const modelFor = c => (w.role && c.models[w.role]) || c.target;
+  const modelFor = c => resolveLaunchModel(c.id, args.difficulty ?? 'medium', { runtimes }).modelId ?? c.target;
   const result = {
     workload: w,
     config: {
@@ -547,6 +576,7 @@ async function main() {
     pick: pick ? { target: pick.c.target, model: modelFor(pick.c), mode: pick.mode, profile: pick.c.profile } : null,
     rule,
     orderSource,
+    ...(args.bias ? { bias: args.bias } : {}),
     fallbackChain: pickedSet.slice(1).map(e => ({ target: e.c.target, model: modelFor(e.c), mode: e.mode })),
     fallbackPolicy: rules.fallbackAdvanceWhen,
     rejected: evaluated.filter(e => !e.eligible).map(e => ({ target: e.c.target, reasons: e.reasons })),
@@ -570,6 +600,7 @@ async function main() {
       console.log(`PICK ${pick.c.target}  model=${modelFor(pick.c)}  mode=${pick.mode}`);
       console.log(`  rule: ${rule}`);
       console.log(`  order: ${orderSource}`);
+      if (args.bias) console.log(`  bias: prefer=[${args.bias.prefer}] avoid=[${args.bias.avoid}]`);
       if (result.fallbackChain.length) {
         console.log('fallback chain:');
         for (const f of result.fallbackChain) console.log(`  -> ${f.target} (${f.model}) [${f.mode}]`);

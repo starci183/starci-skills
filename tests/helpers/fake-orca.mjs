@@ -1,0 +1,115 @@
+// tests/helpers/fake-orca.mjs — the canned Orca binary shared by the dispatch
+// specs. Write FAKE_ORCA to a temp file and run it through the existing
+// STARCI_ORCA_COMMAND / STARCI_ORCA_ARGS overrides:
+//
+//   env: { STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stubPath]) }
+//
+// Every invocation appends {argv} to STARCI_FAKE_ORCA_LOG (JSONL) — the specs
+// prove no terminal/worker leaks from that call log. Mutable state lives in
+// STARCI_FAKE_ORCA_STATE (sends counter, last started worker agent/model).
+//
+// Env knobs:
+//   STARCI_FAKE_ORCA_MODE  'healthy' (default): terminal read shows the qwen
+//                          prompt, worker-start returns a ready dispatch.
+//                          'auth': terminal read shows the observed
+//                          '401 Invalid API-key' death screen and
+//                          worker-start fails at stage 'auth'.
+//   STARCI_FAKE_ORCA_DEAD  comma-separated provider ids whose `account list`
+//                          rateLimits entry reads dead/not-authenticated —
+//                          drives the kernel-pin dead-probe fallthrough spec.
+export const FAKE_ORCA = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
+import fs from 'node:fs';
+const argv = process.argv.slice(2);
+const log = process.env.STARCI_FAKE_ORCA_LOG;
+const stateFile = process.env.STARCI_FAKE_ORCA_STATE;
+const mode = process.env.STARCI_FAKE_ORCA_MODE || 'healthy';
+const deadProviders = new Set((process.env.STARCI_FAKE_ORCA_DEAD || '').split(',').map(s => s.trim()).filter(Boolean));
+if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
+const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : { sends: 0 };
+const save = () => { if (stateFile) fs.writeFileSync(stateFile, JSON.stringify(state)); };
+const arg = n => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : null; };
+const out = o => console.log(JSON.stringify(o));
+const fail = (o, code) => { console.log(JSON.stringify(o)); process.exit(code ?? 1); };
+// qwen card: readiness.screenPattern 'Type your message', identity 'qwen3.8-flash',
+// submission.activityPattern 'Thinking|esc to cancel|tokens'.
+const PROMPT = 'qwen3.8-flash\nType your message\n> ';
+const DEAD = 'qwen3.8-flash\nType your message\n\nERROR 401 Invalid API-key — key rejected upstream\n';
+const LIVE = 'Thinking hard\nesc to cancel\ntokens 96\n';
+const verb = argv.slice(0, 2).join(' ');
+if (verb === 'terminal create')
+  out({ ok: true, result: { terminal: { handle: 'fake-terminal-1', title: arg('title'), connected: true, writable: true } } });
+else if (verb === 'terminal read')
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
+    screen: mode === 'auth' ? DEAD : (state.sends > 0 ? LIVE : PROMPT) } } });
+else if (verb === 'terminal send') { state.sends += 1; save(); out({ ok: true, result: { sent: true } }); }
+else if (verb === 'terminal close') out({ ok: true, result: { closed: arg('terminal') } });
+else if (verb === 'terminal show')
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true } } });
+else if (verb === 'terminal rename')
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), title: arg('title') } } });
+// ---- orchestration verbs (managed-agent lifecycle) ----
+else if (verb === 'orchestration run-create')
+  out({ ok: true, result: { run: { id: 'run-fake-1', objective: arg('objective') } } });
+else if (verb === 'orchestration run-use')
+  out({ ok: true, result: { run: { id: arg('id') } } });
+else if (verb === 'orchestration run-show')
+  out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: 'fake-terminal-1' } } });
+else if (verb === 'orchestration task-create')
+  out({ ok: true, result: { task: { id: 'task-fake-1', display_name: arg('display-name'), run: arg('run') } } });
+else if (verb === 'orchestration task-update')
+  out({ ok: true, result: { task: { id: arg('id') } } });
+else if (verb === 'orchestration task-list')
+  out({ ok: true, result: { tasks: [] } });
+else if (verb === 'orchestration worker-start') {
+  if (mode === 'auth')
+    fail({ ok: false, error: { code: 'not_authenticated' }, result: { stage: 'auth', failedStage: 'auth', residualResources: [] } });
+  state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = 'dispatch-fake-1'; save();
+  out({ ok: true, result: { runId: arg('run'), taskId: arg('task'), dispatchId: 'dispatch-fake-1',
+    state: 'ready', stage: 'ready',
+    launch: { effective: { agent: arg('agent'), model: arg('model'), effort: arg('effort') } } } });
+}
+else if (verb === 'orchestration worker-show')
+  out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1' },
+    worker: { state: 'ready', agent_terminal_handle: 'fake-terminal-1',
+      startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-5.6-sol' } } } },
+    launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-5.6-sol' } },
+    observation: { exactWorker: true } } });
+else if (verb === 'orchestration worker-stop')
+  out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'stopped', alreadySettled: false } });
+else if (verb === 'orchestration worker-release')
+  out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
+else if (verb === 'orchestration worker-abandon')
+  out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'abandoned' } });
+else if (verb === 'orchestration worker-list')
+  out({ ok: true, result: { workers: [] } });
+else if (verb === 'orchestration worker-read')
+  out({ ok: true, result: { dispatch: arg('dispatch'), lines: [] } });
+else if (verb === 'orchestration dispatch')
+  out({ ok: true, result: { dispatch: { id: arg('to') ?? 'dispatch-fake-1' }, preamble: 'fake dispatch preamble' } });
+else if (verb === 'orchestration dispatch-show')
+  out({ ok: true, result: { dispatch: { id: 'dispatch-fake-1', assignee_handle: 'fake-terminal-1' } } });
+else if (verb === 'orchestration check')
+  out({ ok: true, result: { deliveries: [] } });
+else if (verb === 'orchestration send')
+  out({ ok: true, result: { sent: true } });
+else if (verb === 'orchestration reply')
+  out({ ok: true, result: { replied: arg('id') } });
+// ---- misc reads ----
+else if (verb === 'worktree show')
+  out({ ok: true, result: { worktree: { id: arg('worktree'), path: arg('worktree') } } });
+else if (verb === 'account list') {
+  // Pinned receipt shape (scripts/api/quota/orca-account.mjs):
+  //   result.rateLimits.<provider> = {status, weekly:{usedPercent,...}, error,
+  //   usageMetadata:{failureKind}} — 'unavailable' / missing-credentials → dead.
+  const rateLimits = {};
+  for (const p of ['claude', 'codex', 'qwen', 'devin'])
+    rateLimits[p] = deadProviders.has(p)
+      ? { status: 'unavailable', error: 'not authenticated',
+          weekly: { usedPercent: null, windowMinutes: null, resetsAt: null },
+          usageMetadata: { failureKind: 'missing-credentials' } }
+      : { status: 'ok', weekly: { usedPercent: 12, windowMinutes: 10080, resetsAt: null } };
+  out({ ok: true, result: { rateLimits } });
+}
+else { out({ ok: false, error: 'fake-orca: unhandled ' + argv.join(' ') }); process.exit(1); }
+process.exit(0);
+`;

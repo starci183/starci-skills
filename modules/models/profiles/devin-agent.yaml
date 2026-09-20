@@ -1,7 +1,6 @@
 # Profile: devin-agent — the Cognition Devin command-terminal pool.
 # Business frame: the owner-gated executor. Owner-assigned capacity: 10 parallel
 # lanes under explicit-workflow-quota authority.
-# Orca-only; there is no headless path.
 
 target: devin-agent           # registry.json + runtimes.json
 provider: devin               # runtimes.json — provider cognition-devin (devin.json)
@@ -23,13 +22,8 @@ capacity:
   capacityAuthority: explicit-workflow-quota   # only a granted workflow quota opens slots
   quotaTelemetry: launch-status                # quota is observed through launch status
   roles: [implement, verify, write]            # NO decide, NO plan
-  models:
-    implement: swe-2-max
-    verify: swe-2-max
-    write: swe-2-max
 
 launch:
-  executionHosts: [orca]      # registry.json — Orca ONLY; not a headless provider
   orca:
     kind: command-terminal
     command: "devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false"
@@ -63,7 +57,7 @@ business:
     - Second-seat execution behind qwen-agent in the declared cost order.
     - Hard-tier execution behind claude-agent when a quota is open.
   whenNot:
-    - Anywhere outside Orca — executionHosts is [orca]; a headless-host workflow cannot serve it.
+    - Anywhere outside Orca — the pool launches only as an Orca command-terminal inside the workflow worktree.
     - decide/plan/manager/planner/validator/ImageGen roles — none exist (model-catalog.md lists these exclusions verbatim).
     - Beyond its owner-assigned cap: absence of granted quota, not the pool itself, is the gate.
   pickedBy: >-

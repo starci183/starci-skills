@@ -9,9 +9,12 @@ purpose: |-
   not a provider fallback chain in a workflow. A runtime that fails is classified and parked for the cooldown of
   that failure kind, doubling per repeat.
 
-  Models are pinned inside the pool per role (`models`) and attested at launch - never inferred from the pool
-  name. A pool's `roles` is exactly the key set of its `models` map; both are declared so the allocator reads
-  eligibility from `roles` and the role's model from `models`.
+  Models are pinned inside the pool per DIFFICULTY (`models`) and attested at launch - never inferred from the
+  pool name. `roles` is the role-coverage gate; `models` is the difficulty-coverage gate. A pool is eligible
+  for a (role, difficulty) launch only when the role is in `roles` AND `models` names that difficulty - a pool
+  that declares no model for a difficulty is ineligible there, never silently rerouted to another model.
+  `effort` pins the per-difficulty effort where the provider exposes one. The canonical difficulty vocabulary
+  is easy|medium|hard|insane; resolvers accept the legacy S|M|L|XL spellings (and 'high' for 'hard').
 maxParallelOps: 20
 allocation:
   # workflowRuntimeProfile replaces this compatibility default with adaptive-capacity from validated config.json
@@ -37,6 +40,16 @@ allocation:
       decide: [claude-fable, codex-agent, claude-agent]
       plan: [claude-fable, codex-agent, claude-agent]
     easy: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    # Insane tops the ladder: only pools that declare an insane model can serve it. Fable leads the
+    # reasoning roles and verification exactly as on hard; Devin and Qwen carry no insane pin and are
+    # ineligible here by the models gate, so they are absent rather than listed-and-rejected.
+    insane:
+      default: [claude-agent, codex-agent]
+      implement: [claude-agent, codex-agent]
+      write: [claude-agent, codex-agent]
+      verify: [claude-fable, claude-agent, codex-agent]
+      decide: [claude-fable, codex-agent, claude-agent]
+      plan: [claude-fable, codex-agent, claude-agent]
   preference:
     implement: [codex-agent, claude-agent, qwen-agent, devin-agent]
     verify: [codex-agent, claude-fable, claude-agent, qwen-agent, devin-agent]
@@ -56,33 +69,37 @@ allocation:
   backoffFactor: 2
   maxCooldownMs: 3600000
 runtimes:
-  # One Codex account window carries the whole family: the working model covers implement/verify/write and the
-  # reasoning model covers decide/plan. Role/tier/tool/quality gates still apply; an owner allocation changes
-  # capacity, never qualification or effect authority.
+  # One Codex account window carries the whole family: Luna is the easy/medium workhorse, Sol the hard model,
+  # Astra the insane reasoning model. Role/tier/tool/quality gates still apply on top of the difficulty pin;
+  # an owner allocation changes capacity, never qualification or effect authority.
   codex-agent:
     target: codex-agent
     provider: codex
     roles: [implement, verify, write, decide, plan]
     maxParallel: 10
     models:
-      implement: gpt-5.6-luna
-      verify: gpt-5.6-sol
-      write: gpt-5.6-luna
-      decide: gpt-6-astra
-      plan: gpt-6-astra
-  # One Claude session/week window, all five roles on the same pinned model.
+      easy: gpt-5.6-luna
+      medium: gpt-5.6-luna
+      hard: gpt-5.6-sol
+      insane: gpt-6-astra
+    effort:
+      easy: low
+      medium: medium
+      hard: high
+      insane: max
+  # One Claude session/week window, all five roles on the same pinned model at every difficulty.
   claude-agent:
     target: claude-agent
     provider: claude
     roles: [implement, verify, write, decide, plan]
     maxParallel: 6
     models:
-      implement: claude-opus-5
-      verify: claude-opus-5
-      write: claude-opus-5
-      decide: claude-opus-5
-      plan: claude-opus-5
+      easy: claude-opus-5
+      medium: claude-opus-5
+      hard: claude-opus-5
+      insane: claude-opus-5
   # Fable has a weekly window of its own on top of the Claude session and week, so it is a pool of its own.
+  # It is the deep-reasoning/verifier model: pinned for medium and up (never easy), with the roles gate kept.
   claude-fable:
     target: claude-fable
     provider: claude
@@ -90,22 +107,22 @@ runtimes:
     roles: [verify, decide, plan, write]
     maxParallel: 2
     models:
-      verify: claude-fable-5-1
-      decide: claude-fable-5-1
-      plan: claude-fable-5-1
-      write: claude-fable-5-1
+      medium: claude-fable-5-1
+      hard: claude-fable-5-1
+      insane: claude-fable-5-1
+  # The Qwen flash pool serves cheap work only: easy and medium. No hard/insane pin - it is ineligible there.
   qwen-agent:
     target: qwen-agent
     provider: qwen
     roles: [implement, verify, write]
     maxParallel: 10
     models:
-      implement: qwen3.8-flash
-      verify: qwen3.8-flash
-      write: qwen3.8-flash
+      easy: qwen3.8-flash
+      medium: qwen3.8-flash
   # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
   # capacity: 10 parallel lanes. The CLI's auth/readiness and observed launch/refusal status are the live
-  # capacity signal on top of this cap.
+  # capacity signal on top of this cap. swe-2-max is a medium+ agent: no easy pin, so easy work never lands
+  # on Devin even though the easy tier names the pool.
   devin-agent:
     target: devin-agent
     provider: devin
@@ -114,9 +131,8 @@ runtimes:
     capacityAuthority: explicit-workflow-quota
     quotaTelemetry: launch-status
     models:
-      implement: swe-2-max
-      verify: swe-2-max
-      write: swe-2-max
+      medium: swe-2-max
+      hard: swe-2-max
 roleOfKind:
   request.analyze: plan
   task.execute: plan

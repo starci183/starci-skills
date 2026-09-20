@@ -27,7 +27,7 @@ export const FAMILIES=Object.freeze(['br','fr','nfr','data','journey','decision'
 
 /** Untracked runtime custody: legal at the root of the tree, drift anywhere below it. */
 const RUNTIME_ROOT_FILES=new Set(['runtime.sqlite','runtime.sqlite-wal','runtime.sqlite-shm']);
-const RUNTIME_ROOT_DIRS=new Set(['kernel-evidence','kernel-strays','kernel-headless','kernel-approvals','_local']);
+const RUNTIME_ROOT_DIRS=new Set(['kernel-evidence','kernel-strays','kernel-approvals','_local']);
 /** Tracked canonical Work, plus the tracked counter-record and the file that names the untracked half. */
 const CANONICAL_ROOT_FILES=new Set(['workspace.yaml','index.yaml','ledger-anchor.json','.gitignore']);
 const CANONICAL_ROOT_DIRS=new Set(['brand','features','shared']);

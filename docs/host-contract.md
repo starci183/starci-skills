@@ -90,10 +90,6 @@ start:                           # the ordered host-API sequence
   - {api: orchestration.dispatch-show, phase: assignee-attestation}
 release: {api: orchestration.worker-stop, then: terminal.close}
 
-bypassMode:                      # how to unstick a permission menu / run headless
-  interactive: 'send "5" + Enter (switch to bypass mode)'
-  headless: 'devin -p "<prompt>" …'
-
 knownFailures:                   # observed signals → meaning → action, dated
   - {signal: 'agent child exited: exit code: 0', meaning: …, action: …, seenAt: 2026-09-20}
 
@@ -134,6 +130,42 @@ awaitSubmission(handle, card)    → screen must show submission.activityPattern
 failure means the job is **not** running — the reservation is settled and the
 terminal closed (`spawn-failed`), never a ghost lease. `settle` closes the
 worker terminal via the card's `release` block.
+
+## Managed-agent dispatch (`kind: native-managed-agent`)
+
+Claude and Codex are **native managed agents**: the host starts a supervised
+worker — no terminal is created and no provider command is assembled. The
+launch sequence (typed calls from `calls.yaml`, wrappers under
+`scripts/api/orca/`):
+
+```text
+run-create(objective = workflow title)          → runId
+task-create(run, spec = prompt/packet,
+            displayName '[Kernel] <Workflow>'
+            | '[Op] <operation> - <scope>')     → taskId
+worker-start(task, worktree, agent = provider,
+             model, effort, run)                → dispatchId
+dispatch --return-preamble(task, to = dispatch) → preamble (prompt delivery)
+worker-show(dispatch)                           → attestation: worker ready AND
+                                                  effective agent/model match
+```
+
+Attestation is required before the seat is accepted — a worker whose
+`startOptions.launch.effective` mismatches the resolved agent/model is fenced:
+`worker-stop` then `worker-release` on the exact Dispatch, never a retry
+beside it. On success the job's `worker_id` is the **Dispatch id**, and
+`settle` releases it with `worker-stop` + `worker-release` (the
+`settle-dispatch` recovery in `calls.yaml`).
+
+The kernel seat follows the same rule. `start-workflow.mjs` resolves the
+provider by precedence `--provider` > `config.yaml kernel.{provider,model,
+effort}` > route-model, then reads the provider's card: `native-managed-agent`
+launches the orchestration sequence above (the bound run/task/dispatch ids
+persist in the kernel job payload); `command-terminal-agent` keeps the
+terminal pipeline. A config pin whose provider probes `dead` in
+`account list` (not authenticated) is ignored with a printed warning and
+routing falls through to the next eligible pool — an unauthed pin never fails
+the workflow.
 
 ## Checklist for a new agent card
 

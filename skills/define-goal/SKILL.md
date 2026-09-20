@@ -13,6 +13,7 @@ description: >-
 
 Contract: `.claude/modules/goal/define-goal.yaml`
 Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
+`.claude/scripts/agent/bias.mjs` (routing-bias extraction) ·
 `.claude/scripts/goal/define-goal.mjs` (plan + persist)
 
 ## Approval gate — mandatory
@@ -25,7 +26,19 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    `--project <name>` selects which bound project's `.starciwork/runtime.sqlite`
    receives the goal; `--repo <path>` is single-repo mode where the named
    repository owns the ledger. The two flags are mutually exclusive.
-2. **Assess BEFORE drafting** — cold-scan the bound project repositories:
+2. **Extract routing bias** — deterministic, no model:
+
+   ```
+   node .claude/scripts/agent/bias.mjs "<owner prompt>"
+   ```
+
+   Prints `{prefer:[], avoid:[]}` parsed from the owner's wording
+   (`ưu tiên`/`prefer` → prefer, `tránh`/`avoid`/`không dùng` → avoid, over the
+   pool aliases codex/claude/fable/qwen/devin). Keep the JSON — it persists as
+   `routing_bias` in the goal payload at the persist step so the kernel router
+   honors the owner's provider preference without re-parsing prose. An empty
+   `{prefer:[], avoid:[]}` is a valid result — persist it anyway.
+3. **Assess BEFORE drafting** — cold-scan the bound project repositories:
 
    ```
    node .claude/scripts/goal/assess.mjs --repo <project-repos> --json
@@ -36,17 +49,18 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    Audit-type goals score against `.claude/modules/quality/quality-bar.yaml`
    (10 layers; each layer's `enforcedBy`/`status` records what is actually
    verifiable — a `gap` layer is reported, not skipped).
-3. Run the planner preview — writes nothing:
+4. Run the planner preview — writes nothing:
 
    ```
    node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --plan
    ```
 
-4. Present the plan to the owner plainly, in this table shape:
+5. Present the plan to the owner plainly, in this table shape:
 
    ```
    STATE      new workflow — nothing persisted yet
    GOAL       <enriched goal text, including assess findings>
+   BIAS       prefer=[<agents>] avoid=[<agents>]   (routing_bias from step 2)
    OP CHAIN   op1 (<model tier>, ~<est>) → op2 (<model tier>, ~<est>) → op3 (<model tier>, ~<est>)
               lanes: {op1, op2} parallel-safe · {op3} sequential
    WILL-WRITE workflows row · goals revision 0 · inbox pending row · goal-defined event
@@ -58,16 +72,17 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    `.claude/modules/models/selection.yaml`); the lane lines show which legs may
    run in parallel. Underivable chains are shown as such — never filled in by
    hand.
-5. **Wait for the owner to reply exactly `ok`, `OK`, or `oK`.**
+6. **Wait for the owner to reply exactly `ok`, `OK`, or `oK`.**
    Anything else — a question, silence, "sửa X" — means do NOT persist; clarify or
    adjust the prompt/title and re-plan.
-6. On `ok`, persist:
+7. On `ok`, persist — pass the step-2 extraction through so it lands as
+   `routing_bias` in the goal payload:
 
    ```
-   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --json
+   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --routing-bias '<json from step 2>' --json
    ```
 
-7. Report the printed `workflowId` (the goal ID), `goalIdentity`, `opChain`, `queued`.
+8. Report the printed `workflowId` (the goal ID), `goalIdentity`, `opChain`, `queued`.
    The goal now survives process/worktree death.
 
 ## Rules

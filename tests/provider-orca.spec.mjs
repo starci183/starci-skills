@@ -139,23 +139,31 @@ test('the Orca host contract tree is complete and internally consistent',()=>{
   }
 });
 
-test('every scripts/api/orca terminal wrapper is backed by a calls.yaml entry',()=>{
+test('every scripts/api/orca wrapper is backed by a calls.yaml entry',()=>{
   // calls.yaml is the typed contract the thin wrappers implement — this parity
   // check keeps it enforced, not documentary. A wrapper verb or --flag missing
-  // from calls.yaml means argv is built outside the contract.
+  // from calls.yaml means argv is built outside the contract. It covers every
+  // wrapper in the directory — terminal-* and orchestration/account verbs
+  // alike; lib.mjs and index.mjs are shared mechanics, not verbs.
   const calls=hostDoc('calls');
   const entries=Object.values(calls.calls??{});
   // defaults.jsonFlag ('json') is a contract-level default every wrapper sends;
   // it is covered without appearing in each call's flags list.
   const covered=call=>new Set([...(call?.flags??[]),calls.defaults?.jsonFlag].filter(Boolean));
-  const wrappers=fs.readdirSync(WRAPPERS_DIR).filter(f=>/^terminal-.*\.mjs$/.test(f)).sort();
-  assert.ok(wrappers.length>0,'scripts/api/orca holds no terminal-* wrappers');
+  const wrappers=fs.readdirSync(WRAPPERS_DIR).filter(f=>f.endsWith('.mjs')&&!['lib.mjs','index.mjs'].includes(f)).sort();
+  assert.ok(wrappers.length>0,'scripts/api/orca holds no verb wrappers');
   for(const file of wrappers){
     const source=fs.readFileSync(path.join(WRAPPERS_DIR,file),'utf8');
-    // The wrapper's argv literal leads with the orca verb: ['terminal','<verb>',...].
-    const verbMatch=source.match(/\[\s*'terminal'\s*,\s*'([a-z-]+)'/);
-    assert.ok(verbMatch,`${file}: could not extract the orca verb from its argv literal`);
-    const verb=`terminal ${verbMatch[1]}`;
+    // The wrapper's argv literal leads with the orca verb words, anchored at
+    // the orcaRun( call or the argv assignment — other array literals in the
+    // file (validation loops, flag lists) must not be mistaken for it:
+    //   orcaRun(['terminal','show',…]) / const argv = ['orchestration','worker-start',…]
+    // Flags ('--x') and interpolated values are not verb words, so the leading
+    // run of bare word literals IS the command — one or two words.
+    const lead=source.match(/(?:orcaRun\(|argv\s*=)\s*\[\s*((?:'[a-z][a-z-]*'\s*,?\s*)+)/);
+    assert.ok(lead,`${file}: could not extract the orca verb from its argv literal`);
+    const words=[...lead[1].matchAll(/'([a-z][a-z-]*)'/g)].map(m=>m[1]);
+    const verb=words.join(' ');
     const entry=entries.find(c=>c?.command===verb);
     assert.ok(entry,`${file}: calls.yaml has no calls: entry with command '${verb}'`);
     // Every '--flag' literal the wrapper builds into argv must be declared.

@@ -96,7 +96,7 @@ shape:
     Untracked. See ledger-db.md; .starciwork/_local is retired and is only an import source for ledger-migrate.
   workflowAnchor: .starciwork/ledger-anchor.json - TRACKED, the head of every live workflow, so a restored or
     rolled-back ledger is refused instead of resumed
-  kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-headless,kernel-approvals}/** - kernel-owned
+  kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-approvals}/** - kernel-owned
     working state with a real lifetime, untracked, excluded from Work validation, never canonical Work
   uiDirectionAsset: "features/<feature>/ui/<screen>/assets/<name>.png with a sibling
     <name>.prompt.txt under the same assets/. interface.draw writes both - the record's ui block

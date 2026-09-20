@@ -81,3 +81,6 @@ forbidden:
   - dispatch-inject
   - reuse-existing-terminal
   - unsupervised-retain-as-success
+quota:
+  probe: env:qwen-key
+  window: none

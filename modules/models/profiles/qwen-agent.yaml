@@ -18,10 +18,6 @@ identity:
 capacity:
   maxParallel: 10             # runtimes.yaml
   roles: [implement, verify, write]   # NO decide, NO plan
-  models:
-    implement: qwen3.8-flash
-    verify: qwen3.8-flash
-    write: qwen3.8-flash
 
 launch:
   orca:                       # registry.json orcaLaunch — command-terminal, NOT managed-agent
@@ -31,7 +27,6 @@ launch:
     dispatch: return-preamble-and-send               # launcher: dispatch --return-preamble, terminal send, verify submission
     adapter: qwen
     nestedAgents: forbidden                          # every Qwen command excludes the `agent` tool
-  headless: qwen --approval-mode yolo --output-format json   # model-functions.md; answers read through Qwen's event list
   whyCommandTerminal: >-
     registry.json selection: "Orca 1.4.188's native qwen-code adapter cannot
     deliver a prompt to Qwen Code 0.23.3" — so the canonical launcher creates one

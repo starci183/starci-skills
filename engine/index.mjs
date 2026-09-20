@@ -158,12 +158,11 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   // none of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
   // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
   const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json']);
-  // `kernel-strays` is the quarantine `kernel/sync.mjs` moves an untracked stray into. `kernel-headless` is
-  // the headless host's table, mailbox and dispatch logs for a lane opened before any store is bound
-  // (hosts/headless/host.mjs), and `kernel-approvals` holds the scoped delegation mandates
-  // (workflows/delegation.mjs). All three used to live under `_local`, which 1.0.4 retires
-  // (docs/ledger-db.md §13); all three are kernel-owned working state with a real lifetime, not Work records.
-  const runtimeCustodyDirectories=new Set(['kernel-evidence','kernel-strays','kernel-headless','kernel-approvals']);
+  // `kernel-strays` is the quarantine `kernel/sync.mjs` moves an untracked stray into, and
+  // `kernel-approvals` holds the scoped delegation mandates (workflows/delegation.mjs). All three used
+  // to live under `_local`, which 1.0.4 retires (docs/ledger-db.md §13); all three are kernel-owned
+  // working state with a real lifetime, not Work records.
+  const runtimeCustodyDirectories=new Set(['kernel-evidence','kernel-strays','kernel-approvals']);
   function walk(dir, inAssets=false) {
     let entries;
     try { entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); } catch { issue('READ_DIRECTORY',rel(dir),'Cannot enumerate directory.'); return; }

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -25,34 +26,9 @@ const LEDGER_MODULE=await (async()=>{
 })();
 const {openLedger,inspectLedger,ledgerFileFor}=LEDGER_MODULE;
 
-const FAKE_ORCA=String.raw`// fake orca — canned terminal API for the dispatch-handshake spec.
-import fs from 'node:fs';
-const argv = process.argv.slice(2);
-const log = process.env.STARCI_FAKE_ORCA_LOG;
-const stateFile = process.env.STARCI_FAKE_ORCA_STATE;
-const mode = process.env.STARCI_FAKE_ORCA_MODE || 'healthy';
-if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
-const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : { sends: 0 };
-const save = () => { if (stateFile) fs.writeFileSync(stateFile, JSON.stringify(state)); };
-const arg = n => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : null; };
-const out = o => console.log(JSON.stringify(o));
-// qwen card: readiness.screenPattern 'Type your message', identity 'qwen3.8-flash',
-// submission.activityPattern 'Thinking|esc to cancel|tokens'.
-const PROMPT = 'qwen3.8-flash\nType your message\n> ';
-const DEAD = 'qwen3.8-flash\nType your message\n\nERROR 401 Invalid API-key — key rejected upstream\n';
-const LIVE = 'Thinking hard\nesc to cancel\ntokens 96\n';
-if (argv[0] === 'terminal' && argv[1] === 'create')
-  out({ ok: true, result: { terminal: { handle: 'fake-terminal-1', title: arg('title'), connected: true, writable: true } } });
-else if (argv[0] === 'terminal' && argv[1] === 'read')
-  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-    screen: mode === 'auth' ? DEAD : (state.sends > 0 ? LIVE : PROMPT) } } });
-else if (argv[0] === 'terminal' && argv[1] === 'send') { state.sends += 1; save(); out({ ok: true, result: { sent: true } }); }
-else if (argv[0] === 'terminal' && argv[1] === 'close') out({ ok: true, result: { closed: arg('terminal') } });
-else if (argv[0] === 'terminal' && argv[1] === 'show')
-  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true } } });
-else { out({ ok: false, error: 'fake-orca: unhandled ' + argv.join(' ') }); process.exit(1); }
-process.exit(0);
-`;
+// The canned `orca` binary lives in tests/helpers/fake-orca.mjs — the same
+// stub serves this spec and managed-dispatch.spec.mjs (orchestration verbs,
+// account-list rateLimits, STARCI_FAKE_ORCA_MODE / STARCI_FAKE_ORCA_DEAD).
 
 const fixture=t=>{
   const dirs=[];

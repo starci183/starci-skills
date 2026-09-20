@@ -251,11 +251,33 @@ allocationFacts:
   policy: prefer-then-overflow        # runtimes.json — try the preferred pool,
                                       # overflow downward; never sideways-invent
   maxParallelOps: 20                  # global; per-pool maxParallel in profiles/
-  tiers:                              # role-ordered pool preference per tier
+  difficultyVocabulary:               # pool models/effort maps and tier keys
+    canonical: [easy, medium, hard, insane]
+    aliases: "legacy S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
+  tiers:                              # role-ordered pool preference per difficulty tier
+    insane: "claude-agent → codex-agent (verify/decide/plan lead claude-fable)"
     hard: "claude-agent → devin-agent → codex-agent (verify/decide/plan lead claude-fable)"
     medium: "codex-agent → claude-agent → qwen-agent → devin-agent"
     easy: "qwen-agent → devin-agent → codex-agent → claude-agent"
   preference: "per-role order: implement/write = codex→claude→qwen→devin; verify = codex→fable→claude→qwen→devin; decide/plan = fable→codex→claude"
+  poolSelection:
+    # The (role, difficulty) candidate chain — scripts/agent/models.mjs::selectPool executes this.
+    chainRule: >-
+      chain(role, difficulty) = pools present in BOTH tiers[difficulty] (role key first, then the
+      tier's default) AND preference[role]. Tier position is the outer sort; the per-role preference
+      order breaks ties. A pool missing from either list is not on the chain at all.
+    bias: >-
+      {prefer: [pools], avoid: [pools]} — prefer hoists the named pools to the front preserving their
+      relative chain order; avoid removes them. Bias is applied AFTER the chain is built and NEVER
+      bypasses eligibility: a preferred pool that fails a gate is still rejected with its typed reason.
+    eligibility: >-
+      Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles; pool.models[difficulty]
+      exists (no silent cross-difficulty fallback); capacity.auth ≠ 'dead'; capacity.quota.state ≠
+      'dead' (unknown/limited pass); capacity.running < pool.maxParallel; capacity.openIncident ≠ true.
+      Every skipped pool is reported in rejected[] with its typed reason.
+    modelRule: >-
+      The model is pinned per pool per difficulty (runtimes.yaml models/effort maps) — selection picks
+      the POOL by role+tier+bias+capacity, then resolves the MODEL by difficulty inside that pool.
   note: >-
     Tier/preference lists are within-family suitability for direct consumers,
     NOT a provider fallback chain in a workflow (runtimes.json purpose). In a
@@ -288,5 +310,6 @@ misuseModes:
   - "budget-as-eligibility: \"Ordering by remaining quota cannot rescue an ineligible candidate (selectEligibleCandidate).\""
   - "probation-as-qualification: \"Probation never covers high/critical floors or highKinds; elevation strips it before the gates run (workloadFor).\""
   - "fallback-as-retry: \"Advancing a chain on a partial-effect failure re-executes real effects — forbidden without effectState 'none'.\""
-  - "pool-name-as-model: \"A pool's models map pins the model per role; attestation must match that pin, not the pool name (runtimes.json purpose).\""
+  - "pool-name-as-model: \"A pool's models map pins the model per difficulty; attestation must match that pin, not the pool name (runtimes.json purpose).\""
+  - "bias-as-eligibility: \"prefer/avoid reorders or removes chain candidates; it cannot make a pool serve a role or difficulty it does not declare (poolSelection.bias).\""
   - "supervisor-budget-burn: \"Kernel function calls skip the workflow probation budget deliberately — do not route them through operation accounting (MODEL_KINDS comment).\""

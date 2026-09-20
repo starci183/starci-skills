@@ -23,16 +23,9 @@ identity:
 capacity:
   maxParallel: 6                # runtimes.json
   roles: [implement, verify, write, decide, plan]   # runtimes.json — all five
-  models:                       # runtimes.json runtimes.claude-agent.models
-    implement: claude-opus-5
-    verify: claude-opus-5
-    write: claude-opus-5
-    decide: claude-opus-5
-    plan: claude-opus-5
 
 launch:
   orca: {kind: managed-agent, agent: claude}   # registry.json orcaLaunch — worker-start path
-  headless: claude -p --output-format json --model claude-opus  # docs/model-functions.md HEADLESS_PROVIDERS
   imageGeneration: false        # claude.json: every profile imageGeneration:false
 
 position:

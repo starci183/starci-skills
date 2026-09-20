@@ -33,6 +33,11 @@ idempotency:
     exists. If the replay is still unknown, the runner returns outcome unknown and the caller
     reconciles by reading task-list, worker-list or worker-show for the deterministic display name.
 calls:
+  account-list:
+    command: account list
+    kind: read
+    flags: [json]
+    receipt: [result.rateLimits]
   agent-context:
     command: agent-context
     kind: read

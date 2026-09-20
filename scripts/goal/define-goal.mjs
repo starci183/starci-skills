@@ -32,6 +32,7 @@ const projectName = arg('project');
 const repoArg = arg('repo');
 const text = arg('text');
 const title = arg('title');
+const routingBias = (() => { try { return JSON.parse(arg('routing-bias', 'null')); } catch { return null; } })();
 const asJson = process.argv.includes('--json');
 const planOnly = process.argv.includes('--plan');
 const usage = 'usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title] [--json] [--plan]';
@@ -208,10 +209,10 @@ try {
     ledger.db.prepare('UPDATE workflows SET phase=? WHERE workflow_id=?').run('queued', workflowId);
     ledger.db.prepare(
       'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
-    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain }), now);
+    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain, routing_bias: routingBias }), now);
     ledger.db.prepare(
       "INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)"
-    ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, at: now }), 'pending', now);
+    ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, at: now }), 'pending', now);
     ledger.appendEvent({ workflowId, entityType: 'goal', entityId: workflowId, kind: 'goal-defined', payload: { revision: 0, goalIdentity, legs: chain?.legs?.length ?? null } });
   });
   const out = { workflowId, goalRevision: 0, goalIdentity, opChain: chain?.legs?.map(l => l.op) ?? null, queued: true, ledger: ledgerFileFor(repo) };
