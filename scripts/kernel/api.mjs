@@ -737,22 +737,23 @@ const providerHealthOf = (db, provider, now = Date.now()) => {
   const value = parseJson(row.value_json, {});
   return value?.status === 'unavailable' ? { ...value, at: row.at, expiresAt: row.expires_at } : null;
 };
-const providerAuthCooldownMs = () => {
+const providerCooldownMs = (failureKind) => {
   try {
     const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-    const value = Number(doc?.allocation?.cooldownMs?.auth);
+    const map = doc?.allocation?.cooldownMs ?? {};
+    const value = Number(map[failureKind] ?? map.other);
     if (Number.isFinite(value) && value > 0) return value;
   } catch { /* contract fallback below */ }
-  return 24 * 60 * 60 * 1000;
+  return 5 * 60 * 1000;
 };
-const writeProviderAuthCircuit = (db, { provider, model, jobId, step, signal, error, now }) => {
+const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error, now, failureKind = 'auth' }) => {
   const key = normalizeProviderId(provider);
   if (!key) return null;
-  const expiresAt = now + providerAuthCooldownMs();
+  const expiresAt = now + providerCooldownMs(failureKind);
   const prior = providerHealthOf(db, key, now);
   const value = {
     schema: 'starci/provider-health@1', provider: key, status: 'unavailable',
-    failureKind: 'auth', model: model ?? null, jobId, step,
+    failureKind, model: model ?? null, jobId, step,
     signal: signal ?? null, detail: error ?? null, observedAt: now,
     failures: Number(prior?.failures ?? 0) + 1,
   };
@@ -977,8 +978,17 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       ? ledger.db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes
       : 0;
     if (authFailure) {
-      providerHealth = providerHealthEvidence ?? writeProviderAuthCircuit(ledger.db, {
+      providerHealth = providerHealthEvidence ?? writeProviderCircuit(ledger.db, {
         provider: model.provider, model: model.target, jobId, step, signal, error, now,
+      });
+    } else if (step === 'readiness' && model?.provider) {
+      // A spawned terminal that never reaches readiness means the provider's
+      // launch path is broken, not the job. Open the same typed circuit (with
+      // the shorter non-auth cooldown) so route/dispatch skip the dead pool
+      // instead of burning attempts on repeated readiness timeouts.
+      providerHealth = writeProviderCircuit(ledger.db, {
+        provider: model.provider, model: model.target, jobId, step, signal, error, now,
+        failureKind: 'readiness',
       });
     }
     const priorPayload = jobPayloadOf(job);
@@ -1008,7 +1018,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     if (providerHealth) {
       ledger.appendEvent({
         workflowId: job.workflow_id, entityType: 'provider', entityId: providerHealth.provider,
-        kind: 'provider-auth-unavailable', payload: providerHealth,
+        kind: providerHealth.failureKind === 'auth' ? 'provider-auth-unavailable' : 'provider-unavailable',
+        payload: providerHealth,
       });
     }
     // Provider auth is represented by the expiring provider-health circuit.
@@ -1169,7 +1180,7 @@ function cmdDispatch(ledger, args, repo) {
   // pool cannot slip through the circuit.
   const providerHealth = providerHealthOf(db, model.provider);
   if (providerHealth) {
-    const error = `provider auth unavailable (${providerHealth.provider}); circuit open until ${providerHealth.expiresAt ?? 'explicit recovery'}`;
+    const error = `provider ${providerHealth.failureKind ?? 'auth'} unavailable (${providerHealth.provider}); circuit open until ${providerHealth.expiresAt ?? 'explicit recovery'}`;
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step: 'provider-health', error, effectState: 'none', details: providerHealth,
       providerHealthEvidence: providerHealth,
