@@ -51,16 +51,36 @@ const parseArgs = (argv) => {
   return a;
 };
 
+// A custody file becomes reachable through a `<NAME>_FILE` pointer — the same
+// convention app.env already carries (keycloak-admin.json → KEYCLOAK_ADMIN_FILE).
+const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_FILE`;
+
 // The ask report names its provisions in free text; the form derives the
 // entry surface from the same tokens the verifier will check: custody file
 // basenames (*.key/*.txt under runtime/files) and UPPER_SNAKE env variables.
+// Two dedup rules keep one value from being asked twice: a var that is the
+// bare base of a named custody file (github-oauth-client-secret.key ↔
+// GITHUB_OAUTH_CLIENT_SECRET) is the same secret — one merged field; and a
+// bare `X_FILE` var is a pointer to be derived, not a value to paste, so it
+// becomes a custody field instead of a text input.
 const fieldsOf = (text) => {
   const files = [...new Set([...text.matchAll(/([\w-]+\.(?:key|txt|json))/g)].map(m => m[1]))];
-  const vars = [...new Set([...text.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g)].map(m => m[0]))]
+  let vars = [...new Set([...text.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g)].map(m => m[0]))]
     .filter(v => !/^(JSON|HTTP|URL|API|E2E)$/.test(v));
+  const paired = {};
+  for (const v of vars.filter((v) => v.endsWith('_FILE'))) {
+    const base = v.slice(0, -5).toLowerCase().replace(/_/g, '-');
+    if (!files.some((f) => pointerFor(f) === v)) files.push(`${base}.key`);
+  }
+  vars = vars.filter((v) => !v.endsWith('_FILE'));
+  for (const f of files) {
+    const base = pointerFor(f).slice(0, -5);
+    if (vars.includes(base)) { paired[f] = base; vars = vars.filter((v) => v !== base); }
+  }
   return {
     files,
     vars,
+    paired,
     isSecret: (name) => /SECRET|PASSWORD|TOKEN|KEY/i.test(name),
   };
 };
@@ -121,10 +141,6 @@ const appEnvUpsert = (repo, key, value) => {
   }
 };
 
-// A custody file becomes reachable through a `<NAME>_FILE` pointer — the same
-// convention app.env already carries (keycloak-admin.json → KEYCLOAK_ADMIN_FILE).
-const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_FILE`;
-
 const writeEnv = (repo, key, value) => {
   const via = [];
   const local = path.join(repo, '.env.local');
@@ -137,7 +153,8 @@ const writeEnv = (repo, key, value) => {
 const renderForm = ({ nonce, question, fields, repo, workflowId }) => {
   const fileRows = fields.files.map((name) => {
     const present = custodyPresent(repo, name);
-    return `<label>custody file <code>runtime/files/${esc(name)}</code> → <code>${esc(pointerFor(name))}</code>${present ? ' <b style="color:#0a7">— already in custody (leave blank to keep)</b>' : ''}</label>
+    const paired = fields.paired[name] ? ` · also sets <code>${esc(fields.paired[name])}</code>` : '';
+    return `<label>custody file <code>runtime/files/${esc(name)}</code> → <code>${esc(pointerFor(name))}</code>${paired}${present ? ' <b style="color:#0a7">— already in custody (leave blank to keep)</b>' : ''}</label>
       <input type="password" name="file:${esc(name)}" autocomplete="off" ${present ? '' : ''}>`;
   }).join('\n');
   const varRows = fields.vars.map((v) => `<label><code>${esc(v)}</code></label>
@@ -235,8 +252,18 @@ const main = async () => {
         const params = new URLSearchParams(body);
         const custodyWritten = [], envWritten = [], pointersWritten = [], errors = [];
         for (const name of fields.files) {
+          const pairedVar = fields.paired[name];
           const v = params.get(`file:${name}`);
-          if (v == null || v === '') continue;
+          if (v == null || v === '') {
+            // Blank keeps existing custody — but a paired env var still needs
+            // its raw value for provision scripts, synced from the file.
+            if (pairedVar && custodyPresent(repo, name)) {
+              const dir = custodyDirs(repo).find((d) => fs.existsSync(path.join(d, name)));
+              const val = dir ? fs.readFileSync(path.join(dir, name), 'utf8').trim() : null;
+              if (val) { writeEnv(repo, pairedVar, val); envWritten.push(`${pairedVar} (from custody)`); }
+            }
+            continue;
+          }
           const r = writeCustody(repo, name, v);
           if (!r.ok) { errors.push(`${name}: ${r.error}`); continue; }
           custodyWritten.push(`${name} (${r.via})`);
@@ -244,6 +271,8 @@ const main = async () => {
           // pointer for the stack env convention to see it.
           const ptr = pointerFor(name);
           if (appEnvUpsert(repo, ptr, `.starcistacks/dev/runtime/files/${name}`)) pointersWritten.push(ptr);
+          // The merged env var is the same value — provision scripts read it raw.
+          if (pairedVar) { writeEnv(repo, pairedVar, v); envWritten.push(pairedVar); }
         }
         for (const v of fields.vars) {
           const val = params.get(`env:${v}`);
