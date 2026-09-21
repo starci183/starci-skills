@@ -37,7 +37,9 @@ ladders:
 closedSets:
   highKinds:                 # HIGH_KINDS — never probation-eligible, force elevation
     - integration.verify
+    - interface.audit
     - release.deliver
+    - uat.assisted.verify
   kernelFunctionKinds:       # MODEL_KINDS + 'judge' — the kernel's own model calls,
     - model.assessGoal       # NOT operation work. They draw per-call scope but never
     - model.planOp           # consume the workflow's probation budget.

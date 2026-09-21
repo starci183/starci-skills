@@ -153,6 +153,7 @@ roleOfKind:
   backend.implement: implement
   backend.scaffold: implement
   interface.implement: implement
+  interface.audit: verify
   interface.scaffold: implement
   package.scaffold: implement
   scope.define: decide
@@ -173,6 +174,8 @@ roleOfKind:
   security.verify: verify
   perf.verify: verify
   uat.verify: verify
+  uat.assisted.prepare: write
+  uat.assisted.verify: verify
   goal.validate: verify
   architecture.decide: decide
   business.decide: decide

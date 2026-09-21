@@ -152,8 +152,9 @@ archetypes:
       - {op: brand.decide,        leg: decide,       note: "only if no settled brand record — interface.draw prerequisite"}
       - {op: interface.draw,      leg: draw,         note: "designGate holds the frontend build until this ui node is done"}
       - {op: interface.asset,     leg: draw,         note: "optionalWhen node.hasNoArtworkSlots — skipped when the drawing embeds no artwork"}
-      - {op: interface.implement, leg: implement,    note: "frontend build against the drawing; source-edits risk"}
+      - {op: interface.implement, leg: implement,    note: "frontend build against the drawing; every source change is followed by fresh route x viewport capture"}
       - {op: work.author,         leg: workAuthor,   note: "authors the Work records the lane reads (scope defined prereq)"}
+      - {op: interface.audit,     leg: verify,       note: "read-only comprehensive UI/UX/Grammar audit; routes bounded drift to implement and systemic drift to a more explicit draw, max five audit rounds"}
       - {op: uat.verify,          leg: verify,       note: "frontend lane proof: walk the built UI end-to-end on the served build"}
       - {op: review.verify,       leg: verify,       note: "module-tier read; kernel-planned once nodes are implemented"}
     exclusions:
@@ -164,7 +165,10 @@ archetypes:
     laneMapping: >-
       On a Work ledger this maps to lanes design/ui (interface.draw >
       interface.asset) then implementation/frontend (interface.implement >
-      uat.verify > [security.verify, perf.verify iff goal.requires*]).
+      interface.audit > uat.verify > [security.verify, perf.verify iff
+      goal.requires*]). Audit never repairs: small/local drift returns through
+      interface.implement; systemic, unclear or creatively inadequate direction
+      returns through interface.draw, then implementation and a fresh capture.
       review.verify is not a lane step here — it is kernel-planned at the
       module tier (modules/models/kinds.yaml). (inferred from lanes + KERNEL_PLANNED)
     workedExample:
@@ -173,9 +177,42 @@ archetypes:
       decision: >-
         Propose the full chain. scope.define bounds "course-enrolment screen".
         interface.draw is REQUIRED (not optional): the frontend lane's
-        designGate refuses a frontend build without a done ui node. uat.verify
-        is the proof; review.verify closes at module tier.
+        designGate refuses a frontend build without a done ui node.
+        interface.audit must reach no-actionable-drift on fresh captures before
+        uat.verify; review.verify closes at module tier.
       ownerMoments: "none unless critique raises a hidden-decision or the brand record is unsettled (brand-gap -> brand.decide route)"
+
+  # ========================================================================
+  # 1B — ASSISTED UAT FOR GENUINE HUMAN CHECKPOINTS
+  # ========================================================================
+  - id: assisted-uat
+    signals: >-
+      "prepare assisted UAT", "run manual UAT", "verify the human-gated
+      browser flow", "test the OTP/CAPTCHA/3DS/external consent checkpoint".
+      A third-party dependency alone is not this signal when it remains fully
+      automatable.
+    chain:
+      - {op: request.analyze,      leg: intake, note: "classify genuine human gate versus automatable integration"}
+      - {op: uat.assisted.prepare, leg: verify, note: "freeze request/session/scripts/redaction/cleanup and exact digests; no journey execution or pass"}
+      - {op: uat.assisted.verify,  leg: verify, note: "after the user-facing runner creates one immutable receipt, independently derive current acceptance"}
+    exclusions:
+      - {op: interface.implement, why: "assisted acceptance consumes an already verified served build; product repair is a routed follow-up, never part of receipt creation"}
+      - {op: uat.verify, why: "fully automated journeys remain uat.verify; assisted verification covers only declared human-gated checkpoints"}
+    laneMapping: >-
+      This is deliberately two-stage and may span two workflows. The prepare
+      workflow can finish the deterministic package but cannot complete product
+      acceptance while receipts are pending. The user runs the package directly
+      or through skills/run-assisted-uat. A separate acceptance workflow selects
+      exact receipt paths, runs uat.assisted.verify and lets final reconciliation
+      project current evidence into canonical Work.
+    workedExample:
+      prompt: "prepare assisted UAT for the bank 3DS approval journey"
+      signalMatch: "3DS requires a real human/provider checkpoint"
+      decision: >-
+        Generate deterministic scripts and a frozen guided session. A user `ok`
+        records only that controlled execution finished. Current machine
+        postconditions, artifact integrity, redaction and cleanup determine pass.
+      ownerMoments: "the declared human checkpoint itself; no extra approval is invented for automatable setup or verification"
 
   # ==========================================================================
   # 2 — FEATURE-BUILD-BACKEND

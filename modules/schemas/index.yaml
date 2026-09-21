@@ -564,6 +564,64 @@ schemas:
       selectedBy: The record's schema const starci/srs@1.
 
   # --------------------------------------------------------------------------
+  # ASSISTED UAT — immutable human-checkpoint package and derived verification
+  # --------------------------------------------------------------------------
+
+  - id: starci/assisted-uat-request@1
+    file: modules/schemas/assisted-uat-request.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "Frozen assisted-UAT intent, current input/build/environment/flow bindings, genuine human gates, scripts, policies, receipt template and limits."
+    binds: "uat.assisted.prepare E/assisted-uat/request.yaml"
+    usedBy: [modules/ops/ops/uat.assisted.prepare.yaml, scripts/uat/assisted-runner.mjs]
+    business: {question: "Exactly what controlled journey may the user perform?", whenNeeded: "Before opening the assisted browser session.", whenNot: "Not a pass receipt or canonical Work state.", selectedBy: "Exact --request path; latest-run discovery is forbidden."}
+
+  - id: starci/assisted-uat-session-manifest@1
+    file: modules/schemas/assisted-uat-session-manifest.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "Digest-bound runner/browser identity, launch, ordered scripts, human-gate IDs, artifact policy and write-once receipt target."
+    binds: "uat.assisted.prepare E/assisted-uat/session-manifest.yaml"
+    usedBy: [modules/ops/ops/uat.assisted.prepare.yaml, scripts/uat/assisted-runner.mjs]
+    business: {question: "Which exact prepared bytes and browser contract form this session?", whenNeeded: "At assisted-run admission and later verification.", whenNot: "Never a mutable latest-session pointer.", selectedBy: "Request-selected exact manifest path and sha256."}
+
+  - id: starci/assisted-uat-cleanup@1
+    file: modules/schemas/assisted-uat-cleanup.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "Closed cleanup actions plus mandatory read-back probes for run-owned effects."
+    binds: "uat.assisted.prepare E/assisted-uat/cleanup.yaml"
+    usedBy: [scripts/uat/assisted-runner.mjs, modules/ops/ops/uat.assisted.verify.yaml]
+    business: {question: "How are this run's effects removed/restored and proved clean?", whenNeeded: "Every assisted run that can create or mutate state.", whenNot: "Not authority to delete unrelated or unbound resources.", selectedBy: "The prepared request's cleanup path and digest."}
+
+  - id: starci/assisted-uat-redaction@1
+    file: modules/schemas/assisted-uat-redaction.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "Closed evidence redaction rules and deterministic inspection commands."
+    binds: "uat.assisted.prepare E/assisted-uat/redaction.yaml"
+    usedBy: [scripts/uat/assisted-runner.mjs, modules/ops/ops/uat.assisted.verify.yaml]
+    business: {question: "Which prohibited values must be removed and how is that verified?", whenNeeded: "Before receipt finalization and during independent verification.", whenNot: "Never permission to place a secret in chat or source.", selectedBy: "The prepared request's redaction path and digest."}
+
+  - id: starci/assisted-uat-receipt@1
+    file: modules/schemas/assisted-uat-receipt.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "One append-only controlled-run record with exact bindings, ordered flow/gate completion, checks, artifacts, postconditions, cleanup and redaction."
+    binds: "E/assisted-uat/receipts/<run-id>.yaml"
+    usedBy: [scripts/uat/assisted-runner.mjs, modules/ops/ops/uat.assisted.verify.yaml]
+    business: {question: "What exactly happened in this one human-assisted run?", whenNeeded: "After controlled execution finishes.", whenNot: "completionSignal ok is never an acceptance verdict.", selectedBy: "Explicit absolute --receipt path; write once."}
+
+  - id: starci/assisted-uat-verification@1
+    file: modules/schemas/assisted-uat-verification.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "Independent current binding/check/evidence/postcondition/cleanup/redaction result and machine-derived disposition."
+    binds: "uat.assisted.verify E/assisted-uat/verification.yaml"
+    usedBy: [modules/ops/ops/uat.assisted.verify.yaml]
+    business: {question: "Does the exact immutable assisted run still prove the current accepted flow?", whenNeeded: "In the separate acceptance workflow before final reconciliation.", whenNot: "Not a receipt rewrite or direct Work completion.", selectedBy: "Exact request/session/receipt inputs and current read-only probes."}
+
+  # --------------------------------------------------------------------------
   # PROFILES / REGISTRY — evidence profiles and runtime registry
   # --------------------------------------------------------------------------
 
@@ -621,6 +679,6 @@ gaps:
   - "Record kinds named in modules/models/kinds.yaml but not backed by a file here: work/node@1, work/resource@1 (inside work.schema.yaml monolith — covered), starci/evidence-packet@1 (no file found — only listed)."
 
 coverage:
-  tree: "modules/schemas/ — 34 authored files + modules/schemas/spec/ 5 files + index.yaml + relationships.yaml"
-  authoredFiles: 39            # 34 top-level + 5 under spec/
+  tree: "modules/schemas/ — 40 authored files + modules/schemas/spec/ 5 files + index.yaml + relationships.yaml"
+  authoredFiles: 45            # 40 top-level + 5 under spec/
   projection: none             # no compiled projection — consumers read the authored YAML directly

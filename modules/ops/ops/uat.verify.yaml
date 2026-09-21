@@ -498,5 +498,5 @@ route:
   nodeKinds: [uat.ux]
   phase: [verify, post-implementation]
   intent: [uat, acceptance, browser, verify]
-  prerequisites: ["implementation done", "verified served build"]
+  prerequisites: ["implementation done", "interface.audit done", "verified served build"]
   riskHints: [browser-required]

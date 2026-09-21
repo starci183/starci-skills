@@ -352,6 +352,15 @@ operators:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+  interface.audit:
+    skill: starci
+    # Visual/Grammar conformance is independent verification. Codex leads for native image inspection,
+    # then the dedicated reasoning verifier and the remaining hard-capable pools.
+    chain: [codex-agent, claude-fable, claude-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+      - {environment: devin, profiles: [devin-agent]}
   knowledge.repair:
     skill: starci
     chain: [claude-agent, codex-agent, qwen-agent, devin-agent]
@@ -450,6 +459,23 @@ operators:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+  uat.assisted.prepare:
+    skill: starci
+    # Preparation authors deterministic scripts/evidence but performs no product journey.
+    chain: [codex-agent, devin-agent, claude-agent, qwen-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+  uat.assisted.verify:
+    skill: starci
+    # Receipt acceptance is elevated evidence work and therefore uses the independent verify chain.
+    chain: [codex-agent, claude-fable, claude-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+      - {environment: devin, profiles: [devin-agent]}
   work.author:
     skill: starci
     # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every

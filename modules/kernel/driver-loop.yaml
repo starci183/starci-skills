@@ -441,7 +441,11 @@ verdictTable:
       `same` (limit 2, retry); uat/e2e/perf red -> lane.build repair (limit 3,
       reopen); review findings -> lane.build repair (limit 3, settle);
       gate-failed -> lane.build gate repair (limit 3, settle); partial ->
-      `same` carrying open items (limit 5, retry).
+      `same` carrying open items (limit 5, retry). `interface.audit` is the
+      deliberate exception to generic failed->same: bounded/local drift routes
+      to interface.implement; systemic, unclear or creatively inadequate
+      direction reports interface-gap and routes to interface.draw. Both paths
+      return through interface.implement and fresh capture before re-audit.
     budget: >-
       Each route's own `limit:` bounds it (modules/models/kinds.yaml routes —
       failed->same 3, partial->same 5, rejected->same 2, repairs 3, gaps 2).
@@ -486,6 +490,44 @@ verdictTable:
       scope-expansion -> re-run scope.define, then provision.ask if authority
       widens; identity-wrong -> provision.ask ALWAYS.
     citation: "modules/goal/legality.yaml backwardEdges; modules/ops/ops/goal.revise.yaml; init/CLAUDE.md work-correction policy"
+
+interfaceAuditLoop:
+  chain: >-
+    interface.draw -> interface.implement -> fresh capture -> interface.audit.
+    A bounded repair omits redraw; a systemic/direction repair repeats it with
+    a more explicit coverage/component/state map. interface.audit only inspects
+    and writes findings: it never edits code/design/assets/Grammar, never
+    captures replacement renders and never dispatches a repair.
+  budget: >-
+    Count interface.audit attempts for the same selected matrix across both
+    repair routes as one shared budget. Round must be 1..5 with immediate
+    predecessor lineage. Do not enqueue round 6 even if an individual route
+    counter would still permit it. On round 5, no-actionable-drift advances;
+    actionable drift records AUDIT_ROUND_LIMIT with the complete trend and
+    stops at the declared budget boundary rather than claiming pass.
+  freshness: >-
+    Every source/design repair invalidates prior captures. The next audit is
+    executable only after interface.implement stamps fresh real route x state
+    x viewport x theme captures from the repaired served build.
+  citation: "modules/ops/ops/interface.audit.yaml auditPolicy; modules/models/kinds.yaml interface audit routes"
+
+assistedUatLoop:
+  classify: >-
+    Third-party involvement is not itself a human gate. Use ordinary automated
+    UAT/integration whenever the action and assertions are automatable. Select
+    assisted UAT only for a declared human/provider gesture the workflow may
+    not automate, such as CAPTCHA, OTP custody, 3DS or external consent.
+  prepare: >-
+    uat.assisted.prepare freezes exact scripts, bindings, redaction and cleanup
+    without executing the journey or changing canonical Work. The user-facing
+    skills/run-assisted-uat session may create exactly one append-only receipt.
+  verify: >-
+    A later uat.assisted.verify selects exact request/session/receipt paths and
+    derives pass from current digest equality, complete ordered execution,
+    machine postconditions, genuine sanitized artifacts and verified cleanup.
+    Human `ok` means execution finished only. Final reconciliation, not the
+    runner or either assisted op, projects current evidence into Work done.
+  citation: "modules/ops/ops/uat.assisted.{prepare,verify}.yaml; skills/run-assisted-uat/SKILL.md"
 
 # ============================================================================
 # 3 — RE-PLAN TRIGGERS. When the driver stops following the plan and makes a

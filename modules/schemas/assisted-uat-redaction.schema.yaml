@@ -1,0 +1,33 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:assisted-uat-redaction:1
+type: object
+additionalProperties: false
+required: [schema, rules, commands]
+properties:
+  schema: {const: starci/assisted-uat-redaction@1}
+  rules:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [pattern, replacement]
+      properties:
+        id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'}
+        pattern: {type: string, minLength: 1, maxLength: 500}
+        replacement: {type: string, minLength: 1, maxLength: 200}
+  commands:
+    type: array
+    minItems: 1
+    items: {$ref: '#/$defs/command'}
+$defs:
+  command:
+    type: object
+    additionalProperties: false
+    required: [id, command]
+    properties:
+      id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'}
+      command:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1}
+      cwd: {type: string, minLength: 1}

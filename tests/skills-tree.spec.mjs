@@ -9,7 +9,7 @@ const skillDirs=fs.readdirSync(path.join(root,'skills'),{withFileTypes:true}).fi
 const frontmatter=text=>{const match=text.match(/^---\n([\s\S]*?)\n---\n/);assert.ok(match,'a skill starts with YAML frontmatter');return parseYaml(match[1]);};
 
 test('every shipped skill declares its directory name and a description, and the package ships the folder',()=>{
-  for(const name of ['define-goal','start-kernel','computer-use','orca-cli','orchestration','workflow-chat'])
+  for(const name of ['define-goal','start-kernel','computer-use','orca-cli','orchestration','workflow-chat','run-assisted-uat'])
     assert.ok(skillDirs.includes(name),`skills/${name} is part of the locked tree`);
   for(const name of skillDirs){
     const meta=frontmatter(read(`skills/${name}/SKILL.md`));

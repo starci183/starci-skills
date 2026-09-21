@@ -71,7 +71,10 @@ producesVocabulary:
     - "records.X: authored"      # Work records written/remapped
     - "node.X: cut into disjoint children"  # seam-first split landed, node is a derived parent (work.author cut mode - the implementation.plan kind)
     - "tests.X: authored"        # regression coverage exists
+    - "ui.X: audited"            # fresh render matrix has no actionable UI/UX drift
     - "ui.X: verified"           # walked end-to-end on served build
+    - "uat.X: assisted-ready"    # human-gated session package is frozen and runnable
+    - "uat.X: assisted-verified" # exact immutable assisted run passed machine verification
     - "api.X: verified"          # proven through public API on real stack
     - "integration.X: verified"  # live-provider proof w/ owner credential
     - "perf.X: verified"         # measured against declared budget
@@ -104,11 +107,14 @@ producesVocabulary:
     interface.draw:       ["ui.X: drawn"]
     interface.asset:      ["ui.X: assets"]
     interface.implement:  ["impl.X: done (frontend)"]
+    interface.audit:      ["ui.X: audited"]
     backend.implement:    ["impl.X: done (backend)"]
     code.refactor:        ["impl.X: done (restructured, behavior-invariant)"]
     work.author:          ["records.X: authored", "node.X: cut into disjoint children"]
     test.author:          ["tests.X: authored"]
     uat.verify:           ["ui.X: verified"]
+    uat.assisted.prepare: ["uat.X: assisted-ready"]
+    uat.assisted.verify:  ["uat.X: assisted-verified"]
     e2e.verify:           ["api.X: verified"]
     integration.verify:   ["integration.X: verified"]
     perf.verify:          ["perf.X: verified"]
@@ -146,11 +152,46 @@ forwardEdges:
     illegal: "UI work without interface.draw first is ILLEGAL"
 
   - id: verify-after-implement
-    if: "any proof leg is proposed (uat.verify / e2e.verify / review.verify / perf.verify / security.verify)"
+    if: "any proof leg is proposed (interface.audit / uat.verify / uat.assisted.verify / e2e.verify / review.verify / perf.verify / security.verify)"
     thenBefore: "the implementation it proves must be done first"
     enforcement: lane order — proofs are steps after the build in every lane; a proof that finds nothing built reports 'no delivery to inspect', not a pass
     why: "verification reads a delivered slice; it is not the builder (docs/verify-proof.md)"
     illegal: "uat.verify before implementation is complete is ILLEGAL"
+
+  - id: capture-before-interface-audit
+    if: "interface.audit is proposed"
+    thenRequired: >-
+      interface.implement settled pass for the selected delivery revision and
+      produced a fresh real route x state x viewport x theme capture for every
+      selected matrix cell after its last source change
+    enforcement: >-
+      interface.audit is product-read-only and refuses stale, missing or
+      audit-generated captures; every repair returns through
+      interface.implement before the next audit round
+    illegal: "auditing a stale/pre-repair capture or letting audit create its own render proof is ILLEGAL"
+
+  - id: interface-audit-before-uat
+    if: "a frontend lane proposes uat.verify"
+    thenBefore: "interface.audit must settle no-actionable-drift for the same delivered revision and matrix"
+    enforcement: "implementation/frontend lane order: interface.implement -> interface.audit -> uat.verify"
+    illegal: "business UAT cannot waive actionable Grammar, layout, asset, icon, responsive or visual drift"
+
+  - id: assisted-uat-separation
+    if: "a selected UAT flow contains a genuine human-gated checkpoint"
+    thenRequired: >-
+      uat.assisted.prepare freezes exact request/session/scripts/redaction/
+      cleanup bindings; the user-facing runner writes one immutable receipt;
+      uat.assisted.verify independently derives the outcome before final
+      reconciliation
+    enforcement: >-
+      prepare and verify never write canonical Work state or runtime.sqlite;
+      human `ok` is execution-finished only; final reconciliation alone marks
+      current Work done after all ordinary automated and assisted evidence bind
+      the same delivery revision
+    illegal: >-
+      treating every third-party flow as manual, treating a human response as
+      pass, discovering the latest receipt, rewriting a receipt, or completing
+      .starciwork before current assisted verification is ILLEGAL
 
   - id: remap-after-refactor
     if: "code.refactor is proposed"

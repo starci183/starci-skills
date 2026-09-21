@@ -178,11 +178,24 @@ const ARCHETYPES = [
     hints: { custody: true, implQualifier: 'backend' },
   },
   {
+    id: 'assisted-uat-prepare',
+    signals: [/(?:\b(?:prepare|generate|package|author)\b[\s\S]{0,80}\b(?:assisted|manual|human[- ]gated)\s+uat\b)|(?:\b(?:assisted|manual|human[- ]gated)\s+uat\b[\s\S]{0,80}\b(?:prepare|generate|package|author)\b)/i],
+    excludes: [/\b(?:run|execute|verify|accept|reconcile)\b[\s\S]{0,40}\b(?:receipt|session|assisted|manual|human[- ]gated)\b/i],
+    vars: a => [{ family: 'uat', suffix: a.surfaceName, state: 'assisted-ready' }],
+    hints: { assistedUat: true, assistedMode: 'prepare' },
+  },
+  {
+    id: 'assisted-uat-verify',
+    signals: [/(?:\b(?:run|execute|verify|accept|reconcile)\b[\s\S]{0,80}\b(?:assisted|manual|human[- ]gated)\s+uat\b)|(?:\b(?:assisted|manual|human[- ]gated)\s+uat\b[\s\S]{0,80}\b(?:run|execute|verify|accept|reconcile|receipt)\b)|\b(?:otp|captcha|3ds|external consent)\b[\s\S]{0,80}\b(?:uat|acceptance|browser flow)\b/i],
+    vars: a => [{ family: 'uat', suffix: a.surfaceName, state: 'assisted-verified' }],
+    hints: { assistedUat: true, assistedMode: 'verify' },
+  },
+  {
     id: 'verify-only',
     signals: [/\b(lint|verify|review|audit|check( the)? repo|inspect)\b/i],
     // a build/refactor verb anywhere means the audit word names the target
     // ("refactor the audit module"), not the request
-    excludes: [/\b(build|implement|add|create|code|làm|integrate|refactor|clean[ -]?up|restructure|rename|fix)\b/i],
+    excludes: [/\b(build|implement|add|create|code|làm|integrate|refactor|clean[ -]?up|restructure|rename|fix)\b/i, /\b(?:assisted|manual|human[- ]gated)\s+uat\b/i],
     vars: a => [{ family: 'slice', suffix: a.surfaceName, state: 'reviewed' }],
     hints: {},
   },
@@ -338,7 +351,7 @@ const EXTERNAL_OPS = new Set(['request.analyze']); // model/kinds.yaml external:
 function parsePrerequisite(text, ops) {
   const t = String(text).trim();
   // "<op.id> done ..." — an explicit op dependency
-  const opRef = /^([a-z]+\.[a-z]+)\b/i.exec(t);
+  const opRef = /^([a-z]+(?:\.[a-z]+)+)\b/i.exec(t);
   if (opRef && ops.has(opRef[1])) {
     return { kind: 'op', op: opRef[1], note: t };
   }
@@ -695,7 +708,9 @@ function legalityCheck(order, legs, ops, s0) {
     if (phase !== 'verify') continue;
     const hasImplBefore = order.slice(0, pos.get(leg.legId))
       .some(l => stageRankOf(ops.get(l.op)) === 4);
-    const s0ok = leg.needsSatisfiedBy.some(n => n.startsWith('S0:')) || leg.assumed.length;
+    const consumesPreExistingDelivery = ['uat.assisted.prepare', 'uat.assisted.verify'].includes(leg.op)
+      && leg.conditions.some(c => /served build|controlled-run receipt/i.test(c));
+    const s0ok = leg.needsSatisfiedBy.some(n => n.startsWith('S0:')) || leg.assumed.length || consumesPreExistingDelivery;
     if (!hasImplBefore && !s0ok && !legs.get(leg.legId)?.instance) {
       findings.push({ rule: 'verify-after-implement', leg: leg.legId, note: 'proof leg with no delivered slice before it' });
     }
@@ -708,6 +723,18 @@ function legalityCheck(order, legs, ops, s0) {
       const s0ok = impl.needsSatisfiedBy.some(n => /S0.*draw|interface\.draw/.test(n));
       if (!s0ok) findings.push({ rule: 'draw-before-ui-build', leg: impl.legId, note: 'interface.implement without interface.draw (designGate)' });
     }
+  }
+  // UI proof order: implementation captures first, then read-only audit,
+  // then business UAT. The op prerequisites normally produce these edges;
+  // retain an explicit legality finding so a hand-authored delta cannot skip
+  // the capture/audit boundary.
+  const audit = order.find(l => l.op === 'interface.audit');
+  const uat = order.find(l => l.op === 'uat.verify');
+  if (audit && (!impl || pos.get(impl.legId) > pos.get(audit.legId))) {
+    findings.push({ rule: 'capture-before-interface-audit', leg: audit.legId, note: 'interface.audit without a settled interface.implement before it' });
+  }
+  if (uat && (!audit || pos.get(audit.legId) > pos.get(uat.legId))) {
+    findings.push({ rule: 'interface-audit-before-uat', leg: uat.legId, note: 'uat.verify without interface.audit no-actionable-drift before it' });
   }
   // stage-order sanity: no decide/direct leg AFTER an implement leg it does not
   // explicitly follow (registry coarse order — a warning-tier finding).

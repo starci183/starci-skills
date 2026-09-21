@@ -1,0 +1,80 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:assisted-uat-verification:1
+type: object
+additionalProperties: false
+required: [schema, request, sessionManifest, receipt, bindings, checks, derived, disposition, verifiedAt]
+properties:
+  schema: {const: starci/assisted-uat-verification@1}
+  request: {$ref: '#/$defs/fileRef'}
+  sessionManifest: {$ref: '#/$defs/fileRef'}
+  receipt: {$ref: '#/$defs/fileRef'}
+  bindings:
+    type: object
+    additionalProperties: false
+    required: [requestDigest, inputDigest, buildDigest, environmentDigest, flowsDigest, scriptsDigest, cleanupPlanDigest, redactionPolicyDigest]
+    properties:
+      requestDigest: {$ref: '#/$defs/digest'}
+      inputDigest: {$ref: '#/$defs/digest'}
+      buildDigest: {$ref: '#/$defs/digest'}
+      environmentDigest: {$ref: '#/$defs/digest'}
+      flowsDigest: {$ref: '#/$defs/digest'}
+      scriptsDigest: {$ref: '#/$defs/digest'}
+      cleanupPlanDigest: {$ref: '#/$defs/digest'}
+      redactionPolicyDigest: {$ref: '#/$defs/digest'}
+  checks:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, command, exitCode, evidenceRefs]
+      properties:
+        id: {$ref: '#/$defs/id'}
+        command: {$ref: '#/$defs/text'}
+        exitCode: {type: integer}
+        evidenceRefs:
+          type: array
+          uniqueItems: true
+          items: {$ref: '#/$defs/relativePath'}
+  derived:
+    type: object
+    additionalProperties: false
+    required: [currentBindings, flowsComplete, postconditionsPassed, evidenceComplete, cleanupComplete, redactionComplete]
+    properties:
+      currentBindings: {type: boolean}
+      flowsComplete: {type: boolean}
+      postconditionsPassed: {type: boolean}
+      evidenceComplete: {type: boolean}
+      cleanupComplete: {type: boolean}
+      redactionComplete: {type: boolean}
+  disposition: {enum: [pass, fail, blocked]}
+  verifiedAt: {type: string, format: date-time}
+allOf:
+  - if:
+      properties: {disposition: {const: pass}}
+      required: [disposition]
+    then:
+      properties:
+        derived:
+          properties:
+            currentBindings: {const: true}
+            flowsComplete: {const: true}
+            postconditionsPassed: {const: true}
+            evidenceComplete: {const: true}
+            cleanupComplete: {const: true}
+            redactionComplete: {const: true}
+$defs:
+  text: {type: string, minLength: 1}
+  id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'}
+  digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+  relativePath:
+    type: string
+    minLength: 1
+    pattern: '^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*\\).+$'
+  fileRef:
+    type: object
+    additionalProperties: false
+    required: [path, sha256]
+    properties:
+      path: {$ref: '#/$defs/relativePath'}
+      sha256: {$ref: '#/$defs/digest'}

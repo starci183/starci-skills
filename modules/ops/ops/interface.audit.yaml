@@ -1,0 +1,323 @@
+# modules/ops/ops/interface.audit.yaml
+# Read-only render/UX-UI drift audit. This op diagnoses and routes; it never repairs.
+
+id: interface.audit
+goal:
+  en: >-
+    Audit selected real interface renders against accepted product intent, the actual installed Grammar,
+    declared brand/assets and applicable UI proof rules; emit reproducible hard-check findings, a calibrated
+    bounded visual rubric and an actionable repair route until the selected matrix has no actionable drift.
+nodeKinds: [operations]
+completionProfile: operations
+sideEffects:
+  - authorized navigation, sign-in and non-destructive state setup on the selected verified runtime
+  - audit evidence writes under the selected operations node only
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated evidence
+  prerequisiteState: done
+  dispatch: never
+readOnlyPolicy:
+  productSource: true
+  productData: true
+  allowedEffects:
+    - read repository, runtime, DOM, accessibility tree, computed style, network metadata and image bytes
+    - inspect implementation-produced real route x viewport captures
+    - write only the audit node and its evidence bundle
+  forbiddenEffects:
+    - edit, format, generate or commit product, design, asset or Grammar source
+    - generate, retouch or replace product renders or captures
+    - change accepted direction, assertions, baselines or expected values
+    - dispatch or perform a repair
+    - certify review.verify or uat.verify
+reads:
+  - id: target
+    path: .starciwork/features/<feature>/operations/<audit>/index.yaml
+    purpose:
+      en: >-
+        Read the existing selected audit scope, exact route/state/viewport/theme matrix, assertion IDs,
+        dependencies, attempt number and evidence lineage. An absent target or audit-expanded matrix is a scope
+        gap, not permission to invent coverage.
+  - id: intent
+    path: .starciwork/features/<feature>/{business,architecture,ui}/**/index.yaml + accepted direction assets
+    purpose:
+      en: >-
+        Read accepted content, states, SDS behavior, UI coverage/component/state mapping, visual direction,
+        brand revision, artwork slots and declared exceptions. Source and screenshots do not redefine intent.
+        An ImageGen direction is a design input, not component anatomy or runtime proof.
+  - id: grammar
+    path: consuming manifest/lockfile + resolved installed Grammar package/public entry/types/renderers/CSS/tokens + matching reference renders
+    purpose:
+      en: >-
+        Resolve the consuming application's Grammar and record package name, exact version, lockfile identity,
+        resolved path, public entry, inspected source hashes and matching real reference renders for every audited
+        primitive/state/theme. Inspect DOM anatomy, slots, state attributes, computed geometry and winning
+        token/declaration provenance. Never infer anatomy, tokens, borders, surfaces, shadows or radii from a
+        component name or product screenshot alone.
+  - id: knowledge
+    path: knowledge/ui/{composition,presentation,proof}/**/*.yaml + selected knowledge/grammars/<family>/{DNA,family,idioms,playbook}.yaml
+    purpose:
+      en: >-
+        Load only applicable stable rule IDs, including anatomy-source, brand, accessibility, contrast, focus,
+        motion, render-truth, UX and taste. Knowledge snapshots cannot replace current installed Grammar source
+        and reference renders.
+  - id: brand-assets
+    path: .starciwork/brand/index.yaml + declared masters/assets + selected UI asset manifest
+    purpose:
+      en: >-
+        Resolve current brand tokens/rules and every selected icon, image, font and artwork-slot master, including
+        identity/hash, rights, aspect/crop, semantic role and alt/announcement contract.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: >-
+        Read the exact delivered frontend source, dependency graph, routes, component ownership, styles and asset
+        imports to attribute a measured delta. Repository access is read-only and authorizes no repair or commit.
+  - id: implementation-captures
+    path: selected interface.implement E/screens/**/*.png + E/runtime.json + E/measurements.json
+    purpose:
+      en: >-
+        Inspect fresh real route x viewport captures produced by interface.implement for this delivered revision.
+        This audit never generates replacement renders. Every repair must return through interface.implement,
+        produce fresh captures, and bind them before the next audit.
+  - id: environment
+    path: .starciwork/_resources/environments/<environment>/resource.yaml
+    purpose:
+      en: Bind expected origin, environment revision, probes and served-version mechanism; HEAD is not served proof.
+  - id: identity
+    path: .starciwork/_resources/identities/<identity>/resource.yaml
+    purpose:
+      en: Resolve an authorized actor and sealed custody, or explicit anonymous access; retain no secrets.
+  - id: previous
+    path: selected prior E/audit-summary.json + E/findings.json + E/matrix.json + E/routing.json
+    purpose:
+      en: >-
+        For rounds 2 through 5, read the immediate predecessor and ancestry. Compare immutable signatures,
+        matrix cells, delivered revision and measurements; never relabel old evidence as new observation.
+  - id: workflow
+    path: selected workflow request + .starciwork/runtime.sqlite job lineage + modules/kernel/verdict-contract.yaml
+    purpose:
+      en: >-
+        Read the kernel-assigned audit round and attempt lineage. The kernel owns scheduling and the five-round
+        ceiling; this operation reports a route and stops.
+  - id: matrix
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
+    purpose:
+      en: Bind only an explicitly selected request cell, inputs, criteria and output schema.
+  - id: profile
+    path: modules/models/registry.yaml + modules/models/runtimes.yaml + selected runtime + actual host/browser tools
+    purpose:
+      en: >-
+        Prove the actual image, DOM/accessibility and computed-style inspection capabilities used. Missing required
+        instrumentation is blocked, never replaced with model judgement.
+writes:
+  - id: node
+    path: .starciwork/features/<feature>/operations/<audit>/index.yaml
+    fields: [state, blockedBy, completion.inputDigest, completion.evidence]
+    content:
+      en: >-
+        Update only this audit record's state/blocker/completion binding. Completion says the selected matrix has
+        no actionable drift; it never completes UI, implementation, UAT or review nodes.
+  - id: evidence
+    path: >-
+      E/manifest.yaml + E/audit-summary.json + E/findings.json + E/routing.json + E/matrix.json +
+      E/grammar.json + E/measurements.json + E/interactions.json + E/assets.json + E/taste.json +
+      E/trend.json + E/runtime.json + E/inspected-captures.json + E/result.md
+    fields: [id,nodeId,inputDigest,outcome,assertions,assets,provenance,codeRefs,extensions]
+    content:
+      en: >-
+        Retain references/hashes for the implementation-produced captures actually inspected, DOM/accessibility/
+        computed-style observations, measurement units/tolerances, Grammar and asset provenance, hard-check
+        results, calibrated taste rows, attempt lineage, trend and routing. Evidence is diagnostic, not a patch or
+        independent acceptance.
+  - id: matrixHandoff
+    path: E/job-result.json
+    fields: [requestId,requestDigest,op,operation when selected,status,criteria,outputs,artifacts]
+    content:
+      en: Return exact request-bound audit, finding and routing artifacts only for a selected job matrix.
+steps:
+  - reads: [target,intent,grammar,knowledge,brand-assets,repo,implementation-captures,environment,identity,previous,workflow,profile]
+    writes: [evidence]
+    action:
+      en: >-
+        Freeze round 1's route x state x viewport x theme matrix and hard-rule IDs. Later rounds recheck the exact
+        matrix; they may add newly reachable cells but never remove, rename or silently exempt an old cell. Bind
+        one served build, the installed Grammar and fresh implementation-produced capture for every cell. Reject
+        a round outside 1..5, skipped lineage, stale capture or capture made before the routed repair.
+  - reads: [implementation-captures,target,intent,environment,identity,repo,profile]
+    writes: [evidence]
+    action:
+      en: >-
+        Inspect, but do not create or alter, every selected real render. Corroborate each capture with route,
+        state, actor, viewport, theme, served build, DOM, accessibility tree, computed styles, element rectangles,
+        scroll/overflow ownership and event-state observations. Product writes needed for business outcomes belong
+        to UAT, not this audit.
+  - reads: [intent,grammar,knowledge,brand-assets,repo,implementation-captures]
+    writes: [evidence]
+    action:
+      en: >-
+        Execute deterministic checks for geometry, content, icons, assets, responsive composition and interaction
+        states. Compare each mapped Grammar instance's structure and computed border, surface, shadow and radius
+        with its matching installed-version reference, tracing values to winning Grammar/family/application
+        declarations and tokens. If the canonical primitive/reference has no border and the product render adds
+        one, emit a hard `grammar.anatomy` finding; attractiveness, taste score or preference cannot waive it.
+  - reads: [intent,knowledge,grammar,brand-assets,implementation-captures]
+    writes: [evidence]
+    action:
+      en: >-
+        Apply selected proof lenses. Hard constraints are pass/fail/not-run/inconclusive and gate the audit.
+        Separately score only applicable TASTE-1..TASTE-12 rows using named measurements and same-round low/mid/
+        high calibration anchors, then compute TASTE-13 exactly. Void calibration, missing measurement or
+        fix-first is actionable. Creative scoring never changes a hard failure or Grammar authority.
+  - reads: [target,intent,repo,grammar,previous,workflow]
+    writes: [evidence]
+    action:
+      en: >-
+        Normalize findings and group shared causes. Attribute from accepted intent, winning declarations and
+        source ownership; root cause and blast radius outrank raw finding count. Route `interface.implement` when
+        intent/Grammar are explicit and the repair is bounded implementation/content/asset work. Route
+        `interface.draw` when intent is missing, contradictory, generic or creatively inadequate, or systemic
+        multi-surface composition needs revised direction/coverage. `code.refactor` is optional secondary advice
+        only for proven behavior-invariant structural mechanics with an existing before/after regression.
+  - reads: [target,previous,workflow,matrix]
+    writes: [node,evidence,matrixHandoff]
+    action:
+      en: >-
+        Compare the current attempt with its predecessor on the same matrix and signatures. Record resolved,
+        unchanged, new and reopened findings, deltas, no-progress and oscillation. No relevant delivered revision
+        or no diminished actionable finding is no-progress; a resolved signature that reopens or alternates
+        beyond tolerance is oscillation. Both fail with an explicit route/recheck matrix. On round 5 any known
+        actionable finding fails and missing authority/instrumentation blocks; neither can pass. Complete only as
+        `no-actionable-drift`, validate, report and stop without dispatch. review.verify and uat.verify remain
+        independent.
+findingSchema:
+  schema: starci/interface-audit-finding@1
+  required: [id,signature,category,constraintClass,ruleRefs,matrixCells,expected,observed,measurements,evidenceRefs,sourceAttribution,severity,status,rootCause,blastRadius,routing]
+  categories: [geometry,content,icon,asset,responsive,interaction,grammar.anatomy,grammar.token,accessibility,render.truth,taste]
+  constraintClasses: [hard, creative-rubric]
+  statuses: [open,resolved,unchanged,new,reopened,blocked]
+  routing:
+    required: [primaryOp,rationale,affectedPaths,recheckMatrix,nextChain]
+    primaryOps: [interface.implement, interface.draw]
+    optionalMechanicalOp: code.refactor
+auditPolicy:
+  roundLimit: 5
+  lineage: immediate-predecessor-required
+  matrixRecheck: immutable-route-state-viewport-theme-plus-additions
+  hardConstraintRule: every-required-hard-cell-pass
+  freshCaptureRule: every-repair-produces-new-interface-implement-captures-before-audit
+  creativeRubric:
+    rules: TASTE-1..TASTE-13
+    calibration: same-round-low-mid-high-required
+    completionVerdict: ship
+  routingPriority: root-cause-then-blast-radius-never-raw-finding-count
+  primaryRoutes:
+    boundedImplementation:
+      op: interface.implement
+      chain: [interface.implement, interface.audit]
+    systemicDirection:
+      op: interface.draw
+      chain: [interface.draw, interface.implement, interface.audit]
+  optionalMechanicalRoute:
+    op: code.refactor
+    onlyWhen: behavior-invariant-structural-change-with-covering-before-after-regression
+  completion:
+    status: no-actionable-drift
+    requires:
+      - every selected matrix cell was freshly inspected on one verified served revision
+      - every required hard constraint passed with actual measurements and authority
+      - no open, unchanged, new, reopened or blocked actionable finding remains
+      - calibrated taste verdict is ship for the selected applicable scope
+      - round and trend lineage are valid and the immutable matrix was rechecked
+    neverMeans: [review.verify acceptance, uat.verify business journey proof, permission to waive hard constraints]
+  reportMapping:
+    noActionableDrift: {outcome: done, route: none}
+    boundedImplementationDrift: {outcome: failed, route: interface.implement}
+    systemicOrDirectionDrift: {outcome: blocked, blocker: interface-gap, route: interface.draw}
+    grammarMissingFromCanonicalPackage: {outcome: blocked, blocker: grammar-gap, route: grammar.update}
+    note: >-
+      Existing Grammar violated by product code is bounded implementation drift, not grammar-gap.
+      On audit round 5 every actionable mapping is terminal for this five-round loop: the Kernel
+      records exhaustion and never schedules audit round 6.
+proofs:
+  - id: deterministic-coverage
+    requirement:
+      en: Every matrix cell has fresh capture and measurement evidence; required not-run/inconclusive cannot pass.
+  - id: grammar-hard-authority
+    requirement:
+      en: >-
+        Every Grammar result binds installed version, public entry, anatomy/reference and winning declaration/token
+        provenance. Unexpected border, surface, shadow, radius, containment, slot or state anatomy is hard failure;
+        no visual or creative score can waive it.
+  - id: bounded-creative-rubric
+    requirement:
+      en: Applicable TASTE rows have measurements/calibration and never override deterministic findings.
+  - id: actionable-routing
+    requirement:
+      en: >-
+        Every actionable finding has cause, blast radius, affected paths and recheck cells; bounded drift routes
+        interface.implement, while systemic or unclear direction/creative drift routes interface.draw.
+  - id: bounded-loop
+    requirement:
+      en: >-
+        Rounds preserve lineage/matrix, report no-progress/oscillation and never exceed five; round 5 with drift
+        is failed or blocked, never passed. Every repair supplies fresh implementation captures before re-audit.
+  - id: no-actionable-drift
+    requirement:
+      en: >-
+        Pass is `no-actionable-drift`: complete hard coverage, calibrated taste ship and zero actionable findings.
+        It proves this audit scope only and leaves review.verify and UAT independent.
+  - id: binding
+    requirement:
+      en: "`starci validate` passes and evidence hashes, served versions, Grammar, codeRefs and lineage agree."
+blockers:
+  - code: AUDIT_SCOPE_INCOMPLETE
+    condition: {en: Required matrix cells, expectations, rules or immediate lineage are missing or ambiguous.}
+  - code: RUNTIME_UNVERIFIED
+    condition: {en: Selected routes/states cannot bind to the environment and observed served versions.}
+  - code: CAPTURE_OR_MEASUREMENT_UNAVAILABLE
+    condition: {en: Fresh implementation captures or required inspection evidence cannot be obtained.}
+  - code: GRAMMAR_AUTHORITY_UNPROVEN
+    condition:
+      en: Installed Grammar version, entry, matching reference or declaration/token provenance is unresolved.
+  - code: DESIGN_INTENT_UNCLEAR
+    condition:
+      en: Material intent is absent/contradictory; route detailed interface.draw and do not guess.
+  - code: AUDIT_INPUT_CHANGED
+    condition: {en: Product, environment, Grammar, brand, asset, matrix or intent changes during inspection.}
+  - code: AUDIT_ROUND_LIMIT
+    condition:
+      en: Round exceeds five, or round 5 lacks required proof; the kernel must not enqueue a sixth audit.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition: {en: A prerequisite is not effectively done or a required selected input is absent.}
+placeholders:
+  feature: Selected feature slug
+  audit: Stable selected audit slug
+  repo-id: Resolved repository name or path
+  bound-paths: Inspected product source read set
+  environment: Resolved environment resource slug
+  identity: Selected actor resource slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks: [starci-validate]
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+business:
+  question: >-
+    "Does the selected real interface have actionable render, UX or UI drift, and where must repair resume?"
+  whenNeeded:
+    - After interface.implement and after each routed repair, on the same selected matrix and fresh captures.
+  whenNot:
+    - Not source/design/asset repair, render generation, behavioral UAT or review.verify acceptance.
+  consumes:
+    - Accepted SRS/SDS/UI direction, brand/assets, installed Grammar/references, delivered source/runtime, fresh implementation captures, selected matrix and prior attempt.
+  produces:
+    - Structured findings, hard matrices, calibrated taste, lineage/trend and a repair route or no-actionable-drift.
+  failureModes:
+    - AUDIT_SCOPE_INCOMPLETE, RUNTIME_UNVERIFIED, CAPTURE_OR_MEASUREMENT_UNAVAILABLE, GRAMMAR_AUTHORITY_UNPROVEN, DESIGN_INTENT_UNCLEAR, AUDIT_INPUT_CHANGED, AUDIT_ROUND_LIMIT, DECLARED_DEPENDENCY_UNMET.
+route:
+  nodeKinds: [operations]
+  phase: [verify, post-implementation]
+  intent: [audit, interface-audit, ui-drift, ux-drift, render-drift]
+  prerequisites: ["interface.implement settled pass with fresh real captures", "verified served build", "accepted UI direction and installed Grammar binding"]
+  riskHints: [browser-required, read-only-product-source, grammar-hard-authority, bounded-five-round-loop]

@@ -421,11 +421,14 @@ steps:
       - evidence
     action:
       en: Bind an authorized preview and observed served build. Open the implemented screens, drive
-        relevant controls and capture every required screen/state/viewport represented by draws plus
-        other required acceptance states. Open the captures and compare each mapped draw with its
+        relevant controls and, after the final source mutation in this attempt, capture every required
+        route/screen/state/viewport/theme matrix cell represented by draws plus other required acceptance
+        states. Stamp every capture with source revision, served-build identity and capture time; a capture
+        made before the last edit is stale and cannot be handed to interface.audit. Open the captures and compare each mapped draw with its
         corresponding rendered evidence and applicable knowledge rules. Record coverage per input
         image and all deviations; no representative screenshot may stand in for unobserved screens.
-        Repair within scope and recheck affected tests/captures before passing.
+        Repair within scope and recheck affected tests, then recapture the complete selected audit matrix
+        before passing. interface.audit inspects these bytes later; it never creates or refreshes them.
   - reads:
       - repo
       - target

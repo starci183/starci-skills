@@ -312,6 +312,23 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
+  interface.audit:
+    family: prove
+    role: verify
+    operator: interface.audit
+    readOnly: false
+    # Audit is product-read-only. `readOnly:false` here means it may author its own evidence record;
+    # product source, design, Grammar, assets and captures remain immutable under the op contract.
+    reads: [srs, sds, design, asset, brand, grammar, code, evidence]
+    writes: [evidence]
+    knowledge: [patterns/fe/*, ui/*, grammars/*]
+    checks: [scripts/checks/acceptance.mjs]
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    carries: [work/evidence@1, starci/evidence-packet@1]
+    purpose: Inspect fresh implementation-produced renders against intent, installed Grammar, brand and UI proof rules, then report a bounded repair route or no-actionable-drift without repairing anything.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
   backend.implement:
     family: build
     role: implement
@@ -430,6 +447,40 @@ kinds:
     stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Walk one end-to-end scenario on the running product and leave the scenario and its evidence.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, srs-gap, interface-gap, environment, authority]
+  uat.assisted.prepare:
+    family: prove
+    role: write
+    operator: uat.assisted.prepare
+    readOnly: false
+    # Preparation writes the controlled Playwright package and evidence only; it never executes the
+    # journey, changes product source or writes canonical Work state.
+    reads: [srs, design, asset, brand, code, evidence]
+    writes: [evidence, code]
+    knowledge: [patterns/fe/*, ui/*, grammars/*]
+    checks: [scripts/uat/assisted-runner.mjs]
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/assisted-uat-request.schema.yaml, modules/schemas/assisted-uat-session-manifest.schema.yaml, modules/schemas/assisted-uat-receipt.schema.yaml, modules/schemas/assisted-uat-cleanup.schema.yaml, modules/schemas/assisted-uat-redaction.schema.yaml]
+    carries: [work/uat-flow@1, work/evidence@1, starci/assisted-uat-request@1, starci/assisted-uat-session-manifest@1, starci/assisted-uat-receipt@1, starci/assisted-uat-cleanup@1, starci/assisted-uat-redaction@1]
+    purpose: Freeze genuine human-gated UAT into deterministic, digest-bound scripts and policies without executing it or claiming acceptance.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, srs-gap, interface-gap, environment, authority]
+  uat.assisted.verify:
+    family: prove
+    role: verify
+    operator: uat.assisted.verify
+    readOnly: false
+    # Verification replays no product action. It may write independent verification evidence while
+    # the immutable runner receipt and canonical Work remain unchanged.
+    reads: [srs, design, asset, brand, code, evidence]
+    writes: [evidence]
+    knowledge: [patterns/fe/*, ui/*, grammars/*]
+    checks: [scripts/checks/acceptance.mjs]
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/assisted-uat-request.schema.yaml, modules/schemas/assisted-uat-session-manifest.schema.yaml, modules/schemas/assisted-uat-receipt.schema.yaml, modules/schemas/assisted-uat-verification.schema.yaml]
+    carries: [work/uat-flow@1, work/evidence@1, starci/assisted-uat-receipt@1, starci/assisted-uat-verification@1, starci/evidence-packet@1]
+    purpose: Derive acceptance from one exact immutable assisted-run receipt using current bindings, machine postconditions, evidence integrity, redaction and cleanup; human ok is completion only.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, srs-gap, interface-gap, environment, authority]
@@ -832,6 +883,7 @@ lanes:
       The security and performance proofs exist only for a goal that declares them in its `done` metrics.
     steps:
       - kind: interface.implement
+      - kind: interface.audit
       - kind: uat.verify
       - kind: security.verify
         optionalWhen: goal.requiresSecurity
@@ -909,6 +961,27 @@ lanes:
 # bounds how many times one route may fire for the same node group; past it the workflow asks the user.
 # Ordered: the first matching route wins, and a route with an explicit `from` stands before the `any` one.
 routes:
+  - id: interface-audit-local-drift-repairs-the-interface
+    on: {outcome: failed}
+    from: interface.audit
+    to: {kind: interface.implement, origin: repair}
+    limit: 5
+    then: reopen
+    purpose: A bounded drift against explicit intent and Grammar returns to implementation; that repair must capture the full selected matrix before audit runs again.
+  - id: interface-audit-systemic-drift-redraws-direction
+    on: {blocker: interface-gap}
+    from: interface.audit
+    to: {kind: interface.draw, origin: architecture}
+    limit: 5
+    then: reopen
+    purpose: Missing, contradictory, generic or creatively inadequate direction returns to a more explicit draw, then implementation and fresh-capture audit; the audit never redraws.
+  - id: assisted-uat-red-repairs-the-build
+    on: {outcome: failed}
+    from: uat.assisted.verify
+    to: {kind: interface.implement, origin: repair}
+    limit: 3
+    then: reopen
+    purpose: A current immutable assisted run whose independently reproduced product postcondition is red returns to the frontend build; receipt, runner and verifier never patch the product.
   - id: uat-red-repairs-the-build
     on: {outcome: failed}
     from: uat.verify

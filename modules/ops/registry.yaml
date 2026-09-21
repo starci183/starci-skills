@@ -27,7 +27,7 @@ coarsePhases:
   verify: post-implementation
   release: post-implementation
   operate: cross-cutting
-count: 33
+count: 36
 ops:
   - id: architecture.decide
     family: architecture
@@ -616,6 +616,63 @@ ops:
       rules?\""
     whenNeeded: After interface.draw declares artworkSlots; before or during interface.implement, which
       needs the files bound.
+  - id: interface.audit
+    family: interface
+    goal: Audit selected real interface renders against accepted product intent, the actual installed
+      Grammar, declared brand/assets and applicable UI proof rules; emit reproducible hard-check
+      findings, a calib
+    nodeKinds:
+      - operations
+    completionProfile: operations
+    sideEffects:
+      count: 2
+      summary: authorized navigation, sign-in and non-destructive state setup on the selected verified
+        runtime
+    reads:
+      - target
+      - intent
+      - grammar
+      - knowledge
+      - brand-assets
+      - repo
+      - implementation-captures
+      - environment
+      - identity
+      - previous
+      - workflow
+      - matrix
+      - profile
+    writes:
+      - node
+      - evidence
+      - matrixHandoff
+    route:
+      nodeKinds:
+        - operations
+      phase:
+        - verify
+        - post-implementation
+      intent:
+        - audit
+        - interface-audit
+        - ui-drift
+        - ux-drift
+        - render-drift
+      prerequisites:
+        - interface.implement settled pass with fresh real captures
+        - verified served build
+        - accepted UI direction and installed Grammar binding
+      riskHints:
+        - browser-required
+        - read-only-product-source
+        - grammar-hard-authority
+        - bounded-five-round-loop
+    lifecyclePosition: verify | post-implementation
+    kindInferred: audit
+    businessQuestion: '"Does the selected real interface have actionable render, UX or UI drift, and
+      where must repair resume?"'
+    whenNeeded: After interface.implement and after each routed repair, on the same selected matrix and
+      fresh captures.
   - id: interface.draw
     family: interface
     goal: Establish an image-first interface direction before frontend implementation.
@@ -1283,6 +1340,122 @@ ops:
       collected by the real runner - without claiming any product verdict?"'
     whenNeeded: When a test-gap blocker routes here, or a slice needs authored tests before the verify
       ops can run them.
+  - id: uat.assisted.prepare
+    family: uat
+    goal: Prepare one accepted UAT flow set that contains genuine human-gated checkpoints as an
+      immutable, digest-bound assisted browser session without executing the product journey or
+      claiming acceptance.
+    nodeKinds:
+      - uat.ux
+    completionProfile: uat.ux
+    sideEffects:
+      count: 2
+      summary: write only the selected operation evidence bundle and deterministic Playwright session
+        scripts
+    reads:
+      - target
+      - acceptance
+      - build
+      - environment
+      - browser
+      - automation
+      - authority
+      - workflow
+      - matrix
+      - profile
+    writes:
+      - request
+      - session
+      - playwright
+      - redaction
+      - cleanup
+      - evidence
+      - handoff
+      - matrixHandoff
+    route:
+      nodeKinds:
+        - uat.ux
+      phase:
+        - verify
+        - post-implementation
+      intent:
+        - uat-assisted
+        - prepare
+        - browser
+        - human-gated
+      prerequisites:
+        - request analyzed
+        - accepted UAT flow
+        - verified served build
+        - at least one genuine human gate
+      riskHints:
+        - browser-required
+        - human-checkpoint
+    lifecyclePosition: verify | post-implementation
+    kindInferred: assisted
+    businessQuestion: '"Is this genuinely human-gated UAT scope frozen into a deterministic,
+      digest-bound and safely cleanable browser session without pretending that preparation or a
+      human ok accepted the product?"'
+    whenNeeded: An accepted browser flow has at least one unavoidable or explicitly reserved human
+      action/observation.
+  - id: uat.assisted.verify
+    family: uat
+    goal: Independently verify one controlled human-assisted browser run from exact immutable receipts
+      by reproducing its bindings, machine postconditions, evidence integrity, redaction and cleanup
+      without trea
+    nodeKinds:
+      - uat.ux
+    completionProfile: uat.ux
+    sideEffects:
+      count: 2
+      summary: read-only build, environment, database, API and provider probes declared by the prepared
+        request
+    reads:
+      - target
+      - request
+      - session
+      - scripts
+      - policies
+      - receipt
+      - runArtifacts
+      - build
+      - environment
+      - postconditions
+      - cleanup
+      - workflow
+      - matrix
+      - profile
+    writes:
+      - verification
+      - evidence
+      - handoff
+      - matrixHandoff
+    route:
+      nodeKinds:
+        - uat.ux
+      phase:
+        - verify
+        - post-implementation
+      intent:
+        - uat-assisted
+        - verify
+        - browser
+        - human-gated
+        - receipt
+      prerequisites:
+        - uat.assisted.prepare passed for the exact request/session
+        - immutable controlled-run receipt
+      riskHints:
+        - browser-required
+        - human-checkpoint
+        - evidence-sensitive
+    lifecyclePosition: verify | post-implementation
+    kindInferred: assisted
+    businessQuestion: '"Does this exact human-assisted run still prove the frozen flow on the exact
+      current build/environment, with genuine sanitized evidence, independently reproduced
+      postconditions and verified cleanup?"'
+    whenNeeded: After the controlled runner wrote one immutable receipt for a request prepared by
+      uat.assisted.prepare.
   - id: uat.verify
     family: uat
     goal: Execute the requested sequential UX flows with scoped account/seed setup, real
@@ -1326,6 +1499,7 @@ ops:
         - verify
       prerequisites:
         - implementation done
+        - interface.audit done
         - verified served build
       riskHints:
         - browser-required

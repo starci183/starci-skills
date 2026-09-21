@@ -32,7 +32,30 @@ test('a canonical product landing request remains a feature scope', () => {
   const plan = body(result);
   assert.equal(plan.scopeKind, 'feature-build-with-ui');
   assert.ok(plan.legs.some(leg => leg.op === 'interface.implement'));
+  const ops = plan.legs.map(leg => leg.op);
+  assert.ok(ops.indexOf('interface.implement') < ops.indexOf('interface.audit'));
+  assert.ok(ops.indexOf('interface.audit') < ops.indexOf('uat.verify'));
   assert.ok(!plan.legs.some(leg => leg.op === 'workspace.manage'));
+});
+
+test('assisted UAT preparation is a separate existing-build workflow', () => {
+  const result = run('prepare assisted UAT for the bank approval journey');
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  const plan = body(result);
+  assert.equal(plan.status, 'ok');
+  assert.equal(plan.scopeKind, 'assisted-uat-prepare');
+  assert.deepEqual(plan.legs.map(leg => leg.op), ['request.analyze', 'uat.assisted.prepare']);
+  assert.ok(!plan.legs.some(leg => leg.op === 'interface.implement'));
+});
+
+test('assisted UAT verification consumes the exact prepared package before acceptance', () => {
+  const result = run('verify assisted UAT receipt for the bank approval journey');
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  const plan = body(result);
+  assert.equal(plan.status, 'ok');
+  assert.equal(plan.scopeKind, 'assisted-uat-verify');
+  assert.deepEqual(plan.legs.map(leg => leg.op), ['request.analyze', 'uat.assisted.prepare', 'uat.assisted.verify']);
+  assert.ok(!plan.legs.some(leg => leg.op === 'uat.verify'));
 });
 
 test('an ordinary behavior-invariant refactor retains the Work remap', () => {

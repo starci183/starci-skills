@@ -1,0 +1,163 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:assisted-uat-receipt:1
+type: object
+additionalProperties: false
+required: [schema, receiptId, runId, request, sessionManifest, bindings, runner, startedAt, finishedAt, completionSignal, flows, humanGates, checks, artifacts, postconditions, cleanup, redaction]
+properties:
+  schema: {const: starci/assisted-uat-receipt@1}
+  receiptId: {$ref: '#/$defs/id'}
+  runId: {$ref: '#/$defs/id'}
+  request: {$ref: '#/$defs/fileRef'}
+  sessionManifest: {$ref: '#/$defs/fileRef'}
+  bindings:
+    type: object
+    additionalProperties: false
+    required: [requestDigest, inputDigest, buildDigest, environmentDigest, flowsDigest, scriptsDigest, cleanupPlanDigest, redactionPolicyDigest]
+    properties:
+      requestDigest: {$ref: '#/$defs/digest'}
+      inputDigest: {$ref: '#/$defs/digest'}
+      buildDigest: {$ref: '#/$defs/digest'}
+      environmentDigest: {$ref: '#/$defs/digest'}
+      flowsDigest: {$ref: '#/$defs/digest'}
+      scriptsDigest: {$ref: '#/$defs/digest'}
+      cleanupPlanDigest: {$ref: '#/$defs/digest'}
+      redactionPolicyDigest: {$ref: '#/$defs/digest'}
+  runner:
+    type: object
+    additionalProperties: false
+    required: [name, version, platform, playwrightVersion, browserRevision]
+    properties:
+      name: {const: starci-assisted-uat}
+      version: {$ref: '#/$defs/text'}
+      platform: {$ref: '#/$defs/text'}
+      playwrightVersion: {$ref: '#/$defs/text'}
+      browserRevision: {$ref: '#/$defs/text'}
+  startedAt: {$ref: '#/$defs/timestamp'}
+  finishedAt: {$ref: '#/$defs/timestamp'}
+  completionSignal:
+    type: object
+    additionalProperties: false
+    required: [value, actor, recordedAt, meaning]
+    properties:
+      value: {enum: [ok, fail, cancel]}
+      actor: {$ref: '#/$defs/text'}
+      recordedAt: {$ref: '#/$defs/timestamp'}
+      meaning: {const: execution-finished-not-pass}
+  flows:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, status, steps]
+      properties:
+        id: {$ref: '#/$defs/id'}
+        status: {$ref: '#/$defs/status'}
+        steps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, status, observed, evidenceRefs]
+            properties:
+              id: {$ref: '#/$defs/id'}
+              status: {$ref: '#/$defs/status'}
+              observed: {type: [string, 'null']}
+              evidenceRefs: {$ref: '#/$defs/evidenceRefs'}
+  humanGates:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, status, response, evidenceRefs]
+      properties:
+        id: {$ref: '#/$defs/id'}
+        status: {$ref: '#/$defs/status'}
+        response: {enum: [ok, fail, cancel, not-run]}
+        evidenceRefs: {$ref: '#/$defs/evidenceRefs'}
+  checks:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, command, exitCode, evidenceRefs]
+      properties:
+        id: {$ref: '#/$defs/id'}
+        command: {$ref: '#/$defs/text'}
+        exitCode: {type: integer}
+        evidenceRefs: {$ref: '#/$defs/evidenceRefs'}
+  artifacts:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [path, sha256, mediaType, redacted]
+      properties:
+        path: {$ref: '#/$defs/relativePath'}
+        sha256: {$ref: '#/$defs/digest'}
+        mediaType: {$ref: '#/$defs/text'}
+        redacted: {const: true}
+  postconditions:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, expected, observed, status, evidenceRefs]
+      properties:
+        id: {$ref: '#/$defs/id'}
+        expected: {$ref: '#/$defs/text'}
+        observed: {$ref: '#/$defs/text'}
+        status: {$ref: '#/$defs/status'}
+        evidenceRefs: {$ref: '#/$defs/evidenceRefs'}
+  cleanup:
+    type: object
+    additionalProperties: false
+    required: [attempted, complete, actions, unresolved]
+    properties:
+      attempted: {type: boolean}
+      complete: {type: boolean}
+      actions:
+        type: array
+        items: {$ref: '#/$defs/commandResult'}
+      unresolved:
+        type: array
+        items: {$ref: '#/$defs/text'}
+  redaction:
+    type: object
+    additionalProperties: false
+    required: [applied, complete, failures]
+    properties:
+      applied: {type: boolean}
+      complete: {type: boolean}
+      failures:
+        type: array
+        items: {$ref: '#/$defs/text'}
+$defs:
+  text: {type: string, minLength: 1}
+  id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'}
+  digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+  timestamp: {type: string, format: date-time}
+  status: {enum: [completed, failed, not-run, cancelled, inconclusive]}
+  relativePath:
+    type: string
+    minLength: 1
+    pattern: '^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*\\).+$'
+  evidenceRefs:
+    type: array
+    uniqueItems: true
+    items: {$ref: '#/$defs/relativePath'}
+  fileRef:
+    type: object
+    additionalProperties: false
+    required: [path, sha256]
+    properties:
+      path: {$ref: '#/$defs/relativePath'}
+      sha256: {$ref: '#/$defs/digest'}
+  commandResult:
+    type: object
+    additionalProperties: false
+    required: [id, command, exitCode]
+    properties:
+      id: {$ref: '#/$defs/id'}
+      command: {$ref: '#/$defs/text'}
+      exitCode: {type: integer}
+      evidenceRefs: {$ref: '#/$defs/evidenceRefs'}

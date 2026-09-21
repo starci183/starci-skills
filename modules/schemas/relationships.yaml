@@ -103,6 +103,23 @@ schemaToSchema:
      note: "registry.yaml carries schema: starci/profile-registry@1",
      source: "modules/models/registry.yaml:1"}
 
+  # --- assisted UAT ----------------------------------------------------------
+  - {from: assisted-uat-request, to: assisted-uat-session-manifest, type: prepares,
+     note: "the frozen request selects the exact digest-bound session manifest",
+     source: "modules/ops/ops/uat.assisted.prepare.yaml"}
+  - {from: assisted-uat-session-manifest, to: assisted-uat-receipt, type: emits,
+     note: "the controlled runner writes one immutable receipt at the manifest's exact template",
+     source: "scripts/uat/assisted-runner.mjs"}
+  - {from: assisted-uat-request, to: assisted-uat-cleanup, type: consumes,
+     note: "cleanup actions and read-back probes are frozen before execution",
+     source: "modules/ops/ops/uat.assisted.prepare.yaml"}
+  - {from: assisted-uat-request, to: assisted-uat-redaction, type: consumes,
+     note: "redaction rules and inspections are frozen before evidence capture",
+     source: "modules/ops/ops/uat.assisted.prepare.yaml"}
+  - {from: assisted-uat-verification, to: assisted-uat-receipt, type: verifies,
+     note: "verification selects one exact receipt and derives pass independently; human ok is completion only",
+     source: "modules/ops/ops/uat.assisted.verify.yaml"}
+
   # --- knowledge --------------------------------------------------------------
   - {from: code-example-catalog, to: code-example-manifest, type: delegates,
      note: "catalog lists examples; each example's detail is a code-example@1 manifest",
@@ -142,8 +159,10 @@ schemaToSubsystem:
     note: "modules/schemas/spec/*.schema.yaml — umbrella contract + split-section maps + two compat monoliths; executables live in scripts/checks/spec/."
 
   gate:             # executable checks / verification reports
-    schemas: [source-staleness, code-pattern-profile, code-pattern-check, profiles]
-    note: "report shapes + the per-kind proof ceiling; nonzero findings never authorize writes."
+    schemas: [source-staleness, code-pattern-profile, code-pattern-check, profiles,
+              assisted-uat-request, assisted-uat-session-manifest, assisted-uat-cleanup,
+              assisted-uat-redaction, assisted-uat-receipt, assisted-uat-verification]
+    note: "report shapes + the per-kind proof ceiling + immutable assisted-UAT package; nonzero findings never authorize writes."
 
   routing:          # host/workspace/source resolution
     schemas: [workspace-routing]

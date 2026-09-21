@@ -153,6 +153,19 @@ LOOP:
     api check (results recorded) → api settle (enforces the consumed report,
     releases the worker; verify evidence BYTES — an op's last words are never
     proof) → retry/escalate on fail|blocked.
+  - Interface quality loop: `interface.draw → interface.implement → fresh
+    capture → interface.audit`. Audit only inspects. Local drift returns to
+    implementation; systemic/unclear/creatively inadequate direction returns
+    to a more explicit draw, then implementation. Count both paths in one
+    five-round audit budget, require immediate lineage and a fresh complete
+    route×state×viewport×theme matrix after every repair, and never enqueue
+    audit round 6.
+  - Assisted UAT: third-party does not automatically mean manual. Only a
+    genuine declared human checkpoint selects `uat.assisted.prepare`, the
+    user-facing `run-assisted-uat` session and `uat.assisted.verify`. Human
+    `ok` is execution-finished, never pass; current machine postconditions,
+    artifact integrity, redaction and cleanup derive the verdict. These stages
+    never mark canonical Work done; final reconciliation does.
   - Fan-out: run independent ops in parallel up to runtime-pool capacity; never two ops
     whose normalized concrete owned_paths intersect by equality or ancestor/
     descendant prefix. Admission is only that intersection plus durable

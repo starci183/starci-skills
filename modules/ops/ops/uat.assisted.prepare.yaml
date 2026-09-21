@@ -1,0 +1,342 @@
+# modules/ops/ops/uat.assisted.prepare.yaml
+# The operator contract is the authority; the trailing business block is analysis.
+
+id: uat.assisted.prepare
+goal:
+  en: Prepare one accepted UAT flow set that contains genuine human-gated checkpoints as an immutable,
+    digest-bound assisted browser session without executing the product journey or claiming acceptance.
+nodeKinds:
+  - uat.ux
+completionProfile: uat.ux
+sideEffects:
+  - write only the selected operation evidence bundle and deterministic Playwright session scripts
+  - launch a temporary browser readiness probe that performs no product action and retains no authenticated profile
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+canonicalWorkPolicy:
+  targetState: todo
+  nodeWrites: forbidden
+  completion: final-reconciliation-only
+  runtimeSqliteWrites: forbidden
+reads:
+  - id: target
+    path: .starciwork/features/<feature>/uat/<flow>/index.yaml
+    purpose:
+      en: Read the existing selected work/uat-flow@1 records, their accepted steps, assertions, refs,
+        accounts, fixtures, effects and cleanup obligations. The target remains state todo. This operation
+        neither creates a missing flow nor writes state, completion, evidence pointers or blockers.
+  - id: acceptance
+    path: selected target refs to current SRS, SDS, UI and implementation records
+    purpose:
+      en: Read only the accepted behavior, actor, entry, negative cases, observable feedback and postconditions
+        the selected UAT records bind. Current code and locator convenience never redefine an expectation.
+  - id: build
+    path: repository:<repo-id>/<bound-paths> + selected served-build identity
+    purpose:
+      en: Resolve exact repository roots, revisions, dirty state, artifact or served-build identity and the
+        deterministic command that identifies what the human-assisted run will exercise. A mutable branch
+        name, friendly environment label or current browser page is not a build binding.
+  - id: environment
+    path: .starciwork/_resources/environments/<environment>/resource.yaml + live read-only identity probes
+    purpose:
+      en: Resolve the exact environment resource, revision, origins, owner, allowed effects and live identity.
+        Compute a digest from the selected declaration and observed immutable identity; never infer it from a
+        hostname or allow a later environment to stand in for the prepared one.
+  - id: browser
+    path: docs/browser-testing.md + repository:<repo-id>/<playwright-manifest-and-lockfile>
+    purpose:
+      en: Inspect the project's locked Playwright dependency, local runner, browser installation and existing
+        test conventions. Reuse them. Readiness requires an actual Chromium launch against the intended target,
+        a finalized screenshot and short playable video; package installation alone is not readiness.
+  - id: automation
+    path: repository:<repo-id>/<existing-browser-suite-and-page-objects>
+    purpose:
+      en: Inspect stable role/test-id locators, authentication/session setup, fixture ownership, deterministic
+        clock/locale/network conventions and artifact finalization. Existing automation is an input, not
+        authority to change accepted flow steps or to mark an automatable step human-gated.
+  - id: authority
+    path: selected request authority + target effects + environment allowedEffects
+    purpose:
+      en: Bind every setup, product action, paid provider call and cleanup effect to the accepted flow. Preparation
+        grants no new effect and performs none of them. The later runner may execute only effects already named
+        here and within declared retry, timeout and spend limits.
+  - id: workflow
+    path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
+    purpose:
+      en: When dispatched, read the exact operation request, owned paths and standard starci/op-report@1 filing
+        contract. Canonical report ingestion is api report for the current job; no operation writes
+        .starciwork/runtime.sqlite directly.
+  - id: matrix
+    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
+    purpose:
+      en: Only when selected in a job matrix, read the exact cell, immutable inputs, required criteria and output
+        shape. The matrix does not authorize a flow, checkpoint or effect absent from the selected request.
+  - id: profile
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve available tools without switching runtime, spawning another operation or treating a model's
+        ability to click as proof that a checkpoint is safe to automate.
+writes:
+  - id: request
+    path: E/assisted-uat/request.yaml
+    fields:
+      - schema
+      - requestId
+      - nodeId
+      - preparedAt
+      - bindings
+      - build
+      - environment
+      - flows
+      - humanGates
+      - scripts
+      - sessionManifest
+      - redaction
+      - cleanup
+      - receipt
+      - limits
+    content:
+      en: Write one starci/assisted-uat-request@1 document. bindings contains sha256 inputDigest, buildDigest,
+        environmentDigest and flowsDigest. flows preserves accepted flow and step order with IDs, actor, entry,
+        actions, expected observations, machine-verifiable postconditions and evidence requirements. humanGates
+        is a finite list of actual gates, each with id, flowId, afterStepId, class, reason, prompt,
+        responseSchema and evidenceRequired. The only classes are secret-entry, anti-automation-challenge,
+        cross-device-action, subjective-observation and reserved-manual-action. A third-party API, provider,
+        remote browser or external resource is not a human gate unless progress actually requires a human action
+        or observation. scripts records flowId, path, sha256, command and cwd. redaction and cleanup bind their
+        exact path and sha256. receipt fixes schema starci/assisted-uat-receipt@1, a run-id path template and
+        immutable true. No pass field or owner approval is written.
+  - id: session
+    path: E/assisted-uat/session-manifest.yaml
+    fields:
+      - schema
+      - sessionId
+      - request
+      - bindings
+      - playwright
+      - launch
+      - scripts
+      - humanGateIds
+      - artifacts
+      - receipt
+    content:
+      en: Write one starci/assisted-uat-session-manifest@1 document after request.yaml is final. request carries
+        its exact path and sha256. bindings records that same value as requestDigest, repeats inputDigest,
+        buildDigest, environmentDigest and flowsDigest, and adds scriptsDigest, cleanupPlanDigest and
+        redactionPolicyDigest. Record actual Playwright version,
+        browser and revision, an argv-safe launch command/cwd/environment variable names without values, ordered
+        script hashes, ordered humanGateIds, required artifact/media policy and the write-once receipt template.
+  - id: playwright
+    path: E/assisted-uat/playwright/<flow-id>.spec.ts
+    fields:
+      - deterministic Playwright source
+    content:
+      en: Generate one deterministic script per accepted flow in request order. Pin stable locators, actor/session
+        boundaries, timeouts, retry ceiling, evidence checkpoints and the exact human gate IDs. Pause only at a
+        declared gate and resume only with a response valid for that gate's responseSchema. Do not use arbitrary
+        sleeps, broad text guesses, hidden API writes for UI actions, fallback to another build/environment,
+        embedded credentials or a generic human ok as an assertion. These scripts are operation evidence, not
+        product source and not automatic uat.verify scenarios.
+  - id: redaction
+    path: E/assisted-uat/redaction.yaml
+    fields:
+      - schema
+      - sensitiveSources
+      - prohibitedContent
+      - captureRules
+      - inspection
+      - failurePolicy
+    content:
+      en: Write the exact capture and sanitization policy before the run. Exclude credentials, cookies, tokens,
+        secret-entry values, unrelated personal data and sensitive screen regions from logs/media. Require final
+        human-visible media inspection plus machine hash/magic/playability checks; redaction failure prevents a
+        receipt from being accepted and never authorizes silent deletion of failure evidence.
+  - id: cleanup
+    path: E/assisted-uat/cleanup.yaml
+    fields:
+      - schema
+      - ownership
+      - actions
+      - order
+      - verification
+      - resume
+    content:
+      en: Write an idempotent finally-style plan for the exact selected effects before the first later mutation.
+        Every action names its real owner, run-owned identifier source, precondition, command or supported API,
+        dependency order, expected absence/restoration read-back and nonzero failure behavior. Preserve shared or
+        reused resources, never delete by broad prefix/age and never mistake local metadata removal for provider
+        cleanup. The runner records actual IDs; preparation never invents them.
+  - id: evidence
+    path: E/manifest.yaml + E/assisted-uat/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - codeRefs
+      - extensions
+    content:
+      en: Retain request/session/script/policy paths and hashes, browser readiness output and any preparation
+        blockers. A passed preparation means only that an exact controlled session is ready. It is not execution,
+        UAT acceptance, a human decision or canonical Work completion.
+  - id: handoff
+    path: E/response.json
+    fields: [schema, requestId, requestDigest, op, step, slot, runId, workflow, status, criteria, outputs, artifacts]
+    content:
+      en: For a selected named workflow, emit the standard response with prepared request/session paths and
+        digests. File the enclosing starci/op-report@1 through api report for the current job, then signal. Never
+        write ledger SQL or treat the response as a receipt from an execution that has not happened.
+  - id: matrixHandoff
+    path: E/job-result.json
+    fields: [requestId, requestDigest, op, operation when selected, status, criteria, outputs, artifacts]
+    content:
+      en: Only for a selected matrix, return exact prepared artifact references and hashes. Missing readiness or
+        a material binding remains failed or blocked; no fabricated receipt/output advances another cell.
+steps:
+  - reads: [target, acceptance, authority]
+    writes: [request]
+    action:
+      en: Freeze the selected accepted flow and classify only checkpoints that truly require a human. Give every
+        gate one declared class, reason, structured response and evidence requirement. Keep automatable UI steps
+        automated. A flow with no genuine human gate belongs to uat.verify and is rejected from this operation;
+        the mere presence of a third party, CAPTCHA-capable provider or remote system is insufficient.
+  - reads: [build, environment, target, acceptance]
+    writes: [request]
+    action:
+      en: Resolve exact current Work input, build, environment and ordered-flow bytes and compute their sha256
+        digests. Record served identity and dirty state honestly. Stop on an unresolved or mutable identity;
+        never prepare against one revision and label another as equivalent.
+  - reads: [browser, automation, build, environment]
+    writes: [playwright, evidence]
+    action:
+      en: >-
+        Reuse the locked project Playwright runner and generate deterministic scripts. Run only the documented
+        readiness probe: launch Chromium, open the intended target without executing a selected journey, capture
+        a screenshot and short video, finalize them and verify readability. No authenticated profile or probe
+        artifact containing secrets is retained.
+  - reads: [authority, target, environment]
+    writes: [redaction, cleanup]
+    action:
+      en: Finalize redaction and cleanup policy from actual effect owners before any later run. Verify each cleanup
+        mechanism has exact-ID input, a dry/read-only inspection path and a post-cleanup read-back. Missing safe
+        cleanup blocks preparation even if every journey step is otherwise executable.
+  - reads: [request, browser, automation]
+    writes: [session, evidence]
+    action:
+      en: Hash finalized scripts and policies, then finalize request.yaml and hash its exact bytes into the session
+        manifest. Bind the manifest to those hashes, actual browser revision, launch argv, required artifacts and
+        write-once receipt path. Re-read every referenced file and recompute requestDigest and all other digests;
+        no latest-run lookup,
+        wildcard script discovery or mutable branch resolution is permitted.
+  - reads: [workflow, matrix]
+    writes: [evidence, handoff, matrixHandoff]
+    action:
+      en: Run the applicable validators and report preparation only. Keep the canonical UAT records todo and
+        unchanged. Through the standard op report, return exact prepared paths and hashes for the controlled
+        runner; never wait for the human run inside this operation and never self-dispatch verification.
+proofs:
+  - id: human-gate-classification
+    requirement:
+      en: Every declared gate blocks on an actual human action or observation, has one allowed class and structured
+        response, and every ordinary third-party interaction remains an automated step. At least one gate exists.
+  - id: immutable-bindings
+    requirement:
+      en: Exact request, input, build, environment, flow, script, cleanup and redaction bytes are sha256-bound through the
+        finalized request and session manifest, with no latest/branch/hostname alias standing in for identity.
+  - id: deterministic-scripts
+    requirement:
+      en: One ordered script per flow uses the selected local Playwright version, stable locators and bounded
+        timeouts/retries, pauses only on declared gate IDs and contains no credential, generic ok assertion,
+        arbitrary sleep or hidden product action.
+  - id: browser-readiness
+    requirement:
+      en: Chromium actually launched against the intended target and finalized a readable screenshot and playable
+        video in a non-journey probe; package presence alone is not proof.
+  - id: safe-session
+    requirement:
+      en: Redaction and exact-ID idempotent cleanup are complete before execution, required artifacts are declared,
+        and the receipt path is write-once under one run ID.
+  - id: no-acceptance
+    requirement:
+      en: No product journey, setup effect or cleanup effect ran; no receipt/pass was invented; canonical Work
+        remains todo without a completion write, and runtime.sqlite was touched only through canonical APIs.
+blockers:
+  - code: NO_HUMAN_GATE
+    condition:
+      en: The selected flow contains no checkpoint that actually requires a human; use automatic uat.verify.
+  - code: ASSISTED_FLOW_INCOMPLETE
+    condition:
+      en: Accepted flow, expected result, gate placement/response, postcondition or evidence requirement is missing
+        or ambiguous and cannot be inferred from current implementation.
+  - code: BINDING_UNSTABLE
+    condition:
+      en: Exact Work input, build, environment or ordered-flow identity cannot be resolved to stable current bytes.
+  - code: BROWSER_UNREADY
+    condition:
+      en: The locked project Playwright/browser pair cannot complete the real screenshot/video readiness probe.
+  - code: CLEANUP_UNSAFE
+    condition:
+      en: A selected effect lacks exact ownership, idempotent cleanup, bounded resume or actual absence read-back.
+  - code: REDACTION_UNSAFE
+    condition:
+      en: Required evidence cannot be captured and inspected without retaining a secret or unrelated personal data.
+  - code: ACTION_OUTSIDE_SCOPE
+    condition:
+      en: A planned action, provider call, setup/cleanup effect, retry or spend exceeds selected authority.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done or a required selected input is missing; never weaken the
+        graph, invent acceptance or run a predecessor to proceed.
+placeholders:
+  feature: Selected feature slug
+  flow: Selected UAT flow slug
+  flow-id: Stable accepted flow ID rendered to a safe deterministic filename
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  environment: Resolved environment resource slug
+  playwright-manifest-and-lockfile: Actual package manifest and lockfile that pin Playwright
+  existing-browser-suite-and-page-objects: Existing project browser automation input paths
+assistedUatPreparePolicy:
+  minimumHumanGates: 1
+  thirdPartyIsGate: false
+  executesJourney: false
+  requestSchema: starci/assisted-uat-request@1
+  sessionSchema: starci/assisted-uat-session-manifest@1
+  receiptSchema: starci/assisted-uat-receipt@1
+  receiptWrite: runner-write-once
+  workState: todo-until-final-reconciliation
+  reportIngestion: starci-op-report-via-kernel-api
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+
+business:
+  question: >-
+    "Is this genuinely human-gated UAT scope frozen into a deterministic, digest-bound and safely cleanable
+    browser session without pretending that preparation or a human ok accepted the product?"
+  whenNeeded:
+    - An accepted browser flow has at least one unavoidable or explicitly reserved human action/observation.
+  whenNot:
+    - Fully automatable UAT remains uat.verify; third-party involvement alone never selects assisted UAT.
+    - Preparation never runs the journey, settles acceptance, updates Work completion or writes the ledger directly.
+  consumes:
+    - Existing UAT records, accepted requirements/design, exact build/environment, locked Playwright runner and effect authority.
+  produces:
+    - Digest-bound request/session, deterministic scripts, redaction/cleanup policies and readiness evidence.
+  failureModes:
+    - NO_HUMAN_GATE, ASSISTED_FLOW_INCOMPLETE, BINDING_UNSTABLE, BROWSER_UNREADY, CLEANUP_UNSAFE, REDACTION_UNSAFE, ACTION_OUTSIDE_SCOPE and DECLARED_DEPENDENCY_UNMET.
+route:
+  nodeKinds: [uat.ux]
+  phase: [verify, post-implementation]
+  intent: [uat-assisted, prepare, browser, human-gated]
+  prerequisites: ["request analyzed", "accepted UAT flow", "verified served build", "at least one genuine human gate"]
+  riskHints: [browser-required, human-checkpoint]

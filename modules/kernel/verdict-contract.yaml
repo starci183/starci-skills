@@ -128,6 +128,11 @@ returns:
       - identity-wrong          -> provision.ask ALWAYS; the driver never
         self-decides (identity-changing revisions are rejected;
         amendments bind baseGoalIdentity — modules/ops/ops/goal.revise.yaml).
+      For interface.audit, violating an existing explicit Grammar/direction is
+      failed bounded implementation drift; missing, contradictory or
+      systemically inadequate direction is blocked interface-gap. The Kernel
+      follows that typed distinction, requires fresh implementation-produced
+      captures and shares one five-round budget across both repair routes.
     neverQuietly: >-
       The suspicion is reported, not patched: the op's allowlist does not
       cover the record it doubts, so it cannot and may not edit it

@@ -1,0 +1,99 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:assisted-uat-session-manifest:1
+type: object
+additionalProperties: false
+required: [schema, sessionId, request, bindings, playwright, launch, scripts, humanGateIds, artifacts, receipt]
+properties:
+  schema: {const: starci/assisted-uat-session-manifest@1}
+  sessionId: {$ref: '#/$defs/id'}
+  request: {$ref: '#/$defs/fileRef'}
+  bindings:
+    type: object
+    additionalProperties: false
+    required: [requestDigest, inputDigest, buildDigest, environmentDigest, flowsDigest, scriptsDigest, cleanupPlanDigest, redactionPolicyDigest]
+    properties:
+      requestDigest: {$ref: '#/$defs/digest'}
+      inputDigest: {$ref: '#/$defs/digest'}
+      buildDigest: {$ref: '#/$defs/digest'}
+      environmentDigest: {$ref: '#/$defs/digest'}
+      flowsDigest: {$ref: '#/$defs/digest'}
+      scriptsDigest: {$ref: '#/$defs/digest'}
+      cleanupPlanDigest: {$ref: '#/$defs/digest'}
+      redactionPolicyDigest: {$ref: '#/$defs/digest'}
+  playwright:
+    type: object
+    additionalProperties: false
+    required: [version, browser, revision]
+    properties:
+      version: {$ref: '#/$defs/text'}
+      browser: {enum: [chromium, chrome]}
+      revision: {$ref: '#/$defs/text'}
+  launch:
+    type: object
+    additionalProperties: false
+    required: [command, cwd, envNames]
+    properties:
+      command: {$ref: '#/$defs/command'}
+      cwd: {$ref: '#/$defs/text'}
+      envNames:
+        type: array
+        uniqueItems: true
+        items: {type: string, pattern: '^[A-Za-z_][A-Za-z0-9_]*$'}
+  scripts:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [flowId, path, sha256]
+      properties:
+        flowId: {$ref: '#/$defs/id'}
+        path: {$ref: '#/$defs/relativePath'}
+        sha256: {$ref: '#/$defs/digest'}
+  humanGateIds:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: {$ref: '#/$defs/id'}
+  artifacts:
+    type: object
+    additionalProperties: false
+    required: [runDirTemplate, requiredMedia, hash]
+    properties:
+      runDirTemplate: {$ref: '#/$defs/templatePath'}
+      requiredMedia:
+        type: array
+        uniqueItems: true
+        items: {$ref: '#/$defs/text'}
+      hash: {const: sha256}
+  receipt:
+    type: object
+    additionalProperties: false
+    required: [schema, pathTemplate, writeOnce]
+    properties:
+      schema: {const: starci/assisted-uat-receipt@1}
+      pathTemplate: {$ref: '#/$defs/templatePath'}
+      writeOnce: {const: true}
+$defs:
+  text: {type: string, minLength: 1}
+  id: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'}
+  digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+  relativePath:
+    type: string
+    minLength: 1
+    pattern: '^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*\\).+$'
+  templatePath:
+    type: string
+    minLength: 1
+    pattern: '^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*\\).*\{runId\}.*$'
+  command:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+  fileRef:
+    type: object
+    additionalProperties: false
+    required: [path, sha256]
+    properties:
+      path: {$ref: '#/$defs/relativePath'}
+      sha256: {$ref: '#/$defs/digest'}
