@@ -31,12 +31,18 @@ const fixture=t=>{
   return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-'));dirs.push(dir);return dir;}};
 };
 
-/** One workflow + one queued op job, seeded through the ledger API then closed. */
+/** One workflow + one dispatched op job (running + contract-bound dispatch, the
+ * state `api report`/`settle` require), seeded through the ledger then closed. */
 const seedJob=(repo,jobId)=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId,workflowId:'wf-verdict',opId:'ex-test.probe',kind:'op',
-      payload:{opId:'ex-test.probe',owned_paths:['docs/']}});
+    const wf='wf-verdict',dispatchId=`ctx-${jobId}`;
+    ledger.ensureWorkflow({workflowId:wf,title:'verdict fixture'});
+    const at=Date.now();
+    ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'running',?,?,?)")
+      .run(jobId,wf,'ex-test.probe',JSON.stringify({opId:'ex-test.probe',owned_paths:['docs/'],orca:{dispatchId,agentTerminalHandle:`term-${jobId}`}}),`term-${jobId}`,at,at);
+    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
+      .run(wf,'ex-test.probe',1,dispatchId,'# contract','{}',at);
   }finally{ledger.close();}
 };
 const jobStatus=(repo,jobId)=>{
@@ -77,7 +83,7 @@ test('settle rejects a garbage verdict with exit!=0 and leaves the job untouched
   seedJob(repo,jobId);
   const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict','maybe','--report',reportFile(repo),'--json');
   assert.notEqual(r.status,0,`a verdict outside pass|fail|blocked must be refused, got exit ${r.status}: ${r.stdout}`);
-  assert.equal(jobStatus(repo,jobId),'queued','a rejected verdict must not settle the job');
+  assert.equal(jobStatus(repo,jobId),'running','a rejected verdict must not settle the job');
 });
 
 test('settle refuses a missing report file with exit!=0',t=>{
@@ -85,5 +91,5 @@ test('settle refuses a missing report file with exit!=0',t=>{
   seedJob(repo,jobId);
   const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--report',path.join(repo,'absent.json'),'--json');
   assert.notEqual(r.status,0,'a verdict without its evidence report is not a settle');
-  assert.equal(jobStatus(repo,jobId),'queued');
+  assert.equal(jobStatus(repo,jobId),'running');
 });

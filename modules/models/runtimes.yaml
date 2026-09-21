@@ -89,6 +89,7 @@ runtimes:
   codex-agent:
     target: codex-agent
     provider: codex
+    provides: [imagegen]
     roles: [implement, verify, write, decide, plan]
     maxParallel: 10
     models:
@@ -188,3 +189,10 @@ roleOfKind:
   work.author: plan
   implementation.plan: plan
   workspace.manage: plan
+# Hard capability gates per kind, checked inside poolRejectionReasons before a
+# pool can be selected — a declared `provides` entry on the pool is the only
+# proof; tier chain membership and owner prefer-bias can never hoist a pool
+# past a capability it does not provide.
+kindRequires:
+  interface.draw: [imagegen]
+  interface.asset: [imagegen]

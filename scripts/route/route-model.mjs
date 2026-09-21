@@ -354,6 +354,10 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
       base.capacityDrift = `profile pins maxParallel ${pc}; runtimes.yaml declares ${rt.maxParallel} (runtimes.yaml wins)`;
     if (w.role && rt.roles?.length && !rt.roles.includes(w.role))
       return { ...base, status: 'rejected', structural: true, reasons: [`pool does not serve role '${w.role}'`] };
+    const caps = runtimes?.kindRequires?.[w.kind] ?? [];
+    const missingCaps = caps.filter(c => !(rt.provides ?? []).includes(c));
+    if (missingCaps.length)
+      return { ...base, status: 'rejected', structural: true, reasons: missingCaps.map(c => `pool lacks capability '${c}' required by kind '${w.kind}'`) };
     if (lm.error)
       return { ...base, status: 'rejected', structural: true, reasons: [lm.error] };
     const evidence = evidenceByRuntime[id];

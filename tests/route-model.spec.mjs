@@ -70,6 +70,23 @@ test('--kind model.manageWorkflow --risk high resolves or fails typed, never sil
   }
 });
 
+test('kindRequires capability gate: interface.draw cannot be hoisted onto a pool without imagegen',t=>{
+  // regression: prefer devin-agent hoisted devin ahead of codex on
+  // interface.draw, whose contract requires built-in image_gen.imagegen that
+  // only the codex pool provides — one burned dispatch. kindRequires makes the
+  // rejection structural and named.
+  const ownerRoot=fixture(t).dir();
+  const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','devin-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
+  assert.equal(r.status,0,r.stderr||r.error?.message);
+  const body=out(r);
+  assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
+  const devin=(body.candidates??[]).find(c=>c.target==='devin-agent'||c.id==='devin-agent');
+  assert.ok(devin,'devin-agent must appear in the walked chain');
+  assert.equal(devin.status,'rejected');
+  assert.ok((devin.reasons??[]).some(x=>/imagegen/.test(x)),`devin rejection must name the imagegen capability, got ${JSON.stringify(devin.reasons)}`);
+  assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a devin prefer');
+});
+
 test('--plan writes nothing to the working directory',t=>{
   const dir=fixture(t).dir();
   const before=fs.readdirSync(dir);

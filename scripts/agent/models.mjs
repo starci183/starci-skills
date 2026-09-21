@@ -108,11 +108,15 @@ export function applyBias(chain, bias) {
 // capacity map is caller-supplied live state: capacity[target] =
 // {auth, quota:{state}, running, openIncident}; an absent entry means "no
 // live signal" and passes the capacity gates (unknown is OK — dead is not).
-function poolRejectionReasons({ pool, target, role, difficulty, capacity, runtimes }) {
+function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, runtimes }) {
   const reasons = [];
   if (!pool) return [`no runtimes.yaml entry for pool '${target}'`];
   if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role))
     reasons.push(`pool does not serve role '${role}'`);
+  for (const cap of runtimes?.kindRequires?.[kind] ?? []) {
+    if (!(pool.provides ?? []).includes(cap))
+      reasons.push(`pool lacks capability '${cap}' required by kind '${kind}'`);
+  }
   const lm = resolveLaunchModel(target, difficulty, { runtimes });
   if (lm.error) reasons.push(lm.error);
   const cap = capacity?.[target];
@@ -144,7 +148,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const rejected = [];
   for (const target of chain) {
     const pool = rt?.runtimes?.[target] ?? null;
-    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, difficulty: d, capacity, runtimes: rt });
+    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, runtimes: rt });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
     return { target: pool.target ?? target, modelId, effort, role: resolvedRole, difficulty: d, chain, tierSource, rejected };
