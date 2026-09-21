@@ -283,12 +283,36 @@ test('api check rejects scalar and double-encoded payloads before recording evid
     assert.equal(checkRows(fx).length,0,'a refused check payload must not mutate the checks row');
   }
 
+  dispatchRunning(fx,jobId);
+  fileReport(fx,jobId,{outcome:'done',name:'check-shape-report.json'});
   const accepted=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(valid),'--json');
   assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
   const body=JSON.parse(accepted.stdout);
   assert.equal(body.checks,1);
   assert.deepEqual(body.checkEvidence,{observed:1,passed:1,failed:0,green:true});
   assert.deepEqual(JSON.parse(checkRows(fx)[0].checks_json),valid);
+});
+
+test('queued jobs cannot self-file reports, record green checks, or settle pass without an operation dispatch',{skip:skipFor(['report','check','consumeWrite'])},t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-undispatched-claim');
+  const report=writeEnvelope(fx,{outcome:'done',name:'undispatched-report.json'});
+  const checks=JSON.stringify(checkEnvelope({name:'validator',command:'starci validate',exitCode:0,evidence:'green'}));
+
+  const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
+  assert.notEqual(filed.status,0,'a queued job must not impersonate its missing Op worker');
+  assert.match(`${filed.stderr}${filed.stdout}`,/report-job-not-active/);
+  assert.equal(reportRows(fx).length,0,'a refused queued report must not create a report row');
+
+  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',checks,'--json');
+  assert.notEqual(checked.status,0,'Kernel checks cannot manufacture a worker report boundary');
+  assert.match(`${checked.stderr}${checked.stdout}`,/report-job-not-active/);
+  assert.equal(checkRows(fx).length,0,'a refused queued check must not create check evidence');
+
+  const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
+  assert.notEqual(settled.status,0,'an undispatched queued job cannot settle pass');
+  assert.match(`${settled.stderr}${settled.stdout}`,/report-job-not-active/);
+  assert.equal(jobRow(fx,jobId)?.status,'queued');
 });
 
 /* ------------------------------------------------------ settle integrates */

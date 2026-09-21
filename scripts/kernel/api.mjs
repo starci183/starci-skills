@@ -1728,6 +1728,7 @@ function cmdSettle(ledger, args, repo) {
     if (SETTLED.includes(job.status) && job.status !== 'effect_unknown') {
       throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
     }
+    if (verdict === 'pass') requireDispatchedReportBinding(db, job);
     const payload = jobPayloadOf(job);
     payload.verdict = verdict;
     payload.report = reportAbs;
@@ -1953,6 +1954,30 @@ const reportDispatchIdOf = (job) => {
   const payload = jobPayloadOf(job);
   return payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? job.worker_id ?? job.job_id;
 };
+const REPORTABLE_JOB_STATUSES = new Set(['running', 'answering', 'effect_unknown']);
+const explicitReportDispatchIdOf = (job) => {
+  const payload = jobPayloadOf(job);
+  return payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? null;
+};
+const requireDispatchedReportBinding = (db, job) => {
+  if (!REPORTABLE_JOB_STATUSES.has(job.status)) {
+    throw Object.assign(new Error(`job ${job.job_id} cannot file or verify a worker report while ${job.status}`), {
+      code: 'report-job-not-active', status: job.status,
+    });
+  }
+  const dispatchId = explicitReportDispatchIdOf(job);
+  if (!dispatchId) {
+    throw Object.assign(new Error(`job ${job.job_id} has no bound operation dispatch`), { code: 'report-dispatch-unbound' });
+  }
+  const contract = db.prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+    .get(job.workflow_id, jobOpOf(job), job.attempt);
+  if (!contract || contract.dispatch_id !== dispatchId) {
+    throw Object.assign(new Error(`job ${job.job_id} has no contract bound to dispatch ${dispatchId}`), {
+      code: 'report-contract-unbound', dispatchId,
+    });
+  }
+  return dispatchId;
+};
 const parseAttempt = (v) => {
   if (v == null) return null;
   const n = Number(v);
@@ -1976,6 +2001,7 @@ const reportIdentityOf = (job) => {
 function cmdReport(ledger, args, repo) {
   const db = ledger.db, job = resolveJob(db, args.job);
   const jobPayload = jobPayloadOf(job);
+  requireDispatchedReportBinding(db, job);
   const reportAbs = [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p));
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
   const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
@@ -2050,6 +2076,19 @@ function cmdCheck(ledger, args, repo) {
   const parsed = parseJson(raw);
   if (!isCheckResultEnvelope(parsed)) {
     throw Object.assign(new Error('checks payload must be an object with a non-empty checks[] of {name, exitCode, command?, evidence?} entries'), { code: 'checks-invalid' });
+  }
+  if (attempt !== job.attempt) {
+    throw Object.assign(new Error(`checks attempt ${attempt} does not match job ${job.job_id} attempt ${job.attempt}`), {
+      code: 'checks-attempt-mismatch', attempt, jobAttempt: job.attempt,
+    });
+  }
+  const dispatchId = requireDispatchedReportBinding(db, job);
+  const reportRow = db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=? AND dispatch_id=?')
+    .get(job.workflow_id, dispatchId);
+  if (!reportRow) {
+    throw Object.assign(new Error(`job ${job.job_id} has no filed worker report for dispatch ${dispatchId}`), {
+      code: 'checks-report-missing', dispatchId,
+    });
   }
   const checkEvidence = summarizeCheckEvidence(parsed);
   ledger.transaction(() => {
