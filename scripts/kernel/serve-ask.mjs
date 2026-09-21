@@ -322,7 +322,7 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
   }).join('\n');
   const varRows = fields.vars.map((v) => `<label><code>${esc(v)}</code></label>
       <input type="${fields.isSecret(v) ? 'password' : 'text'}" name="env:${esc(v)}" autocomplete="off" ${readonly ? 'disabled' : ''}>`).join('\n');
-  const options = (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" ${readonly ? 'disabled' : ''}> ${esc(o)}</label>`).join('\n');
+  const options = (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" required ${readonly ? 'disabled' : ''}> ${esc(o)}</label>`).join('\n');
   // A selection ask declares each pick dimension in question.picks — one
   // required radio group per {id, label, choices}, never free-text picks.
   // When picks are not declared, derive groups from the draw naming
