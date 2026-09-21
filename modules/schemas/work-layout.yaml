@@ -48,7 +48,11 @@ shape:
     `work/business-rule@1.module`, and `work/sds-component@1.owners[].path` above) is the directory a reader
     would call the module's root - `src/modules/domain/task`, not
     `src/modules/domain/task/ownership.guard.ts` - so a file inside it moving during a refactor is not, by
-    itself, a broken reference. A done implementation's every owner directory must exist on disk
+    itself, a broken reference. An owner path resolves against the repository the record's `repository`
+    field names (the backend repository when the field is absent); to point at a sibling repository bound
+    in workspace.yaml, prefix the path `repository:<repo-name>/` - `repository:nivo-fe/apps/landing` -
+    the same convention implementation `files[]` and job `owned_paths` already carry. A done
+    implementation's every owner directory must exist on disk
     (OWNER_PATH_MISSING otherwise refuses it); a todo one is warned, not refused. A done implementation
     whose `proves` names a record that is not itself `state: done` is refused (PROVES_TARGET_NOT_DONE) -
     proof cannot outrun what it proves."

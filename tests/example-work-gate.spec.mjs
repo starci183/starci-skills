@@ -132,6 +132,20 @@ test('trust concept 8: a done implementation is refused when its ui direction is
   assert.equal(backendUntouched.filter(p => p.includes('IMPL_BEFORE_DIRECTION')).length, 0, backendUntouched.join('\n'));
 });
 
+test('owner/module paths resolve across bound repositories via the repository:<name>/ prefix (OWNER_PATH_MISSING)', () => {
+  const workRoot = tree({
+    'workspace.yaml': 'schema: work/workspace@1\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: fixture-fe}]\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: t\nstate: todo\nmodule: repository:fixture-fe/apps/landing\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule@1\nid: br.f.b\ntitle: t\nstate: todo\nmodule: repository:fixture-fe/apps/ghost\n',
+  });
+  const siblingRepo = path.join(path.dirname(path.dirname(workRoot)), 'fixture-fe');
+  fs.mkdirSync(path.join(siblingRepo, 'apps', 'landing'), { recursive: true });
+  const problems = []; const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.equal(warnings.filter(w => w.includes('br/a') && w.includes('OWNER_PATH_MISSING')).length, 0, warnings.join('\n'));
+  assert.ok(warnings.some(w => w.includes('br/b') && w.includes('OWNER_PATH_MISSING')), warnings.join('\n'));
+});
+
 test('trust concept 5: a blockedBy cycle is refused (BLOCKER_CYCLE), and a chain rooted in a gap or an open decision is accepted', () => {
   const cyclic = refusalsFor({
     'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "waiting on b"}\n',

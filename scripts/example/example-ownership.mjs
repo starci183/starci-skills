@@ -88,10 +88,16 @@ export function declaresOwnPaths(data) {
 export function resolveOwnedDirs(id, record, recordsById, workspaceDoc, workRoot) {
   const out = new Map(); // abs -> {rel, abs, via}
   const add = (data, via) => {
-    const repoRoot = repoRootFor(workRoot, data.repository, workspaceDoc);
+    const defaultRoot = repoRootFor(workRoot, data.repository, workspaceDoc);
     for (const rel of ownedRelPaths(data)) {
-      const abs = path.join(repoRoot, rel);
-      if (!out.has(abs)) out.set(abs, {rel, abs, via});
+      // `repository:<name>/<path>` pins one owner path to a bound sibling
+      // repository — the same prefix convention implementation files[] and job
+      // owned_paths already carry in a multi-repo workspace.
+      const prefixed = /^repository:([^/]+)\/(.+)$/.exec(rel);
+      const repoRoot = prefixed ? repoRootFor(workRoot, prefixed[1], workspaceDoc) : defaultRoot;
+      const relPath = prefixed ? prefixed[2] : rel;
+      const abs = path.join(repoRoot, relPath);
+      if (!out.has(abs)) out.set(abs, {rel: prefixed ? rel : relPath, abs, via});
     }
   };
   add(record.data, 'self');
