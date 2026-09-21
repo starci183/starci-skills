@@ -281,6 +281,16 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
   const varRows = fields.vars.map((v) => `<label><code>${esc(v)}</code></label>
       <input type="${fields.isSecret(v) ? 'password' : 'text'}" name="env:${esc(v)}" autocomplete="off" ${readonly ? 'disabled' : ''}>`).join('\n');
   const options = (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" ${readonly ? 'disabled' : ''}> ${esc(o)}</label>`).join('\n');
+  // A selection ask declares each pick dimension in question.picks — one
+  // required radio group per {id, label, choices}, never free-text picks.
+  const pickRows = (question.picks ?? []).map((p) => {
+    const radios = (p.choices ?? []).map((c) => {
+      const value = typeof c === 'string' ? c : (c?.id ?? c?.label);
+      const label = typeof c === 'string' ? c : (c?.label ?? c?.id);
+      return `<label class="opt"><input type="radio" name="pick:${esc(p.id)}" value="${esc(value)}" required ${readonly ? 'disabled' : ''}> ${esc(label)}</label>`;
+    }).join('\n');
+    return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend>${radios}</fieldset>`;
+  }).join('\n');
   const imgRows = (images ?? []).map((img, i) => `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption></figure>`).join('\n');
   return `<!doctype html><html><head><meta charset="utf-8"><title>provision.ask — ${esc(workflowId)}</title>
 <style>
@@ -291,6 +301,9 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
  figure{margin:1rem 0}figure img{max-width:100%;border:1px solid #ccc;border-radius:6px;display:block}
  figcaption{font-size:.8rem;color:#666;margin-top:.25rem}
  .opt{font-weight:400;display:block;margin:.3rem 0}
+ fieldset.pick{border:1px solid #ddd;border-radius:6px;margin:.6rem 0;padding:.4rem .8rem .6rem}
+ fieldset.pick legend{font-weight:600;font-size:.9rem;padding:0 .3rem}
+ fieldset.pick .opt{display:inline-block;margin:.2rem 1.2rem .2rem 0}
  button{margin-top:1.2rem;padding:.6rem 1.4rem;font-size:1rem;cursor:pointer}
  .note{color:#666;font-size:.85rem;margin-top:1.5rem}
 </style></head><body>
@@ -300,6 +313,7 @@ ${imgRows ? `<h3>Artifacts under review</h3>${imgRows}` : ''}
 ${readonly ? '<p><b>This ask is already answered — view only.</b></p>' : ''}
 <form method="post" action="/${esc(nonce)}/answer">
 ${options ? `<h3>Choose</h3>${options}` : ''}
+${pickRows ? `<h3>Picks</h3>${pickRows}` : ''}
 <h3>Credentials</h3>
 ${fileRows}
 ${varRows}
@@ -438,6 +452,11 @@ const main = async () => {
           bridge = r.status === 0 ? 'refreshed' : 'refresh-failed';
         }
         const optionIdx = params.get('option');
+        const picks = {};
+        for (const p of question.picks ?? []) {
+          const v = params.get(`pick:${p.id}`);
+          if (v != null && v !== '') picks[p.id] = v;
+        }
         const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', args.workflow, 'serve-ask');
         fs.mkdirSync(receiptDir, { recursive: true });
         const receiptPath = path.join(receiptDir, `answer-${Date.now()}.json`);
@@ -445,6 +464,7 @@ const main = async () => {
           schema: 'starci/ask-answer@1',
           workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
           option: optionIdx != null ? (question.options ?? [])[Number(optionIdx)] ?? null : null,
+          picks: Object.keys(picks).length ? picks : null,
           custodyWritten, envWritten, pointersWritten, bridge, errors,
           note: params.get('note') || null, at: new Date().toISOString(),
         };

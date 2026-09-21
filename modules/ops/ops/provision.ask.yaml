@@ -69,7 +69,11 @@ steps:
         When the ask presents alternatives the owner must judge (candidate draws, artifacts,
         plans), the report's question.assets must list the exact repo-relative artifact paths —
         optionally {path, label} — so the owner reviews the artifacts themselves, never a text
-        description or a bare hash of them.
+        description or a bare hash of them. When the owner must pick per dimension (one
+        candidate per screen, per variant, per plan), question.picks declares each dimension
+        as {id, label, choices} so the form renders a required radio group per dimension and
+        the receipt records structured picks — a free-text "type your picks in the note"
+        instruction is not an answer schema.
         Wait as long as the contract lets you.
   - reads:
       - question
