@@ -17,6 +17,15 @@ test('current activity wins over the provider input row kept visible by the TUI'
   assert.equal(classifyAgentScreen(screen).state,'active');
 });
 
+test('quoted child activity does not strand a turn-idle Kernel',()=>{
+  const screen=` │ • Working (28s · esc to interrupt) · Running hook
+ │ › Ask Codex to do anything
+ └ Exited with code 0
+Seam worker filed its report; the Kernel must consume it.
+› Ask Devin to build features, fix bugs, or work on your code`;
+  assert.equal(classifyAgentScreen(screen).state,'turn-idle');
+});
+
 test('permission and process failures are not treated as safe wake prompts',()=>{
   assert.equal(classifyAgentScreen('1 Yes (Approve once)\n2 No\nconfirm · esc Cancel').state,'interactive-gate');
   assert.equal(classifyAgentScreen('ERROR: Not logged in\n› Ask Codex to do anything').state,'failed');
