@@ -53,6 +53,18 @@ reads:
       en: >-
         Read only the relevant UI rules and references. Use them to constrain hierarchy, density, states,
         accessibility, responsive behavior and visual review; knowledge never supplies missing product facts.
+        When a Grammar family is resolved for the consuming app, composition law comes from two tiers:
+        (1) the installed package's shipped `concepts.yaml` — the authored normative vocabulary,
+        selection map, composition rules (SURFACE-UNIT-1, LABEL-EXTERNAL-1, JOIN-FLUSH-1,
+        SEP-HAIRLINE-1, ACTION-BOTTOM-1, ART-BAND-1, DEPTH-1, TONE-TRUTH-1, BAND-ORDER-1) and
+        anti-patterns — resolved via `node_modules/<pkg>/concepts.yaml`, then a project-vendored
+        `.starciwork/_resources/grammar-concepts.yaml`, then a source checkout; and
+        (2) the family's cataloged reusableStyle (idioms) and productComposition (playbook) under
+        knowledge/grammars/<family>/ as observed-evidence supplement. The evidence record cites
+        which concept rule ids each surface applies. A direction that draws titled cards inside
+        cards, per-band cards, gapped bands, or floating actions where the concepts call for one
+        joined surface with an external label row and hairline-separated bands is non-conformant
+        even if the palette and assets are right.
   - id: grammar
     path: consuming manifest/lockfile + resolved Grammar exports/types/renderers/CSS + actual anatomy/reference captures
     purpose:
