@@ -199,7 +199,11 @@ steps:
       en: >-
         Build one exact prompt per representative direction from accepted business/SDS, brand rules/masters,
         relevant UI knowledge and actual Grammar anatomy/reference inputs. Include real product-shaped content,
-        screen purpose, component regions, state, viewport, accessibility and forbidden treatments. Invoke built-in
+        screen purpose, component regions, state, viewport, accessibility and forbidden treatments. Each direction
+        renders the COMPLETE PAGE IN SITU — the consuming app's real persistent chrome (sidebar, navbar, subnav,
+        page container, rail layout per its actual layout components) surrounds the content region being directed,
+        so the owner reviews the page as it will exist, not a content fragment floating on a blank canvas. A
+        pre-auth or chromeless route says so explicitly rather than inventing chrome. Invoke built-in
         `image_gen.imagegen`; a browser capture, hand-painted boxes, mockup export or prose-only substitute does not
         satisfy this operation. Save the returned image and exact prompt, open the image, review it, and record the
         actual tool provenance. Do not claim an image-model name the tool did not expose.
