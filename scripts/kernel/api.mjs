@@ -898,6 +898,7 @@ const buildPacket = ({ job, payload, model, goal }) => ({
       goal_revision: payload.goal_binding?.revision ?? goal?.revision ?? null,
       goal_identity: payload.goal_binding?.identity ?? goal?.goal_identity ?? null,
     },
+    attempt: job.attempt,
     records: payload.records ?? [],
     owned_paths: (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? { path: p } : p)),
     ...(payload.cut ? { cut: payload.cut } : {}),
@@ -908,12 +909,19 @@ const buildPacket = ({ job, payload, model, goal }) => ({
   returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
 });
 
-const buildPrompt = (packet, jobId, repo) => {
+const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
   const entrySkill = path.join(skillRoot, 'SKILL.md');
   const brief = path.join(skillRoot, packet.brief);
   const verdictContract = path.join(skillRoot, VERDICT_CONTRACT);
   return [
-  `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel (job ${jobId}).`,
+  `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel (job ${jobId}, attempt ${packet.context.attempt ?? 1}).`,
+  ...(priorFailures.length ? [
+    `prior_attempt_failures: an earlier attempt of this same op settled fail on the kernel checks below.`,
+    `  They are your authoritative residual defects — verify and repair them first; records already on`,
+    `  disk are prior attempts' output you must check, not license to file done. Re-filing another`,
+    `  attempt's report or claiming done without new authored writes is an automatic fail:`,
+    ...priorFailures.map((f) => `  - [${f.name}] ${f.evidence}`),
+  ] : []),
   `MANDATORY LOAD ORDER — read before any action:`,
   `  1. ${entrySkill} — canonical Source runtime load order (the routed repository may not contain .claude)`,
   `  2. ${brief} — your contract. It declares your reads, writes, steps, proofs and blockers.`,
@@ -1098,7 +1106,15 @@ function cmdDispatch(ledger, args, repo) {
   const briefExists = fs.existsSync(briefAbs);
 
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id) });
-  const prompt = buildPrompt(packet, jobId, repo);
+  const priorFailures = job.attempt > 1 ? (() => {
+    const row = db.prepare('SELECT attempt, checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC LIMIT 1')
+      .get(job.workflow_id, op, job.attempt);
+    if (!row) return [];
+    return (JSON.parse(row.checks_json ?? '{}')?.checks ?? [])
+      .filter((c) => c && c.exitCode !== 0)
+      .map((c) => ({ name: c.name ?? 'unnamed-check', evidence: `attempt ${row.attempt}: ${String(c.evidence ?? '').slice(0, 400)}` }));
+  })() : [];
+  const prompt = buildPrompt(packet, jobId, repo, priorFailures);
   const worktree = args.worktree ?? repo;
   const title = `[Op] ${op}`;
   // The composed command is what a spawn would actually run — card env prefix
