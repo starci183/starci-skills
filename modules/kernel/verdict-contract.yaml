@@ -294,7 +294,7 @@ rejects:
       permits fallback or cleanup claims: only a typed, identity-bound
       `effectState: none` permits the fallback path; 'released'/'already_
       released' prove cleanup while identity_unproven/no_owned_resource is
-      reported cleanup.complete:false (SKILL.md lifecycle correction;
+      reported cleanup.complete:false (CONTEXT.md lifecycle correction;
       the api's settle requires the settlement to
       name THIS exact dispatch with effectState none).
   - id: invented-answer

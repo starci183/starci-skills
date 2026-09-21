@@ -18,7 +18,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
 **Never spawn a kernel silently.** The flow is always plan → owner confirms → boot:
 
 1. Resolve both locations, without conflating them:
-   - `<Source>` is the host repository containing `.claude/SKILL.md` and the
+   - `<Source>` is the host repository containing `.claude/CONTEXT.md` and the
      entry executable.
    - `<project-owner-repo>` owns the selected project's
      `.starciwork/runtime.sqlite`; `define-goal` printed it as `LEDGER`.

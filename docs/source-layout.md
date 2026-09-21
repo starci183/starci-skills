@@ -1,7 +1,7 @@
 # Backend/frontend source layout
 
 StarCi binds one explicit host to a selected project's backend and frontend
-repositories. The host owns the `.claude/SKILL.md` runtime identity, the
+repositories. The host owns the `.claude/CONTEXT.md` runtime identity, the
 `.workspaces` project/route registry and the bootstrap files written from the
 single `init/AGENTS.md` template. The selected backend owns the project's only
 `.starciwork`; the frontend consumes the same records and does not copy them.
@@ -28,7 +28,7 @@ actual per-project TypeScript configs and source coverage separately
 starci-host/
 ├── .git/
 ├── .claude/
-│   └── SKILL.md
+│   └── CONTEXT.md
 ├── .workspaces/
 │   └── projects/
 └── AGENTS.md            # managed starci:prompt-entry block (same template
@@ -71,10 +71,10 @@ selected-frontend/
 └── src/
 ```
 
-The host bootstrap files must route to `.claude/SKILL.md`. Historical runtime
+The host bootstrap files must route to `.claude/CONTEXT.md`. Historical runtime
 names such as `.claude-v3`, `.claude_legacy`, `.claude-vip` and
 `.claude-starci-ultimate` are forbidden. A routed source duplicates host
-identity only when it carries a `.claude/SKILL.md` runtime marker or a
+identity only when it carries a `.claude/CONTEXT.md` runtime marker or a
 `.workspaces/projects` / `.workspaces/local/routes` registry marker. Routed
 backends also forbid historical Work roots such as `.work`, `.starci` and
 `.starcitemp`.

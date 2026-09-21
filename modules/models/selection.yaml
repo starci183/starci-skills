@@ -295,7 +295,7 @@ fallback:
   neverAdvanceWhen: [permission-denied, user-checkpoint, business-ambiguity, safety-block, partial-or-unknown-effects]
   corollary: >-
     A missing output, unknown effect or guessed terminal identity never permits
-    fallback (SKILL.md lifecycle correction). Fallback is an availability
+    fallback (CONTEXT.md lifecycle correction). Fallback is an availability
     mechanism, not a quality retry.
 
 # ---------------------------------------------------------------------------

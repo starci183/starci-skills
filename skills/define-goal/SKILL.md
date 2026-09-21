@@ -20,7 +20,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 
 **Never write a goal silently.** The flow is always assess → plan → owner confirms → persist:
 
-1. Resolve `<Source>` — the repository containing `.claude/SKILL.md` — and the
+1. Resolve `<Source>` — the repository containing `.claude/CONTEXT.md` — and the
    project binding (routing: `.workspaces/projects/<project>/work.json`). Get the
    owner's prompt and an optional short `--title`; ask if missing.
    `--project <name>` selects which bound project's `.starciwork/runtime.sqlite`

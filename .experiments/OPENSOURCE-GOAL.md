@@ -26,7 +26,7 @@ Not "tests pass" — *a stranger can clone it, run it, understand it, and trust 
 | **Test quality** | E2E via real HTTP/GraphQL clients over real `TestingModule` stacks on BOTH example apps. Unit tests cover real business journeys, not stub assertions. Sonar + Codecov wired and green. |
 | **Product quality** | Output projects meet `.claude/QUALITY-BAR.md` — interface.draw renders are genuinely beautiful, UX complete (skeleton/error/validate/motion), code sát design bám grammar, evidence proves every claim. |
 | **Determinism** | Model/op routing is declarative and reproducible — same inputs → same selection, with cited reasons. Spine code (not agent prose) settles truth. |
-| **Docs** | SKILL.md load order is accurate; a new agent cold-starts correctly from `AGENTS.md` alone. Architecture docs match what the code actually does. |
+| **Docs** | CONTEXT.md load order is accurate; a new agent cold-starts correctly from `AGENTS.md` alone. Architecture docs match what the code actually does. |
 | **Demonstrability** | The whole loop is showable: prompt → plan → dispatched ops → evidence → settled verdict. This is the content story. |
 
 ## Continuous verification loop

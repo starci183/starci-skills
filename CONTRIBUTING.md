@@ -1,6 +1,6 @@
 # Contributing
 
-StarCi is a kernel-agent workflow runtime. Before changing anything, read `SKILL.md`'s load order
+StarCi is a kernel-agent workflow runtime. Before changing anything, read `CONTEXT.md`'s load order
 and the contract YAMLs under `modules/` that touch your surface — contracts are data, and a code
 change that contradicts them is a bug in the code.
 

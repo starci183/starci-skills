@@ -958,7 +958,7 @@ const buildPacket = ({ job, payload, model, goal }) => ({
 });
 
 const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
-  const entrySkill = path.join(skillRoot, 'SKILL.md');
+  const entrySkill = path.join(skillRoot, 'CONTEXT.md');
   const brief = path.join(skillRoot, packet.brief);
   const verdictContract = path.join(skillRoot, VERDICT_CONTRACT);
   return [

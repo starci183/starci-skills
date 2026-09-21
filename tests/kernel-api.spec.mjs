@@ -236,11 +236,11 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
     'dispatch must keep the enqueue-time approved revision rather than silently adopting a later one');
   assert.match(preview?.prompt??'',/records: scope\.workspace-canonicalization/);
   assert.match(preview?.prompt??'',new RegExp(`workflow: ${wf} goal_revision=0 goal_identity=k7goal`));
-  assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'SKILL.md').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
+  assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'CONTEXT.md').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
     'an Op launched in a routed repo must receive the absolute canonical Source skill path');
   assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'modules','ops','ops','ex-test.probe.yaml').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
     'an Op must receive the absolute operation-contract path, not a cwd-relative modules path');
-  assert.doesNotMatch(preview?.prompt??'',/SKILL\.md \(repo root\)/);
+  assert.doesNotMatch(preview?.prompt??'',/CONTEXT\.md \(repo root\)/);
   const job=read(repo,l=>l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId));
   assert.notEqual(job?.status,'running','a packet print must not mark the job running — nothing was spawned');
 });

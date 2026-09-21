@@ -10,7 +10,7 @@ Humans maintain structured knowledge under `knowledge/**/*.yaml`. Agents and ope
 | Calibration data | `knowledge/ui/proof/calibration/calibration.json` | Explicit data exception; all other authored JSON knowledge is rejected. |
 | Runtime | `knowledge/**/*.yaml` | Read directly from source. Public names are the authored files: `index.yaml`, `foo.yaml`. |
 
-Operator `supportingReferences` and `SKILL.md` name runtime paths such as `knowledge/coding-reference.yaml` and `knowledge/patterns/*/index.yaml`. Those authored paths are the public contract; consumers read them in place.
+Operator `supportingReferences` and `CONTEXT.md` name runtime paths such as `knowledge/coding-reference.yaml` and `knowledge/patterns/*/index.yaml`. Those authored paths are the public contract; consumers read them in place.
 
 ## Add a pattern topic
 

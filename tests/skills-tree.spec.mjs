@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import fs f
 import {parseYaml} from '../engine/yaml.mjs';
 
 // The companion skills under `skills/` are discovered by the host beside the entry, so their only contract
-// is the frontmatter a host reads and the routing line in SKILL.md that sends a Codex chat to them.
+// is the frontmatter a host reads and the routing line in CONTEXT.md that sends a Codex chat to them.
 const root=path.resolve(import.meta.dirname,'..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8').replace(/\r\n/g,'\n');
 const skillDirs=fs.readdirSync(path.join(root,'skills'),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);
@@ -38,10 +38,10 @@ test('the workflow-chat skill is product-agnostic, forbids writing the store and
   assert.ok(/inbox/.test(skill)&&/kernel terminal|api\.mjs/.test(skill),'a live kernel is driven through inbox rows and its terminal');
   assert.ok(/Never approve/.test(skill),'approval is the owner\'s');
   assert.ok(/host-unsupported/.test(skill)&&/Orca host/.test(skill),'unsupported operations are relayed to the Orca host');
-  const entry=read('SKILL.md');
+  const entry=read('CONTEXT.md');
   assert.ok(entry.includes('skills/workflow-chat'),'the entry routes a chat to the skill');
   // One shipped bootstrap template: init/AGENTS.md. CLAUDE.md/DEVIN.md are install-time copies emitted only
   // when the host opts in, so no second template lives in the source tree.
-  assert.ok(read('init/AGENTS.md').includes('SKILL.md'),'the bootstrap routes to the entry');
+  assert.ok(read('init/AGENTS.md').includes('CONTEXT.md'),'the bootstrap routes to the entry');
   assert.equal(fs.existsSync(path.join(root,'init','CLAUDE.md')),false,'the installer copies AGENTS.md at install time; no second template ships');
 });

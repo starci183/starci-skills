@@ -366,7 +366,7 @@ schemas:
     subsystem: routing
     governs: "Project binding resolution — .claude+.workspaces host pair, registry .workspaces/projects/<project>/work.json, one canonical .starciwork per project, features under features/<feature>/, rules against copying the host into routed sources."
     binds: host repo layout + project registry entries
-    usedBy: [the kernel agent (the routing questions it asks before effects), SKILL.md]
+    usedBy: [the kernel agent (the routing questions it asks before effects), CONTEXT.md]
     business:
       question: "Which backend/frontend/Work does this project bind — before any effect?"
       whenNeeded: Project start/prep and any cross-repo delegation; preserve binding when changing directories.
@@ -486,7 +486,7 @@ schemas:
     business:
       question: "Did mechanical code-pattern conformance run clean, with what coverage and what limits?"
       whenNeeded: review.verify lint/stales modes; enforcement needs executable coverage, not agent approval.
-      whenNot: status unavailable/invalid is not clean; a missing checker can never be replaced by agent sign-off (per SKILL.md).
+      whenNot: status unavailable/invalid is not clean; a missing checker can never be replaced by agent sign-off (per CONTEXT.md).
       selectedBy: pattern-check orchestration; auditors read reportDigest-bound output.
 
   # --------------------------------------------------------------------------

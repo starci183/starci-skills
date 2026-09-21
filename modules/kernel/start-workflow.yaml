@@ -78,7 +78,7 @@ spawn:
     data — the template lives in modules/, not scripts/): resolved Source
     host, project binding, BE/FE roots, ledger and
     absolute API path + {workflow_id, goal_revision} + mandatory load order —
-    Source SKILL.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
+    Source CONTEXT.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
     mutation goes through node scripts/kernel/api.mjs <cmd>
     (survey/status/plan/enqueue/route/dispatch/nudge/observe/consume-report/

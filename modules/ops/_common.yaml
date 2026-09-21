@@ -78,7 +78,7 @@ sections:
         modules/ops/. Read only selected artifacts.
   - title: Workflow selection and authority
     blocks:
-      - The single [StarCi skill](../SKILL.md) selects one workflow from the op catalog
+      - The single [StarCi skill](../CONTEXT.md) selects one workflow from the op catalog
         [modules/ops/registry.yaml](registry.yaml). Read this policy and the selected op
         contract completely. No preset skill layer or automatic successor exists. A question may
         remain read-only. Unmatched/ad hoc jobs use direct-task → task.execute; unknown explicit

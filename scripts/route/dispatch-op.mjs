@@ -114,7 +114,7 @@ function buildPrompt(packet, context) {
   // packet exists to prevent (agents that skip reads forget bypass flags,
   // miss context, and never persist).
   // The list is not hardcoded: scripts/context/pack.mjs resolves it as a
-  // function — SKILL.md + brief + verdict contract + every concrete file the
+  // function — CONTEXT.md + brief + verdict contract + every concrete file the
   // brief's own reads declare + the packet contract — so a brief edit never
   // leaves the prompt stale.
   const lines = [

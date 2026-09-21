@@ -26,7 +26,7 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
 ## Resolve once
 
 - `<skill root>` is the Source host's `.claude` directory that holds the
-  `SKILL.md` you were sent to. `<repo>` is separately the project repository
+  `CONTEXT.md` you were sent to. `<repo>` is separately the project repository
   that owns the workflow's `.starciwork/runtime.sqlite` (`define-goal` printed
   it as `LEDGER`). `--repo` always names that ledger owner, even when this chat
   was opened elsewhere.

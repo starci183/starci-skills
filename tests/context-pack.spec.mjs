@@ -10,7 +10,7 @@ const PACK=path.join(ROOT,'scripts','context','pack.mjs');
 // Lane m13, contract from lane m7: context assembly is a function, not the op
 // agent's discretion — `pack.mjs --op <id> --json` returns
 // {mandatory:[{path,why}], ownedFiles, truncated, missing} so the dispatch
-// prompt can enumerate the real read list instead of 'read SKILL.md'.
+// prompt can enumerate the real read list instead of 'read CONTEXT.md'.
 // scripts/context/pack.mjs lands in a sibling lane; until it does every test
 // here is skipped.
 const PACK_EXISTS=fs.existsSync(PACK);
@@ -28,7 +28,7 @@ test('--op code.refactor --json emits the mandatory reads in load order',{skip},
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   const paths=mandatoryPaths(body);
   assert.ok(paths.length>0,'context.mandatory is empty — the op would choose its own context again');
-  assert.ok(paths.some(p=>/SKILL\.md$/i.test(p)),`mandatory reads must start at SKILL.md, got: ${paths.join(', ')}`);
+  assert.ok(paths.some(p=>/CONTEXT\.md$/i.test(p)),`mandatory reads must start at CONTEXT.md, got: ${paths.join(', ')}`);
   assert.ok(paths.some(p=>/ops\/code\.refactor\.yaml$/.test(p)),`mandatory reads must carry the op brief, got: ${paths.join(', ')}`);
   assert.ok(paths.some(p=>/verdict-contract\.yaml$/.test(p)),`mandatory reads must carry the verdict contract, got: ${paths.join(', ')}`);
 });

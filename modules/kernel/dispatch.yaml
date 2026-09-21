@@ -339,5 +339,5 @@ nonGoals:
   - "no goal-identity authority — the op cannot revise the goal; suspicion travels back as a report field (verdict-contract.yaml)"
   - "no other op's write scope — dispatch planning proved disjointness before this packet existed; an op that needs a foreign path reports blocker shared-change"
   - "no credential values — custody asks go through provision.ask and the owner's Orca GUI; an agent never sees a secret (modules/ops/ops/provision.ask.yaml)"
-  - "no model/agent override — the agent runs what constraints.model names; host calls come only from the loaded Orca contracts, never inferred (SKILL.md provider rule)"
+  - "no model/agent override — the agent runs what constraints.model names; host calls come only from the loaded Orca contracts, never inferred (CONTEXT.md provider rule)"
   - "no second dispatch of the same op — one lease, one agent, one verdict (oneOpOneAgent above)"

@@ -100,7 +100,8 @@ reads:
         present. Re-resolve component packages from the actual consuming app, not an assumed
         monorepo-root copy, and check exports/props/renderers/CSS plus the active family root and
         effective token bindings against applicable knowledge. Report missing mapping, drift or a
-        material image/package conflict before copying it; do not override or rebuild Grammar to
+        material image/package conflict before copying it. Read the accepted region-level realization map and
+        preserve each `raster-asset` versus `code-native` decision; do not override or rebuild Grammar to
         make an accepted generated approximation appear exact. Only require a separate visual
         direction if this task selected one; an existing no-draw scope can establish its mapping
         directly from source.
@@ -255,13 +256,14 @@ writes:
         expectations. Missing required output/evidence remains blocked or failed and cannot advance.
         The selected request freezes output field schemas before execution.
   - id: assetManifest
-    path: E/assets.json + repository:<repo-id>/<write-ceiling> asset inventory references
+    path: E/assets.json + E/realization-check.json + repository:<repo-id>/<write-ceiling> asset inventory references
     fields:
       - reviewedDrawIds
       - items:[id,drawIds,usage,requiredForFlow,status,sourcePath,artifact,provenance,brief]
     content:
       en: Emit the full asset inventory and link ready files to source paths and actual retained image
-        artifacts. Reuse matching existing assets; otherwise generate/create and inspect them with
+        artifacts. `realization-check.json` maps each accepted direction region to its actual implementation and
+        proves the chosen mode. Reuse matching existing raster assets; otherwise generate/create and inspect them with
         the actual permitted instrument, then integrate dimensions, responsive variants, alt text
         and loading behavior. For Claude without image generation, keep decorative slots blank with
         stable layout, no broken/empty src, and a deferred brief
@@ -326,10 +328,14 @@ steps:
     writes:
       - evidence
     action:
-      en: Map every relevant region across all draws to routes, shared/owned components, API
+      en: >-
+        Map every relevant region across all draws to routes, shared/owned components, API
         reads/actions, states, ACs and actual knowledge rules/cases. Business governs behavior;
         images express accepted visual intent within applicable knowledge and installed component
-        constraints. Record missing screens/states and cross-image or knowledge conflicts; do not
+        constraints. Preserve the accepted realization mode for every region: raster assets keep exact identity,
+        provenance, crop and responsive placement; code-native regions map to semantic DOM, installed Grammar
+        components, CSS layout/effects and repository-native SVG icons. Record missing screens/states and
+        cross-image, realization or knowledge conflicts; do not
         average incompatible alternatives, invent behavior from pictures or weaken the selected
         graph.
   - reads:
@@ -350,7 +356,10 @@ steps:
         and repository conventions. Apply scoped creation, refinement or the smallest defect repair;
         retain cross-image consistency, responsive behavior, keyboard and focus. Follow applicable
         knowledge even where literal image copying would violate it; unresolved material design
-        conflicts remain blocked. Account for every asset visible in every input draw. Reuse a
+        conflicts remain blocked. Never flatten code-native cards, panels, controls, typography, system icons,
+        layout, shadows or glows into screenshots. Never replace a required mascot, illustration, photo or textured
+        media asset with an improvised CSS drawing merely because its silhouette is reproducible. Account for every
+        asset visible in every input draw. Reuse a
         verified matching asset or create/generate the required asset, inspect it and integrate its
         actual source file. Claude with no image-generation capability may reserve a blank
         decorative slot with a deferred brief; never use invented URLs, broken images or label
@@ -519,6 +528,13 @@ proofs:
         explicitly deferred as permitted for Claude. Ready assets have actual retained image bytes
         and source paths. Deferred decorative slots have concrete briefs; functional assets cannot
         pass while missing.
+  - id: realization-fidelity
+    requirement:
+      en: >-
+        E/realization-check.json covers every accepted direction region. `raster-asset` regions bind exact retained
+        bytes/provenance and actual rendered placement; `code-native` regions bind semantic DOM, installed Grammar,
+        responsive CSS and repository-native SVG where applicable. Any mode substitution is an explicit unresolved
+        design conflict and cannot earn done.
 blockers:
   - code: DRAWS_INPUT_INVALID
     condition:
@@ -536,6 +552,11 @@ blockers:
     condition:
       en: A selected accepted draw asset cannot be opened or conflicts with required business/architecture
         inputs; report the exact source and decision needed.
+  - code: REALIZATION_MODE_CONFLICT
+    condition:
+      en: >-
+        A required visual region lacks an accepted raster-asset/code-native classification, or implementation would
+        flatten semantic UI into imagery or replace required authored media with an unapproved CSS/SVG approximation.
   - code: UI_CONTRACT_UNKNOWN
     condition:
       en: Required business state, action API or component ownership is unresolved.

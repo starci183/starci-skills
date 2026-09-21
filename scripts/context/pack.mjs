@@ -11,14 +11,14 @@
 //   - CLI (this file's main): kernel/api calls it to materialize a packet.
 //   - Library: scripts/route/dispatch-op.mjs imports buildContext/renderPromptReads
 //     so the [Op] prompt carries the resolved MANDATORY READS list, not just
-//     "read SKILL.md".
+//     "read CONTEXT.md".
 //
 // CLI:
 //   node scripts/context/pack.mjs --op <id> [--records a,b] [--state <.starciwork>]
 //       [--repo <path>] [--out <file>] [--json]
 //
 //   --repo    runtime/skill root to resolve against (default: this repo —
-//             the directory holding SKILL.md, modules/, knowledge/)
+//             the directory holding CONTEXT.md, modules/, knowledge/)
 //   --out     write the rendered packet markdown to <file> (default: stdout)
 //   --json    print the context object only (default: JSON + rendered text)
 //
@@ -184,7 +184,7 @@ export function buildContext({
   };
 
   // 1-3: the fixed spine every op reads first, in load order.
-  addMandatory('SKILL.md', "the runtime's load order");
+  addMandatory('CONTEXT.md', "the runtime's load order");
   addMandatory(briefRel, 'your contract — it declares your reads, writes, steps, proofs and blockers');
   addMandatory(VERDICT_CONTRACT, 'what your return must look like');
 

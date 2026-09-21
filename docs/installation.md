@@ -99,7 +99,7 @@ resolve from the host. The ledger lives at
 and [source layout](source-layout.md).
 
 Open the coding agent at the host. If a task opens in the frontend or another
-repository, explicitly provide the absolute host, the `.claude/SKILL.md` path
+repository, explicitly provide the absolute host, the `.claude/CONTEXT.md` path
 and the selected project binding — a sibling host's bootstrap is not
 automatically in that task's directory ancestry.
 

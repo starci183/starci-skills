@@ -13,7 +13,7 @@ The routed target intentionally has no `.claude`. Never look for or create a
 target-local `.claude`; all runtime modules and scripts come from the Source host.
 
 MANDATORY LOAD ORDER before any action:
-  1. {skillRoot}/SKILL.md (load order)
+  1. {skillRoot}/CONTEXT.md (load order)
   2. {skillRoot}/modules/kernel/driver-loop.yaml (your loop)
   3. {skillRoot}/modules/kernel/api.yaml (your ONLY mutation surface)
   4. {skillRoot}/modules/kernel/dispatch.yaml

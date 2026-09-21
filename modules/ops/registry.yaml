@@ -618,9 +618,9 @@ ops:
       needs the files bound.
   - id: interface.audit
     family: interface
-    goal: Audit selected real interface renders against accepted product intent, the actual installed
-      Grammar, declared brand/assets and applicable UI proof rules; emit reproducible hard-check
-      findings, a calib
+    goal: "Audit selected real interface renders against the exact latest explicitly owner-accepted
+      interface.draw receipt and its image, prompt and content hashes, accepted product intent, the
+      actual installed "
     nodeKinds:
       - operations
     completionProfile: operations
@@ -631,6 +631,8 @@ ops:
     reads:
       - target
       - intent
+      - accepted-draw-lineage
+      - realization-map
       - grammar
       - knowledge
       - brand-assets
@@ -661,10 +663,14 @@ ops:
       prerequisites:
         - interface.implement settled pass with fresh real captures
         - verified served build
+        - exact latest explicit owner-accepted interface.draw receipt with image/prompt/content
+          hashes
         - accepted UI direction and installed Grammar binding
       riskHints:
         - browser-required
         - read-only-product-source
+        - owner-accepted-draw-lineage
+        - exact-cell-side-by-side
         - grammar-hard-authority
         - bounded-five-round-loop
     lifecyclePosition: verify | post-implementation

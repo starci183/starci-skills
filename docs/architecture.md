@@ -101,7 +101,7 @@ committed per project policy; secrets never are.
 
 | Concern | Maintained source |
 | --- | --- |
-| Agent entry and load order | `SKILL.md` |
+| Agent entry and load order | `CONTEXT.md` |
 | Project binding | `.workspaces/projects/<p>/work.json` (`modules/schemas/workspace-routing.yaml`) |
 | Kernel loop and ledger gate | `modules/kernel/*.yaml`, `scripts/kernel/api.mjs` |
 | Operation contracts | `modules/ops/ops/*.yaml` ([ops-source-ownership](ops-source-ownership.md)) |

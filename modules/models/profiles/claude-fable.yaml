@@ -17,7 +17,7 @@ identity:
   note: >-
     runtimes.json pins models.verify/decide/plan/write = claude-fable-5-1, but the
     registry target requests no model — managed-agent launch inherits the host's
-    configured model. Attestation still applies per SKILL.md (worker-show
+    configured model. Attestation still applies per CONTEXT.md (worker-show
     effective model before effects).
 
 capacity:

@@ -51,7 +51,7 @@ The installer:
 
 1. Copies the declared payload (`package.json` `files[]`) into `<host>/.claude` — the runtime reads
    source directly, there is no build step.
-2. Writes the `AGENTS.md` bootstrap pointing agents at `.claude/SKILL.md` (other host bootstrap
+2. Writes the `AGENTS.md` bootstrap pointing agents at `.claude/CONTEXT.md` (other host bootstrap
    names are opt-in).
 3. Installs the two entry skills — `define-goal` and `start-kernel` — into the host's skills
    directories (`.devin/skills/`, `.agents/skills/`, best-effort).
@@ -86,7 +86,7 @@ model, effort and budgets. Resolution order: explicit `--agent` flag > owner `co
 ## Layout
 
 ```text
-SKILL.md            the one skill every agent loads first
+CONTEXT.md            the one skill every agent loads first
 modules/            contracts as data — goal, kernel, ops, models, quality, schemas
 engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config, constants
 scripts/            executables — kernel/api.mjs, kernel/start-workflow.mjs, goal/, route/,
@@ -129,7 +129,7 @@ directly, e.g. `node .claude/scripts/checks/check-stales.mjs` — there is no wr
 - [Build, test, package and release](docs/releasing.md)
 - [The todo-app standard example](docs/examples/todo-app-standard.md)
 
-Agent-facing instructions live in [SKILL.md](SKILL.md); humans only need this page and `docs/`.
+Agent-facing instructions live in [CONTEXT.md](CONTEXT.md); humans only need this page and `docs/`.
 
 ## Contributing
 
