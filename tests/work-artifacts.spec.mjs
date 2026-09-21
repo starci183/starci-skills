@@ -50,6 +50,13 @@ function findingsFor(extra) {
 
 const UI_RECORD = (assets) => ({'features/f/ui/one/index.yaml': `schema: work/ui-screen@1\nid: ui.f.one\ntitle: t\nstate: done\nui:\n  assets:\n${assets}`});
 
+test('runtime custody manifests are excluded from canonical artifact verification', () => {
+  const found = findingsFor({
+    'kernel-evidence/wf/jobs/op/evidence/manifest.yaml': 'schema: work/evidence@1\nid: proof.runtime\nassets:\n  - {path: missing.txt, sha256: deadbeef}\n',
+  });
+  assert.equal(found.refuse.length, 0, found.refuse.join('\n'));
+});
+
 test('ASSET_MISSING: a declared ui asset whose PNG is not on disk is refused; real bytes are accepted', () => {
   const missing = findingsFor(UI_RECORD('    - {path: assets/one.png, role: direction}\n'));
   assert.ok(missing.refuse.some(line => line.includes('ASSET_MISSING') && line.includes('assets/one.png')), missing.refuse.join('\n'));

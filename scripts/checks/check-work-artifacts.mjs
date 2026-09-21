@@ -365,7 +365,12 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     info: (file, code, msg) => out.info.push(`${relativeToRoot(file)}: ${msg} [${code}]`),
   };
 
-  const records = loadRecords(workRoot, walk);
+  const custodyRoots = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals', '_derived']);
+  const canonicalWalk = start => walk(start).filter(file => {
+    const relative = slash(path.relative(workRoot, file));
+    return !custodyRoots.has(relative.split('/')[0]);
+  });
+  const records = loadRecords(workRoot, canonicalWalk);
   const workspaceDoc = readWorkspace(workRoot);
   const backendRoot = path.dirname(workRoot);
   // `counts` is what the script looked at, not only what it flagged: the CLI prints it so a clean code can
@@ -394,7 +399,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
 
   // evidence docs by the record directory beside them; the run each one settles on is a claim in bytes
   const evidenceByDir = new Map();
-  for (const file of walk(workRoot).filter(f => f.endsWith('evidence.yaml'))) {
+  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('evidence.yaml'))) {
     let doc;
     try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
     if (doc && typeof doc === 'object') evidenceByDir.set(path.dirname(file), {doc, file});
@@ -477,7 +482,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
   }
 
   // ---- every other run under the tree: history is a byte claim too ----
-  for (const file of walk(workRoot).filter(f => f.endsWith('manifest.yaml'))) {
+  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('manifest.yaml'))) {
     const runDir = path.dirname(file);
     counts.runs += 1;
     let doc;
@@ -490,12 +495,12 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     scanRun(runDir);
   }
 
-  for (const file of walk(workRoot).filter(f => f.endsWith('generation-receipts.yaml'))) {
+  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('generation-receipts.yaml'))) {
     counts.receipts += 1;
     checkReceipt(file, ctxFor(path.dirname(path.dirname(file))), wrapped, counts);
   }
 
-  for (const file of walk(workRoot).filter(f => f.endsWith('.prompt.txt'))) {
+  for (const file of canonicalWalk(workRoot).filter(f => f.endsWith('.prompt.txt'))) {
     counts.prompts += 1;
     checkPromptFile(file, wrapped);
   }

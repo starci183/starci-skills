@@ -21,9 +21,11 @@ reads:
     path: N/index.yaml
     purpose:
       en: "Read the current feature record and its flat spec records, refs, dependencies, proof demands
-        and validator freshness. For an explicitly new target, absence is expected: inspect the nearest
-        existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
-        content."
+        and validator freshness. Pre-existing work/node@N records under business/ or architecture/ are
+        read-only legacy inputs: they carry the accepted requirement content this op refines into flat
+        records, they never satisfy the flat writes below, and they are never edited or extended. For an
+        explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace,
+        then create only that selected scope. Preserve unaffected accepted content."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -82,7 +84,10 @@ writes:
         policy question as work/policy-decision@1 under decision/<name>/, each data definition as
         work/data@1 under data/<name>/ and each customer journey as work/customer-journey@1 under
         journey/<name>/. Keep each FR's main, alternative and exception flows, branch review,
-        postconditions and acceptance together in its own record.
+        postconditions and acceptance together in its own record. When a legacy work/node@N tree under
+        business/ already states the requirement, restate it faithfully in the flat records - the job is
+        not done until the selected slice exists as flat records; the legacy tree stays untouched for the
+        canonicalization sweep to retire.
         For a not-yet-implemented slice, author the smallest decision-complete contract covering actor goal,
         observable outcome, material invariants and permissions, relevant branches, acceptance and
         consequential open decisions. Do not pre-author hypothetical future capabilities or source-local

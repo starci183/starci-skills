@@ -45,6 +45,18 @@ function refusalsFor(extra) {
   return problems;
 }
 
+test('nested work/node specification records are not forced through compact flat-family identity rules', () => {
+  const problems = refusalsFor({
+    'features/chatbot/business/index.yaml': 'schema: work/node@1\nid: chatbot.business\nkind: business\nrequired: true\n',
+    'features/chatbot/business/overview/index.yaml': 'schema: work/node@1\nid: chatbot.business.overview\nkind: business-overview\nrequired: true\nstate: todo\n',
+    'features/chatbot/business/srs/index.yaml': 'schema: work/node@1\nid: chatbot.business.srs\nkind: business\nrequired: true\nextensions:\n  work3:\n    srs:\n      schema: starci/srs-aggregate@1\n',
+    'features/chatbot/architecture/sds/components/router/index.yaml': 'schema: work/node@2\nid: chatbot.architecture.sds.component.router\nkind: architecture\nrequired: true\nstate: done\n',
+    'features/chatbot/implementation/frontend/shell/evidence/proof/manifest.yaml': 'schema: work/evidence@1\nid: proof.chatbot.shell\nnodeId: chatbot.shell\noutcome: pass\nassets: []\n',
+    'kernel-strays/retired-copy/features/chatbot/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
+  });
+  assert.equal(problems.filter(problem => problem.includes('no record family in its path') || problem.includes('but its place says') || problem.includes('state is done with no sibling evidence.yaml')).length, 0, problems.join('\n'));
+});
+
 test('concept 1: blocker edges - prose blockedBy is refused, dangling target is refused, a stale (done) blocker is refused', () => {
   const proseOnly = refusalsFor({
     'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\nblockedBy:\n  - a plain sentence naming nothing\n',

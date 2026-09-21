@@ -12,7 +12,10 @@ shape:
     business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
     scripts/checks/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
-    silently."
+    silently. Transition note: trees still carrying the retired work/node@N records under
+    business/{overview,srs} or architecture/{overview,sds} are tolerated by the gate - those records are
+    readable legacy inputs owned by the engine's SRS/SDS readers and are being migrated to these flat
+    families by workspace.canonicalization; ops must never author new work/node records."
   br: features/<feature>/br/<name>/index.yaml, schema work/business-rule@1. May carry appliesTo, module
     (a string or list of module-root directory paths - never individual files, see the owners note under
     implementation below) and blockedBy.

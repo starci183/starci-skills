@@ -107,16 +107,16 @@ ops:
         - api
         - build
       prerequisites:
-        - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
-        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
+        - business.decide settled pass (reviewed requirement seed; Work leaves remain todo)
+        - architecture.decide settled pass (reviewed design seed; Work leaves remain todo)
       riskHints:
         - source-edits
     lifecyclePosition: implement | implementation
     kindInferred: implement
     businessQuestion: '"Does the actual backend code implement the selected accepted operations and ACs
       - and prove it with unit + backend E2E + quality gates (incl.'
-    whenNeeded: When an accepted SRS/SDS slice needs backend code created, refined or defect-repaired
-      (primary mode).
+    whenNeeded: When an accepted requirement/design slice needs backend code created, refined or
+      defect-repaired (primary mode).
   - id: backend.scaffold
     family: backend
     goal: Create one new backend source tree in the bound repository and prove its declared toolchain
@@ -1336,9 +1336,9 @@ ops:
     whenNeeded: "[object Object]"
   - id: work.author
     family: work
-    goal: Author the canonical Work records one node needs before it can be launched - in record mode
-      its own write scope, testable assertions and one runnable check per assertion; in cut mode the
-      child nodes a
+    goal: Author the canonical Work records one slice needs before it can be launched - in record mode
+      each record's own write scope, testable proof demands and one runnable check per demand; in
+      cut mode the ch
     nodeKinds:
       - implementation
       - uat
@@ -1377,8 +1377,8 @@ ops:
         - scope defined
     lifecyclePosition: scope | pre-implementation
     kindInferred: author
-    businessQuestion: '"Is this node launchable - record mode: real write scope + testable assertions +
-      one runnable check each; cut mode: a seam-first split into disjoint children?"'
+    businessQuestion: '"Is this record launchable - record mode: real write scope + testable proof
+      demands + one runnable check each; cut mode: a seam-first split into disjoint children?"'
     whenNeeded: "[object Object]"
   - id: workspace.manage
     family: workspace

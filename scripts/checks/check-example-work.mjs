@@ -22,7 +22,15 @@ import {renderProofProblems} from '../example/example-render-proof.mjs';
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
+// `work/node@*` is the retired recursive specification envelope from the
+// pre-flat business/srs and architecture/sds layouts.  Existing trees still
+// carry those records during canonicalization, and engine/index.mjs keeps the
+// readers that validate their identity and semantics.  Tolerate them here
+// instead of forcing the flat-family contract onto a retired format; ops must
+// not author new work/node records.
 const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
+const isRecursiveNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
+const KERNEL_CUSTODY_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 /** Schemas whose `done` is an authored claim by nature (concept 6); every other schema needs proof or a declaration. */
@@ -81,6 +89,10 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
 
   for (const file of walk(workRoot).filter(f => f.endsWith('.yaml'))) {
     const rel = path.relative(workRoot, file).replaceAll('\\', '/');
+    const rootSegment = rel.split('/')[0];
+    // Kernel custody and generated projections have their own lifetime and
+    // validators.  They are explicitly outside the authored Work record walk.
+    if (KERNEL_CUSTODY_ROOTS.has(rootSegment) || rootSegment === '_derived') continue;
     const shown = path.relative(root, file).replaceAll('\\', '/');
     let record;
     try { record = parseYaml(fs.readFileSync(file, 'utf8')); }
@@ -104,12 +116,23 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       continue;
     }
 
+    // Evidence manifests are proof payloads owned by the adjacent record, not
+    // independent Work records whose id is derived from a feature family.
+    // The engine and check-work-artifacts validate their evidence contract.
+    if ((record.schema === 'work/evidence@1' && !rel.endsWith('/evidence.yaml'))
+      || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) {
+      payloads += 1;
+      infos.push(`${shown}: evidence manifest is proof payload, not a compact family record [PAYLOAD_SKIPPED]`);
+      continue;
+    }
+
     if (rel.endsWith('/evidence.yaml')) {
       evidenceFiles.push({record, shown, dir: path.dirname(file)});
       continue;
     }
-    if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
-    if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema)) {
+    const recursiveNode = isRecursiveNodeSchema(record.schema);
+    if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record, recursiveNode});
+    if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema) && !recursiveNode) {
       const want = expectedId(segments);
       if (want && record.id !== want) problems.push(`${shown}: id is ${record.id}, but its place says ${want}`);
       if (!want) problems.push(`${shown}: no record family in its path; ${[...FAMILIES].join(', ')} are the families`);
@@ -232,6 +255,11 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
   for (const [id, rec] of records) {
     const data = rec.data;
     const schema = rec.schema;
+    // Legacy recursive specification nodes are checked by engine/index.mjs and
+    // the typed SRS/SDS readers.  The rules below are the canonical flat
+    // work/* family contract and must not impose its lifecycle or identity on
+    // the retired format.
+    if (rec.recursiveNode) continue;
 
     // ---- concept 1: blocker edges ----
     if (Array.isArray(data.blockedBy)) {

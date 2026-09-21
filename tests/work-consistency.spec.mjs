@@ -51,6 +51,14 @@ const joinAll = sink => [...sink.refuse, ...sink.suspect, ...sink.info].join('\n
 const criterion = (name, rule) => `schema: work/acceptance-criterion@1\nid: ${rule.replace(/^br\./, 'ac.')}.${name}\nrule: ${rule}\ngiven: g\nwhen: w\nthen: [t]\n`;
 const rule = (id, criteria, extra = '') => `schema: work/business-rule@1\nid: ${id}\ntitle: t\nstate: todo\nstatements: [s]\nacceptanceCriteria: [${criteria.join(', ')}]\nmodule: src/f\n${extra}`;
 
+test('recursive features/index.yaml catalog does not owe the compact root work/catalog record', () => {
+  const workRoot = path.join(freshDir(), '.starciwork');
+  write(workRoot, 'workspace.yaml', 'schema: work/workspace@1\nid: recursive\n');
+  write(workRoot, 'features/index.yaml', 'schema: work/node@2\nid: recursive.features\nkind: business\nrequired: true\ndescription: Recursive feature catalog.\n');
+  const sink = checkWorkConsistencyTree(workRoot);
+  assert.equal(refusedWith(sink, 'CATALOG_DIRTY').length, 0, joinAll(sink));
+});
+
 test('concept 1: a rule naming a criterion that no ac/ directory answers is refused when the rule owns criteria', () => {
   const staleName = consistencySink({
     'features/f/br/complete/once/index.yaml': rule('br.f.complete.once', ['is-idempotent', 'is-reversible']),

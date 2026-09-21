@@ -335,12 +335,16 @@ export function checkConsistencyTree(workRoot, records, sink) {
   // directory names to entries, so it stays silent about an entry whose feature directory exists but holds
   // no feature record, and about a record whose title no longer says what the catalog says it says.
   const catalogFile = path.join(workRoot, 'index.yaml');
+  const recursiveCatalogFile = path.join(workRoot, 'features', 'index.yaml');
   let catalog = null;
   try { catalog = parseYaml(fs.readFileSync(catalogFile, 'utf8')); } catch { catalog = null; }
+  let recursiveCatalog = null;
+  try { recursiveCatalog = parseYaml(fs.readFileSync(recursiveCatalogFile, 'utf8')); } catch { recursiveCatalog = null; }
   const catalogShown = path.relative(root, catalogFile).replaceAll('\\', '/');
-  if (!catalog?.features) {
+  const hasRecursiveCatalog = /^work\/node@\d+$/.test(recursiveCatalog?.schema ?? '');
+  if (!catalog?.features && !hasRecursiveCatalog) {
     refuse(catalogShown, 'CATALOG_DIRTY', 'no readable work/catalog@1 features list at the tree root, so nothing here can be reconciled with it');
-  } else {
+  } else if (catalog?.features) {
     for (const entry of catalog.features) {
       const entryId = String(entry?.id ?? '');
       const entryShown = `${catalogShown} (feature entry ${entryId || '(unnamed)'})`;
