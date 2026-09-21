@@ -84,17 +84,25 @@ BOUNDARY — hard rules, non-negotiable:
     repair or settlement and continue until no immediately executable durable
     transition remains.
   - Evaluate the cut bound for EVERY op before enqueue — the check is
-    mandatory, not discretionary: a write scope past twelve files, more than
-    eight assertions, or >=3 components (modules/models/kinds.yaml
-    implementation.plan) is over the bound. When exceeded, keep the approved
-    plan unchanged and execute that SAME op as a complete seam-first set of
-    pairwise-disjoint jobs using api enqueue `--cut-id/--cut-ordinal/--cut-total`.
-    Never inject another op such as work.author, never launch a mega-op, and
-    do not advance the semantic leg until every slice passes. This
-    decomposition is Kernel/AI technical work, not an owner gate. A wide
-    per-route or per-record implement/verify leg is the canonical cut case —
-    dispatching it as one serial worker wastes wall-clock and starves
-    difficulty-appropriate models of parallel capacity.
+    mandatory and COMPUTED, never estimated by feel: measure the op's write
+    scope (files, assertions, components, records) and call
+    `api estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]`.
+    The returned `slices` is the slice count (runtimes.yaml allocation.slicing
+    owns the weights and the 15-30min target); slices > 1 means the op is over
+    the bound. When exceeded, keep the approved plan unchanged and execute that
+    SAME op as a complete seam-first set of pairwise-disjoint jobs using api
+    enqueue `--cut-id/--cut-ordinal/--cut-total`, sized so each slice holds
+    roughly minutes/slices of the measured work. Never inject another op such
+    as work.author, never launch a mega-op, and do not advance the semantic
+    leg until every slice passes. This decomposition is Kernel/AI technical
+    work, not an owner gate. A wide per-route or per-record implement/verify
+    leg is the canonical cut case — dispatching it as one serial worker wastes
+    wall-clock and starves difficulty-appropriate models of parallel capacity.
+    Spread a multi-slice set across pools: route slice k with
+    `--prefer <pool[k mod tier-pools]>` taken in the difficulty tier's chain
+    order, so devin/codex/claude/qwen lanes fill in parallel rather than every
+    slice landing on the first pool; persisted routes already count queued and
+    leased lanes, so overflow handles the remainder.
     If the selected operation declares a cut-set-aware integration proof, a
     non-final slice may leave only mapped sibling failures in the unchanged
     full regression. Independently record green `cut-slice-postcondition` and

@@ -138,6 +138,8 @@ const usage = (code) => {
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>]
            [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+  estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
+           deterministic slice sizing from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
   reconcile --job <job_id>
@@ -631,6 +633,45 @@ function cmdPlan(ledger, args) {
     args.json);
 }
 
+/* -------------------------------------------------------------- estimate */
+// Deterministic same-op slice sizing. The kernel measures the write scope and
+// passes the counts; weights and bounds live in runtimes.yaml
+// allocation.slicing so the estimate is a declared computation, never a
+// model's guess. W = sum(weight * count) agent-minutes; slices =
+// clamp(ceil(W / targetMinutes[1]), 1, maxSlices).
+function cmdEstimate(ledger, args) {
+  const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
+  const slicing = (fs.existsSync(rtFile) ? parseYaml(fs.readFileSync(rtFile, 'utf8')) : null)
+    ?.allocation?.slicing ?? {};
+  const weights = { file: 4, assertion: 3, component: 12, record: 2, ...(slicing.weights ?? {}) };
+  const target = Array.isArray(slicing.targetMinutes) && slicing.targetMinutes.length === 2
+    ? slicing.targetMinutes.map(Number) : [15, 30];
+  const maxSlices = Math.max(1, Number(slicing.maxSlices) || 15);
+  const counts = {
+    file: Math.max(0, Number(args.files) || 0),
+    assertion: Math.max(0, Number(args.assertions) || 0),
+    component: Math.max(0, Number(args.components) || 0),
+    record: Math.max(0, Number(args.records) || 0),
+  };
+  if (!Object.values(counts).some((n) => n > 0)) {
+    throw Object.assign(
+      new Error('estimate needs at least one of --files/--assertions/--components/--records'),
+      { code: 'estimate-no-measure' });
+  }
+  const minutes = Object.entries(counts).reduce((sum, [k, n]) => sum + (weights[k] ?? 0) * n, 0);
+  const slices = Math.min(maxSlices, Math.max(1, Math.ceil(minutes / target[1])));
+  const perSliceMinutes = Math.round((minutes / slices) * 10) / 10;
+  const out = {
+    ok: true, minutes, slices, perSliceMinutes, counts, weights,
+    targetMinutes: target, maxSlices,
+    overTarget: slices >= maxSlices && perSliceMinutes > target[1],
+  };
+  emit(out, [
+    `estimate: ${minutes} agent-min -> ${slices} slice(s) ~${perSliceMinutes}min each (target ${target[0]}-${target[1]}min, cap ${maxSlices})`,
+    ...(out.overTarget ? [`  slice cap ${maxSlices} reached at ${perSliceMinutes}min/slice — prefer finer path decomposition before enqueue`] : []),
+  ].join('\n'), args.json);
+}
+
 /* --------------------------------------------------------------- enqueue */
 function cmdEnqueue(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
@@ -804,8 +845,14 @@ async function cmdRoute(ledger, args) {
   const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
   const rtDoc = fs.existsSync(rtFile) ? parseYaml(fs.readFileSync(rtFile, 'utf8')) : null;
   const pools = rtDoc?.runtimes ?? {};
+  // A persisted payload.model marks a lane already committed: routed-but-queued,
+  // leased and answering jobs hold the same pool slot a running one does, so
+  // sequential route calls in one fan-out see the fleet filling instead of
+  // piling every slice onto the first preferred pool.
   const runningByModel = {};
-  for (const r of db.prepare("SELECT payload_json FROM jobs WHERE status='running'").all()) {
+  for (const r of db.prepare(
+    `SELECT payload_json FROM jobs WHERE status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`
+  ).all(...FINAL_SETTLED)) {
     const p = parseJson(r.payload_json, {});
     if (p?.model) runningByModel[p.model] = (runningByModel[p.model] ?? 0) + 1;
   }
@@ -2147,7 +2194,7 @@ async function main() {
 
   const required = {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
-    enqueue: ['workflow', 'op', 'paths'], route: ['job'], dispatch: ['job'],
+    enqueue: ['workflow', 'op', 'paths'], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: ['job'], nudge: ['job'], observe: ['job'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
@@ -2176,6 +2223,7 @@ async function main() {
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args);
+      case 'estimate': return cmdEstimate(ledger, args);
       case 'route': return await cmdRoute(ledger, args);
       case 'dispatch': return cmdDispatch(ledger, args, repo);
       case 'reconcile': return cmdReconcile(ledger, args);

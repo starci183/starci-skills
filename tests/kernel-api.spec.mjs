@@ -347,3 +347,20 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',{
   assert.ok(calls.some(argv=>argv.slice(0,2).join(' ')==='terminal close'&&argv.includes('term-k7-kernel')),
     'finish must request close of the exact Kernel terminal');
 });
+
+test('estimate sizes same-op slices from measured counts, never a guess',{skip},t=>{
+  const fx=fixture(t),repo=fx.repo();
+  seed(repo,ledger=>ledger.ensureWorkflow({workflowId:'wf-k7-estimate',title:'estimate smoke'}));
+  const big=runApi('estimate','--repo',repo,'--files','40','--assertions','20','--components','9','--json');
+  assert.equal(big.status,0,big.stderr);
+  const b=out(big);
+  assert.equal(b.minutes,328,'40*4 + 20*3 + 9*12 = 328 agent-minutes');
+  assert.equal(b.slices,11,'ceil(328/30) = 11 slices inside the 15-30min target');
+  assert.ok(b.perSliceMinutes<=30&&b.perSliceMinutes>=15,`per-slice ${b.perSliceMinutes}min outside target`);
+  const small=runApi('estimate','--repo',repo,'--files','3','--json');
+  assert.equal(small.status,0,small.stderr);
+  assert.equal(out(small).slices,1,'a 12-minute measure never cuts');
+  const empty=runApi('estimate','--repo',repo,'--json');
+  assert.notEqual(empty.status,0,'estimate with no measured count must refuse');
+  assert.match(`${empty.stdout}${empty.stderr}`,/estimate-no-measure/);
+});

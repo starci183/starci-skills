@@ -167,12 +167,18 @@ tick:
     cutExecution: >-
       A preflight-proven write closure beyond the canonical cut bounds is
       execution decomposition INSIDE the already approved semantic op, not a
-      new semantic plan leg and not an owner gate. Derive a stable cut id and
-      a complete seam-first partition of concrete, pairwise-disjoint path
-      slices; enqueue one job per slice with the SAME approved op id using
-      `--cut-id <id> --cut-ordinal <n> --cut-total <N>`. Every slice stays at
-      or below the file/assertion/component bounds and carries the same exact
-      goal/record binding. Do not inject work.author, duplicate the op in the
+      new semantic plan leg and not an owner gate. The slice count is
+      computed, not guessed: measure the closure's files/assertions/
+      components/records and call `api estimate`; its `slices` (from
+      runtimes.yaml allocation.slicing, 15-30min per slice, cap 15) is N.
+      Derive a stable cut id and a complete seam-first partition of concrete,
+      pairwise-disjoint path slices; enqueue one job per slice with the SAME
+      approved op id using `--cut-id <id> --cut-ordinal <n> --cut-total <N>`.
+      Every slice stays at or below the file/assertion/component bounds and
+      carries the same exact goal/record binding. Route the set spread across
+      the tier's pool order (`--prefer` rotated per ordinal) so parallel
+      slices occupy devin/codex/claude/qwen lanes concurrently instead of
+      saturating one pool. Do not inject work.author, duplicate the op in the
       derived goal plan, or create a mega-op. The semantic leg advances only
       after every ordinal in the cut set settles pass and the union of their
       declared paths equals the preflight closure. A failed slice retries only
@@ -246,10 +252,11 @@ tick:
         anything in flight),
         lease (no contested capacity-1 resource — the path:* write fences and
         machine:* budgets), group (seam runs alone and first;
-        siblings bounded by runtimes.yaml fanOut.maxPerGroup). An op past the
-        cut bounds (a write scope past twelve files, more than eight
-        assertions, or >=3 components — modules/models/kinds.yaml
-        implementation.plan) is cut into a complete set of disjoint SAME-OP
+        siblings bounded by runtimes.yaml fanOut.maxPerGroup). An op whose
+        `api estimate` over its measured write scope returns slices > 1
+        (the twelve-file / eight-assertion / three-component screen in
+        modules/models/kinds.yaml implementation.plan is the coarse form of
+        the same measure) is cut into a complete set of disjoint SAME-OP
         execution slices before any slice is enqueued (`enqueue.cutExecution`);
         this does not alter the approved semantic chain. These checks span all workflows in the canonical ledger.
         There is no repository-wide, ledger-wide, workflow-wide or open-job

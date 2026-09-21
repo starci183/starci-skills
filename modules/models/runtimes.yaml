@@ -65,6 +65,17 @@ allocation:
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
   fanOut: {seamFirst: true, maxPerGroup: 10}
+  # Deterministic same-op slicing — the kernel measures the write scope and calls `api estimate`;
+  # it never guesses a slice count. W = sum(weight * count) in agent-minutes; the returned slice
+  # count is clamp(ceil(W / targetMinutes[1]), 1, maxSlices) so each slice lands inside
+  # targetMinutes. The static bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a
+  # coarse screen over the same measure — the estimate is the authority. When N > 1 slices are
+  # admitted together the kernel rotates --prefer across the difficulty tier's pool order so the
+  # fleet spreads over devin/codex/claude/qwen lanes instead of piling onto the first pool.
+  slicing:
+    weights: {file: 4, assertion: 3, component: 12, record: 2}
+    targetMinutes: [15, 30]
+    maxSlices: 15
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
