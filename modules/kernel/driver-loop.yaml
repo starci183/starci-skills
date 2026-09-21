@@ -472,7 +472,13 @@ verdictTable:
       account, access, consent, authority, business-decision,
       irreversible-confirmation). A credential ask parks its requesters and
       settles by PRESENCE — the op is 'running' with no dispatch, no
-      runtime, no slot.
+      runtime, no slot. When a report lands with outcome ask, the kernel
+      launches `node scripts/kernel/serve-ask.mjs --repo <owner-repo>
+      --workflow <id>` detached — it serves the question as a localhost form
+      (first free port in 6969..7069, nonce path), writes submitted values to
+      sealed custody/.env.local without any agent seeing them, files a
+      sanitized `ask-answered` event, and wakes the kernel. The ask leg stays
+      parked meanwhile; runnable frontier ops keep driving.
     citation: "modules/models/kinds.yaml routes; modules/kernel/verdict-contract.yaml BLOCKER_KINDS; modules/ops/ops/provision.ask.yaml"
 
   - verdict: suspicion      # mid-flight wrongness — the 'cấn cấn' signal
@@ -509,6 +515,24 @@ interfaceAuditLoop:
     Every source/design repair invalidates prior captures. The next audit is
     executable only after interface.implement stamps fresh real route x state
     x viewport x theme captures from the repaired served build.
+  realization: >-
+    interface.draw classifies every visible region as raster-asset or
+    code-native. Rich authored mascot/illustration/photo/textured media keeps
+    exact asset identity and provenance; layout, cards, panels, controls,
+    typography, system icons, responsive structure, shadows, glows and simple
+    geometry use semantic DOM plus installed Grammar/CSS/repository-native SVG.
+    interface.implement persists the actual binding and interface.audit treats
+    flattened UI or silent CSS approximation of required authored media as hard
+    realization.mode drift.
+  deviations: >-
+    A claimed intentional departure from the accepted draw never passes by an
+    auditor or implementer explanation. interface.audit persists the measured
+    side-by-side diff, rationale, accepted-conformant alternative, strongest
+    counterargument, risks, rollback and recheck matrix as a hash-bound
+    append-only deviation case. Until an explicit owner decision names that
+    exact case digest and draw/capture hashes, keep the finding open and stop
+    with OWNER_DEVIATION_DECISION_REQUIRED. Owner approval creates newer
+    accepted direction lineage; it is not an audit self-waiver.
   citation: "modules/ops/ops/interface.audit.yaml auditPolicy; modules/models/kinds.yaml interface audit routes"
 
 assistedUatLoop:
