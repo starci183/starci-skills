@@ -192,8 +192,10 @@ steps:
         of critical screens that covers the highest-risk layouts, interactions, brand moments and component anatomy;
         do not generate one image for every state. When a screen's direction is genuinely owner-level taste —
         a novel surface, a brand moment, or materially different layout architectures that all satisfy the
-        accepted requirements — the representative set may hold alternative candidates for the same screen and the
-        parked owner ask lets the owner pick; candidates remain direction, and the unchosen ones stay evidence.
+        accepted requirements. The default is one candidate per screen: alternative candidates are generated
+        only when the owner explicitly asked for options (in the goal, a directive, or a prior review note);
+        when alternatives do exist the parked owner ask lets the owner pick, candidates remain direction, and
+        the unchosen ones stay evidence.
         Before generation, classify every visible region by realization:
         use `raster-asset` for authored imagery whose identity depends on rich texture, illustration, photography or
         a declared mascot/media master; use `code-native` for layout, spacing, responsive structure, panels, cards,
