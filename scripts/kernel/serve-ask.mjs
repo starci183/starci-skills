@@ -117,7 +117,7 @@ const writeCustody = (repo, name, value) => {
 // provision scripts read, and `.starcistacks/dev/runtime/env/app.env` is the
 // canonical encrypted store (whole-file set: show → upsert → set back).
 const upsertLines = (content, key, value) => {
-  const re = new RegExp(`(?m)^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=.*$`);
+  const re = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=.*$`, 'm');
   return re.test(content) ? content.replace(re, `${key}=${value}`) : `${content}${content && !content.endsWith('\n') ? '\n' : ''}${key}=${value}\n`;
 };
 
@@ -249,6 +249,7 @@ const main = async () => {
       let body = '';
       req.on('data', (c) => { body += c; if (body.length > 256 * 1024) req.destroy(); });
       req.on('end', () => {
+        try {
         const params = new URLSearchParams(body);
         const custodyWritten = [], envWritten = [], pointersWritten = [], errors = [];
         for (const name of fields.files) {
@@ -312,6 +313,14 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
 <p>You can close this tab — the workflow kernel has been notified.</p></body>`);
         done = true;
         setTimeout(() => { server.close(); process.exit(0); }, 400).unref();
+        } catch (error) {
+          // A failed write must not kill the one-shot server before the owner
+          // can retry — the ask stays unanswered and the form stays usable.
+          res.writeHead(500, { 'content-type': 'text/html; charset=utf-8' });
+          res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
+<h2>Write failed — nothing was stored</h2><p style="color:#a33">${esc(String(error?.message ?? error))}</p>
+<p>Go back and resubmit — the ask is still open.</p></body>`);
+        }
       });
       return;
     }
