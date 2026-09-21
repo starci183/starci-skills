@@ -63,8 +63,12 @@ reads:
         input. When the resolved Grammar package ships a `captures/` directory (per-story rendered component PNGs
         with an index.json, produced by the package's storybook capture harness), prefer those rendered captures as
         ImageGen input images over inferring appearance from type/CSS text alone — they are the package's own
-        ground-truth renders. The direction may be inspired by it but is not proof that an exact export, prop or
-        render works.
+        ground-truth renders. Resolution order: the consuming app's installed `node_modules/<grammar-pkg>/captures/`,
+        then a project-vendored `.starciwork/_resources/grammar-captures/` (a verbatim copy of the package's
+        captures dir), then a source checkout of the Grammar repo. Captures carry the family they were rendered
+        under — if the consuming app declares its own Grammar family/theme, cite captures as anatomy reference and
+        bind palette/tokens to the accepted brand record, never to the capture's own colors. The direction may be
+        inspired by it but is not proof that an exact export, prop or render works.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -166,7 +170,11 @@ steps:
         band from accepted journeys/SDS; map each combination to actual inspected Grammar components and state
         contracts. Classify the scope as bounded or large. For a large task choose the smallest representative set
         of critical screens that covers the highest-risk layouts, interactions, brand moments and component anatomy;
-        do not generate one image for every state. Before generation, classify every visible region by realization:
+        do not generate one image for every state. When a screen's direction is genuinely owner-level taste —
+        a novel surface, a brand moment, or materially different layout architectures that all satisfy the
+        accepted requirements — the representative set may hold alternative candidates for the same screen and the
+        parked owner ask lets the owner pick; candidates remain direction, and the unchosen ones stay evidence.
+        Before generation, classify every visible region by realization:
         use `raster-asset` for authored imagery whose identity depends on rich texture, illustration, photography or
         a declared mascot/media master; use `code-native` for layout, spacing, responsive structure, panels, cards,
         controls, text, system icons, borders, shadows, glows and simple geometric decoration representable by
