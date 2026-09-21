@@ -121,6 +121,62 @@ const imagesOf = (text, repo) => {
 // live behind the report's `files` globs instead. Expand each glob's static
 // directory prefix and collect the newest images beneath it (bounded, so a
 // stray `**` cannot crawl the whole tree).
+// A selection ask declares its reviewable artifacts explicitly through
+// `question.assets` — repo-relative paths, optionally {path, label} — so the
+// owner judges the artifacts, not a text description of them.
+const assetsOf = (assets, repo) => {
+  const out = [];
+  for (const a of assets ?? []) {
+    const spec = typeof a === 'string' ? a : a?.path;
+    if (!spec) continue;
+    const rel = String(spec).replace(/\\/g, '/');
+    const abs = path.join(repo, rel);
+    if (fs.existsSync(abs) && MIME[path.extname(abs).slice(1).toLowerCase()])
+      out.push({ label: (typeof a === 'object' && a?.label) || rel, abs });
+  }
+  return out;
+};
+
+// Candidate draws are always recorded in a draws.yaml next to their assets —
+// when an ask names no paths at all, render the newest draw set rather than
+// leaving the owner to pick blind.
+const drawsImages = (repo) => {
+  const root = path.join(repo, '.starciwork');
+  const candidates = [];
+  const queue = [root]; let head = 0, visited = 0;
+  while (head < queue.length && visited++ < 20000) {
+    const dir = queue[head++];
+    let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of ents) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (!e.name.startsWith('.')) queue.push(p); continue; }
+      if (e.name === 'draws.yaml') candidates.push(p);
+    }
+  }
+  candidates.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  const newest = candidates[0];
+  if (!newest) return [];
+  const out = [];
+  let id = null;
+  for (const line of fs.readFileSync(newest, 'utf8').split('\n')) {
+    const idM = line.match(/^\s+-\s+id:\s*(\S+)/) ?? line.match(/^\s+id:\s*(\S+)/);
+    if (idM) { id = idM[1]; continue; }
+    const imgM = line.match(/^\s+image:\s*(\S+)/);
+    if (imgM) {
+      // draw entries resolve image paths against their ui-node dir, not
+      // necessarily the evidence dir holding draws.yaml — walk ancestors up
+      // to .starciwork until the relative path exists.
+      let abs = null, dir = path.dirname(newest);
+      for (let up = 0; up < 6 && dir.startsWith(root); up++, dir = path.dirname(dir)) {
+        const cand = path.join(dir, imgM[1]);
+        if (fs.existsSync(cand)) { abs = cand; break; }
+      }
+      if (abs && MIME[path.extname(abs).slice(1).toLowerCase()]) out.push({ label: id ?? imgM[1], abs });
+    }
+  }
+  return out;
+};
+
 const reportImages = (files, repo) => {
   const out = [], seen = new Set();
   for (const spec of files ?? []) {
@@ -306,8 +362,10 @@ const main = async () => {
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
   const qText = `${question.text ?? ''}\n${(question.options ?? []).join('\n')}`;
   const fields = fieldsOf(qText);
-  let images = imagesOf(qText, repo);
+  let images = assetsOf(question.assets, repo);
+  if (!images.length) images = imagesOf(qText, repo);
   if (!images.length) images = reportImages(rj.files, repo);
+  if (!images.length) images = drawsImages(repo);
   const nonce = `a-${crypto.randomBytes(9).toString('hex')}`;
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 

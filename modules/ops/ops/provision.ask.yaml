@@ -66,6 +66,10 @@ steps:
         confirmation is degenerate: either the deliverable is named and re-verified, or the ask
         is the wrong lane — interactive actions inside a running product are uat.assisted
         checkpoints, and informational answers carry the answer itself, not a confirmation flag.
+        When the ask presents alternatives the owner must judge (candidate draws, artifacts,
+        plans), the report's question.assets must list the exact repo-relative artifact paths —
+        optionally {path, label} — so the owner reviews the artifacts themselves, never a text
+        description or a bare hash of them.
         Wait as long as the contract lets you.
   - reads:
       - question
