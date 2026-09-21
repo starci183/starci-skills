@@ -55,17 +55,49 @@ const expectedId = segments => {
  * (modules/schemas/work-layout.yaml) declares for staleness. Computed inline here. */
 const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
+/** Record map of a tree for ref RESOLUTION only — the same membership rules the validating walk applies
+ * (kernel custody roots skipped, payload schemas and evidence manifests excluded), but silent: no
+ * problems, no ref collection, no per-record rules. Scoped validation (starci validate <record-dir>)
+ * resolves refs against the enclosing tree — a uat-flow's environment resource lives in _resources/
+ * above the record dir and could never resolve otherwise. */
+const collectRecordMap = (scopeRoot) => {
+  const map = new Map();
+  const wsDoc = readWorkspace(scopeRoot);
+  for (const file of walk(scopeRoot).filter(f => f.endsWith('.yaml'))) {
+    const rel = path.relative(scopeRoot, file).replaceAll('\\', '/');
+    const rootSegment = rel.split('/')[0];
+    if (KERNEL_CUSTODY_ROOTS.has(rootSegment) || rootSegment === '_derived') continue;
+    let record;
+    try { record = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
+    if (!record || typeof record !== 'object') continue;
+    if (!isWorkRecordSchema(record.schema, wsDoc)) continue;
+    const segments = rel.split('/');
+    if ((record.schema === 'work/evidence@1' && !rel.endsWith('/evidence.yaml'))
+      || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
+    if (rel.endsWith('/evidence.yaml')) continue;
+    if (record.id) map.set(record.id, {
+      schema: record.schema, state: record.state, change: record.change, file,
+      shown: path.relative(root, file).replaceAll('\\', '/'), dir: path.dirname(file),
+      data: record, recursiveNode: isRecursiveNodeSchema(record.schema),
+    });
+  }
+  return map;
+};
+
 /**
  * Runs every check in this file against one .starciwork tree rooted at `workRoot`, appending human-readable
  * refusal strings to `problems`. Exported so the fixture test can point it at a throwaway tree instead of
- * the real example tree.
+ * the real example tree. `resolveRoot` optionally widens ref resolution to an ancestor tree while record
+ * rules still apply only to `workRoot` — the scoped-validate case above.
  */
-export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
+export function checkWorkTree(workRoot, problems, warnings = [], infos = [], resolveRoot = workRoot) {
   const records = new Map(); // id -> {schema, state, change, file, shown, dir, data}
   const refs = [];
   const evidenceFiles = [];
   let payloads = 0;
   const workspaceDoc = readWorkspace(workRoot);
+  // Resolution scope is the whole enclosing tree; validation scope stays `records`.
+  const resolveRecords = resolveRoot === workRoot ? null : collectRecordMap(resolveRoot);
 
   const collect = (node, file, trail) => {
     if (typeof node === 'string') {
@@ -140,6 +172,10 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     collect(record, shown, '');
   }
 
+  // Resolution scope: the whole enclosing tree when validate was pointed at a
+  // record dir; otherwise the same map the validating walk just built.
+  const resolveMap = resolveRecords ?? records;
+
   // ---- evidence: naming + staleness (concept: change/staleness) ----
   for (const {record, shown, dir} of evidenceFiles) {
     const siblingFile = path.join(dir, 'index.yaml');
@@ -161,9 +197,9 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     // right now, the evidence is refused unless it already carries stale: true (the same escape valve
     // recordDigest staleness above uses).
     if (record.codeDigest?.digest) {
-      const recEntry = records.get(record.record);
+      const recEntry = resolveMap.get(record.record);
       if (recEntry) {
-        const dirs = resolveOwnedDirs(record.record, recEntry, records, workspaceDoc, workRoot);
+        const dirs = resolveOwnedDirs(record.record, recEntry, resolveMap, workspaceDoc, workRoot);
         const fresh = hashOwnedDirs(dirs);
         const freshDigest = fresh?.digest ?? null;
         if (freshDigest !== record.codeDigest.digest && record.stale !== true) {
@@ -190,6 +226,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
   // minus its family segment + `.` + name), the same place-law a file under ac/ lived under; and one id
   // may not be claimed by two parents.
   const inline = indexInlineCriteria(records);
+  const resolveInline = resolveRecords ? indexInlineCriteria(resolveMap) : inline;
   for (const [id, rec] of records) {
     const wantPrefix = `ac.${id.split('.').slice(1).join('.')}.`;
     for (const criterion of inlineCriteriaOf(rec.data)) {
@@ -202,7 +239,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       if (!criterion.id.startsWith(wantPrefix)) {
         problems.push(`${rec.shown}: inline criterion carries id ${criterion.id}, but its place inside ${id} says ${wantPrefix}* - the compact form keeps the former record's own id [AC_ID_MISMATCH]`);
       }
-      if (records.has(criterion.id)) {
+      if (resolveMap.has(criterion.id)) {
         problems.push(`${rec.shown}: inline criterion id ${criterion.id} is also a live record's id - a collapsed criterion and a record cannot both own it [AC_ID_COLLISION]`);
       }
     }
@@ -215,8 +252,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
   // that record, and a dangling fragment surfaces through the same "does not exist / no record owns"
   // refusal a dangling plain id gets.
   const recOf = ref => {
-    const rid = resolveRecordRef(records, ref, inline);
-    return rid ? records.get(rid) : undefined;
+    const rid = resolveRecordRef(resolveMap, ref, resolveInline);
+    return rid ? resolveMap.get(rid) : undefined;
   };
 
   // ---- refs resolve (existing structural check, now also covers blockedBy/conflictsWith/appliesTo/subscribes/extends record ids) ----
@@ -232,20 +269,20 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       continue;
     }
     if (ref.frag != null) {
-      if (!records.has(ref.id)) {
+      if (!resolveMap.has(ref.id)) {
         problems.push(`${ref.file}: ${ref.trail} points at ${ref.id}#${ref.frag}, but no record owns ${ref.id}`);
         continue;
       }
-      const resolved = inline.byParent.get(ref.id)?.has(ref.frag)
-        || records.has(ref.frag)
-        || inline.byAcId.get(ref.frag) === ref.id;
+      const resolved = resolveInline.byParent.get(ref.id)?.has(ref.frag)
+        || resolveMap.has(ref.frag)
+        || resolveInline.byAcId.get(ref.frag) === ref.id;
       if (!resolved) problems.push(`${ref.file}: ${ref.trail} points at ${ref.id}#${ref.frag}, which names no criterion ${ref.id} carries`);
       continue;
     }
-    if (records.has(ref.id)) continue;
-    if (inline.byAcId.has(ref.id)) {
+    if (resolveMap.has(ref.id)) continue;
+    if (resolveInline.byAcId.has(ref.id)) {
       if (!DECL_TRAIL.test(ref.trail)) {
-        warnings.push(`${ref.file}: ${ref.trail} references collapsed criterion ${ref.id} by its old ac id - the compact form is ${inline.byAcId.get(ref.id)}#${ref.id} [AC_UNREMAPPED_REF]`);
+        warnings.push(`${ref.file}: ${ref.trail} references collapsed criterion ${ref.id} by its old ac id - the compact form is ${resolveInline.byAcId.get(ref.id)}#${ref.id} [AC_UNREMAPPED_REF]`);
       }
       continue;
     }
@@ -299,7 +336,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       } else {
         const ids = Array.isArray(data.tension.records) ? data.tension.records : [];
         if (ids.length < 2) problems.push(`${rec.shown}: tension.records needs at least two record ids`);
-        for (const tid of ids) if (!resolveRecordRef(records, tid, inline)) problems.push(`${rec.shown}: tension.records names ${tid}, which no record owns`);
+        for (const tid of ids) if (!resolveRecordRef(resolveMap, tid, resolveInline)) problems.push(`${rec.shown}: tension.records names ${tid}, which no record owns`);
       }
     }
 
@@ -312,7 +349,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
         if (!closers) {
           problems.push(`${rec.shown}: closedBy must be a record id or a list of record ids, not ${JSON.stringify(data.closedBy)}`);
         } else {
-          const unresolved = closers.filter(c => !resolveRecordRef(records, c, inline));
+          const unresolved = closers.filter(c => !resolveRecordRef(resolveMap, c, resolveInline));
           for (const c of unresolved) problems.push(`${rec.shown}: closedBy names ${c}, which no record owns`);
           if (data.state === 'done' && !unresolved.length) {
             const notDone = closers.filter(c => recOf(c)?.state !== 'done');
@@ -353,13 +390,13 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       if (!['work/business-rule@1', 'work/sds-component@1'].includes(schema)) {
         problems.push(`${rec.shown}: appliesTo is only authored on work/business-rule@1 or work/sds-component@1, not ${schema}`);
       } else {
-        for (const target of data.appliesTo) if (!resolveRecordRef(records, target, inline)) problems.push(`${rec.shown}: appliesTo names ${target}, which no record owns`);
+        for (const target of data.appliesTo) if (!resolveRecordRef(resolveMap, target, resolveInline)) problems.push(`${rec.shown}: appliesTo names ${target}, which no record owns`);
       }
     }
 
     // ---- concept 8: events, data extends, timer transitions ----
     if (schema === 'work/event@1') {
-      if (!data.producer || !resolveRecordRef(records, data.producer, inline)) problems.push(`${rec.shown}: event producer "${data.producer}" does not resolve to a record`);
+      if (!data.producer || !resolveRecordRef(resolveMap, data.producer, resolveInline)) problems.push(`${rec.shown}: event producer "${data.producer}" does not resolve to a record`);
       if (!Array.isArray(data.payload) || !data.payload.length) problems.push(`${rec.shown}: event needs a non-empty payload`);
       const guarantee = data.delivery?.guarantee, ordering = data.delivery?.ordering;
       if (!DELIVERY_GUARANTEES.has(guarantee)) problems.push(`${rec.shown}: delivery.guarantee "${guarantee}" is not one of ${[...DELIVERY_GUARANTEES].join(', ')}`);
@@ -456,7 +493,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
         let relevantUi = provesUi;
         if (!relevantUi.length) {
           const feature = path.relative(workRoot, rec.dir).replaceAll('\\', '/').split('/')[1];
-          relevantUi = [...records.entries()]
+          relevantUi = [...resolveMap.entries()]
             .filter(([, r]) => r.schema === 'work/ui-screen@1' && path.relative(workRoot, r.dir).replaceAll('\\', '/').split('/')[1] === feature)
             .map(([uid]) => uid);
         }
@@ -590,7 +627,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
   // authored for every such chain in one sweep.
   const blockedByOf = rec => Array.isArray(rec?.data?.blockedBy)
     ? rec.data.blockedBy.filter(e => e && typeof e === 'object' && typeof e.record === 'string')
-      .map(e => resolveRecordRef(records, e.record, inline) ?? e.record)
+      .map(e => resolveRecordRef(resolveMap, e.record, resolveInline) ?? e.record)
     : [];
 
   /** DFS from `startId` looking for a path back to `startId` itself. Returns the cycle as an array of ids
@@ -602,8 +639,8 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     const dfs = current => {
       visited.add(current);
       path.push(current);
-      for (const next of blockedByOf(records.get(current))) {
-        if (!records.has(next)) continue;
+      for (const next of blockedByOf(resolveMap.get(current))) {
+        if (!resolveMap.has(next)) continue;
         if (next === startId) return [...path, next];
         if (visited.has(next)) continue;
         const found = dfs(next);
@@ -625,7 +662,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
     const roots = new Map();
     const visitEdge = (targetId, visited) => {
       if (roots.has(targetId)) return;
-      const target = records.get(targetId);
+      const target = resolveMap.get(targetId);
       if (!target) { roots.set(targetId, 'missing'); return; } // dangling ref already caught elsewhere
       if (visited.has(targetId)) { roots.set(targetId, 'cyclic'); return; }
       const isGap = target.schema === 'work/gap@1';
@@ -639,7 +676,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = []) {
       nextVisited.add(targetId);
       for (const sub of subEdges) visitEdge(sub, nextVisited);
     };
-    for (const edge of blockedByOf(records.get(startId))) visitEdge(edge, new Set([startId]));
+    for (const edge of blockedByOf(resolveMap.get(startId))) visitEdge(edge, new Set([startId]));
     return roots;
   };
 

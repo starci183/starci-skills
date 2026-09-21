@@ -36,10 +36,24 @@ export function validateWork(target) {
   const info = [];
   if (!yamlFiles.length) refused.push(`${root}: no YAML Work record found [WORK_RECORD_MISSING]`);
 
+  // Record-scoped validation still resolves refs against the enclosing work
+  // tree: a uat-flow's `environment:` names a _resources record above the
+  // record dir, and resolving it against the dir alone refuses every such ref.
+  const enclosingWorkRoot = (() => {
+    if (mode === 'tree') return root;
+    let dir = root;
+    while (true) {
+      if (path.basename(dir) === '.starciwork' || fs.existsSync(path.join(dir, 'workspace.yaml'))) return dir;
+      const parent = path.dirname(dir);
+      if (parent === dir) return root;
+      dir = parent;
+    }
+  })();
+
   let counts = { records: 0, refs: 0, evidence: 0, payloads: 0 };
   try {
     checkFamiliesDrift(refused, path.join(runtimeRoot, 'modules', 'schemas', 'work-layout.yaml'));
-    counts = checkWorkTree(root, refused, suspect, info);
+    counts = checkWorkTree(root, refused, suspect, info, enclosingWorkRoot);
   } catch (error) {
     refused.push(`${root}: structural validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
   }
