@@ -117,6 +117,37 @@ const imagesOf = (text, repo) => {
   return found;
 };
 
+// A candidate-pick ask often names no files in its question — the artifacts
+// live behind the report's `files` globs instead. Expand each glob's static
+// directory prefix and collect the newest images beneath it (bounded, so a
+// stray `**` cannot crawl the whole tree).
+const reportImages = (files, repo) => {
+  const out = [], seen = new Set();
+  for (const spec of files ?? []) {
+    const rel = String(spec).replace(/\\/g, '/');
+    const abs = path.join(repo, rel);
+    if (!/[*{[]/.test(rel)) {
+      if (fs.existsSync(abs) && MIME[path.extname(abs).slice(1).toLowerCase()] && !seen.has(abs)) { seen.add(abs); out.push({ label: rel, abs, mtime: fs.statSync(abs).mtimeMs }); }
+      continue;
+    }
+    const prefix = rel.slice(0, rel.search(/[*{[]/)).replace(/\/[^/]*$/, '');
+    const base = path.join(repo, prefix);
+    if (!fs.existsSync(base)) continue;
+    const queue = [base]; let head = 0, visited = 0;
+    while (head < queue.length && visited++ < 4000 && out.length < 16) {
+      const dir = queue[head++];
+      let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+      for (const e of ents) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) { if (!e.name.startsWith('.')) queue.push(p); continue; }
+        if (!MIME[path.extname(e.name).slice(1).toLowerCase()] || seen.has(p)) continue;
+        seen.add(p); out.push({ label: path.relative(repo, p).replace(/\\/g, '/'), abs: p, mtime: e.mtimeMs ?? fs.statSync(p).mtimeMs });
+      }
+    }
+  }
+  return out.sort((a, b) => b.mtime - a.mtime).slice(0, 8);
+};
+
 const custodyDirs = (repo) => ['.starcistacks', '.stacks']
   .map(root => path.join(repo, root, 'dev', 'runtime', 'files'))
   .filter(d => fs.existsSync(path.dirname(d)));
@@ -275,7 +306,8 @@ const main = async () => {
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
   const qText = `${question.text ?? ''}\n${(question.options ?? []).join('\n')}`;
   const fields = fieldsOf(qText);
-  const images = imagesOf(qText, repo);
+  let images = imagesOf(qText, repo);
+  if (!images.length) images = reportImages(rj.files, repo);
   const nonce = `a-${crypto.randomBytes(9).toString('hex')}`;
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 
