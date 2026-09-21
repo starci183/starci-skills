@@ -177,6 +177,15 @@ tick:
       after every ordinal in the cut set settles pass and the union of their
       declared paths equals the preflight closure. A failed slice retries only
       that ordinal with the same cut id/total and never reruns a passed slice.
+      When the operation contract declares cut-set-aware integration proof,
+      each non-final slice reruns the unchanged full regression but may retain
+      only failures mapped to unsettled sibling ordinals; its independent
+      Kernel checks are green `cut-slice-postcondition` and
+      `cut-regression-inventory`, with the raw nonzero integration result kept
+      as evidence rather than mislabeled green. The final ordinal must record
+      `full-regression-final` green. This is a saga-style bounded migration:
+      slice acceptance proves monotonic progress, final acceptance proves the
+      global postcondition.
       If a complete disjoint partition cannot be derived from repository
       evidence, that inability is a technical planner incident for Kernel/AI
       repair; it becomes an owner gate only when business scope or authority

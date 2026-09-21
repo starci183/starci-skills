@@ -48,6 +48,32 @@ migrationAuthority:
     - weakening, deleting or rewriting an assertion to obtain green
     - treating a post-edit red result as partial success
     - applying red-before/green-after semantics outside workspace canonicalization
+cutSetAuthority:
+  scope: workspace-canonicalization-only
+  appliesWhen: >-
+    The dispatch packet carries context.cut {id, ordinal, total} with total >= 2,
+    every cut job uses this same approved code.refactor semantic leg and exact
+    goal/record binding, and the complete pairwise-disjoint path union was
+    preflighted before the first slice launched.
+  permits: >-
+    The unchanged full migration regression may remain red after a NON-FINAL
+    cut only for assertions whose unresolved paths belong exclusively to
+    not-yet-passed sibling ordinals in the same cut set. The current slice must
+    pass an independently reproducible exact-slice postcondition, the full
+    regression command and assertion inventory must remain byte-for-byte
+    unchanged, the full failure set must not gain an unrelated assertion, and
+    a failure already resolved by a passed ordinal may not reappear. Record the
+    raw nonzero full-regression result as integration evidence, not as the
+    slice's red verdict. The Kernel records two green checks for a non-final
+    pass: `cut-slice-postcondition` and `cut-regression-inventory`. The FINAL
+    ordinal must additionally record `full-regression-final` green from the
+    unchanged command; only then may the semantic leg advance.
+  forbids:
+    - declaring a non-final slice done from file edits alone or without an exact-slice executable check
+    - accepting any new/unmapped failure, assertion inventory change, widened path or reappearing resolved failure
+    - relabeling the raw full-regression exit code as green; the green inventory check proves only that its allowed residuals are exactly the unsettled sibling closure
+    - advancing workspace.manage or the semantic code.refactor leg before every ordinal passes and the final full regression is green
+    - using cut-set intermediate semantics when context.cut is absent, inconsistent or the complete closure partition is not durably known
 reads:
   - id: target
     path: N/index.yaml OR packet context.records -> exact bound scope.define record/extensions.work3.scope
@@ -89,8 +115,11 @@ reads:
         behavior and that it can run in this environment. The check must exist, cover the changed
         surface and run verbatim. Normally its baseline must be green. Under the exact
         workspace-canonicalization migrationAuthority, it may be red only where every failed
-        assertion is the bound proposal's selected migration delta, and it must become green after
-        the edits without changing the assertions. A missing, non-covering or unrunnable suite is
+        assertion is the bound proposal's selected migration delta. Without context.cut it must
+        become green after the edits. With cutSetAuthority, a non-final slice instead proves its
+        exact-slice postcondition plus an unchanged, monotonic full-regression inventory whose
+        remaining failures map only to unsettled sibling ordinals; the final ordinal must make the
+        unchanged full regression green. A missing, non-covering or unrunnable suite is
         reported `blocked` with blocker kind `test-gap`, which routes to test.author; it is never a
         reason to skip the proof or author coverage inside this op.
   - id: conventions
@@ -207,7 +236,9 @@ steps:
         --profile <nest|next> --root ROOT --all BEFORE the first edit too and keep the machine report
         and exit code. A green baseline is normally the invariant's left side. The sole exception is
         migrationAuthority: preserve the complete red baseline, map every failure to the bound
-        workspace-canonicalization proposal, and proceed only when no unrelated failure exists. No
+        workspace-canonicalization proposal, and proceed only when no unrelated failure exists.
+        For context.cut, also bind the stable cut id/ordinal/total, complete path-union manifest and
+        passed-ordinal state before editing; ambiguity or a missing sibling mapping blocks. No
         existing, covering, runnable check is reported `blocked` with blocker kind `test-gap` and
         this op stops; it never authors the missing tests itself. Resolve the execution profile and
         actual tool availability before selecting instruments; this does not switch the model/runtime
@@ -236,9 +267,12 @@ steps:
         record it beside the before run; where the machines ran before, run the SAME starci
         code-patterns check AFTER the change on the same roots and record it beside the before
         report. Parity normally means the same commands, same scope, same counts and the same green
-        results. Under migrationAuthority it means the identical command/assertion inventory moves
-        from only the declared migration failures to fully green, while unrelated observable
-        behavior remains unchanged. A different command, narrowed selection, rewritten assertion,
+        results. Under migrationAuthority without a cut it means the identical command/assertion
+        inventory moves from only the declared migration failures to fully green. Under
+        cutSetAuthority, a non-final ordinal runs the unchanged full command and may retain only
+        failures mapped to unsettled sibling ordinals, while an independent exact-slice check is
+        green and the failure inventory is monotonic; the final ordinal makes the full command
+        green. Unrelated observable behavior remains unchanged. A different command, narrowed selection, rewritten assertion,
         post-edit failure or new architecture/pattern violation is failed with the diff between the
         two outputs. Nothing is re-worded or skipped to make the after run look green.
   - reads:
@@ -273,11 +307,15 @@ proofs:
         this proof.
   - id: regression-parity
     requirement:
-      en: The same declared regression check ran verbatim before AND after the change, on the exact
+      en: >-
+        The same declared regression check ran verbatim before AND after the change, on the exact
         before tree and the exact after tree, with both exit codes, counts and outputs recorded; the
         after result matches the before result, except that the exact workspace-canonicalization
         migrationAuthority requires the bound declared migration failures before and a fully green
-        result after with the assertion inventory unchanged. Where the slice lives in a checked FE/BE repository,
+        result after with the assertion inventory unchanged, except for the explicit
+        cutSetAuthority intermediate rule: non-final ordinals require green
+        `cut-slice-postcondition` and `cut-regression-inventory`, while the final ordinal requires
+        green `full-regression-final`. Where the slice lives in a checked FE/BE repository,
         the same starci code-patterns check ran verbatim on both sides with its reports retained; a
         new architecture or pattern violation after the change is a failure. A missing, different or
         narrowed check on either side is a failure, and no coverage at all is the `test-gap`
@@ -349,7 +387,7 @@ commitPolicy:
 refactorPolicy:
   behaviorInvariant: required
   regressionCheck: same-check-verbatim-before-and-after
-  workspaceCanonicalizationMigration: exact-declared-red-before-green-after
+  workspaceCanonicalizationMigration: exact-declared-red-before-green-after-or-cut-monotonic-until-final-green
   architectureCheck: starci-code-patterns-check-same-machines-before-and-after
   baselineRed: failed-not-refactored
   coverageAbsent: blocked-test-gap

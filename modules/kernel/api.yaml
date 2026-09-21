@@ -539,6 +539,7 @@ commands:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
       - checks-not-green: 'pass requires at least one independently recorded green check and zero red checks'
+      - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the final ordinal additionally lacks full-regression-final'
       - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal

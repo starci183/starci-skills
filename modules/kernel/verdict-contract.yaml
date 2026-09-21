@@ -220,6 +220,13 @@ accepts:
       fail. Pass still requires `done` plus recorded green checks; every other
       contradiction is verdict-outcome-mismatch. Acceptance writes the verdict
       record on the job's result_json.
+      For an operation with explicit cutSetAuthority, the raw unchanged full
+      integration command may remain nonzero on a non-final slice only as
+      preserved evidence whose residual failures map exclusively to unsettled
+      sibling ordinals. The green Kernel checks are the independently executed
+      `cut-slice-postcondition` and `cut-regression-inventory`; the final ordinal
+      additionally requires `full-regression-final` green. No generic operation
+      may reinterpret a red check this way.
   - layer: boundary-correct
     rule: >-
       A blocked verdict is accepted only with a typed blocker in BLOCKER_KINDS

@@ -90,6 +90,12 @@ BOUNDARY — hard rules, non-negotiable:
     work.author, never launch a mega-op, and do not advance the semantic leg
     until every slice passes. This decomposition is Kernel/AI technical work,
     not an owner gate.
+    If the selected operation declares a cut-set-aware integration proof, a
+    non-final slice may leave only mapped sibling failures in the unchanged
+    full regression. Independently record green `cut-slice-postcondition` and
+    `cut-regression-inventory`; preserve the raw nonzero integration output as
+    evidence. Require `full-regression-final` green on the final ordinal before
+    advancing the semantic leg.
   - LONG-LIVED means the durable Kernel identity survives model-turn boundaries.
     The external canonical watchdog, not this model turn, owns the five-minute
     cadence. When the frontier is legitimately waiting for an active Op, lease,

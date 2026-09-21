@@ -1714,7 +1714,9 @@ function cmdSettle(ledger, args, repo) {
     const status = verdict === 'pass' ? 'succeeded' : 'failed';
     const checkRow = db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
       .get(job.workflow_id, jobOpOf(job), job.attempt);
-    checkEvidence = summarizeCheckEvidence(parseJson(checkRow?.checks_json));
+    const checksEnvelope = parseJson(checkRow?.checks_json);
+    const recordedChecks = Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : [];
+    checkEvidence = summarizeCheckEvidence(checksEnvelope);
     const result = { verdict, report: reportAbs, at: payload.settledAt, checkEvidence };
     // The worker's claim is the reports row keyed by its dispatch. No row yet:
     // a --report file that is itself a valid op-report@1 envelope is filed on
@@ -1751,6 +1753,17 @@ function cmdSettle(ledger, args, repo) {
       }
       if (!checkEvidence.green) {
         throw Object.assign(new Error(`pass requires independently recorded green checks for ${jobId}`), { code: 'checks-not-green' });
+      }
+      if (payload.cut) {
+        const requiredNames = payload.cut.ordinal < payload.cut.total
+          ? ['cut-slice-postcondition', 'cut-regression-inventory']
+          : ['cut-slice-postcondition', 'cut-regression-inventory', 'full-regression-final'];
+        const missing = requiredNames.filter((name) => !recordedChecks.some((check) => check?.name === name && check.exitCode === 0));
+        if (missing.length) {
+          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')}`), {
+            code: 'cut-checks-missing', cut: payload.cut, missing,
+          });
+        }
       }
     }
     machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);

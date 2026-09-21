@@ -48,6 +48,11 @@ paths; sharing a ledger is not itself a conflict.
   provider input prompt, but Kernel still applied the ten-minute wedge clock
   and yielded. A turn-idle worker with no report is already actionable; age is
   irrelevant until the one bounded nudge has been attempted.
+- The first workspace-canonicalization cut could not truthfully make the full
+  migration regression green because that unchanged integration command spans
+  paths owned by seven later cuts. Requiring global green after every bounded
+  slice made the legal decomposition impossible even though the partition and
+  semantic plan were correct.
 
 ## Derived
 
@@ -94,6 +99,12 @@ paths; sharing a ledger is not itself a conflict.
 13. Status promotes any exact turn-idle/live-idle worker with no report to
     `frontier.state=worker-nudge-ready` and lists the exact job ids. Kernel must
     nudge those ids before considering a wait or wedge threshold.
+14. A cut migration uses saga-style proof: every non-final slice independently
+    proves its exact postcondition and a monotonic, unchanged assertion
+    inventory; the raw full regression may remain nonzero only for mapped
+    unsettled siblings. The final ordinal alone must make the unchanged full
+    regression green. `api settle` enforces the canonical green check names so
+    agents cannot reinterpret an arbitrary red integration result as pass.
 
 ## Evidence
 
@@ -102,6 +113,9 @@ paths; sharing a ledger is not itself a conflict.
 - `.claude/tests/op-ipc.spec.mjs` proves report-filed wakes an idle Kernel only
   after the row is durable; `.claude/tests/kernel-api.spec.mjs` covers
   orphaned-frontier projection and persisted cut metadata.
+- `.claude/tests/kernel-api.spec.mjs` also proves a cut pass is refused without
+  `cut-slice-postcondition` and `cut-regression-inventory` (plus
+  `full-regression-final` on the last ordinal).
 - Live reconciliations preserved landing attempt 6 and canonicalization attempt
   2, released their exact-path leases, and resumed both existing Kernel PTYs.
 

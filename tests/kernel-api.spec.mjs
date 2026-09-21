@@ -266,6 +266,33 @@ test('settle --verdict fail --report marks the job settled and appends an event'
   assert.ok(after.events>before,'settle appended no event');
 });
 
+test('cut pass requires the cut-aware green check names before settlement',{skip},t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-cut-settle',jobId='op-k7-cut';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.enqueueJob({jobId,workflowId:wf,opId:'ex-test.probe',kind:'op',payload:{
+      opId:'ex-test.probe',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
+    }});
+    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
+    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
+      .run(wf,jobId,'ex-test.probe',1,0,'done',json({outcome:'done'}),null,at);
+    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
+      .run(wf,'ex-test.probe',1,json({checks:[{name:'generic-green',exitCode:0}]}),at);
+  });
+  const refused=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
+  assert.notEqual(refused.status,0,'generic green evidence must not settle a cut pass');
+  assert.match(`${refused.stdout}${refused.stderr}`,/cut-checks-missing/);
+  seed(repo,ledger=>ledger.db.prepare('UPDATE checks SET checks_json=? WHERE workflow_id=? AND op_id=? AND attempt=1')
+    .run(json({checks:[
+      {name:'cut-slice-postcondition',exitCode:0},
+      {name:'cut-regression-inventory',exitCode:0},
+    ]}),wf,'ex-test.probe'));
+  const accepted=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
+  assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
+  assert.equal(read(repo,ledger=>ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status),'succeeded');
+});
+
 test('incident writes an incidents row for the workflow',{skip},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-incident';
   seedGoal(repo,wf);
