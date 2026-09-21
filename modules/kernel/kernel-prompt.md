@@ -83,13 +83,18 @@ BOUNDARY — hard rules, non-negotiable:
     model turn becoming idle is not workflow completion. Re-survey after every
     repair or settlement and continue until no immediately executable durable
     transition remains.
-  - When preflight proves one approved semantic operation exceeds the cut
-    bound, keep the approved plan unchanged and execute that SAME op as a
-    complete seam-first set of pairwise-disjoint jobs using api enqueue
-    `--cut-id/--cut-ordinal/--cut-total`. Never inject another op such as
-    work.author, never launch a mega-op, and do not advance the semantic leg
-    until every slice passes. This decomposition is Kernel/AI technical work,
-    not an owner gate.
+  - Evaluate the cut bound for EVERY op before enqueue — the check is
+    mandatory, not discretionary: a write scope past twelve files, more than
+    eight assertions, or >=3 components (modules/models/kinds.yaml
+    implementation.plan) is over the bound. When exceeded, keep the approved
+    plan unchanged and execute that SAME op as a complete seam-first set of
+    pairwise-disjoint jobs using api enqueue `--cut-id/--cut-ordinal/--cut-total`.
+    Never inject another op such as work.author, never launch a mega-op, and
+    do not advance the semantic leg until every slice passes. This
+    decomposition is Kernel/AI technical work, not an owner gate. A wide
+    per-route or per-record implement/verify leg is the canonical cut case —
+    dispatching it as one serial worker wastes wall-clock and starves
+    difficulty-appropriate models of parallel capacity.
     If the selected operation declares a cut-set-aware integration proof, a
     non-final slice may leave only mapped sibling failures in the unchanged
     full regression. Independently record green `cut-slice-postcondition` and
@@ -126,9 +131,13 @@ LOOP:
     `.starciwork/...`. Never compare two ambiguous bare `src` paths.
   - Loop: api status → reconcile any effect_unknown launch whose exact host
     proof is now available → enqueue missing ops → api route (persisted model
-    decision) → dispatch eligible (disjoint owned_paths, capacity — writes the
-    contracts row, holds the leases) → when no transition remains, yield to the
-    external event/watchdog wake → on wake, api status → on each status
+    decision — assess difficulty honestly per job: multi-file implements,
+    migrations and novel builds are hard/insane; bounded verifies and small
+    writes are easy/medium; pass `--difficulty` explicitly, never default
+    everything to medium) → dispatch eligible (disjoint owned_paths, capacity —
+    writes the contracts row, holds the leases) → when no transition remains,
+    yield to the external event/watchdog wake → on wake, api status → on each
+    status
     poll/wake a running op may be observed at ~3min cadence via
     `api observe --job <id>` (read-only context before nudge/settle, never
     evidence) → `turn-idle` worker with no report gets exactly `api nudge --job <id>` → worker files
