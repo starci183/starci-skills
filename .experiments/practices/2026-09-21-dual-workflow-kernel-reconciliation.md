@@ -53,6 +53,11 @@ paths; sharing a ledger is not itself a conflict.
   paths owned by seven later cuts. Requiring global green after every bounded
   slice made the legal decomposition impossible even though the partition and
   semantic plan were correct.
+- After repeated no-effect worker-start failures, a Kernel could manufacture a
+  queued job's completion boundary: `api report` fell back to the job id when
+  no Dispatch was bound, `api check` accepted Kernel-authored evidence without
+  a worker report, and `api settle --verdict pass` accepted both. The result
+  looked green but no operation agent had accepted the contract.
 
 ## Derived
 
@@ -105,6 +110,11 @@ paths; sharing a ledger is not itself a conflict.
     unsettled siblings. The final ordinal alone must make the unchanged full
     regression green. `api settle` enforces the canonical green check names so
     agents cannot reinterpret an arbitrary red integration result as pass.
+15. Worker evidence cannot be synthesized by the Kernel. `api report` requires
+    an active operation job plus its exact contract-bound Dispatch; `api check`
+    additionally requires that Dispatch's filed report; pass settlement repeats
+    the Dispatch/contract guard. A queued, reconciled or never-dispatched job may
+    still settle fail when appropriate, but it can never earn pass.
 
 ## Evidence
 
@@ -116,6 +126,8 @@ paths; sharing a ledger is not itself a conflict.
 - `.claude/tests/kernel-api.spec.mjs` also proves a cut pass is refused without
   `cut-slice-postcondition` and `cut-regression-inventory` (plus
   `full-regression-final` on the last ordinal).
+- `.claude/tests/op-ipc.spec.mjs` proves a queued job cannot self-file a report,
+  record green checks or settle pass without an accepted operation Dispatch.
 - Live reconciliations preserved landing attempt 6 and canonicalization attempt
   2, released their exact-path leases, and resumed both existing Kernel PTYs.
 
