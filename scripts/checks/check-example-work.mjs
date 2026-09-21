@@ -95,7 +95,9 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   const refs = [];
   const evidenceFiles = [];
   let payloads = 0;
-  const workspaceDoc = readWorkspace(workRoot);
+  // workspace.yaml is a tree-level file - in scoped mode (a record dir under the tree) it lives at
+  // resolveRoot, never inside the walked subtree.
+  const workspaceDoc = readWorkspace(resolveRoot);
   // Resolution scope is the whole enclosing tree; validation scope stays `records`.
   const resolveRecords = resolveRoot === workRoot ? null : collectRecordMap(resolveRoot);
 
@@ -199,7 +201,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     if (record.codeDigest?.digest) {
       const recEntry = resolveMap.get(record.record);
       if (recEntry) {
-        const dirs = resolveOwnedDirs(record.record, recEntry, resolveMap, workspaceDoc, workRoot);
+        const dirs = resolveOwnedDirs(record.record, recEntry, resolveMap, workspaceDoc, resolveRoot);
         const fresh = hashOwnedDirs(dirs);
         const freshDigest = fresh?.digest ?? null;
         if (freshDigest !== record.codeDigest.digest && record.stale !== true) {
@@ -456,7 +458,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     // to that root). A done record naming one that does not exist on disk is refused; a todo one is only
     // warned, since the module a todo record targets may not have been built yet.
     if (declaresOwnPaths(data)) {
-      const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot);
+      const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, resolveRoot);
       const missing = missingOwnedDirs(dirs);
       if (missing.length) {
         const list = missing.map(m => m.rel).join(', ');
