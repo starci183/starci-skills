@@ -24,6 +24,9 @@ commandRequirements:
 kernelCommandRequirements:
   - '--permission-mode dangerous'
   - '--respect-workspace-trust false'
+terminalFallback:
+  command: devin
+  modelArgs: ['--model', '<model>']
 kernelPermissionReason: |-
   The long-lived kernel is not an implementation worker: its required loop repeatedly invokes the declared
   Node kernel API and Orca observation commands. Per-command menus deadlock an unattended kernel. Dangerous
@@ -33,6 +36,12 @@ kernelPermissionReason: |-
 readiness:
   screenPattern: '(?:Ask Devin|Message Devin|Type your message|Enter a prompt|(^|\n)\s*[>❯❭]\s*$)'
   identityPattern: 'Devin'
+modelAttestation:
+  mode: launch-flag
+  reason: >-
+    The Devin TUI does not render the model id on screen, so screen attestation can never pass.
+    The launch command pins --model and the CLI exits with 'Unknown model' before the readiness
+    prompt on an invalid id, so surviving to readiness is the attestation.
   timeoutMs: 120000
   intervalMs: 5000
 delivery:
@@ -71,6 +80,9 @@ bypassMode:
   launch: '--permission-mode dangerous — equivalent unattended/yolo mode, injected before Task delivery.'
   recovery: 'For a legacy already-running accept-edits terminal, send "5" + Enter once, then let the next attempt use the launch flag.'
 knownFailures:
+  - signal: 'Unknown model'
+    meaning: The --model flag named an id the account cannot run; the CLI exits before the prompt.
+    action: Fix the model pin in the route or config — do not retry the same id.
   - signal: 'Agent connection lost: agent child exited: exit code: 0'
     meaning: The spawned agent child process died; queued sends will not be processed.
     action: Close the terminal and spawn a fresh lane; do not keep sending into the dead TUI.

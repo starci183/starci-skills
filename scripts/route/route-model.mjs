@@ -53,8 +53,9 @@ const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) 
 // preferred when present; otherwise the yaml is parsed directly. A missing or
 // unparsable file is never fatal — callers degrade to "no config" and route
 // exactly as before.
+const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
 async function readOwnerConfig() {
-  const file = path.join(skillRoot, 'config.yaml');
+  const file = path.join(ownerRoot, 'config.yaml');
   if (!fs.existsSync(file)) return { file, config: null, error: null };
   const engineLoader = path.join(skillRoot, 'engine', 'config.mjs');
   let engineError = null;
@@ -63,7 +64,7 @@ async function readOwnerConfig() {
       const mod = await import(pathToFileURL(engineLoader).href);
       for (const name of ['loadOwnerConfig', 'readOwnerConfig'])
         if (typeof mod[name] === 'function')
-          return { file, config: mod[name](skillRoot) ?? null, error: null };
+          return { file, config: mod[name](ownerRoot) ?? null, error: null };
     } catch (e) { engineError = `engine/config.mjs: ${e.message}`; }
     // No usable export (or the import failed) — the direct yaml read below is
     // the fallback; an engine error is annotated, never fatal.

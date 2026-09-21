@@ -69,6 +69,9 @@ const renderArgs = (args, values) => {
 export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null } = {}) {
   const { card, error } = loadAdapter(provider);
   if (error) return { provider, error };
+  // 'none' is in the config effort vocabulary (engine/config.mjs) and means
+  // "no effort pin" — normalize it away before any card asks for effortArgs.
+  if (effort === 'none') effort = null;
   const plat = process.platform === 'win32' ? 'win32' : 'posix';
   const prefix = [card?.credentialRefresh?.[plat], card?.commandPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
@@ -174,6 +177,12 @@ const modelPattern = (model) => {
 function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '') {
   if (!expectedModel) return { ok: true, screen: initialScreen, model: null };
   const spec = adapter?.modelAttestation && typeof adapter.modelAttestation === 'object' ? adapter.modelAttestation : {};
+  // 'launch-flag': the provider TUI never renders the model id on screen, so
+  // a screen regex can never attest it. The composed launch command pins the
+  // model and the CLI exits before the readiness prompt on an unknown id, so
+  // reaching this point (readiness passed) is the attestation.
+  if (spec.mode === 'launch-flag')
+    return { ok: true, screen: initialScreen ?? '', model: expectedModel, mode: 'launch-flag' };
   const timeoutMs = Number(spec.timeoutMs) || 15000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
   const expected = modelPattern(expectedModel);

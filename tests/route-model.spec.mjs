@@ -12,7 +12,7 @@ const ROUTE=path.join(ROOT,'scripts','route','route-model.mjs');
 // evidence instead of failing on it) and must never write. A route is a pick
 // or a typed refusal ('no eligible model', exit 1) — never a silent swap.
 
-const run=(args,cwd=ROOT)=>spawnSync(process.execPath,[ROUTE,...args],{cwd,encoding:'utf8',windowsHide:true,timeout:60000});
+const run=(args,cwd=ROOT,env={})=>spawnSync(process.execPath,[ROUTE,...args],{cwd,encoding:'utf8',windowsHide:true,timeout:60000,env:{...process.env,...env}});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
 const fixture=t=>{
@@ -22,7 +22,10 @@ const fixture=t=>{
 };
 
 test('--plan --kind code.refactor --difficulty hard walks the tier in declared order and annotates',t=>{
-  const r=run(['--kind','code.refactor','--difficulty','hard','--plan','--json']);
+  // Isolate from the real owner config: preferredProvider is a documented pick bias,
+  // so the declared-tier assertion runs with no owner config at all.
+  const ownerRoot=fixture(t).dir();
+  const r=run(['--kind','code.refactor','--difficulty','hard','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
@@ -35,6 +38,21 @@ test('--plan --kind code.refactor --difficulty hard walks the tier in declared o
     assert.ok(c.status==='qualified'||typeof c.evidence==='string'||(c.reasons??[]).length>0,
       `candidate ${c.target} has neither qualification nor an annotation — evidence gaps must be visible`);
   assert.equal(body.pick?.primary?.target,'claude-agent','tier order picks the first previewable runtime');
+});
+
+test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=>{
+  const ownerRoot=fixture(t).dir();
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),
+    'language: vi\nmodel: null\neffort: medium\nallocation: {mode: adaptive, preferredProvider: devin}\n');
+  const r=run(['--kind','code.refactor','--difficulty','hard','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
+  assert.equal(r.status,0,r.stderr||r.error?.message);
+  const body=out(r);
+  assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
+  assert.equal(body.config?.preferredProvider,'devin','the bias must be reported, never hidden');
+  assert.deepEqual(body.tier?.chain,['claude-agent','devin-agent','codex-agent'],'bias permutes the pick, never the declared tier chain');
+  assert.equal(body.pick?.primary?.target,'devin-agent','preferredProvider hoists the first pickable candidate of that provider');
+  // Bias is bounded: the non-preferred tier members remain as fallbacks, never removed.
+  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['claude-agent','codex-agent']);
 });
 
 test('--kind model.manageWorkflow --risk high resolves or fails typed, never silently',t=>{
