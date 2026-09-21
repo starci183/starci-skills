@@ -43,7 +43,7 @@ const parseArgs = (argv) => {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
-    if (k === '--json') { a.json = true; continue; }
+    if (k === '--json' || k === '--review') { a[k.slice(2)] = true; continue; }
     const v = argv[++i];
     if (v === undefined) { console.error(`serve-ask: --${k.slice(2)} needs a value`); process.exit(2); }
     a[k.slice(2)] = v;
@@ -83,6 +83,38 @@ const fieldsOf = (text) => {
     paired,
     isSecret: (name) => /SECRET|PASSWORD|TOKEN|KEY/i.test(name),
   };
+};
+
+// An approval ask about produced artifacts is meaningless without showing
+// them — extract image paths named in the question and serve them inline.
+// Basenames (auth-sign-in-desktop-direction.png) are located by a bounded
+// walk under .starciwork, the only tree where workflow evidence lives.
+const imagesOf = (text, repo) => {
+  const tokens = [...new Set([...text.matchAll(/[\w./\\-]+\.(?:png|jpe?g|webp|gif|svg)\b/gi)].map((m) => m[0]))];
+  const root = path.join(repo, '.starciwork');
+  const locate = (base) => {
+    // BFS — a named artifact lives a few levels under .starciwork, while a
+    // DFS stack would burn the whole budget inside kernel-strays archives.
+    const queue = [root]; let head = 0, visited = 0;
+    while (head < queue.length && visited++ < 20000) {
+      const dir = queue[head++];
+      let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+      for (const e of ents) {
+        if (e.name === base) return path.join(dir, e.name);
+        if (e.isDirectory() && !e.name.startsWith('.')) queue.push(path.join(dir, e.name));
+      }
+    }
+    return null;
+  };
+  const found = [];
+  for (const t of tokens) {
+    const rel = t.replace(/\\/g, '/');
+    const abs = path.join(repo, rel);
+    if (rel.includes('/') && fs.existsSync(abs)) { found.push({ label: rel, abs }); continue; }
+    const hit = fs.existsSync(root) ? locate(path.basename(rel)) : null;
+    if (hit) found.push({ label: rel, abs: hit });
+  }
+  return found;
 };
 
 const custodyDirs = (repo) => ['.starcistacks', '.stacks']
@@ -150,35 +182,42 @@ const writeEnv = (repo, key, value) => {
   return { ok: true, via: via.join('+') };
 };
 
-const renderForm = ({ nonce, question, fields, repo, workflowId }) => {
+const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
+
+const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonly }) => {
   const fileRows = fields.files.map((name) => {
     const present = custodyPresent(repo, name);
     const paired = fields.paired[name] ? ` · also sets <code>${esc(fields.paired[name])}</code>` : '';
     return `<label>custody file <code>runtime/files/${esc(name)}</code> → <code>${esc(pointerFor(name))}</code>${paired}${present ? ' <b style="color:#0a7">— already in custody (leave blank to keep)</b>' : ''}</label>
-      <input type="password" name="file:${esc(name)}" autocomplete="off" ${present ? '' : ''}>`;
+      <input type="password" name="file:${esc(name)}" autocomplete="off" ${readonly ? 'disabled' : ''}>`;
   }).join('\n');
   const varRows = fields.vars.map((v) => `<label><code>${esc(v)}</code></label>
-      <input type="${fields.isSecret(v) ? 'password' : 'text'}" name="env:${esc(v)}" autocomplete="off">`).join('\n');
-  const options = (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}"> ${esc(o)}</label>`).join('\n');
+      <input type="${fields.isSecret(v) ? 'password' : 'text'}" name="env:${esc(v)}" autocomplete="off" ${readonly ? 'disabled' : ''}>`).join('\n');
+  const options = (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" ${readonly ? 'disabled' : ''}> ${esc(o)}</label>`).join('\n');
+  const imgRows = (images ?? []).map((img, i) => `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption></figure>`).join('\n');
   return `<!doctype html><html><head><meta charset="utf-8"><title>provision.ask — ${esc(workflowId)}</title>
 <style>
  body{font:14px/1.5 system-ui;margin:2rem auto;max-width:720px;padding:0 1rem;color:#222}
  h1{font-size:1.1rem}.q{white-space:pre-wrap;background:#f6f6f6;border:1px solid #ddd;padding:1rem;border-radius:6px}
  label{display:block;margin:.9rem 0 .25rem;font-weight:600}
  input[type=text],input[type=password],textarea{width:100%;padding:.45rem;border:1px solid #bbb;border-radius:4px;box-sizing:border-box}
+ figure{margin:1rem 0}figure img{max-width:100%;border:1px solid #ccc;border-radius:6px;display:block}
+ figcaption{font-size:.8rem;color:#666;margin-top:.25rem}
  .opt{font-weight:400;display:block;margin:.3rem 0}
  button{margin-top:1.2rem;padding:.6rem 1.4rem;font-size:1rem;cursor:pointer}
  .note{color:#666;font-size:.85rem;margin-top:1.5rem}
 </style></head><body>
 <h1>Owner provision — <code>${esc(workflowId)}</code></h1>
 <div class="q">${esc(question.text ?? '')}</div>
+${imgRows ? `<h3>Artifacts under review</h3>${imgRows}` : ''}
+${readonly ? '<p><b>This ask is already answered — view only.</b></p>' : ''}
 <form method="post" action="/${esc(nonce)}/answer">
 ${options ? `<h3>Choose</h3>${options}` : ''}
 <h3>Credentials</h3>
 ${fileRows}
 ${varRows}
-<label>Note to kernel (optional)</label><textarea name="note" rows="2"></textarea>
-<button type="submit">Submit answer</button>
+<label>Note to kernel (optional)</label><textarea name="note" rows="2" ${readonly ? 'disabled' : ''}></textarea>
+<button type="submit" ${readonly ? 'disabled' : ''}>Submit answer</button>
 </form>
 <p class="note">Secret values land in encrypted stack custody (<code>.starcistacks</code>) and are exposed through <code>*_FILE</code> pointers in <code>app.env</code> / the generated <code>.env.local</code> bridge — never in the ledger, the chat, or any log. Submitting wakes the workflow kernel.</p>
 </body></html>`;
@@ -229,11 +268,14 @@ const main = async () => {
   const answered = db.prepare(
     `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
   ).get(args.workflow, report.dispatch_id);
-  if (answered) { console.error(JSON.stringify({ ok: false, error: `ask ${report.dispatch_id} already answered` })); process.exit(1); }
+  const readonly = Boolean(args.review);
+  if (answered && !readonly) { console.error(JSON.stringify({ ok: false, error: `ask ${report.dispatch_id} already answered` })); process.exit(1); }
 
   const rj = parseJson(report.report_json, {});
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
-  const fields = fieldsOf(`${question.text ?? ''}\n${(question.options ?? []).join('\n')}`);
+  const qText = `${question.text ?? ''}\n${(question.options ?? []).join('\n')}`;
+  const fields = fieldsOf(qText);
+  const images = imagesOf(qText, repo);
   const nonce = `a-${crypto.randomBytes(9).toString('hex')}`;
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 
@@ -242,7 +284,15 @@ const main = async () => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     if (req.method === 'GET' && url.pathname === `/${nonce}`) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(renderForm({ nonce, question, fields, repo, workflowId: args.workflow }));
+      res.end(renderForm({ nonce, question, fields, images, repo, workflowId: args.workflow, readonly }));
+      return;
+    }
+    const imgMatch = req.method === 'GET' && url.pathname.match(new RegExp(`^/${nonce}/img/(\\d+)$`));
+    if (imgMatch) {
+      const img = images[Number(imgMatch[1])];
+      if (!img) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, { 'content-type': MIME[path.extname(img.abs).slice(1).toLowerCase()] ?? 'application/octet-stream' });
+      fs.createReadStream(img.abs).pipe(res);
       return;
     }
     if (req.method === 'POST' && url.pathname === `/${nonce}/answer`) {
@@ -250,6 +300,14 @@ const main = async () => {
       req.on('data', (c) => { body += c; if (body.length > 256 * 1024) req.destroy(); });
       req.on('end', () => {
         try {
+        const already = db.prepare(
+          `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
+        ).get(args.workflow, report.dispatch_id);
+        if (already) {
+          res.writeHead(409, { 'content-type': 'text/html; charset=utf-8' });
+          res.end('<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px"><h2>Already answered</h2><p>This ask was already settled — no second submission is recorded.</p></body>');
+          return;
+        }
         const params = new URLSearchParams(body);
         const custodyWritten = [], envWritten = [], pointersWritten = [], errors = [];
         for (const name of fields.files) {
