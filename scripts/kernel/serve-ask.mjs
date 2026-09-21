@@ -6,12 +6,14 @@
 //
 //   node serve-ask.mjs --repo <path> --workflow <id> [--dispatch <id>] [--ttl <ms>] [--json]
 //
-// Submit flow: custody fields named '*.key|*.txt' in the question text are
-// written through <repo>/scripts/stack-secret.mjs set --from-file (the
+// Submit flow: custody fields named '*.key|*.txt|*.json' in the question text
+// are written through <repo>/scripts/stack-secret.mjs set --from-file (the
 // canonical encrypted-custody write; values never touch argv or the ledger),
-// falling back to a materialized write under .starcistacks|dev/.stacks when the
-// tool is absent. UPPER_SNAKE variables are upserted into <repo>/.env.local
-// (the provision-script convention). A sanitized receipt (names and custody
+// and each written file auto-derives its <NAME>_FILE pointer in the canonical
+// encrypted app.env — then dev-env.mjs refreshes the .env.local managed
+// bridge so the pointer reaches the app's env loader. UPPER_SNAKE variables
+// are upserted into BOTH .env.local (the provision-script sink) and app.env
+// (the canonical encrypted env store). A sanitized receipt (names and custody
 // paths only — never values) lands in kernel-evidence, an `ask-answered`
 // event is appended, and the workflow's Kernel is woken through its Orca
 // terminal so it can re-verify custody presence and settle the ask.
@@ -99,36 +101,43 @@ const upsertLines = (content, key, value) => {
   return re.test(content) ? content.replace(re, `${key}=${value}`) : `${content}${content && !content.endsWith('\n') ? '\n' : ''}${key}=${value}\n`;
 };
 
+const APP_ENV_REL = 'dev/runtime/env/app.env';
+
+// Upsert one KEY=VALUE into the canonical encrypted app.env. Never `set` a
+// whole env file we could not read first — an empty base would clobber every
+// other key in the encrypted store.
+const appEnvUpsert = (repo, key, value) => {
+  const tool = path.join(repo, 'scripts', 'stack-secret.mjs');
+  if (!fs.existsSync(tool)) return false;
+  const tmp = path.join(os.tmpdir(), `serve-ask-env-${crypto.randomBytes(8).toString('hex')}`);
+  try {
+    spawnSync(process.execPath, [tool, 'show', APP_ENV_REL], { cwd: repo, stdio: 'ignore' });
+    const cur = [path.join(repo, '.starcistacks', APP_ENV_REL), path.join(repo, '.stacks', APP_ENV_REL)].find(fs.existsSync);
+    if (!cur) return false;
+    fs.writeFileSync(tmp, upsertLines(fs.readFileSync(cur, 'utf8'), key, value), { mode: 0o600 });
+    return spawnSync(process.execPath, [tool, 'set', APP_ENV_REL, '--from-file', tmp], { cwd: repo }).status === 0;
+  } finally {
+    try { fs.unlinkSync(tmp); } catch { /* best effort */ }
+  }
+};
+
+// A custody file becomes reachable through a `<NAME>_FILE` pointer — the same
+// convention app.env already carries (keycloak-admin.json → KEYCLOAK_ADMIN_FILE).
+const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_FILE`;
+
 const writeEnv = (repo, key, value) => {
   const via = [];
   const local = path.join(repo, '.env.local');
   fs.writeFileSync(local, upsertLines(fs.existsSync(local) ? fs.readFileSync(local, 'utf8') : '', key, value), { mode: 0o600 });
   via.push('.env.local');
-  const tool = path.join(repo, 'scripts', 'stack-secret.mjs');
-  const appEnvRel = 'dev/runtime/env/app.env';
-  if (fs.existsSync(tool)) {
-    const tmp = path.join(os.tmpdir(), `serve-ask-env-${crypto.randomBytes(8).toString('hex')}`);
-    try {
-      spawnSync(process.execPath, [tool, 'show', appEnvRel], { cwd: repo, stdio: 'ignore' });
-      const cur = [path.join(repo, '.starcistacks', appEnvRel), path.join(repo, '.stacks', appEnvRel)].find(fs.existsSync);
-      // Never `set` a whole env file we could not read first — an empty base
-      // would clobber every other key in the encrypted store.
-      if (cur) {
-        fs.writeFileSync(tmp, upsertLines(fs.readFileSync(cur, 'utf8'), key, value), { mode: 0o600 });
-        const r = spawnSync(process.execPath, [tool, 'set', appEnvRel, '--from-file', tmp], { cwd: repo });
-        if (r.status === 0) via.push('app.env');
-      }
-    } finally {
-      try { fs.unlinkSync(tmp); } catch { /* best effort */ }
-    }
-  }
+  if (appEnvUpsert(repo, key, value)) via.push('app.env');
   return { ok: true, via: via.join('+') };
 };
 
 const renderForm = ({ nonce, question, fields, repo, workflowId }) => {
   const fileRows = fields.files.map((name) => {
     const present = custodyPresent(repo, name);
-    return `<label>custody file <code>runtime/files/${esc(name)}</code>${present ? ' <b style="color:#0a7">— already in custody (leave blank to keep)</b>' : ''}</label>
+    return `<label>custody file <code>runtime/files/${esc(name)}</code> → <code>${esc(pointerFor(name))}</code>${present ? ' <b style="color:#0a7">— already in custody (leave blank to keep)</b>' : ''}</label>
       <input type="password" name="file:${esc(name)}" autocomplete="off" ${present ? '' : ''}>`;
   }).join('\n');
   const varRows = fields.vars.map((v) => `<label><code>${esc(v)}</code></label>
@@ -154,7 +163,7 @@ ${varRows}
 <label>Note to kernel (optional)</label><textarea name="note" rows="2"></textarea>
 <button type="submit">Submit answer</button>
 </form>
-<p class="note">Values are written to encrypted custody / .env.local on this machine only — they never enter the ledger, the chat, or any log. Submitting wakes the workflow kernel.</p>
+<p class="note">Secret values land in encrypted stack custody (<code>.starcistacks</code>) and are exposed through <code>*_FILE</code> pointers in <code>app.env</code> / the generated <code>.env.local</code> bridge — never in the ledger, the chat, or any log. Submitting wakes the workflow kernel.</p>
 </body></html>`;
 };
 
@@ -224,18 +233,31 @@ const main = async () => {
       req.on('data', (c) => { body += c; if (body.length > 256 * 1024) req.destroy(); });
       req.on('end', () => {
         const params = new URLSearchParams(body);
-        const custodyWritten = [], envWritten = [], errors = [];
+        const custodyWritten = [], envWritten = [], pointersWritten = [], errors = [];
         for (const name of fields.files) {
           const v = params.get(`file:${name}`);
           if (v == null || v === '') continue;
           const r = writeCustody(repo, name, v);
-          (r.ok ? custodyWritten : errors).push(r.ok ? `${name} (${r.via})` : `${name}: ${r.error}`);
+          if (!r.ok) { errors.push(`${name}: ${r.error}`); continue; }
+          custodyWritten.push(`${name} (${r.via})`);
+          // The file alone is unreachable — app.env must carry its <NAME>_FILE
+          // pointer for the stack env convention to see it.
+          const ptr = pointerFor(name);
+          if (appEnvUpsert(repo, ptr, `.starcistacks/dev/runtime/files/${name}`)) pointersWritten.push(ptr);
         }
         for (const v of fields.vars) {
           const val = params.get(`env:${v}`);
           if (val == null || val === '') continue;
           const r = writeEnv(repo, v, val);
           envWritten.push(v);
+        }
+        // Regenerate the .env.local managed block so fresh *_FILE pointers in
+        // app.env reach the app's env loader without a manual dev:env run.
+        let bridge = null;
+        const devEnv = path.join(repo, 'scripts', 'dev-env.mjs');
+        if (pointersWritten.length && fs.existsSync(devEnv)) {
+          const r = spawnSync(process.execPath, [devEnv], { cwd: repo, stdio: 'ignore' });
+          bridge = r.status === 0 ? 'refreshed' : 'refresh-failed';
         }
         const optionIdx = params.get('option');
         const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', args.workflow, 'serve-ask');
@@ -245,18 +267,18 @@ const main = async () => {
           schema: 'starci/ask-answer@1',
           workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
           option: optionIdx != null ? (question.options ?? [])[Number(optionIdx)] ?? null : null,
-          custodyWritten, envWritten, errors,
+          custodyWritten, envWritten, pointersWritten, bridge, errors,
           note: params.get('note') || null, at: new Date().toISOString(),
         };
         fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
         ledger.transaction(() => ledger.appendEvent({
           workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
-          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, custodyWritten, envWritten, errors },
+          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, custodyWritten, envWritten, pointersWritten, errors },
         }));
         const wake = wakeKernel(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
-<h2>Answer received</h2><p>custody: ${esc(custodyWritten.join(', ') || 'none')} · env: ${esc(envWritten.join(', ') || 'none')} · wake: ${esc(wake.action)}</p>
+<h2>Answer received</h2><p>custody: ${esc(custodyWritten.join(', ') || 'none')} · env: ${esc(envWritten.join(', ') || 'none')} · pointers: ${esc(pointersWritten.join(', ') || 'none')} · wake: ${esc(wake.action)}</p>
 ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` : ''}
 <p>You can close this tab — the workflow kernel has been notified.</p></body>`);
         done = true;
