@@ -6,10 +6,15 @@ id: provision.ask
 goal:
   en: >-
     Ask the owner for the one thing only they can give - a credential, an account on an outside system, a
-    dataset, a legal authority, or the go-ahead for an irreversible effect - exactly named, in this operation's
+    dataset, a legal authority, a decision between real alternatives (candidate picks, accept/reject of a
+    reviewable artifact), or the go-ahead for an irreversible effect - exactly named, in this operation's
     own workflow, and wait for it. Credential input belongs to the kernel's Orca GUI after official-documentation
     preparation; no model agent asks for a value.
     This operation verifies only that the provision is present.
+    An ask is information or a decision flowing FROM the owner, never task delegation: a step performed
+    inside a running browser or application (an OAuth consent click-through, a captcha, a 2FA prompt, a
+    payment confirmation on a live page) is a human-gated UAT checkpoint and belongs to
+    `uat.assisted.{prepare,verify}` with an evidence receipt, not to a provision ask.
 nodeKinds:
   - business
 completionProfile: business
@@ -55,8 +60,13 @@ steps:
         For a credential, return the exact declared requirement to the kernel; do not open an input terminal,
         ask the owner to compose a command, or wait for a "set" reply. The workflow owns the researched form
         in Orca and resumes its satisfied requesters automatically.
-        For anything else, ask in this terminal and wait for the owner
-        to reply "provided" once it exists. Wait as long as the contract lets you.
+        For anything else, the ask must name a deliverable the requester can verify afterwards
+        (the OAuth app's client id, the DNS record, the granted account) or present at least two
+        real alternatives for the owner to pick between. A bare single-option "reply provided"
+        confirmation is degenerate: either the deliverable is named and re-verified, or the ask
+        is the wrong lane — interactive actions inside a running product are uat.assisted
+        checkpoints, and informational answers carry the answer itself, not a confirmation flag.
+        Wait as long as the contract lets you.
   - reads:
       - question
       - environment
@@ -88,6 +98,13 @@ blockers:
   - code: QUESTION_UNCLEAR
     condition:
       en: The question names no provision and no system; the operation that asked it is sent back to state it.
+  - code: NOT_A_PROVISION
+    condition:
+      en: >-
+        The request is a delegated action, not information or a decision from the owner — e.g. an interactive
+        step inside a running product (OAuth consent, captcha, 2FA, live payment confirmation). Those are
+        human-gated UAT checkpoints routed to uat.assisted.{prepare,verify}; the asking operation is sent
+        back to re-plan through that lane.
 placeholders:
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
