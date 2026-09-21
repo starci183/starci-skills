@@ -273,10 +273,13 @@ test('cut pass requires the cut-aware green check names before settlement',{skip
     const at=Date.now();
     ledger.enqueueJob({jobId,workflowId:wf,opId:'ex-test.probe',kind:'op',payload:{
       opId:'ex-test.probe',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
+      orca:{dispatchId:'ctx-k7-cut',agentTerminalHandle:'term-k7-cut'},
     }});
     ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
+    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
+      .run(wf,'ex-test.probe',1,'ctx-k7-cut','# cut contract',json({}),at);
     ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,jobId,'ex-test.probe',1,0,'done',json({outcome:'done'}),null,at);
+      .run(wf,'ctx-k7-cut','ex-test.probe',1,0,'done',json({outcome:'done'}),null,at);
     ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
       .run(wf,'ex-test.probe',1,json({checks:[{name:'generic-green',exitCode:0}]}),at);
   });
