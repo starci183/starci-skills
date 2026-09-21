@@ -34,10 +34,10 @@ proposalAuthority:
     - treating an unbound, differently revised or non-predecessor scope proposal as authority
 reads:
   - id: target
-    path: N/index.yaml OR packet context.records -> exact bound scope.define record/extensions.work3.scope
+    path: .starciwork/features/<feature>/**/index.yaml OR packet context.records -> exact bound scope.define record/extensions.work3.scope
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. Normally this consumer op requires its target node to exist. The
+      en: "Read the existing selected target record, feature scope, declared refs/dependencies/proof
+        demands and validator freshness. Normally this consumer op requires its target record to exist. The
         one exception is the workspace-canonicalization proposalAuthority below: when N is the exact
         selected proposed id in the explicitly bound direct-predecessor scope record, resolve that
         record by id and use the matching entry without materializing N. For this exception, do
@@ -49,12 +49,12 @@ reads:
         scope/graph gap. The assertions name what the authored tests must exercise; they are never
         re-worded here."
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,data,integration}/**/index.yaml
     purpose:
-      en: Read the declared contracts, data ownership, authorization and error identity of the slice
-        the tests cover, so each authored test exercises a stated behavior. Where the design is
-        silent about an observable effect, report the gap instead of writing a test that invents an
-        expectation.
+      en: Read the declared design contracts, data ownership, authorization and error identity of
+        the slice the tests cover, so each authored test exercises a stated behavior. Where the
+        design is silent about an observable effect, report the gap instead of writing a test that
+        invents an expectation.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -91,20 +91,19 @@ reads:
         permissions and existing task authority.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/<family>/<name>/index.yaml
     fields:
       - state
-      - blocker
-      - completion.inputDigest
-      - completion.evidence
-      - completion.codeRefs
+      - evidence
+      - blockedBy
     content:
-      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. When
-        N exists, write only state/blocker/completion here; authored test inventory and collection
-        results belong to the evidence result, not semantic node prose. When proposalAuthority is in
-        use because N does not exist, omit this write entirely and leave the bound scope proposal
-        unchanged for workspace.manage to materialize later. Missing refs/dependencies/acceptance
-        require a reported gap; never add/remove them to obtain pass.
+      en: Read the existing selected scope, expected proof demands and the flat Work record graph
+        unchanged. When the target exists, write only state/evidence/blockedBy here; authored test
+        inventory and collection results belong to the evidence result, not semantic record prose.
+        When proposalAuthority is in use because the target does not exist, omit this write entirely
+        and leave the bound scope proposal unchanged for workspace.manage to materialize later.
+        Missing refs/dependsOn/proof demands require a reported gap; never add/remove them to
+        obtain pass.
   - id: source
     path: repository:<repo-id>/<test-ceiling>
     fields:
@@ -275,7 +274,9 @@ blockers:
         exact ids; never search the repository for a substitute, run predecessors or weaken
         dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Feature folder of the intake or migration, inside the operation allowlist
+  family: Flat family folder of the selected target record
+  name: Record folder inside its family
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   suite-paths: Existing test harness, fixture and helper paths

@@ -20,9 +20,9 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
-        For an explicitly new target, absence is expected: inspect the nearest existing
-        ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
+      en: "Read the current feature record and its flat spec records, refs, dependencies, proof demands
+        and validator freshness. For an explicitly new target, absence is expected: inspect the nearest
+        existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
         content."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
@@ -38,9 +38,9 @@ reads:
       en: Classify each statement as intent, observed fact, example, proposal, unknown or contradiction,
         with source citation/revision. Existing behavior does not authorize a new rule.
   - id: specification
-    path: modules/ops/ops/business.decide.yaml + modules/schemas/spec/contract.schema.yaml
+    path: modules/ops/ops/business.decide.yaml + modules/schemas/work-layout.yaml + modules/schemas/work-*.schema.yaml
     purpose:
-      en: Read the JSON field contract and this operator procedure before authoring the .starciwork
+      en: Read the record family contracts and this operator procedure before authoring the .starciwork
         payload.
   - id: matrix
     path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
@@ -57,38 +57,40 @@ reads:
         permissions and existing task authority.
 writes:
   - id: node
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{index.yaml,fr/**/index.yaml,nfr/**/index.yaml,br/**/index.yaml,decision/**/index.yaml,data/**/index.yaml,journey/**/index.yaml}
     fields:
       - schema
+      - id
+      - title
       - state
-      - activity
-      - blockers
-      - investigation.contextDigest
-      - businessOverview
-      - extensions.work3.srs
+      - blockedBy
       - refs
-      - assertions
       - dependsOn
-      - required
+      - change
+      - extensions.work3.decisionLog
+      - extensions.work3.integrations
+      - family payload
     content:
-      en: Every authored index.yaml is a work/node@1 record at its catalog-declared path under
-        features/<feature>/business/. Author
-        business/overview/index.yaml with businessOverview for readable purpose, customer
-        understanding, outcome, scope and open questions. Author typed extensions.work3.srs leaves
-        under functional-requirements, non-functional-requirements, business-rules,
-        policy-decisions, data and customer-journeys - each leaf payload carrying its declared
-        starci/srs-*@1 section const. Every item owns a folder/index.yaml; every
-        intermediate index carries only starci/srs-aggregate@1 metadata. Keep each FR's main,
-        alternative and exception flows, branch review, postconditions and acceptance together.
+      en: Every authored index.yaml is a flat work/*@1 record at its family path under
+        features/<feature>/, where <family> is one of fr, nfr, br, decision, data or journey.
+        The feature's readable overview is features/<feature>/index.yaml (work/feature@1) carrying
+        purpose, customer understanding, outcome, scope and open questions in title/description.
+        Author each requirement as work/functional-requirement@1 under fr/<name>/ (actors, trigger,
+        mainFlow, exceptionFlows, postconditions, composes, requiresProof), each quality as
+        work/non-functional-requirement@1 under nfr/<name>/, each rule as work/business-rule@1
+        under br/<name>/ with its acceptance criteria inline or under br/<rule>/ac/<name>/, each
+        policy question as work/policy-decision@1 under decision/<name>/, each data definition as
+        work/data@1 under data/<name>/ and each customer journey as work/customer-journey@1 under
+        journey/<name>/. Keep each FR's main, alternative and exception flows, branch review,
+        postconditions and acceptance together in its own record.
         For a not-yet-implemented slice, author the smallest decision-complete contract covering actor goal,
         observable outcome, material invariants and permissions, relevant branches, acceptance and
         consequential open decisions. Do not pre-author hypothetical future capabilities or source-local
-        mechanics merely to make the document look comprehensive. Keep the selected SRS leaves at
-        state todo while implementation, test/E2E or UAT evidence is still open; activity records
-        investigating, implementing or verifying without inventing another lifecycle state. A passing
-        business.decide job means the current SRS seed is reviewed and usable downstream, not that the
-        Work leaf or feature is done.
-        Write all canonical SRS content in English, including natural-language prose, YAML/schema
+        mechanics merely to make the document look comprehensive. Keep the selected spec records at
+        state todo while implementation, test/E2E or UAT evidence is still open; never invent another
+        lifecycle state. A passing business.decide job means the current requirement seed is reviewed
+        and usable downstream, not that the record or feature is done.
+        Write all canonical spec content in English, including natural-language prose, YAML/schema
         keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables, types,
         operation names and source symbols. Stable semantic refs resolve
         through exact owning Work refs without copying.
@@ -180,14 +182,14 @@ steps:
     writes:
       - node
     action:
-      en: Author business/overview/index.yaml for readable intent and typed extensions.work3.srs
-        leaves under functional-requirements, non-functional-requirements, business-rules,
-        policy-decisions, data and customer-journeys. Every item owns a folder/index.yaml;
-        intermediate indexes carry only starci/srs-aggregate@1 metadata. Keep each FR's flows,
-        branch review, postconditions and acceptance cohesive. Write all canonical SRS content in
-        English, including natural-language prose, YAML/schema keys, stable IDs/refs, enum literals,
-        protocol identifiers, API fields, variables, types, operation names and source symbols.
-        Connect semantic IDs to exact owning Work refs.
+      en: Author the feature's readable overview at features/<feature>/index.yaml and typed flat
+        work/*@1 records under fr/, nfr/, br/, decision/, data/ and journey/ as the selected slice
+        requires. Every item owns a folder/index.yaml carrying its own family schema const; deeper
+        name segments may group related records but every index.yaml is a complete record. Keep each
+        FR's flows, branch review, postconditions and acceptance cohesive. Write all canonical spec
+        content in English, including natural-language prose, YAML/schema keys, stable IDs/refs,
+        enum literals, protocol identifiers, API fields, variables, types, operation names and
+        source symbols. Connect semantic IDs to exact owning Work refs.
   - reads:
       - target
       - intent
@@ -201,7 +203,7 @@ steps:
         readings the recorded requirement actually admits, and choose the most reasonable one from the
         accepted records of this feature, the decided records of the other features and the product's own
         conventions. Write that reading into the requirement, rule or journey with the acceptance an
-        implementer derives code from, bump the record's rev, and append EXACTLY ONE
+        implementer derives code from, bump the record's change.rev, and append EXACTLY ONE
         extensions.work3.decisionLog entry {rev, at, gap, chosen, why, alternatives}, never rewriting or
         deleting an earlier one. One exception: when the readings differ in an observable outcome about
         money, authority or customer data, do not choose silently - report ask with question.kind decision,
@@ -210,7 +212,7 @@ steps:
         they answer. Never ask for anything else. Treat implementation feedback as evidence about feasibility
         or a missing observable case, not as business authority: revise only when it exposes an actual
         requirement gap or accepted owner feedback. File names, private helper choices and other reversible
-        source-local details remain in Implementation and do not trigger an SRS revision. Preserve valid
+        source-local details remain in Implementation and do not trigger a spec revision. Preserve valid
         unrelated content and invalidate only downstream proof affected by the accepted delta."
   - reads:
       - target
@@ -221,15 +223,15 @@ steps:
       - node
       - matrixHandoff
     action:
-      en: Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph.
-        Review contradictions, scope and unresolved decisions with the user. Bind the reviewed current
-        semantic context in investigation.contextDigest, leave selected SRS leaves state todo, and return
-        activity to idle after the review. Open material issues stay in blockers[] and produce partial or
-        blocked; they are never hidden by schema validity. Output reviewed business outcomes and observable
-        security/quality acceptance for Architecture; no implementation or deployed-proof claim. The op job
-        may settle done because this bounded authoring job completed, but Work state done is reserved for
-        final reconciliation of current SRS, SDS, code, test/E2E and UAT evidence at one revision. Return the
-        selected matrix's request-bound typed outputs when applicable.
+      en: Validate detailed requirement/flow/branch/acceptance coverage and the Work tree.
+        Review contradictions, scope and unresolved decisions with the user. Leave the selected spec
+        records state todo after the review. Open material issues stay in blockedBy and produce
+        partial or blocked; they are never hidden by schema validity. Output reviewed business
+        outcomes and observable security/quality acceptance for Architecture; no implementation or
+        deployed-proof claim. The op job may settle done because this bounded authoring job
+        completed, but record state done is reserved for final reconciliation of current
+        requirements, design, code, test/E2E and UAT evidence at one revision. Return the selected
+        matrix's request-bound typed outputs when applicable.
 proofs:
   - id: binding
     requirement:
@@ -245,17 +247,19 @@ proofs:
   - id: impact-security-coverage
     requirement:
       en: Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps
-        and postconditions, and security has observable negative acceptance. Validate nested
-        ownership and every split SRS section contract; no code/service inventory is required in
-        Business. Existing specification@1 and srs@1 records are readable inputs, never new output.
+        and postconditions, and security has observable negative acceptance. Validate flat family
+        placement and every authored work/*@1 record's own schema contract; no code/service inventory
+        is required in Business. Existing specification@1 and srs@1 records are readable inputs, never
+        new output.
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
-        record changed, its rev higher than it was, and exactly one new extensions.work3.decisionLog entry
-        naming the gap, the chosen reading, why it is the most reasonable one by the records it was read from,
-        and the alternatives that were not taken. A changed record with no entry is a defect. A reading that
-        changes an observable outcome about money, authority or customer data and was taken without a decision
-        record with numbered options and one recommendation is a defect, whatever else the revision gets right."
+        record changed, its change.rev higher than it was, and exactly one new extensions.work3.decisionLog
+        entry naming the gap, the chosen reading, why it is the most reasonable one by the records it was
+        read from, and the alternatives that were not taken. A changed record with no entry is a defect. A
+        reading that changes an observable outcome about money, authority or customer data and was taken
+        without a decision record with numbered options and one recommendation is a defect, whatever else
+        the revision gets right."
 blockers:
   - code: BUSINESS_UNKNOWN
     condition:
@@ -271,9 +275,9 @@ blockers:
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
         Report node/resource IDs and propose a separately selected graph update when needed; never
-        run predecessors or weaken dependsOn/refs/required to proceed.
+        run predecessors or weaken dependsOn/refs to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
@@ -300,21 +304,21 @@ business:
     decisions, data, customer journeys, acceptance - stated so an implementer
     and an acceptor need no guesses?"
   whenNeeded:
-    - When a selected scope needs a minimum decision-complete SRS seed: only the typed leaves required by the next implementation slice, plus its readable overview context.
+    - When a selected scope needs a minimum decision-complete requirement seed: only the flat work/*@1 records required by the next implementation slice, plus the feature's readable overview.
     - Repair mode (business.revise secondary request): when implementation evidence or accepted feedback proves an observable requirement silent, ambiguous or contradictory.
   whenNot:
     - Not for technical design - that is architecture.decide; this op does not design components or pick frameworks.
-    - Not for code/service inventories - repo reads ground the SRS, they are not the deliverable.
+    - Not for code/service inventories - repo reads ground the requirements, they are not the deliverable.
     - Not for speculative completeness across unselected future capabilities or reversible source-local choices; those do not block the selected slice.
     - Never turns observed source behavior into approved policy; money/authority/customer-data conflicts go to the owner via ask, never averaged silently.
   consumes:
-    - Target business node; accepted user intent, domain documents and prior decided records.
+    - Target feature record and its flat spec records; accepted user intent, domain documents and prior decided records.
     - Repo observation for grounding (existing behavior is a candidate fact, not authority).
-    - modules/schemas/spec/contract.schema.yaml section contract (loaded by spec/validate.mjs for this op).
+    - modules/schemas/work-layout.yaml and the work-*.schema.yaml family contracts.
   produces:
-    - business/overview + typed SRS leaf records (starci/srs-*@1 schemas per specification.yaml).
-    - Current investigation.contextDigest on reviewed todo leaves; decisionLog entries on every revision; E/ matrix job-result when selected.
-    - Downstream: the reviewed SRS seed + journeys that architecture.decide, scope.define and verification ops consume; later evidence may refine them through a new reviewed revision. This op does not author Work state done.
+    - features/<feature>/index.yaml overview + flat work/*@1 records (fr, nfr, br, decision, data, journey) at their family paths.
+    - change.rev bumps and decisionLog entries on every revision; E/ matrix job-result when selected.
+    - Downstream: the reviewed requirement seed + journeys that architecture.decide, scope.define and verification ops consume; later evidence may refine them through a new reviewed revision. This op does not author record state done.
   failureModes:
     - BUSINESS_UNKNOWN, BUSINESS_CONTRADICTION, DECLARED_DEPENDENCY_UNMET (declared blockers).
     - A changed record without a decisionLog entry is a defect; unreviewed contradiction cannot be hidden in prose.

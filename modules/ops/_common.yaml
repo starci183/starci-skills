@@ -8,11 +8,12 @@ schema: starci/document@1
 sections:
   - title: Expandable business tree and local workflow tracking
     blocks:
-      - Each work folder has one index.yaml node; index is the node, not an extra directory listing.
-      - Keep global parents thin. Business uses focused rules, actors, states, flows and acceptance
-        children when each is independently investigable or acceptable. Architecture uses services,
-        contracts, data, patterns, security, recovery, code and verification only as needed. Do not
-        create mandatory scaffolding or collapse independently checkable existing nodes.
+      - Each record folder has one index.yaml record; index is the record, not an extra directory
+        listing. Records live in flat family folders under their feature.
+      - Keep the feature's record set lean. The requirement layer uses `br`/`ac`/`fr`/`nfr`/`data`/
+        `journey`/`decision` records when each is independently investigable or acceptable; the
+        design layer uses `sds`/`contract`/`integration` records only as needed. Do not create
+        mandatory scaffolding or collapse independently checkable existing records.
       - "Only leaves author state: uninvestigate, todo or done. todo is confirmed incomplete work
         and requires no investigation receipt. activity is idle, investigating, implementing or
         verifying; blockers[] is auxiliary context. A parent keeps scope and derives progress from
@@ -28,8 +29,8 @@ sections:
       - "Record output screenshots/videos in evidence assets with scope: node and paths under the
         primary owner assets/. Output evidence is not also declared as a semantic input, avoiding
         self-invalidating proof."
-      - Source code remains in bound repositories; code/index.yaml tracks requirements, exact source
-        references and completion.
+      - Source code remains in bound repositories; `impl` records track the requirements they prove,
+        exact source ownership and completion.
       - node.yaml and Markdown node files remain readable; exactly one node file
         per work folder. New and edited canonical nodes use index.yaml. Do not automatically migrate
         unrelated user Work.
@@ -132,36 +133,39 @@ sections:
         resource/files within the existing graph, but may not attach new consumers.
   - title: Path and field contract
     blocks:
-      - Paths below are templates, not discovered locations. Resolve `<business>`, `<piece>`,
-        resource slugs and repository IDs from the selected workspace. Never persist literal
-        angle-bracket placeholders or guess a path by similar name. `N` means the selected node
-        directory, `E` means `N/evidence/<unique-evidence-id>`, `R` means
+      - Paths below are templates, not discovered locations. Resolve `<feature>`, `<family>`,
+        `<name>`, resource slugs and repository IDs from the selected workspace. Never persist
+        literal angle-bracket placeholders or guess a path by similar name. `N` means the selected
+        record directory, `E` means `N/evidence/<unique-evidence-id>`, `R` means
         `.starciwork/_resources/<category>/<slug>`. Resolve symlinks and keep writes within the
         authorized roots.
       - Work metadata uses YAML 1.2 in workspace.yaml, index.yaml, resource.yaml and
-        evidence/manifest.yaml. Canonical index.yaml uses work/node@1 metadata and a readable
-        description field. Domain JSON required by operator contracts remains in extensions. YAML
-        schema consts are defined by the catalog under modules/schemas/ — nothing is exported into
-        the work tree. node.yaml and Markdown node files
-        remain readable; keep exactly one node file per folder.
+        evidence/manifest.yaml. Canonical index.yaml carries the schema const of its own family
+        (`work/<family>@1` under `features/`, `work/catalog@1`/`work/feature@1`/`work/brand@1` at
+        their declared positions, `work/node@1` for root-level operations/scope records) and a
+        readable description field. Domain JSON required by operator contracts remains in
+        extensions. YAML schema consts are defined by the catalog under modules/schemas/ — nothing
+        is exported into the work tree.
       - "| Destination | Fields or content | Writer / invariant |"
       - "| --- | --- | --- |"
       - "| `.starciwork/workspace.yaml` | `schema: work/workspace@1`, stable `id`; declared
         workspace extensions if needed | Initialize only if this workspace is new; do not replace an
         existing identity. |"
-      - "| `N/index.yaml` metadata | `schema: work/node@1`, stable `id`, `kind`, `required`,
-        `dependsOn`, `refs`, `assertions`; leaf `state`, `activity`, `blockers`, `investigation`,
-        `completion`, `history` as applicable | Scope/graph fields belong to the selected
-        scope/planning change. Consumer ops read them unchanged; `refs` contains resolvable
-        node/resource IDs, not a copied document. |"
-      - "| `N/index.yaml` description | Specific purpose, scope/exclusions, authority citations,
+      - "| `.starciwork/index.yaml` | `schema: work/catalog@1`, `id`, `features[]` | One entry per
+        feature; the catalog is the product map, not a work record. |"
+      - "| `features/<feature>/index.yaml` | `schema: work/feature@1`, `id`, `title`, `description` |
+        The feature's readable overview; a parent carries no state. |"
+      - "| `features/<feature>/<family>/<name>/index.yaml` | `schema: work/<family>@1`, stable `id`,
+        `title`, `state`, family fields per modules/schemas/work-*.schema.yaml; `dependsOn`,
+        `refs`, `blockedBy`, `evidence`, `change` as applicable | Scope/graph fields belong to the
+        selected scope/planning change. Consumer ops read them unchanged; `refs` contains resolvable
+        record/resource IDs, not a copied document. |"
+      - "| record description/title | Specific purpose, scope/exclusions, authority citations,
         observable done-when; the operator's domain tables | Current readable specification, not a
-        transcript. IDs survive renames. Child directories define the tree. |"
-      - "| `N/index.yaml` leaf metadata | `state` is `uninvestigate`, `todo` or `done`; `activity`
-        is `idle`, `investigating`, `implementing` or `verifying`; `blockers[]`,
-        `investigation.contextDigest`, `completion`, `history` as applicable | Parents store no
-        state/completion. blockers never become lifecycle state. Imported or newly discovered
-        unapproved scope starts uninvestigate with no investigation/completion. |"
+        transcript. IDs survive renames. |"
+      - "| record lifecycle | `state` is `todo` or `done` on authored records; `blockedBy` names
+        the open question or gap a wait is rooted in | `provenBy` is kernel-derived and never
+        agent-authored. A record reaches done only when its declared proof demands are bound. |"
       - "| `N/index.yaml` `extensions.work3` | Domain-specific structured data explicitly described
         in the selected op; version/domain must be named if another consumer depends on it | Not a
         second progress ledger. Extension data is retained, but not automatically semantically
@@ -183,10 +187,12 @@ sections:
       - "| Product repository paths | The selected op's actual discovered/planned source write
         ceiling | Source changes stay in source; `.starciwork` links repo and revision. Do not copy
         product source into the completion tree. |"
-      - Folders such as `business`, `architecture`, `implementation`, `uat`, `release`, `operations`
-        are sensible roles, not a fixed depth or mandatory stage list. Add a new domain as a new
-        node/resource kind plus its explicit contract. Existing IDs and core fields need not change.
-        An unknown kind can be retained but is not automatically approved by a known profile.
+      - The flat families `br`, `ac`, `fr`, `nfr`, `data`, `journey`, `decision`, `sds`, `ui`,
+        `impl`, `uat`, `contract`, `integration`, `gap` and `event` are the closed set of record
+        folders under a feature - no `business/`/`architecture/` wrapper ever appears inside
+        `features/`. Root-level operations and scope records live at `.starciwork/<scope>/`
+        outside `features/` and carry `work/node@1`. Add a new domain as a new family or resource
+        kind plus its explicit contract, never as an invented folder.
       - 'Accepted art direction/design assets are source inputs: store them in the selected design
         resource directory and declare `files:[{"path":"assets/direction.png"}]` using the real
         filename. Consuming UI design/frontend nodes reference that resource explicitly. Captured
@@ -212,7 +218,9 @@ sections:
         wrong file name, missing `schema:` const or wrong const fails the run; the layout is never
         adapted to fit an observed file."
       - "Every structured artifact an op writes carries its declared `schema:` const as a record
-        key: node records `work/node@1`, the workspace `work/workspace@1`, resources
+        key: family records `work/<family>@1`, the catalog `work/catalog@1`, the feature overview
+        `work/feature@1`, the brand `work/brand@1`, root-level operations/scope records
+        `work/node@1`, the workspace `work/workspace@1`, resources
         `work/resource@1`, evidence manifests `work/evidence@1` (emitted by the kernel from the
         op's manifest fields), the workflow goal `starci/goal@1`, intake records
         `starci/workflow-intake@1`, .starcistacks compose `starci/application-stacks@1`. Staged handoffs
@@ -230,17 +238,17 @@ sections:
         records (intake.json, a goal revision) travel as report evidence under its declared write
         ceiling; it never emits checks, contracts, inbox commands or report rows directly —
         those are kernel/api outputs, not op output."
-      - "`features/<feature>/` record trees follow the declared shape: `features/index.yaml` the
-        catalog, one `index.yaml` per node folder (`work/node@1`), business overview and split SRS
-        leaves whose `extensions.work3.srs` payloads carry their `starci/srs-*@1` section const
-        with `starci/srs-aggregate@1` intermediate indexes, architecture overview and SDS leaves
-        whose `extensions.work3.sds` payloads carry their `starci/sds-*@1` section const with
-        `starci/sds-aggregate@1` intermediates, `ui/**` nodes with their `assets/`, implementation
-        frontend/backend nodes, `uat/<flow>/` folders `{index.yaml,accounts.yaml,fixtures.yaml,
-        seed.sql,cleanup.sql,assets/}`, `integration/<id>/` nodes, the root `brand/index.yaml`
-        with `brand/assets/**`, and `_resources/<category>/<slug>/resource.yaml`. Every feature
-        record class carries its schema const and is covered by `starci validate`; writing outside
-        the declared layout fails checks."
+      - "`features/<feature>/` record trees follow the declared flat shape: `.starciwork/index.yaml`
+        the catalog (`work/catalog@1`), `features/<feature>/index.yaml` the feature overview
+        (`work/feature@1`), and one `index.yaml` per record inside its flat family folder -
+        `br`/`ac`/`fr`/`nfr`/`data`/`journey`/`decision` for the requirement layer,
+        `sds`/`contract`/`integration` for the design layer, `ui/<name>/` nodes with their
+        `assets/`, `impl/<repository>/<name>/` implementation nodes, `uat/<flow>/` folders
+        `{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/,runs/}`,
+        `gap` and `event` records - each carrying its own `work/<family>@1` const. The root
+        `brand/index.yaml` with `brand/assets/**`, and `_resources/<category>/<slug>/resource.yaml`
+        complete the tree. Every record class carries its schema const and is covered by
+        `starci validate`; writing outside the declared layout fails checks."
   - title: Evidence, completion and commits
     blocks:
       - "Before executing, establish the selected node's current `inputDigest` using the read-only

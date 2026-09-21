@@ -127,7 +127,7 @@ blockers:
     condition:
       en: Missing, unknown or multiple operations; select a single mode under existing task authority.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
@@ -293,7 +293,7 @@ executionModes:
             evidenced delivery node, or a required scope is missing. Report node/resource IDs and propose
             a separately selected graph update when needed; never weaken dependsOn/refs/required to proceed.
     placeholders:
-      business: Selected business slug
+      feature: Selected feature slug
       repo-id: Resolved repository resource ID
       bound-paths: Inspected source read set
       write-ceiling: Explicit owned source paths
@@ -329,7 +329,7 @@ executionModes:
             target is a scope/graph gap: report it and propose a separately selected scope op; do
             not create a target or invent its acceptance/graph here."
       - id: business
-        path: .starciwork/<business>/business/**/index.yaml
+        path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
         purpose:
           en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
             inputs in the selected .starciwork graph. Intent governs expected behavior; source is
@@ -337,7 +337,7 @@ executionModes:
             require one; a needed missing input is a reported graph/scope gap, not a new dependency
             silently added here.
       - id: architecture
-        path: .starciwork/<business>/architecture/**/index.yaml
+        path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
         purpose:
           en: Read the current reviewed SDS seed and exact SRS mappings for the selected delivery slice.
             Architecture remains todo until this reconciliation proves the same current source and runtime
@@ -371,20 +371,18 @@ executionModes:
             policy, op permissions and existing task authority.
     writes:
       - id: node
-        path: selected SRS/SDS/implementation/test/E2E/UAT N/index.yaml records
+        path: selected requirement/design/implementation/test/E2E/UAT index.yaml records
         fields:
           - state
-          - activity
-          - blockers
-          - completion.inputDigest
-          - completion.evidence
+          - evidence
+          - blockedBy
         content:
-          en: Read semantic content unchanged and write only state/activity/blockers/completion. Author
-            state done only on the selected required leaves after one current reconciliation manifest binds
-            every SRS, SDS, implementation, test/E2E and UAT assertion to the same delivery revision.
-            Otherwise keep affected leaves todo, record blockers[] where applicable and return partial or
+          en: Read semantic content unchanged and write only state/evidence/blockedBy. Author
+            state done only on the selected required records after one current reconciliation manifest binds
+            every requirement, design, implementation, test/E2E and UAT proof demand to the same delivery revision.
+            Otherwise keep affected records todo, record blockedBy where applicable and return partial or
             blocked. Findings, commit mappings and remaining cleanup belong to evidence, never rewritten
-            semantic prose.
+            record prose.
       - id: evidence
         path: E/manifest.yaml + E/reconciliation.json + E/result.md
         fields:
@@ -502,7 +500,7 @@ executionModes:
             evidenced delivery node, or a required scope is missing. Report node/resource IDs and propose
             a separately selected graph update when needed; never weaken dependsOn/refs/required to proceed.
     placeholders:
-      business: Selected business slug
+      feature: Selected feature slug
       repo-id: Resolved repository resource ID
       bound-paths: Inspected source read set
       write-ceiling: Explicit owned source paths
@@ -688,7 +686,7 @@ executionModes:
             Report node/resource IDs and propose a separately selected graph update when needed;
             never run predecessors or weaken dependsOn/refs/required to proceed.
     placeholders:
-      business: Selected business slug
+      feature: Selected feature slug
       repo-id: Resolved repository resource ID
       bound-paths: Inspected source read set
       write-ceiling: Explicit owned source paths
@@ -724,7 +722,7 @@ executionModes:
             target is a scope/graph gap: report it and propose a separately selected scope op; do
             not create a target or invent its acceptance/graph here."
       - id: business
-        path: .starciwork/<business>/business/**/index.yaml
+        path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
         purpose:
           en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
             inputs in the selected .starciwork graph. Intent governs expected behavior; source is
@@ -902,7 +900,7 @@ executionModes:
             Report node/resource IDs and propose a separately selected graph update when needed;
             never run predecessors or weaken dependsOn/refs/required to proceed.
     placeholders:
-      business: Selected business slug
+      feature: Selected feature slug
       repo-id: Resolved repository resource ID
       bound-paths: Inspected source read set
       write-ceiling: Explicit owned source paths
@@ -946,7 +944,7 @@ executionModes:
             target is a scope/graph gap: report it and propose a separately selected scope op; do
             not create a target or invent its acceptance/graph here."
       - id: business
-        path: .starciwork/<business>/business/**/index.yaml
+        path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
         purpose:
           en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
             inputs in the selected .starciwork graph. Intent governs expected behavior; source is
@@ -1128,7 +1126,7 @@ executionModes:
             Report node/resource IDs and propose a separately selected graph update when needed;
             never run predecessors or weaken dependsOn/refs/required to proceed.
     placeholders:
-      business: Selected business slug
+      feature: Selected feature slug
       repo-id: Resolved repository resource ID
       bound-paths: Inspected source read set
       write-ceiling: Explicit owned source paths

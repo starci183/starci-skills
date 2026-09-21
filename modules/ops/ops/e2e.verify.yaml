@@ -29,14 +29,14 @@ reads:
         target or invent its assertions here, and never rewrite an assertion so an existing scenario
         can pass."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{br,ac,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
       en: Read the accepted requirements, rules, denials and acceptance IDs declared as relevant inputs in
         the selected .starciwork graph. Intent governs the expected observable effect; current source
         behavior is not a replacement for it. A needed missing input is a reported graph/scope gap,
         not a silently added dependency.
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: Read the declared operations, contracts, data ownership, authorization and error identity,
         transaction and idempotency boundaries and eventual-consistency expectations of the slice
@@ -345,7 +345,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Feature folder of the selected records, inside the operation allowlist
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   suite-paths: Existing end-to-end suite and fixture paths

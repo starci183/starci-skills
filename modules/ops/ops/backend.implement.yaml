@@ -30,28 +30,29 @@ reads:
         Acceptance additionally requires the selected real startup, persistence, recovery and
         application checks. This conditional read grants no extra deployment or source scope.
   - id: target
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
-        target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here. Current reviewed todo SRS/SDS inputs are
-        semantic refs; the settled-pass decide jobs are the execution prerequisites. Do not require those
-        specification refs to be Work state done before implementation."
+      en: "Read the existing selected implementation record, its feature scope, declared
+        refs/dependsOn/proof demands and validator freshness. This consumer op requires its target
+        record to exist. An absent target is a scope/graph gap: report it and propose a separately
+        selected scope op; do not create a target or invent its acceptance/graph here. Current
+        reviewed todo requirement/design inputs are semantic refs; the settled-pass decide jobs are
+        the execution prerequisites. Do not require those specification refs to be Work state done
+        before implementation."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{br,ac,fr,nfr,decision}/**/index.yaml
     purpose:
-      en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
-        inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a
+      en: Read accepted requirements, decisions, constraints and acceptance ids declared as relevant
+        inputs in the selected flat Work graph. Intent governs expected behavior; source is not a
         replacement. Do not invent a mandatory BA predecessor for a scope that does not require one;
         a needed missing input is a reported graph/scope gap, not a new dependency silently added
         here.
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,data,integration}/**/index.yaml
     purpose:
       en: Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the
-        selected .starciwork graph; distinguish proposed paths from observed files. No universal
-        architecture-first op chain is implied; report genuinely missing required scope before
+        selected flat Work graph; distinguish proposed paths from observed files. No universal
+        design-first op chain is implied; report genuinely missing required scope before
         proceeding.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
@@ -76,18 +77,16 @@ reads:
         permissions and existing task authority.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     fields:
       - state
-      - blocker
-      - completion.inputDigest
-      - completion.evidence
-      - completion.codeRefs
+      - evidence
+      - blockedBy
     content:
-      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
-        only state/blocker/completion here; actual observations, findings, commit mappings and
-        remaining cleanup belong to the evidence result, not semantic node prose. Missing
-        refs/dependencies/acceptance require a reported gap or separately selected scope update;
+      en: Read the existing selected scope, expected proof demands and flat Work graph unchanged. Write
+        only state/evidence/blockedBy here; actual observations, findings, commit mappings and
+        remaining cleanup belong to the evidence result, not semantic record prose. Missing
+        refs/dependsOn/acceptance require a reported gap or separately selected scope update;
         never add/remove them to obtain pass.
   - id: source
     path: repository:<repo-id>/<write-ceiling>
@@ -180,17 +179,17 @@ steps:
         execution profile and actual tool availability before selecting instruments; this does not
         switch the model/runtime or spawn workers. Classify implementation feedback before stopping:
         repository paths, private helper names, library calls and other reversible source-local choices
-        are owned here and do not require SRS/SDS expansion. A changed observable outcome, actor permission,
+        are owned here and do not require spec expansion. A changed observable outcome, actor permission,
         money or customer-data rule is an srs-gap; a missing logical owner, contract, authority boundary,
         durable state/effect, compatibility, material failure/recovery or quality mechanism is an sds-gap.
-        Report a spec-affecting finding with the exact observed fact, affected semantic IDs and smallest
-        proposed delta; never edit SRS/SDS in this op. CALL POINT (discovery, implementation or
-        verification): when an observed source/test fact proves the accepted SDS technically
-        missing or contradictory while business and SRS stay unchanged, read
+        Report a spec-affecting finding with the exact observed fact, affected semantic ids and smallest
+        proposed delta; never edit requirement or design records in this op. CALL POINT (discovery,
+        implementation or verification): when an observed source/test fact proves the accepted design
+        technically missing or contradictory while requirements stay unchanged, read
         backend.implement/secondary.json and request its implementation.architecture role. The
-        backend worker waits and never edits SDS. Orca runs architecture.decide in a separate child
-        worktree; after coordinator review/integration, start a fresh backend attempt from that SDS
-        revision and rerun every affected check. If business/SRS, owner or accepted scope must
+        backend worker waits and never edits design records. Orca runs architecture.decide in a separate
+        child worktree; after coordinator review/integration, start a fresh backend attempt from that
+        design revision and rerun every affected check. If requirements, owner or accepted scope must
         change, return blocked for a user decision instead of invoking the sidearm."
   - reads:
       - business
@@ -274,7 +273,7 @@ proofs:
 blockers:
   - code: BUSINESS_UNKNOWN
     condition:
-      en: Implementation reaches a rule not decided by the accepted business node.
+      en: Implementation reaches a rule not decided by the accepted requirement records.
   - code: SCOPE_WIDENING
     condition:
       en: Required operation, owner or protected path lies outside selected code-scope.
@@ -287,7 +286,9 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Feature folder of the intake or migration, inside the operation allowlist
+  repository: Implementation repository segment under impl/
+  name: Implementation record folder
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
@@ -338,20 +339,20 @@ business:
     ACs - and prove it with unit + backend E2E + quality gates (incl. sonar when
     declared) against the tested commit?"
   whenNeeded:
-    - When an accepted SRS/SDS slice needs backend code created, refined or defect-repaired (primary mode).
+    - When an accepted requirement/design slice needs backend code created, refined or defect-repaired (primary mode).
     - As the declared interface.backend secondary of interface.implement for a bounded, contract-compatible backend repair.
   whenNot:
     - Not for frontend code, browser UAT, remote migrations, package publishing or production deploys (declared not-this-scope).
-    - Not when SDS is merely silent - a proven SDS gap delegates to the architecture.decide secondary; a business contradiction is blocked, never guessed.
-    - Reversible source-local choices are implementation work, not automatic SRS/SDS gaps; do not stop merely because the upstream specs omit a private mechanism.
+    - Not when the design is merely silent - a proven design gap delegates to the architecture.decide secondary; a requirement contradiction is blocked, never guessed.
+    - Reversible source-local choices are implementation work, not automatic spec gaps; do not stop merely because the upstream records omit a private mechanism.
     - INFERRED: not a substitute for verification ops - its own gates prove the implementation only within its declared suite; independent proof belongs to e2e/integration/uat/review.
   consumes:
-    - Accepted business + architecture records and the target node (request-bound scope).
+    - Accepted requirement + design records and the target implementation record (request-bound scope).
     - Bound repo paths, write ceiling, existing code + suite; backend pattern INDEX topics; sonar policy.
     - apiDelivery bindings for consumers needing a runnable API; secondary request contract when acting as interface.backend.
   produces:
     - Source edits inside the declared write ceiling; scoped commits when authorized.
-    - Node completion + codeRefs; apiDelivery assertions for consumers.
+    - Record state + evidence; apiDelivery assertions for consumers.
     - Evidence bundle: checks, backend tests, sonar report, lineage, api-contract; E/response.json workflow handoff.
   failureModes:
     - BUSINESS_UNKNOWN, SCOPE_WIDENING, PROOF_UNAVAILABLE, DECLARED_DEPENDENCY_UNMET (declared blockers).
@@ -366,5 +367,5 @@ route:
   nodeKinds: [implementation]
   phase: [implement, implementation]
   intent: [implement, backend, code, api, build]
-  prerequisites: ["business.decide settled pass (reviewed SRS seed; Work leaves remain todo)", "architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)"]
+  prerequisites: ["business.decide settled pass (reviewed requirement seed; Work leaves remain todo)", "architecture.decide settled pass (reviewed design seed; Work leaves remain todo)"]
   riskHints: [source-edits]

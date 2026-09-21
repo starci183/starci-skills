@@ -28,7 +28,7 @@ reads:
       en: "Read the selected implementation node this package realises: declared path, package
         identity (name/scope), public surface refs, assertions. No selected node is a scope gap."
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: "REQUIRED. Package boundaries — name, exports shape, dependency policy, consumer contract —
         are settled architecture. Undecided boundaries report sds-gap; the scaffold never invents

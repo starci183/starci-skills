@@ -29,7 +29,7 @@ reads:
       en: "Read the selected implementation node this scaffold realises: declared source path,
         framework/design refs, assertions. No selected node is a scope/graph gap — report it."
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: "REQUIRED for greenfield. Framework choice, app shell shape, routing root and data
         boundaries come from the settled SDS — never guessed. Missing decisions report sds-gap."
@@ -40,7 +40,7 @@ reads:
         Resolve the bound grammar package and its version before writing any component; a missing
         or unbound grammar reports grammar-gap."
   - id: brand
-    path: .starciwork/<business>/brand/**/index.yaml (settled tokens inside)
+    path: .starciwork/brand/index.yaml (settled tokens inside)
     purpose:
       en: Read settled brand tokens the scaffold wires into the theme layer. Absent brand decisions
         report brand-gap rather than shipping placeholder styling as settled.

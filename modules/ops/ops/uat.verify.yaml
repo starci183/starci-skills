@@ -22,14 +22,14 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/uat/<flow>/index.yaml
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
+      en: "Read the existing selected uat record, feature scope, declared refs/dependencies/proof
+        demands and validator freshness. This consumer op requires its target record to exist. An absent
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
         create a target or invent its acceptance/graph here."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
     purpose:
       en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
         inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a
@@ -50,7 +50,7 @@ reads:
       en: Read exact target/origins, owner, configuration revision, declared probes and allowed effects;
         validate live observations without inferring identity from hostname alone.
   - id: flows
-    path: request flows[] + selected .starciwork/<business>/uat/<flow>/**/index.yaml
+    path: request flows[] + selected .starciwork/features/<feature>/uat/<flow>/index.yaml
     purpose:
       en: Read the finite ordered flows array from the accepted FE E/flows.json or its exact selected
         workflow request. Preserve the FE commit/runtime binding; a different served build requires
@@ -115,16 +115,22 @@ reads:
         permissions and existing task authority.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/uat/<flow>/index.yaml
     fields:
+      - schema
+      - id
+      - title
       - state
-      - blocker
-      - completion.inputDigest
-      - completion.evidence
+      - accounts
+      - steps
+      - proves
+      - evidence
+      - blockedBy
     content:
-      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
-        only state/blocker/completion here; actual observations, findings, commit mappings and
-        remaining cleanup belong to the evidence result, not semantic node prose. Missing
+      en: Read the existing selected scope, expected proof demands and .starciwork graph unchanged.
+        Write the work/uat-flow@1 record's state, proves and evidence pointer here; actual
+        observations, findings, commit mappings and
+        remaining cleanup belong to the evidence result, not record prose. Missing
         refs/dependencies/acceptance require a reported gap or separately selected scope update;
         never add/remove them to obtain pass.
   - id: source
@@ -431,7 +437,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths

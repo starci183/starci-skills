@@ -25,7 +25,7 @@ reads:
         scope/graph gap: report it and propose a separately selected scope op; do not create a
         target or invent its acceptance/graph here."
   - id: records
-    path: .starciwork/<business>/**/index.yaml
+    path: .starciwork/features/<feature>/**/index.yaml
     purpose:
       en: Read the decided requirement, design, decision and goal records the document describes -
         the settled intent. Documentation restates what records decided; it never decides anything
@@ -62,16 +62,15 @@ writes:
     fields:
       - schema
       - state
-      - blocker
-      - completion.inputDigest
-      - completion.evidence
+      - blockedBy
+      - evidence
       - description
       - extensions.work3.docs
     content:
-      en: Write the document's own declaration on the selected node (schema work/node@1 preserved) -
+      en: Write the document's own declaration on the selected record (its existing schema preserved) -
         which documents it owns under
-        extensions.work3.docs - plus state/blocker/completion. The document content itself belongs
-        to the docs write and observations to evidence; do not widen refs/dependencies/acceptance to
+        extensions.work3.docs - plus state/blockedBy/evidence. The document content itself belongs
+        to the docs write and observations to evidence; do not widen refs/dependsOn/acceptance to
         obtain pass.
   - id: docs
     path: .starciwork/<docs-dir>/<doc>.md
@@ -209,7 +208,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   docs-dir: Tree directory that owns the selected documents

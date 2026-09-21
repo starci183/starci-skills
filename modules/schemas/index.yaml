@@ -492,6 +492,10 @@ schemas:
   # --------------------------------------------------------------------------
   # SPECIFICATION — SRS/SDS payload contracts (bodies under
   # modules/schemas/spec/; validators live in scripts/checks/spec/)
+  # DORMANT on flat trees: these govern the retired nested business/architecture
+  # layout via engine/index.mjs's legacy path. Canonical flat work/* records are
+  # enforced by the work-* family schemas and the check-work-* gate stack, never
+  # by this subsystem.
   # --------------------------------------------------------------------------
 
   - id: starci/specification-contract@1
@@ -538,7 +542,7 @@ schemas:
     dialect: prose-contract
     subsystem: spec
     governs: "The typed split-SRS section contracts — aggregate starci/srs-aggregate@1 with allowedSections, plus per-section records (functional-requirement, nfr, business-rule, policy-decision, data, customer-journey) with required fields."
-    binds: business/srs/**/index.yaml payloads (extensions.work3.srs)
+    binds: legacy business/srs/**/index.yaml payloads (extensions.work3.srs) - retired nested layout, dormant on flat work/* trees
     usedBy: [scripts/checks/spec/srs-sections.mjs (SRS_SECTION_CONTRACT), contract.schema.yaml semantics.layout]
     business:
       question: "Does each split SRS leaf carry exactly the fields its section type owns?"
@@ -551,7 +555,7 @@ schemas:
     dialect: json-schema
     subsystem: spec
     governs: "The compatibility SRS record — id, nodeType, name, summary, refs, content; op const business.decide."
-    binds: business/srs leaves (compatibility/recovery only)
+    binds: legacy business/srs leaves (compatibility/recovery only) - retired nested layout
     usedBy: [scripts/checks/spec/srs.mjs (SRS_SCHEMA compat reader), contract.schema.yaml compatibilityBusiness.schema, tests/srs.spec.mjs]
     business:
       question: "Is a pre-split SRS record still readable under its original checks?"

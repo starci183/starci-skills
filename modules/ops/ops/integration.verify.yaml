@@ -48,7 +48,7 @@ reads:
         scope op. Never create the node, never invent its assertions, and never re-word one so a scenario
         that already ran can be called a pass."
   - id: integration
-    path: .starciwork/<business>/**/index.yaml extensions.work3.integrations[]
+    path: .starciwork/features/<feature>/**/index.yaml extensions.work3.integrations[] + .starciwork/features/<feature>/integration/**/index.yaml
     purpose:
       en: "Read the declaration the business or architecture record made: the integration id, the provider,
         the sandbox account to use, and the credential entry - its exact variable name, that the owner
@@ -57,7 +57,7 @@ reads:
         credential variable, or no custody, is a reported gap, never a guessed name and never a key read
         from somewhere else."
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: Read the declared contract with the external system - the request the product sends, the response
         and error identities it expects, the retry, idempotency and timeout boundaries, and what the product
@@ -331,7 +331,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never run
         predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Feature folder of the selected records, inside the operation allowlist
   slug: Identity custody slug the integration declaration names (custody identity:<slug>)
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set covering the delivered client of this integration

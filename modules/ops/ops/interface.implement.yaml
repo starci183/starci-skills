@@ -32,16 +32,16 @@ reads:
         Acceptance additionally requires the selected real startup, persistence, recovery and
         application checks. This conditional read grants no extra deployment or source scope.
   - id: target
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
+      en: "Read the existing selected impl record, feature scope, declared refs/dependencies/proof
+        demands and validator freshness. This consumer op requires its target record to exist. An absent
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here. Current reviewed todo SRS/SDS inputs are
+        create a target or invent its acceptance/graph here. Current reviewed todo spec inputs are
         semantic refs; the settled-pass decide jobs are the execution prerequisites. Do not require those
-        specification refs to be Work state done before implementation."
+        specification refs to be record state done before implementation."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
     purpose:
       en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
         inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a
@@ -49,7 +49,7 @@ reads:
         a needed missing input is a reported graph/scope gap, not a new dependency silently added
         here.
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the
         selected .starciwork graph; distinguish proposed paths from observed files. No universal
@@ -137,17 +137,25 @@ reads:
         asset. Do not fabricate asset URLs or silently omit artwork.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     fields:
+      - schema
+      - id
+      - title
       - state
-      - blocker
-      - completion.inputDigest
-      - completion.evidence
-      - completion.codeRefs
+      - repository
+      - owners
+      - revision
+      - proves
+      - verification
+      - verificationSource
+      - evidence
+      - blockedBy
     content:
-      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
-        only state/blocker/completion here; actual observations, findings, commit mappings and
-        remaining cleanup belong to the evidence result, not semantic node prose. Missing
+      en: Read the existing selected scope, expected proof demands and .starciwork graph unchanged.
+        Write the work/implementation@1 record with its real owners, revision, proves and
+        verification/evidence here; actual observations, findings, commit mappings and
+        remaining cleanup belong to the evidence result, not record prose. Missing
         refs/dependencies/acceptance require a reported gap or separately selected scope update;
         never add/remove them to obtain pass.
   - id: source
@@ -160,7 +168,7 @@ writes:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
         changes; record actual diff and commit mapping, not proposed changes as delivered.
   - id: evidence
-    path: N/assets/running-page.png
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/assets/running-page.png
     fields:
       - id
       - nodeId
@@ -348,8 +356,8 @@ steps:
         decorative slot with a deferred brief; never use invented URLs, broken images or label
         pending art complete. Functional asset requirements remain blocking. Record E/assets.json
         even when the reviewed draws need no distinct assets. Write the frontend source summary only
-        to implementation/frontend/index.yaml. Store only running-page screenshots in
-        implementation/frontend/assets; design PNGs remain in ui/assets and UAT captures remain with
+        to the owning impl/<repository>/<name>/index.yaml record. Store only running-page screenshots in
+        that record's assets/; design PNGs remain in ui/<name>/assets and UAT captures remain with
         their flow.
   - reads:
       - repo
@@ -537,7 +545,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths

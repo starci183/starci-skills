@@ -12,7 +12,7 @@ completionProfile: architecture
 sideEffects: []
 graphPolicy:
   mode: selected-scope-only
-  location: Canonical .starciwork SRS/SDS owners and collocated assets
+  location: Canonical .starciwork spec/design records and collocated assets
   prerequisiteState: done
   dispatch: never
 reads:
@@ -35,12 +35,12 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
+      en: "Read current target, ancestor scope, refs, dependencies, proof demands and validator freshness.
         For an explicitly new target, absence is expected: inspect the nearest existing
         ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
         content."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{index.yaml,fr/**/index.yaml,nfr/**/index.yaml,br/**/index.yaml,decision/**/index.yaml,data/**/index.yaml,journey/**/index.yaml}
     purpose:
       en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
         inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a
@@ -54,10 +54,9 @@ reads:
         using primary documentation where necessary; do not present a design as deployed-source
         observation.
   - id: specification
-    path: modules/ops/ops/architecture.decide.yaml + modules/schemas/spec/sds-map.schema.yaml +
-      docs/architecture-sds.md
+    path: modules/ops/ops/architecture.decide.yaml + modules/schemas/work-layout.yaml + modules/schemas/work-*.schema.yaml
     purpose:
-      en: Read the JSON field contract and this operator procedure before authoring the .starciwork
+      en: Read the record family contracts and this operator procedure before authoring the .starciwork
         payload.
   - id: feasibility
     path: Selected repositories, relevant configuration and installed API declarations
@@ -79,39 +78,50 @@ reads:
         permissions and existing task authority.
 writes:
   - id: node
-    path: .starciwork/<business>/architecture/{overview,sds/**}/index.yaml
+    path: .starciwork/features/<feature>/{sds/**/index.yaml,contract/**/index.yaml,integration/**/index.yaml}
     fields:
       - schema
+      - id
+      - title
       - state
-      - activity
-      - blockers
-      - investigation.contextDigest
+      - responsibility
+      - interfaces
+      - owners
       - refs
       - dependsOn
-      - assertions
-      - required
-      - extensions.work3.sds
+      - blockedBy
+      - change
+      - requiresProof
+      - extensions.work3.decisionLog
+      - extensions.work3.integrations
+      - family payload
     content:
-      en: Every authored index.yaml is a work/node@1 record at its catalog-declared path under
-        features/<feature>/architecture/. Author
-        overview plus typed extensions.work3.sds leaves in flows, components, contracts,
-        data, quality, deployment, decisions and verification - each leaf payload carrying its
-        declared starci/sds-*@1 section const. Parent indexes carry only
-        starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
-        interfaces without repository roles, paths, symbols, signatures, source status or revision
-        evidence. For a not-yet-implemented slice, author the smallest design-complete map that settles
+      en: "Every authored index.yaml is a flat work/*@1 record at its family path under
+        features/<feature>/, where <family> is sds, contract or integration. Author logical
+        components as work/sds-component@1 under sds/<name>/ (responsibility, interfaces, owners,
+        refs, dependsOn, stateMachine, sequence, requiresProof), synchronous surfaces between a
+        provider feature and a consumer feature as work/contract@1 under contract/<name>/
+        (between, owner, surface, guarantees, consumerObligations), and each external system as
+        work/integration@1 under integration/<name>/ (provider, boundary, endpoints, credential
+        {name, providedBy: owner, where}, sandbox, requiresProof.live) with the declaring side
+        naming it in extensions.work3.integrations and dependsOn/refs. Components prescribe
+        logical responsibilities and interfaces without repository roles, paths, symbols,
+        signatures, source status or revision evidence. For a not-yet-implemented slice, author
+        the smallest design-complete map that settles
         logical ownership, contracts, authority, durable state/effects, material failure/recovery and
         planned verification. Do not invent endpoints, tables, event topics, retry counts, file layouts
         or private helpers unless an accepted constraint makes that logical contract necessary. Keep the
-        selected SDS leaves at state todo while implementation, test/E2E or UAT evidence is still open;
-        activity records investigating, implementing or verifying without inventing another lifecycle state.
-        A passing architecture.decide job means the current SDS seed is reviewed and usable downstream, not
-        that the Work leaf or feature is done. Link reviewed todo SRS inputs through refs; do not place them
-        in dependsOn, because the durable business.decide-to-architecture.decide job edge owns execution order.
-        Write all canonical SDS content in English, including natural-language prose,
+        selected design records at state todo while implementation, test/E2E or UAT evidence is still
+        open; never invent another lifecycle state.
+        A passing architecture.decide job means the current design seed is reviewed and usable
+        downstream, not that the record or feature is done. Link reviewed todo requirement inputs
+        through refs; do not place them
+        in dependsOn, because the durable business.decide-to-architecture.decide job edge owns
+        execution order.
+        Write all canonical design content in English, including natural-language prose,
         YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
-        types, operation names and source symbols. Preserve Business and shared
-        design through stable IDs and exact owning Work refs.
+        types, operation names and source symbols. Preserve business and shared
+        design through stable IDs and exact owning Work refs."
   - id: matrixHandoff
     path: E/job-result.json
     fields:
@@ -142,8 +152,9 @@ steps:
     writes:
       - node
     action:
-      en: "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read
-        modules/schemas/spec/sds-map.schema.yaml and docs/architecture-sds.md. Survey relevant source,
+      en: "Resolve accepted requirement scope, drivers, actors and platform constraints from canonical
+        Work. Read modules/schemas/work-layout.yaml and the work-sds-component/work-contract/
+        work-integration schema contracts. Survey relevant source,
         configuration and installed APIs; then independently record retain, extend, correct, replace
         or add decisions with rationale, impact and migration. Bound the design to the next selected
         implementation slice and separate material logical decisions from reversible source-local
@@ -173,7 +184,7 @@ steps:
     writes:
       - node
     action:
-      en: Design runtime scenarios referencing canonical SRS flow IDs. Every step names its component,
+      en: Design runtime scenarios referencing canonical fr record IDs. Every step names its component,
         logical operation, callers/receivers, contracts, authorization, data,
         transaction/state decision, return path, failure outcome, recovery and planned verification.
         Repository roles, paths, symbols and signatures belong to the later Implementation mapping;
@@ -226,15 +237,14 @@ steps:
       - node
       - matrixHandoff
     action:
-      en: Validate recursive layout and exact canonical SRS/shared-design references. Review full
-        requirement/flow/acceptance coverage across the owning architecture scope. Resolve material
-        design blockers before pass. Confirm that all canonical SDS content is English; schema
-        validity alone is not review. Bind the reviewed current semantic context in
-        investigation.contextDigest, leave selected SDS leaves state todo, and return activity to idle.
-        Open material issues stay in blockers[] and produce partial or blocked. Implementation owns source
+      en: Validate flat family layout and exact canonical requirement/shared-design references. Review
+        full requirement/flow/acceptance coverage across the owning architecture scope. Resolve material
+        design blockers before pass. Confirm that all canonical design content is English; schema
+        validity alone is not review. Leave the selected design records state todo after the review.
+        Open material issues stay in blockedBy and produce partial or blocked. Implementation owns source
         mapping and test execution. The op job may settle done because this bounded design job completed,
-        but Work state done is reserved for final reconciliation of current SRS, SDS, code, test/E2E and
-        UAT evidence at one revision.
+        but record state done is reserved for final reconciliation of current requirements, design,
+        code, test/E2E and UAT evidence at one revision.
   - reads:
       - target
       - business
@@ -248,7 +258,8 @@ steps:
         two or three readings the recorded design actually admits, and choose the most reasonable one from the
         accepted requirement it realises, the rest of the design it must stay consistent with, the decided
         records of the other features and the product's own conventions. Write that reading into the section
-        with the contract and the acceptance an implementer derives code from, bump the record's rev, and
+        with the contract and the acceptance an implementer derives code from, bump the record's
+        change.rev, and
         append EXACTLY ONE extensions.work3.decisionLog entry {rev, at, gap, chosen, why, alternatives},
         never rewriting or deleting an earlier one. One exception: when the readings differ in an observable
         outcome about money, authority or customer data, do not choose silently - report ask with
@@ -264,8 +275,8 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
-        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, declared
+        proof demands are covered, input bindings are current, and an honest not-run/fail cannot earn
         done. The starci/sds@1 record remains a readable input for existing trees, never new
         authoring output.
   - id: implementability
@@ -280,13 +291,13 @@ proofs:
         empirical refinement do not require theoretical perfection before coding.
   - id: impact-security-coverage
     requirement:
-      en: SRS outcomes map to owned contracts, runtime scenarios and design checks. Assess relevant
+      en: Requirement outcomes map to owned contracts, runtime scenarios and design checks. Assess relevant
         threats/failures and limitations. Structural validation does not establish semantic approval
         or executed behavior.
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
-        record changed, its rev higher than it was, and exactly one new extensions.work3.decisionLog entry
+        record changed, its change.rev higher than it was, and exactly one new extensions.work3.decisionLog entry
         naming the gap, the chosen reading, why it is the most reasonable one by the records it was read from,
         and the alternatives that were not taken. A changed record with no entry is a defect. A reading that
         changes an observable outcome about money, authority or customer data and was taken without a decision
@@ -303,9 +314,9 @@ blockers:
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
         Report node/resource IDs and propose a separately selected graph update when needed; never
-        run predecessors or weaken dependsOn/refs/required to proceed.
+        run predecessors or weaken dependsOn/refs to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
@@ -352,7 +363,7 @@ business:
     - Constraints + feasibility survey of relevant source inventory; repair mode consumes the reported gap (repo:).
     - Optionally: matrix cell request, runtime execution profile.
   produces:
-    - architecture overview + SDS leaves (sds-flow/component/contract/data-model/quality/deployment/decision/verification records) under features/<feature>/architecture/ - written only by this op's architecture mode.
+    - Design records (sds/contract/integration/data/decision) under the feature's flat families - written only by this op's architecture mode.
     - Current investigation.contextDigest on reviewed todo leaves; decisionLog entries on every revision; E/ matrix job-result when selected.
     - Downstream: current reviewed design authority consumed by interface.implement/backend.implement write ceilings and secondary responses; concrete evidence may open a bounded revised version.
   failureModes:

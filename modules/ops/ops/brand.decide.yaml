@@ -19,21 +19,21 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: .starciwork/brand/index.yaml
     purpose:
-      en: "Read the existing selected brand record, its ancestor scope, declared refs/dependencies/assertions,
-        its current `rev` and validator freshness. There is exactly one brand record per product: this op
-        revises that record rather than adding a second identity. An absent target is a scope/graph gap:
-        report it and propose a separately selected scope op; never create a second brand owner here."
+      en: "Read the existing product brand record, its declared refs, its current `rev` and validator
+        freshness. There is exactly one brand record per product: this op revises that record rather than
+        adding a second identity. An absent target is a scope/graph gap: report it and propose a
+        separately selected scope op; never create a second brand owner here."
   - id: owner
-    path: .starciwork/<business>/business/**/index.yaml + the selected request and the owner's recorded
+    path: .starciwork/features/*/{br,fr,decision}/**/index.yaml + the selected request and the owner's recorded
       rulings
     purpose:
-      en: "Read the accepted business scope and the owner's actual rulings about identity - the name, the
-        primary hue, whether danger may match primary, the mascot and what it may never appear in, the
-        voice. A taste decision belongs to the owner: an unanswered one is a question with the closed
-        options, never a choice this op makes on the owner's behalf. Inferring identity from a competitor,
-        a template or a screenshot is not a ruling."
+      en: "Read the accepted requirement and decision records plus the owner's actual rulings about
+        identity - the name, the primary hue, whether danger may match primary, the mascot and what it may
+        never appear in, the voice. A taste decision belongs to the owner: an unanswered one is a question
+        with the closed options, never a choice this op makes on the owner's behalf. Inferring identity
+        from a competitor, a template or a screenshot is not a ruling."
   - id: grammar
     path: consuming app manifest/lockfile + resolved component package exports/types/renderers/CSS + app
       family root/style imports
@@ -53,7 +53,7 @@ reads:
         already serve. A source file the record names and that does not exist is an environment blocker,
         never a value filled in from memory."
   - id: assets
-    path: N/assets/* + repository:<repo-id>/<bound-paths>
+    path: .starciwork/brand/assets/* + repository:<repo-id>/<bound-paths>
     purpose:
       en: Read the mascot, logo and icon-set assets that already exist - beside the record and in the
         frontend repository - with their formats, dimensions and provenance. Reuse an existing verified
@@ -75,35 +75,44 @@ reads:
         authority.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/brand/index.yaml
     fields:
       - schema
-      - "brand: {identity,colors,typography,mascot,logo,iconography,imagery,voice,motion,forbidden,sources,artworkSlots}"
-      - assets:[{path}]
-      - assertions
+      - id
+      - state
       - rev
+      - colour
+      - typography
+      - mascot
+      - logo
+      - iconography
+      - imagery
+      - voice
+      - motion
+      - donts
+      - review
+      - extensions
     content:
-      en: "Write the whole identity into the one brand record (schema work/node@1): identity (name and the installed grammar
-        family), colour tokens as grammar token name -> value with role and the policy that governs them
-        (`dangerMayMatchPrimary`, `minContrast`), typography, mascot, logo, iconography, imagery, voice,
-        motion, the explicit forbidden list, the `artworkSlots` conventions every later prompt fills, and
-        `sources` naming the real files each value was read from. Every asset path recorded under
-        `brand.mascot`/`brand.logo` is also declared in top-level assets for byte binding. Bump `rev` once
-        per accepted revision and state what changed. No product code, no second brand owner and no
-        identity claim the owner did not rule."
+      en: "Write the whole identity into the one brand record (schema work/brand@1, id brand): colour
+        tokens as name -> value with role and the policy that governs them (whether danger may match
+        primary, the contrast floor - stated in `donts` concretely enough to check), typography,
+        mascot, logo, iconography, imagery, voice, motion, the `donts` list every later surface is
+        judged against, and `review` naming who settled this revision and on what authority - a brand
+        reaches done only through that review. `sources`-style traces to the real files each value was
+        read from live in the record's extension fields; every asset byte lives under the brand
+        record's own `assets/` with its sha256. Bump `rev` once per accepted revision and state what
+        changed. No product code, no second brand owner and no identity claim the owner did not rule."
   - id: brandAssets
-    path: N/assets/<asset>
+    path: .starciwork/brand/assets/<asset>
     fields:
-      - brand.mascot.assets:[{path,sha256}]
-      - brand.logo.assets:[{path,sha256}]
-      - assets:[{path}]
+      - asset bytes with sha256 provenance
     content:
       en: "Store reused or newly generated identity bytes under the brand record's own assets in their actual
-        formats, each with its sha256 and its provenance. A mascot the product does not yet have may be
-        produced once as an explicit placeholder from the owner's description with the available image
-        generator; it is recorded as a placeholder, never as the final mascot and never as a capture of a
-        shipped surface. When no generator is actually available, record a concrete deferred brief instead
-        and leave the slot empty: a missing file is never described as generated."
+        formats, each with its sha256 and its provenance recorded beside them. A mascot the product does
+        not yet have may be produced once as an explicit placeholder from the owner's description with the
+        available image generator; it is recorded as a placeholder, never as the final mascot and never as
+        a capture of a shipped surface. When no generator is actually available, record a concrete deferred
+        brief instead and leave the slot empty: a missing file is never described as generated."
   - id: evidence
     path: E/manifest.yaml + E/brand-check.txt + E/token-trace.md
     fields:
@@ -173,7 +182,7 @@ steps:
         explicit placeholder from the owner's description with the available image generator, store it under
         the record's own assets with its sha256, and record it as a placeholder pending the owner's
         acceptance; if the runtime has no generator, write a concrete deferred brief instead and never claim
-        a file exists. Write `allowedIn`, `forbiddenIn` and the usage rules for each, and name the single
+        a file exists. Write `mayAppearIn`, `neverIn` and the usage rules for each, and name the single
         icon set the product may use so no later screen introduces a second one."
   - reads:
       - target
@@ -183,9 +192,9 @@ steps:
       - node
     action:
       en: "Write the rules that make every later surface derive from this record rather than from taste:
-        imagery style with its explicit forbidden list and `promptRules` that require every later image
-        prompt to state this brand by name, family, palette and mascot policy; the `artworkSlots`
-        conventions a drawing fills; voice; motion; and one forbidden list the record is judged against. A
+        imagery style with its explicit forbidden list and prompt rules that require every later image
+        prompt to state this brand by name, family, palette and mascot policy; the artwork-slot
+        conventions a drawing fills; voice; motion; and the `donts` list the record is judged against. A
         rule nobody could check from the record is rewritten until it can be."
   - reads:
       - target
@@ -246,7 +255,6 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never run
         predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
@@ -286,8 +294,8 @@ business:
     - Installed grammar family + real token/style source files; existing brand asset masters.
     - Applicable UI knowledge topics; environment/identity resources.
   produces:
-    - The brand record: identity/colors/typography/mascot/logo/iconography/imagery/voice/motion/forbidden/sources + artworkSlots declarations.
-    - Brand asset files with sha256 provenance; brand-check and token-trace evidence; node completion.review.
+    - The brand record: colour/typography/mascot/logo/iconography/imagery/voice/motion/donts + review and artwork-slot declarations.
+    - Brand asset files with sha256 provenance; brand-check and token-trace evidence; record review.
     - Downstream authority consumed by interface.draw candidates and interface.asset slot generation.
   failureModes:
     - BRAND_SOURCE_MISSING (blocked/environment), BRAND_TOKEN_UNTRACEABLE (ask), BRAND_DECISION_UNRULED (ask), DECLARED_DEPENDENCY_UNMET.

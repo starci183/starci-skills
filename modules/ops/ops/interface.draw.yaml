@@ -20,22 +20,22 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/ui/<name>/index.yaml
     purpose:
       en: >-
-        Read the selected UI node, its ancestor scope, assertions, refs/dependencies, existing directions and
+        Read the selected ui record, its feature's scope, proof demands, refs/dependencies, existing directions and
         freshness. The target already exists; this operation neither creates scope nor weakens its graph.
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
     purpose:
       en: >-
         Read the accepted requirements, decisions, actors, journeys, states, content and acceptance IDs in
         scope. A plausible picture cannot invent product behavior or permission.
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: >-
-        Read the accepted SDS flows, component boundaries, data/API contracts, security and failure behavior
+        Read the accepted design flows, component boundaries, data/API contracts, security and failure behavior
         relevant to the interface. The direction may communicate those outcomes but cannot prove an API.
   - id: brand
     path: .starciwork/brand/index.yaml + declared brand/assets/** masters
@@ -86,15 +86,20 @@ reads:
       en: Read the request-bound cell only when a job matrix selected it; do not fabricate a matrix handoff.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/ui/<name>/index.yaml
     fields:
       - schema
+      - id
+      - title
+      - state
+      - brand
+      - refs
       - "ui: {status,intent,surfaces,states,coverage,accessibility,responsive,assets,artworkSlots,observations,gaps}"
       - assets:[{path}]
-      - assertions
+      - blockedBy
     content:
       en: >-
-        Write the selected image-first direction in the approved UI node (work/node@1). Keep every required screen and reachable
+        Write the selected image-first direction in the approved ui record (work/ui-screen@1). Keep every required screen and reachable
         state, then add `ui.coverage`: scale, representativeScreens and a map of screen/state/viewport to actual
         Grammar components, derivation and optional directionAsset. For a large frontend task select a deliberately
         small critical-screen set covering the highest-risk anatomy and journeys; derive the rest in the map.
@@ -213,7 +218,7 @@ blockers:
     condition:
       en: A declared prerequisite or required scope is missing or not effectively done; do not weaken the graph.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths

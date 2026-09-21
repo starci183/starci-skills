@@ -23,22 +23,22 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
-      en: "Read the selected implementation node this scaffold realises: declared source path,
-        stack decision refs, assertions and validator freshness. A scaffold with no selected node
-        is a scope/graph gap: report it; do not invent the node or its path."
+      en: "Read the selected implementation record this scaffold realises: declared owners paths,
+        refs into the settled design, proof demands and validator freshness. A scaffold with no
+        selected record is a scope/graph gap: report it; do not invent the record or its path."
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,data}/**/index.yaml
     purpose:
       en: "REQUIRED for greenfield. The stack, layout, naming, ports and module boundaries are
-        decided by the SDS, never by the scaffold agent. If no settled architecture names the
-        stack and tree shape, report sds-gap — do not guess a framework."
+        decided by the flat design records, never by the scaffold agent. If no settled design names
+        the stack and tree shape, report sds-gap — do not guess a framework."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{br,ac,fr,nfr}/**/index.yaml
     purpose:
       en: Read accepted requirements the new service must satisfy at skeleton level (entry points,
-        health surface, declared acceptance IDs). Intent governs what the skeleton proves.
+        health surface, declared acceptance ids). Intent governs what the skeleton proves.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -62,12 +62,12 @@ reads:
         actual tools, selected profile policy and op permissions.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     fields:
       - state
-      - activity
-      - codeRefs
+      - owners
       - evidence
+      - blockedBy
     content:
       en: Record the realised source root, exact scaffolded paths and the evidence the checks produced.
   - id: source
@@ -123,8 +123,8 @@ steps:
   - reads: [target]
     writes: [node, evidence]
     action:
-      en: Record the realised source root and codeRefs on the node, then return the evidence bundle —
-        exact files created, commands run, observed outputs, remaining gaps.
+      en: Record the realised source root and owned paths on the record, then return the evidence
+        bundle — exact files created, commands run, observed outputs, remaining gaps.
 proofs:
   - id: scaffold-runs
     requirement:
@@ -151,9 +151,12 @@ blockers:
     condition:
       en: The required tree would write outside the declared source root or conflict with retained work.
 placeholders:
+  feature: Feature folder of the intake or migration, inside the operation allowlist
+  repository: Implementation repository segment under impl/
+  name: Implementation record folder
   repo-id: Observed selected repository identity; use an existing resource ID only when actually bound
   bound-paths: Inspected relevant source read set
-  declared-source-root: The exact path the node/design declares for the new tree
+  declared-source-root: The exact path the record/design declares for the new tree
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
@@ -173,8 +176,8 @@ business:
     - Not a repo/workspace binding operation — the repository must already be bound
       (workspace.manage owns binding).
   consumes:
-    - The selected implementation node; settled architecture (stack, layout); business acceptance
-      at skeleton level; the bound (possibly empty) repository; house conventions.
+    - The selected implementation record; settled design records (stack, layout); requirement
+      acceptance at skeleton level; the bound (possibly empty) repository; house conventions.
   produces:
     - A runnable, lint-clean backend skeleton under the declared source root plus its evidence bundle.
   failureModes:

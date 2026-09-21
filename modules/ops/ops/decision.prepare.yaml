@@ -27,10 +27,11 @@ reads:
         authority, credential), what it blocks - before anything is written. A question of business, design,
         authority, security, money or customer data is the owner's to answer; only a mechanical one is not.
   - id: decided
-    path: ".starciwork/features/<feature>/business/**/index.yaml + .starciwork/features/<feature>/architecture/**/index.yaml (done)"
+    path: ".starciwork/features/<feature>/**/index.yaml (done)"
     purpose:
-      en: Read every decided business (SRS) and architecture (SDS) record the question touches. A decided
-        record that already settles the question is the answer, named by id; the owner is not asked twice.
+      en: Read every decided flat Work record the question touches - rules, requirements, data, decisions,
+        design, contracts, integrations. A decided record that already settles the question is the answer,
+        named by id; the owner is not asked twice.
   - id: environment
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -39,23 +40,29 @@ reads:
         (.starciwork/_resources/identity/<slug>/) holds it. Never the value itself.
 writes:
   - id: decision
-    path: .starciwork/features/<feature>/business/srs/business-rules/policy-decisions/<slug>/index.yaml
+    path: .starciwork/features/<feature>/decision/<slug>/index.yaml
     fields:
       - schema
-      - description
-      - extensions.work3.srs
-      - refs
+      - id
+      - title
+      - state
+      - outcome
+      - tension
+      - question
+      - options
+      - recommendation
+      - recommendationReason
+      - change
     content:
-      en: One policy-decision record draft (work/node@1, kind business, an srs-policy-decision section with decisionStatus
-        open, the shape of the existing policy decisions of the tree), state todo, carrying in order the question in one sentence; why it
-        matters and what changes until it is answered; the options, numbered, each with what it means
-        for the architecture, the user stories, the security and authority, the business rules and the
-        quality limits, and what it costs; the decided records each option agrees or conflicts with, by id;
-        and exactly one recommendation with its reason. Real product-shaped content, no placeholder, no
-        secret value. The srs.requiredDecisions array lists unresolved topics, never selectable answers.
-        Before owner presentation, srs.options contains at least two distinct concrete mutually exclusive
-        policy outcomes in the exact presentation order. Questions beginning with Whether are agenda topics,
-        not yes/no decisions. Repair an unprepared options array in this operation before requesting an answer.
+      en: One work/policy-decision@1 record draft (id decision.<feature>.<slug>, state todo, outcome open,
+        the shape of the existing policy decisions of the tree), carrying in order the question; tension,
+        naming by id the decided records the question strains between and the statement of that strain;
+        the options, each with an id, a summary and its consequence for the design, the rules, the
+        security and authority, and what it costs; and exactly one recommendation with its reason. Real
+        product-shaped content, no placeholder, no secret value. The options array contains at least two
+        distinct concrete mutually exclusive policy outcomes in the exact presentation order before
+        owner presentation. Questions beginning with Whether are agenda topics, not yes/no decisions.
+        Repair an unprepared options array in this operation before requesting an answer.
 steps:
   - reads:
       - question
@@ -73,9 +80,9 @@ steps:
     writes:
       - decision
     action:
-      en: Otherwise write the one policy-decision record draft with the question, why it matters, the numbered
-        options analysed per side, the decided records each touches by id in the text (never as a graph edge)
-        and one recommendation. A provision is not prepared here; that is provision.ask.
+      en: Otherwise write the one policy-decision record draft with the question, the decided records it
+        strains between named in tension.records, the numbered options analysed per side and one
+        recommendation. A provision is not prepared here; that is provision.ask.
   - reads:
       - question
     writes: []
@@ -99,9 +106,9 @@ proofs:
       en: A question a decided record settles is answered from that record, by id, and no record is written.
   - id: one-record
     requirement:
-      en: Otherwise exactly one policy-decision record draft exists with the question, the numbered options
-        analysed per side, the touched records by id and one recommendation, and the workspace validates.
-        The explicit srs.options array contains outcomes separate from the requiredDecisions agenda.
+      en: Otherwise exactly one policy-decision record draft exists with the question, the tension records
+        by id, the numbered options analysed per side and one recommendation, and the workspace validates.
+        The explicit options array contains concrete selectable outcomes, not an agenda of topics.
   - id: asked-in-the-terminal
     requirement:
       en: The question and its numbered options were printed in this operation's own terminal, with both ways
@@ -145,13 +152,13 @@ business:
     - Not for provisions - a credential/account/dataset is provision.ask, which actually waits for the owner.
     - Not for mechanical questions the runtime can answer itself; never decides money/authority/customer-data silently.
   consumes:
-    - The question as raised; decided SRS/SDS records; environment facts (a credential question cites the variable name + custody, never the value).
+    - The question as raised; decided flat Work records; environment facts (a credential question cites the variable name + custody, never the value).
   produces:
-    - One policy-decision record draft (decisionStatus open, state todo) with numbered options and exactly one recommendation.
+    - One work/policy-decision@1 record draft (outcome open, state todo) with numbered options and exactly one recommendation.
     - Terminal print of the question for the owner; provisional recommendation the runtime may carry until overturned.
   failureModes:
     - QUESTION_UNCLEAR, DECLARED_DEPENDENCY_UNMET (declared blockers).
-    - Missing srs.options is repaired in-op before requesting an answer - the record must be decidable, not just stored.
+    - Missing options is repaired in-op before requesting an answer - the record must be decidable, not just stored.
 # ---------------------------------------------------------------------------
 # route: resolver index.
 # Keys derive from this op's nodeKinds + modules/ops/registry.yaml

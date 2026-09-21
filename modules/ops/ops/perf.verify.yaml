@@ -27,13 +27,13 @@ reads:
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
         create a target or invent its acceptance/graph here."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{br,ac,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
       en: Read the accepted non-functional requirements and the journeys the measurements are taken
         on, declared as relevant inputs in the selected .starciwork graph. Intent declares the
         threshold; observed behavior is not a replacement for it.
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: Read the declared quality targets - latency, throughput, resource ceilings and the
         operations they apply to - so each measurement has a stated expectation. Where the design is
@@ -237,7 +237,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Feature folder of the selected records, inside the operation allowlist
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   environment: Resolved environment label

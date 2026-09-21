@@ -25,14 +25,14 @@ reads:
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
         create a target or invent its acceptance/graph here."
   - id: business
-    path: .starciwork/<business>/business/**/index.yaml
+    path: .starciwork/features/<feature>/{br,ac,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
       en: Read accepted requirements, denials, data classifications and authority boundaries declared
         as relevant inputs in the selected .starciwork graph. The records say what a vulnerability is
         for this slice - a denied action the code permits is a finding; a needed missing input is a
         reported graph/scope gap.
   - id: architecture
-    path: .starciwork/<business>/architecture/**/index.yaml
+    path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: Read the declared security boundaries - authentication, authorization, tenancy, secrets
         custody, external calls and data ownership - the inspection is held to. Where the design is
@@ -239,7 +239,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  business: Selected business slug
+  feature: Feature folder of the selected records, inside the operation allowlist
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   manifest-paths: Manifest and script files defining the listed scan commands

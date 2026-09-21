@@ -14,8 +14,8 @@ test('SRS and SDS ops seed only the selected decision-complete slice and refine 
   assert.match(business,/minimum complete observable behavior/);
   assert.match(business,/smallest decision-complete contract/);
   assert.match(business,/state todo while implementation, test\/E2E or UAT evidence is still open/);
-  assert.match(business,/passing business\.decide job means the current SRS seed is reviewed/);
-  assert.match(business,/Work state done is reserved for final reconciliation/);
+  assert.match(business,/passing business\.decide job means the current requirement seed is reviewed/);
+  assert.match(business,/record state done is reserved for final reconciliation/);
   assert.match(business,/implementation feedback as evidence/);
   assert.match(business,/speculative completeness/);
   assert.doesNotMatch(business,/reviewed SRS leaf may be done/);
@@ -23,9 +23,9 @@ test('SRS and SDS ops seed only the selected decision-complete slice and refine 
   const architecture=prose(load('architecture.decide'));
   assert.match(architecture,/minimum complete flow-led/);
   assert.match(architecture,/smallest design-complete map/);
-  assert.match(architecture,/selected SDS leaves at state todo while implementation, test\/E2E or UAT evidence is still open/);
-  assert.match(architecture,/passing architecture\.decide job means the current SDS seed is reviewed/);
-  assert.match(architecture,/Work state done is reserved for final reconciliation/);
+  assert.match(architecture,/selected design records at state todo while implementation, test\/E2E or UAT evidence is still open/);
+  assert.match(architecture,/passing architecture\.decide job means the current design seed is reviewed/);
+  assert.match(architecture,/record state done is reserved for final reconciliation/);
   assert.match(architecture,/Classify implementation feedback before revising/);
   assert.match(architecture,/Reversible source-local mechanics/);
   assert.doesNotMatch(architecture,/target repo\/path\/symbol\/signature/);
@@ -91,7 +91,7 @@ test('workspace canonicalization test author accepts only its explicitly bound d
   assert.match(prose(target),/packet context\.workflow binds the approved goal identity\/revision/);
 
   const nodeWrite=contract.writes.find(write=>write.id==='node');
-  assert.match(prose(nodeWrite),/When proposalAuthority is in use because N does not exist, omit this write entirely/);
+  assert.match(prose(nodeWrite),/When proposalAuthority is in use because the target does not exist, omit this write entirely/);
   assert.match(prose(nodeWrite),/workspace\.manage to materialize later/);
 });
 

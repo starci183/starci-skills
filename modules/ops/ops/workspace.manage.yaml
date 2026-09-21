@@ -19,12 +19,11 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: .starciwork/<scope>/index.yaml
     purpose:
-      en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
-        For an explicitly new target, absence is expected: inspect the nearest existing
-        ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
-        content."
+      en: "Read current target scope record, refs, dependencies, assertions and validator freshness.
+        For an explicitly new target, absence is expected: inspect the existing workspace/catalog,
+        then create only that selected scope. Preserve unaffected accepted content."
   - id: selection
     path: selected request operation + exact mode contract in this operator JSON
     purpose:
@@ -45,7 +44,7 @@ reads:
         permissions and existing task authority.
 writes:
   - id: node
-    path: N/index.yaml
+    path: .starciwork/<scope>/index.yaml
     fields:
       - completion.inputDigest
       - completion.evidence
@@ -119,7 +118,8 @@ blockers:
     condition:
       en: Missing, unknown or multiple operations; select a single mode under existing task authority.
 placeholders:
-  business: Selected business slug
+  feature: Selected feature slug
+  scope: Selected operations scope slug
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
@@ -144,7 +144,7 @@ modePolicy:
       - .starciwork
       - .starcistacks
     importSlices:
-      - exact selected .starciwork/<business>/migration node paths
+      - exact selected .starciwork/<scope>/ migration record paths
       - exact selected repository/import resource paths and retained asset paths
       - exact selected .starcistacks migration/deployment declaration paths when stack material is in scope
       - exact cleanup target only when cleanup is explicitly authorized
@@ -178,12 +178,11 @@ executionModes:
           en: Read the actual requested outcome, agreed scope and existing workspace identity; do not turn
             examples or future ideas into obligations.
       - id: target
-        path: N/index.yaml
+        path: .starciwork/<scope>/index.yaml
         purpose:
-          en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
-            For an explicitly new target, absence is expected: inspect the nearest existing
-            ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
-            content."
+          en: "Read current target scope record, refs, dependencies, assertions and validator freshness.
+            For an explicitly new target, absence is expected: inspect the existing workspace/catalog,
+            then create only that selected scope. Preserve unaffected accepted content."
       - id: declaration
         path: current explicit repository scope +
           .starciwork/_resources/repositories/<resource>/resource.yaml
@@ -215,39 +214,42 @@ executionModes:
             existing workspace unchanged.
             Never invent repository/environment resources merely to satisfy setup.
       - id: node
-        path: .starciwork/<business>/index.yaml + .starciwork/<business>/setup/index.yaml + selected child
-          directories/index.yaml
+        path: .starciwork/index.yaml + .starciwork/features/<feature>/index.yaml +
+          .starciwork/features/<feature>/<family>/<name>/index.yaml +
+          .starciwork/<scope>/index.yaml
         fields:
           - schema
           - id
-          - kind
-          - required
+          - title
+          - description
+          - state
           - dependsOn
           - refs
+          - blockedBy
           - assertions
-          - "description: Purpose / Scope / Done when / Decisions / Unknowns"
           - "extensions.work3.nativeGoal: actual returned current-task goal reference only"
         content:
-          en: "Every authored index.yaml is a work/node@1 record at its catalog-declared path. Capture the
-            customer-language product overview first in .starciwork/business/index.yaml using
-            readable block prose for purpose, customerUnderstanding, desiredOutcome, scope and
-            openQuestions; it does not approve inferred module requirements. Write other parent
-            purpose with no state. The one setup leaf .starciwork/<business>/setup/index.yaml is N
-            for this op, kind business, with only scope-review assertions. All planned confirmed
-            business/architecture/code/UAT leaves remain todo. Source-generated scope awaiting
-            confirmation is uninvestigate; unresolved impediments use blockers[], and non-applicable
-            scope stays outside required leaves. Scope decisions distinguish implement, defer and
-            not applicable. Store requirement IDs once. Repository binding is an internal part of
-            this complete preparation job, not a separate prerequisite node. Declare only genuinely
-            selected downstream business targets with expected assertions, todo; do not invent
-            accepted business intent. Graph edits apply only to the explicitly selected approved
-            scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource
-            IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec
+          en: "Every authored index.yaml carries the schema const its path declares. Capture the
+            customer-language product catalog in .starciwork/index.yaml (work/catalog@1, one entry
+            per feature) and each feature's readable overview in
+            features/<feature>/index.yaml (work/feature@1: id, title, description, no state); these
+            do not approve inferred module requirements. The one setup scope record
+            .starciwork/<scope>/index.yaml is N for this op - a root-level operations record
+            carrying only scope-review assertions. Seeded product records live in flat family
+            folders (fr/nfr/br/data/journey/decision/sds/ui/impl/uat/contract/integration) and
+            remain todo. Source-generated scope awaiting confirmation stays todo with blockers[];
+            non-applicable scope stays outside the declared records. Scope decisions distinguish
+            implement, defer and not applicable. Store requirement ids once. Repository binding is
+            an internal part of this complete preparation job, not a separate prerequisite record.
+            Declare only genuinely selected downstream targets as todo records; do not invent
+            accepted intent. Graph edits apply only to the explicitly selected approved scope:
+            declare real prerequisite record ids in dependsOn and semantic input record/resource
+            ids in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec
             changes before review proof. For a bounded revision of existing imported consumer scope,
             inspect eligibility and accepted inputs before freezing the next effectful goal; reuse
-            workspace identity and bindings. The setup/scope-review leaf alone is the preparation
+            workspace identity and bindings. The setup scope record alone is the preparation
             completion target. Explicitly bound child paths/resources are preparation write scope:
-            correct only selected incomplete semantics/assertions and set confirmed leaves todo
+            correct only selected incomplete semantics and set confirmed records todo
             without implementation completion. Do not introduce preparation for already-ready scope
             or require product-wide scaffolding."
       - id: evidence
@@ -391,7 +393,8 @@ executionModes:
             Report node/resource IDs and propose a separately selected graph update when needed;
             never run predecessors or weaken dependsOn/refs/required to proceed.
     placeholders:
-      business: Selected business slug
+      feature: Selected feature slug
+      scope: Selected operations scope slug
       repo-id: Resolved repository resource ID
       bound-paths: Inspected source read set
       write-ceiling: Explicit owned source paths
@@ -406,7 +409,7 @@ executionModes:
   import:
     id: workspace.manage
     goal:
-      en: Preserve and import one selected business/pilot from inspected source and existing artifacts
+      en: Preserve and import one selected feature/pilot from inspected source and existing artifacts
         into canonical .starciwork, without claiming imported implementation or UAT is complete.
     nodeKinds:
       - operations
@@ -423,12 +426,11 @@ executionModes:
       dispatch: never
     reads:
       - id: target
-        path: N/index.yaml
+        path: .starciwork/<scope>/index.yaml
         purpose:
-          en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
-            For an explicitly new target, absence is expected: inspect the nearest existing
-            ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
-            content."
+          en: "Read current target scope record, refs, dependencies, assertions and validator freshness.
+            For an explicitly new target, absence is expected: inspect the existing workspace/catalog,
+            then create only that selected scope. Preserve unaffected accepted content."
       - id: repo
         path: repository:<repo-id>/<bound-paths>
         purpose:
@@ -497,40 +499,40 @@ executionModes:
             preserve an existing identity.
             Never put the canonical root inside the selected disposable target.
       - id: node
-        path: .starciwork/<business>/index.yaml + .starciwork/<business>/migration/index.yaml + optional
-          .starciwork/<business>/cleanup/index.yaml + selected imported child directories/index.yaml
+        path: .starciwork/index.yaml + .starciwork/features/<feature>/index.yaml +
+          .starciwork/<scope>/index.yaml + optional .starciwork/<scope-cleanup>/index.yaml +
+          selected imported features/<feature>/<family>/<name>/index.yaml records
         fields:
           - schema
           - id
-          - kind
-          - required
+          - title
+          - description
           - dependsOn
           - refs
           - assertions
           - state
-          - activity
           - blockers
           - completion
           - "description: Pilot boundary / Observed source mapping / Approved intent / Candidate
             scope / Unknowns"
         content:
-          en: "Every authored index.yaml is a work/node@1 record at its catalog-declared path. N is the
-            operations migration-review leaf, with inventory/preservation/import assertions; the
-            business parent has no state/completion. Capture the current customer-language product
-            overview in .starciwork/business/index.yaml before module SRS import. Every newly
-            imported business/architecture/ui/implementation/UAT leaf starts state:uninvestigate
-            with activity:idle and no completion, even if old notes say done. Assign stable IDs,
-            observed source citations versus candidate requirements, and only approved graph scope.
-            Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its
-            business-review and workflow-review targets before consumers run; their expected
-            assertions remain bounded to intent review and imported graph integrity, never product
-            completion. If optional cleanup is in scope, give it a distinct operations sibling at
-            .starciwork/<business>/cleanup/index.yaml, never a child of N, with exact deletion
-            assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn
-            an incomplete parent done. Graph edits apply only to the explicitly selected approved
-            scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource
-            IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec
-            changes before review proof."
+          en: "Every authored index.yaml carries the schema const its path declares. N is the
+            operations migration-review scope record at .starciwork/<scope>/index.yaml, with
+            inventory/preservation/import assertions. Capture the product catalog in
+            .starciwork/index.yaml (work/catalog@1) and each feature's overview in
+            features/<feature>/index.yaml (work/feature@1, no state) before importing product
+            records. Every newly imported flat family record (br/fr/nfr/data/journey/decision/sds/
+            ui/impl/uat/contract/integration) starts todo with no completion, even if old notes
+            say done. Assign stable ids, observed source citations versus candidate requirements,
+            and only approved graph scope. Do not overwrite existing accepted records. For an
+            explicitly selected preset, declare its review targets before consumers run; their
+            expected assertions remain bounded to intent review and imported graph integrity,
+            never product completion. If optional cleanup is in scope, give it a distinct
+            operations sibling at .starciwork/<scope-cleanup>/index.yaml, never a child of N, with
+            exact deletion assertions; unresolved cleanup remains blocked. Graph edits apply only
+            to the explicitly selected approved scope: declare real prerequisite record ids in
+            dependsOn and semantic input record/resource ids in refs. No catalogue-wide chain or
+            new unrelated scope; finish all graph/spec changes before review proof."
       - id: resources
         path: .starciwork/_resources/repositories/<resource>/resource.yaml +
           .starciwork/_resources/imports/<resource>/resource.yaml +
@@ -748,7 +750,8 @@ executionModes:
             Report node/resource IDs and propose a separately selected graph update when needed;
             never run predecessors or weaken dependsOn/refs/required to proceed.
     placeholders:
-      business: Selected business slug
+      feature: Selected feature slug
+      scope: Selected operations scope slug
       repo-id: Resolved repository resource ID
       bound-paths: Inspected source read set
       write-ceiling: Explicit owned source paths
@@ -763,7 +766,7 @@ executionModes:
       removal-target: Exact inventoried old directory relative to the bound repository, verified within
         the selected ceiling
     migrationPolicy:
-      scope: one-selected-business
+      scope: one-selected-feature
       importState: uninvestigate
       initialActivity: idle
       importCompletion: forbidden
@@ -790,13 +793,13 @@ business:
     - Reconstruction: existing source or old worktrees need canonical Work records rebuilt from inspected reality (import mode).
     - Optional exact cleanup of a verified old directory only when explicitly selected.
   whenNot:
-    - Import never approves inferred business or marks imported work done - leaves start uninvestigate/idle with no completion.
+    - Import never approves inferred intent or marks imported work done - leaves start uninvestigate/idle with no completion.
     - Prepare never rolls implementation forward; cleanup only when explicitly selected and every preservation check passes.
     - Modes never union permissions; a failed check leaves the original untouched and the cleanup leaf blocked.
   consumes:
     - Intent, target, repo declaration/inventory, custody policy; application-stacks declarations when the source contains stack material; matrix cell when selected.
   produces:
-    - workspace.yaml; business/setup or migration/cleanup nodes; repository/import resources + preserved assets; evidence: scope-review, inventory, preservation, import-review, cleanup.
+    - workspace.yaml; catalog/feature records and setup/migration/cleanup scope records; repository/import resources + preserved assets; evidence: scope-review, inventory, preservation, import-review, cleanup.
   failureModes:
     - OPERATION_REQUIRED; PURPOSE_AMBIGUOUS, PILOT_SCOPE_UNKNOWN, PRESERVATION_UNPROVEN, REMOVAL_UNSAFE, DECLARED_DEPENDENCY_UNMET (declared blockers).
 # ---------------------------------------------------------------------------
