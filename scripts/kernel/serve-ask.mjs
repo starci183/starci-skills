@@ -271,6 +271,48 @@ const writeEnv = (repo, key, value) => {
 
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
 
+// Resolve pick groups for the form: declared question.picks wins; otherwise
+// groups are derived from the draw naming convention
+// <screen>-<choice>[-round-N] / -candidate-<choice>. Returns [] when the
+// images do not partition cleanly into >=2-choice groups — the flat artifact
+// list renders instead. Each choice may carry {idx,label} of its image.
+const pickGroupsOf = (question, images) => {
+  const imgs = images ?? [];
+  if (question?.picks?.length) {
+    return question.picks.map((p) => ({
+      id: String(p.id), label: p.label ?? String(p.id),
+      choices: (p.choices ?? []).map((c) => {
+        const obj = typeof c === 'string' ? { id: c, label: c } : { id: c?.id ?? c?.label, label: c?.label ?? c?.id };
+        if (obj.id == null) return null;
+        if (c?.image) {
+          const rel = String(c.image).replace(/\\/g, '/');
+          const idx = imgs.findIndex((img) => img.label === rel || img.abs.endsWith(rel));
+          if (idx >= 0) obj.image = { idx, label: imgs[idx].label };
+        }
+        return obj;
+      }).filter(Boolean),
+    }));
+  }
+  const groups = new Map();
+  for (const [i, img] of imgs.entries()) {
+    const base = path.basename(img.label ?? '', path.extname(img.label ?? ''));
+    const m = base.match(/^(.+?)-(?:candidate-)?([a-z])(?:-round-\d+)?$/);
+    if (!m) return [];
+    const [, screen, letter] = m;
+    if (!groups.has(screen)) groups.set(screen, new Map());
+    groups.get(screen).set(letter, { idx: i, label: img.label });
+  }
+  const picks = [];
+  for (const [screen, choices] of groups) {
+    if (choices.size < 2) return [];
+    picks.push({
+      id: screen, label: screen,
+      choices: [...choices.keys()].sort().map((k) => ({ id: k.toUpperCase(), label: k.toUpperCase(), image: choices.get(k) })),
+    });
+  }
+  return picks;
+};
+
 const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonly }) => {
   const fileRows = fields.files.map((name) => {
     const present = custodyPresent(repo, name);
@@ -283,15 +325,21 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
   const options = (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" ${readonly ? 'disabled' : ''}> ${esc(o)}</label>`).join('\n');
   // A selection ask declares each pick dimension in question.picks — one
   // required radio group per {id, label, choices}, never free-text picks.
-  const pickRows = (question.picks ?? []).map((p) => {
-    const radios = (p.choices ?? []).map((c) => {
-      const value = typeof c === 'string' ? c : (c?.id ?? c?.label);
-      const label = typeof c === 'string' ? c : (c?.label ?? c?.id);
-      return `<label class="opt"><input type="radio" name="pick:${esc(p.id)}" value="${esc(value)}" required ${readonly ? 'disabled' : ''}> ${esc(label)}</label>`;
+  // When picks are not declared, derive groups from the draw naming
+  // convention (<screen>-<choice>[-round-N] / -candidate-<choice>) so the
+  // owner still clicks a radio under each candidate image.
+  const pickGroups = pickGroupsOf(question, images);
+  const pickedImages = new Set();
+  for (const p of pickGroups) for (const c of p.choices) if (c.image) pickedImages.add(c.image.idx);
+  const pickRows = pickGroups.map((p) => {
+    const cells = p.choices.map((c) => {
+      const imgTag = c.image ? `<img src="/${esc(nonce)}/img/${esc(c.image.idx)}" alt="${esc(c.image.label)}">` : '';
+      return `<label class="cell"><input type="radio" name="pick:${esc(p.id)}" value="${esc(c.id)}" required ${readonly ? 'disabled' : ''}>
+        ${imgTag}<span class="cell-label">${esc(c.label)}</span></label>`;
     }).join('\n');
-    return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend>${radios}</fieldset>`;
+    return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend><div class="cells">${cells}</div></fieldset>`;
   }).join('\n');
-  const imgRows = (images ?? []).map((img, i) => `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption></figure>`).join('\n');
+  const imgRows = (images ?? []).map((img, i) => pickedImages.has(i) ? '' : `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption></figure>`).join('\n');
   return `<!doctype html><html><head><meta charset="utf-8"><title>provision.ask — ${esc(workflowId)}</title>
 <style>
  body{font:14px/1.5 system-ui;margin:2rem auto;max-width:720px;padding:0 1rem;color:#222}
@@ -304,6 +352,10 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
  fieldset.pick{border:1px solid #ddd;border-radius:6px;margin:.6rem 0;padding:.4rem .8rem .6rem}
  fieldset.pick legend{font-weight:600;font-size:.9rem;padding:0 .3rem}
  fieldset.pick .opt{display:inline-block;margin:.2rem 1.2rem .2rem 0}
+ .cells{display:flex;flex-wrap:wrap;gap:1rem}
+ .cell{flex:1 1 44%;min-width:260px;font-weight:400;border:1px solid #ccc;border-radius:8px;padding:.6rem;cursor:pointer}
+ .cell img{max-width:100%;display:block;border:1px solid #eee;border-radius:6px;margin:.4rem 0}
+ .cell-label{display:block;font-weight:600;text-align:center}
  button{margin-top:1.2rem;padding:.6rem 1.4rem;font-size:1rem;cursor:pointer}
  .note{color:#666;font-size:.85rem;margin-top:1.5rem}
 </style></head><body>
@@ -453,7 +505,7 @@ const main = async () => {
         }
         const optionIdx = params.get('option');
         const picks = {};
-        for (const p of question.picks ?? []) {
+        for (const p of pickGroupsOf(question, images)) {
           const v = params.get(`pick:${p.id}`);
           if (v != null && v !== '') picks[p.id] = v;
         }
