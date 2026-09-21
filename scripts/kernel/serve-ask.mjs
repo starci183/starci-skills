@@ -91,14 +91,38 @@ const writeCustody = (repo, name, value) => {
   }
 };
 
-// `.env.local` upsert — the same Set-EnvLine contract the provision scripts use.
-const writeEnv = (repo, key, value) => {
-  const file = path.join(repo, '.env.local');
-  let content = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+// Env vars go to BOTH real sinks: `.env.local` is the generated bridge the
+// provision scripts read, and `.starcistacks/dev/runtime/env/app.env` is the
+// canonical encrypted store (whole-file set: show → upsert → set back).
+const upsertLines = (content, key, value) => {
   const re = new RegExp(`(?m)^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=.*$`);
-  content = re.test(content) ? content.replace(re, `${key}=${value}`) : `${content}${content && !content.endsWith('\n') ? '\n' : ''}${key}=${value}\n`;
-  fs.writeFileSync(file, content, { mode: 0o600 });
-  return { ok: true, via: '.env.local' };
+  return re.test(content) ? content.replace(re, `${key}=${value}`) : `${content}${content && !content.endsWith('\n') ? '\n' : ''}${key}=${value}\n`;
+};
+
+const writeEnv = (repo, key, value) => {
+  const via = [];
+  const local = path.join(repo, '.env.local');
+  fs.writeFileSync(local, upsertLines(fs.existsSync(local) ? fs.readFileSync(local, 'utf8') : '', key, value), { mode: 0o600 });
+  via.push('.env.local');
+  const tool = path.join(repo, 'scripts', 'stack-secret.mjs');
+  const appEnvRel = 'dev/runtime/env/app.env';
+  if (fs.existsSync(tool)) {
+    const tmp = path.join(os.tmpdir(), `serve-ask-env-${crypto.randomBytes(8).toString('hex')}`);
+    try {
+      spawnSync(process.execPath, [tool, 'show', appEnvRel], { cwd: repo, stdio: 'ignore' });
+      const cur = [path.join(repo, '.starcistacks', appEnvRel), path.join(repo, '.stacks', appEnvRel)].find(fs.existsSync);
+      // Never `set` a whole env file we could not read first — an empty base
+      // would clobber every other key in the encrypted store.
+      if (cur) {
+        fs.writeFileSync(tmp, upsertLines(fs.readFileSync(cur, 'utf8'), key, value), { mode: 0o600 });
+        const r = spawnSync(process.execPath, [tool, 'set', appEnvRel, '--from-file', tmp], { cwd: repo });
+        if (r.status === 0) via.push('app.env');
+      }
+    } finally {
+      try { fs.unlinkSync(tmp); } catch { /* best effort */ }
+    }
+  }
+  return { ok: true, via: via.join('+') };
 };
 
 const renderForm = ({ nonce, question, fields, repo, workflowId }) => {
