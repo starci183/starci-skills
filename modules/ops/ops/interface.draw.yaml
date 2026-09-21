@@ -24,7 +24,9 @@ reads:
     purpose:
       en: >-
         Read the selected ui record, its feature's scope, proof demands, refs/dependencies, existing directions and
-        freshness. The target already exists; this operation neither creates scope nor weakens its graph.
+        freshness. For an explicitly new target, absence is expected: inspect the nearest existing
+        ancestor/workspace, then create only that selected scope. This operation neither creates scope
+        beyond the selected target nor weakens its graph; preserve unaffected accepted content.
   - id: business
     path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
     purpose:
