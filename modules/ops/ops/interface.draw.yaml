@@ -206,7 +206,12 @@ steps:
     action:
       en: >-
         Build one exact prompt per representative direction from accepted business/SDS, brand rules/masters,
-        relevant UI knowledge and actual Grammar anatomy/reference inputs. Include real product-shaped content,
+        relevant UI knowledge and actual Grammar anatomy/reference inputs. Include real product-shaped content:
+        every visible datum renders as concrete plausible data — actual numbers, currency amounts, dates, names,
+        statuses and copy derived from the accepted business record — never skeleton bars, gray placeholder
+        blocks, lorem text or blurred stand-ins. A skeleton/shimmer treatment is drawn only when the state being
+        directed IS the loading state; an accepted-content screen with placeholder bars is non-conformant.
+        Include real product-shaped content,
         screen purpose, component regions, state, viewport, accessibility and forbidden treatments. Each direction
         renders the COMPLETE PAGE IN SITU — the consuming app's real persistent chrome (sidebar, navbar, subnav,
         page container, rail layout per its actual layout components) surrounds the content region being directed,
@@ -226,7 +231,10 @@ steps:
         camera, base, material, light, scale and density form one family; does it remain legible at the smallest
         required viewport; and could installed Grammar or repository-native SVG communicate it more truthfully than
         raster artwork. Reject childlike clip-art, generic stock metaphor, semantic ambiguity and mixed visual
-        families unless accepted intent explicitly requires them. Correct the prompt and regenerate within the
+        families unless accepted intent explicitly requires them. Reject an accepted-content screen whose data
+        renders as skeleton bars or gray placeholder blocks — regenerate it with concrete values from the
+        business record; placeholder treatment belongs only to a deliberately directed loading state.
+        Correct the prompt and regenerate within the
         bounded representative set when it fails. Declare every embedded
         illustration/mascot/decorative/media region classified `raster-asset` as an artworkSlots entry for
         `interface.asset`. Record every `code-native` region with its semantic structure, Grammar primitive or family
