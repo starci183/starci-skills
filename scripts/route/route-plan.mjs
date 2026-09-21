@@ -134,12 +134,30 @@ function loadProducesTable(goalDir) {
 
 // ------------------------------------------------------------ PARSE -> S* --
 
-// The small intent->S* table for the 7 archetypes in modules/goal/archetypes.yaml.
+// The small intent->S* table for the archetypes in modules/goal/archetypes.yaml.
 // Signals are regexes over the owner prompt; each hit contributes target state
 // variables plus chain hints the backward chainer consumes (producer
 // preference, custody pre-mark, diagnostic-first). Archetypes COMPOSE: union
 // of matched vars (archetypes.yaml composition.unionNotOverride).
 const ARCHETYPES = [
+  {
+    id: 'workspace-canonicalization',
+    // A canonical Work/stack-root migration is not ordinary record authoring.
+    // Keep this signal narrow so product requests such as "canonical NIVO
+    // landing" remain feature work even when they share the same project
+    // ledger with a workspace migration.
+    signals: [/(?:\b(?:canonicali[sz](?:e|ation)|normal(?:i[sz]e|ization)|migrat\w*|refactor)\b[\s\S]{0,240}(?:\.starciwork|\.starcistacks|\.stacks\b|\bwork tree\b|\bapplication[- ]stack(?: package)?\b))|(?:(?:\.starciwork|\.starcistacks)[\s\S]{0,240}\b(?:canonicali[sz](?:e|ation)|normal(?:i[sz]e|ization)|migrat\w*|refactor)\b)/i],
+    vars: () => [
+      { family: 'impl', suffix: 'workspace-path-consumers', state: 'done' },
+      { family: 'workspace', suffix: '', state: 'managed' },
+    ],
+    hints: {
+      preferProducer: 'code.refactor',
+      needsCoverage: true,
+      workspaceCanonicalization: true,
+      scopeKind: 'workspace-canonicalization',
+    },
+  },
   {
     id: 'investigate-first',
     signals: [/\b(lag|laggy|slow|sluggish|feels broken|takes forever|chậm|hơi lag)\b/i],
@@ -149,6 +167,7 @@ const ARCHETYPES = [
   {
     id: 'refactor',
     signals: [/\b(refactor|clean[ -]?up|restructure|rename|split .* into .* module)\b/i],
+    excludes: [/(?:\.starciwork|\.starcistacks|\.stacks\b|\bwork tree\b|\bapplication[- ]stack(?: package)?\b)/i],
     vars: a => [{ family: 'impl', suffix: a.surfaceName, state: 'done' }],
     hints: { preferProducer: 'code.refactor', needsCoverage: true, scopeProvided: true },
   },
@@ -384,7 +403,12 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
 
   function ensureLeg(opId, { forVar = null, instance = null, injected = null } = {}) {
     const lid = legIdFor(opId, instance);
-    if (legs.has(lid)) { if (forVar) legs.get(lid).producesCovered.push(varKey(forVar) + ': ' + forVar.state); return legs.get(lid); }
+    if (legs.has(lid)) {
+      const existing = legs.get(lid);
+      if (forVar) existing.producesCovered.push(varKey(forVar) + ': ' + forVar.state);
+      if (injected && !existing.injected) existing.injected = injected;
+      return existing;
+    }
     const op = ops.get(opId);
     const leg = {
       legId: lid, op: opId, instance,
@@ -481,6 +505,13 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
     for (const pre of op?.route?.prerequisites ?? []) {
       const req = parsePrerequisite(pre, ops);
       if (req.kind === 'op') {
+        // define-goal is itself the analyzed owner intake for this narrow
+        // lifecycle archetype. Do not manufacture a generic request.analyze
+        // leg ahead of the explicit canonicalization scope.
+        if (hints.workspaceCanonicalization && leg.op === 'scope.define' && req.op === 'request.analyze') {
+          leg.needsSatisfiedBy.push('owner goal entry (request analyzed for canonicalization scope)');
+          continue;
+        }
         // satisfied by S0? else ensure the leg exists
         const prodEntries = prodTable.byVar.filter(p => p.op === req.op);
         const s0ok = prodEntries.length && prodEntries.every(pe => satisfiedByS0({ family: pe.family, suffix: pe.suffix, state: pe.state }, s0)?.by === 's0');
@@ -517,6 +548,32 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
 
   // ---- injected legs (business rules that needs/produces alone miss) ----
   const has = pred => [...legs.values()].some(pred);
+  // Workspace canonicalization is a distinct lifecycle scope. It first bounds
+  // the migration/quiescence surface, pins behavior with migration tests,
+  // refactors path consumers, reconstructs the canonical Work/stack roots,
+  // then verifies. Sharing a project ledger with a product/landing workflow is
+  // not itself a conflict; actual owned-path overlap and live-workflow custody
+  // are evaluated later from the concrete scope.
+  if (hints.workspaceCanonicalization) {
+    const scope = ensureLeg('scope.define', {
+      forVar: { family: 'scope', suffix: 'workspace-canonicalization', state: 'defined' },
+      injected: 'canonicalization boundary and quiescence scope before migration effects',
+    });
+    const tests = ensureLeg('test.author', {
+      forVar: { family: 'tests', suffix: 'workspace-canonicalization', state: 'authored' },
+      injected: 'migration regression coverage before the behavior-invariant refactor',
+    });
+    const refactor = ensureLeg('code.refactor', {
+      forVar: { family: 'impl', suffix: 'workspace-path-consumers', state: 'done' },
+    });
+    const workspace = ensureLeg('workspace.manage', {
+      forVar: { family: 'workspace', suffix: '', state: 'managed' },
+      injected: 'canonical root reconstruction replaces generic Work record remapping',
+    });
+    edges.push([scope.legId, tests.legId], [tests.legId, refactor.legId], [refactor.legId, workspace.legId]);
+    tests.needsSatisfiedBy.push(`${scope.legId} (bounded canonicalization scope)`);
+    workspace.needsSatisfiedBy.push(`${refactor.legId} (path consumers migrated before canonical root reconstruction)`);
+  }
   // investigate-first: a baseline perf.verify BEFORE scoping, then the closing
   // one after the build (archetypes.yaml #6 orderingIsThePoint).
   if (hints.diagnosticFirst) {
@@ -548,7 +605,7 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
   //     work.author runs BEFORE the implement legs (route prereq "scope defined");
   //  b) after code.refactor it REMAPS the implementation record's source
   //     mapping to the moved code (legality.yaml remap-after-refactor).
-  if (legs.has('scope.define') && has(l => stageRankOf(ops.get(l.op)) === 4 && l.op !== 'code.refactor')) {
+  if (!hints.workspaceCanonicalization && legs.has('scope.define') && has(l => stageRankOf(ops.get(l.op)) === 4 && l.op !== 'code.refactor')) {
     const wa = ensureLeg('work.author', { injected: 'lane reads authored Work records — scope.define produced the scope' });
     for (const l of legs.values()) {
       if (stageRankOf(ops.get(l.op)) === 4 && l.op !== 'code.refactor') {
@@ -557,7 +614,7 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
       }
     }
   }
-  if (legs.has('code.refactor')) {
+  if (legs.has('code.refactor') && !hints.workspaceCanonicalization) {
     const wa = ensureLeg('work.author', { injected: 'remap-after-refactor: evidence pins sourceIdentity — a move without a remap invalidates it' });
     edges.push(['code.refactor', wa.legId]);
     wa.needsSatisfiedBy.push('code.refactor (moved code to remap)');
@@ -573,6 +630,10 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
         rv.needsSatisfiedBy.push(`${l.legId} (a delivery to inspect)`);
       }
     }
+  }
+  if (hints.workspaceCanonicalization && legs.has('workspace.manage') && legs.has('review.verify')) {
+    edges.push(['workspace.manage', 'review.verify']);
+    legs.get('review.verify').needsSatisfiedBy.push('workspace.manage (canonical roots reconstructed)');
   }
 
   return { legs, edges, gaps, assumptions };
@@ -813,6 +874,7 @@ function main() {
     legalityFindings: findings.length ? findings : undefined,
     assumptions: assumptions.length ? assumptions : undefined,
     parseNotes,
+    scopeKind: hints.scopeKind ?? hints.archetypes?.[0] ?? null,
   };
 
   if (args.json) { console.log(JSON.stringify(result, null, 2)); }

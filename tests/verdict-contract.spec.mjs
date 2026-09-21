@@ -44,14 +44,28 @@ const jobStatus=(repo,jobId)=>{
   try{return ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;}
   finally{ledger.close();}
 };
-const reportFile=repo=>{const f=path.join(repo,'report.json');fs.writeFileSync(f,JSON.stringify({outcome:'done',checks:[]}));return f;};
+const reportFile=(repo,outcome='done')=>{const f=path.join(repo,'report.json');fs.writeFileSync(f,JSON.stringify({
+  schema:'starci/op-report@1',outcome,summary:`op ${outcome} — verdict fixture`,files:['docs/'],
+  checks:[{name:'self-check',command:'true',exitCode:outcome==='done'?0:1}],
+  ...(outcome==='blocked'?{blocker:{kind:'environment',detail:'dep missing'}}:{}),
+  ...(outcome==='partial'?{open:['unfinished item']}:{}),
+}));return f;};
 
 test('settle accepts the contract verdicts pass|fail|blocked',async t=>{
-  for(const [verdict,expected] of [['pass','succeeded'],['fail','failed'],['blocked','failed']]){
+  // verdict -> the op-report outcome the envelope must carry (verdict-outcome-mismatch otherwise)
+  for(const [verdict,outcome,expected] of [['pass','done','succeeded'],['fail','failed','failed'],['blocked','blocked','failed']]){
     await t.test(`--verdict ${verdict} settles the job as ${expected}`,t=>{
       const repo=fixture(t).repo(),jobId=`job-${verdict}`;
       seedJob(repo,jobId);
-      const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--report',reportFile(repo),'--json');
+      // The report is filed row-first via `api report`; pass additionally needs the
+      // kernel's independently recorded green checks (verdict-contract.yaml).
+      const filed=runApi('report','--repo',repo,'--job',jobId,'--report',reportFile(repo,outcome),'--json');
+      assert.equal(filed.status,0,filed.stderr||filed.error?.message);
+      if(verdict==='pass'){
+        const checked=runApi('check','--repo',repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'self-check',command:'true',exitCode:0}]}),'--json');
+        assert.equal(checked.status,0,checked.stderr||checked.error?.message);
+      }
+      const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--json');
       assert.equal(r.status,0,r.stderr||r.error?.message);
       assert.equal(jobStatus(repo,jobId),expected);
     });

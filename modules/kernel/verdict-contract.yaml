@@ -69,7 +69,10 @@ returns:
       fail: >-
         The work ran and is red — maps to outcome `failed` (a failing check
         or an honest summary required), or `partial` (unfinished, open items
-        listed for the next attempt). Also the shape of a red proof leg:
+        listed for the next attempt). A worker may incorrectly claim `done`;
+        an independently recorded red Kernel check overrules that claim,
+        settles fail and releases the worker instead of leaving the attempt
+        fenced forever. Also the shape of a red proof leg:
         uat/e2e/perf red reports `failed` and routes to lane.build repair.
       blocked: >-
         Progress needs something outside the grant — maps to outcome
@@ -164,6 +167,25 @@ envelope:
     report replaces itself rather than doubling; consumed_at marks the
     report the kernel already integrated (`api consume-report`).
 
+retryAccounting:
+  identity: >-
+    Business/effectful retries are new jobs rows with attempt+1 and a fresh
+    Dispatch. A launch rejected before any accepted contract/effect is the
+    narrow exception: explicit no-effect infrastructure proof returns the same
+    durable job/attempt to queued. Repeated recovery cannot create a successor,
+    duplicate contract or duplicate business effect.
+  noEffectInfrastructure: >-
+    A dispatch-rejected/provider failure is excluded from business route limits
+    only when its durable result explicitly carries effectState:none,
+    retryable:true and attemptConsumed:false. The queued job keeps
+    its durable attempt and businessAttempt while consuming the separately
+    bounded infrastructure restart allowance.
+  failClosed: >-
+    Missing, unknown or partial effect state is not a free resume. It consumes
+    the normal business retry budget and must reconcile possible effects before
+    another writer is admitted; prose, a dead terminal, or an expired lease is
+    not no-effect proof.
+
 # ============================================================================
 # 3 — WHAT THE SPINE ACCEPTS. Layers, in order; a report is judged at each.
 # ============================================================================
@@ -193,8 +215,10 @@ accepts:
       `done` is accepted only after the kernel re-runs the op's checks itself
       — the re-run results are recorded on the checks row via `api check`
       (keyed workflow_id/op_id/attempt, one row per attempt) — and the filed
-      envelope's outcome agrees with the verdict (verdict-outcome-mismatch);
-      acceptance writes the verdict
+      envelope's outcome normally agrees with the verdict. A red checks row
+      is the one admissible contradiction: it may overrule a `done` claim to
+      fail. Pass still requires `done` plus recorded green checks; every other
+      contradiction is verdict-outcome-mismatch. Acceptance writes the verdict
       record on the job's result_json.
   - layer: boundary-correct
     rule: >-
@@ -231,7 +255,10 @@ rejects:
       A dead worker's recovered last words are honoured for partial/failed/
       ask/blocked — never for done: 'done' owes checks no lost worker ran.
       Falls back to outcome failed so the ordinary acceptance path judges it
-      (the api's last-words recovery via scripts/agent/lib.mjs).
+      (the api's last-words recovery via scripts/agent/lib.mjs). A live screen
+      tail read via `api observe` is the same class — read-observe via the api
+      only, reasoning context never proof; the mutation surfaces are
+      unchanged (send is `api nudge`, close is `api settle`).
   - id: out-of-scope-files
     rule: "report.files outside the allowlist -> rejected, per-file named"
     citation: "validateOpReport ownedPaths check (scripts/kernel/report-envelope.mjs), run at api report and when settle files a --report"
@@ -278,4 +305,5 @@ routingSummary:
   fail:     "retry inside route limits (failed->same x3, partial->same x5, rejected->same x2, repairs x3, gaps x2) -> then needUser"
   blocked:  "typed blocker -> owning route; environment/authority/ask -> needUser; owner-bound -> provision.ask"
   suspicion: "free text -> backward edge: revise route / scope.define+provision.ask / provision.ask-always (identity)"
+  infrastructureNoEffect: "same job/attempt returns queued with no contract/effect, same businessAttempt, infra restart budget"
   citation: "modules/models/kinds.yaml routes; modules/goal/legality.yaml; scripts/kernel/api.mjs settle"

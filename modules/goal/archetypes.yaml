@@ -93,7 +93,10 @@ legRationale:
     work.author authors or remaps Work records (prerequisite: "scope defined").
     On a refactor it re-anchors the record's source mapping to the moved code —
     without it the evidence pins the old identity (docs/verify-proof.md
-    currentCodeMap / sourceIdentity).
+    currentCodeMap / sourceIdentity). Whole-root .starciwork/.starcistacks
+    canonicalization is the narrow exception: workspace.manage owns canonical
+    reconstruction after code.refactor migrates path consumers, so adding
+    work.author would duplicate ownership.
   verify: >-
     uat.verify / e2e.verify / integration.verify / review.verify / perf.verify
     are proof legs. They report findings and never repair
@@ -104,6 +107,35 @@ legRationale:
 
 # ----------------------------------------------------------------------------
 archetypes:
+
+  # ==========================================================================
+  # WORKSPACE-CANONICALIZATION
+  # ==========================================================================
+  - id: workspace-canonicalization
+    signals: >-
+      An explicit canonicalize/normalize/migrate/refactor request naming
+      .starciwork, .starcistacks, the Work tree or the application-stack
+      package. Merely describing a product/landing experience as "canonical"
+      does not match this lifecycle scope.
+    chain:
+      - {op: scope.define,     leg: scopeDefine, note: "bound legacy-to-canonical mapping, preservation and live-workflow quiescence before effects"}
+      - {op: test.author,      leg: implement,   note: "author migration-focused regression coverage first"}
+      - {op: code.refactor,    leg: implement,   note: "migrate path consumers and behavior-invariant filesystem/configuration references"}
+      - {op: workspace.manage, leg: workAuthor,  note: "reconstruct the sole canonical Work/stack roots; replaces generic work.author for this whole-root migration"}
+      - {op: review.verify,    leg: verify,      note: "independently run Work and application-stack conformance checks"}
+    exclusions:
+      - {op: request.analyze, why: "the approved goal entry is already the analyzed lifecycle intake; scope.define consumes it directly"}
+      - {op: work.author, why: "record/cut mode does not own whole canonical-root reconstruction; workspace.manage does"}
+      - {op: runtime.operate, why: "canonicalization is static and behavior-invariant; application, container, host and remote effects remain outside scope"}
+    isolation: >-
+      Product/landing and canonicalization are separate workflows/scopes even
+      in one project-owned runtime.sqlite. Co-residence alone is not a conflict;
+      concrete owned-path overlap, dirty-byte custody and live effects decide
+      whether a quiescent checkpoint is required.
+    ownerMoments: >-
+      A plan-divergence revision is previewed as rev+1 and requires exact owner
+      ok before it is appended. The existing live Kernel remains parked until
+      that transaction lands, then resurvey resumes the same workflow.
 
   # ==========================================================================
   # 1 — FEATURE-BUILD-WITH-UI

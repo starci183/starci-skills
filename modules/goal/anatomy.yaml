@@ -286,6 +286,7 @@ approval:
 revision:
   rpc: goal_amend / reviseGoal        # the kernel agent exports
   op: goal.revise                     # modules/ops/ops/goal.revise.yaml
+  entry: scripts/goal/define-goal.mjs --revise <workflow_id>
   prerequisites: "an approved goal exists"   # route block
   rules:
     bump: rev increments by exactly one; the diff is explicit
@@ -313,6 +314,24 @@ revision:
       state.goalRevisions[] appends {schema: starci/goal-revision@1, rev, at,
       source, changed}; historical reports stay bound to the rev that produced
       them — evidence is never relabelled.
+    approvalPreview: >-
+      --revise ... --plan is read-only and emits
+      starci/goal-revision-preview@1: base/next revision, stable goal identity,
+      explicit op-chain diff, content-bound approval token and argv. Only the
+      exact preview approved by the owner may append revision+1; a stale or
+      mismatched token refuses before writes.
+    liveKernel: >-
+      Revision appends one pending goal-revision inbox row to the same workflow.
+      It never adds another kind=goal row or starts another Kernel. A live
+      Kernel remains parked on plan-divergence before approval and may resurvey
+      only after the approved goal, approval receipt, inbox row and
+      goal-revised event commit atomically.
+    scopeIsolation: >-
+      Multiple workflows may share the one project ledger. Co-residence is
+      custody, not a conflict; conflict requires concrete owned-path/effect
+      overlap or a live custody constraint. Product landing scope and
+      workspace canonicalization therefore keep distinct goal identities and
+      op chains even when both are registered in the same runtime.sqlite.
   businessRule: >-
     A mid-flight discovery that the goal itself is wrong is NOT fixed in place.
     It becomes a revision (or an owner question), the affected derivations are

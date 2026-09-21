@@ -9,7 +9,7 @@ import {
   BRAND_CHECKS,CHECK_IDS,MIN_PRIMARY_DANGER_DELTA,TOKEN_TOLERANCE,
   checkContrastAa,checkIconSetOnly,checkMascotAssetsPresent,checkPrimaryDangerDistinct,checkTokensInGrammar,checkTokensMatchSource,
   contrastRatio,deltaEOk,formatBrandChecks,importSpecifiers,parseColor,parseCssCustomProperties,parseTokenData,
-  readBrandRecord,runBrandChecks
+  readBrandRecord,readSourceTokens,runBrandChecks
 } from '../scripts/checks/brand.mjs';
 
 const ACCENT='#7547ff';
@@ -47,10 +47,10 @@ const brandSpec=()=>({
 });
 
 /** A Work tree carrying one brand record, plus the mascot bytes the record names. */
-function tree(t,{brand=brandSpec(),rev='brand-1',mascot='<svg xmlns="http://www.w3.org/2000/svg"/>',label='tree'}={}){
+function tree(t,{brand=brandSpec(),rev='brand-1',mascot='<svg xmlns="http://www.w3.org/2000/svg"/>',label='tree',schema='work/node@1'}={}){
   const root=temporary(t,label);
   const work=path.join(root,'.starciwork');
-  write(work,'brand/index.yaml',stringifyYaml({schema:'work/node@1',id:'brand',kind:'brand',required:true,state:'todo',
+  write(work,'brand/index.yaml',stringifyYaml({schema,id:'brand',kind:'brand',required:true,state:'todo',
     ...(rev===null?{}:{rev}),description:'Product brand record.',brand}));
   if(mascot!==null)write(work,'brand/assets/mascot.svg',mascot);
   return {repoRoot:root,work,mascotSha:mascot===null?null:crypto.createHash('sha256').update(mascot).digest('hex')};
@@ -122,6 +122,19 @@ test('custom properties are read per scope, and token files by key',()=>{
   assert.equal(nested.derived.get('--starci-core-accent'),ACCENT);
   const listed=parseTokenData({tokens:[{name:'--starci-core-danger',value:DANGER}]});
   assert.equal(listed.exact.get('--starci-core-danger'),DANGER);
+});
+
+test('a CSS token source is parsed by extension even when its semantic kind is tokens',t=>{
+  const source=temporary(t,'css-token-source');
+  write(source,'family.css',`:root{--starci-core-accent:${ACCENT_OKLCH};--focus:var(--starci-core-accent);}`);
+  const result=readSourceTokens(source,{repository:'starci-fe',path:'family.css',kind:'tokens'});
+  assert.equal(result.error,undefined);
+  assert.equal(result.declarations,2);
+  assert.equal(result.lookup.css.base.get('--starci-core-accent').value,ACCENT_OKLCH);
+  const checked=checkTokensMatchSource({sourceRoot:source,brand:{sources:[{repository:'starci-fe',path:'family.css',kind:'tokens'}],color:{tokens:[{token:'--focus',value:ACCENT_OKLCH}]}}});
+  assert.equal(checked.outcome,'pass',JSON.stringify(checked,null,2));
+  assert.equal(checked.evidence.tokens[0].sourceValue,'var(--starci-core-accent)');
+  assert.equal(checked.evidence.tokens[0].resolvedFrom,'--starci-core-accent');
 });
 
 test('tokens-match-source binds every brand colour to the shipped stylesheet across notations',t=>{
@@ -294,6 +307,11 @@ test('runBrandChecks reports every check, resolves the record from a repository 
 
   const fromRepository=runBrandChecks({tree:repoRoot,sourceRoot:source,grammarRoot});
   assert.equal(fromRepository.brand.record,'.starciwork/brand/index.yaml');
+  assert.equal(fromRepository.ok,true,JSON.stringify(fromRepository.checks.filter(entry=>entry.outcome!=='pass'),null,2));
+
+  const current=tree(t,{label:'run-node-2',schema:'work/node@2'});
+  const fromNode2=runBrandChecks({tree:current.work,sourceRoot:source,grammarRoot});
+  assert.equal(fromNode2.ok,true,JSON.stringify(fromNode2.checks.filter(entry=>entry.outcome!=='pass'),null,2));
 
   const withoutSource=runBrandChecks({tree:work,grammarRoot});
   assert.equal(withoutSource.ok,true);

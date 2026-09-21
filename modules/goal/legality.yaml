@@ -154,14 +154,32 @@ forwardEdges:
 
   - id: remap-after-refactor
     if: "code.refactor is proposed"
-    thenRequired: "a work.author leg to remap the implementation record's source mapping to the moved code"
+    thenRequired: >-
+      a work.author leg to remap the implementation record's source mapping to
+      moved product code; for an explicitly selected .starciwork/.starcistacks
+      canonicalization, workspace.manage replaces work.author because the
+      canonical root/layout itself is reconstructed after path consumers move
     why: >-
       Evidence pins source identity (sourceIdentity / currentCodeMap,
       docs/verify-proof.md). A refactor that moves code without
       remapping the record leaves evidence certifying a tree that no longer
       exists — the stale-evidence rule. The regression-coverage prerequisite
       is enforced by the test-gap route (blocker test-gap -> test.author).
-    illegal: "refactor without the work.author remap is ILLEGAL"
+    illegal: "refactor without its owning remap/reconstruction leg is ILLEGAL"
+
+  - id: canonical-workspace-migration-order
+    if: "the selected scope canonicalizes .starciwork or .starcistacks"
+    thenRequired: >-
+      scope.define -> test.author -> code.refactor -> workspace.manage ->
+      review.verify. scope.define bounds quiescence and preservation;
+      test.author pins migration invariants before effects; code.refactor moves
+      path consumers; workspace.manage reconstructs the canonical roots;
+      review.verify independently proves the result.
+    enforcement: "route-plan workspace-canonicalization archetype + owner-approved goal revision preview"
+    illegal: >-
+      generic work.author in place of workspace.manage is ILLEGAL for a whole
+      canonical-root reconstruction; product/landing work is never folded into
+      this migration merely because both workflows share runtime.sqlite
 
   - id: architecture-after-business
     if: "architecture.decide is proposed"

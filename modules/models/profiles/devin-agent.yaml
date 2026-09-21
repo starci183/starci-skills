@@ -26,7 +26,7 @@ capacity:
 launch:
   orca:
     kind: command-terminal
-    command: "devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false"
+    command: "devin --model swe-2-max --permission-mode dangerous --respect-workspace-trust false"
     reasoningCommand: same command shape
     dispatch: return-preamble-and-send
     adapter: devin
@@ -35,9 +35,10 @@ launch:
   adapterPreflight: >-
     model-catalog.md: the adapter runs read-only `devin models list --format json`
     BEFORE the interactive CLI, because `auth status` exits zero even while logged
-    out. accept-edits is the permission mode; the workspace-trust dialog is
-    disabled because the worktree is already isolated; Task delivery and
-    settlement stay under Orca's Dispatch.
+    out. dangerous is the unattended operation mode: authority remains bounded
+    by the approved operation contract, owned-path leases and Kernel settlement;
+    the workspace-trust dialog is disabled because Orca already selected the
+    workflow worktree.
 
 position:
   easyTier: second

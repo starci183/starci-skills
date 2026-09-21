@@ -16,16 +16,51 @@ sideEffects:
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
-  prerequisiteState: done
+  prerequisiteState: done-or-exact-workspace-canonicalization-proposal-with-regression
   dispatch: never
+proposalAuthority:
+  scope: workspace-canonicalization-only
+  permits: >-
+    When the selected N/index.yaml does not exist yet, consume the exact proposed implementation
+    target from the one scope.define record explicitly bound in packet context.records, but only
+    for a workspace-canonicalization goal whose packet-bound revision contains this code.refactor
+    leg after a passed test.author leg. The proposed id must equal the selected target id, its
+    declared test dependency must be satisfied by the authored regression file, and the same
+    covering regression command must run under the applicable refactor or migration proof below.
+  forbids:
+    - repository-wide discovery of a substitute scope record or proposed target
+    - choosing another nodes[] entry because it appears compatible
+    - materializing or editing the proposed Work node; workspace.manage owns later reconstruction
+    - using a proposal without the packet-bound approved goal identity/revision and preceding passed test.author leg
+    - treating the existence of a test path as proof; the declared regression must actually run before edits
+migrationAuthority:
+  scope: workspace-canonicalization-only
+  permits: >-
+    Under proposalAuthority, the exact authored migration regression may be red before source edits
+    and must be green after them. Every red baseline assertion must map to the selected proposal's
+    declared canonical-root/path-consumer delta; any unrelated failure blocks before edits. This
+    exception changes only the selected path/root bindings and their exact consumers. All other
+    observable behavior, bytes, ids, refs, secrets, live effects and concurrent workflow state remain
+    invariant.
+  forbids:
+    - accepting a collection-only check as the migration regression
+    - editing when the red baseline contains an assertion not declared by the bound proposal
+    - weakening, deleting or rewriting an assertion to obtain green
+    - treating a post-edit red result as partial success
+    - applying red-before/green-after semantics outside workspace canonicalization
 reads:
   - id: target
-    path: N/index.yaml
+    path: N/index.yaml OR packet context.records -> exact bound scope.define record/extensions.work3.scope
     purpose:
       en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
-        target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here."
+        and validator freshness. Normally this consumer op requires its target node to exist. The
+        one exception is proposalAuthority for workspace canonicalization: resolve the exact
+        selected proposed id from the one explicitly bound scope.define record, confirm packet
+        context.workflow binds the approved goal identity/revision, confirm this code.refactor leg
+        follows the passed test.author leg in that revision, and confirm the declared regression
+        file and source paths match the selected proposal. Do not scan .starciwork for alternatives.
+        When any binding is absent or ambiguous, report DECLARED_DEPENDENCY_UNMET. Never create the
+        target or invent its acceptance/graph here."
   - id: business
     path: .starciwork/<business>/business/**/index.yaml
     purpose:
@@ -52,9 +87,12 @@ reads:
     purpose:
       en: Establish before any edit which declared check actually exercises the slice's observable
         behavior and that it can run in this environment. The check must exist, cover the changed
-        surface and run verbatim - a test suite that does not exist, does not cover the slice or
-        cannot run is reported `blocked` with blocker kind `test-gap`, which routes to test.author;
-        it is never a reason to skip the invariant or to write the missing coverage inside this op.
+        surface and run verbatim. Normally its baseline must be green. Under the exact
+        workspace-canonicalization migrationAuthority, it may be red only where every failed
+        assertion is the bound proposal's selected migration delta, and it must become green after
+        the edits without changing the assertions. A missing, non-covering or unrunnable suite is
+        reported `blocked` with blocker kind `test-gap`, which routes to test.author; it is never a
+        reason to skip the proof or author coverage inside this op.
   - id: conventions
     path: knowledge/coding-reference.yaml + knowledge/patterns/fe/index.yaml +
       knowledge/patterns/be/index.yaml
@@ -96,8 +134,10 @@ writes:
       - completion.codeRefs
     content:
       en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
-        only state/blocker/completion here; actual observations, findings, commit mappings and
-        remaining cleanup belong to the evidence result, not semantic node prose. Missing
+        only state/blocker/completion here when N exists; actual observations, findings, commit
+        mappings and remaining cleanup belong to the evidence result, not semantic node prose. When
+        proposalAuthority is in use because N does not exist, omit this write entirely and leave the
+        bound scope proposal byte-unchanged for workspace.manage to materialize later. Missing
         refs/dependencies/acceptance require a reported gap or separately selected scope update;
         never add/remove them to obtain pass.
   - id: source
@@ -165,12 +205,13 @@ steps:
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
         output. Where the slice lives in a checked FE/BE repository, run starci code-patterns check
         --profile <nest|next> --root ROOT --all BEFORE the first edit too and keep the machine report
-        and exit code. A green baseline is the invariant's left side; a red baseline is reported
-        failed with the observed output - a refactor does not begin on a suite already red. No
+        and exit code. A green baseline is normally the invariant's left side. The sole exception is
+        migrationAuthority: preserve the complete red baseline, map every failure to the bound
+        workspace-canonicalization proposal, and proceed only when no unrelated failure exists. No
         existing, covering, runnable check is reported `blocked` with blocker kind `test-gap` and
         this op stops; it never authors the missing tests itself. Resolve the execution profile and
-        actual tool availability before selecting instruments; this does not switch the
-        model/runtime or spawn workers."
+        actual tool availability before selecting instruments; this does not switch the model/runtime
+        or spawn workers."
   - reads:
       - architecture
       - conventions
@@ -194,10 +235,12 @@ steps:
       en: Run the SAME regression check AFTER the change, verbatim, on the restructured tree and
         record it beside the before run; where the machines ran before, run the SAME starci
         code-patterns check AFTER the change on the same roots and record it beside the before
-        report. Parity means the same commands, same scope, same counts and the same green results;
-        a different command, a narrowed selection, a new test failure or a new architecture/pattern
-        violation is not parity - it is failed with the diff between the two outputs. Nothing is
-        re-worded or skipped to make the after run look like the before run.
+        report. Parity normally means the same commands, same scope, same counts and the same green
+        results. Under migrationAuthority it means the identical command/assertion inventory moves
+        from only the declared migration failures to fully green, while unrelated observable
+        behavior remains unchanged. A different command, narrowed selection, rewritten assertion,
+        post-edit failure or new architecture/pattern violation is failed with the diff between the
+        two outputs. Nothing is re-worded or skipped to make the after run look green.
   - reads:
       - target
       - repo
@@ -221,11 +264,20 @@ proofs:
       en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
         done.
+  - id: proposal-binding
+    requirement:
+      en: When N does not yet exist in workspace canonicalization, the evidence names the one bound
+        scope.define record, packet-bound workflow/goal identity and revision, selected proposed id,
+        preceding passed test.author leg and exact authored regression file. The proposal remains
+        byte-unchanged for workspace.manage, and no repository scan or alternate proposal satisfies
+        this proof.
   - id: regression-parity
     requirement:
       en: The same declared regression check ran verbatim before AND after the change, on the exact
         before tree and the exact after tree, with both exit codes, counts and outputs recorded; the
-        after result matches the before result. Where the slice lives in a checked FE/BE repository,
+        after result matches the before result, except that the exact workspace-canonicalization
+        migrationAuthority requires the bound declared migration failures before and a fully green
+        result after with the assertion inventory unchanged. Where the slice lives in a checked FE/BE repository,
         the same starci code-patterns check ran verbatim on both sides with its reports retained; a
         new architecture or pattern violation after the change is a failure. A missing, different or
         narrowed check on either side is a failure, and no coverage at all is the `test-gap`
@@ -234,7 +286,9 @@ proofs:
     requirement:
       en: The diff is explainable as pure restructuring - every changed symbol maps to a move,
         rename, extraction or equivalent rewrite, no public contract, persisted shape, error identity
-        or observable side effect changed, and no feature or fix rode inside the change.
+        or observable side effect changed, and no feature or fix rode inside the change. The exact
+        migrationAuthority additionally permits only the selected canonical root/path-consumer
+        binding delta while preserving all other behavior and custody invariants.
   - id: commit
     requirement:
       en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository,
@@ -274,8 +328,11 @@ blockers:
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
-        Report node/resource IDs and propose a separately selected graph update when needed; never
-        run predecessors or weaken dependsOn/refs/required to proceed.
+        For proposal-authorized workspace canonicalization this includes an absent explicit
+        context.records binding, a scope record outside the packet-bound approved goal revision, an
+        unpassed preceding test.author leg, zero/multiple matching proposed ids, or a missing/non-green
+        declared regression. Report exact ids; never search for a substitute, run predecessors or
+        weaken dependsOn/refs/required to proceed.
 placeholders:
   business: Selected business slug
   repo-id: Resolved direct repository name or path
@@ -292,6 +349,7 @@ commitPolicy:
 refactorPolicy:
   behaviorInvariant: required
   regressionCheck: same-check-verbatim-before-and-after
+  workspaceCanonicalizationMigration: exact-declared-red-before-green-after
   architectureCheck: starci-code-patterns-check-same-machines-before-and-after
   baselineRed: failed-not-refactored
   coverageAbsent: blocked-test-gap

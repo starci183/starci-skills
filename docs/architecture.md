@@ -19,8 +19,9 @@ Every kernel state operation is one command:
 
 ```text
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
-  survey | status | hierarchy | plan | enqueue | route | dispatch | op-contract | report |
-  consume-report | check | settle | incident | finish
+  survey | status | hierarchy | plan | enqueue | route | dispatch | nudge |
+  observe | op-contract | report | consume-report | check | settle | incident |
+  finish
 ```
 
 Reads (`survey`, `status`, `hierarchy`) return projections. Each write runs inside one
@@ -67,7 +68,16 @@ survey → plan → enqueue → drive { status → dispatch → wait → settle 
 ```
 
 The kernel re-derives the frontier from ledger state each tick — never from
-memory of what it sent. Structural plan divergence against the approved goal
+memory of what it sent. A five-minute liveness watchdog may wake the same
+Kernel terminal after a provider turn returns to its input prompt, but it never
+chooses workflow work. A connected operation terminal at an input prompt is
+`turn-idle`, not active; the Kernel uses `nudge` to resume that exact worker
+without creating a replacement job, lease, retry, or authority. `observe`
+gives the Kernel a read-only screen tail of its own job's op terminal —
+reasoning context at a ~3-minute cadence, never evidence: it sends nothing,
+closes nothing, and never substitutes for the reports row or re-run checks. The Kernel
+yields when durably waiting and never keeps a model turn alive with sleep or an
+internal polling loop. Structural plan divergence against the approved goal
 `opChain` is an incident, not a quiet re-plan. The contracts the loop reads:
 
 - `modules/kernel/start-workflow.yaml` — claim a queued goal, spawn the kernel

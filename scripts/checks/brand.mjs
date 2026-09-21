@@ -240,7 +240,7 @@ export function readSourceTokens(sourceRoot,source){
   if(!fs.existsSync(file))return {...entry,error:'this repository does not carry the declared file'};
   let text;
   try{text=readText(file);}catch(error){return {...entry,found:true,error:String(error.message??error)};}
-  if(source.kind==='css'){
+  if(source.kind==='css'||path.extname(file).toLowerCase()==='.css'){
     const parsed=parseCssCustomProperties(text);
     return {...entry,found:true,declarations:parsed.all.length,lookup:{css:parsed}};
   }
@@ -252,14 +252,23 @@ export function readSourceTokens(sourceRoot,source){
 }
 
 /** The first declaration of this token across the declared sources, preferring the default scope. */
-function lookupToken(sources,token){
+function lookupToken(sources,token,seen=new Set()){
+  if(seen.has(token))return null;
+  const nextSeen=new Set(seen).add(token);
   const bare=token.replace(/^--/,'');
   for(const scope of ['base','dark']){
     for(const source of sources){
       const css=source.lookup?.css;
       if(css){
         const found=css[scope].get(token);
-        if(found)return {value:found.value,file:source.path,selector:found.selector,scope};
+        if(found){
+          const reference=String(found.value).trim().match(/^var\(\s*(--[A-Za-z0-9_-]+)\s*\)$/)?.[1]??null;
+          if(reference){
+            const resolved=lookupToken(sources,reference,nextSeen);
+            if(resolved)return {...resolved,file:source.path,selector:found.selector,scope,declaredValue:found.value,resolvedFrom:reference};
+          }
+          return {value:found.value,file:source.path,selector:found.selector,scope};
+        }
       }
       if(scope!=='base')continue;
       const tokens=source.lookup?.tokens;
@@ -292,7 +301,8 @@ export function readBrandRecord(tree){
   if(!file)throw Error(`No brand record: expected ${candidates.map(candidate=>slash(path.relative(root,candidate))).join(' or ')}.`);
   const source=readText(file);
   const record=parseYaml(source);
-  if(record?.schema!=='work/node@1'||record?.kind!=='brand')throw Error('A brand record must be a work/node@1 node of kind brand.');
+  const supportedNodeSchemas=new Set(['work/node@1','work/node@2']);
+  if(!supportedNodeSchemas.has(record?.schema)||record?.kind!=='brand')throw Error('A brand record must be a supported work/node@1 or work/node@2 node of kind brand.');
   if(!record.brand||typeof record.brand!=='object'||Array.isArray(record.brand))throw Error('The brand record carries no brand specification.');
   const declared=record.rev??record.revision??record.brand.rev;
   return {file,dir:path.dirname(file),record,brand:record.brand,
@@ -349,7 +359,7 @@ export function checkTokensMatchSource({brand,sourceRoot}){
     const actual=parseColor(found.value);
     if(!actual)return {token:token.token,expected:token.value,actual:found.value,file:found.file,scope:found.scope,status:'unparseable-source-value'};
     const delta=round(deltaEOk(expected,actual),3);
-    return {token:token.token,expected:token.value,actual:found.value,expectedHex:expected.hex,actualHex:actual.hex,
+    return {token:token.token,expected:token.value,actual:found.value,sourceValue:found.declaredValue??found.value,resolvedFrom:found.resolvedFrom??null,expectedHex:expected.hex,actualHex:actual.hex,
       file:found.file,selector:found.selector,scope:found.scope,deltaE:delta,
       status:found.scope==='dark'?'only-in-dark-scope':delta<=TOKEN_TOLERANCE?'match':'differs'};
   });
@@ -432,7 +442,8 @@ export function checkMascotAssetsPresent({brand,tree,brandDir}){
     const relative=slash(asset.path??'');
     const entry={path:relative,purpose:asset.purpose??null,declaredSha256:asset.sha256??null};
     if(!relative||path.isAbsolute(relative)||relative.split('/').includes('..'))return {...entry,exists:false,status:'escapes-tree'};
-    const candidates=[path.resolve(brandDir,relative),path.resolve(root,relative)];
+    const workRoot=path.dirname(brandDir);
+    const candidates=[path.resolve(brandDir,relative),path.resolve(workRoot,relative),path.resolve(root,relative)];
     const file=candidates.find(candidate=>fs.existsSync(candidate)&&fs.lstatSync(candidate).isFile());
     if(!file)return {...entry,exists:false,status:'absent',searched:candidates.map(candidate=>slash(path.relative(root,candidate)))};
     const resolved=slash(path.relative(root,file));

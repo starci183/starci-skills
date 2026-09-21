@@ -16,10 +16,12 @@ release:
 terminalFallback:
   when: orchestration.worker-start is unavailable or a plain-command lane is wanted
   command: claude
-  bypassFlag: '--dangerously-skip-permissions'
+  modelArgs: ['--model', '<model>']
+  effortArgs: ['--effort', '<effort>']
+  bypassArgs: ['--dangerously-skip-permissions']
   bypassReason: Unattended lanes stall on per-tool permission menus; same rule as qwen --yolo / devin bypass mode.
-verifiedAt: 2026-09-20
-verifiedAgainst: 'claude CLI (installed)'
+verifiedAt: 2026-09-21
+verifiedAgainst: 'claude CLI 2.1.274'
 forbidden:
   - shell-only-role
   - unsupervised-dispatch-inject-as-success

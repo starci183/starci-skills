@@ -136,6 +136,25 @@ modePolicy:
   implicitChain: false
   permissionUnion: false
   completion: selected-mode-profile
+  ownershipDerivation:
+    rule: narrowest-concrete-selected-prefixes
+    normalize: workspace-relative with stable repository prefix when applicable, slash-normalized, no root/absolute/parent-traversal/globs
+    broadRootsForbiddenWhenDerivable:
+      - repository root
+      - .starciwork
+      - .starcistacks
+    importSlices:
+      - exact selected .starciwork/<business>/migration node paths
+      - exact selected repository/import resource paths and retained asset paths
+      - exact selected .starcistacks migration/deployment declaration paths when stack material is in scope
+      - exact cleanup target only when cleanup is explicitly authorized
+    concurrency: >-
+      Read-only source inventory grants no product-source write ownership. Keep
+      product application paths out of import owned_paths unless an explicit
+      selected effect writes them. A product workflow such as a landing-app
+      slice may run concurrently with canonicalization when its normalized
+      owned_paths do not intersect these migration slices; sharing the project,
+      repository binding or canonical ledger is not a conflict.
 executionModes:
   prepare:
     id: workspace.manage

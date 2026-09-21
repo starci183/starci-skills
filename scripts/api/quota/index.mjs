@@ -1,11 +1,16 @@
 // scripts/api/quota/index.mjs — per-provider quota/viability probe dispatch.
 //
 // Pinned contract (o2 consumes):
-//   probeQuota(provider) -> { state, usedPercent, detail }
+//   probeQuota(provider) -> { state, usedPercent, detail, auth?, failureKind?,
+//                             allowLaunchAttempt? }
 //     state: 'ok' | 'limited' | 'dead' | 'unknown'
 //       'dead'    = hard-ineligible, router must not select the provider
 //       'limited' = usable but constrained (near cap / refreshable auth fault)
 //       'unknown' = probe could not decide; NEVER blocks routing
+//     A refreshable stale token reports limited/auth=refreshable and may receive
+//     one real launch. A confirmed launch auth rejection is persisted by the
+//     kernel's provider-health circuit, which overrides this preflight probe
+//     for every pool sharing the provider credential.
 //     usedPercent: number | null (weekly window percent when the probe sees it)
 //     detail: human-readable reason string
 //

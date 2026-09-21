@@ -117,7 +117,9 @@ function poolRejectionReasons({ pool, target, role, difficulty, capacity, runtim
   if (lm.error) reasons.push(lm.error);
   const cap = capacity?.[target];
   if (cap) {
-    if (cap.auth === 'dead') reasons.push('capacity auth is dead');
+    if (cap.auth === 'dead') reasons.push(cap.authDetail
+      ? `provider auth is unavailable: ${cap.authDetail}`
+      : 'provider auth is unavailable');
     if (cap.quota?.state === 'dead') reasons.push('capacity quota is dead');
     const max = Number(pool.maxParallel);
     const running = Number(cap.running ?? 0);

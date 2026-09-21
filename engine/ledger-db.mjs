@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
+import {findOwnedPathLeaseConflicts} from './admission.mjs';
 const require=createRequire(import.meta.url);
 
 // The ledger's small store vocabulary: a token mint and the settled-job set.
@@ -291,19 +292,40 @@ const setJournalMode=(db,{journalMode})=>{
   need(actual===requested,`SQLite selected journal mode ${actual}, expected ${requested}`);
   return actual;
 };
+// A synchronous sleep for the open-retry backoff — the engine cannot import
+// scripts/api/orca/lib.mjs's sleep (engine sits below scripts), so it uses the
+// same Atomics.wait primitive inline.
+const openSleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
+// SQLITE_CANTOPEN surfaces as "unable to open database file" and is transient on Windows: a
+// concurrent process mid-close can leave the WAL -shm/-wal delete-pending exactly when this
+// process maps them (observed 2026-09-20, two kernels dispatching in the same second). The
+// busy_timeout only covers lock waits AFTER a successful open, so the open itself gets a
+// short bounded retry; every other error still fails immediately.
+const OPEN_RETRY_DELAYS_MS=[0,300,900];
+const cantOpen=error=>/unable to open/i.test(String(error?.message??''));
 function openDb({file,busyTimeoutMs,journalMode,autoVacuum=false,label}){
   const {DatabaseSync}=require('node:sqlite');
   need(typeof file==='string'&&file.trim(),`${label} needs a file`);
   fs.mkdirSync(path.dirname(path.resolve(file)),{recursive:true});
-  const db=new DatabaseSync(file,{timeout:busyTimeoutMs});
-  try{
-    // auto_vacuum only takes on a database SQLite still considers empty; switching to WAL first defeats it.
-    if(autoVacuum)db.exec('PRAGMA auto_vacuum=INCREMENTAL');
-    db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
-    const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
-    const actual=setJournalMode(db,{journalMode});
-    return {db,sqliteVersion,journalMode:actual};
-  }catch(error){try{db.close();}catch{}throw error;}
+  let lastError;
+  for(const delay of OPEN_RETRY_DELAYS_MS){
+    if(delay)openSleep(delay);
+    let db;
+    try{
+      db=new DatabaseSync(file,{timeout:busyTimeoutMs});
+      // auto_vacuum only takes on a database SQLite still considers empty; switching to WAL first defeats it.
+      if(autoVacuum)db.exec('PRAGMA auto_vacuum=INCREMENTAL');
+      db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
+      const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
+      const actual=setJournalMode(db,{journalMode});
+      return {db,sqliteVersion,journalMode:actual};
+    }catch(error){
+      try{db?.close();}catch{}
+      if(!cantOpen(error))throw error;
+      lastError=error;
+    }
+  }
+  throw lastError;
 }
 const makeTransaction=(db,label)=>{let inside=false;return fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;db.exec('BEGIN IMMEDIATE');try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;}};};
 
@@ -469,6 +491,8 @@ export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],tt
     return ledger.transaction(db=>{
       const at=ledger.now(),token=newToken();
       const reasons=[];
+      const pathConflicts=findOwnedPathLeaseConflicts(db,repoNeeds);
+      for(const conflict of pathConflicts)reasons.push(`resource ${conflict.requested} overlaps durable lease ${conflict.held} held by ${conflict.job_id}`);
       for(const item of repoNeeds){
         const row=db.prepare('SELECT capacity FROM resources WHERE resource_key=?').get(item.resourceKey);
         if(!row){reasons.push(`resource ${item.resourceKey} has no declared capacity`);continue;}

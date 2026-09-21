@@ -52,8 +52,8 @@ credentialRefresh: {win32: '…', posix: '…'}   # optional card-owned credenti
 environmentStrip:                # vars removed INSIDE the terminal command
   - {name: ACP_BACKEND, reason: "…"}
 
-commandRequirements:             # op-agent flags — always injected
-  - '--permission-mode accept-edits'
+commandRequirements:             # op-agent flags — always injected; no interactive command gate
+  - '--permission-mode dangerous'
 kernelCommandRequirements:       # kernel-terminal flags (--kernel selects these)
   - '--permission-mode dangerous'
 kernelPermissionReason: "…"      # why the kernel lane gets wider permissions
@@ -78,7 +78,7 @@ submission:                      # proof the prompt was consumed
   timeoutMs: 45000
   maxEnter: 2
 
-approvalMode:        {working: accept-edits, reasoning: accept-edits, reason: "…"}
+approvalMode:        {working: dangerous, reasoning: dangerous, reason: "approved contract + owned-path lease are the boundary"}
 kernelApprovalMode:  {working: dangerous, reasoning: "…"}
 
 start:                           # the ordered host-API sequence

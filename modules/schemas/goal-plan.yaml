@@ -18,6 +18,7 @@ shape:
 rules:
   - legs is required and must be an array; every leg carries a non-empty string `op` - anything else is plan-file-invalid.
   - Leg order is execution intent: the api diffs it structurally against goals.json.opChain.legs - legs added, removed or re-ordered vs the approved chain mark the plan divergent, and a divergent plan escalates (api incident --kind plan-divergence), never dispatches.
+  - An oversized approved leg is not duplicated in this semantic plan. The Kernel partitions its concrete closure into same-op execution jobs using api enqueue cut metadata; see modules/kernel/driver-loop.yaml enqueue.cutExecution.
   - "Independent legs (no dependency between them) must declare disjoint `paths` prefixes: the kernel runs several ops at once on one worktree, so an overlap is a re-plan, not a risk note (modules/goal/legality.yaml splitRules; api dispatch refuses path-collision)."
   - A leg with no `paths` is an unbounded grant: enqueue refuses empty-paths, so a leg meant to run must name its ceiling.
   - Op ids come only from the operator catalog; there is no dependsOn field - ordering is the legs array itself plus the approved opChain it is diffed against.

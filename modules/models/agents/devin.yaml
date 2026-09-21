@@ -19,7 +19,7 @@ environmentStrip:
       with 'agent child exited: exit code: 0'. The strip must run inside the terminal command before
       devin starts — clearing it in the spawn host does not help a terminal that already inherited it.
 commandRequirements:
-  - '--permission-mode accept-edits'
+  - '--permission-mode dangerous'
   - '--respect-workspace-trust false'
 kernelCommandRequirements:
   - '--permission-mode dangerous'
@@ -28,7 +28,8 @@ kernelPermissionReason: |-
   The long-lived kernel is not an implementation worker: its required loop repeatedly invokes the declared
   Node kernel API and Orca observation commands. Per-command menus deadlock an unattended kernel. Dangerous
   mode is scoped to this dedicated terminal; the kernel packet still forbids direct ledger writes, source
-  implementation and self-spawned operation terminals. Ordinary Devin operation lanes remain accept-edits.
+  implementation and self-spawned operation terminals. Operation lanes also launch unattended, but remain
+  bounded by their narrower operation contract and owned-path leases.
 readiness:
   screenPattern: '(?:Ask Devin|Message Devin|Type your message|Enter a prompt|(^|\n)\s*[>❯❭]\s*$)'
   identityPattern: 'Devin'
@@ -46,9 +47,13 @@ submission:
   timeoutMs: 45000
   maxEnter: 2
 approvalMode:
-  working: accept-edits
-  reasoning: accept-edits
-  reason: File edits are automatic inside the isolated workflow worktree; command execution still follows Devin normal permission checks and the operation contract.
+  working: dangerous
+  reasoning: dangerous
+  reason: >-
+    Every dispatched operation already passed the owner goal gate, exact owned-path admission and durable
+    lease fencing. The worker must therefore be non-interactive: per-command permission menus deadlock the
+    workflow without adding authority. Dangerous mode removes the UI prompt; the operation contract,
+    owned paths and Kernel settlement remain the actual boundary.
 kernelApprovalMode:
   working: dangerous
   reasoning: dedicated-long-lived-kernel-must-not-stall-on-declared-api-commands
@@ -63,7 +68,8 @@ release:
   api: orchestration.worker-stop
   then: terminal.close
 bypassMode:
-  interactive: 'At a permission menu, send "5" + Enter (Switch to bypass mode) — equivalent of qwen --yolo for the session.'
+  launch: '--permission-mode dangerous — equivalent unattended/yolo mode, injected before Task delivery.'
+  recovery: 'For a legacy already-running accept-edits terminal, send "5" + Enter once, then let the next attempt use the launch flag.'
 knownFailures:
   - signal: 'Agent connection lost: agent child exited: exit code: 0'
     meaning: The spawned agent child process died; queued sends will not be processed.

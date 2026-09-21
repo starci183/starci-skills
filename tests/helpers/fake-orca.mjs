@@ -15,9 +15,22 @@
 //                          'auth': terminal read shows the observed
 //                          '401 Invalid API-key' death screen and
 //                          worker-start fails at stage 'auth'.
+//                          'auth-partial': worker-start reports an auth failure
+//                          plus a residual Dispatch that cleanup can settle.
+//                          'auth-unknown': worker-start reports outcome_unknown;
+//                          worker-show observes it ready, so fallback must stop.
+//                          'prompt-stalled': worker-start created an exact
+//                          worker whose prompt injection stalled; its process
+//                          exited and release retains only terminal bookkeeping.
+//                          'dead-terminal': terminal show reports the exact
+//                          terminal disconnected/unwritable and terminal read
+//                          fails — the observe spec's disconnected/unreadable
+//                          projection.
 //   STARCI_FAKE_ORCA_DEAD  comma-separated provider ids whose `account list`
 //                          rateLimits entry reads dead/not-authenticated —
 //                          drives the kernel-pin fail-closed spec.
+//   STARCI_FAKE_ORCA_STALE comma-separated provider ids whose `account list`
+//                          entry reports a refreshable stale OAuth token.
 //   STARCI_FAKE_ORCA_EFFECTIVE_MODEL overrides the model rendered by the
 //                          terminal for requested/effective mismatch coverage.
 export const FAKE_ORCA = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
@@ -27,6 +40,7 @@ const log = process.env.STARCI_FAKE_ORCA_LOG;
 const stateFile = process.env.STARCI_FAKE_ORCA_STATE;
 const mode = process.env.STARCI_FAKE_ORCA_MODE || 'healthy';
 const deadProviders = new Set((process.env.STARCI_FAKE_ORCA_DEAD || '').split(',').map(s => s.trim()).filter(Boolean));
+const staleProviders = new Set((process.env.STARCI_FAKE_ORCA_STALE || '').split(',').map(s => s.trim()).filter(Boolean));
 const effectiveModelOverride = process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || null;
 if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
 const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : { sends: 0 };
@@ -51,12 +65,16 @@ if (verb === 'terminal create') {
   out({ ok: true, result: { terminal: { handle: 'fake-terminal-1', title: arg('title'), connected: true, writable: true } } });
 }
 else if (verb === 'terminal read')
-  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-    screen: mode === 'auth' ? DEAD() : (state.sends > 0 ? LIVE() : PROMPT()) } } });
+  mode === 'dead-terminal'
+    ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
+    : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
+      screen: mode === 'auth' ? DEAD() : (state.sends > 0 ? LIVE() : PROMPT()) } } });
 else if (verb === 'terminal send') { state.sends += 1; save(); out({ ok: true, result: { sent: true } }); }
 else if (verb === 'terminal close') out({ ok: true, result: { closed: arg('terminal') } });
 else if (verb === 'terminal show')
-  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true } } });
+  mode === 'dead-terminal'
+    ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })
+    : out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'running', connected: true, writable: true, lastOutputAt: Date.now() } } });
 else if (verb === 'terminal rename')
   out({ ok: true, result: { terminal: { handle: arg('terminal'), title: arg('title') } } });
 // ---- orchestration verbs (managed-agent lifecycle) ----
@@ -78,21 +96,43 @@ else if (verb === 'orchestration task-list')
 else if (verb === 'orchestration worker-start') {
   if (mode === 'auth')
     fail({ ok: false, error: { code: 'not_authenticated' }, result: { stage: 'auth', failedStage: 'auth', residualResources: [] } });
+  if (mode === 'auth-partial')
+    fail({ ok: false, error: { code: 'not_authenticated' }, result: { dispatchId: 'dispatch-fake-1', stage: 'auth', failedStage: 'auth', residualResources: ['dispatch-fake-1'] } });
+  if (mode === 'auth-unknown') {
+    state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = 'dispatch-fake-1'; save();
+    fail({ ok: false, error: { code: 'not_authenticated' }, result: { dispatchId: 'dispatch-fake-1', state: 'outcome_unknown' } });
+  }
+  if (mode === 'prompt-stalled') {
+    state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = 'dispatch-fake-1'; save();
+    fail({ ok: false, error: { code: 'agent_prompt_stalled' }, result: {
+      dispatchId: 'dispatch-fake-1', stage: 'dispatch_input', failedStage: 'dispatch_input',
+      residualResources: ['dispatch-fake-1']
+    } });
+  }
   state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = 'dispatch-fake-1'; save();
   out({ ok: true, result: { runId: arg('run'), taskId: arg('task'), dispatchId: 'dispatch-fake-1',
     state: 'ready', stage: 'ready',
     launch: { effective: { agent: arg('agent'), model: arg('model'), effort: arg('effort') } } } });
 }
-else if (verb === 'orchestration worker-show')
-  out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1' },
-    worker: { state: 'ready', agent_terminal_handle: 'fake-terminal-1',
-      startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-5.6-sol' } } } },
-    launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-5.6-sol' } },
-    observation: { exactWorker: true } } });
+else if (verb === 'orchestration worker-show') {
+  if (mode === 'prompt-stalled')
+    out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', last_failure: 'agent_prompt_stalled' },
+      worker: { state: 'failed', stage: 'dispatch_input', agent_terminal_handle: 'fake-terminal-1' },
+      terminal: { handle: 'fake-terminal-1', connected: false, writable: false },
+      observation: { exactWorker: true, status: 'exited' } } });
+  else
+    out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1' },
+      worker: { state: 'ready', agent_terminal_handle: 'fake-terminal-1',
+        startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-5.6-sol' } } } },
+      observation: { exactWorker: true } } });
+}
 else if (verb === 'orchestration worker-stop')
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'stopped', alreadySettled: false } });
-else if (verb === 'orchestration worker-release')
+else if (verb === 'orchestration worker-release') {
+  if (mode === 'prompt-stalled')
+    fail({ ok: false, result: { dispatchId: arg('dispatch'), state: 'retained', reason: 'identity_unproven' } });
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
+}
 else if (verb === 'orchestration worker-abandon')
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'abandoned' } });
 else if (verb === 'orchestration worker-list')
@@ -122,6 +162,10 @@ else if (verb === 'account list') {
       ? { status: 'unavailable', error: 'not authenticated',
           weekly: { usedPercent: null, windowMinutes: null, resetsAt: null },
           usageMetadata: { failureKind: 'missing-credentials' } }
+      : staleProviders.has(p)
+        ? { status: 'error', error: 'OAuth token expired; refresh may occur on launch',
+            weekly: { usedPercent: null, windowMinutes: 10080, resetsAt: null },
+            usageMetadata: { failureKind: 'stale-token' } }
       : { status: 'ok', weekly: { usedPercent: 12, windowMinutes: 10080, resetsAt: null } };
   out({ ok: true, result: { rateLimits } });
 }

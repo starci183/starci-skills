@@ -68,6 +68,10 @@ packet:
   op: <id>                              # the operation id; resolves to the full durable identity
   brief: modules/ops/ops/<id>.yaml      # business context the shell agent reads
   context:
+    workflow:                           # approved authority binding, not revision authority
+      id: <workflow-id>
+      goal_revision: <revision>
+      goal_identity: <identity>
     records: [...]                      # .starciwork records it touches (the read set)
     owned_paths: [...]                  # what it may modify — boundary enforcement
   constraints:
@@ -118,13 +122,30 @@ fields:
       The closed READ set: the .starciwork records (and resolved references)
       this op may consult. In dispatch-planning terms these are the op's
       `reads` — resolved references and binding inputPaths resolved through
-      the loaded Work tree by the api before launch.
+      the loaded Work tree by the api before launch. They are supplied by
+      `api enqueue --records`; an empty list is no authority to scan for a
+      convenient substitute. A consumer of a scope.define proposal must name
+      that exact predecessor scope record here.
     enforcedBy: >-
       Read sets matter at the file level: an op must never READ a path another
       in-flight op is rewriting — the api's conflict check compares my reads
       against their writes both directions. The one deliberate exception:
       two provision.ask ops may share a feature's decision folder — each
       writes a new slug of its own (the provision.ask exception).
+
+  context.workflow:
+    meaning: >-
+      The immutable workflow id plus latest approved goal revision and stable
+      goal identity the job was dispatched against. This lets a consumer prove
+      that an explicitly bound proposal belongs to the same approved chain;
+      it grants no goal-revision authority.
+    enforcedBy: >-
+      scripts/kernel/api.mjs freezes the latest approved goal revision and
+      identity into jobs.payload_json at enqueue, then combines that binding
+      with the job's workflow_id while building the durable contract packet.
+      A later goal revision never silently retargets an already queued job.
+      The op may compare bindings and report a mismatch, but never revise or
+      substitute them.
 
   context.owned_paths:
     meaning: >-
@@ -259,6 +280,9 @@ spawnMechanics:
     The kernel agent invokes `node scripts/kernel/api.mjs dispatch --job
     <job_id> --spawn` and reads the JSON receipt — it never runs an orca
     terminal-* command itself (modules/kernel/api.yaml conventions.neverDoes).
+    The only look at a running op's screen is `api observe --job <id>` —
+    read-observe via the api only, context never proof; the mutation
+    surfaces are unchanged (send stays `api nudge`, close stays `api settle`).
     Without --spawn the same call is a dry-run: the packet prints, nothing is
     reserved and nothing launches.
   sequence: >-
@@ -300,9 +324,11 @@ spawnMechanics:
     rendering surface, not the relationship source.
   spawnLines: >-
     The agent card injects the permission-gate answer into the
-    spawn line — `qwen -i "<prompt>" --yolo`, devin's commandRequirements
-    (accept-edits for op lanes; the card's kernelCommandRequirements apply
-    only to the kernel seat). Verify the spawn actually landed with
+    spawn line — `qwen -i "<prompt>" --yolo`, or Devin
+    `--permission-mode dangerous`. Both Kernel and Op seats are unattended;
+    their distinct authority comes from the Kernel packet versus the exact
+    operation contract + owned-path lease, not from a per-command UI menu.
+    Verify the spawn actually landed with
     terminal-read --screen — a long typed command can leave Enter
     un-landed, which is exactly the launch-window case above.
 

@@ -98,7 +98,7 @@ calls:
       on: [windows, macos, linux]
     receipt: [result.dispatchId]
     creates: dispatch
-    note: "--from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle. Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1."
+    note: "--from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle. Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1. For a fresh worker in an existing worktree, creation labels do not set the terminal title: after dispatch-show resolves the exact assignee, use terminal-rename to apply the semantic [Op] title."
     classify:
       - when: {exitCode: 0, path: result.state, in: [ready]}
         outcome: ok

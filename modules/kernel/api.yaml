@@ -38,16 +38,18 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    Fourteen verbs. Reads return projections (survey, status, hierarchy,
-    op-contract);
+    Seventeen verbs. Reads return projections (survey, status, hierarchy,
+    op-contract) plus `observe` — the kernel's read-only window onto its own
+    job's exact op terminal screen, reasoning context and never evidence;
     the op IPC is durable rows (dispatch writes contracts, report files
     reports, consume-report integrates, check records re-runs); the rest are
     single ledger transactions that each append one hash-chained event (plan,
-    enqueue, route, dispatch, settle, incident, finish). Every command prints
+    enqueue, route, dispatch, reconcile, nudge, observe, settle, incident, finish). Every command prints
     one JSON object to stdout; a refusal exits non-zero with {ok:false,
     reason} — a refusal is a fact for the driver loop, never a crash to route
     around. The op lifecycle is fixed: enqueue -> route (model decision
-    persisted) -> dispatch (contract row written, leases held) -> worker
+    persisted) -> dispatch (contract row written, leases held; or reconcile a
+    pre-contract effect_unknown launch back to the same queued attempt) -> worker
     files `api report` -> kernel `api consume-report` -> kernel re-runs
     checks -> `api check` -> `api settle` (consumption enforced — settle
     marks the report consumed if the kernel did not).
@@ -93,6 +95,7 @@ conventions:
     - 'kernel never settles a report it has not consumed — `api consume-report` before `api settle`; consumption is the kernel''s durable acknowledgement and settle enforces it (marks consumed_at) at the latest'
     - 'kernel never holds durable state only in memory — survey findings, the derived plan, the slice table and routing reasoning persist via plan/incident into events/state_snapshots BEFORE dispatch'
     - 'kernel never reuses an op terminal — settle closes the worker terminal; a retry is a new job row at attempt+1'
+    - 'kernel never mutates an op terminal outside nudge/settle — `api observe` is the only read of its screen (context, never proof; sending is `api nudge`, closing is `api settle`)'
 
 # ============================================================================
 # COMMANDS
@@ -126,15 +129,17 @@ commands:
 
   status:
     args: '--workflow <id>'
-    reads: 'workflows.phase + generation; jobs grouped by status; leases joined to live jobs'
+    reads: 'workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact running-operation terminal show receipts'
     writes: 'nothing'
     returns:
       ok: true
       phase: '<workflows.phase>'
+      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,openOperations,unconsumedReports,nudgeReadyJobs[],reason} — worker-nudge-ready and orphaned-frontier are immediately executable Kernel transitions, never wait/completion states'
       jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
+      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn'
     refuses:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
@@ -198,12 +203,22 @@ commands:
   # --------------------------------------------------------------------------
 
   enqueue:
-    args: '--workflow <id> --op <opId> --paths <csv>'
+    args: >-
+      --workflow <id> --op <opId> --paths <csv> [--records <csv>]
+      [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>]
     reads: 'workflows.phase; existing jobs for {workflow_id, op_id}; the brief modules/ops/ops/<opId>.yaml must exist'
     writes: >-
       jobs row {job_id, workflow_id, op_id, attempt=max(prior attempts)+1
       (1 on first enqueue), generation, kind:'op', status:'queued',
-      payload_json:{owned_paths:[--paths]}} + events 'job-enqueued'
+      payload_json:{goal_binding:{revision,identity},records:[--records],
+      owned_paths:[--paths],cut?:{id,ordinal,total}}} + events 'job-enqueued'.
+      `cut` marks one bounded execution slice of the SAME approved semantic op;
+      all three cut flags are atomic, ordinal is 1-based and total is at least
+      two. The goal binding is
+      frozen at enqueue so a later approved revision cannot silently retarget
+      an already queued job. `records` is the explicit closed read binding carried
+      unchanged into the dispatch packet; omission means no Work record is
+      bound and never licenses repository-wide discovery.
     returns: '{ok:true, job_id, workflowId, op, status:queued, attempt}'
     refuses:
       - workflow-unknown: 'no workflows row'
@@ -211,6 +226,7 @@ commands:
       - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
       - already-queued: 'a queued or in-flight job for this op exists — the row IS the queue entry, never doubled'
       - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
+      - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
     usedBy: 'tick.enqueue — one row per planned op the queue lacks; retries enqueue attempt+1'
 
   # --------------------------------------------------------------------------
@@ -225,7 +241,8 @@ commands:
       --difficulty is absent); the workflow goal's routing_bias {prefer[],
       avoid[]} — flag entries lead the merged list; modules/models/runtimes.yaml
       pool cards (maxParallel, provider); live running counts; provider quota
-      probes; open incidents that name the provider
+      probes; typed expiring provider-health signals. Free-form incident text
+      is evidence for the Kernel but never provider-health input
     writes: >-
       jobs.payload_json gains {model, modelId, effort, routeChain,
       routeRejected, difficulty} — the PERSISTED route dispatch then launches
@@ -234,7 +251,10 @@ commands:
     returns: '{ok:true, jobId, kind, difficulty, bias, decision:{model, modelId, effort, routeChain, routeRejected}}'
     refuses:
       - job-unknown: 'no jobs row for --job'
+      - job-reconcile-required: 'effect_unknown remains fenced until api reconcile proves no effect'
       - job-settled: 'a settled job takes no route — the decision was already spent'
+      - job-not-queued: 'a live/leased/answering job cannot be rerouted; inspect status.workers and settle or reconcile its exact attempt'
+      - job-live-worker: 'ledger says queued but the prior exact terminal is still connected+writable; reconcile it, never route a duplicate'
       - job-no-op: 'the job carries no op identity to route for'
       - route-refused: 'selectPool returned no decision — capacity, eligibility or quota; a wait reason, not a failure'
     usedBy: >-
@@ -266,11 +286,15 @@ commands:
       job may stand running; workflows.phase queued->running with a
       'phase-transition' event; jobs.status ->running with lease_token +
       worker_id only after attestation below (intent -> attested -> running);
+      managed workers in an existing worktree have their exact assignee
+      terminal renamed to `[Op] <op-id>` after dispatch-show (worker-start's
+      creation display name otherwise renders as `worker-task_<id>`);
       events 'op-dispatched' ('dispatch-rejected' on refusal). A dispatch-rejected
       launch claims nothing — no contract row, no leases, no running phase.
     packet: >-
       the dispatch.yaml packet, fields unchanged — {op, brief,
-      context:{records, owned_paths}, constraints:{model, budget, lease},
+      context:{workflow:{id,goal_revision,goal_identity},records,owned_paths,cut?},
+      constraints:{model, budget, lease},
       returns:{verdict, evidence, suspicion}}
     spawn: >-
       with --spawn the api runs the Orca sequence itself — through
@@ -286,7 +310,10 @@ commands:
       'running' the api attests the launch: the terminal handle is bound,
       the rendered packet visibly landed, and FIRST MODEL ACTIVITY is
       seen inside the launch window — against the adapter card's
-      readiness patterns + knownFailures signatures. An auth failure or
+      readiness patterns + knownFailures signatures. Managed-worker identity
+      is read from Orca's typed launch receipt, including
+      worker.startOptions.launch.effective (and the legacy top-level launch
+      field); missing a legacy field is not a model mismatch. An auth failure or
       known-crash signature (e.g. '401 Invalid API-key'), a terminal that
       dies, or a prompt that never lands is `dispatch-rejected`: the job
       stays NOT running, the terminal is closed (scripts/agent/lib.mjs),
@@ -294,7 +321,9 @@ commands:
       routed refusal, never a running ghost.
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
-      - job-settled: 'job already running/settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
+      - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
+      - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
+      - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
       - contested-lease: 'an in-flight job holds a capacity-1 resource this op needs (path:* write fences, machine:* budgets)'
       - path-collision: 'owned_paths overlap an in-flight jobs read/write set (the api''s dispatch-planning conflict check)'
       - path-illegal: 'owned_paths contradict the target repo''s layout/lint contracts — preflight says incident, never dispatch (dispatch.yaml preflight)'
@@ -302,6 +331,90 @@ commands:
       - spawn-failed: 'create/read/send sequence did not land — the reservation is settled, never left leasing a ghost'
       - dispatch-rejected: 'post-spawn attestation failed — auth/known-failure signature or dead terminal; job NOT running, terminal closed, slot released'
     usedBy: 'drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free'
+
+  # --------------------------------------------------------------------------
+  # RECONCILE — resolve a quarantined managed launch from exact host proof.
+  # --------------------------------------------------------------------------
+
+  reconcile:
+    args: '--job <job_id>'
+    reads: >-
+      either an effect_unknown managed launch, or a queued row whose accepted
+      contract still points at a connected+writable exact operation terminal;
+      contracts and reports for the exact {workflow_id,op_id,attempt}; Orca
+      terminal/worker observation and cleanup receipts through wrappers
+    writes: >-
+      queued+live recovery re-reserves the same owned-path leases, restores
+      status=running and the exact worker identity, and appends
+      live-worker-reconciled without spawning or re-sending anything. For an
+      effect_unknown launch, only after proof of no operation effect: deletes the job's exact leases,
+      clears stale worker/task/terminal bindings, returns the SAME job and
+      attempt to queued, records result {reason:'dispatch-reconciled',
+      effectState:'none',attemptConsumed:false,retryable:true,proof}, and appends
+      'dispatch-reconciled'. Machine lease refs are released best-effort after
+      the ledger transaction. An ambiguous proof writes nothing and retains
+      the fence.
+    proof: >-
+      no accepted contract or report exists; the exact managed worker is
+      failed at stage dispatch_input with last_failure agent_prompt_stalled;
+      observation says exactWorker:true and the process/terminal is exited;
+      release completed, or state=retained only because
+      reason=identity_unproven (terminal bookkeeping with no process action)
+    returns: '{ok:true,jobId,reconciled:true,dispatchId,status:queued,attempt,effectState:none,attemptConsumed:false,leasesReleased,machineRefsReleased,cleanup}'
+    refuses:
+      - job-unknown
+      - job-not-reconcilable: 'status is neither effect_unknown nor the idempotent already-queued case'
+      - dispatch-identity-missing: 'no exact managed Dispatch id is bound'
+      - accepted-contract-exists: 'operation authority may have landed; never infer no effect'
+      - worker-report-exists: 'worker evidence exists; use ordinary consume/check/settle'
+      - effect-unknown: 'host proof remains incomplete; status and lease stay unchanged'
+      - live-worker-lease-conflict: 'the exact live worker exists but its owned paths cannot be re-fenced; do not duplicate or continue unfenced'
+    usedBy: 'drive.reconcile before route; infrastructure retry reuses the same logical attempt and does not consume business route budget'
+
+  nudge:
+    args: '--job <job_id>'
+    reads: 'running operation job, exact report row, exact terminal show/read frame'
+    writes: >-
+      sends a fixed liveness wake to the same exact operation terminal and
+      appends op-worker-nudged. It creates no job, contract, lease, retry,
+      verdict or authority.
+    returns: '{ok:true,jobId,nudged:true|false,reason?,worker,receipt?}'
+    refuses:
+      - job-not-running: 'only the current running attempt may be nudged'
+      - worker-unavailable: 'exact terminal is disconnected/unwritable'
+      - interactive-gate: 'permission/trust input is a typed environment problem, not a wake'
+      - worker-state-unknown: 'weak observation never authorizes input'
+    usedBy: 'drive.wait on the first turn-idle observation with no durable report'
+
+  # --------------------------------------------------------------------------
+  # OBSERVE — read-only screen context on the job's own exact op terminal.
+  # --------------------------------------------------------------------------
+
+  observe:
+    args: '--job <job_id> [--lines <n>]'
+    reads: >-
+      the job row; the exact operation terminal handle resolved from the
+      dispatch binding (payload.managed/orca agentTerminalHandle, hierarchy
+      runtime handle, or worker_id — the same source nudge/status use);
+      Orca terminal-show for liveness plus a bounded terminal-read screen
+      tail through scripts/api/orca wrappers — the kernel still never calls
+      orca itself
+    writes: >-
+      one events row kind 'op-observed' {opId, attempt, terminal, turnState,
+      screenBytes} — a compact receipt only; the screen bytes never enter
+      the ledger. No jobs/contracts/reports/checks/leases row is touched:
+      observation is READ-ONLY reasoning context, never evidence — an op's
+      screen is never proof; only `api report` plus kernel-run `api check`
+      rows settle a verdict
+    returns: '{ok:true, job, jobId, opId, attempt, ledgerStatus, terminal:{handle,connected,writable,status,idleMs,screenState?}, screen:<tail of last --lines lines, default 80, null when unreadable>, turnState:active|turn-idle|disconnected|unreadable|unknown, observedAt}'
+    refuses:
+      - job-not-found: 'no jobs row for --job'
+      - job-not-operation: 'only an operation job has an observable worker terminal'
+      - no-live-worker: 'the job binds no live worker terminal (never dispatched, or no handle recorded) — typed, not a crash'
+    usedBy: >-
+      drive.wait — a ~180s observation cadence on a running op keeps
+      reasoning context alive before nudge/settle-fail decisions;
+      observation never substitutes for report/checks
 
   # --------------------------------------------------------------------------
   # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
@@ -329,10 +442,14 @@ commands:
       contracts row was written for; consumed_at stays NULL until
       `api consume-report` (or `api settle`). The api validates the envelope
       and stamps run/task/dispatch/from — the worker never claims identity.
-      events 'report-filed'. The file stays the artifact the row binds —
+      events 'report-filed'. After the transaction commits, the api
+      best-effort wakes the SAME Kernel terminal when its provider frame is
+      turn-idle and records `kernel-transition-woken`; terminal failure never
+      rolls back or weakens the authoritative report row. The five-minute
+      watchdog is only the fallback for a missed/racing event wake. The file stays the artifact the row binds —
       the ROW is the record, and `api status` projects it so the kernel
       knows exactly when an op answered and with what outcome.
-    returns: '{ok:true, report_id, job_id, outcome}'
+    returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}}'
     refuses:
       - report-missing: 'report file unreadable'
       - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch'
@@ -356,6 +473,10 @@ commands:
 
   check:
     args: '--job <job_id> (--checks <json> | --checks-file <path>)'
+    inputShape: >-
+      {checks:[{name:<non-empty string>, exitCode:<integer>, command?:<string>, evidence?:<string>}]}.
+      The envelope and checks array are mandatory and non-empty. JSON scalars, bare arrays,
+      legacy key/value maps and double-encoded JSON strings are refused.
     reads: 'the job row; the op''s declared checks (the re-run results being recorded)'
     writes: >-
       checks row UPSERT keyed PK(workflow_id,op_id,attempt) — the kernel''s
@@ -363,7 +484,7 @@ commands:
       a re-run upserts itself rather than doubling; events
       'checks-recorded'. `done` is never taken on trust: these are the
       results the kernel measured, not the worker''s claims.
-    returns: '{ok:true, job_id, checks:<n>}'
+    returns: '{ok:true, jobId, workflowId, op, attempt, checks:<n>, checkEvidence:{observed,passed,failed,green}}'
     refuses:
       - job-unknown
       - checks-invalid: 'the --checks payload is not valid JSON / not the check-result shape'
@@ -403,17 +524,22 @@ commands:
       owned_paths, identity bound to the job. `pass` records only after the declared checks
       re-ran green (`api check` row) —
       evidence is bytes on disk, never words in a summary
-      (verdict-contract.yaml accepts). A filed envelope's outcome must agree
-      with the verdict (pass↔done, fail↔failed|partial, blocked↔blocked|ask)
-      — a contradiction refuses 'verdict-outcome-mismatch'; a dispatch with
+      (verdict-contract.yaml accepts). A filed envelope's outcome normally
+      agrees with the verdict (pass↔done, fail↔failed|partial,
+      blocked↔blocked|ask). The report is a worker claim, not authority: a
+      recorded red Kernel check may overrule `done` to `fail`, settle the
+      attempt and release its worker. Any other contradiction refuses
+      'verdict-outcome-mismatch'; a dispatch with
       no filed report at all (a dead worker) still settles on the kernel's
       verdict, recorded reportFiled:false. A --report file with no reports
       row is validated and filed on the job's behalf first — an invalid one
       is simply not filed (the settle stands on the kernel's verdict).
-    returns: '{ok:true, jobId, verdict, status, reportFiled, reportOutcome, leasesReleased, reportsConsumed, terminalClosed, managedWorker?}'
+    returns: '{ok:true, jobId, verdict, status, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?}'
     refuses:
       - report-missing: 'the --report path is unreadable'
-      - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict (pass↔done, fail↔failed|partial, blocked↔blocked|ask)'
+      - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
+      - checks-not-green: 'pass requires at least one independently recorded green check and zero red checks'
+      - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
     usedBy: 'drive.settle — last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
@@ -440,7 +566,7 @@ commands:
       escalation.mustAskOwner)
 
   # --------------------------------------------------------------------------
-  # FINISH — the last call of the loop. History preserved; nothing deleted.
+  # FINISH — the last call of the loop. History preserved; live custody removed.
   # --------------------------------------------------------------------------
 
   finish:
@@ -448,17 +574,17 @@ commands:
     reads: 'workflows row; every jobs row; the final verify verdict'
     writes: >-
       workflows.phase='finished' + finished_json {at, verdict}; the inbox
-      goal row closed (status 'done'); the kernel signals row released;
-      events 'workflow-finished'. goals/jobs/reports/events all stay — a
+      goal row closed (status 'done'); the kernel singleton signal deleted;
+      the Kernel job settled with worker_id and terminalHandle cleared; the
+      exact Kernel terminal receives a best-effort close request after the
+      durable receipt is emitted; events 'workflow-finished'.
+      goals/jobs/reports/events all stay — a
       finished goal is history, not deletion
       (start-workflow.yaml: finished goals never re-enter the queue).
-    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished:true|false}'
+    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested}'
     refuses:
       - workflow-unknown
-      # finish itself is idempotent and never refuses on live state — the
-      # ORDERING (every job settled AND the final verify leg pass) is the
-      # driver-loop's precondition, not an api refusal (driver-loop.yaml
-      # tick.finish). alreadyFinished:true reports a re-run.
+      - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'
     usedBy: 'tick.finish — called only once every job is settled AND the final verify leg passed (driver-loop.yaml)'
 
 # ============================================================================
@@ -467,12 +593,12 @@ commands:
 tableMap:
   workflows:  {read: [survey, status, hierarchy, plan, enqueue, incident, finish], write: [dispatch, finish]}
   goals:      {read: [survey, plan, route], write: [plan]}
-  jobs:       {read: [survey, status, hierarchy, enqueue, route, dispatch, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, settle]}
+  jobs:       {read: [survey, status, hierarchy, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, reconcile, settle]}
   inbox:      {read: [survey, status], write: [finish]}
   signals:    {read: [survey], write: [finish]}
-  leases:     {read: [status, dispatch, settle], write: [dispatch, settle]}
+  leases:     {read: [status, dispatch, reconcile, settle], write: [dispatch, reconcile, settle]}
   incidents:  {read: [survey, route], write: [dispatch, incident]}
-  events:     {read: [survey], write: [plan, enqueue, route, dispatch, report, consume-report, check, settle, incident, finish]}
-  reports:    {read: [consume-report, settle], write: [report, consume-report, settle]}
-  contracts:  {read: [op-contract], write: [dispatch]}
+  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, report, consume-report, check, settle, incident, finish]}
+  reports:    {read: [reconcile, consume-report, settle], write: [report, consume-report, settle]}
+  contracts:  {read: [reconcile, op-contract], write: [dispatch]}
   checks:     {read: [settle], write: [check]}

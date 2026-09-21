@@ -73,3 +73,53 @@ test('implementation and verification ops distinguish material spec gaps from lo
   assert.match(tests,/REQUIREMENT_UNSETTLED/);
   assert.match(tests,/suite-local mechanics are not spec gaps/);
 });
+
+test('workspace canonicalization test author accepts only its explicitly bound direct-predecessor proposal',()=>{
+  const contract=load('test.author');
+  assert.equal(contract.graphPolicy.prerequisiteState,'done-or-exact-direct-predecessor-proposal');
+  assert.equal(contract.proposalAuthority.scope,'workspace-canonicalization-only');
+  const authority=prose(contract.proposalAuthority);
+  assert.match(authority,/one scope record explicitly bound in packet context\.records/);
+  assert.match(authority,/passed scope\.define output immediately preceding this test\.author leg/);
+  assert.match(authority,/proposed id must equal the selected target id/);
+  assert.match(authority,/repository-wide discovery/);
+  assert.match(authority,/workspace\.manage owns later reconstruction/);
+
+  const target=contract.reads.find(read=>read.id==='target');
+  assert.match(target.path,/packet context\.records -> exact bound scope\.define record/);
+  assert.match(prose(target),/do not scan \.starciwork for alternatives/);
+  assert.match(prose(target),/packet context\.workflow binds the approved goal identity\/revision/);
+
+  const nodeWrite=contract.writes.find(write=>write.id==='node');
+  assert.match(prose(nodeWrite),/When proposalAuthority is in use because N does not exist, omit this write entirely/);
+  assert.match(prose(nodeWrite),/workspace\.manage to materialize later/);
+});
+
+test('workspace canonicalization refactor consumes the same bound proposal only after regression proof',()=>{
+  const contract=load('code.refactor');
+  assert.equal(contract.graphPolicy.prerequisiteState,'done-or-exact-workspace-canonicalization-proposal-with-regression');
+  assert.equal(contract.proposalAuthority.scope,'workspace-canonicalization-only');
+  const authority=prose(contract.proposalAuthority);
+  assert.match(authority,/one scope\.define record explicitly bound in packet context\.records/);
+  assert.match(authority,/after a passed test\.author leg/);
+  assert.match(authority,/same covering regression command must run under the applicable refactor or migration proof/);
+  assert.match(authority,/repository-wide discovery/);
+  assert.match(authority,/workspace\.manage owns later reconstruction/);
+
+  assert.equal(contract.migrationAuthority.scope,'workspace-canonicalization-only');
+  const migration=prose(contract.migrationAuthority);
+  assert.match(migration,/red before source edits/);
+  assert.match(migration,/green after/);
+  assert.match(migration,/any unrelated failure blocks before edits/);
+  assert.match(migration,/collection-only check/);
+  assert.match(contract.refactorPolicy.workspaceCanonicalizationMigration,/red-before-green-after/);
+
+  const target=contract.reads.find(read=>read.id==='target');
+  assert.match(target.path,/packet context\.records -> exact bound scope\.define record/);
+  assert.match(prose(target),/Do not scan \.starciwork for alternatives/);
+  assert.match(prose(target),/packet context\.workflow binds the approved goal identity\/revision/);
+
+  const nodeWrite=contract.writes.find(write=>write.id==='node');
+  assert.match(prose(nodeWrite),/omit this write entirely/);
+  assert.match(prose(nodeWrite),/workspace\.manage to materialize later/);
+});

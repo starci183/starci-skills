@@ -59,9 +59,10 @@ const runDispatch=(fx)=>spawnSync(process.execPath,
   [API,'dispatch','--repo',fx.repo,'--job',fx.jobId,'--spawn','--json'],
   {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:fx.env});
 
-const calls=fx=>fs.existsSync(path.join(fx.root,'calls.jsonl'))
-  ?fs.readFileSync(path.join(fx.root,'calls.jsonl'),'utf8').trim().split('\n').map(l=>JSON.parse(l).argv.slice(0,2).join(' '))
+const callArgv=fx=>fs.existsSync(path.join(fx.root,'calls.jsonl'))
+  ?fs.readFileSync(path.join(fx.root,'calls.jsonl'),'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv)
   :[];
+const calls=fx=>callArgv(fx).map(argv=>argv.slice(0,2).join(' '));
 
 const jobRow=(fx,jobId)=>{
   const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
@@ -79,6 +80,10 @@ test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   const seen=calls(fx);
   for(const step of ['terminal create','terminal read','terminal send'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
+  const create=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='terminal create');
+  const command=create?.[create.indexOf('--command')+1]??'';
+  assert.match(command,/--yolo\b/,'the real API dispatch path must inject Qwen yolo into the profile command');
+  assert.match(command,/--exclude-tools agent\b/,'the real API dispatch path must preserve the nested-agent exclusion');
 });
 
 // The 401 screen still carries the readiness pattern (the TUI renders its

@@ -13,6 +13,7 @@ const ROUTES = {
   api: '../scripts/kernel/api.mjs',
   start: '../scripts/kernel/start-workflow.mjs',
   goal: '../scripts/goal/define-goal.mjs',
+  validate: '../scripts/checks/work-validate.mjs',
 };
 
 const HELP = `starci — kernel-agent workflow runtime
@@ -21,6 +22,7 @@ const HELP = `starci — kernel-agent workflow runtime
   starci api <verb> [args]            kernel ledger gate: survey|status|plan|enqueue|route|dispatch|op-contract|report|consume-report|check|settle|incident|finish
   starci start [args]                 claim a queued goal and boot its kernel agent
   starci goal [args]                  define a goal: assess, plan table, persist to the ledger
+  starci validate <work-root>         read-only Work record/layout validation
   starci help                         this text
 `;
 

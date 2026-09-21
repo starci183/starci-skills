@@ -1,7 +1,8 @@
 # Workflow kernel
 
-The kernel is **one long-lived LLM agent per workflow**. It is not a service
-and not a scheduler process: it is an agent that reasons over ledger
+The kernel is **one long-lived logical LLM agent per workflow**. A provider
+generation may return to its input prompt; the durable Kernel identity spans
+those turn boundaries. It is not a scheduler process: it is an agent that reasons over ledger
 projections and mutates state only through `scripts/kernel/api.mjs`. This page
 is the map; the authoritative contracts are the YAML files it cites — when
 they disagree with prose, the YAML wins.
@@ -22,6 +23,17 @@ plan, jobs and events survive agent churn. A `signals` singleton row enforces
 one kernel per workflow in data, not by politeness. Contract:
 `modules/kernel/start-workflow.yaml`.
 
+For explicitly authorized unattended execution,
+`scripts/kernel/watchdog.mjs` is the liveness supervisor. Every five minutes it
+reads canonical status/survey and the attested terminal. It wakes the same
+Kernel on `turn-idle`, or re-enters start-workflow only after exact
+disconnected/unwritable proof. It never chooses, retries or settles Ops. The
+Kernel processes immediately executable transitions and then yields when
+durably waiting; it never uses shell sleep, timers, or an in-turn polling loop.
+Normal Op completion does not wait for that cadence: `api report` commits the
+report row and immediately wakes the same Kernel when its provider turn is at
+the input prompt. The watchdog is the missed-event/disconnection fallback.
+
 ## The tick — `modules/kernel/driver-loop.yaml`
 
 Each iteration, in order, expressed in api calls:
@@ -30,8 +42,8 @@ Each iteration, in order, expressed in api calls:
 | --- | --- | --- |
 | survey | `api survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
 | plan | `api plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
-| enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. Refusals: `already-queued`, `empty-paths` (an op without `owned_paths` is an unbounded grant), `unknown-op`. |
-| drive | `status → dispatch → wait → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); settle every arrived verdict before picking again; route retries inside the kind's budget, then escalate. |
+| enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
+| drive | `status → dispatch → durable wait/observe → nudge → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); yield when no transition is executable and let the external watchdog own the five-minute cadence; observe a running op's screen on a ~3-minute cadence for context; nudge an exact `turn-idle` worker that owes a report; settle every arrived verdict before picking again; route retries inside the kind's budget, then escalate. |
 | finish | `api finish --workflow <id>` | Last call. Refuses while any job is unsettled (`jobs-unsettled`) or the final verify leg has not passed (`verify-open`). |
 
 The kernel decides order and assignment. It never decides scope, identity or
@@ -43,9 +55,12 @@ authority, never answers an `ask` itself, and never edits the ledger by hand.
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
 survey   status                       reads: projections only
 plan     --file <plan.json>           write: plan-derived event + structural diff
-enqueue  --op <opId> --paths <csv>    write: queued job row
+enqueue  --op <opId> --paths <csv> [--cut-id <id> --cut-ordinal <n> --cut-total <N>]
+                                        write: queued job row / bounded same-op cut slice
 dispatch --job <id> [--spawn] [--model <t>] [--worktree <sel>]
 route    --job <id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
+nudge    --job <id>               wakes the exact turn-idle worker; no new authority
+observe  --job <id> [--lines <n>] read-only op-terminal screen tail; context, never evidence
 op-contract --job <id>           worker reads its contracts row
 report   --job <id> --report <file> [--outcome <o>]   files a starci/op-report@1 row
 consume-report --job <id>        kernel marks the report integrated
@@ -57,6 +72,10 @@ finish
 
 Every write is one transaction + one hash-chained `events` row; every refusal
 exits 1 with `{ok:false, reason}` where the reason string is the contract.
+`observe` is read-only in every way that matters: it returns the exact worker
+terminal's liveness plus a bounded screen tail as reasoning context and
+appends only a compact `op-observed` receipt — an op's screen is never proof,
+and only `api report` plus kernel-run `api check` rows settle a verdict.
 
 ## Dispatch — `modules/kernel/dispatch.yaml`
 

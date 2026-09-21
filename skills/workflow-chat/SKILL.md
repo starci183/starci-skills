@@ -44,6 +44,12 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
   directly.
 - Keep the `workflowId` from goal intake and the `[Kernel]` terminal handle from boot; every later
   step names one of them.
+- A Codex/Claude/Devin chat task and an Orca terminal are different control
+  surfaces. Never use desktop task/thread messaging, a tab title, or sidebar
+  position to wake a Kernel: those can create an unrelated empty chat turn.
+  Kernel relay always names the attested terminal handle and uses
+  `terminal-send.mjs`; liveness/output always use `terminal-show.mjs` /
+  `terminal-read.mjs`.
 
 ## 1. The owner's prompt becomes the goal — through the entry skill
 
@@ -73,12 +79,30 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
 - Every few minutes run `api.mjs status --workflow <id>` for the cheap projection (phase, job
   counts, pending inbox rows), and `api.mjs survey --workflow <id>` when you need the detail —
   open jobs, live signals, the events tail, open incidents.
+- When the owner authorized unattended continuation, make the five-minute
+  liveness poll deterministic with:
+
+  ```
+  node <skill root>/scripts/kernel/watchdog.mjs --repo <repo> --workflow <id> --once --repair --json
+  ```
+
+  The watchdog is not another orchestrator. It only wakes the same Kernel when
+  its LLM turn has returned to the input prompt, or re-enters start-workflow
+  after exact disconnected/unwritable proof. Without that authorization omit
+  `--repair`; report `wake-needed`/`restart-needed` instead.
+- The cadence belongs to this external monitor/watchdog. A healthy Kernel
+  reasons through all immediately executable transitions, then yields when it
+  is durably waiting. It must never keep a model turn alive with `Start-Sleep`,
+  shell sleep, timers, or an internal polling loop.
 - Read the kernel's own words with `terminal-read --terminal <kernel handle> --screen`: what it is
   doing, what it is asking. Relay every owner-bound item — a question the kernel poses, an open
   `incident`, a pending `inbox` row that needs the owner — verbatim, then say what answering it
   takes.
 - An `incident` is the kernel's escalation record (plan divergence, retry budget exhausted, an op
   death it cannot reconcile): relay its kind and detail, never adjudicate it yourself.
+- `effect_unknown` is an open, fenced job and must remain visible in survey.
+  The Kernel owns `api reconcile --job <id>`; the monitor reports its result.
+  Only exact no-effect host proof can return the same attempt to queued.
 
 ## 4. Owner answers go into the kernel terminal
 
@@ -95,9 +119,13 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
 - `terminal-show --terminal <kernel handle>` is the liveness check: `connected` + `writable`. A dead
   or exited kernel terminal means re-run `start-kernel` on the same goal — the durable
   plan/jobs/events survive agent churn, so nothing is lost.
+- Connected+writable is only terminal availability. A provider input prompt
+  with no current Working/Thinking marker is `turn-idle`; phase=running means
+  the same Kernel must be woken. The long-lived identity spans model turns.
 - `[Op] <op>` terminals belong to `api dispatch` alone: it spawns one ephemeral agent per job and
   `api settle` records the verdict and closes the worker. Never read, send to, spawn or close an op
-  terminal from the chat.
+  terminal from the chat — the kernel's own read-only window is `api observe --job <id>`, and it is
+  the kernel's surface, not yours.
 - When the owner says stop, send that to the kernel terminal — every api write is a single
   transaction, so a kernel that stands down (or whose terminal is closed) leaves no half-write; the
   claimed goal waits in the `inbox` until a replacement kernel is booted.

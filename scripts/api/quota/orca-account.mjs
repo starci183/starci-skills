@@ -51,35 +51,46 @@ export function probeOrcaAccount(provider) {
   try {
     list = accountList();
   } catch (e) {
-    return { state: 'unknown', usedPercent: null, detail: `orca account list failed: ${e?.message ?? e}` };
+    return { state: 'unknown', usedPercent: null, auth: 'unknown', failureKind: null,
+      allowLaunchAttempt: true, detail: `orca account list failed: ${e?.message ?? e}` };
   }
   if (!list?.ok) {
-    return { state: 'unknown', usedPercent: null, detail: `orca account list not ok${list?.error ? `: ${list.error}` : ''}` };
+    return { state: 'unknown', usedPercent: null, auth: 'unknown', failureKind: null,
+      allowLaunchAttempt: true, detail: `orca account list not ok${list?.error ? `: ${list.error}` : ''}` };
   }
   const entry = list.rateLimits?.[provider];
   if (!entry) {
-    return { state: 'dead', usedPercent: null, detail: `no orca account/rate-limit entry for '${provider}'` };
+    return { state: 'dead', usedPercent: null, auth: 'unavailable', failureKind: 'missing-account',
+      allowLaunchAttempt: false, detail: `no orca account/rate-limit entry for '${provider}'` };
   }
   const usedPercent = typeof entry.weekly?.usedPercent === 'number' ? entry.weekly.usedPercent : null;
 
   if (entry.status === 'ok') {
     if (usedPercent !== null && usedPercent >= 90) {
-      return { state: 'limited', usedPercent, detail: `weekly quota ${usedPercent}% used (resets ${entry.weekly?.resetsAt ? new Date(entry.weekly.resetsAt).toISOString() : 'unknown'})` };
+      return { state: 'limited', usedPercent, auth: 'ok', failureKind: null, allowLaunchAttempt: true,
+        detail: `weekly quota ${usedPercent}% used (resets ${entry.weekly?.resetsAt ? new Date(entry.weekly.resetsAt).toISOString() : 'unknown'})` };
     }
-    return { state: 'ok', usedPercent, detail: 'orca account rate-limit status ok' };
+    return { state: 'ok', usedPercent, auth: 'ok', failureKind: null, allowLaunchAttempt: true,
+      detail: 'orca account rate-limit status ok' };
   }
   if (entry.status === 'error') {
     const failureKind = entry.usageMetadata?.failureKind ?? null;
     if (failureKind === 'stale-token') {
-      return { state: 'limited', usedPercent, detail: `stale token (refreshable): ${entry.error ?? 'oauth token expired'}` };
+      return { state: 'limited', usedPercent, auth: 'refreshable', failureKind, allowLaunchAttempt: true,
+        detail: `stale token (refreshable): ${entry.error ?? 'oauth token expired'}` };
     }
     if (failureKind === 'missing-credentials') {
-      return { state: 'dead', usedPercent, detail: `missing credentials: ${entry.error ?? 'no credentials'}` };
+      return { state: 'dead', usedPercent, auth: 'unavailable', failureKind, allowLaunchAttempt: false,
+        detail: `missing credentials: ${entry.error ?? 'no credentials'}` };
     }
-    return { state: 'unknown', usedPercent, detail: `rate-limit error, failureKind=${failureKind ?? 'absent'}: ${entry.error ?? 'no detail'}` };
+    return { state: 'unknown', usedPercent, auth: 'unknown', failureKind, allowLaunchAttempt: true,
+      detail: `rate-limit error, failureKind=${failureKind ?? 'absent'}: ${entry.error ?? 'no detail'}` };
   }
   if (entry.status === 'unavailable') {
-    return { state: 'dead', usedPercent, detail: `provider unavailable: ${entry.error ?? 'unavailable'}` };
+    return { state: 'dead', usedPercent, auth: 'unavailable',
+      failureKind: entry.usageMetadata?.failureKind ?? 'unavailable', allowLaunchAttempt: false,
+      detail: `provider unavailable: ${entry.error ?? 'unavailable'}` };
   }
-  return { state: 'unknown', usedPercent, detail: `unrecognized rate-limit status '${entry.status}'` };
+  return { state: 'unknown', usedPercent, auth: 'unknown', failureKind: null, allowLaunchAttempt: true,
+    detail: `unrecognized rate-limit status '${entry.status}'` };
 }

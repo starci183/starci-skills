@@ -18,6 +18,19 @@ about:
     (kernel attempt+1, same workflow generation), never a duplicate. Durable
     plan/jobs/events survive agent churn.
 
+watchdog:
+  executable: scripts/kernel/watchdog.mjs
+  cadenceMs: 300000
+  boundary: >-
+    Liveness only. It reads canonical status/survey and the attested Kernel
+    terminal. A connected terminal at its provider input prompt is turn-idle
+    and receives a continuation wake; disconnected/unwritable exact proof may
+    re-enter start-workflow for the same approved goal. It never plans,
+    enqueues, routes, dispatches, reconciles, settles or finishes operations.
+    It owns the waiting cadence: the Kernel yields when no durable transition is
+    immediately executable and never keeps a model turn alive with sleep or an
+    internal polling loop.
+
 actor: >-
   launcher — a human Codex, Claude or Devin chat surface
   (codex-chat | claude-chat | devin-chat). The launcher is ingress only; it
@@ -68,8 +81,8 @@ spawn:
     Source SKILL.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
     mutation goes through node scripts/kernel/api.mjs <cmd>
-    (survey/status/plan/enqueue/route/dispatch/consume-report/check/settle/
-    incident/finish — plus the worker-side op IPC op-contract/report) — never
+    (survey/status/plan/enqueue/route/dispatch/nudge/observe/consume-report/
+    check/settle/incident/finish — plus the worker-side op IPC op-contract/report) — never
     direct sqlite writes, never self-spawned op terminals, never direct
     orca/git/agent-CLI calls (report/contract/check truth is the ledger
     rows via the api verbs); `api route` persists the model decision before

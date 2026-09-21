@@ -39,12 +39,13 @@ export function loadAdapter(provider) {
 // Build the terminal command for a provider. Composition:
 //   credentialRefresh[plat] + commandPrefix[plat]          ← card-owned env prep (ACP strip, stale-key unset)
 //   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
-//   OR the card's own body: commandRequirements (kernel → kernelCommandRequirements)
+//     AND any missing card requirements (kernel → kernelCommandRequirements)
+//   OR the card's own body plus those requirements
 //     or terminalFallback.command + bypassFlag for native-managed agents.
 // A terminalFallback may additionally declare modelArgs/effortArgs/bypassArgs.
 // Those arrays are the only source of provider-specific CLI flags; placeholder
 // values are shell-quoted before they enter Orca's command string.
-// Requirements ALWAYS come from the card — that is where --yolo lives.
+// Requirements ALWAYS come from the card — that is where --yolo/dangerous lives.
 const shellQuote = (value) => {
   const text = String(value);
   return process.platform === 'win32'
@@ -71,11 +72,28 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   const plat = process.platform === 'win32' ? 'win32' : 'posix';
   const prefix = [card?.credentialRefresh?.[plat], card?.commandPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
-  const reqs = (kernel && Array.isArray(card?.kernelCommandRequirements)
+  const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements
-    : (Array.isArray(card?.commandRequirements) ? card.commandRequirements : [])).join(' ');
+    : (Array.isArray(card?.commandRequirements) ? card.commandRequirements : [])).map(String);
+  const reqs = requirementList.join(' ');
   const tf = card?.terminalFallback;
-  let body = typeof command === 'string' && command.trim() ? command.trim() : null;
+  // Native-managed agents still use this terminal fallback for the long-lived
+  // Kernel and for any explicitly requested command-terminal lane. Their
+  // unattended flags therefore apply to explicit profile commands too; an
+  // override may choose model/tuning, never permission interactivity.
+  const fallbackBypassArgs = Array.isArray(tf?.bypassArgs)
+    ? tf.bypassArgs.map(String)
+    : [String(tf?.bypassFlag ?? '').match(/^(--?\S+)/)?.[1] ?? ''].filter(Boolean);
+  const explicit = typeof command === 'string' && command.trim() ? command.trim() : null;
+  let body = explicit;
+  if (body) {
+    const missing = requirementList.filter((requirement) => !body.includes(requirement));
+    const missingBypass = fallbackBypassArgs.length > 0
+      && !fallbackBypassArgs.every((requirement) => body.includes(requirement))
+      ? fallbackBypassArgs
+      : [];
+    body = [body, ...missing, ...missingBypass].filter(Boolean).join(' ');
+  }
   if (!body && typeof tf?.command === 'string' && tf.command.trim()) {
     if (model && !Array.isArray(tf.modelArgs))
       return { provider, error: `adapter card ${provider}.yaml cannot pin model '${model}' (terminalFallback.modelArgs missing)` };
@@ -85,10 +103,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
     const effortArgs = effort ? renderArgs(tf.effortArgs, { model, effort }) : [];
     // bypassArgs is canonical. bypassFlag remains a compatibility seam for
     // older installed cards and deliberately keeps only its first CLI token.
-    const bypassArgs = Array.isArray(tf.bypassArgs)
-      ? tf.bypassArgs.map(String)
-      : [String(tf.bypassFlag ?? '').match(/^(--?\S+)/)?.[1] ?? ''].filter(Boolean);
-    body = [tf.command.trim(), reqs, ...modelArgs, ...effortArgs, ...bypassArgs].filter(Boolean).join(' ');
+    body = [tf.command.trim(), reqs, ...modelArgs, ...effortArgs, ...fallbackBypassArgs].filter(Boolean).join(' ');
   } else if (!body && (prefix || reqs)) {
     body = [card?.agent ?? provider, reqs].filter(Boolean).join(' ');
   }
@@ -109,6 +124,26 @@ const signalRegexp = (source) => {
   catch { return new RegExp(String(source).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); }
 };
 
+const failureMatchers = (adapter) => {
+  const spec = adapter?.attestation && typeof adapter.attestation === 'object' ? adapter.attestation : {};
+  return [
+    { signal: 'generic', re: regexp(spec.failurePattern, '401|Invalid API-key|not authenticated|authentication failed|OAuth[^\\n]*(?:expired|invalid|rejected)|token[^\\n]*(?:expired|invalid|rejected)|agent child exited') },
+    ...(Array.isArray(adapter?.knownFailures) ? adapter.knownFailures : [])
+      .map((f) => f?.signal).filter((s) => typeof s === 'string' && s.trim())
+      .map((signal) => ({ signal, re: signalRegexp(signal) })),
+  ];
+};
+const failureOnScreen = (adapter, screen) => {
+  for (const failure of failureMatchers(adapter)) {
+    const match = failure.re.exec(screen ?? '');
+    if (match) return {
+      signal: failure.signal === 'generic' ? `generic failure signature '${match[0]}'` : failure.signal,
+      matched: match[0],
+    };
+  }
+  return null;
+};
+
 // Card-driven readiness: screen must show the provider's prompt pattern
 // (and identity when declared) before anything is sent.
 function awaitReadiness(handle, adapter) {
@@ -121,6 +156,8 @@ function awaitReadiness(handle, adapter) {
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
     const read = terminalRead({ terminal: handle });
     screen = read.screen;
+    const failure = failureOnScreen(adapter, screen);
+    if (read.ok && failure) return { ok: false, reason: `terminal rejected readiness: ${failure.signal}`, screen, ...failure };
     if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen };
     if (elapsed < timeoutMs) sleep(intervalMs);
   }
@@ -142,6 +179,8 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
   const expected = modelPattern(expectedModel);
   let screen = initialScreen ?? '';
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
+    const failure = failureOnScreen(adapter, screen);
+    if (failure) return { ok: false, screen, reason: `terminal rejected model attestation: ${failure.signal}`, ...failure };
     if (expected.test(screen)) return { ok: true, screen, model: expectedModel };
     if (elapsed >= timeoutMs) break;
     sleep(intervalMs);
@@ -168,6 +207,8 @@ export function awaitSubmission(handle, adapter) {
     if (elapsed > 0) sleep(settleMs);
     const read = terminalRead({ terminal: handle });
     screen = read.screen;
+    const failure = failureOnScreen(adapter, screen);
+    if (read.ok && failure) return { ok: false, reason: `prompt submission rejected: ${failure.signal}`, screen, enters, ...failure };
     if (read.ok && activity.test(screen)) return { ok: true, screen, enters };
     if (read.ok && enters < maxEnter && (staged.test(screen) || input.test(screen))) {
       terminalSend({ terminal: handle, text: '', enter: true });
@@ -191,12 +232,6 @@ export function awaitAttestation(handle, adapter) {
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
   const activity = regexp(spec.activityPattern ?? adapter?.submission?.activityPattern,
     'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens');
-  const failures = [
-    { signal: 'generic', re: regexp(spec.failurePattern, '401|Invalid API-key|not authenticated|agent child exited') },
-    ...(Array.isArray(adapter?.knownFailures) ? adapter.knownFailures : [])
-      .map((f) => f?.signal).filter((s) => typeof s === 'string' && s.trim())
-      .map((signal) => ({ signal, re: signalRegexp(signal) })),
-  ];
   let screen = '', activitySeen = false;
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
     if (elapsed > 0) sleep(intervalMs);
@@ -208,10 +243,8 @@ export function awaitAttestation(handle, adapter) {
         signal: `terminal ${read.terminal?.connected === false ? 'disconnected' : 'unreadable'} during attestation: ${read.error ?? read.terminal?.exitCause ?? 'no receipt'}`,
       };
     }
-    for (const f of failures) {
-      const m = f.re.exec(screen);
-      if (m) return { ok: false, screen, activitySeen, signal: f.signal === 'generic' ? `generic failure signature '${m[0]}'` : f.signal, matched: m[0] };
-    }
+    const failure = failureOnScreen(adapter, screen);
+    if (failure) return { ok: false, screen, activitySeen, ...failure };
     if (activity.test(screen)) activitySeen = true;
   }
   return { ok: true, screen, activitySeen };
@@ -275,16 +308,18 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
   };
   if (!handle) return fail('create', create.error || 'no terminal handle');
   const ready = awaitReadiness(handle, built.adapter);
-  if (!ready.ok) return fail('readiness', ready.reason);
+  if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null, { screen: ready.screen, matched: ready.matched });
   const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen);
-  if (!modelAttested.ok) return fail('model-attestation', modelAttested.reason, null, { requestedModel: model });
+  if (!modelAttested.ok) return fail('model-attestation', modelAttested.reason, modelAttested.signal ?? null,
+    { requestedModel: model, screen: modelAttested.screen, matched: modelAttested.matched });
   const text = promptFile ? fs.readFileSync(promptFile, 'utf8') : prompt;
   if (text != null) {
     const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree, dispatchId });
     artifact = send.artifact ?? null;
     if (!send.ok) return fail('send', send.error || 'send failed');
     const submitted = awaitSubmission(handle, built.adapter);
-    if (!submitted.ok) return fail('submission', submitted.reason);
+    if (!submitted.ok) return fail('submission', submitted.reason, submitted.signal ?? null,
+      { screen: submitted.screen, matched: submitted.matched });
     if (attest) {
       const attested = awaitAttestation(handle, built.adapter);
       if (!attested.ok) return fail('attestation', `attestation rejected: ${attested.signal}`, attested.signal);

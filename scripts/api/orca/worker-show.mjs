@@ -8,11 +8,21 @@ export function workerShow({ dispatch }) {
   if (!dispatch) throw new Error('workerShow: missing required --dispatch');
   const r = orcaRun(['orchestration', 'worker-show', '--dispatch', dispatch, '--json']);
   const result = jsonOf(r.stdout)?.result ?? null;
+  let rawStartOptions = null;
+  try { rawStartOptions = JSON.parse(result?.worker?.start_options ?? 'null'); } catch { /* malformed host detail is not attestation */ }
+  // Current Orca receipts expose the requested/effective launch on the worker
+  // start options, while older receipts exposed it at result.launch. Accept
+  // both typed locations; never infer a model from terminal text or titles.
+  const effective = result?.launch?.effective
+    ?? result?.worker?.startOptions?.launch?.effective
+    ?? rawStartOptions?.launch?.effective
+    ?? result?.effective
+    ?? null;
   return {
     ok: r.status === 0 && Boolean(result),
     state: result?.worker?.state ?? null,
     dispatch: result?.dispatch ?? null,
-    effective: result?.launch?.effective ?? result?.effective ?? null,
+    effective,
     result,
     error: r.error ?? r.stderr,
   };

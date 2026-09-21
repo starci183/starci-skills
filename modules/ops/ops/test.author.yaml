@@ -17,17 +17,37 @@ sideEffects:
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
-  prerequisiteState: done
+  prerequisiteState: done-or-exact-direct-predecessor-proposal
   dispatch: never
+proposalAuthority:
+  scope: workspace-canonicalization-only
+  permits: >-
+    When the selected N/index.yaml does not exist yet, consume the exact proposed target entry from
+    the one scope record explicitly bound in packet context.records, but only when that record is the
+    passed scope.define output immediately preceding this test.author leg in the packet-bound approved
+    goal revision. The proposed id must equal the selected target id and must carry the grounded test
+    paths, assertions, dependencies and exclusions this operation uses.
+  forbids:
+    - repository-wide discovery of a substitute scope record or proposed target
+    - choosing another nodes[] entry because it appears compatible
+    - materializing or editing the proposed Work node; workspace.manage owns later reconstruction
+    - treating an unbound, differently revised or non-predecessor scope proposal as authority
 reads:
   - id: target
-    path: N/index.yaml
+    path: N/index.yaml OR packet context.records -> exact bound scope.define record/extensions.work3.scope
     purpose:
       en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
-        target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here. The assertions name what the authored
-        tests must exercise; they are never re-worded here."
+        and validator freshness. Normally this consumer op requires its target node to exist. The
+        one exception is the workspace-canonicalization proposalAuthority below: when N is the exact
+        selected proposed id in the explicitly bound direct-predecessor scope record, resolve that
+        record by id and use the matching entry without materializing N. For this exception, do
+        not scan .starciwork for alternatives. Confirm packet context.workflow binds the approved
+        goal identity/revision, scope.define is its passed immediate predecessor, and exactly one
+        nodes[] entry matches the selected target id with grounded test paths, assertions,
+        dependencies and exclusions. If any binding is absent or ambiguous, report
+        DECLARED_DEPENDENCY_UNMET instead of inventing a target. Any other absent target is a
+        scope/graph gap. The assertions name what the authored tests must exercise; they are never
+        re-worded here."
   - id: architecture
     path: .starciwork/<business>/architecture/**/index.yaml
     purpose:
@@ -79,10 +99,12 @@ writes:
       - completion.evidence
       - completion.codeRefs
     content:
-      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
-        only state/blocker/completion here; authored test inventory and collection results belong to
-        the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a
-        reported gap or separately selected scope update; never add/remove them to obtain pass.
+      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. When
+        N exists, write only state/blocker/completion here; authored test inventory and collection
+        results belong to the evidence result, not semantic node prose. When proposalAuthority is in
+        use because N does not exist, omit this write entirely and leave the bound scope proposal
+        unchanged for workspace.manage to materialize later. Missing refs/dependencies/acceptance
+        require a reported gap; never add/remove them to obtain pass.
   - id: source
     path: repository:<repo-id>/<test-ceiling>
     fields:
@@ -188,6 +210,13 @@ proofs:
       en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
         done.
+  - id: proposal-binding
+    requirement:
+      en: When N does not yet exist in workspace-canonicalization, the evidence names the one scope
+        record id from packet context.records, the packet-bound workflow/goal identity and revision,
+        the passed immediate predecessor scope.define job, and the exact matching proposed target id.
+        No repository scan or alternative proposal can satisfy this proof, and the proposal remains
+        byte-unchanged for workspace.manage.
   - id: authored-coverage
     requirement:
       en: Every selected assertion maps to at least one authored test file whose cases exercise the
@@ -240,8 +269,11 @@ blockers:
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
-        Report node/resource IDs and propose a separately selected graph update when needed; never
-        run predecessors or weaken dependsOn/refs/required to proceed.
+        For a proposal-authorized workspace-canonicalization leg this includes an absent explicit
+        context.records binding, a scope record not produced by the passed direct predecessor in the
+        packet-bound approved goal revision, or zero/multiple proposed entries matching N. Report the
+        exact ids; never search the repository for a substitute, run predecessors or weaken
+        dependsOn/refs/required to proceed.
 placeholders:
   business: Selected business slug
   repo-id: Resolved direct repository name or path

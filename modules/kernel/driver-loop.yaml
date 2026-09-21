@@ -93,7 +93,16 @@ boundary:
   terminalLifecycle: >-
     `api settle` closes the worker terminal — the kernel never reuses an op
     terminal and never re-dispatches into a settled job's handle. A retry
-    is a NEW job row at attempt+1 with a fresh dispatch.
+    is a NEW job row at attempt+1 with a fresh dispatch. A launch rejected
+    before any accepted contract/effect is the narrow exception: explicit
+    infrastructure + effectState:none returns that same job/attempt to queued
+    for rerouting, while businessAttempt and business route budget stay fixed.
+  opTerminalObservation: >-
+    The one sanctioned look at an op's screen is `api observe --job <id>` —
+    read-only reasoning context through the api on the job's own exact
+    worker. It sends nothing (that is `api nudge`), closes nothing (that is
+    `api settle`), and an op's screen is never proof: only `api report`
+    plus kernel-run `api check` rows settle a verdict.
 
 # ============================================================================
 # 1 — THE TICK. One iteration of the driver loop, in order — expressed in api
@@ -108,10 +117,10 @@ tick:
   order:
     - survey    # api survey --workflow — the tick opens on the ledger, never on memory
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
-    - enqueue   # api enqueue --workflow --op --paths — a queued job row per planned op the queue lacks
-    - drive     # loop{ status -> route -> dispatch -> wait -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
+    - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
+    - drive     # loop{ status -> reconcile effect_unknown -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
     - finish    # api finish --workflow — every job settled AND the final verify passed
-  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, plan, enqueue, route, dispatch, op-contract, report, consume-report, check, settle, incident, finish"
+  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, finish"
 
   survey:
     rule: >-
@@ -144,26 +153,76 @@ tick:
   enqueue:
     rule: >-
       Each planned op with no job row gets one: `api enqueue --op <opId>
-      --paths <owned_paths csv>` writes status='queued' with the op's
-      write-set on the row. A duplicate is a refusal, not a hazard — an
+      --paths <owned_paths csv> [--records <closed read-set csv>]` writes
+      status='queued' with the op's explicit Work-record reads and write-set
+      on the row. A downstream op that consumes a scope.define proposal binds
+      that exact predecessor scope record here; it never discovers a
+      repository-wide substitute. A duplicate is a refusal, not a hazard — an
       existing queued or in-flight row IS the queue entry and is never
-      re-enqueued (api.yaml already-queued).
+      re-enqueued (api.yaml already-queued). A settled dispatch-rejected job
+      is different: when its result explicitly proves infrastructure failure
+      and effectState:none, it returns the same durable row/attempt to queued
+      with the same businessAttempt. Repeating recovery creates no successor
+      row, contract or effect, so rerouting is idempotent.
+    cutExecution: >-
+      A preflight-proven write closure beyond the canonical cut bounds is
+      execution decomposition INSIDE the already approved semantic op, not a
+      new semantic plan leg and not an owner gate. Derive a stable cut id and
+      a complete seam-first partition of concrete, pairwise-disjoint path
+      slices; enqueue one job per slice with the SAME approved op id using
+      `--cut-id <id> --cut-ordinal <n> --cut-total <N>`. Every slice stays at
+      or below the file/assertion/component bounds and carries the same exact
+      goal/record binding. Do not inject work.author, duplicate the op in the
+      derived goal plan, or create a mega-op. The semantic leg advances only
+      after every ordinal in the cut set settles pass and the union of their
+      declared paths equals the preflight closure. A failed slice retries only
+      that ordinal with the same cut id/total and never reruns a passed slice.
+      If a complete disjoint partition cannot be derived from repository
+      evidence, that inability is a technical planner incident for Kernel/AI
+      repair; it becomes an owner gate only when business scope or authority
+      truly must expand.
     boundary: >-
       Enqueue is declaration, not launch: owned_paths ride on the job row so
       dispatch-time disjointness is checkable before any agent exists
       (modules/goal/legality.yaml splitRules; modules/schemas/goal-plan.yaml disjoint
-      allowlists).
+      allowlists). Paths are normalized concrete workspace-relative prefixes;
+      absolute/root/traversal/glob grants are refused (a trailing `/**` is
+      normalized to its directory prefix). Broad `workspace.manage` grants are
+      decomposed into exact selected migration node/resource/stack slices when
+      those slices are derivable. In multi-repository projects each product
+      prefix is qualified by its stable repository binding (for example
+      `nivo-fe/apps/landing`); canonical Work remains `.starciwork/...`.
 
   drive:
     status: >-
       Each loop iteration opens on `api status` — phase, jobs grouped by
-      status, live leases, the filed reports. Cheap by design; survey is the
-      deep read. An expired lease under a 'running' job is a detector, not
-      free capacity (the api's lease expiry keeps unproved leases held).
+      status, live leases, filed reports, and exact running-operation terminal
+      liveness/output freshness. Survey is the deep ledger read. Report age is
+      never worker liveness: connected+writable only proves a terminal can
+      receive input. The api also reads the current provider frame: an activity
+      marker is active, while a ready input prompt is `turn-idle`. Output age is
+      fallback evidence only. A running active or live-idle attempt is never
+      routed/dispatched again; its own lease blocking a duplicate is a safety
+      fence, not a capacity defect. An expired lease under a 'running' job is a
+      detector, not free capacity (the api keeps unproved leases held).
+      `frontier.state=worker-nudge-ready` is never a wait reason: immediately
+      call `api nudge` for each exact id in `frontier.nudgeReadyJobs` before
+      applying any age/wedge threshold. `orphaned-frontier` is likewise an
+      immediate technical plan/repair transition, not a reason to yield.
+    reconcile: >-
+      An `effect_unknown` job is part of the open frontier and remains fenced.
+      Before routing it, call `api reconcile --job <id>`. The api reads the
+      exact managed Dispatch through Orca wrappers and requeues the same
+      job/attempt only when no contract/report exists and host evidence proves
+      prompt injection stalled before model input, the exact worker process is
+      exited, and release either completed or retained terminal bookkeeping
+      only as `identity_unproven`. Any weaker observation leaves the lease and
+      effect_unknown status intact; the kernel records/relays that blocker and
+      never creates a successor attempt from a guess.
     dispatch:
       rule: >-
-        For each ELIGIBLE queued job — owned_paths disjoint from every
-        in-flight job's read/write set AND capacity free — the kernel first
+        For each ELIGIBLE queued job — normalized concrete owned_paths disjoint
+        from every durable in-flight path lease AND capacity free — the kernel first
         calls `api route --job <id>` (the model decision is resolved and
         persisted on the job payload: model/modelId/effort/routeChain), then
         `api dispatch --job <id> --spawn` reserves the durable lease, writes
@@ -174,14 +233,18 @@ tick:
         --spawn it is a dry-run packet preview.
       eligibility: >-
         Dispatch planning's three levels, enforced inside the api's refusals:
-        file (no write/write or write/read overlap with anything in flight),
+        file (no write/write or write/read ancestor/equality overlap with
+        anything in flight),
         lease (no contested capacity-1 resource — the path:* write fences and
         machine:* budgets), group (seam runs alone and first;
         siblings bounded by runtimes.yaml fanOut.maxPerGroup). An op past the
         cut bounds (a write scope past twelve files, more than eight
         assertions, or >=3 components — modules/models/kinds.yaml
-        implementation.plan) is cut into disjoint children BEFORE it is
-        ever enqueued.
+        implementation.plan) is cut into a complete set of disjoint SAME-OP
+        execution slices before any slice is enqueued (`enqueue.cutExecution`);
+        this does not alter the approved semantic chain. These checks span all workflows in the canonical ledger.
+        There is no repository-wide, ledger-wide, workflow-wide or open-job
+        exclusion: disjoint concrete paths remain concurrently eligible.
       route: >-
         The op id was route-op's pick during plan (scripts/route/route-op.mjs
         — pick + reasons + citations, never a whole-contract read). The
@@ -201,20 +264,49 @@ tick:
         holding a lease is never re-dispatched and a settled job is never
         re-launched — a retry is a NEW row at attempt+1
         (dispatch.yaml oneOpOneAgent; the api settles it, not a new launch).
+        The only same-row retry is an infrastructure launch rejected before
+        contract/effect and explicitly returned to queued by no-effect
+        rejection or `api reconcile`; that row no longer holds a lease.
       starvation: >-
         'contested-lease' / 'no free slot' is a wait reason, not a failure —
-        the loop waits; it does not force (runtimes.yaml maxParallelOps).
+        the loop records it and yields; it does not force
+        (runtimes.yaml maxParallelOps). A
+        path lease remains the durable fence until explicit settle/reconcile;
+        expiry is a recovery signal, never proof that a prior worker cannot
+        still write.
     wait:
       rule: >-
-        Between dispatch and the next report the kernel WAITS — it polls
-        `api status` on a cadence and reads the op terminal for liveness; it
-        does not poll for work to invent. The report discipline is durable:
+        Between dispatch and the next report the kernel WAITS durably, not
+        inside one model turn. Once no immediately executable transition
+        remains, it records/names the exact wait reason and yields immediately.
+        The external watchdog owns the five-minute cadence and wakes the same
+        Kernel identity; the resumed turn begins with `api status`. The Kernel
+        never runs Start-Sleep, shell sleep, a timer, or an in-turn polling loop.
+        It does not poll for work to invent. The report discipline is durable:
         the worker files its answer through `api report --job <id> --report
         <file>` — the file is a starci/op-report@1 JSON envelope, an upsert
         keyed UNIQUE(workflow_id, dispatch_id) on the reports row, which IS
         the verdict of record; `api status` projects the filed rows
         (modules/kernel/verdict-contract.yaml envelope). The done-marker/
         Orca message is only the wake-up.
+      observe: >-
+        While a running op owes a report the kernel may keep reasoning
+        context on it: `api observe --job <id> [--lines <n>]` reads the exact
+        worker terminal's liveness plus a bounded screen tail, on roughly a
+        three-minute cadence and especially before a nudge or settle-fail
+        decision — an op that dies without filing leaves `result.report:
+        null`, so the screen is how the kernel learns what the op was doing.
+        The screen is context, never evidence: only `api report` plus the
+        kernel's own `api check` re-runs settle a verdict, and the read never
+        sends (that is `api nudge`) or closes (that is `api settle`).
+      turnIdle: >-
+        A connected+writable Op terminal showing its provider input prompt is
+        not working. On the first `turn-idle` observation with no filed report,
+        call `api nudge --job <id>`; that wakes the exact worker with its existing
+        contract and grants no new authority. If the bounded wake returns idle
+        without a report, record worker-idle-without-report and settle fail from
+        the missing-report evidence before retrying at attempt+1. Never wait
+        indefinitely and never spawn a duplicate over the original lease.
       workerDonePing: >-
         An op's `worker_done` / terminal-done signal is a completion PING,
         never an outcome — the durable outcome is the reports row filed via
@@ -222,17 +314,20 @@ tick:
         outcome=failed (reportFiled:false): the signal wakes the kernel,
         the row carries the verdict.
       boundary: >-
-        Waiting is itself supervised — a kernel whose event log is silent
-        past the health window is restarted (failureHandling.kernelDeath).
-        The wait is where the failure detectors live — failureHandling
-        section.
+        Waiting is itself supervised outside the model turn. A turn-idle Kernel
+        is woken on the watchdog cadence; only a Kernel whose terminal is proven
+        disconnected or unwritable is restarted
+        (failureHandling.kernelDeath). Failure detectors run on the resumed
+        state transition — failureHandling section.
     settle:
       rule: >-
         A landed report settles in order: the kernel reads the reports row
         the worker filed, integrates it via `api consume-report --job <id>`
         (consumed_at set — the kernel's durable acknowledgement), re-runs
         the op's declared checks itself and records the results via `api
-        check --job <id> --checks '<json>'`, and only then `api settle
+        check --job <id> --checks
+        '{"checks":[{"name":"<check>","command":"<exact rerun>","exitCode":0,"evidence":"<observed proof>"}]}'`,
+        and only then `api settle
         --job <id> --verdict <v> [--report <path>]` — the api validates the
         filed envelope's outcome against the verdict, binds the reports row
         to the job's dispatch_id (the envelope's identity fields {run, task,
@@ -268,7 +363,9 @@ tick:
       onFail: >-
         verdict fail -> retry inside the route's limit: `api enqueue` the
         same op at attempt+1 with the failure named back (modules/models/
-        kinds.yaml routes — the full table is verdictTable below).
+        kinds.yaml routes — the full table is verdictTable below). A
+        dispatch-rejected/no-effect infrastructure recovery reroutes the same
+        queued durable attempt and does not consume this route limit.
       onBlocked: >-
         verdict blocked -> the typed blocker is the route key
         (verdictTable.blocked); environment/authority/ask go to needUser.
@@ -276,7 +373,7 @@ tick:
         On a settle-fail or a suspicious report the kernel climbs a ladder,
         never reads a transcript: (1) `api check` re-runs the deterministic
         checks; (2) the kernel takes one bounded tail read of the op
-        terminal — triage classification only; (3) full-transcript
+        terminal via `api observe` — triage classification only; (3) full-transcript
         forensics are delegated to a fresh op (kind review.verify)
         that files its own report envelope; (4) repeated failures
         escalate to the owner with the terminal handle. The kernel never
@@ -285,7 +382,11 @@ tick:
         Past the route's limit, `api incident --kind <k> --detail <s>`
         records the fingerprint and the workflow asks the user — identical
         evidence is not progress and a runtime swap alone never resets the
-        budget (the api's incident fingerprint/attempt upsert).
+        budget (the api's incident fingerprint/attempt upsert). Only attempts
+        that may have produced business effects count here; an explicit
+        dispatch-rejected result with effectState:none, retryable:true and
+        attemptConsumed:false uses the separately bounded infrastructure
+        restart budget.
 
   finish:
     rule: >-
@@ -436,6 +537,16 @@ escalation:
     - kind: REPAIR-ROUTE
       scope: "red proof / gap blocker -> the revise/build kind the route table names"
       basis: "the route table is closed — the driver matches, it does not improvise"
+    - kind: TECHNICAL-BLOCKER
+      scope: >-
+        checker/adapter/runtime defects, red reproducible proof, worker
+        lifecycle cleanup and other machine-resolvable failures; repair in
+        current authority or persist the typed incident for the authorized
+        runtime monitor, then resume without asking the owner
+      basis: >-
+        the report is a claim; Kernel checks settle truth. A model turn ending
+        is not workflow completion, and a technical incident keeps the
+        workflow running/resumable until the repair lands
   mustAskOwner:
     - kind: INTENT
       why: "S* cannot be formed — a wrong identity voids all downstream evidence"
@@ -499,9 +610,12 @@ failureHandling:
       report-command ENOENT, agent_prompt_stalled (task never delivered),
       session_not_reported, a terminal closed under a live worker
       (modules/host/orca/calls.yaml signatures; the adapter card's
-      knownFailures). These charge infra restarts, bound
+      knownFailures). When the durable rejection proves effectState:none, the
+      same job returns to queued at the same durable and business attempt; no
+      successor or accepted dispatch contract is created. These charge infra restarts, bound
       by the infra restart budget, then blocked + needUser
-      (the api classifies the cause).
+      (the api classifies the cause). Unknown/partial effect is never classified
+      as a free resume and consumes the ordinary business route budget.
     neverRespawn: >-
       Never respawn over an unsettled lease — the durable attempt is settled
       FIRST while the writer fence is still held (the api's settle path); an
@@ -534,12 +648,13 @@ failureHandling:
   kernelDeath:
     symptom: "the [Kernel] agent/process itself is gone or silent"
     detection: >-
-      start-workflow's signalHealth check proves liveness, not silence:
-      a command-terminal kernel is live only while its Orca terminal is
-      connected and writable, a managed kernel while worker-show reports a
-      non-terminal worker state, and a starting kernel only inside its
-      startup-reservation TTL — anything else is stale and replaced
-      (scripts/kernel/start-workflow.mjs;
+      start-workflow proves process/terminal availability. The canonical
+      watchdog additionally distinguishes an active LLM turn from the same
+      connected terminal sitting at its input prompt. Every 5 minutes it reads
+      api status/survey plus the attested frame; turn-idle wakes the same Kernel,
+      while disconnected/unwritable exact proof re-enters start-workflow for a
+      replacement. The Kernel itself never sleeps or polls to preserve liveness
+      (scripts/kernel/watchdog.mjs; scripts/kernel/start-workflow.mjs;
       modules/kernel/start-workflow.yaml claim.onDeadKernel).
     respawn: >-
       start-workflow re-opens the `[Kernel] <id>` coordinator terminal and
@@ -553,8 +668,9 @@ failureHandling:
       to prevent.
     note: >-
       On Orca the [Kernel] agent plays this role toward its [Op]
-      children — it IS the supervisor of its own dispatches; the program
-      supervisor supervises the kernel in turn.
+      children — it IS the supervisor of its own dispatches. The watchdog is a
+      liveness-only supervisor of the Kernel turn: it may wake/restart the same
+      durable identity, but may never choose or settle workflow work.
 
 # ============================================================================
 # 6 — SUPERVISION CHAIN. Who watches whom.
@@ -563,7 +679,9 @@ supervision:
   chain: >-
     owner chat (trigger only) -> [Kernel] agent (one per project, long-lived)
     -> [Op] agents (one per op, ephemeral). Above the kernel:
-    start-workflow (scripts/kernel/start-workflow.mjs) — a one-shot
+    watchdog (scripts/kernel/watchdog.mjs) — a five-minute liveness loop over
+    canonical status/survey and the attested Kernel terminal; start-workflow
+    (scripts/kernel/start-workflow.mjs) — a one-shot
     claim -> spawn -> attest; re-running it on a dead kernel claims the stale
     binding and spawns the replacement (kernel attempt+1). Beside the
     kernel: nothing — there is no Coordinator and

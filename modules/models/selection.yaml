@@ -263,9 +263,11 @@ allocationFacts:
       bypasses eligibility: a preferred pool that fails a gate is still rejected with its typed reason.
     eligibility: >-
       Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles; pool.models[difficulty]
-      exists (no silent cross-difficulty fallback); capacity.auth ≠ 'dead'; capacity.quota.state ≠
+      exists (no silent cross-difficulty fallback); provider-wide durable capacity.auth ≠ 'dead'; capacity.quota.state ≠
       'dead' (unknown/limited pass); capacity.running < pool.maxParallel; capacity.openIncident ≠ true.
-      Every skipped pool is reported in rejected[] with its typed reason.
+      Every skipped pool is reported in rejected[] with its typed reason. A refreshable stale-token
+      preflight is limited rather than dead and may receive one real launch, but a confirmed auth
+      rejection opens the provider circuit and excludes every pool sharing that credential.
     modelRule: >-
       The model is pinned per pool per difficulty (runtimes.yaml models/effort maps) — selection picks
       the POOL by role+tier+bias+capacity, then resolves the MODEL by difficulty inside that pool.
@@ -287,6 +289,7 @@ fallback:
   advanceOnlyWhen:
     - "failure reason ∈ {unavailable, quota-exhausted, rate-limited, startup-failure, unsupported}"
     - "effectState === 'none' — typed, identity-bound proof nothing happened"
+    - "a rejected provider candidate with effectState none reuses the same operation job/attempt; pool fallback never mints a logical operation attempt"
   neverAdvanceWhen: [permission-denied, user-checkpoint, business-ambiguity, safety-block, partial-or-unknown-effects]
   corollary: >-
     A missing output, unknown effect or guessed terminal identity never permits

@@ -45,6 +45,17 @@ input:
     is cold'), WILL-WRITE list and the resolved ledger path. The skill shows
     the table to the owner; only an explicit ok re-runs without --plan, which
     is the run that persists.
+  revise: >-
+    Optional existing workflow_id. Revision mode never creates another
+    workflow: --plan reads the latest append-only goal revision and emits a
+    starci/goal-revision-preview@1 with the exact rev+1, stable goal identity,
+    op-chain diff, live-kernel state and a machine-actionable approval command.
+    Sharing a project ledger with another workflow is reported as custody, not
+    inferred as a scope conflict; concrete owned-path overlap decides conflict.
+  approve_revision: >-
+    The content-bound token from revisionPreview.approval. It may be supplied
+    only after the owner replies exact `ok` to that preview. A missing, stale or
+    mismatched token refuses the revision before opening a write transaction.
 
 derives:
   goal_markdown: the goal statement rendered from the prompt
@@ -60,11 +71,22 @@ writes:
   - table: inbox
     row: {workflow_id, kind: 'goal', key: workflow_id, payload_json: {prompt, at}, status: 'pending'}
     note: THE QUEUE. pending = unclaimed; start-workflow claims it atomically.
+  revision:
+    - table: goals
+      row: '{same workflow_id, revision: latest+1, same goal_identity, markdown, json: {opChain, revision lineage}, amendment_json: owner approval receipt}'
+      note: Append-only; the prior revision is never edited or relabelled.
+    - table: inbox
+      row: '{same workflow_id, kind: goal-revision, key: workflow_id:revision, payload_json: {baseRevision, revision, goalIdentity, approvalToken, opChain}, status: pending}'
+      note: Wakes the existing workflow contract without adding another kind=goal row or another Kernel singleton.
+    - table: events
+      row: '{kind: goal-revised, payload: {previousRevision, revision, goalIdentity, opChainDiff, kernelResume}}'
 
 guarantees:
   - 'crash before ledger write → nothing happened; re-enter the prompt'
   - 'crash after ledger write → goal sits queued until a kernel claims it'
   - 'no agent memory is part of correctness'
+  - 'revision preview is read-only; only its owner-approved, content-bound token may append rev+1'
+  - 'a live Kernel remains parked on divergence before approval and may only resurvey after the approved goals + inbox + event transaction commits'
 
 rules:
   - 'goal row written BEFORE inbox row — a queue entry without its goal is refused'
@@ -73,8 +95,13 @@ rules:
   - 'when the workflow finishes, the goal is finished (workflows.phase=finished, inbox consumed) — a completed goal leaves the queue forever'
   - '--project and --repo are mutually exclusive; --project binds the ledger to work.ownerRole''s repository, not the host'
   - 'the flow is plan → owner ok → persist: --plan exits 0 having written nothing; only the ok re-run without --plan opens the ledger transaction'
+  - 'revision preserves workflow_id and goal_identity, increments revision by exactly one, records explicit lineage, and never duplicates the workflow or kind=goal inbox row'
+  - 'finished/archived workflows and revisions with open operation jobs are refused; checkpoint or settle the operations first'
+  - 'same project ledger is not a conflict predicate; only explicit owned-path/effect overlap or live custody constraints may block execution'
 
 returns:
   workflow_id: the durable id start-workflow binds to
   op_chain: the derived legs (advisory — kernel re-derives on boot)
   queued: true
+  revision_preview: 'revision mode + --plan only: starci/goal-revision-preview@1 including approval.token and approval.command'
+  revised: 'revision mode after approved token: true, with the same workflow_id and goal_identity at rev+1'

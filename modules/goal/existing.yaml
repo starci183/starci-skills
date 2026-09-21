@@ -154,6 +154,19 @@ rules:
       silent edit is NORM_UNRECORDED, a moved dep is DEP_STALE. Either way the
       done variable is not done until re-proven.
 
+  - id: shared-ledger-is-not-scope-conflict
+    rule: >-
+      Two workflows registered in the same project runtime.sqlite are not in
+      conflict merely because they share ledger custody. Classify each goal's
+      semantic scope first (for example public landing delivery versus
+      .starciwork/.starcistacks canonicalization), then compare concrete owned
+      path prefixes, effects and live custody.
+    mechanism: >-
+      Workflow ids and goal identities remain separate. The revision preview
+      reports co-resident live workflows with conflictInferred:false; an actual
+      overlap is raised only from explicit owned_paths/effect ceilings or a
+      quiescence requirement, never from the common ledger filename.
+
 # ----------------------------------------------------------------------------
 # WHAT THE SURVEY MUST NEVER DO
 # ----------------------------------------------------------------------------

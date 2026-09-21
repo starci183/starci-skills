@@ -20,7 +20,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -32,12 +32,16 @@ const projectName = arg('project');
 const repoArg = arg('repo');
 const text = arg('text');
 const title = arg('title');
+const reviseWorkflowId = arg('revise');
+const revisionReason = arg('reason', 'owner-approved plan-divergence correction');
+const approveRevision = arg('approve-revision');
 const routingBias = (() => { try { return JSON.parse(arg('routing-bias', 'null')); } catch { return null; } })();
 const asJson = process.argv.includes('--json');
 const planOnly = process.argv.includes('--plan');
-const usage = 'usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title] [--json] [--plan]';
+const usage = 'usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]]';
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
+if (approveRevision && !reviseWorkflowId) { console.error('--approve-revision requires --revise <workflow-id>'); process.exit(2); }
 
 // --project: resolve the workspace binding. work.ownerRole picks the ledger
 // owner out of the declared repositories; every declared repository is a
@@ -141,8 +145,126 @@ const workflowId = `wf-${slug(title || text)}-${Date.now().toString(36)}`;
 const goalIdentity = crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
 const chain = deriveOpChain(text);
 const now = Date.now();
-const willWrite = ['workflows row (phase=queued)', 'goals row (revision 0)', 'inbox row (kind=goal, status=pending)', 'goal-defined event'];
 const legLabel = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;
+const chainOps = c => c?.legs?.map(legLabel) ?? [];
+const contentDigest = crypto.createHash('sha256').update(text).digest('hex');
+
+function readRevisionBase(id) {
+  const file = ledgerFileFor(repo);
+  if (!fs.existsSync(file)) throw new Error(`cannot revise ${id}: ledger does not exist at ${file}`);
+  const ledger = inspectLedger({ file });
+  try {
+    const workflow = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(id);
+    if (!workflow) throw new Error(`cannot revise ${id}: workflow not found in ${file}`);
+    if (workflow.phase === 'finished' || workflow.archived_at !== null) throw new Error(`cannot revise ${id}: finished or archived workflows are immutable`);
+    const goals = ledger.db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision').all(id);
+    if (!goals.length) throw new Error(`cannot revise ${id}: workflow has no persisted goal`);
+    const identities = new Set(goals.map(g => g.goal_identity));
+    if (identities.size !== 1) throw new Error(`cannot revise ${id}: persisted goal identity lineage is inconsistent`);
+    const goal = goals.at(-1);
+    if (workflow.goal_identity && workflow.goal_identity !== goal.goal_identity) {
+      throw new Error(`cannot revise ${id}: workflow identity does not match its latest goal`);
+    }
+    const liveKernel = !!ledger.db.prepare("SELECT 1 FROM signals WHERE scope='kernel' AND key=? AND (expires_at IS NULL OR expires_at>?) LIMIT 1").get(id, Date.now());
+    const settled = SETTLED_JOB_STATUSES.map(() => '?').join(',');
+    const openOperationJobs = ledger.db.prepare(`SELECT job_id,op_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${settled}) ORDER BY job_id`)
+      .all(id, ...SETTLED_JOB_STATUSES);
+    const otherLiveWorkflows = ledger.db.prepare("SELECT workflow_id,title,phase FROM workflows WHERE workflow_id<>? AND phase NOT IN ('finished','archived') ORDER BY workflow_id").all(id);
+    let json = {};
+    try { json = JSON.parse(goal.json || '{}'); } catch { /* invalid JSON yields an empty previous chain */ }
+    return { workflow, goal, json, liveKernel, openOperationJobs, otherLiveWorkflows, file };
+  } finally { ledger.close(); }
+}
+
+const revisionBase = (() => {
+  if (!reviseWorkflowId) return null;
+  try { return readRevisionBase(reviseWorkflowId); }
+  catch (error) { console.error(error.message); process.exit(2); }
+})();
+
+function revisionDiff(base, proposedChain) {
+  const before = chainOps(base.json?.opChain);
+  const after = chainOps(proposedChain);
+  const sharedBefore = before.filter(op => after.includes(op));
+  const sharedAfter = after.filter(op => before.includes(op));
+  return {
+    before,
+    after,
+    added: after.filter(op => !before.includes(op)),
+    removed: before.filter(op => !after.includes(op)),
+    reordered: JSON.stringify(sharedBefore) !== JSON.stringify(sharedAfter),
+    markdownChanged: base.goal.markdown !== text,
+    changed: JSON.stringify(before) !== JSON.stringify(after) || base.goal.markdown !== text,
+  };
+}
+
+function revisionPreview(base) {
+  const nextRevision = base.goal.revision + 1;
+  const diff = revisionDiff(base, chain);
+  const approvalPayload = {
+    workflowId: reviseWorkflowId,
+    baseRevision: base.goal.revision,
+    nextRevision,
+    goalIdentity: base.goal.goal_identity,
+    contentDigest,
+    opChain: diff.after,
+    reason: revisionReason,
+    routingBias,
+  };
+  const approvalToken = `rev-${crypto.createHash('sha256').update(JSON.stringify(approvalPayload)).digest('hex')}`;
+  const selectorArgs = projectName ? ['--project', projectName] : ['--repo', repo];
+  const approvalArgs = [
+    fileURLToPath(import.meta.url), ...selectorArgs, '--revise', reviseWorkflowId,
+    '--text', text, '--reason', revisionReason, '--approve-revision', approvalToken, '--json',
+  ];
+  if (title) approvalArgs.push('--title', title);
+  if (routingBias !== null) approvalArgs.push('--routing-bias', JSON.stringify(routingBias));
+  return {
+    schema: 'starci/goal-revision-preview@1',
+    workflowId: reviseWorkflowId,
+    baseRevision: base.goal.revision,
+    nextRevision,
+    goalIdentity: base.goal.goal_identity,
+    preservesGoalIdentity: true,
+    proposedContentDigest: contentDigest,
+    reason: revisionReason,
+    scope: {
+      kind: chain?.scopeKind ?? null,
+      sameLedgerIsNotConflict: true,
+      otherLiveWorkflows: base.otherLiveWorkflows.map(w => ({ ...w, conflictInferred: false })),
+      note: 'Shared ledger custody is not path-overlap evidence; concrete owned paths and live effects decide conflicts.',
+    },
+    opChainDiff: diff,
+    planDivergence: diff.changed ? {
+      action: 'approve-goal-revision',
+      added: diff.added,
+      removed: diff.removed,
+      reordered: diff.reordered,
+    } : null,
+    kernel: {
+      live: base.liveKernel,
+      resumeAllowed: false,
+      resumeCondition: `goals revision ${nextRevision} and its owner-approval receipt must be committed atomically`,
+    },
+    openOperationJobs: base.openOperationJobs,
+    checkpoint: {
+      queuedSupersedable: base.openOperationJobs.filter(job => job.status === 'queued').map(job => job.job_id),
+      mustSettleFirst: base.openOperationJobs.filter(job => job.status !== 'queued').map(job => ({ jobId: job.job_id, status: job.status })),
+      rule: 'owner-approved revision atomically cancels only queued no-effect jobs; leased/running/effect_unknown jobs must settle or reconcile first',
+    },
+    approval: {
+      required: true,
+      ownerReply: 'ok',
+      token: approvalToken,
+      command: { executable: process.execPath, args: approvalArgs },
+    },
+  };
+}
+
+const preview = revisionBase ? revisionPreview(revisionBase) : null;
+const willWrite = revisionBase
+  ? [`goals row (revision ${preview.nextRevision}, same workflow + identity)`, 'queued no-effect operation jobs superseded atomically', 'inbox row (kind=goal-revision, status=pending)', 'goal-revised event']
+  : ['workflows row (phase=queued)', 'goals row (revision 0)', 'inbox row (kind=goal, status=pending)', 'goal-defined event'];
 
 // --plan: show exactly what would be persisted — a STATE scan of every repo in
 // scope, the goal, the op chain with cold leg estimates, the will-write list
@@ -157,9 +279,11 @@ if (planOnly) {
   const totalMinutes = legs.length ? legs.reduce((n, l) => n + l.estimateMinutes, 0) : null;
   const out = {
     plan: true,
+    mode: revisionBase ? 'revise' : 'define',
+    workflowId: revisionBase ? reviseWorkflowId : undefined,
     title: title || text.slice(0, 80),
     prompt: text,
-    goalIdentity,
+    goalIdentity: revisionBase ? revisionBase.goal.goal_identity : goalIdentity,
     project: project ? { name: project.project, ownerRole: project.ownerRole, ownerRepo: project.ownerRepo, repos: project.repos, binding: project.file } : undefined,
     opChain: chain?.legs?.map(l => l.op) ?? null,
     legs,
@@ -170,9 +294,10 @@ if (planOnly) {
     config: ownerConfigSummary(),
     kernelRoute: 'precedence: --agent flag > config.yaml kernel pin > route-model',
     ledger: ledgerFileFor(repo),
+    revisionPreview: preview ?? undefined,
   };
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
-  const lines = [`PLAN — goal "${out.title}"`, `  identity: ${goalIdentity}`];
+  const lines = [`PLAN — ${revisionBase ? `revise ${reviseWorkflowId} to rev ${preview.nextRevision}` : `goal "${out.title}"`}`, `  identity: ${out.goalIdentity}${revisionBase ? ' (preserved)' : ''}`];
   lines.push(project
     ? `  scope: project '${project.project}' — owner role '${project.ownerRole}' → ${project.ownerRepo}`
     : `  scope: repo ${repo}`);
@@ -196,16 +321,178 @@ if (planOnly) {
       + (cfg.error ? ` (${cfg.error})` : '')
     : 'CONFIG: no config.yaml — kernel route falls to --agent flag or route-model');
   lines.push('WILL WRITE:', ...willWrite.map(w => `  - ${w}`));
+  if (revisionBase) {
+    lines.push(`REVISION DIFF: remove [${preview.opChainDiff.removed.join(', ') || '-'}] add [${preview.opChainDiff.added.join(', ') || '-'}] reordered=${preview.opChainDiff.reordered}`);
+    lines.push(`APPROVAL REQUIRED: exact owner reply ok; token ${preview.approval.token}`);
+    lines.push(`KERNEL: ${preview.kernel.live ? 'live' : 'not live'}; resume is forbidden until the approved rev ${preview.nextRevision} transaction lands`);
+  }
   lines.push(`ledger: ${out.ledger}`, 're-run without --plan to persist');
   console.log(lines.join('\n'));
   process.exit(0);
+}
+
+if (revisionBase) {
+  if (!approveRevision) {
+    console.error('revision approval required: run --plan, present revisionPreview, then pass --approve-revision <token> only after the owner\'s exact ok');
+    process.exit(2);
+  }
+  if (revisionBase.json?.revision?.approvalToken === approveRevision) {
+    const out = {
+      workflowId: reviseWorkflowId,
+      goalRevision: revisionBase.goal.revision,
+      goalIdentity: revisionBase.goal.goal_identity,
+      opChain: chainOps(revisionBase.json?.opChain),
+      revised: true,
+      alreadyApplied: true,
+      queued: false,
+      kernel: { live: revisionBase.liveKernel, resumeAllowed: true, action: 'resurvey pending goal-revision inbox; do not spawn a second kernel' },
+      ledger: revisionBase.file,
+    };
+    console.log(asJson ? JSON.stringify(out, null, 2) : `revision ${revisionBase.goal.revision} was already applied to ${reviseWorkflowId}`);
+    process.exit(0);
+  }
+  if (approveRevision !== preview.approval.token) {
+    console.error(`revision approval token mismatch for ${reviseWorkflowId}; regenerate --plan and obtain owner approval for the current preview`);
+    process.exit(2);
+  }
+  if (!chain || !Array.isArray(chain.legs) || chain.status !== 'ok') {
+    console.error(`cannot revise ${reviseWorkflowId}: proposed op chain is not executable (${chain?.status ?? 'underivable'})`);
+    process.exit(2);
+  }
+  const unsafePreviewJobs = revisionBase.openOperationJobs.filter(job => job.status !== 'queued');
+  if (unsafePreviewJobs.length) {
+    console.error(`cannot revise ${reviseWorkflowId}: ${unsafePreviewJobs.length} operation job(s) have possible effects (${unsafePreviewJobs.map(job => `${job.job_id}:${job.status}`).join(', ')}); settle or reconcile them before revision checkpoint`);
+    process.exit(2);
+  }
+
+  const ledger = openLedger({ file: revisionBase.file });
+  let alreadyApplied = false;
+  let supersededJobs = [];
+  try {
+    ledger.transaction(() => {
+      const current = ledger.db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(reviseWorkflowId);
+      let currentJson = {};
+      try { currentJson = JSON.parse(current?.json || '{}'); } catch { /* handled by revision check */ }
+      if (current?.revision === preview.nextRevision && currentJson?.revision?.approvalToken === approveRevision) {
+        alreadyApplied = true;
+        return;
+      }
+      if (!current || current.revision !== preview.baseRevision || current.goal_identity !== preview.goalIdentity) {
+        throw new Error(`stale revision preview for ${reviseWorkflowId}: expected rev ${preview.baseRevision} and identity ${preview.goalIdentity}`);
+      }
+      const workflow = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(reviseWorkflowId);
+      if (!workflow || workflow.phase === 'finished' || workflow.archived_at !== null) throw new Error(`workflow ${reviseWorkflowId} is no longer revisable`);
+      if (workflow.goal_identity && workflow.goal_identity !== preview.goalIdentity) throw new Error(`workflow ${reviseWorkflowId} identity changed after preview`);
+      const settledMarks = SETTLED_JOB_STATUSES.map(() => '?').join(',');
+      const openNow = ledger.db.prepare(`SELECT job_id,op_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${settledMarks}) ORDER BY job_id`)
+        .all(reviseWorkflowId, ...SETTLED_JOB_STATUSES);
+      const unsafeNow = openNow.filter(job => job.status !== 'queued');
+      if (unsafeNow.length) {
+        throw new Error(`cannot checkpoint revision ${preview.nextRevision}: operation effects are still possible (${unsafeNow.map(job => `${job.job_id}:${job.status}`).join(', ')})`);
+      }
+      const leasedQueued = ledger.db.prepare(`SELECT l.job_id,l.resource_key FROM leases l JOIN jobs j ON j.job_id=l.job_id WHERE j.workflow_id=? AND j.kind<>'kernel' AND j.status='queued' ORDER BY l.job_id,l.resource_key`).all(reviseWorkflowId);
+      if (leasedQueued.length) {
+        throw new Error(`cannot checkpoint revision ${preview.nextRevision}: queued job lease drift (${leasedQueued.map(row => `${row.job_id}:${row.resource_key}`).join(', ')})`);
+      }
+      const amendment = {
+        schema: 'starci/goal-revision-approval@1',
+        source: 'owner-approved-goal-entry',
+        baseRevision: preview.baseRevision,
+        nextRevision: preview.nextRevision,
+        baseGoalIdentity: preview.goalIdentity,
+        approvalToken: approveRevision,
+        reason: revisionReason,
+        changed: preview.opChainDiff,
+        ownerApproval: {
+          quote: 'ok',
+          threadId: null,
+          messageId: null,
+          messageIdAvailability: 'unavailable-to-cli',
+          assurance: 'conversation-context-not-authenticated',
+        },
+        approvedAt: now,
+      };
+      const nextJson = {
+        ...revisionBase.json,
+        derivedFrom: 'owner-approved-revision',
+        opChain: chain,
+        derivedPlan: null,
+        routing_bias: routingBias ?? revisionBase.json?.routing_bias ?? null,
+        revision: amendment,
+      };
+      supersededJobs = openNow.map(job => job.job_id);
+      for (const job of openNow) {
+        const result = {
+          reason: 'goal-revision-superseded', effectState: 'none',
+          baseRevision: preview.baseRevision, nextRevision: preview.nextRevision,
+          approvalToken: approveRevision, at: now,
+        };
+        ledger.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,lease_token=NULL,worker_id=NULL,deadline=NULL,updated_at=? WHERE job_id=? AND status='queued'")
+          .run(JSON.stringify(result), now, job.job_id);
+        ledger.appendEvent({
+          workflowId: reviseWorkflowId, entityType: 'job', entityId: job.job_id,
+          generation: workflow.generation ?? 0, kind: 'job-superseded-by-goal-revision',
+          payload: { opId: job.op_id, ...result }, createdAt: now,
+        });
+      }
+      ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,amendment_json,created_at) VALUES(?,?,?,?,?,?,?)')
+        .run(reviseWorkflowId, preview.nextRevision, preview.goalIdentity, text, JSON.stringify(nextJson), JSON.stringify(amendment), now);
+      ledger.db.prepare('UPDATE workflows SET goal_identity=COALESCE(goal_identity,?),updated_at=? WHERE workflow_id=?')
+        .run(preview.goalIdentity, now, reviseWorkflowId);
+      ledger.db.prepare('INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)')
+        .run(reviseWorkflowId, 'goal-revision', `${reviseWorkflowId}:${preview.nextRevision}`, JSON.stringify({
+          revision: preview.nextRevision,
+          baseRevision: preview.baseRevision,
+          goalIdentity: preview.goalIdentity,
+          approvalToken: approveRevision,
+          reason: revisionReason,
+          opChain: preview.opChainDiff.after,
+          supersededJobs,
+          at: now,
+        }), 'pending', now);
+      ledger.appendEvent({
+        workflowId: reviseWorkflowId,
+        entityType: 'goal',
+        entityId: reviseWorkflowId,
+        generation: workflow.generation ?? 0,
+        kind: 'goal-revised',
+        payload: {
+          revision: preview.nextRevision,
+          previousRevision: preview.baseRevision,
+          goalIdentity: preview.goalIdentity,
+          approvalToken: approveRevision,
+          opChainDiff: preview.opChainDiff,
+          supersededJobs,
+          kernelResume: 'resurvey-pending-revision-inbox',
+        },
+        createdAt: now,
+      });
+    });
+    const out = {
+      workflowId: reviseWorkflowId,
+      goalRevision: preview.nextRevision,
+      goalIdentity: preview.goalIdentity,
+      opChain: preview.opChainDiff.after,
+      revised: true,
+      alreadyApplied,
+      supersededJobs,
+      queued: false,
+      kernel: { live: revisionBase.liveKernel, resumeAllowed: true, action: 'resurvey pending goal-revision inbox; do not spawn a second kernel' },
+      ledger: revisionBase.file,
+    };
+    console.log(asJson ? JSON.stringify(out, null, 2) : `revised ${reviseWorkflowId} to goal rev ${preview.nextRevision}; ${revisionBase.liveKernel ? 'live kernel may now resurvey' : 'revision awaits the existing workflow kernel'}`);
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 2;
+  } finally { ledger.close(); }
+  process.exit(process.exitCode ?? 0);
 }
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
 try {
   ledger.transaction(() => {
     ledger.ensureWorkflow({ workflowId, title: title || text.slice(0, 80), ledgerMode: 'durable', sourceRoots: [repo] });
-    ledger.db.prepare('UPDATE workflows SET phase=? WHERE workflow_id=?').run('queued', workflowId);
+    ledger.db.prepare('UPDATE workflows SET phase=?,goal_identity=? WHERE workflow_id=?').run('queued', goalIdentity, workflowId);
     ledger.db.prepare(
       'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
     ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain, routing_bias: routingBias }), now);

@@ -59,6 +59,7 @@ const skipFor=names=>{
 const WORKFLOW='wf-op-ipc';
 const OP='code.refactor';
 const OWNED=['docs/','src/op-ipc.txt'];
+const checkEnvelope=(...checks)=>({checks});
 // api.mjs's normalizeOwnedPath, mirrored: lease resource_keys are
 // 'path:' + the owned path with separators canonicalised and trailing
 // slashes stripped ('docs/' fences 'path:docs').
@@ -208,6 +209,31 @@ test('api report upserts the dispatch report; api op-contract prints the stored 
   assert.equal(oc.stdout.trim(),contract.markdown.trim(),'op-contract must print the stored contract markdown verbatim');
 });
 
+test('api report immediately wakes an idle Kernel after committing the durable report',{skip:skipFor(['dispatchIpc','report'])},t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-report-wake');
+  dispatchRunning(fx,jobId);
+
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    const now=Date.now();
+    ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,?,?,?,NULL)")
+      .run(WORKFLOW,null,'kernel-token',JSON.stringify({terminal:'kernel-terminal-1'}),now);
+  }finally{ledger.close();}
+  // Dispatch prompt delivery increments the fake transport's counter. Reset it
+  // so terminal-read projects the provider input prompt (turn-idle), which is
+  // the exact state report filing is allowed to wake.
+  fs.writeFileSync(fx.env.STARCI_FAKE_ORCA_STATE,JSON.stringify({
+    sends:0,terminalCommand:'codex --model gpt-5.6-sol',terminalModel:'gpt-5.6-sol',
+  }));
+
+  fileReport(fx,jobId,{outcome:'done',sentinel:'WAKE-KERNEL'});
+  const state=JSON.parse(fs.readFileSync(fx.env.STARCI_FAKE_ORCA_STATE,'utf8'));
+  assert.equal(state.sends,1,'report-filed must send one event wake to the idle Kernel terminal');
+  assert.ok(eventKinds(fx).includes('kernel-transition-woken'),'the wake receipt must be durable for audit');
+  assert.equal(reportRows(fx).length,1,'the report remains authoritative even though wake is transport-only');
+});
+
 /* ------------------------------------- consume-report + checks durability */
 
 test('api consume-report marks the dispatch report consumed; api check upserts the checks row',{skip:skipFor(['dispatchIpc','report','check','consumeReport'])},t=>{
@@ -220,21 +246,49 @@ test('api consume-report marks the dispatch report consumed; api check upserts t
   assert.equal(c.status,0,`api consume-report failed: ${c.stderr||c.stdout}`);
   assert.ok(reportRows(fx)[0]?.consumed_at,'consume-report must set reports.consumed_at');
 
-  const k1=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({lint:'pass',tests:'pass'}),'--json');
+  const first=checkEnvelope(
+    {name:'lint',command:'npm run lint',exitCode:0,evidence:'lint passed'},
+    {name:'tests',command:'npm test',exitCode:0,evidence:'tests passed'},
+  );
+  const k1=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(first),'--json');
   assert.equal(k1.status,0,`api check failed: ${k1.stderr||k1.stdout}`);
   let rows=checkRows(fx);
   assert.equal(rows.length,1,'api check writes one checks row per attempt');
   assert.equal(rows[0].op_id,OP);
   assert.equal(rows[0].attempt,job.attempt,'checks key to the job attempt');
-  assert.deepEqual(JSON.parse(rows[0].checks_json),{lint:'pass',tests:'pass'});
+  assert.deepEqual(JSON.parse(rows[0].checks_json),first);
 
   // Same PK (workflow_id,op_id,attempt): a re-run check upserts.
-  const k2=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({lint:'pass',tests:'fail'}),'--json');
+  const rerun=checkEnvelope(
+    {name:'lint',command:'npm run lint',exitCode:0,evidence:'lint passed'},
+    {name:'tests',command:'npm test',exitCode:1,evidence:'tests failed'},
+  );
+  const k2=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(rerun),'--json');
   assert.equal(k2.status,0,`api check (re-run) failed: ${k2.stderr||k2.stdout}`);
   rows=checkRows(fx);
   assert.equal(rows.length,1,'a second check for the same attempt must upsert, not append');
-  assert.equal(JSON.parse(rows[0].checks_json).tests,'fail');
+  assert.equal(JSON.parse(rows[0].checks_json).checks[1].exitCode,1);
   assert.ok(eventKinds(fx).includes('checks-recorded'),'api check must emit the checks-recorded event');
+});
+
+test('api check rejects scalar and double-encoded payloads before recording evidence',{skip:skipFor(['check'])},t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-check-shape');
+  const valid=checkEnvelope({name:'validator',command:'starci validate',exitCode:0,evidence:'green'});
+
+  for(const malformed of [JSON.stringify('pass'),JSON.stringify(JSON.stringify(valid))]){
+    const refused=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',malformed,'--json');
+    assert.notEqual(refused.status,0,'scalar and double-encoded JSON must be refused');
+    assert.match(`${refused.stderr}${refused.stdout}`,/checks-invalid/);
+    assert.equal(checkRows(fx).length,0,'a refused check payload must not mutate the checks row');
+  }
+
+  const accepted=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(valid),'--json');
+  assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
+  const body=JSON.parse(accepted.stdout);
+  assert.equal(body.checks,1);
+  assert.deepEqual(body.checkEvidence,{observed:1,passed:1,failed:0,green:true});
+  assert.deepEqual(JSON.parse(checkRows(fx)[0].checks_json),valid);
 });
 
 /* ------------------------------------------------------ settle integrates */
@@ -248,6 +302,8 @@ test('settle consumes the dispatch report and releases every owned-path lease',{
 
   const verdictReport=path.join(fx.repo,'verdict-report.md');
   fs.writeFileSync(verdictReport,'# verdict\npass\n');
+  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checkEnvelope({name:'validator',exitCode:0})),'--json');
+  assert.equal(checked.status,0,`api check failed: ${checked.stderr||checked.stdout}`);
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--report',verdictReport,'--json');
   assert.equal(s.status,0,`settle failed: ${s.stderr||s.stdout}`);
   assert.equal(jobRow(fx,jobId)?.status,'succeeded');
@@ -264,8 +320,10 @@ test('dispatch-rejected regression: a dead provider claims no contract, no lease
   assert.notEqual(r.status,0,'a dead provider screen must reject the dispatch');
 
   const job=jobRow(fx,jobId);
-  assert.equal(job?.status,'failed','a rejected dispatch never stands running');
+  assert.equal(job?.status,'queued','a proven no-effect rejection returns the same durable attempt to the queue');
+  assert.equal(job?.attempt,1,'a no-effect infrastructure rejection reuses the logical operation attempt');
   assert.match(job?.result_json??'',/dispatch-rejected/);
+  assert.equal(JSON.parse(job.result_json).attemptConsumed,false,'infrastructure rejection does not consume business retry budget');
   assert.equal(contractRows(fx).length,0,'a rejected dispatch must not claim a contract');
   assert.equal(leaseRows(fx,jobId).length,0,'a rejected dispatch holds no leases');
   assert.notEqual(phaseOf(fx),'running','a rejected dispatch must not claim phase=running');
@@ -317,7 +375,7 @@ test('api report enforces the starci/op-report@1 envelope',t=>{
 
 /* ------------------------------------------------ kernel reads the answer */
 
-test('api status projects filed reports; settle works row-first without --report and enforces verdict↔outcome',{skip:skipFor(['dispatchIpc','report','consumeWrite'])},t=>{
+test('api status projects filed reports; settle works row-first without --report and enforces verdict↔outcome',{skip:skipFor(['dispatchIpc','report','check','consumeWrite'])},t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   dispatchRunning(fx,jobId);
@@ -334,6 +392,9 @@ test('api status projects filed reports; settle works row-first without --report
   assert.notEqual(bad.status,0,'verdict blocked cannot settle a done report');
   assert.match(`${bad.stderr}${bad.stdout}`,/verdict-outcome-mismatch/);
 
+  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checkEnvelope({name:'validator',exitCode:0})),'--json');
+  assert.equal(checked.status,0,checked.stderr||checked.stdout);
+
   // Settle consumes the row — no --report needed; the row is the verdict.
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(s.status,0,`row-first settle failed: ${s.stderr||s.stdout}`);
@@ -342,4 +403,24 @@ test('api status projects filed reports; settle works row-first without --report
   assert.equal(settled.reportOutcome,'done');
   assert.equal(jobRow(fx,jobId)?.status,'succeeded');
   assert.ok(reportRows(fx)[0]?.consumed_at);
+});
+
+test('a red Kernel check overrules an Op done claim, settles fail, and releases the worker',{skip:skipFor(['dispatchIpc','report','check','consumeWrite'])},t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-red-done');
+  dispatchRunning(fx,jobId);
+  fileReport(fx,jobId,{outcome:'done',name:'red-done.json'});
+  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checkEnvelope(
+    {name:'required-validator',command:'starci validate',exitCode:1,evidence:'failed'},
+    {name:'bounded-assertion',exitCode:0,evidence:'passed'},
+  )),'--json');
+  assert.equal(checked.status,0,checked.stderr||checked.stdout);
+
+  const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','fail','--json');
+  assert.equal(settled.status,0,settled.stderr||settled.stdout);
+  const body=JSON.parse(settled.stdout);
+  assert.equal(body.claimOverruled,true,'Kernel evidence must outrank the worker claim');
+  assert.ok(body.checkEvidence.failed>0);
+  assert.equal(jobRow(fx,jobId)?.status,'failed');
+  assert.equal(leaseRows(fx,jobId).length,0,'failed settlement releases the operation lease');
 });

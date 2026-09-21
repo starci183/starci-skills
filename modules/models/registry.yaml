@@ -170,8 +170,8 @@ targets:
       reasoning: devin-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false
-      reasoningCommand: devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false
+      command: devin --model swe-2-max --permission-mode dangerous --respect-workspace-trust false
+      reasoningCommand: devin --model swe-2-max --permission-mode dangerous --respect-workspace-trust false
       dispatch: return-preamble-and-send
       adapter: devin
       nestedAgents: forbidden

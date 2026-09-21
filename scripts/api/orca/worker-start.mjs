@@ -52,6 +52,8 @@ export function workerStart({ task, worktree, agent, model, effort, name, repo, 
     state,
     launch: result?.launch?.effective ?? null,
     result,
+    errorCode: errCode ?? null,
+    errorReceipt: j?.error ?? null,
     error: r.error ?? r.stderr,
   };
 }
