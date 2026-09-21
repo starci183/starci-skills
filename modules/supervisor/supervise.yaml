@@ -1,0 +1,79 @@
+schema: starci/supervisor@1
+id: supervisor
+title: Supervisor — chat-facing observe/analyze/patch/restart loop
+
+purpose: |
+  The supervisor is an owner-proxy monitoring loop run BY A CHAT (Claude Code, Codex, Devin —
+  whichever host the owner is talking to), not a daemon and not a second orchestrator. When the
+  owner says "theo dõi" / "supervise" / "monitor" the workflows, the chat runs this loop for the
+  session's lifetime: if the chat stops, the loop stops.
+
+  Its job is the experiment ratchet: observe what the kernels and ops actually produce, diagnose
+  whether a defect is a runtime-contract gap or an op-level mistake, patch `.claude` when the
+  contract is the gap, restart affected kernels so they reload the new context, then sleep and
+  re-observe. Owner feedback becomes runtime law; kernels reload it; quality converges.
+
+lanes:
+  kernel:
+    does: orchestrates one approved goal end-to-end via scripts/kernel/api.mjs only
+    never: sees or fixes its own systemic contract flaws — it works inside the contract
+  watchdog:
+    does: scripts/kernel/watchdog.mjs — liveness only; wakes/replaces a dead kernel terminal
+    never: chooses work, plans, or patches the runtime
+  supervisor:
+    does: observes the durable ledger, analyzes digests, patches .claude contracts/knowledge,
+      restarts kernels to reload context, surfaces owner gates to the owner verbatim
+    never: dispatches ops, writes the ledger, answers owner asks on the owner's behalf, edits
+      product code, or finishes/retries an op itself
+
+loop:
+  command: node <skillRoot>/modules/supervisor/poll.mjs --repo <ledger-owner> [--workflow <id>]... [--interval-ms 180000]
+  cadence: one digest per interval; 180000 ms default — owner may override
+  perCycle:
+    - step: observe
+      do: read the printed digest — new op reports, open asks + serving URLs, fresh direction
+        artifacts, kernel liveness; open new direction images and check them against the current
+        contracts (concepts.yaml rules, full-page chrome, concrete data, ui.flow coverage)
+    - step: classify
+      do: |
+        contract-gap    → the contract allowed or caused the defect → patch .claude
+        op-defect       → contract is right, the op just failed → let the kernel retry/escalate
+        owner-gate      → ask/ask-review pending → surface to the owner verbatim, never answer it
+        kernel-dead     → terminal unreachable → start-workflow --goal replaces it (attempt+1)
+        noise           → nothing actionable → report briefly and sleep
+    - step: patch
+      do: when a contract gap is confirmed, edit the owning .claude contract/knowledge file,
+        commit, push — the change is law only after it lands in the tree
+    - step: rearm
+      do: restart ONLY the workflows whose in-flight leg is governed by the changed contract —
+        terminal-close the stale kernel, then `node scripts/kernel/start-workflow.mjs --repo
+        <repo> --goal <id> --agent <recorded-agent>`; the ledger carries all durable state so the
+        replacement resumes without loss
+    - step: report
+      do: summarize to the owner in one block — what changed, what was patched, what restarted,
+        what now waits on the owner (ask URLs rendered with inline artifacts)
+    - step: sleep
+      do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
+
+guardrails:
+  - id: restart-cooldown
+    rule: a kernel is restarted only when a contract it must obey actually changed AND its current
+      leg is governed by that contract, or its terminal is proven dead — never on a timer, never
+      twice for the same patch, and a restart lands at most once per patch batch per workflow
+  - id: no-op-authority
+    rule: the supervisor never runs op work, dispatches jobs, settles reports, or writes
+      .starciwork product records — analysis may conclude "the op must redo this" but the redo is
+      issued as an owner-worded disposition to the kernel, which re-plans through api.mjs
+  - id: owner-word
+    rule: pending asks are surfaced verbatim with their live form URLs; the supervisor relays,
+      never answers — accept/reject stays the owner's word
+  - id: patch-then-restart
+    rule: restarting a kernel without a landed contract change is a wasted turn — kernels resume
+      from the same durable state and will reproduce the same defect
+
+failureModes:
+  churn: restarting kernels every cycle prevents convergence — treat restarts as expensive
+  shadow-orchestrator: the moment the supervisor plans/dispatches it has become a second control
+    plane — stop and return the observation to the owner instead
+  stale-context: a kernel keeps running under a contract the supervisor already patched — the
+    restart step exists precisely for this; skipping it makes the patch a dead letter
