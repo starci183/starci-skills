@@ -166,10 +166,21 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
     lines.push(`${short(w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
   }
   const tree = orcaTree(db);
+  // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
+  // workflow; workflows that already finished are summarized, not listed.
+  const outside = new Map();
   for (const f of tree.findings) {
     if (f.workflowId && !mine(wanted, f.workflowId)) continue;
+    if (f.code === 'TASK_OUTSIDE_RUN') { outside.set(f.workflowId, (outside.get(f.workflowId) ?? 0) + 1); continue; }
     lines.push(`  ORCA-TREE ${formatFinding(f)}`);
   }
+  const live = new Set(wfs.map((w) => w.workflow_id));
+  let finishedLeaks = 0;
+  for (const [wf, n] of outside) {
+    if (live.has(wf)) lines.push(`  ORCA-TREE TASK_OUTSIDE_RUN ${short(wf)}: ${n} open Task(s) in a superseded run`);
+    else finishedLeaks += n;
+  }
+  if (finishedLeaks) lines.push(`  ORCA-TREE ${finishedLeaks} open Task(s) left by finished workflows`);
   if (!tree.listed && wfs.length) lines.push(`  orca tree unchecked (${tree.reason})`);
   const reps = reportsSince(db, state.first ? state.lastReportId - BASELINE_REPORTS : state.lastReportId, wanted);
   for (const r of reps) lines.push(`  report ${short(r.workflow_id)} ${r.op_id} a${r.attempt} -> ${r.outcome} @${ts(r.created_at)}`);
