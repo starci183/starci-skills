@@ -6,7 +6,7 @@ import {parseYaml} from './yaml.mjs';
 
 export const configRoot=skillRoot;
 export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
-export const DEFAULT_MODEL_POOLS={'fable-astra':['claude-fable','codex-agent'],'opus-sol':['claude-agent','codex-agent']};
+export const DEFAULT_MODEL_POOLS={'sol-opus':['codex-agent','claude-agent']};
 export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
 export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
@@ -49,7 +49,7 @@ export function validateConfig(config){
     if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps','perOpMs','dailyTokens'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))
       throw Error('Invalid config.yaml: budgets must be {maxOps?, perOpMs?, dailyTokens?} with positive-integer-or-null values.');
   }
-  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==2||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==3||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
+  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==Object.keys(DEFAULT_MODEL_POOLS).length||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==3||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
   for(const [pool,members] of Object.entries(models.pools))if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);
   for(const [role,required] of Object.entries(NON_OPERATION_ROLES)){const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw Error(`Invalid config.yaml: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);}
   return config;

@@ -25,8 +25,8 @@ Required keys:
 - `model` — `null` (inherit host) or non-empty host model name
 - `effort` — one of `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`
 - `models.selection` — `quota-aware`; selection happens before a call
-- `models.pools` — the two closed cross-provider pools, `fable-astra` and `opus-sol`; every member is a
-  known runtime with the role its consumers require
+- `models.pools` — the one closed cross-provider pool, `sol-opus` (`codex-agent` and `claude-agent`, in route
+  order); every member is a known runtime with the role its consumers require
 - `models.nonOperation` — the closed mapping from the three non-operation roles to one declared pool
 
 Optional keys:
@@ -41,21 +41,21 @@ Optional keys:
 
 | non-operation role | required runtime role | default pool |
 | --- | --- | --- |
-| `planner` | `plan` | `fable-astra` |
-| `kernelManager` | `decide` | `opus-sol` |
-| `validator` | `verify` | `fable-astra` |
+| `planner` | `plan` | `sol-opus` |
+| `kernelManager` | `decide` | `sol-opus` |
+| `validator` | `verify` | `sol-opus` |
 
-The roles and the default pool pairs are `engine/config.mjs`
-(`NON_OPERATION_ROLES`, `DEFAULT_MODEL_POOLS`), which also refuses a pool that
-is not its canonical pair or whose members lack the required role. The kernel's
-own model call kinds are `modules/models/selection.yaml`
-`kernelFunctionKinds`.
+The roles and the default pool are `engine/config.mjs`
+(`NON_OPERATION_ROLES`, `DEFAULT_MODEL_POOLS`), which also refuses an unknown
+pool name, a pool that is not its canonical pair, or members that lack the
+required role. The kernel's own model call kinds are
+`modules/models/selection.yaml` `kernelFunctionKinds`.
 
-The named pools keep provider diversity without making one model a fallback. Before a call, admission chooses
-an eligible, qualified member using actual capacity and fresh known quota. Planner/validator remain in the
-Fable/Astra pool and manager/technical decisions remain in Opus/Sol; adaptive allocation does not invent Qwen
-support for these functions. Functions retain separate typed inputs and independent contexts even when they
-share a pool.
+The pool keeps provider diversity without making one model a fallback. Before a call, admission chooses an
+eligible, qualified member using actual capacity and fresh known quota; member order is the route order, so an
+owner who lists `claude-agent` first leads with Claude Opus 5.5. Adaptive allocation does not invent Qwen or
+Devin support for these functions — neither runtime carries `plan` or `decide`. Functions
+retain separate typed inputs and independent contexts even though they share a pool.
 
 Operation candidates still come from the operation policy and runtime catalog, but adaptive allocation treats
 catalog order as eligibility/suitability rather than sequential fallback. It groups candidates by provider
@@ -72,7 +72,7 @@ identity.
 | `host` | Workflow execution environment | `orca` |
 | `agent` | Executable/Orca adapter | `codex` |
 | `provider` | Credential, billing and quota family used by allocation | `codex` |
-| `model` | Concrete model identifier | `gpt-5.6-sol` |
+| `model` | Concrete model identifier | `gpt-6-sol` |
 | `profile` | StarCi capability/routing profile | `codex-agent` |
 | `runtimePool` | Capacity pool selected by the allocator | `codex-agent` |
 
