@@ -898,6 +898,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   audit. Sáng: thầy xong onboarding Claude Code → merge lane Q (trial merge chỉ conflict
   tests/config.spec.mjs) → thầy quyết pin kernel.
 
+- 05:40 Thầy cho merge luôn: lane Q (`6342c1e1d`) và planner fix (`5ea28d7d2`) vào main. Plan lại ra đúng 12 leg,
+  brand ghi assumed → persist theo ok của thầy: `wf-nivo-modules-agentos-mud6zg6y`,
+  `wf-nivo-collab-group-chat-mud6zgff`. Kernel Collab chạy (devin). Kernel modules: devin chết ngay 2 lần
+  ("prompt was not consumed", terminal exited trống) — nghi trần phiên Devin vì app Devin desktop của thầy còn
+  ~24 process từ 20h; codex 2 lần "Timed out waiting for terminal handle" phía Orca. Chưa chạy. Lane P xong
+  (4 vá, replay không đổi job nào) nhưng đụng lane Q ở 6 file routing → agent lane P đang merge main vào nhánh.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
