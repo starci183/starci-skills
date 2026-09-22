@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: event.task.completed
-recordDigest: 12834f7d15f0ef3d91341fca14413cc409172dcf0a50370b0df933f3a9787b32
+recordDigest: 2084b734d59dbbdb50a65ed5d3dcd61540e00f706b3fdbbf1a024c977887a70c
 codeDigest:
   algorithm: sha256
   files:
@@ -54,7 +54,7 @@ codeDigest:
     - path: src/modules/bussiness/task/list-tasks.query.ts
       sha256: d2255a9c907778ed9431dbcd1f2abf1784ab9ededdeec629fa967e735a47fc94
     - path: src/modules/bussiness/task/ownership.guard.spec.ts
-      sha256: b623e488a0db1df4b268fdc59679d592469ee525284b0eb5fdea4c999de5e7b7
+      sha256: 99835e620b6797801921c67e3ac65c7c00e8d1c3ca19e52257f8bf9e763142e1
     - path: src/modules/bussiness/task/ownership.guard.ts
       sha256: 1bc3ae50c35934f06b7b2096b0872480078b86f9f7ba4a4c27e9a0f445e53d31
     - path: src/modules/bussiness/task/reopen-task.command.ts
@@ -82,7 +82,7 @@ codeDigest:
     - path: src/modules/platform/events/event-bus.providers.spec.ts
       sha256: 43292d8c0c3ff55a27b600965dd103c48f72ff1f330490f3a81bbe5819041d49
     - path: src/modules/platform/events/event-bus.providers.ts
-      sha256: f083f135f1594c48703e071952c7d28b9be37ad395312354b27fed6dfab16389
+      sha256: 3f75d352a8d2c5e4bd11924d507181cdc542a59a75c14a99e159357977726609
     - path: src/modules/platform/events/events.module-definition.ts
       sha256: 3c0cb2ebafc3b145eded5bceecfb2101cf57c6fbaa881403a89a16b4822ade4b
     - path: src/modules/platform/events/events.module.spec.ts
@@ -90,10 +90,10 @@ codeDigest:
     - path: src/modules/platform/events/events.module.ts
       sha256: b7e77ea220ae21ef248f2ba9e37b90288496128aa7bdccc54ed9fa381caf0302
     - path: src/modules/platform/events/events.types.spec.ts
-      sha256: 1a33c48209127ee38425089a097b40ef035addd191d0889af1cfd94386121cc2
+      sha256: bf153673dbe03bd2e5d6951e052be533e58c136d0eb8f7f72dfb404153f95ff6
     - path: src/modules/platform/events/events.types.ts
-      sha256: dee7f5e48e713553f9bf990f4ff1cc3dc8b4a60b53ada1dcd91b30edca79f7f1
-  digest: b651a7a94dcfed39477c453626b55785ba4de99f39d90c5b9d05077199156788
+      sha256: 9234eccd67b4e04e91ce2a4ac233b76b364abc3b0d1546c11bbb8c8f700cfa11
+  digest: 44cc3dec3a14800b94c82bdaa1bd72ae41a39c74c0ef2a650dbde46f2d285cc2
 outcome: pass
 assertions:
   - id: event.task.completed
@@ -104,6 +104,6 @@ assertions:
       "event.task.completed" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:21:35.557Z
+  capturedAt: 2026-09-22T18:36:19.663Z

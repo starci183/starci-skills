@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: br.notify.delivery.once
-recordDigest: 84687b0a0306b053e2080bad4471fb61e0f424f5b0d6f003725e562ed50f77c5
+recordDigest: bd009e4176ee588f304141d2f9f8155726d6b6b3547a1c2c6c567dcb43dee88f
 codeDigest:
   algorithm: sha256
   files:
@@ -46,7 +46,7 @@ codeDigest:
     - path: src/modules/bussiness/notify/preferences.service.ts
       sha256: 3afffd8b107e2aca496cb2f0f502cd94f04727144bb64e4fbb4eb343f0816bc3
     - path: src/modules/bussiness/notify/testing/fake-notify-entity-manager.ts
-      sha256: 2e2425d11eda99480b6efacd5e543c987d30b6ae4052d28499f862cf76ff888b
+      sha256: 53bd50911490ce97ffe5d1d1fe57c5f8b245f6e79e0f0a98e0f603010fbb27d3
     - path: src/modules/bussiness/notify/types/delivery-attempt-record.ts
       sha256: 6f5294a31089ba905479b86761b2da7c78e0327c8e07c147bb2407e336601d43
     - path: src/modules/bussiness/notify/types/digest-window-record.ts
@@ -54,7 +54,7 @@ codeDigest:
     - path: src/modules/bussiness/notify/types/notification-record.ts
       sha256: 9dae1165afdd3902d7a97ca1a75ddb0653dcc1a6d368b103e7723a5777cbfec2
     - path: src/modules/bussiness/notify/types/preference-patch.ts
-      sha256: 282892cf34bce0d963b0673f3ae92dde6153807de42f39d0e7b87b599e6675ac
+      sha256: 7e0d35c2949bc14faef18181f7c800d864273206f601bc14a777fb54b6c254e4
     - path: src/modules/bussiness/notify/types/preference-record.ts
       sha256: 54dc2b24f3d0ea8ce2ce281125bab92d9ba1be4539f9c539916cf931ca40dc0f
     - path: src/modules/bussiness/notify/unsubscribe.command.ts
@@ -69,7 +69,7 @@ codeDigest:
       sha256: 53a64661c87bd932e22689eca05746899a292f00f858ca8892a522b81cf540d4
     - path: src/modules/bussiness/notify/update-notification-preferences.handler.ts
       sha256: 7b30887dfaba380024c4ab64b2f2d70284391aedc259469d64234706fa783751
-  digest: 3f2683daf6f4b62a38549b515f0e8468839f18abf6b50e61d95c8bd49dfd7d7f
+  digest: a219c7ba4ca0758c6d41b7bf081ac68fba1052be1f42a97fd38fbaa0ead46ea6
 outcome: pass
 assertions:
   - id: dedupe-collapses-retry
@@ -79,6 +79,6 @@ assertions:
     observation: npx jest dedupe.service.spec.ts -t dedupe-collapses-retry exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:13:07.574Z
+  capturedAt: 2026-09-22T18:22:21.074Z

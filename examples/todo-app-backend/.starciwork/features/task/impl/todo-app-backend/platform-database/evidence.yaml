@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: impl.task.todo-app-backend.platform-database
-recordDigest: c0824a7c94bcdc0b1bcfd3ec50a6ae691f4d4e4beffa4ada98f6dfacc74fbca5
+recordDigest: 9465ca01978f8b4c9f40c4279bee32c1fb39c1c26d69ec959e796c0d26a0b84b
 codeDigest:
   algorithm: sha256
   files:
@@ -34,7 +34,7 @@ codeDigest:
     - path: src/modules/platform/databases/postgresql/primary/entities/audit-log-line.entity.ts
       sha256: 23c359bb799fba47752c486a9d06b9b1d38fb94b4a145064f414d09c31c789d3
     - path: src/modules/platform/databases/postgresql/primary/entities/entities.spec.ts
-      sha256: 0715ee88601bbebd9714dc547504baf12468f7f9e55bb0f783bead832ca54628
+      sha256: f29c604e90a815be041eb14596318f279abc62f5c7461c909b49ac88983854d4
     - path: src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts
       sha256: ea271588bbbd863d114ddc385c418680caca67d166d11f3667208ba71a0fdd3b
     - path: src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts
@@ -78,11 +78,11 @@ codeDigest:
     - path: src/modules/platform/databases/postgresql/primary/migrations/1758300000000-create-uploads-table.ts
       sha256: ebb9ef4229b1ad6eb13f9a005a8a9e1072a15bb8d4e5b9cfcb6ca047585944ae
     - path: src/modules/platform/databases/postgresql/primary/primary.client.spec.ts
-      sha256: 1464030529abd5ebd7ad59bc1facc1bd6a97d1526b78ba2dcda533e6fc10d823
+      sha256: 7c241909cd9bc61651beb0c824b45e8e71b2b42a42544dc1dd7fc05b1ce4636c
     - path: src/modules/platform/databases/postgresql/primary/primary.client.ts
       sha256: d4b9911daa4040c5008da9a977ec34481e42a6497157f9777fc2233a8c5c5b90
     - path: src/modules/platform/databases/postgresql/primary/primary.decorators.spec.ts
-      sha256: 3bf80473a01f35c90d7d54062e668b4f4e4fa3dfe16068ca135c0202a17012bc
+      sha256: ee85f3009faed697debc97e153eafb7a5229db6b80925ce92b2a733a547add23
     - path: src/modules/platform/databases/postgresql/primary/primary.decorators.ts
       sha256: 533a75a419dd404296d82a50ddc9a24d8c6eca07c68356c3bac52e4bcee956f5
     - path: src/modules/platform/databases/postgresql/primary/primary.module-definition.ts
@@ -92,10 +92,10 @@ codeDigest:
     - path: src/modules/platform/databases/postgresql/primary/primary.module.ts
       sha256: cf91c8fd504aa20420dd7838c02a3b3437240b46c80592e7013cf872510f7bde
     - path: src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.spec.ts
-      sha256: c278ee405e961e8e2d94b4439c5ca79b6ccc191f0ab97a889f40786d194de8ae
+      sha256: 8605dc1e3dcebe74a512dc60c802e909828f8862a21825d5d31294eaad67e717
     - path: src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.ts
       sha256: e960e139afde0e236b513d3d18cd1f4941501898569a31c62e3939281ce9a3e2
-  digest: fbe6cce818f2ea34915c1c9b7a0a3d69512e1ca120357fcdbe61aef28a5fb253
+  digest: 0366050c2bf66af01198764cc4b572a8bc52605948d92d1b7d39d697aedbd6d1
 outcome: pass
 assertions:
   - id: data.task.task
@@ -115,6 +115,6 @@ assertions:
     observation: npx jest src/modules/platform/databases/postgresql/primary exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T21:05:07.425Z
+  capturedAt: 2026-09-22T18:38:36.046Z

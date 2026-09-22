@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: sds.recur.generation-engine
-recordDigest: 49d4680bec94e65d264b04ea710a0c26cd921d5448b4ac5b69653fb38703105a
+recordDigest: c82e9d28cb76521a8988858871f53a69fd5b3fc8e2c1dcb4a0adfda887fc9634
 codeDigest:
   algorithm: sha256
   files:
@@ -52,7 +52,7 @@ codeDigest:
     - path: src/modules/bussiness/recur/rule.service.ts
       sha256: a487bdb68103eff8c0cd73b2c3e72cc0a8e62a58740c3b7cb5029f0f167ddde2
     - path: src/modules/bussiness/recur/scheduler.service.spec.ts
-      sha256: c467d916d4df7abdd3e1f0a8f3650f0d94d5b4239bddbd8ebbe53c9eba890b14
+      sha256: a5c5aaa29060fd753fa7fdc780c24f814ccb8a2dc67991561655a7d8af1dec9f
     - path: src/modules/bussiness/recur/scheduler.service.ts
       sha256: f072d6040ac1b6109a16cbdf6286d859aea3fd125970bee464991940e51dc875
     - path: src/modules/bussiness/recur/skip-occurrence.command.ts
@@ -77,7 +77,7 @@ codeDigest:
       sha256: b8a1529f2865889faacc5fd5f6d12ec1eb171fef6758d82aba42fccad72f2f1b
     - path: src/modules/bussiness/recur/zone.util.ts
       sha256: 27963a4429369ca92486ed2903a1a3a67af5e9021bfec5f52fa43e4ff32c0930
-  digest: 5ba1a0b55571d6a92f41669e400b488d62a5e47d1270635eb30b84409f20e72b
+  digest: c6526a898f35eab5b3a36249be28b44116a1db5b30c2feae91fedfc338be116f
 outcome: pass
 assertions:
   - id: implementation
@@ -91,6 +91,6 @@ assertions:
       src/modules/bussiness/recur/generator.service.spec.ts exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:17:56.482Z
+  capturedAt: 2026-09-22T18:33:55.866Z

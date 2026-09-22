@@ -1346,11 +1346,3 @@ findings:
       - gap.share.live-proof
     because: uat.share.invite-and-collaborate is todo, blocked on gap.share.live-proof - a real product
       question, not missing code; it moves once that is settled.
-  - id: stale-evidence-bulk-edit:br.task.single-owner
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - br.task.single-owner
-    because: br.task.single-owner's evidence is stale with staleSince naming only itself - a bare digest
-      mismatch (the record's own bytes moved after capture), not a change in some other record it
-      depends on.

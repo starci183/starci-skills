@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: fr.task.create
-recordDigest: a89b301407a9e1deff3d647275df97f57f220b83ae5b22cbe11248e6927c3789
+recordDigest: b09ad241a34d72e98b54166156c3eb089317f05ce1f3cc87b0df1ebd3917eb82
 codeDigest:
   algorithm: sha256
   files:
@@ -56,7 +56,7 @@ codeDigest:
     - path: src/modules/bussiness/task/list-tasks.query.ts
       sha256: d2255a9c907778ed9431dbcd1f2abf1784ab9ededdeec629fa967e735a47fc94
     - path: src/modules/bussiness/task/ownership.guard.spec.ts
-      sha256: b623e488a0db1df4b268fdc59679d592469ee525284b0eb5fdea4c999de5e7b7
+      sha256: 99835e620b6797801921c67e3ac65c7c00e8d1c3ca19e52257f8bf9e763142e1
     - path: src/modules/bussiness/task/ownership.guard.ts
       sha256: 1bc3ae50c35934f06b7b2096b0872480078b86f9f7ba4a4c27e9a0f445e53d31
     - path: src/modules/bussiness/task/reopen-task.command.ts
@@ -81,7 +81,7 @@ codeDigest:
       sha256: d983a4a891dfec3d295eb66db354e7ef75ab0514aad4d325a03dab91dfc013d4
     - path: src/modules/bussiness/task/types/task-record.ts
       sha256: e7a7719a464f7be1ab8faa18a97991d5c3d7f37bf8cbfac80c0d66eab0a5941c
-  digest: ffbf1c984a5573c11a9eedf7a9148f64b2a8461d09b5dbbe6b8fc505e55e3ff2
+  digest: de35e9174c75392ae5dad93a3ddd32c4ceb1d54855e25713f184b2523977685c
 outcome: pass
 assertions:
   - id: unit-composed-rules
@@ -96,6 +96,6 @@ assertions:
     observation: npx jest src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:21:49.751Z
+  capturedAt: 2026-09-22T18:36:43.972Z

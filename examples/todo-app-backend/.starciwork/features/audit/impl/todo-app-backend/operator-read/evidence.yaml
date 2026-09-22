@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: impl.audit.todo-app-backend.operator-read
-recordDigest: 32629c7ffee0f53aeeb195081a5791a367b9a0771d10bd0164b220a1a8cb9e0d
+recordDigest: d27c4d2edb56b7fc55060df77cfd49424761d55285bcc82890d2251c3504e032
 codeDigest:
   algorithm: sha256
   files:
@@ -24,7 +24,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/append-log-line.handler.ts
       sha256: 091c9a70a8a90fe6ec9ed030d5ac3b3dd41b5befbb2d5270b802d180f327a0bf
     - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      sha256: eced8460bc4ab6e074babb2da465cd6dd6c7a682bacdba0b99f2b49e17015aeb
+      sha256: 78b5ab923a61972d6a27872f94dac199cdaa3cc484b7aa07bbdf982e25746214
     - path: src/modules/bussiness/audit/audit-erasure.service.ts
       sha256: a4b36693f4a2189c731eb60ecacff92b91fb39f443d1403d945536b6dbde62c4
     - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
@@ -85,7 +85,7 @@ codeDigest:
       sha256: 56bdf0a467ab20094eaa91fec2a4052081b2f1a27fe39846b8f956e67786b762
     - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
       sha256: a69b044f18ff64b6c457cf4c3ffa0e3b0c3af57a58f0d0d2ca98228dc4fcc1eb
-  digest: a428c15db514e8b575d9533a52d66eace72dea9ddf81688079de7495f166d00b
+  digest: 7a63f9cdf92ae348cfdecc5af246961f50a606a942f86194e9e9f873ba8f9f38
 outcome: pass
 assertions:
   - id: filtered-whole-chain-read
@@ -110,6 +110,6 @@ assertions:
     observation: npx jest src/modules/bussiness/audit/audit-operator.service.spec.ts --runInBand exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:12:38.958Z
+  capturedAt: 2026-09-22T18:18:09.795Z

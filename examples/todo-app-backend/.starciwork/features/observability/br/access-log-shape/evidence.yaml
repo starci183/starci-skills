@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: br.observability.access-log-shape
-recordDigest: 1f0c1a913858d0ea025b4a419c3c2de813e92037475d6348b7fce6451c8e72ae
+recordDigest: 584bed4fdce4c8b2df56708d6296ef9c6fe08b97c5921a0fadc146de22513497
 codeDigest:
   algorithm: sha256
   files:
@@ -36,6 +36,6 @@ assertions:
     observation: npx jest src/modules/platform/observability/metrics.service.spec.ts exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T20:59:49.046Z
+  capturedAt: 2026-09-22T18:23:47.100Z

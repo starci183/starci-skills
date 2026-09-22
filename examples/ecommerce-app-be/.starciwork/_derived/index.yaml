@@ -43,8 +43,7 @@ records:
     schema: work/business-rule@1
     feature: identity
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - contract.checkout.order-for-identity
@@ -287,50 +286,45 @@ records:
     schema: work/ui-screen@1
     feature: checkout
     state: todo
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: todo
   ui.checkout.landing-home:
     schema: work/ui-screen@1
     feature: checkout
     state: uninvestigate
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: uninvestigate
   ui.checkout.shop-browse:
     schema: work/ui-screen@1
     feature: checkout
     state: todo
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: todo
   ui.checkout.stock-refused:
     schema: work/ui-screen@1
     feature: checkout
     state: todo
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: todo
   ui.identity.sign-in:
     schema: work/ui-screen@1
     feature: identity
     state: todo
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: todo
 tally:
   overall:
-    done: 3
-    todo: 9
-    stale: 17
+    done: 4
+    todo: 13
+    stale: 11
     blocked: 0
-    total: 29
+    total: 28
   byFeature:
     checkout:
       done: 2
-      todo: 7
-      stale: 10
+      todo: 10
+      stale: 6
       blocked: 0
-      total: 19
+      total: 18
     identity:
-      done: 1
-      todo: 2
-      stale: 7
+      done: 2
+      todo: 3
+      stale: 5
       blocked: 0
       total: 10
   gaps:

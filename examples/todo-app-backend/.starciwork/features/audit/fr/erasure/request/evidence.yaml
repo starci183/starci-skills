@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: fr.audit.erasure.request
-recordDigest: 1377779ef98865cfb152613ed0c5f1e8575180d9f179d5f0847513e681164bfc
+recordDigest: 262bd916b1c5cf5a45d7e4457cade92a0c474646343040f2d87b8048c305229d
 outcome: pass
 assertions:
   - id: br.audit.erasure.right
@@ -25,6 +25,6 @@ assertions:
       src/modules/bussiness/audit/audit-erasure.service.spec.ts exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T13:01:50.748Z
+  capturedAt: 2026-09-22T18:15:34.066Z

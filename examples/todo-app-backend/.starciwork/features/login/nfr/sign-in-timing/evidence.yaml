@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: nfr.login.sign-in-timing
-recordDigest: 09de9b7caccb077b38dbe7b1eda1a0d072fd063fa1d4efb907c4e3add189913d
+recordDigest: 5f7b2b127754b5c302003930f8f731b1722a7f02fdfa0a2aa7b0573db82036c1
 outcome: pass
 assertions:
   - id: identical-refusal-parity
@@ -15,6 +15,6 @@ assertions:
       unknown email identically" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T07:51:47.873Z
+  capturedAt: 2026-09-22T18:21:37.487Z

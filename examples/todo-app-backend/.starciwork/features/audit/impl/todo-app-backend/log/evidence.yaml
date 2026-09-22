@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: impl.audit.todo-app-backend.log
-recordDigest: 3adcb228d120b97a93ab5ecb9c34ab2e3f8fa9d01135c5b8315cba316a47993d
+recordDigest: 6edc3fb0cbf04535b0434ada919816ecab0591560cdfd60939330729616d2e70
 codeDigest:
   algorithm: sha256
   files:
@@ -24,7 +24,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/append-log-line.handler.ts
       sha256: 091c9a70a8a90fe6ec9ed030d5ac3b3dd41b5befbb2d5270b802d180f327a0bf
     - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      sha256: eced8460bc4ab6e074babb2da465cd6dd6c7a682bacdba0b99f2b49e17015aeb
+      sha256: 78b5ab923a61972d6a27872f94dac199cdaa3cc484b7aa07bbdf982e25746214
     - path: src/modules/bussiness/audit/audit-erasure.service.ts
       sha256: a4b36693f4a2189c731eb60ecacff92b91fb39f443d1403d945536b6dbde62c4
     - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
@@ -85,7 +85,7 @@ codeDigest:
       sha256: 56bdf0a467ab20094eaa91fec2a4052081b2f1a27fe39846b8f956e67786b762
     - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
       sha256: a69b044f18ff64b6c457cf4c3ffa0e3b0c3af57a58f0d0d2ca98228dc4fcc1eb
-  digest: 7f4b67ee05c4a01b4c3ca475769f7b186f0511db978413c546e1d2d8a44c4e2f
+  digest: 3428f633bf5fc55664b2559c2d5a0499a9501257cc44460b321c19f1fe4a7f92
 outcome: pass
 assertions:
   - id: br.audit.append-only
@@ -113,6 +113,6 @@ assertions:
       "ac.audit.append-only.chain-detects-tamper" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:12:23.497Z
+  capturedAt: 2026-09-22T18:17:37.331Z

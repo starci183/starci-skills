@@ -14,8 +14,7 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.log-line
@@ -31,8 +30,7 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -44,8 +42,7 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -60,8 +57,7 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - br.audit.erasure.right
@@ -76,8 +72,7 @@ records:
     schema: work/business-rule@1
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.login.person
@@ -89,8 +84,7 @@ records:
     schema: work/business-rule@1
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - contract.login.identity-for-task
@@ -119,8 +113,7 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - contract.notify.new-device-signal
@@ -137,8 +130,7 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.notification
@@ -152,8 +144,7 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -163,8 +154,7 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -176,8 +166,7 @@ records:
     schema: work/business-rule@1
     feature: observability
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       composes:
         - fr.observability.request-logging
@@ -185,8 +174,7 @@ records:
     schema: work/business-rule@1
     feature: observability
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       composes:
         - fr.observability.probes
@@ -194,8 +182,7 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - fr.plan.usage.view
@@ -204,8 +191,7 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.downgrade.freeze
@@ -222,8 +208,7 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.subscription
@@ -234,8 +219,7 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.subscription
@@ -244,8 +228,7 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.payment-intent
@@ -257,8 +240,7 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.occurrence
@@ -270,8 +252,7 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.occurrence
@@ -281,8 +262,7 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.rule
@@ -294,8 +274,7 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.occurrence
@@ -306,8 +285,7 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.rule
@@ -414,8 +392,7 @@ records:
     schema: work/business-rule@1
     feature: task
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     usedBy:
       refs:
         - contract.login.identity-for-task
@@ -443,8 +420,7 @@ records:
     schema: work/business-rule@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       composes:
         - fr.task.create
@@ -452,8 +428,7 @@ records:
     schema: work/business-rule@1
     feature: upload
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       composes:
         - fr.upload.intake
@@ -461,8 +436,7 @@ records:
     schema: work/business-rule@1
     feature: upload
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.upload.upload
@@ -474,8 +448,7 @@ records:
     schema: work/business-rule@1
     feature: upload
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.upload.upload
@@ -532,8 +505,7 @@ records:
     schema: work/contract@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - fr.task.create
@@ -574,8 +546,7 @@ records:
     schema: work/data@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       tension:
         - decision.audit.deleted-task-target
@@ -677,8 +648,7 @@ records:
     schema: work/policy-decision@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - br.audit.erasure.right
@@ -802,8 +772,7 @@ records:
     schema: work/event@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       subscribes:
         - fr.audit.log.append
@@ -813,8 +782,7 @@ records:
     schema: work/event@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       subscribes:
         - fr.audit.log.append
@@ -823,8 +791,7 @@ records:
     schema: work/event@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - fr.task.delete
@@ -840,14 +807,12 @@ records:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   fr.audit.erasure.request:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - ui.audit.privacy
@@ -855,8 +820,7 @@ records:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - ui.audit.privacy
@@ -864,14 +828,12 @@ records:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   fr.audit.log.read:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   fr.login.sign-in:
     schema: work/functional-requirement@1
     feature: login
@@ -1165,8 +1127,7 @@ records:
     schema: work/functional-requirement@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - event.task.created
@@ -1241,8 +1202,7 @@ records:
     schema: work/gap@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   gap.audit.render-proof:
     schema: work/gap@1
     feature: audit
@@ -1252,8 +1212,7 @@ records:
     schema: work/gap@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   gap.login.device-field:
     schema: work/gap@1
     feature: login
@@ -1485,20 +1444,17 @@ records:
     schema: work/implementation@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.audit.todo-app-backend.log:
     schema: work/implementation@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.audit.todo-app-backend.operator-read:
     schema: work/implementation@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.audit.todo-app-frontend.privacy:
     schema: work/implementation@1
     feature: audit
@@ -1539,8 +1495,7 @@ records:
     schema: work/implementation@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.plan.todo-app-frontend.usage:
     schema: work/implementation@1
     feature: plan
@@ -1581,50 +1536,42 @@ records:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-backend.create-task:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-backend.delete-task:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-backend.list:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-backend.ownership:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-backend.platform-database:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-backend.platform-events:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-backend.reopen-task:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   impl.task.todo-app-frontend.task-list:
     schema: work/implementation@1
     feature: task
@@ -1823,20 +1770,17 @@ records:
     schema: work/non-functional-requirement@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   nfr.audit.tamper-evidence:
     schema: work/non-functional-requirement@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   nfr.login.sign-in-timing:
     schema: work/non-functional-requirement@1
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   nfr.notify.delivery.guarantee:
     schema: work/non-functional-requirement@1
     feature: notify
@@ -1918,14 +1862,12 @@ records:
     schema: work/sds-component@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   sds.audit.log-chain:
     schema: work/sds-component@1
     feature: audit
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.audit.erasure-request
@@ -1933,8 +1875,7 @@ records:
     schema: work/sds-component@1
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.lapse.reverts-on-read
@@ -1943,8 +1884,7 @@ records:
     schema: work/sds-component@1
     feature: notify
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - integration.notify.queue
@@ -1952,8 +1892,7 @@ records:
     schema: work/sds-component@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - contract.plan.create-precondition
@@ -1985,8 +1924,7 @@ records:
     schema: work/sds-component@1
     feature: plan
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.lapse.reverts-on-read
@@ -2002,8 +1940,7 @@ records:
     schema: work/sds-component@1
     feature: recur
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - integration.recur.scheduler
@@ -2011,8 +1948,7 @@ records:
     schema: work/sds-component@1
     feature: recur
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   sds.share.invitation-lifecycle:
     schema: work/sds-component@1
     feature: share
@@ -2023,8 +1959,7 @@ records:
     schema: work/sds-component@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.occurrence
@@ -2032,8 +1967,7 @@ records:
     schema: work/sds-component@1
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: done
   share:
     schema: work/feature@1
     feature: share
@@ -2329,46 +2263,46 @@ records:
     effectiveState: null
 tally:
   overall:
-    done: 55
+    done: 120
     todo: 27
-    stale: 119
-    blocked: 27
+    stale: 53
+    blocked: 28
     total: 228
   byFeature:
     audit:
-      done: 5
+      done: 25
       todo: 3
-      stale: 22
+      stale: 2
       blocked: 2
       total: 32
     login:
-      done: 8
+      done: 12
       todo: 5
-      stale: 9
+      stale: 5
       blocked: 2
       total: 24
     notify:
-      done: 9
+      done: 14
       todo: 6
-      stale: 13
+      stale: 8
       blocked: 5
       total: 33
     observability:
-      done: 0
+      done: 2
       todo: 0
-      stale: 5
+      stale: 3
       blocked: 0
       total: 5
     plan:
-      done: 8
+      done: 17
       todo: 3
-      stale: 13
+      stale: 4
       blocked: 7
       total: 31
     recur:
-      done: 10
+      done: 17
       todo: 2
-      stale: 11
+      stale: 4
       blocked: 6
       total: 29
     share:
@@ -2378,15 +2312,15 @@ tally:
       blocked: 3
       total: 27
     task:
-      done: 6
+      done: 21
       todo: 6
-      stale: 24
-      blocked: 2
+      stale: 8
+      blocked: 3
       total: 38
     upload:
-      done: 1
+      done: 4
       todo: 0
-      stale: 8
+      stale: 5
       blocked: 0
       total: 9
   gaps:
