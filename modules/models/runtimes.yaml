@@ -18,6 +18,12 @@ purpose: |-
   that declares no model for a difficulty is ineligible there, never silently rerouted to another model.
   `effort` pins the per-difficulty effort where the provider exposes one. The canonical difficulty vocabulary
   is easy|medium|hard|insane; resolvers accept the S|M|L|XL spellings (and 'high' for 'hard').
+# CONCURRENCY LIVES HERE AND NOWHERE ELSE. `runtimes.<pool>.maxParallel` below is the enforced slot
+# count: scripts/kernel/api.mjs (route capacity), scripts/agent/models.mjs (selectPool) and
+# scripts/route/route-model.mjs read it, and route-model reports any model profile whose cached
+# `capacity.maxParallel` has drifted from it. `maxParallelOps` is the fleet-wide ceiling the kernel
+# reasons against (modules/kernel/driver-loop.yaml); no code enforces it. Every other contract cites
+# this file instead of restating a number.
 maxParallelOps: 20
 allocation:
   # The workflow-bound profile applies adaptive capacity from validated config.json; this is the default it overrides.

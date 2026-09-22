@@ -16,7 +16,7 @@ identity:
   modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # qwen.json
 
 capacity:
-  maxParallel: 10             # runtimes.yaml
+  maxParallel: 10             # cached from runtimes.yaml; route-model.mjs reports drift
   roles: [implement, verify, write]   # NO decide, NO plan
 
 launch:
@@ -49,9 +49,9 @@ business:
     pools only see what survives escalation?" — qwen-agent.
   whenNeeded:
     - Routine bounded implement/write/test/content work — the established Qwen→Devin→Claude→Codex cost order spends its capacity first.
-    - review.verify — it LEADS the independent-review chain (registry.json), the cost-aware front seat for judging.
-    - Easy-tier fan-out (allocation.fanOut seamFirst, maxPerGroup 9) — cheap parallelism.
-    - Default operation dispatch in orchestrated mode.
+    - review.verify — it LEADS the independent-review chain (registry.yaml), the cost-aware front seat for judging.
+    - Easy-tier fan-out (runtimes.yaml allocation.fanOut) — cheap parallelism.
+    - The default operation target (registry.yaml orchestration.defaultOperationTarget).
   whenNot:
     - decide/plan work — the pool has no such roles; business/architecture decisions never route here.
     - Hard-tier lists exclude it entirely — high-risk or high-floor workloads get Claude/Devin/Codex orders instead.

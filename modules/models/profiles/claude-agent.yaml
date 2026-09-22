@@ -21,7 +21,7 @@ identity:
     undeclared-models-inherit-current-host-configuration".
 
 capacity:
-  maxParallel: 6                # runtimes.json
+  maxParallel: 6                # cached from runtimes.yaml; route-model.mjs reports drift
   roles: [implement, verify, write, decide, plan]   # runtimes.json — all five
 
 launch:

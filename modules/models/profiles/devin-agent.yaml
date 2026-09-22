@@ -18,7 +18,7 @@ identity:
     infer it. modelPolicy: "pin-swe-2-max-and-attest-the-devin-cli-runtime-before-dispatch".
 
 capacity:
-  maxParallel: 10             # runtimes.yaml — owner-assigned capacity
+  maxParallel: 10             # cached from runtimes.yaml — owner-assigned capacity
   capacityAuthority: explicit-workflow-quota   # only a granted workflow quota opens slots
   quotaTelemetry: launch-status                # quota is observed through launch status
   roles: [implement, verify, write]            # NO decide, NO plan

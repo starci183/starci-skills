@@ -18,7 +18,7 @@ identity:
   modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # codex.json
 
 capacity:
-  maxParallel: 10             # runtimes.json — the largest pool
+  maxParallel: 10             # cached from runtimes.yaml; the largest pool
   roles: [implement, verify, write, decide, plan]   # all five
   sharedQuota: >-
     Sol, Astra and Luna consume the SAME observed Codex provider capacity — the

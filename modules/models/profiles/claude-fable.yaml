@@ -21,7 +21,7 @@ identity:
     effective model before effects).
 
 capacity:
-  maxParallel: 2              # runtimes.json — the smallest pool after devin's 0
+  maxParallel: 2              # cached from runtimes.yaml; the smallest pool in the fleet
   budgetWindow: fableWeekly   # runtimes.json — its own weekly quota window;
                             # saturating it does NOT overflow into claude-agent automatically
   roles: [verify, decide, plan, write]   # runtimes.json — implement is ABSENT
@@ -52,7 +52,7 @@ business:
     - Non-operation model functions (goal critique/validation) whose configured pool is Fable/Astra.
   whenNot:
     - ANY implement-role operation — structurally excluded; the pool declares no implement role (runtimes.json). Not a preference, a fact.
-    - "High-volume or easy work: maxParallel 2 on a weekly window is the scarcest capacity in the fleet — a bulk queue here starves the decide/plan lanes (inference from budgetWindow + maxParallel)."
+    - "High-volume or easy work: maxParallel 2 on a weekly window is the scarcest capacity in the fleet — a bulk queue here starves the decide/plan roles (inference from budgetWindow + maxParallel)."
     - "When its quota window is cooling: the chain already falls to codex-agent then claude-agent; do not force Fable past cooldown."
   pickedBy: >-
     Allocator by role (decide/plan/verify/write only) + tier + qualification;

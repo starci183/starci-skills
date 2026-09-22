@@ -241,9 +241,12 @@ reviewerPolicy:
 #    sources: runtimes.json allocation + registry.json fallback/selection
 # ---------------------------------------------------------------------------
 allocationFacts:
-  policy: prefer-then-overflow        # runtimes.json — try the preferred pool,
+  policy: prefer-then-overflow        # runtimes.yaml — try the preferred pool,
                                       # overflow downward; never sideways-invent
-  maxParallelOps: 20                  # global; per-pool maxParallel in profiles/
+  # Concurrency is not restated here. modules/models/runtimes.yaml owns every
+  # slot count: maxParallelOps is the fleet ceiling, runtimes.<pool>.maxParallel
+  # the enforced per-pool limit.
+  concurrency: modules/models/runtimes.yaml
   difficultyVocabulary:               # pool models/effort maps and tier keys
     canonical: [easy, medium, hard, insane]
     aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."

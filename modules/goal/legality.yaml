@@ -386,9 +386,10 @@ splitRules:
     (modules/kernel/dispatch.yaml groupAssertions; modules/models/kinds.yaml
     implementation.plan purpose).
   limits: >-
-    allocation.fanOut: seamFirst true, maxPerGroup 9 against maxParallelOps 10
-    — eight or nine builds of one parent at once while the seam runs alone
-    (modules/kernel/dispatch.yaml).
+    The seam builds alone first, then the rest of the group runs at once, bounded
+    by modules/models/runtimes.yaml allocation.fanOut (seamFirst, maxPerGroup) and
+    the per-pool slot counts in the same file. The numbers live there; this rule
+    does not restate them (modules/kernel/dispatch.yaml).
   rule: "split only where scopes are disjoint; where they are not, serial — never force a fan-out the tree cannot own"
 
 # ============================================================================

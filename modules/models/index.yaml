@@ -47,7 +47,7 @@ pools:
   - {target: claude-fable,  profile: profiles/claude-fable.yaml,  provider: claude, roles: [verify, decide, plan, write],             automaticChains: true, budgetWindow: fableWeekly}
   - {target: codex-agent,   profile: profiles/codex-agent.yaml,   provider: codex,  roles: [implement, verify, write, decide, plan], automaticChains: true, note: "sole image-generation route"}
   - {target: qwen-agent,    profile: profiles/qwen-agent.yaml,    provider: qwen,   roles: [implement, verify, write],                automaticChains: true, note: "orchestration default operation target"}
-  - {target: devin-agent,   profile: profiles/devin-agent.yaml,   provider: devin,  roles: [implement, verify, write],                automaticChains: true, note: "closed at rest — maxParallel 0 until explicit workflow quota; Orca-only"}
+  - {target: devin-agent,   profile: profiles/devin-agent.yaml,   provider: devin,  roles: [implement, verify, write],                automaticChains: true, note: "Orca-only; capacityAuthority explicit-workflow-quota — slots come from the owner, see runtimes.yaml"}
 
 exceptionTargets:
   # registry.yaml targets not present in runtimes.yaml — installed but off all
