@@ -883,6 +883,14 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   interface.audit > e2e.verify > uat.verify > review.verify` (brand.decide chỉ khi chưa có brand đã duyệt).
   Lệch thì không persist, để sáng.
 
+- 05:05 Merge lane archetype của phiên fork (`533f76be1`). Plan lại hai goal: prompt gốc khớp nhầm
+  spec-foundation (5 leg, không implement) vì cụm "đóng SRS/SDS còn thiếu"; prompt modules khớp nhầm refactor
+  vì tên nhánh WIP. Diễn đạt lại (giữ ý, bỏ hai cụm gây nhầm) thì cả hai ra 13 leg full-stack, nhưng có
+  `brand.decide` trong khi nivo đã có brand duyệt (rev 1, 21/9) → trái điều kiện của thầy, KHÔNG persist.
+  Phiên fork sửa cả hai lỗi planner (ưu tiên spec-foundation, điều kiện brand) trong nhánh mới.
+  Prompt đã diễn đạt lại dùng để persist: bỏ "SRS/SDS còn thiếu" → "chốt nốt quyết định nghiệp vụ và kiến
+  trúc"; bỏ câu nhánh refactor WIP khỏi prompt modules (WIP chỉ tham khảo, ghi ở đây).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
