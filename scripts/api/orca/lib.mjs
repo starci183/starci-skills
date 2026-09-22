@@ -126,6 +126,26 @@ function liveFlags(c) {
   return out;
 }
 
+/** An agent-context `commands` array as Map<command, Set<flag>>, or null. */
+export function listingOf(commands) {
+  if (!Array.isArray(commands)) return null;
+  const listing = new Map();
+  for (const c of commands) {
+    const name = commandName(c);
+    if (name) listing.set(name, liveFlags(c));
+  }
+  return listing.size ? listing : null;
+}
+
+/** The commands calls.yaml requires of `listing`, or null when it satisfies them. */
+export function missingFrom(listing, entry, jsonFlag = JSON_FLAG) {
+  if (!listing) return { listing: 'unreadable' };
+  const flags = listing.get(entry?.command);
+  if (!flags) return { command: entry?.command ?? null };
+  const missing = (entry.flags ?? []).filter((f) => f !== jsonFlag && !flags.has(f));
+  return missing.length ? { command: entry.command, flags: missing } : null;
+}
+
 function agentContextListing() {
   if (liveListing !== undefined) return liveListing;
   const entry = CALLS.calls?.['agent-context'];
@@ -134,25 +154,11 @@ function agentContextListing() {
   const r = orcaRun([...words(entry.command), `--${JSON_FLAG}`],
     { timeout: entry.timeoutMs ?? CALLS.defaults?.timeoutMs ?? 30000 });
   const receipt = jsonOf(r.stdout);
-  const commands = receipt?.commands ?? receipt?.result?.commands ?? null;
-  if (!Array.isArray(commands)) return liveListing;
-  const listing = new Map();
-  for (const c of commands) {
-    const name = commandName(c);
-    if (name) listing.set(name, liveFlags(c));
-  }
-  liveListing = listing.size ? listing : null;
+  liveListing = listingOf(receipt?.commands ?? receipt?.result?.commands ?? null);
   return liveListing;
 }
 
-function liveDrift(entry) {
-  const listing = agentContextListing();
-  if (!listing) return { listing: 'unreadable' };
-  const flags = listing.get(entry.command);
-  if (!flags) return { command: entry.command };
-  const missing = (entry.flags ?? []).filter((f) => f !== JSON_FLAG && !flags.has(f));
-  return missing.length ? { command: entry.command, flags: missing } : null;
-}
+const liveDrift = (entry) => missingFrom(agentContextListing(), entry);
 
 const driftEnvelope = (verb, entry, missing) => ({
   schema: ENVELOPE_SCHEMA,
