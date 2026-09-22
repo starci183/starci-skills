@@ -572,3 +572,29 @@ Hai bước còn đỏ trên tree hiện tại, để nguyên vì là drift th�
   `examples/todo-app-frontend/uat/lib/paths.ts:36` ghi `runs/<runId>/...` không có `E/` (lane H
   khi migrate op).
 - 18 `.webm` UAT tracked dưới `.starciwork/**/videos/`: là evidence sinh bằng runner, giữ.
+
+### Lane D landed: 10 wrapper, 3 CLI shell, 2 check mồ côi xoá; stub Orca chung; coverage untracked
+
+Giữ lại có lý do: `terminal-list` (workflow-chat skill gọi), `bias.mjs` (`--routing-bias` sống
+end-to-end qua define-goal → goal row → `cmdRoute`), `probe-reference-conventions.mjs`
+(knowledge cite), `reference-renders/` (interface.audit và QUALITY-BAR cite).
+
+Việc rơi sang lane khác:
+
+- C: `calls.yaml` còn 10 entry không có wrapper (`run-use:60`, `run-show:66`, `task-update:79`,
+  `task-list:85`, `worker-read:144`, `worker-list:150`, `worker-abandon:174`, `check:199`,
+  `send:206`, `reply:212`) và `:34` nói reconcile đọc `task-list`/`worker-list` trong khi chỉ
+  `worker-show` có code. Xoá entry hoặc ghi rõ "not issued by StarCi".
+- E: `docs/cli.md:56,59,60` và `docs/host-contract.md:111` trỏ `scripts/agent/{spawn,health,kill}.mjs` đã xoá.
+- B: `engine/ledger-db.mjs:296` comment nhắc `sleep` đã đổi tên `sleepSync`.
+- H: `interface.implement.yaml:268-283` khai shape asset-manifest mà validator `spec/assets.mjs`
+  (đã xoá, chưa ai gọi) từng check; giờ contract không có executable. Cho nó một check hoặc
+  hạ claim.
+- F2: 4 file critique trong `examples/*/.starciwork/_derived/` mang stamp path cũ, sinh lại.
+- Chưa ai wire: `check-work-{surfaces,history,replay}` chỉ spec của chính nó gọi. Chỉ 2/24
+  check được op gọi. H quyết định khi migrate op (proofs cite check nào).
+- `probe-reference-conventions.mjs` cần `eslint` + `@typescript-eslint/parser` không có trong
+  tree; Fable quyết: giữ như external-only workflow, header ghi rõ, không thêm devDependency.
+
+Lưu ý cho mọi lane: worktree không có `config.yaml` (untracked) nên `goal-entry.spec` ×2
+và `json-exceptions.spec` fail trong worktree, không fail trên `main`. Đó không phải regression.
