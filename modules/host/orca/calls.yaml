@@ -2,16 +2,14 @@ schema: starci/orca-calls@1
 provider: orca
 api: api.yaml
 purpose: |-
-  One typed contract per Orca call that StarCi may issue. The wrappers in scripts/api/orca/ —
-  one .mjs file per verb over the shared lib.mjs — build argv only from these entries, verify
-  each command and flag against the live agent-context before the first effect, and convert
-  every exit code and receipt into a typed result envelope. An Orca failure is a classified
-  result, never an untyped exception.
-liveSchema:
-  call: agent-context
-  schemaVersion: 1
-  compare: [command, flags]
-  onMismatch: stop-before-effects-and-request-runtime-contract-upgrade
+  The documented call surface: one typed entry per Orca call StarCi may issue, naming the command,
+  its flags, the receipt paths that prove it, and the outcome/effectState classification its caller
+  must apply. The wrappers in scripts/api/orca/ — one .mjs file per verb over the shared lib.mjs —
+  each hold that verb's argv as a literal and implement its classify rules inline, so an Orca
+  failure comes back as a classified envelope rather than an untyped exception. This file is not
+  read at runtime; the binding between it and the wrappers is enforced by
+  tests/provider-orca.spec.mjs, which refuses a wrapper whose verb or --flag this file does not
+  declare.
 envelope:
   schema: starci/orca-call-result@1
   outcomes: [ok, failed, unknown]
