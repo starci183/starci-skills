@@ -70,6 +70,12 @@ properties:
           $ref: "#/$defs/prose"
           description: "What data sits at this path. A rule about what the op must or must never do
             with it belongs in the step that applies it."
+        mustExist:
+          const: true
+          description: "The op cannot run without this record. When the job's bound records or owned
+            paths spell out every `<placeholder>` of `path`, `api dispatch` refuses prerequisite-unmet
+            if nothing is there (scripts/kernel/prerequisites.mjs); an unresolved placeholder is
+            unknown and admits."
   writes:
     type: array
     minItems: 1

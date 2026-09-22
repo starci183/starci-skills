@@ -61,6 +61,7 @@ import { classifyAgentScreen } from './terminal-liveness.mjs';
 // dispatch-show/worker-show/worker-stop/worker-release).
 import { selectPool, resolveLaunchModel, missingHostTools } from '../agent/models.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
+import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
@@ -1662,6 +1663,21 @@ function cmdDispatch(ledger, args, repo) {
     process.exit(1);
   }
 
+  // Data prerequisites, before the packet and before any Orca call: a record
+  // the op must read that the binding names but the repository lacks, or a
+  // bound record whose dependsOn is not done where the op requires done. A
+  // dispatch that can only end blocked on them is a wasted launch.
+  const briefForAdmission = (() => {
+    try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8')); } catch { return null; }
+  })();
+  const prerequisites = briefForAdmission ? checkPrerequisites({ brief: briefForAdmission, payload, repo }) : { unmet: [], unknown: [] };
+  if (prerequisites.unmet.length) {
+    const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', unmet: prerequisites.unmet,
+      detail: prerequisiteDetail({ op, jobId, unmet: prerequisites.unmet }) };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): prerequisite-unmet — ${out.detail}`, args.json);
+    process.exit(1);
+  }
+
   const model = resolveModel(args.model ?? payload.model ?? 'qwen-agent'); // orchestrationDefault: qwen-agent
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
@@ -1670,7 +1686,7 @@ function cmdDispatch(ledger, args, repo) {
 
   // The packet's params are the brief's defaults with the overrides enqueue
   // already validated on top — dispatch resolves, it never re-decides.
-  const briefDoc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
+  const briefDoc = briefForAdmission ?? parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams });
