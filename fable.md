@@ -935,6 +935,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   transition-ready. Modules 3 job ready. Watchdog đúng việc: thấy active thì không đụng, AUTH báo idle-waiting khi
   frontier không actionable. Không vá gì.
 
+- 07:00 Phiên fork báo Orca tạo lại được terminal Codex tương tác từ ~22:30 giờ Orca; đã báo 4 kernel nivo thôi giữ
+  job Codex. Phiên fork mở lane P4: baseline Nest/Next qua được check-scoped-lint (layout module + architecture
+  config, canon một authority).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
