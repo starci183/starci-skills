@@ -139,6 +139,8 @@ producesVocabulary:
     knowledge.repair:     ["knowledge: repaired"]
     workspace.manage:     ["workspace: managed"]
     task.execute:         ["task: executed"]
+  settledOutOfBand:  # a variable a Work record settles without a chain leg; route-plan --work reads the record (path relative to the Work root) and drops the producing leg when its state matches
+    - {var: "brand: settled", record: brand/index.yaml, state: done}
   stalenessNote: >-
     A produced variable is only as good as its evidence binding: DEP_STALE /
     evidence-invalidation flips it back to unsettled (check-work-deep.mjs,

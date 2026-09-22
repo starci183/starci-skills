@@ -44,7 +44,9 @@ input:
     fails, never blocks), GOAL text, OP CHAIN (the derived legs, each mapped to
     a cold tier estimate easy=15m / medium=45m / hard=90m, labelled 'estimate
     is cold'; `underivable (kernel will derive at boot)` with route-plan's
-    reason when it forms no chain), WILL-WRITE list and the resolved ledger path. The skill shows
+    reason when it forms no chain; an `assumed:` line per variable the owner
+    repository's Work root settles out of band — route-plan --work, per
+    legality.yaml settledOutOfBand), WILL-WRITE list and the resolved ledger path. The skill shows
     the table to the owner; only an explicit ok re-runs without --plan, which
     is the run that persists.
   revise: >-
