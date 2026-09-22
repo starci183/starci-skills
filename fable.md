@@ -552,3 +552,23 @@ Lỗ schema (C/F2 phải đóng trước khi F2 bỏ skip):
    có field để đọc. F2 thêm field khi viết 8 schema thiếu.
 
 Check chưa vào `npm run check`: lane I hoặc lane cuối wire vào `package.json` `check`.
+
+### Lane F1 landed: `todo-app-example.yml` chạy đúng những gì có
+
+Bốn job `records`, `backend`, `frontend`, `live`; job `uat` cũ (npm ci vào thư mục không có
+manifest, artifact glob không ai ghi) gộp vào `live`. Demo key mở 10 file `.enc`, tất cả là
+cụm chữ thường ngắn, không vendor prefix, không DSN. Quyết định 1 đứng.
+
+Hai bước còn đỏ trên tree hiện tại, để nguyên vì là drift thật:
+
+- `check-example-work.mjs` từ chối 207 record (180 todo-app-backend, 27 ecommerce) vì
+  `recordDigest`/`codeDigest` stale. F2 sinh lại bằng `scripts/example/*`.
+- `check-scoped-lint.mjs` cả hai profile trả `ARCH_CONFIG_INVALID` vì `package.json` của
+  example khai `file:../../packages/{e2e,fe}-kit` nằm ngoài `--root`. Cần check hiểu dependency
+  path ngoài root khi nó nằm trong cùng repo (`scripts/checks/check-scoped-lint.mjs`, giao F2).
+  Profile `next` thêm `CANON_VERSION_MISMATCH`: `modules/models/code-patterns.yaml:456` pin
+  fe canon `3.0.2`, `packages/eslint/fe/package.json:3` là `3.1.0` (lane C).
+- `modules/ops/ops/uat.verify.yaml:165` khai evidence dưới `E/`; harness thật
+  `examples/todo-app-frontend/uat/lib/paths.ts:36` ghi `runs/<runId>/...` không có `E/` (lane H
+  khi migrate op).
+- 18 `.webm` UAT tracked dưới `.starciwork/**/videos/`: là evidence sinh bằng runner, giữ.
