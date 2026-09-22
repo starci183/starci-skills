@@ -968,6 +968,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   `lane-p4/e2e-flag` (test e2e baseline chỉ chạy khi STARCI_E2E_BASELINE=1). Fork báo gap stale-input (job đã
   settle không bị đánh dấu cũ khi file knowledge đầu vào đổi digest); giao fork làm lane P5.
 
+- 08:10 Yên. Collab architecture.decide 8 slice done; WSPV implement a31 done, kernel đang xử lý (transition-ready);
+  Modules business.decide a10 partial, chờ op; AUTH owner-gate 4 + dependency 3, idle-waiting đúng. Không vá gì.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
