@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {parseYaml} from '../../../../../core/yaml.mjs';
+import {parseYaml} from '../../../../../engine/yaml.mjs';
 import {parseCssCustomProperties,parseColor,contrastRatio,deltaEOk,checkMascotAssetsPresent,checkIconSetOnly} from '../../../../../scripts/checks/brand.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../../..');
 const dir=path.dirname(path.dirname(fileURLToPath(import.meta.url)));

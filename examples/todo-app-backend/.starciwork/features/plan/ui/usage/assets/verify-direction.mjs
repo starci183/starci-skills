@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {parseYaml} from '../../../../../../../../core/yaml.mjs';
+import {parseYaml} from '../../../../../../../../engine/yaml.mjs';
 const assetDir=path.dirname(fileURLToPath(import.meta.url));
 const dir=path.dirname(assetDir),root=path.resolve(assetDir,'../../../../../../../..');
 const read=p=>fs.readFileSync(p),hash=p=>crypto.createHash('sha256').update(read(p)).digest('hex');
