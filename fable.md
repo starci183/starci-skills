@@ -618,3 +618,33 @@ Việc rơi sang lane khác:
 - H: ~15 op còn `reads: matrix` / `writes: matrixHandoff`, giữ vocabulary matrix sống qua
   registry sinh ra. Bỏ khi migrate op-shape.
 - `maxParallelOps: 20` giữ tạm vì B cite; sau khi B quyết, C hoặc H xoá.
+
+### Lane B landed: kernel contracts nói thật, một authority cho verb, list, hàm, số
+
+18 verb ở mọi bề mặt + `check-api-surface.mjs`; refusal chỉ còn cái code in ra (`empty-paths`,
+`unknown-op`, `workflow-finished` implement có spec; 3 refusal ma xoá; 5 đổi tên theo string
+thật); `observe` chuyển sang nhóm write trong `api.yaml`; `check-contract-cites.mjs` phủ
+`modules/kernel`; blocker kinds/outcomes/effort/job status mỗi cái một chỗ;
+`normalizeOwnedPath`, `readOwnerConfig`, phase transition mỗi cái một implementation; số vào
+`runtimes.yaml allocation.*`; ghost engine/kernel hết. Fable wire ba check mới vào
+`npm run check` (`check-api-surface`, `check-contract-cites`, `check-schema-catalog`).
+
+Quyết định của Fable trên các điểm B để mở:
+
+- `already-queued` bỏ vì `cutExecution` cố ý enqueue N job cùng op; fence thật là path lease.
+  Không thêm refusal cut-aware trong alpha.2.
+- Không thêm `CHECK(status IN ...)` vào `jobs`; `JOB_STATUSES` trong `ledger-db.mjs` là vocabulary.
+- `readDistJson` đổi tên: lane cuối (K) làm cùng `check-scoped-lint.mjs:7,186`.
+- Refusal của `report` (`report-contract-unbound`, `report-dispatch-unbound`,
+  `report-job-not-active`) document sau khi Devin/G sửa A7.
+
+Việc rơi sang lane khác:
+
+- E: `README.md:17` 8 verb; `docs/ledger-db.md:149-153`, `docs/host-contract.md:131`,
+  `docs/workflow-kernel.md:89` còn tên refusal đã xoá; `docs/examples/todo-app-standard.md:111,194`
+  path `scripts/example-evidence.mjs`; `runtimes.yaml:5,23` "config.json"; bare filename trong
+  `citation:` ở `modules/goal/anatomy.yaml:344`, `legality.yaml:310-425`,
+  `modules/schemas/relationships.yaml:46-137` (E hoặc H, chạy
+  `node scripts/checks/check-contract-cites.mjs --scan modules --scan docs --scan CONTEXT.md --scan skills`).
+- C đã xử lý: `selection.yaml` model-policy cites, profiles model-catalog, `work-layout.yaml:38`,
+  `schemas/index.yaml:520`.
