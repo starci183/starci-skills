@@ -905,6 +905,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   ~24 process từ 20h; codex 2 lần "Timed out waiting for terminal handle" phía Orca. Chưa chạy. Lane P xong
   (4 vá, replay không đổi job nào) nhưng đụng lane Q ở 6 file routing → agent lane P đang merge main vào nhánh.
 
+- 06:00 Thầy tắt app Devin desktop (36 → 10 process devin) → kernel modules boot ngay trên devin
+  (`term_b33015f6`). Watchdog `--repair` cho hai workflow mới. Merge lane P (`1aacfc3c5`, gộp với lane Q):
+  audit và draw route sang codex (agent có trình duyệt/ImageGen trong nhóm think). Phiên fork báo Orca
+  không tạo được terminal Codex tương tác từ ~21:45 giờ Orca (mọi repo) → audit/draw sẽ không dispatch
+  được tới khi Orca hết kẹt; đã báo 4 kernel giữ job codex ở queued, một incident, không retry vòng.
+  Lane Q2 (kernel theo nhóm) conflict với lane P → phiên fork merge main vào Q2.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
