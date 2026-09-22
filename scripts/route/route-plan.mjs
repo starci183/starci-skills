@@ -19,7 +19,9 @@
 //   node scripts/route/route-plan.mjs --target "feature.A: exists proven" [--state <.starciwork dir>] [--surface ui|api]
 //   node scripts/route/route-plan.mjs --simulate --target-json '{"sds.X":"decided","ui.X":"verified"}'
 //   node scripts/route/route-plan.mjs --text "build the enrolment screen" [--state <dir>]
-//   [--opsDir <dir>] [--goalDir <dir>] [--json]
+//   [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]
+//   --work reads only the records legality.yaml settledOutOfBand names (a
+//   settled brand record drops brand.decide); --state is the full SURVEY.
 //
 // Output: ordered legs, each {op, producesCovered, needsSatisfiedBy, extends?,
 // assumed?, conditions?}; plus an `infeasible` report when no chain exists.
@@ -41,7 +43,7 @@ function usage(code) {
   console.error(`use: node scripts/route/route-plan.mjs
     (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --text "<prompt>")
     [--state <.starciwork dir>] [--simulate] [--surface ui|api]
-    [--opsDir <dir>] [--goalDir <dir>] [--json]`);
+    [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]`);
   process.exit(code);
 }
 
@@ -62,6 +64,7 @@ function parseArgs(argv) {
     else if (k === '--surface') a.surface = take();
     else if (k === '--opsDir') a.opsDir = take();
     else if (k === '--goalDir') a.goalDir = take();
+    else if (k === '--work') a.work = take();
     else if (k === '--json') a.json = true;
     else if (k === '--help' || k === '-h') usage(0);
     else usage(2);
@@ -127,6 +130,27 @@ function loadProducesTable(goalDir) {
     }
   }
   return { byVar, file: path.relative(skillRoot, file) };
+}
+
+/** legality.yaml producesVocabulary.settledOutOfBand, evaluated against one
+ *  Work root: each entry whose record exists with the named state yields the
+ *  variable it settles. The record's `state` field is read as YAML data. */
+function loadSettledOutOfBand(goalDir, workRoot) {
+  const doc = parseYaml(fs.readFileSync(path.join(goalDir, 'legality.yaml'), 'utf8'));
+  const out = [];
+  for (const entry of asArray(doc?.producesVocabulary?.settledOutOfBand)) {
+    const m = /^([A-Za-z][A-Za-z0-9.]*)\s*:\s*(\S+)$/.exec(String(entry?.var ?? '').trim());
+    if (!m || !entry.record) continue;
+    let recordState;
+    try { recordState = String(parseYaml(fs.readFileSync(path.join(workRoot, entry.record), 'utf8'))?.state ?? ''); } catch { continue; }
+    if (recordState !== String(entry.state)) continue;
+    const dot = m[1].indexOf('.');
+    out.push({
+      family: dot < 0 ? m[1] : m[1].slice(0, dot), state: m[2], record: entry.record, recordState,
+      note: `${m[1]}: ${m[2]} record ${entry.record} state ${recordState} — satisfied out-of-band, no chain leg`,
+    });
+  }
+  return out;
 }
 
 // ------------------------------------------------------------ PARSE -> S* --
@@ -261,10 +285,23 @@ function alternativeMatches(text, alt) {
 function loadArchetypeSignals(goalDir) {
   const file = path.join(goalDir, 'archetypes.yaml');
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
+  const sets = doc?.signalMatching?.phraseSets ?? {};
+  const expand = list => asArray(list).flatMap(p => {
+    if (typeof p !== 'string' || !p.startsWith('$')) return [p];
+    const set = sets[p.slice(1)];
+    if (!Array.isArray(set)) throw Error(`${file}: phrase set '${p}' is not declared in signalMatching.phraseSets`);
+    return set;
+  });
+  const expandAlt = alt => (alt && typeof alt === 'object' ? {
+    ...alt,
+    phrases: expand(alt.phrases),
+    requires: asArray(alt.requires).map(expand),
+    excludes: expand(alt.excludes),
+  } : alt);
   const byId = new Map();
   for (const arch of asArray(doc?.archetypes)) {
     for (const entry of arch?.variants ? asArray(arch.variants) : [arch]) {
-      byId.set(String(entry.id), { id: String(entry.id), signals: asArray(entry.signals), supersedes: asArray(entry.supersedes ?? arch.supersedes), extra: entry });
+      byId.set(String(entry.id), { id: String(entry.id), signals: asArray(entry.signals).map(expandAlt), supersedes: asArray(entry.supersedes ?? arch.supersedes), extra: entry });
     }
   }
   const sequence = asArray(doc?.signalMatching?.sequence).map(String);
@@ -448,7 +485,8 @@ function parsePrerequisite(text, ops) {
   return { kind: 'condition', note: `unparsed prerequisite treated as a condition: '${t}'` };
 }
 
-function planChain({ sstar, s0, ops, prodTable, hints }) {
+function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
+  const settledOutOfBand = v => outOfBand.find(o => o.family === v.family && o.state === v.state) ?? null;
   const legs = new Map();  // legId -> leg
   const edges = [];        // [fromLegId, toLegId]  (from must run first)
   const gaps = [];         // unproducible vars
@@ -523,6 +561,13 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
           return true;
         }
       }
+    }
+    // 1b. settled by a Work record outside the chain (legality.yaml settledOutOfBand)?
+    const oob = settledOutOfBand(v);
+    if (oob) {
+      consumerLeg.assumed.push(oob.note);
+      consumerLeg.needsSatisfiedBy.push(`out-of-band: ${oob.record} (${oob.recordState})`);
+      return true;
     }
     // 2. satisfied by S0?
     const s0hit = satisfiedByS0(v, s0);
@@ -612,6 +657,12 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
         }
         // satisfied by S0? else ensure the leg exists
         const prodEntries = prodTable.byVar.filter(p => p.op === req.op);
+        const oob = prodEntries.length && prodEntries.every(pe => settledOutOfBand(pe)) ? settledOutOfBand(prodEntries[0]) : null;
+        if (oob) {
+          leg.assumed.push(oob.note);
+          leg.needsSatisfiedBy.push(`out-of-band: ${oob.record} (${oob.recordState})`);
+          continue;
+        }
         const s0ok = prodEntries.length && prodEntries.every(pe => satisfiedByS0({ family: pe.family, suffix: pe.suffix, state: pe.state }, s0)?.by === 's0');
         if (s0ok) { leg.needsSatisfiedBy.push(`S0 (${req.note})`); continue; }
         const dep = ensureLeg(req.op);
@@ -890,6 +941,7 @@ function main() {
   const goalDir = path.resolve(args.goalDir ?? path.join(skillRoot, 'modules', 'goal'));
   const ops = loadOps(opsDir);
   const prodTable = loadProducesTable(goalDir);
+  const outOfBand = args.work ? loadSettledOutOfBand(goalDir, path.resolve(args.work)) : [];
 
   // PARSE -> S*
   let sstar = [], hints = {}, parseNotes = [];
@@ -945,7 +997,7 @@ function main() {
   }
 
   // CHAIN
-  const { legs, edges, gaps, assumptions } = planChain({ sstar: delta, s0, ops, prodTable, hints });
+  const { legs, edges, gaps, assumptions } = planChain({ sstar: delta, s0, ops, prodTable, hints, outOfBand });
 
   // done-record-reverify: a producing leg whose S0 counterpart record is done
   // but touched gets extends + the chain keeps a verify leg over the surface.

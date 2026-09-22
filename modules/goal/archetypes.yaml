@@ -150,7 +150,16 @@ signalMatching:
     A matched archetype's supersedes list removes those archetypes from the
     match set before the union is taken — a lifecycle scope (specification,
     scaffold) names repositories and surfaces as nouns without asking to build
-    them, so the generic build priors it supersedes never join its chain.
+    them, so the generic build priors it supersedes never join its chain. A
+    lifecycle scope holds only while the prompt carries no delivery demand:
+    its excludes cite $buildIntent, so a build prompt that also asks to close
+    spec gaps keeps its implement legs. Repository names and product nouns
+    (starci-next-fe, "Code challenge") are not delivery demands.
+  phraseSets:
+    buildIntent: [end to end, end-to-end, full-stack, fullstack feature, build fullstack, làm fullstack, tính năng fullstack, backend and frontend, frontend and backend, backend và frontend, frontend và backend, đúng thiết kế, sản phẩm chạy được, tới sản phẩm, e2e xanh, test xanh, tests xanh, uat trình duyệt, trên trình duyệt, tests green, e2e green, working product, running product, làm trọn tính năng, trọn tính năng, implement the*, implement it]
+  phraseSetReference: >-
+    A phrase written "$name" in phrases, requires or excludes stands for every
+    phrase of phraseSets.name.
   noMatch: >-
     No surviving match means S* cannot be formed: route-plan reports the INTENT
     tier (needs-owner) and define-goal prints the chain as `underivable (kernel
@@ -206,7 +215,7 @@ archetypes:
       phrases: [srs, sds, đặc tả, specification*, software requirements, software design]
       requires:
         - [author*, write, writing, complete, extend, rebuild, reconstruct, declare, define, viết, soạn, bổ sung, hoàn thiện, tái lập, khai báo, xây dựng đặc tả]
-      excludes: [implement*, scaffold*, base repo]
+      excludes: [implement*, scaffold*, base repo, $buildIntent]
     supersedes: [feature-build-fullstack, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
     chain:
       - {op: workspace.manage,    leg: workAuthor, note: "import mode: reconstruct the canonical .starciwork in the owner repository from the existing Work source with provenance, source untouched; its setup scope record is the bounded scope, so scope.define is not a leg"}
@@ -247,6 +256,7 @@ archetypes:
         business. The stack is fixed by CONTEXT.md and the toolchain by
         knowledge/repository-baseline.yaml, so no decide leg precedes it.
       phrases: [scaffold*, base repo, base repository, repository baseline, repo baseline, greenfield, khởi tạo repo, dựng repo, dựng base repo, tạo repo mới, bootstrap the repo*]
+      excludes: [$buildIntent]
     supersedes: [spec-foundation, feature-build-fullstack, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
     surfaces:
       backend: [backend, back-end, nestjs, nest, code be, api, máy chủ]
@@ -283,8 +293,8 @@ archetypes:
         feature delivered through both the API and the interface to a running
         product. Naming repositories that happen to be a backend and a frontend
         is not this signal; lifecycle scopes supersede it.
-      phrases: [end to end, end-to-end, full-stack, fullstack, full stack, backend and frontend, frontend and backend, back end and front end, backend và frontend, frontend và backend, be và fe, fe và be, tới sản phẩm chạy được, đến sản phẩm chạy được, làm trọn tính năng, trọn tính năng]
-    supersedes: [feature-build-with-ui, feature-build-backend]
+      phrases: [end to end, end-to-end, full-stack, fullstack feature, build fullstack, làm fullstack, tính năng fullstack, backend and frontend, frontend and backend, back end and front end, backend và frontend, frontend và backend, be và fe, fe và be, tới sản phẩm chạy được, đến sản phẩm chạy được, làm trọn tính năng, trọn tính năng]
+    supersedes: [feature-build-with-ui, feature-build-backend, verify-only]
     chain:
       - {op: request.analyze,     leg: intake,      note: "external; chat-side intake"}
       - {op: scope.define,        leg: scopeDefine, note: "bounds both surfaces of the feature"}
@@ -446,7 +456,7 @@ archetypes:
         behaviour" — a behaviour-invariant change to existing delivered code.
         A request naming the Work or stack roots is workspace-canonicalization.
       phrases: [refactor, clean up, cleanup, clean-up, restructure, rename, tái cấu trúc, dọn dẹp code, dọn code, đổi tên]
-      excludes: [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack]
+      excludes: [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack, $buildIntent]
     chain:
       - {op: request.analyze, leg: intake}
       - {op: code.refactor,   leg: implement, note: "prereq: 'delivered code + existing regression coverage'; test-gap blocker routes to test.author first if coverage is missing"}

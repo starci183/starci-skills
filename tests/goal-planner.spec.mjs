@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -169,4 +171,46 @@ test('repository nouns do not trigger fullstack, and no lifecycle prompt opens w
     assert.ok(!['test.author', 'code.refactor'].includes(plan.legs[0]?.op), `${plan.scopeKind} must not open with a migration leg`);
     assert.ok(!plan.legs.some(leg => leg.op === 'code.refactor'));
   }
+});
+
+// The two nivo goal prompts of the 2026-09-23 night log (04:40 request, 05:05
+// re-plan), in their original shape: each asks to close missing SRS/SDS AND to
+// deliver backend + frontend to green tests, e2e and browser UAT; the modules
+// prompt also names a WIP refactor branch as reference. Reconstructed from the
+// log's description — the log does not quote them.
+const NIVO_MODULES_PROMPT = 'Hoàn thiện ba module Sales, Accounting, Chatbot và quản lý instance AgentOS trong nivo: đóng SRS/SDS còn thiếu, backend và frontend đúng thiết kế, test và e2e xanh, UAT trình duyệt. Nhánh WIP refactor/accounting (206 file) chỉ tham khảo, không merge.';
+const NIVO_COLLAB_PROMPT = 'Làm trọn tính năng chat nhóm Collab trong nivo: SRS/SDS còn thiếu được đóng, backend và frontend đúng thiết kế, test và e2e xanh, UAT trình duyệt, tới sản phẩm chạy được.';
+
+const runWith = (text, ...extra) => spawnSync(process.execPath, [ROUTE_PLAN, '--text', text, '--json', ...extra], {
+  cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 60000,
+});
+const workRoot = (t, brandState) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-work-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  if (brandState) {
+    fs.mkdirSync(path.join(dir, 'brand'));
+    fs.writeFileSync(path.join(dir, 'brand', 'index.yaml'), `schema: work/brand@1\nid: fixture.brand\nstate: ${brandState}\n`);
+  }
+  return dir;
+};
+
+test('a build prompt that also closes spec gaps keeps its implement legs (buildIntent excludes the lifecycle scopes)', () => {
+  for (const prompt of [NIVO_MODULES_PROMPT, NIVO_COLLAB_PROMPT]) {
+    const plan = body(run(prompt));
+    assert.equal(plan.status, 'ok');
+    assert.deepEqual(plan.parseNotes, ['intent->S* via archetypes [feature-build-fullstack]'], prompt);
+    assert.deepEqual(plan.legs.map(leg => leg.op), FULLSTACK_LEGS, prompt);
+  }
+  // A course named "Fullstack" and a contract named "E2E" are nouns, not a delivery demand.
+  assert.equal(body(run(SPEC_PROMPT)).scopeKind, 'spec-foundation');
+  assert.equal(body(run(SCAFFOLD_PROMPT)).scopeKind, 'greenfield-scaffold');
+});
+
+test('a settled brand record drops brand.decide as an out-of-band assumption; an absent or unsettled one keeps it', t => {
+  const settled = body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, 'done')));
+  assert.deepEqual(settled.legs.map(leg => leg.op), FULLSTACK_LEGS.filter(op => op !== 'brand.decide'));
+  const draw = settled.legs.find(leg => leg.op === 'interface.draw');
+  assert.ok(draw.assumed.includes('brand: settled record brand/index.yaml state done — satisfied out-of-band, no chain leg'));
+  assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, null))).legs.map(leg => leg.op), FULLSTACK_LEGS);
+  assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, 'todo'))).legs.map(leg => leg.op), FULLSTACK_LEGS);
 });
