@@ -75,6 +75,7 @@ calls:
     required: [spec, run]
     receipt: [result.task.id, result.task.display_name]
     creates: task
+    values: {parent: task-id, deps: task-id-list, run: run-id, from: terminal-handle}
   task-update:
     command: orchestration task-update
     kind: mutation

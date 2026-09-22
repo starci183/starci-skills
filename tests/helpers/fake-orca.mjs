@@ -171,6 +171,8 @@ else if (verb === 'orchestration run-use')
   out({ ok: true, result: { run: { id: arg('id') } } });
 else if (verb === 'orchestration run-show')
   out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: 'fake-terminal-1' } } });
+else if (verb === 'orchestration task-create' && arg('parent') != null && !/^task[_-]/.test(arg('parent')))
+  fail({ ok: false, error: { code: 'invalid_parent', message: '--parent takes a task id' } });
 else if (verb === 'orchestration task-create')
   out({ ok: true, result: { task: { id: 'task-fake-1', display_name: arg('display-name'), run: arg('run') } } });
 else if (verb === 'orchestration task-update')

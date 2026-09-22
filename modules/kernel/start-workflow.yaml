@@ -106,14 +106,14 @@ orcaTree:
   rule: >-
     A workflow has exactly one live kernel terminal; its Orca Run is created
     once and survives kernel restarts; every operation Task is created in that
-    Run with the CURRENT kernel terminal as `from` and as `parent`; a job that
+    Run with the CURRENT kernel terminal as `from` (Orca `--parent` takes a task id, never a terminal); a job that
     ends (settle, reject, finish) leaves no live terminal, worker or open Task;
     a kernel restart closes the previous kernel terminal before the new one is
     recorded.
   enforcedBy:
     - scripts/kernel/start-workflow.mjs — the restart merges the new seat over the previous kernel payload, so orca.runId and hierarchy.runtime.runId survive, and terminal-closes the previous kernel terminal before the replacement is recorded; a refused close is a kernel-stale-terminal-unclosed event plus an open incident.
-    - scripts/kernel/api.mjs — ensureWorkflowRun creates the Run once per workflow; createOperationTask passes the current kernel terminal as parent and from; rejectDispatch closes the terminal or worker the refused attempt created and records terminalClosed; settle closes the worker and the Task; finish closes the kernel terminal and every Task the Run still holds open.
-    - modules/host/orca/calls.yaml — the typed calls those steps issue (terminal-create --title, terminal-close, task-create --parent, task-update).
+    - scripts/kernel/api.mjs — ensureWorkflowRun creates the Run once per workflow; createOperationTask passes the current kernel terminal as `from`; rejectDispatch closes the terminal or worker the refused attempt created and records terminalClosed; settle closes the worker and the Task; finish closes the kernel terminal and every Task the Run still holds open.
+    - modules/host/orca/calls.yaml — the typed calls those steps issue (terminal-create --title, terminal-close, task-create --from, task-update).
   titles:
     kernelTerminal: '[Kernel] <workflow_id>'
     operationTerminal: '[Op] <op> a<attempt> · <workflow_id>'

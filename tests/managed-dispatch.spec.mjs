@@ -165,8 +165,8 @@ test('managed dispatch: route persists the decision, spawn marks the job running
     'the dedicated Kernel terminal is the explicit Orca Run/worker coordinator');
   const taskCreateCall=calls.find(argv=>argv.slice(0,2).join(' ')==='orchestration task-create');
   assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--run')+1],'run-fake-1');
-  assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--parent')+1],'fake-kernel-terminal',
-    'the Task is a child of the CURRENT kernel terminal, not merely issued from it');
+  assert.equal(taskCreateCall?.includes('--parent'),false,
+    'Orca --parent takes a task id; the kernel is a terminal, so the Task hangs under the Run and names the kernel with --from');
   assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--from')+1],'fake-kernel-terminal');
   assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--task-title')+1],'code.refactor #1');
   assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--display-name')+1],'[Op] code.refactor');

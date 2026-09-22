@@ -1622,7 +1622,6 @@ const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle }
     spec: prompt,
     taskTitle: `${op} #${attempt}`,
     displayName: title,
-    parent: kernelHandle,
     from: kernelHandle,
   });
 

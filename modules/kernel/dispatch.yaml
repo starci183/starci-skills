@@ -332,7 +332,7 @@ spawnMechanics:
     render are one rule, stated once in modules/kernel/start-workflow.yaml
     orcaTree: one live kernel terminal per workflow, one Run that survives
     kernel restarts, every operation Task created in it with the CURRENT
-    kernel terminal as `from` and as `parent`, and nothing live left behind by
+    kernel terminal as `from`, and nothing live left behind by
     a settle, a reject or a finish. scripts/checks/check-orca-tree.mjs is the
     executable half.
   launchWindow: >-
