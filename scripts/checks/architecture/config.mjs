@@ -42,7 +42,7 @@ function exactKeys(value, allowed, label) {
  * resolve into: a checked project is routinely one package of a repository that also ships the packages
  * it consumes, and `--root` is the project, not the repository.
  */
-function repositoryRoot(root) {
+function enclosingRepository(root) {
   let cursor = path.resolve(root);
   for (;;) {
     if (fs.existsSync(path.join(cursor, '.git'))) return cursor;
@@ -91,7 +91,7 @@ function workspaceDirectories(root) {
   const directories = new Set();
   const queue = [root];
   const visited = new Set();
-  const repository = repositoryRoot(root);
+  const repository = enclosingRepository(root);
   const admit = (candidate, label = 'local package', strict = false) => {
     const absolute = path.resolve(candidate);
     if (!isInside(root, absolute) || absolute === root || !existingDirectory(root, slash(path.relative(root, absolute)))) {
@@ -385,6 +385,7 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   assertFrontendRolesDisjoint(root, resolvedFrontend);
   return {
     root,
+    repository: enclosingRepository(root),
     kinds: [...kinds].sort(),
     projects,
     workspaces,
@@ -394,4 +395,4 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   };
 }
 
-export { CONFIG_SCHEMA, isInside, slash };
+export { CONFIG_SCHEMA, enclosingRepository, isInside, slash };

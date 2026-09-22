@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {loadArchitectureConfig} from '../scripts/checks/architecture/config.mjs';
+import {enclosingRepository, loadArchitectureConfig} from '../scripts/checks/architecture/config.mjs';
 
 /**
  * A checked project is routinely one package of a repository that also ships the packages it consumes.
@@ -99,4 +99,24 @@ test('with no repository around it, the project itself is the boundary', t => {
   assert.throws(() => loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json'),
     /must resolve to a package directory inside the repository/,
     'the wider boundary is a git checkout, not any parent directory that happens to exist');
+});
+
+test('the loaded config carries the repository it found, so every later boundary test asks the same question', t => {
+  const {root, write, manifest} = repo(t);
+  write('.git', 'gitdir: elsewhere\n');
+  manifest('', {name: 'monorepo', version: '0.0.0', private: true});
+  project(write, manifest, 'examples/app', {});
+  const config = loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json');
+  assert.equal(config.repository, path.resolve(root),
+    'the import-resolution check reads this rather than walking up again, so the two cannot disagree about where the checkout ends');
+  assert.equal(enclosingRepository(path.join(root, 'examples/app')), path.resolve(root));
+});
+
+test('a project with no git checkout around it reports no repository at all', t => {
+  const {root, write, manifest} = repo(t);
+  manifest('', {name: 'monorepo', version: '0.0.0', private: true});
+  project(write, manifest, 'examples/app', {});
+  const config = loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json');
+  assert.equal(config.repository, null,
+    'null is what makes the project itself the boundary; a parent directory that is not a checkout is not a wider scope, it is just a parent');
 });

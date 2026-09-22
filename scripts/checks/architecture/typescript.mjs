@@ -307,7 +307,14 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
       const actualTarget = canonical(resolvedName);
       const workspaceImport = [...workspaceNames].some(name => reference.specifier === name || reference.specifier.startsWith(`${name}/`));
       const internal = reference.specifier.startsWith('.') || pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
-      if (internal && !isInside(config.root, actualTarget)) {
+      // The boundary is the checkout, not the checked project: a path alias that lands in a sibling
+      // package of the same repository (`@fe-kit/*` -> packages/fe-kit) is still source a reviewer can
+      // open, while anything past the repository, or anything inside an installed dependency tree, is
+      // not. `config.repository` is null when there is no git checkout around the project, and the
+      // project is then the boundary it always was.
+      const reviewable = isInside(config.root, actualTarget)
+        || (config.repository && isInside(config.repository, actualTarget) && !slash(actualTarget).includes('/node_modules/'));
+      if (internal && !reviewable) {
         errors.push({
           ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',
           project: project.relative,
