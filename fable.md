@@ -939,6 +939,15 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   job Codex. Phiên fork mở lane P4: baseline Nest/Next qua được check-scoped-lint (layout module + architecture
   config, canon một authority).
 
+- 07:15 AUTH bị watchdog đánh thức lặp: kernel ghi "[owner-gate-pending]" bằng văn xuôi, status vẫn báo 2 cut
+  integration.verify là ready. Vá `6b6f0579f`: `api incident --kind owner-gate --holds` giữ job (queuedBecause
+  owner-gate, route/dispatch từ chối), `--resolve` đóng incident (cũng là verb resolve còn thiếu). Kernel AUTH đã
+  chuyển sang gate có cấu trúc (inc-4f9f44eb513a), actionable=false. Collab kẹt ở hộp thoại hỏi của Devin CLI;
+  watchdog gõ lời đánh thức vào ô "Other" vì con trỏ ❭ giống prompt. Vá `134fee6a0`: gate agent-question-dialog
+  + kernel-prompt cấm hỏi owner qua dialog. Trò Esc hộp thoại, trả lời 3 quyết định Collab theo ủy quyền:
+  read-scope shared-office-read, safe-mode mandatory-category-gate, quality-targets ngưỡng tạm 2s/5s/3s p95.
+  Mâu thuẫn scope.define (ghi work/node@1) với work-layout (cấm work/node mới) giao cho một lane nền.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
