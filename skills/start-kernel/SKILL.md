@@ -10,6 +10,10 @@ description: >-
 
 # start-kernel
 
+You are the owner's chat. This skill boots the one long-lived `[Kernel]` agent
+for a goal `define-goal` already persisted, and the owner's exact `ok` is the
+only thing that lets you spawn it.
+
 Contract: `.claude/modules/kernel/start-workflow.yaml`
 Executable: `.claude/scripts/kernel/start-workflow.mjs`
 
@@ -21,7 +25,8 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
    - `<Source>` is the host repository containing `.claude/CONTEXT.md` and the
      entry executable.
    - `<project-owner-repo>` owns the selected project's
-     `.starciwork/runtime.sqlite`; `define-goal` printed it as `LEDGER`.
+     `.starciwork/runtime.sqlite`; `define-goal` printed that path on its
+     `ledger:` line.
    Resolve the **goal ID** (`workflowId`) printed by `define-goal`, or ask the
    owner. Omit `--goal` only to target the earliest pending goal.
 2. Run the preview — mutates nothing:
@@ -55,7 +60,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
 - **Singleton**: a live kernel signal refuses a second kernel; a dead one is rebound.
 - **Topology**: Codex/Claude/Devin chats are ingress launchers; Orca is the
   execution host; the Kernel is one dedicated Orca terminal. Codex/Claude
-  managed workers are operation lanes and are not used to boot the Kernel.
+  managed workers run ops; the Kernel is never booted on one.
 - **Identity**: `agent` means execution adapter (`codex|claude|devin|qwen`),
   `model` means a concrete model id, `profile` means a StarCi routing target,
   and `runtimePool` means a quota/capacity window. Do not call all four a provider.
@@ -64,20 +69,19 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   Kernel is recorded running; a command flag alone is not attestation.
 - A `finished` workflow's goal never re-enters the queue — starting it again is refused.
 - The spawned kernel is ONE long-lived LLM agent that orchestrates exclusively
-  through `node .claude/scripts/kernel/api.mjs <cmd>`
-  (`survey | status | hierarchy | plan | enqueue | route | dispatch | nudge | observe | consume-report |
-  check | settle | incident | finish`; the worker-side op IPC is
-  `op-contract | report`). It never writes `.starciwork/runtime.sqlite`
-  directly, never calls `orca`
-  itself — the api owns all host mechanics — and never spawns op terminals by
-  hand: each op is one ephemeral `[Op]` agent per job, launched through
-  `api dispatch --spawn`. Do NOT hand the kernel op-level work or
-  direct-ledger instructions.
+  through `node .claude/scripts/kernel/api.mjs <verb>`; the verb surface is
+  `.claude/modules/kernel/api.yaml`. It never writes
+  `.starciwork/runtime.sqlite` directly, never calls `orca` itself — the api
+  owns all host mechanics — and never spawns op terminals by hand: each op is
+  one ephemeral `[Op]` agent per job, launched through `api dispatch --spawn`.
+  Do NOT hand the kernel op-level work or direct-ledger instructions.
 - Long-lived is a durable logical identity, not a promise that one provider
-  generation never returns to its input prompt. For explicitly authorized
-  unattended workflows, `scripts/kernel/watchdog.mjs` polls every five minutes,
-  wakes that same terminal on `turn-idle`, and re-enters this start path only
-  after exact disconnected/unwritable proof. The watchdog never chooses Ops.
+  generation never returns to its input prompt. `scripts/kernel/watchdog.mjs`
+  polls on the cadence in `.claude/modules/models/runtimes.yaml`
+  (`allocation.watchdogCadenceMs`), wakes that same terminal on `turn-idle`,
+  and re-enters this start path only after exact disconnected/unwritable
+  proof. It repairs only when the owner authorized unattended continuation,
+  and it never chooses Ops.
   The Kernel itself processes immediately executable transitions and yields
   when durably waiting; it never uses `Start-Sleep`, shell sleep, timers, or an
   in-turn polling loop to imitate liveness.

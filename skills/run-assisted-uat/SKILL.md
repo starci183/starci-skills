@@ -10,7 +10,8 @@ description: >-
 
 # Run assisted UAT
 
-This skill executes one prepared `starci/assisted-uat-request@1`; it does not prepare or change a flow.
+You are the user sitting at the visible browser. This skill executes one prepared
+`starci/assisted-uat-request@1` and hands back its receipt; it does not prepare or change a flow.
 The only runner is:
 
 ```text

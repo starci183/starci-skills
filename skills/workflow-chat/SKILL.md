@@ -10,7 +10,8 @@ description: >-
 
 # Workflow chat
 
-One chat monitors one workflow. The workflow's brain is ONE long-lived `[Kernel] <workflow_id>`
+You are the owner's chat, monitoring one workflow. You relay; the kernel
+decides. One chat monitors one workflow. The workflow's brain is ONE long-lived `[Kernel] <workflow_id>`
 agent running on an Orca terminal; its durable state is the ledger at
 `<repo>/.starciwork/runtime.sqlite`, mutated only through `scripts/kernel/api.mjs`. The chat adds
 no second mechanism and no second mutation surface: it reads ledger projections through the api and
@@ -28,8 +29,8 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
 - `<skill root>` is the Source host's `.claude` directory that holds the
   `CONTEXT.md` you were sent to. `<repo>` is separately the project repository
   that owns the workflow's `.starciwork/runtime.sqlite` (`define-goal` printed
-  it as `LEDGER`). `--repo` always names that ledger owner, even when this chat
-  was opened elsewhere.
+  that path on its `ledger:` line). `--repo` always names that ledger owner,
+  even when this chat was opened elsewhere.
 - Every runtime call goes through the runtime's own scripts, run from anywhere:
 
   ```
@@ -40,8 +41,8 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
   node <skill root>/scripts/api/orca/terminal-list.mjs [--worktree <sel>]
   ```
 
-  The scripts call the host CLI themselves; there is no build step and you never invoke `orca`
-  directly.
+  The scripts call the host CLI themselves; you run them straight from the tree and never
+  invoke `orca` directly.
 - Keep the `workflowId` from goal intake and the `[Kernel]` terminal handle from boot; every later
   step names one of them.
 - A Codex/Claude/Devin chat task and an Orca terminal are different control
@@ -90,10 +91,10 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
   its LLM turn has returned to the input prompt, or re-enters start-workflow
   after exact disconnected/unwritable proof. Without that authorization omit
   `--repair`; report `wake-needed`/`restart-needed` instead.
-- The cadence belongs to this external monitor/watchdog. A healthy Kernel
-  reasons through all immediately executable transitions, then yields when it
-  is durably waiting. It must never keep a model turn alive with `Start-Sleep`,
-  shell sleep, timers, or an internal polling loop.
+- The cadence belongs to this external monitor/watchdog. The Kernel's own
+  yield rule is `.claude/modules/kernel/driver-loop.yaml` — read it there
+  rather than restating it here — and a Kernel that sleeps or polls inside its
+  turn is violating that contract, not this skill.
 - Read the kernel's own words with `terminal-read --terminal <kernel handle> --screen`: what it is
   doing, what it is asking. Relay every owner-bound item — a question the kernel poses, an open
   `incident`, a pending `inbox` row that needs the owner — verbatim, then say what answering it
@@ -135,9 +136,9 @@ means a quota/capacity window. Do not collapse these roles into “provider”.
 
 ## Never
 
-- Write `.starciwork/runtime.sqlite` or `state.json` — the kernel mutates the ledger only through
-  `scripts/kernel/api.mjs` and the chat mutates nothing at all. A live kernel is driven through its
-  `inbox` rows and its terminal.
+- Write `.starciwork/runtime.sqlite`, or keep workflow state in a file of your own — the kernel
+  mutates the ledger only through `scripts/kernel/api.mjs` and the chat mutates nothing at all. A
+  live kernel is driven through its `inbox` rows and its terminal.
 - Never approve — the exact-`ok` gate in `define-goal`/`start-kernel` fires only on the owner's
   literal word; a relayed "looks fine to me" is not approval unless the owner typed it.
 - Spawn a second kernel or a second workflow in this chat. A second goal is a second workflow: open
