@@ -956,6 +956,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   kernel đang xử lý. Backlog: workspace.manage vẫn ghi "setup scope record" gốc (work/node@1) và _common.yaml
   vẫn nói bản ghi gốc mang work/node@1; kinds.yaml còn work/node@1 cho workspace.manage và scope.finish.
 
+- 07:45 Merge lane P4 `a26456e6d`: baseline Nest/Next qua check-scoped-lint, typecheck, test, build và boot.
+  Đã review 4 thay đổi checker: settingMatches chỉ nhận đúng defaultOptions, bỏ spec khỏi NEST-FEATURE-FILE-SHAPE,
+  cho phép transports rỗng, và export default định danh được tính là subject. Sau merge: check xanh, spec 31/31.
+  Yêu cầu fork đặt test e2e baseline (~4.5 phút, cài package) sau cờ env, chạy ở checklist release.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
