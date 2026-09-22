@@ -8,7 +8,8 @@
 // packet.md, the exact text the op must be told to read, in load order.
 //
 // Consumed two ways:
-//   - CLI (this file's main): kernel/api calls it to materialize a packet.
+//   - CLI (this file's main): materializes a packet on demand; tests/context-pack.spec.mjs
+//     drives it as a process.
 //   - Library: scripts/route/dispatch-op.mjs imports buildContext/renderPromptReads
 //     so the [Op] prompt carries the resolved MANDATORY READS list, not just
 //     "read CONTEXT.md".

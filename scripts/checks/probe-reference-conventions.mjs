@@ -4,6 +4,9 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 
 // Read-only probes against installed reference rules, not a product lint pass.
+// Caller: knowledge/patterns/scan-coverage.yaml:26 (probe-helper) tells a scan
+// to run this against a backend reference root that has @starci/eslint-canon-be
+// installed. No root spec covers it — this repo carries no eslint.
 const root=path.resolve(process.argv[2]??'..');
 const require=createRequire(path.join(root,'package.json'));
 const {Linter}=require('eslint');
