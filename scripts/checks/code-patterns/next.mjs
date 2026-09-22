@@ -207,6 +207,10 @@ function sourceExports(ts, source) {
   for (const statement of source.statements) if (exported(ts, statement) || ts.isExportDeclaration(statement)) {
     for (const name of declarationNames(ts, statement)) names.add(name);
   }
+  // `const X = ...; export default X` is how a Next convention file (layout, page) names its one subject.
+  for (const statement of source.statements) if (ts.isExportAssignment(statement) && !statement.isExportEquals && ts.isIdentifier(statement.expression)) {
+    names.add(statement.expression.text);
+  }
   return names;
 }
 

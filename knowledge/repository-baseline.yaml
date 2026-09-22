@@ -26,8 +26,9 @@ provenance:
     differ from each other or from this baseline, the observations below say so and the baseline
     value wins for a new repository. Package versions are the observed pins at readAt; recheck the
     published kit versions when scaffolding. The shapes were proven at readAt by materialising each
-    profile into an empty directory and running npm install, typecheck, lint and the test runner
-    with exit 0.
+    profile into an empty directory and running npm install, typecheck, lint, the test runner, build,
+    the start script answering GET /health/live, and check-scoped-lint --all with the shape's
+    architecture.json, all with exit 0; tests/repository-baseline.spec.mjs repeats that proof.
 parameters:
   name: npm package name of the new repository - the bound repository name
   app: Nest application folder under apps/ - the service name the record or design declares
@@ -39,10 +40,13 @@ guidance:
       quality configuration comes from the shapes below for the repository's profile. A profile shape
       extends common: maps merge with the profile's keys added, and a profile list is appended to the
       common list. An angle-bracket placeholder resolves to the common key it names or to a declared
-      parameter; common.* references resolve to the value they name. The manifest is composed as
-      common.manifest orders it, and every entry under files is written byte for byte at its path with
-      only its placeholders filled. A value the shapes do not carry is a named gap in the scaffold
-      evidence, never an improvised choice.
+      parameter; an angle-bracket token that starts with a capital or is a TypeScript type keyword
+      (Promise<void>, Readonly<NodeJS.ProcessEnv>) is source text and stays as written. common.*
+      references resolve to the value they name, and a modules/models/code-patterns.yaml#dotted.path
+      citation resolves to the value that file owns. The manifest is composed as common.manifest
+      orders it, with starci taken from the profile shape, and every entry under files is written
+      byte for byte at its path with only its placeholders filled. A value the shapes do not carry is
+      a named gap in the scaffold evidence, never an improvised choice.
   - id: BASELINE-CHECK-ONLY-GATES
     requirement: |
       CI and pre-push run check-only commands (lint:check, typecheck, test:ci, build). Only the
@@ -64,6 +68,22 @@ guidance:
     requirement: |
       The skeleton exposes only process-local liveness per docs/application-runtime-config-and-health.md.
       Readiness over dependencies arrives with the SDS that declares those dependencies.
+  - id: BASELINE-CODE-PATTERN-CLEAN
+    requirement: |
+      The skeleton is clean under the runtime's own gate, not only under the repository's lint:
+      node scripts/checks/check-scoped-lint.mjs --profile nest|next --root REPOSITORY
+      --architecture-config architecture.json --all exits 0 on the files the shape writes. The canon
+      kit is installed at exactly the version and content digest modules/models/code-patterns.yaml
+      pins, which is why the shape cites that file instead of restating a range. The package.json
+      starci contracts and architecture.json declare only what the skeleton owns; a scaffold slice
+      that adds an owner, env parser, error family or transport extends them in the same change.
+  - id: BASELINE-ONE-LAYOUT
+    requirement: |
+      Nest is a monorepo of deployable apps: apps/<app>/src holds only main.ts and app.module.ts,
+      features live under src/features and capabilities under src/modules, as
+      docs/backend-source-pattern.md draws the default tree. nest build compiles the whole tsconfig
+      rootDir, so the entry is dist/apps/<app>/src/main.js, the path start:prod runs. Next is one app
+      rooted at src/app; build writes .next and start serves it with next start.
 shapes:
   - id: common
     packageManager: npm@11.6.2
@@ -77,7 +97,7 @@ shapes:
       name: <name>
       version: 0.1.0
       private: true
-      order: [name, version, private, packageManager, engines, scripts, lint-staged, dependencies, devDependencies]
+      order: [name, version, private, packageManager, engines, scripts, lint-staged, starci, dependencies, devDependencies]
       lint-staged: common.hooks.lintStaged
     typescript:
       strict: true
@@ -199,7 +219,7 @@ shapes:
       '@nestjs/cli': ^11.0.0
       '@nestjs/schematics': ^11.0.0
       '@nestjs/testing': ^11.0.1
-      '@starci/eslint-canon-be': ^1.2.1
+      '@starci/eslint-canon-be': modules/models/code-patterns.yaml#profiles.nest.canon.version
       '@types/express': ^5.0.0
       '@types/jest': ^29.5.14
       '@types/supertest': ^7.2.1
@@ -221,6 +241,36 @@ shapes:
       exclusions: '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**'
       testInclusions: '**/*.spec.ts'
     health: GET /health/live, the Terminus liveness check with no indicators, at the transport path docs/application-runtime-config-and-health.md names for Nest
+    starci:
+      codePatterns:
+        nest:
+          boundaries:
+            schema: starci/nest-boundary-contract@1
+            envParsers: [src/modules/platform/env/config.ts]
+            cacheOwners: []
+            jestLifecycleEntries: []
+          errorIdentity:
+            schema: starci/nest-error-identity@1
+            profile: capability
+            throwRoots: [apps/<app>/src, src]
+            families:
+              - id: env
+                path: src/modules/platform/env/errors/env-error.ts
+                export: EnvError
+                declarationRoots: [src/modules/platform/env/errors]
+                codeProperty: code
+                causeProperties: [cause]
+          transportErrors:
+            schema: starci/nest-transport-error-contract@1
+            errorTypes:
+              - id: env
+                path: src/modules/platform/env/errors/env-error.ts
+                export: EnvError
+                codeProperty: code
+                messageProperty: message
+                causeProperties: [cause]
+            transports: []
+            mappers: []
     files:
       tsconfig.json: |
         {
@@ -295,7 +345,7 @@ shapes:
                 "^.+\\.ts$": ["ts-jest", { tsconfig: "tsconfig.json", diagnostics: true }],
             },
             clearMocks: true,
-            collectCoverageFrom: ["apps/**/*.ts", "src/**/*.ts", "!**/*.spec.ts", "!**/*.d.ts", "!**/main.ts"],
+            collectCoverageFrom: ["apps/**/*.ts", "src/**/*.ts", "!**/*.spec.ts", "!**/*.d.ts", "!**/main.ts", "!**/*.module.ts", "!**/index.ts"],
             coverageDirectory: "<coverage.reportsDirectory>",
             coverageThreshold: {
                 global: {
@@ -315,8 +365,27 @@ shapes:
 
         const sources = ["apps/**/*.ts", "src/**/*.ts"]
 
+        // The code-pattern manifest keeps these canon rules off: an architecture or script check replaces each.
+        const replacedByChecks = [
+            "starci-be/exception-name-ends-in-exception",
+            "starci-be/exception-code-matches-class-name",
+            "starci-be/exception-metadata-type-named-for-class",
+            "starci-be/exception-extends-abstract",
+            "starci-be/exception-in-errors-folder",
+            "starci-be/require-exception-object-arg",
+            "starci-be/throw-abstract-exception",
+            "starci-be/no-handler-encoded-failure",
+            "starci-be/must-deep-module-import",
+            "starci-be/no-folder-reexport",
+            "starci-be/handler-has-twin-spec",
+        ]
+        // A warning already fails the zero-warning gate, so the canon's warn level is stated as error.
+        const asError = (setting) => (setting === "warn" ? "error" : Array.isArray(setting) && setting[0] === "warn" ? ["error", ...setting.slice(1)] : setting)
+        const canonRules = Object.fromEntries(Object.entries(starciRecommended).map(([rule, setting]) => [rule, replacedByChecks.includes(rule) ? "off" : asError(setting)]))
+
         export default defineConfig([
             { ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**"] },
+            { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" } },
             {
                 plugins: { js },
                 extends: ["js/recommended"],
@@ -325,9 +394,11 @@ shapes:
             ...tseslint.configs.recommended.map((config) => ({ ...config, files: sources })),
             {
                 files: sources,
+                languageOptions: {
+                    parserOptions: { emitDecoratorMetadata: true, experimentalDecorators: true },
+                },
                 rules: {
-                    "@typescript-eslint/no-explicit-any": "error",
-                    "no-console": "error",
+                    "@typescript-eslint/consistent-type-imports": "error",
                     indent: ["error", 4],
                     quotes: ["error", "double"],
                     semi: ["error", "never"],
@@ -336,31 +407,75 @@ shapes:
             {
                 files: sources,
                 plugins: { "starci-be": starciBe },
-                rules: starciRecommended,
+                rules: canonRules,
             },
         ])
+      architecture.json: |
+        {
+          "schema": "starci/architecture-config@1",
+          "kinds": ["backend"],
+          "tsconfig": "tsconfig.json",
+          "backend": {
+            "apps": ["apps"],
+            "features": ["src/features"],
+            "modules": ["src/modules"],
+            "moduleRegistration": {
+              "providerIdentity": "exported-class-token",
+              "handlerDecorators": []
+            }
+          },
+          "owners": [
+            { "id": "feature-system-health", "root": "src/features/system-health", "entry": "src/features/system-health/index.ts" },
+            { "id": "module-platform-env", "root": "src/modules/platform/env", "entry": "src/modules/platform/env/index.ts" }
+          ]
+        }
       apps/<app>/src/main.ts: |
-        import { NestFactory } from "@nestjs/core"
-        import { AppModule } from "./app.module"
+        import {
+            NestFactory,
+        } from "@nestjs/core"
+        import {
+            readServerConfig,
+        } from "@modules/platform/env"
+        import {
+            AppModule,
+        } from "./app.module"
 
-        async function bootstrap() {
+        /** Parses the environment before composing the application, then serves until a shutdown signal. */
+        const bootstrap = async (): Promise<void> => {
+            const config = readServerConfig()
             const app = await NestFactory.create(AppModule)
             app.enableShutdownHooks()
-            await app.listen(process.env.PORT ?? 3000)
+            await app.listen(config.port)
         }
 
         void bootstrap()
       apps/<app>/src/app.module.ts: |
-        import { Module } from "@nestjs/common"
-        import { SystemHealthModule } from "@features/system-health/system-health.module"
+        import {
+            Module,
+        } from "@nestjs/common"
+        import {
+            SystemHealthModule,
+        } from "@features/system-health"
 
-        @Module({ imports: [SystemHealthModule] })
-        /** Composition root: the modules this service runs. */
+        @Module({
+            imports: [SystemHealthModule],
+        })
+        /** Composition root: the features this service runs. */
         export class AppModule {}
+      src/features/system-health/index.ts: |
+        export {
+            SystemHealthModule,
+        } from "./system-health.module"
       src/features/system-health/system-health.module.ts: |
-        import { Module } from "@nestjs/common"
-        import { TerminusModule } from "@nestjs/terminus"
-        import { LiveController } from "./transport/http/live.controller"
+        import {
+            Module,
+        } from "@nestjs/common"
+        import {
+            TerminusModule,
+        } from "@nestjs/terminus"
+        import {
+            LiveController,
+        } from "./transport/http/live.controller"
 
         @Module({
             imports: [TerminusModule],
@@ -369,46 +484,160 @@ shapes:
         /** Process-local liveness; readiness arrives with the SDS that declares dependencies. */
         export class SystemHealthModule {}
       src/features/system-health/transport/http/live.controller.ts: |
-        import { Controller, Get } from "@nestjs/common"
-        import { HealthCheck, HealthCheckService } from "@nestjs/terminus"
+        import {
+            Controller,
+            Get,
+        } from "@nestjs/common"
+        import {
+            HealthCheck,
+            HealthCheckService,
+        } from "@nestjs/terminus"
+        import type {
+            HealthCheckResult,
+        } from "@nestjs/terminus"
 
         @Controller("health")
         /** Liveness probe: answers from process-local state and never touches a dependency. */
         export class LiveController {
-            constructor(private readonly health: HealthCheckService) {}
+            constructor(
+                /** Terminus executor; it runs no indicator, so a dependency outage never restarts the process. */
+                private readonly health: HealthCheckService,
+            ) {}
 
-            /** A provider outage must not restart the process, so no indicator runs here. */
+            /** Reports the process alive while its event loop still answers requests. */
             @Get("live")
             @HealthCheck()
-            live() {
+            live(): Promise<HealthCheckResult> {
                 return this.health.check([])
             }
         }
-      apps/<app>/src/app.module.spec.ts: |
-        import type { INestApplication } from "@nestjs/common"
-        import { Test } from "@nestjs/testing"
-        import request from "supertest"
-        import { AppModule } from "./app.module"
+      src/features/system-health/transport/http/live.controller.spec.ts: |
+        import {
+            Test,
+        } from "@nestjs/testing"
+        import {
+            TerminusModule,
+        } from "@nestjs/terminus"
+        import {
+            LiveController,
+        } from "./live.controller"
 
-        describe("GET /health/live", () => {
-            let app: INestApplication
+        describe("LiveController",
+            () => {
+                it("reports ok from process-local state",
+                    async () => {
+                        const moduleRef = await Test.createTestingModule({
+                            imports: [TerminusModule],
+                            providers: [LiveController],
+                        }).compile()
+                        const controller = moduleRef.get(LiveController)
+                        await expect(controller.live()).resolves.toMatchObject({
+                            status: "ok",
+                        })
+                        await moduleRef.close()
+                    })
+            })
+      src/modules/platform/env/index.ts: |
+        export {
+            parseServerConfig,
+            readServerConfig,
+        } from "./config"
+        export type {
+            ServerOptions,
+        } from "./config"
+        export {
+            EnvError,
+        } from "./errors/env-error"
+      src/modules/platform/env/config.ts: |
+        import {
+            EnvError,
+        } from "./errors/env-error"
 
-            beforeAll(async () => {
-                const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
-                app = moduleRef.createNestApplication()
-                await app.init()
+        /** Typed server configuration, validated once before the listener starts. */
+        export interface ServerOptions {
+            /** TCP port the HTTP listener binds. */
+            readonly port: number
+        }
+
+        const DEFAULT_PORT = 3000
+        const MAX_PORT = 65535
+
+        /** Validates the server keys of an environment snapshot; a malformed PORT refuses startup. */
+        export const parseServerConfig = (env: Readonly<NodeJS.ProcessEnv>): ServerOptions => {
+            const raw = env.PORT
+            if (raw === undefined || raw === "") {
+                return {
+                    port: DEFAULT_PORT,
+                }
+            }
+            const port = Number(raw)
+            if (!Number.isInteger(port) || port < 1 || port > MAX_PORT) {
+                throw new EnvError("ENV_PORT_INVALID", `PORT must be an integer from 1 to ${MAX_PORT}.`)
+            }
+            return {
+                port,
+            }
+        }
+
+        /** Parses the live process environment, the one place this service reads it. */
+        export const readServerConfig = (): ServerOptions => parseServerConfig(process.env)
+      src/modules/platform/env/config.spec.ts: |
+        import {
+            EnvError,
+        } from "./errors/env-error"
+        import {
+            parseServerConfig,
+            readServerConfig,
+        } from "./config"
+
+        describe("parseServerConfig",
+            () => {
+                it("falls back to port 3000 when PORT is unset",
+                    () => {
+                        expect(parseServerConfig({})).toEqual({
+                            port: 3000,
+                        })
+                    })
+
+                it("accepts an integer PORT inside the TCP range",
+                    () => {
+                        expect(parseServerConfig({
+                            PORT: "8080",
+                        })).toEqual({
+                            port: 8080,
+                        })
+                    })
+
+                it("rejects a malformed PORT without echoing its value",
+                    () => {
+                        expect(() => parseServerConfig({
+                            PORT: "80a",
+                        })).toThrow(EnvError)
+                        expect(() => parseServerConfig({
+                            PORT: "70000",
+                        })).toThrow("PORT must be an integer from 1 to 65535.")
+                    })
             })
 
-            afterAll(async () => {
-                await app.close()
+        describe("readServerConfig",
+            () => {
+                it("reads the port from the live process environment",
+                    () => {
+                        expect(readServerConfig().port).toBeGreaterThan(0)
+                    })
             })
+      src/modules/platform/env/errors/env-error.ts: |
+        /** Startup configuration refusal: names the key and the rule it broke, never the supplied value. */
+        export class EnvError extends Error {
+            /** Stable machine code for the refused key and rule. */
+            readonly code: string
 
-            it("answers ok from process-local state", async () => {
-                const response = await request(app.getHttpServer()).get("/health/live")
-                expect(response.status).toBe(200)
-                expect(response.body).toMatchObject({ status: "ok" })
-            })
-        })
+            constructor(code: string, message: string) {
+                super(message)
+                this.name = "EnvError"
+                this.code = code
+            }
+        }
   - id: next
     appliesTo: frontend
     extends: common
@@ -423,7 +652,7 @@ shapes:
       '@heroui/react': ^3.2.1
       '@heroui/styles': ^3.2.1
     devDependencies:
-      '@starci/eslint-canon-fe': 3.0.2
+      '@starci/eslint-canon-fe': modules/models/code-patterns.yaml#profiles.next.canon.version
       '@types/react': ^19
       '@types/react-dom': ^19
       tailwindcss: ^4
@@ -457,10 +686,51 @@ shapes:
     grammar:
       package: '@starci/grammar'
       peers: ['@heroui/react', '@heroui/styles']
-      stylesheet: src/app/globals.css imports tailwind, HeroUI styles, the grammar common sheet and the bound family sheet, and lets Tailwind scan the grammar dist
-      components: import from '@starci/grammar/<grammarFamily>' or '@starci/grammar/common'; the baseline adds no other UI library
+      stylesheet: src/app/globals.css imports tailwind, HeroUI styles and the bound family sheet (which imports the common sheet itself), and lets Tailwind scan the grammar dist
+      components: import from '@starci/grammar/<grammarFamily>', which re-exports common; architecture.json selects that one code entry and style entry, and the baseline adds no other UI library
     health: GET /health/live route at the path docs/application-runtime-config-and-health.md names for Next
+    starci:
+      codePatterns:
+        next:
+          schema: starci/next-code-pattern-contract@1
+          projects: [tsconfig.json]
+          owners: []
+          closedVocabularies: []
+          grammarGuards:
+            schema: starci/grammar-guard-contract@1
+            package: '@starci/grammar'
+            entry: ./<grammarFamily>
+            source:
+              kind: installed
+            vectorProfile: starci/grammar-guards-v1
+          errorState:
+            schema: starci/next-error-state@1
+            sourceRoots: [src]
+            transports: []
+            worldMappings: []
+            envelopes: []
+            writes: []
+            boundaries: []
+            requiredValues: []
     files:
+      architecture.json: |
+        {
+          "schema": "starci/architecture-config@1",
+          "kinds": ["frontend"],
+          "tsconfig": "tsconfig.json",
+          "owners": [],
+          "frontend": {
+            "routes": "src/app",
+            "grammar": {
+              "package": "@starci/grammar",
+              "entry": "@starci/grammar/<grammarFamily>",
+              "styleEntry": "@starci/grammar/<grammarFamily>.css",
+              "styleSources": ["src/app/globals.css"],
+              "consumerManifests": ["package.json"],
+              "peers": ["react", "@heroui/react"]
+            }
+          }
+        }
       tsconfig.json: |
         {
           "compilerOptions": {
@@ -482,14 +752,13 @@ shapes:
               "@/*": ["./src/*"]
             }
           },
-          "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+          "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
           "exclude": ["node_modules"]
         }
       next.config.ts: |
         import type { NextConfig } from "next"
 
         const nextConfig: NextConfig = {
-            output: "standalone",
             transpilePackages: ["@starci/grammar"],
             experimental: {
                 optimizePackageImports: ["@heroui/react"],
@@ -601,6 +870,7 @@ shapes:
                     },
                 },
                 rules: {
+                    "@typescript-eslint/array-type": ["error", { default: "generic", readonly: "generic" }],
                     "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports" }],
                     "@typescript-eslint/no-floating-promises": "error",
                     "@typescript-eslint/no-misused-promises": "error",
@@ -621,7 +891,6 @@ shapes:
       src/app/globals.css: |
         @import "tailwindcss";
         @import "@heroui/styles/css";
-        @import "@starci/grammar/common.css";
         @import "@starci/grammar/<grammarFamily>.css";
 
         @source "../../node_modules/@starci/grammar/dist";
@@ -662,7 +931,7 @@ shapes:
         import { describe, expect, it } from "vitest"
         import { GET } from "./route"
 
-        describe("GET /health/live", () => {
+        describe("GET", () => {
             it("answers ok from process-local state", async () => {
                 const response = GET()
                 expect(response.status).toBe(200)
@@ -684,7 +953,11 @@ observations:
       survives and the next build emits nothing.
   - id: lint
     observed: Both use a flat eslint.config.mjs over the canon kit (@starci/eslint-canon-be ^1.2.1,
-      @starci/eslint-canon-fe 3.0.2, both the published versions at readAt). nivo-fe lint:check passes
+      @starci/eslint-canon-fe 3.0.2, both the published versions at readAt); the baseline installs the
+      exact version code-patterns.yaml pins, because a caret range drifts past the pinned content
+      digest the code-pattern gate verifies. The nest config states the canon's warn rules as error and
+      turns off the rules the code-pattern manifest replaces with architecture or script checks, and
+      refuses inline configuration, as that gate requires. nivo-fe lint:check passes
       the zero-warning budget to eslint; nivo-backend lint:check passes none. Both alias format:check to
       the lint check - formatting is the canon's stylistic rules, not a separate formatter. nivo-backend
       also forces one element or argument per line and three repository-local rules; the baseline keeps
@@ -704,13 +977,19 @@ observations:
       tests to push. lint-staged 16 is the pin because 17 requires Node 22.22.1, above the engines floor.
   - id: nest-layout
     observed: nivo-backend is a Nest monorepo with apps/<app>/src composition roots and @features/@modules
-      path aliases; the baseline keeps that shape for one app. Its liveness is a Terminus check with no
+      path aliases; the baseline keeps that shape for one app, and adds src/modules/platform/env as the
+      one env parser plus EnvError as the one error family the code-pattern contracts require. Its liveness is a Terminus check with no
       indicators at /health/live, which the baseline keeps; its readiness indicators are SDS-owned.
   - id: grammar
     observed: nivo-fe apps pin @starci/grammar 0.4.13 (the published version at readAt) beside @heroui/react
       and @heroui/styles ^3.2.1, which the grammar declares as peers. globals.css imports tailwind, HeroUI
       styles and the grammar common sheet, and adds the grammar dist as a Tailwind source; nivo-fe supplies
-      its own family sheet where a new app imports the bound grammar family sheet.
+      its own family sheet where a new app imports the bound grammar family sheet, which already imports
+      the common sheet - the architecture grammar contract admits one style entry.
+  - id: next-output
+    observed: nivo-fe builds output standalone for its container image, where next start refuses that
+      output; the baseline builds the default output so next start serves the build, and a deployment
+      design that wants a standalone image adds it with its own start command.
   - id: ci
     observed: Both ci.yml files trigger on push to main and pull requests, run npm ci, lint:check,
       typecheck, build and test:ci, then upload coverage/lcov.info with codecov-action v5 (OIDC,
