@@ -920,6 +920,12 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   boot tự chuyển thành viên khi launch hỏng không để lại gì. config.example ship nhóm; config.yaml của thầy vẫn
   ghim devin/swe-2-max, load OK. check + 63 spec xanh.
 
+- 06:30 tick: Modules chạy 6 cut business.decide song song; Collab scope.define xong (a3). Ask login AUTH live nhưng
+  form hiện 4 nhóm radio mua workspace của WSPV: serve-ask lấy draws.yaml mới nhất toàn cây khi report chỉ liệt kê
+  draws.yaml. Supervisor trả lời Desktop B + Mobile B theo uỷ quyền (bỏ trống 4 nhóm lạc đề, ghi lý do). Vá
+  serve-ask (`c2e4564cb`): ảnh lấy từ draws.yaml của report, bỏ fallback toàn cục, có options thì không suy picks.
+  Merge lane P3 của phiên fork (`f68c490be`): baseline ghim phiên bản toolchain nest/next.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
