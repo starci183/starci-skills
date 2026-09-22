@@ -8,6 +8,7 @@
 //   RULE_IN_DATA    a reads[].purpose carries a rule (must/never/only/reject) instead of data
 //   PATH_JOINED     a writes[].path joins several paths with ' + '
 //   CHECK_MISSING   a proofs[].check names a file that is not on disk
+//   PARAM_DEFAULT   a param carries both a default and `required: true`, or neither
 //   SCHEMA_INVALID  the manifest breaks modules/schemas/op.schema.yaml
 //
 //   node scripts/checks/check-op-manifest.mjs [--opsDir <dir>] [--json]
@@ -152,6 +153,13 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
     for (const error of validateAgainstSchema(doc, schema)) add(id, 'SCHEMA_INVALID', 'error', error);
     if (doc?.id && doc.id !== id) add(id, 'SCHEMA_INVALID', 'error', `$.id is ${doc.id} but the file is ${file}`);
 
+    // PARAM_DEFAULT — a param either has a value that stands when nobody sets it, or is required
+    // of its setter at enqueue; a JSON schema walker without oneOf cannot say "exactly one".
+    for (const [name, def] of Object.entries(doc?.params && typeof doc.params === 'object' ? doc.params : {})) {
+      const hasDefault = Object.hasOwn(def ?? {}, 'default'), required = def?.required === true;
+      if (hasDefault === required) add(id, 'PARAM_DEFAULT', 'error', `params.${name} ${hasDefault ? 'carries both a default and required: true' : 'carries neither a default nor required: true'} — exactly one`);
+    }
+
     // (a) PARAM_RESTATED — a tunable's value spelled out in prose the agent reads as law.
     const covered = unitsCoveredBy(doc?.params);
     if (covered.size) {
@@ -206,7 +214,7 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
 
 export function opManifestMain(argv = []) {
   if (argv.includes('--help') || argv.includes('-h')) {
-    return { exitCode: 0, text: 'Usage: node scripts/checks/check-op-manifest.mjs [--opsDir <dir>] [--json]\n\nEvery modules/ops/ops/<id>.yaml holds the modules/schemas/op.schema.yaml shape, keeps each rule in one step, cites params instead of restating numbers, keeps rules out of reads[].purpose, writes one path per entry and cites only checks that exist. Exit 0 is clean.\n' };
+    return { exitCode: 0, text: 'Usage: node scripts/checks/check-op-manifest.mjs [--opsDir <dir>] [--json]\n\nEvery modules/ops/ops/<id>.yaml holds the modules/schemas/op.schema.yaml shape, gives each param a default or required: true, keeps each rule in one step, cites params instead of restating numbers, keeps rules out of reads[].purpose, writes one path per entry and cites only checks that exist. Exit 0 is clean.\n' };
   }
   const i = argv.indexOf('--opsDir');
   const result = checkOpManifest(i >= 0 ? { opsDir: argv[i + 1] } : {});

@@ -73,8 +73,10 @@ conventions:
   stdout: >-
     one JSON object — {ok:true, ...} on success. A refusal prints ok:false and
     names itself in one of four fields: `code` (the thrown refusals, the
-    common case), `reason` (nudge, observe, reconcile, and the `max-ops`
-    concurrency refusal route and dispatch share), `rejected` (every
+    common case), `reason` (nudge, observe, reconcile, the `max-ops`
+    concurrency refusal route and dispatch share, and every refusal that
+    carries a `detail` telling the Kernel its next call — enqueue's missing
+    required param), `rejected` (every
     dispatch launch failure) or `refused` (dispatch admission drift). The
     kebab string is the contract callers match on; each command's `refuses:`
     below names the string it prints and every untyped refusal says so
@@ -339,6 +341,7 @@ commands:
       - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
       - params-invalid: '--params is not a JSON object, names a param the brief does not declare, carries a value of the wrong type or outside its min/max/enum, sets a `setBy: owner` param the approved goal leg does not carry, or a goal leg carries a `setBy: kernel` param (scripts/route/dispatch-op.mjs resolveOpParams)'
+      - 'params-invalid (field `reason`) for a missing `required: true` param: prints {ok:false, workflowId, op, reason:"params-invalid", param, detail} on stdout and exits 1, no job written. detail reads "<op> requires params.<name> (<type>, set by <setBy>): <doc> — none was given; re-run enqueue with --params ''{"<name>": <type>}''" (a `setBy: owner` param names the approved goal leg instead). provision.ask requires params.subject, the one-sentence provision or decision it asks'
     duplicates: >-
       enqueue does not refuse a second live job for the same op: cutExecution
       (driver-loop.yaml) enqueues N disjoint same-op slices at once, each its

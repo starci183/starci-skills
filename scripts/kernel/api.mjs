@@ -1037,7 +1037,12 @@ function cmdEnqueue(ledger, args) {
       throw Object.assign(new Error('--params must be a JSON object of {name: value}'), { code: 'params-invalid' });
     }
   }
-  const resolvedParams = resolveOpParams(brief, { leg: goalLegParams(goal, args.op), flag: flagParams });
+  const resolvedParams = resolveOpParams(brief, { leg: goalLegParams(goal, args.op), flag: flagParams, enforceRequired: true });
+  if (!resolvedParams.ok && resolvedParams.param) {
+    const out = { ok: false, workflowId, op: args.op, reason: resolvedParams.reason, param: resolvedParams.param, detail: resolvedParams.detail };
+    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
+    process.exit(1);
+  }
   if (!resolvedParams.ok) throw Object.assign(new Error(resolvedParams.detail), { code: resolvedParams.reason });
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
   // An op with no owned_paths is an unbounded write grant: the packet would
@@ -1654,7 +1659,7 @@ function cmdDispatch(ledger, args, repo) {
   // already validated on top — dispatch resolves, it never re-decides.
   const briefDoc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
-  for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(dispatchParams, name)) dispatchParams[name] = value;
+  for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams });
   const priorFailures = job.attempt > 1 ? (() => {
     const row = db.prepare('SELECT attempt, checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC LIMIT 1')

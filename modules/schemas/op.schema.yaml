@@ -188,13 +188,18 @@ $defs:
   param:
     type: object
     additionalProperties: false
-    required: [type, default, setBy, doc]
-    description: "One tunable: its type, the value that applies when nobody sets it, who may set it,
-      and one sentence of meaning."
+    required: [type, setBy, doc]
+    description: "One tunable: its type, the value that applies when nobody sets it (or `required:
+      true` when no value may stand in for the setter's), who may set it, and one sentence of meaning.
+      scripts/checks/check-op-manifest.mjs refuses a param with both or neither."
     properties:
       type:
         enum: [integer, number, string, boolean, enum]
       default: {}
+      required:
+        const: true
+        description: "No default applies: `api enqueue` refuses params-invalid until the setter
+          supplies the value (scripts/route/dispatch-op.mjs resolveOpParams)."
       min: {type: number}
       max: {type: number}
       enum:
