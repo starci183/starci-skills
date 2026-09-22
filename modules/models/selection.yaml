@@ -11,7 +11,8 @@
 # The one-sentence business rule (capabilities.yaml): a model NAME is an
 # availability fact, never proof of capability. A model job is eligible only
 # through a measured qualification record or a narrowly scoped probation with
-# strict machine gates and independent review. Budget orders eligible candidates;
+# strict machine gates and independent review (the kernel's own function calls:
+# decisionFlow kernel-function). Budget orders eligible candidates;
 # it never makes one eligible and never lowers a floor.
 
 schema: starci/module-model-selection@1
@@ -210,8 +211,24 @@ decisionFlow:
     do: "reasons = qualificationGates(runtime, evidence, job); mode = 'qualified'"
   - step: probation-fallback
     do: "if reasons non-empty AND a probation record exists: re-evaluate under recordGates; mode = 'probation'"
+  - step: kernel-function
+    do: "if reasons remain AND workload.kind ∈ kernelFunctionKinds AND the runtime is on runtimes.yaml allocation.preference.think: eligible, mode = 'kernel-function'; no qualification record is required"
+    reason: >-
+      The kernel's own model calls (the [Kernel] seat, its decisions and validations) are the
+      runtime's control plane, not operation work: they carry no operation effects for a
+      qualification record to scope, and they run only on the owner-declared frontier think group
+      (Claude Opus 5.5, then GPT-6 Sol). The qualification store ships empty, so without this step
+      an elevated kernel route (model.manageWorkflow --risk high) refuses on every fresh install and
+      a single-model config pin becomes the only way to boot a kernel. Qualified and probation
+      admissions still come first when they exist; operation kinds never take this step.
   - step: verdict
     do: "eligible = reasons empty; on success return qualification {provider, model, evidenceId, scopeId?}"
+  - step: kernel-availability
+    do: >-
+      Kernel functions select quota-aware (config.yaml models.selection): a provider whose quota probe reads
+      'dead' or whose ledger provider-health circuit is open is rejected by name; a 'limited' provider stays
+      eligible but is ordered behind every available member; 'unknown' never blocks
+      (scripts/agent/models.mjs providerAvailability). Every member unavailable → the typed verdict refusal.
   # createWorkflowModelEligibility wraps this per workflow:
   - "callback(job, runtime): derive workload via workloadFor, lazily CREATE a probation record when none exists and admission+budgets allow, then evaluate. Ineligible with no evidence prepends 'model qualification evidence is missing' plus the probation-unavailable detail."
   - "providerFilter(job): if ANY runtime is qualified → return exactly those targets. Else walk candidates via callback; collect eligible — but STOP after the first for non-kernel work ('probation admits exactly one target for one durable job so an internal fallback can never execute an unconsumed probation candidate'). Kernel functions keep all eligible members (per-call selection)."
@@ -304,7 +321,7 @@ fallback:
 # 9. Misuse modes — what goes wrong when an agent routes by vibes
 # ---------------------------------------------------------------------------
 misuseModes:
-  - "name-as-proof: \"Shipping in the package ≠ qualified. qualifications.yaml is empty; every admission today is qualification-by-receipt or probation.\""
+  - "name-as-proof: \"Shipping in the package ≠ qualified. qualifications.yaml is empty; every operation admission today is qualification-by-receipt or probation (kernel functions: decisionFlow kernel-function).\""
   - "budget-as-eligibility: \"Ordering by remaining quota cannot rescue an ineligible candidate (selectEligibleCandidate).\""
   - "probation-as-qualification: \"Probation never covers high/critical floors or highKinds; elevation strips it before the gates run (workloadFor).\""
   - "fallback-as-retry: \"Advancing a chain on a partial-effect failure re-executes real effects — forbidden without effectState 'none'.\""

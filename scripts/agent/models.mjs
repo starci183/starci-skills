@@ -186,3 +186,44 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   return { error: `no eligible pool for role '${resolvedRole}' at ${d} difficulty`, role: resolvedRole, work: route.work, difficulty: d,
     measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected };
 }
+
+// Provider availability for a quota-aware group (the kernel think group and the
+// config.yaml kernel group). One provider credential is one availability fact:
+//   unavailable — the kernel's provider-health circuit is open, or the quota
+//                 probe reads 'dead' (not authenticated / no account);
+//   limited     — the probe reads 'limited' (near the window cap, or a
+//                 refreshable stale token): still launchable, ordered last;
+//   available   — 'ok' or 'unknown' (an unanswered probe never blocks).
+export const PROVIDER_HEALTH_SCOPE = 'provider-health';
+const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().replace(/-agent$/, '');
+
+// The OPEN provider-health circuit for a provider in one ledger, or null.
+export function providerCircuitOf(db, provider, now = Date.now()) {
+  const key = providerKey(provider);
+  if (!key || !db) return null;
+  const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
+  if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
+  let value = {};
+  try { value = JSON.parse(row.value_json || '{}') ?? {}; } catch { value = {}; }
+  return value?.status === 'unavailable' ? { ...value, at: row.at, expiresAt: row.expires_at } : null;
+}
+
+export function providerAvailability({ probe = null, circuit = null } = {}) {
+  if (circuit) return { state: 'unavailable', reason: `provider circuit open (${circuit.failureKind ?? 'auth'}) until ${circuit.expiresAt ? new Date(circuit.expiresAt).toISOString() : 'explicit recovery'}` };
+  if (probe?.state === 'dead') return { state: 'unavailable', reason: `quota probe dead (${probe.detail ?? 'not authenticated'})` };
+  if (probe?.state === 'limited') return { state: 'limited', reason: `quota limited (${probe.detail ?? 'near the window cap'})` };
+  return { state: 'available', reason: `quota ${probe?.state ?? 'unknown'}` };
+}
+
+// Members in declared order with unavailable ones removed and limited ones
+// moved behind every available one; relative order is otherwise kept.
+export function orderByAvailability(members, availabilityOf) {
+  const rank = { available: 0, limited: 1 };
+  const seen = members.map((member, index) => ({ member, index, availability: availabilityOf(member) }));
+  const ordered = seen.filter(s => s.availability?.state !== 'unavailable')
+    .sort((a, b) => (rank[a.availability?.state] ?? 0) - (rank[b.availability?.state] ?? 0) || a.index - b.index);
+  return {
+    ordered: ordered.map(s => ({ ...s.member, availability: s.availability })),
+    unavailable: seen.filter(s => s.availability?.state === 'unavailable').map(s => ({ ...s.member, availability: s.availability })),
+  };
+}

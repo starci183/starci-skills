@@ -31,6 +31,12 @@
 //                          drives the kernel-pin fail-closed spec.
 //   STARCI_FAKE_ORCA_STALE comma-separated provider ids whose `account list`
 //                          entry reports a refreshable stale OAuth token.
+//   STARCI_FAKE_ORCA_LIMITED comma-separated provider ids whose `account list`
+//                          entry is ok at 96% of the weekly window (limited).
+//   STARCI_FAKE_ORCA_GATE  comma-separated provider ids (claude|codex) whose
+//                          terminals render that CLI's first-run interactive
+//                          gate screen on every read — drives the kernel
+//                          group fall-through spec.
 //   STARCI_FAKE_ORCA_EFFECTIVE_MODEL overrides the model rendered by the
 //                          terminal for requested/effective mismatch coverage.
 //   STARCI_FAKE_ORCA_UNIQUE_TERMINALS='1' hands every `terminal create` a fresh
@@ -73,6 +79,13 @@ const stateFile = process.env.STARCI_FAKE_ORCA_STATE;
 const mode = process.env.STARCI_FAKE_ORCA_MODE || 'healthy';
 const deadProviders = new Set((process.env.STARCI_FAKE_ORCA_DEAD || '').split(',').map(s => s.trim()).filter(Boolean));
 const staleProviders = new Set((process.env.STARCI_FAKE_ORCA_STALE || '').split(',').map(s => s.trim()).filter(Boolean));
+const limitedProviders = new Set((process.env.STARCI_FAKE_ORCA_LIMITED || '').split(',').map(s => s.trim()).filter(Boolean));
+// Providers whose kernel terminal shows an interactive gate screen instead of a prompt.
+const gateScreens = {
+  claude: "Let's get started. Choose the text style that looks best with your terminal To change this later, run /theme 1. Auto (match terminal) ❯ 2. Dark mode ✔",
+  codex: 'Do you trust the contents of this directory? › 1. Yes, continue 2. No, quit  Press enter to continue',
+};
+const gatedProviders = new Set((process.env.STARCI_FAKE_ORCA_GATE || '').split(',').map(s => s.trim()).filter(Boolean));
 const effectiveModelOverride = process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || null;
 if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
 const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : { sends: 0 };
@@ -95,6 +108,8 @@ const DEAD = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your
 const LIVE = h => (isQwen(h) ? 'Qwen' : 'Codex') + '\nmodel: ' + renderedModel(h) + '\nThinking hard\nesc to interrupt\ntokens 96\n';
 // A spec may mark one terminal record dead; mode 'dead-terminal' kills them all.
 const isDead = handle => mode === 'dead-terminal' || record(handle)?.connected === false;
+const commandProvider = handle => (String(record(handle)?.command ?? state.terminalCommand ?? '').match(/(?:^|[\s"'\\/])(claude|codex|qwen|devin)(?:\.exe|\.cmd)?(?=[\s"']|$)/i)?.[1] ?? '').toLowerCase();
+const gatedProviderOf = handle => { const p = commandProvider(handle); return p && gatedProviders.has(p) && gateScreens[p] ? p : null; };
 const hasSent = handle => { const r = record(handle); return r ? !!r.sent : state.sends > 0; };
 const verb = argv.slice(0, 2).join(' ');
 // The live-schema listing scripts/api/orca/lib.mjs compares against, derived
@@ -128,6 +143,9 @@ if (verb === 'terminal create') {
   save();
   out({ ok: true, result: { terminal: { handle, title: arg('title'), connected: true, writable: true } } });
 }
+else if (verb === 'terminal read' && gatedProviderOf(arg('terminal')))
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
+    screen: gateScreens[gatedProviderOf(arg('terminal'))] } } });
 else if (verb === 'terminal read')
   isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
@@ -257,6 +275,8 @@ else if (verb === 'account list') {
         ? { status: 'error', error: 'OAuth token expired; refresh may occur on launch',
             weekly: { usedPercent: null, windowMinutes: 10080, resetsAt: null },
             usageMetadata: { failureKind: 'stale-token' } }
+      : limitedProviders.has(p)
+        ? { status: 'ok', weekly: { usedPercent: 96, windowMinutes: 10080, resetsAt: null } }
       : { status: 'ok', weekly: { usedPercent: 12, windowMinutes: 10080, resetsAt: null } };
   out({ ok: true, result: { rateLimits } });
 }
