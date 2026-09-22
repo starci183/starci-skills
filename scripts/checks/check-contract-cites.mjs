@@ -25,7 +25,7 @@ const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const DEFAULT_SCAN = ['modules/kernel'];
 const EXTENSIONS = 'mjs|yaml|yml|md|sql';
 const CITE_KEYS = /^\s*(?:-\s*)?(?:citation|enforcedBy|source|sources)\s*:/;
-const PATH_TOKEN = new RegExp(`[A-Za-z0-9_][A-Za-z0-9_@./{},<>*+-]*\\.(?:${EXTENSIONS})\\b`, 'g');
+const PATH_TOKEN = new RegExp(`\\.?[A-Za-z0-9_][A-Za-z0-9_@./{},<>*+-]*\\.(?:${EXTENSIONS})\\b`, 'g');
 const BACKTICKED = new RegExp('`([^`\\n]+)`', 'g');
 const SYMBOL_CITE = new RegExp(`([A-Za-z0-9_][A-Za-z0-9_./-]*\\.(?:${EXTENSIONS}))::([A-Za-z0-9_.$-]+)`, 'g');
 const SYMBOL_IN_FILE = new RegExp('`([A-Za-z0-9_.$]+)\\(\\)`\\s+in\\s+([A-Za-z0-9_][A-Za-z0-9_./-]*\\.(?:' + EXTENSIONS + '))', 'g');
@@ -44,8 +44,10 @@ const expandBraces = (token) => {
 
 /** A token the tree cannot decide: a glob, a placeholder, or runtime state. */
 export const isUnverifiable = (token) => token.includes('*') || token.includes('<') || token.includes('>')
-  || token.startsWith('.starciwork/') || token.includes('/.starciwork/')
-  || token.includes('node_modules/');
+  || /(^|\/)\.starci[a-z]*\//.test(token) || token.includes('node_modules/');
+
+/** `.claude/x` is how an installed tree spells the runtime root this check walks. */
+const detemplate = (token) => token.replace(/^\.claude\//, '');
 
 const yamlFilesUnder = (dir) => {
   const out = [];
@@ -76,14 +78,24 @@ export function citesIn(text) {
   const cites = [];
   const lines = text.split('\n');
   const addPath = (line, token, form) => {
-    for (const candidate of expandBraces(token)) {
+    for (const raw of expandBraces(token)) {
+      const candidate = detemplate(raw.replace(/[.,;)]+$/, ''));
       if (isUnverifiable(candidate)) continue;
-      cites.push({ line, kind: 'path', target: candidate.replace(/[.,;)]+$/, ''), form });
+      if (!candidate.includes('/')) {
+        // A citation key names one authority, so a bare filename there is
+        // dead. In running prose a bare filename is ordinary vocabulary.
+        if (form === 'cite value') cites.push({ line, kind: 'bare', target: candidate, form });
+        continue;
+      }
+      cites.push({ line, kind: 'path', target: candidate, form });
     }
   };
   let inCite = false;
   let citeIndent = 0;
-  lines.forEach((raw, index) => {
+  // `{skillRoot}/x` and friends are the tree root spelled for a prompt.
+  const untemplate = (line) => line.replace(/\{[A-Za-z_][A-Za-z0-9_]*\}\//g, '');
+  lines.forEach((source, index) => {
+    const raw = untemplate(source);
     const line = index + 1;
     const indent = raw.length - raw.trimStart().length;
     if (CITE_KEYS.test(raw)) { inCite = true; citeIndent = indent; }
@@ -98,9 +110,13 @@ export function citesIn(text) {
     for (const m of raw.matchAll(BACKTICKED)) {
       for (const token of m[1].matchAll(PATH_TOKEN)) addPath(line, token[0], 'backticked path');
     }
-    if (inCite) {
-      const stripped = raw.replace(BACKTICKED, ' ');
-      for (const token of stripped.matchAll(PATH_TOKEN)) addPath(line, token[0], 'cite value');
+    const stripped = raw.replace(BACKTICKED, ' ');
+    for (const token of stripped.matchAll(PATH_TOKEN)) {
+      const [first] = expandBraces(token[0]);
+      // Outside a cite key only a rooted path is a reference; a bare
+      // filename in running prose is ordinary vocabulary.
+      if (!inCite && !first.includes('/')) continue;
+      addPath(line, token[0], inCite ? 'cite value' : 'prose path');
     }
   });
   return cites;
@@ -122,7 +138,18 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
       const key = `${cite.line}:${cite.kind}:${cite.target}:${cite.symbol ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      // Outside a cite key, only a token rooted at a real top-level entry is
+      // a reference to this tree; `E/manifest.yaml` names a record artifact.
+      // A cite key must name a repo-relative path; elsewhere only a token
+      // rooted at a real top-level entry refers to this tree (`E/manifest.yaml`
+      // names a record artifact, not a file here).
+      if (cite.kind === 'path' && cite.form !== 'cite value'
+        && !fs.existsSync(path.join(root, cite.target.split('/')[0]))) continue;
       checked += 1;
+      if (cite.kind === 'bare') {
+        dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
+        continue;
+      }
       const body = readTarget(path.join(root, cite.target));
       if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'no such file' }); continue; }
       if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {

@@ -29,7 +29,8 @@
 #   engine/ledger-db.mjs     — jobs/leases tables; leases_match_job trigger
 #                              ('lease-identity-drift' RAISE(ABORT));
 #                              DDL source: engine/schema.sql
-#   engine/constants.mjs     — launch window, TTL and limit constants
+#   scripts/agent/lib.mjs    — readiness/attestation windows from the agent
+#                              card; scripts/kernel/api.mjs holds the lease TTL
 #   modules/kernel/verdict-contract.yaml — starci/op-report@1, OUTCOMES,
 #                              validateOpReport semantics the api's settle runs
 #   modules/models/kinds.yaml — role per kind (role:, roleOfKind), routes
@@ -170,7 +171,7 @@ fields:
       And over time: a done record whose deps moved since baseline refuses
       DEP_STALE — writing a path re-arms the re-verification debt of every
       record that owns it (scripts/checks/check-work-deep.mjs DEP_STALE;
-      legality.yaml done-record-reverify).
+      modules/goal/legality.yaml done-record-reverify).
 
   constraints.model:
     meaning: >-
@@ -185,12 +186,14 @@ fields:
       eligible, cooling/capacity park. Dispatch launches what route wrote.
     enforcedBy: >-
       Eligibility is evaluated against the kind's ROLE
-      (kinds.yaml role: resolved through runtimes.yaml roleOfKind;
+      (modules/models/kinds.yaml role: resolved through
+      modules/models/runtimes.yaml roleOfKind;
       scripts/agent/models.mjs selectPool); a verify op additionally avoids the
-      implementing runtime (runtimes.yaml verifyAvoidsImplementRuntime). A
+      implementing runtime
+      (modules/models/runtimes.yaml verifyAvoidsImplementRuntime). A
       model NAME is an
-      availability fact, never proof of capability (selection.yaml,
-      capabilities.yaml rule).
+      availability fact, never proof of capability
+      (modules/models/selection.yaml, modules/models/capabilities.yaml rule).
 
   constraints.budget:
     meaning: >-
@@ -270,7 +273,7 @@ preflight:
     context pack or a machine check exposes the repo's layout contract,
     cite it; the obligation stands regardless — the defect this prevents is
     a conflict only caught at settle.
-  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/code-patterns/*; api.yaml enqueue/dispatch refuses path-illegal"
+  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/code-patterns/*; modules/kernel/api.yaml dispatch layoutPreflight — the api does not refuse an illegal path, the kernel does not enqueue one"
 
 # ============================================================================
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.

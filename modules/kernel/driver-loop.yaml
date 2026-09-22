@@ -495,7 +495,7 @@ verdictTable:
       business.revise etc., or goal.revise for a goal-level conflict);
       scope-expansion -> re-run scope.define, then provision.ask if authority
       widens; identity-wrong -> provision.ask ALWAYS.
-    citation: "modules/goal/legality.yaml backwardEdges; modules/ops/ops/goal.revise.yaml; init/CLAUDE.md work-correction policy"
+    citation: "modules/goal/legality.yaml backwardEdges; modules/ops/ops/goal.revise.yaml"
 
 interfaceAuditLoop:
   chain: >-
@@ -596,7 +596,7 @@ replanTriggers:
   - trigger: retry-budget-exhausted
     when: "a route's limit fired its last allowed time for a node group"
     driverDoes: "the route's own `then: needUser` fires — the workflow stops for the user with the failure history attached"
-    citation: "modules/models/kinds.yaml routes purpose lines; api.yaml incident (fingerprint/exhaustion)"
+    citation: "modules/models/kinds.yaml routes purpose lines; modules/kernel/api.yaml incident"
 
   - trigger: goal-completes
     when: "every leg settled and the gates ran"
@@ -615,7 +615,7 @@ escalation:
       record: "assumptions land on the goal (`assumed:`) so a later revision can see they were guesses"
     - kind: RETRY
       scope: "re-dispatch inside a route's limit, with the failure named back"
-      basis: "modules/models/kinds.yaml routes + engine/constants.mjs budgets"
+      basis: "modules/models/kinds.yaml routes — the route row carries the limit"
     - kind: REPAIR-ROUTE
       scope: "red proof / gap blocker -> the revise/build kind the route table names"
       basis: "the route table is closed — the driver matches, it does not improvise"
