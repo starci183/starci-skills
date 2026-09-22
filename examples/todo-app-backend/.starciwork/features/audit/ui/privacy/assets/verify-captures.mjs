@@ -10,7 +10,7 @@
  *
  * This asserts presence and pairing only. It deliberately does not claim the captures pass the
  * brand+grammar canon: impl.audit.todo-app-frontend.privacy is not `done`, so
- * scripts/example-render-proof.mjs answers vacuously for it, and this node's screenshots predate
+ * scripts/example/example-render-proof.mjs answers vacuously for it, and this node's screenshots predate
  * the v7-9 capture convention (they were taken without the grayscale-antialiasing flags, so
  * scripts/checks/render.mjs's palette-off-brand reads LCD fringes as brand colours). Proving this screen's
  * palette is the render lane's open item, recorded in ex-testing/lint/v7-9-REPORT.md.
@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../../../../../../../core/yaml.mjs';
+import { parseYaml } from '../../../../../../../../engine/yaml.mjs';
 
 const assetDir = path.dirname(fileURLToPath(import.meta.url));
 const nodeDir = path.dirname(assetDir);

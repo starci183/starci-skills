@@ -8,7 +8,7 @@ owners:
   - {role: module, path: src/features/todo/graphql/queries/task/list-tasks}
   - {role: module, path: src/features/todo/graphql/queries/task/task-counts}
 proves: [br.task.list.owned]
-change: {rev: 1, kind: clarifying, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
+change: {rev: 1, kind: initial, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
   owners now also claims the shipped list read doors,
   src/features/todo/graphql/queries/task/{list-tasks,task-counts} - their resolvers dispatch
   ListTasksQuery and TaskCountsQuery into the module above (the task-counts half is the provider

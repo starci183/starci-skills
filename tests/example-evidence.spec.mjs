@@ -45,7 +45,8 @@ test('generateEvidence: a passing assertion writes outcome: pass with a matching
   assert.equal(result.evidence.outcome, 'pass');
   assert.equal(result.evidence.recordDigest, sha256File(recordFile));
   assert.equal(result.evidence.provenance.actor, 'example-evidence');
-  assert.equal(result.evidence.provenance.tool, 'scripts/example-evidence.mjs');
+  assert.equal(result.evidence.provenance.tool, 'scripts/example/example-evidence.mjs',
+    'the tool is named by the path a reader can go and run; a path that no longer exists is not provenance');
 
   const written = parseYaml(fs.readFileSync(result.evidenceFile, 'utf8'));
   assert.equal(written.schema, 'work/evidence@1');

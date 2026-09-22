@@ -72,7 +72,7 @@ requiresProof:
 
 change:
   rev: 2
-  kind: clarifying
+  kind: breaking
   at: 2026-09-18T16:40:00.000Z
   withdraws: ["POST /auth/sign-in with the pair, observable: http", "the session cookie and a redirect
     to the list, observable: http"]

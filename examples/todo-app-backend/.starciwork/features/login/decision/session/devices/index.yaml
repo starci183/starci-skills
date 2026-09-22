@@ -27,5 +27,5 @@ reason: >-
   expectation many-devices would satisfy later. What is still missing is not this decision but
   gap.login.device-field - no device field exists yet on a session or person to actually carry out a
   single-device eviction against.
-change: {rev: 1, kind: clarifying, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: single-device, overriding the many-devices recommendation."}
+change: {rev: 1, kind: initial, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: single-device, overriding the many-devices recommendation."}
 

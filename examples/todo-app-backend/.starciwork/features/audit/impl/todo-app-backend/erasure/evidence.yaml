@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: impl.audit.todo-app-backend.erasure
-recordDigest: d955f4179abc0404f4beaa94f74acd20c29ec77eaecc1a860bfc9459eed746a1
+recordDigest: f2c6b47e331d51dce1d42c655db94a88eb135fde661a7da4ded1a68fe1ef3b45
 codeDigest:
   algorithm: sha256
   files:
@@ -12,7 +12,7 @@ codeDigest:
     - path: src/features/todo/graphql/mutations/audit/complete-erasure/complete-erasure.module.ts
       sha256: fa42f70bf516043cab4be4613bb014d8e4cf7146534681140a48f461220e0f92
     - path: src/features/todo/graphql/mutations/audit/complete-erasure/complete-erasure.resolver.spec.ts
-      sha256: c1ee4270e5f1eba7ce60299311f18df055cbc4bfe46e5c356c2539d2821aef7f
+      sha256: 85a5ca5b1ea52a22738c2d11fa6a204370832ae460ca616850f297d723f4a956
     - path: src/features/todo/graphql/mutations/audit/complete-erasure/complete-erasure.resolver.ts
       sha256: 29cbc97e0cec3d7aef4a4ea839afe45016a1f80ac04c81903d5c47e77971de28
     - path: src/features/todo/graphql/mutations/audit/complete-erasure/graphql-types/response.ts
@@ -24,7 +24,7 @@ codeDigest:
     - path: src/features/todo/graphql/mutations/audit/request-erasure/request-erasure.module.ts
       sha256: cbd7c5a6fbff7431356a54d8f71e5b3fabcf93c71bb6b1cdd9cf6d55167c3b48
     - path: src/features/todo/graphql/mutations/audit/request-erasure/request-erasure.resolver.spec.ts
-      sha256: 2f11488886d3672203b8c2e1a7ff6266a19cf31155766db38160f690d137930b
+      sha256: 157ae41acfb5c912bd180efec21b664c727590860e706bb31a44cb0fd53119fd
     - path: src/features/todo/graphql/mutations/audit/request-erasure/request-erasure.resolver.ts
       sha256: fab237d1a9852bf631280986034a942d681d6faf80c23de8361bc28a658c47c2
     - path: src/modules/bussiness/audit/append-log-line.command.ts
@@ -34,7 +34,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/append-log-line.handler.ts
       sha256: 091c9a70a8a90fe6ec9ed030d5ac3b3dd41b5befbb2d5270b802d180f327a0bf
     - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      sha256: eced8460bc4ab6e074babb2da465cd6dd6c7a682bacdba0b99f2b49e17015aeb
+      sha256: 78b5ab923a61972d6a27872f94dac199cdaa3cc484b7aa07bbdf982e25746214
     - path: src/modules/bussiness/audit/audit-erasure.service.ts
       sha256: a4b36693f4a2189c731eb60ecacff92b91fb39f443d1403d945536b6dbde62c4
     - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
@@ -95,7 +95,7 @@ codeDigest:
       sha256: 56bdf0a467ab20094eaa91fec2a4052081b2f1a27fe39846b8f956e67786b762
     - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
       sha256: a69b044f18ff64b6c457cf4c3ffa0e3b0c3af57a58f0d0d2ca98228dc4fcc1eb
-  digest: 0bcc09ceb731b827df94426c0aa8a7c5414bf2edc39c45b8655ec8aab12cd23f
+  digest: 4443daf3a77a3a4f1eea1b81991e4957ae8fec9a9d2f0c482079e2ff4d9482c5
 outcome: pass
 assertions:
   - id: br.audit.erasure.right
@@ -133,6 +133,6 @@ assertions:
     observation: npx jest src/modules/bussiness/audit --runInBand -t "fr.audit.erasure.complete" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:12:08.505Z
+  capturedAt: 2026-09-22T18:17:08.712Z

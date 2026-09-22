@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: gap.audit.unbuilt-module
-recordDigest: 0d2a6cadd34407c0f930140e1f4c2538188194922beb6d03d966489409bbf21c
+recordDigest: c9fc7bdf071eae6533624bb1255aa6317c2b3d6e797399e78e84862438d1c483
 outcome: pass
 assertions:
   - id: audit-module-exists-and-registers
@@ -13,6 +13,6 @@ assertions:
     observation: npx jest src/modules/bussiness/audit src/app.boot.spec.ts exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:07:51.540Z
+  capturedAt: 2026-09-22T18:16:25.553Z

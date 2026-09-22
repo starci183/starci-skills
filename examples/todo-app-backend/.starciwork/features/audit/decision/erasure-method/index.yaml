@@ -49,4 +49,4 @@ reason: >-
   readability of every field in it - a real, accepted change to br.audit.retention's plain-language
   statement, not just an implementation detail, and now a settled fact of the design rather than an open
   tension.
-change: {rev: 1, kind: clarifying, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: crypto-shredding, matching the record's own recommendation."}
+change: {rev: 1, kind: initial, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: crypto-shredding, matching the record's own recommendation."}

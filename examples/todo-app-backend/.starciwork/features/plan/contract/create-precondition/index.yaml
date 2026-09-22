@@ -38,7 +38,6 @@ change:
     create-precondition.contract.spec.ts, the surface corrected to the throw-based
     TaskCreationPolicy.assertMayCreate the pre-existing seam actually exposes."
 
-blockedBy: []
 
 # The consumer obligation is proven against the real CreateTaskHandler/TaskCreationPolicyRegistry
 # classes, and fr.task.create's own record now states the same reality - its exceptionFlows carry the

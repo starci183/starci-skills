@@ -1,8 +1,0 @@
-schema: work/uat-flow@1
-id: uat.fake.ghost
-title: A uat flow that never ran
-state: todo
-entry: /ghost
-actor: person
-steps:
-  - {order: 1, actor: person, action: "Walk the flow.", expected: "the flow settles", checks: [{id: settles, expected: yes}]}

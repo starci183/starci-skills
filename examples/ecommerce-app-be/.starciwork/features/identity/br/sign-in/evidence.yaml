@@ -1,22 +1,22 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: br.identity.sign-in
-recordDigest: 33e1532e75f6eaf1e9aff0a50bdc7242a7d11868c72e47990f3f3a8f1a3c1068
+recordDigest: 473d762aa5f655afd17ec8b8b9b8359d110ab91331f9b1235ddbb457c6ad43f2
 codeDigest:
   algorithm: sha256
   files:
     - path: src/modules/bussiness/account/account.module-definition.ts
       sha256: d439398712cb22e99772e193f32e46512061b2a87444019b456ab682d3617e2e
     - path: src/modules/bussiness/account/account.module.ts
-      sha256: 6b2b32be628d053b3570f7097cc25df727599d01af25f1ec53411398bf7920ab
+      sha256: de7a6b04643e2f312bdcccb408b2fde81e5d56e00e2eed80e354df16082e0e4a
     - path: src/modules/bussiness/account/account.service.spec.ts
-      sha256: ee2e683814e864e7a8c13e1a261286beab8821cf9e99975bc649d3d1b2a28234
+      sha256: 905a9b88c7ded5886d6e1415bfd90dc50f225d63545f6749bfb88ad6dba406b3
     - path: src/modules/bussiness/account/account.service.ts
-      sha256: e506dd257c30284afae0c99827eb7e1c7e0c6f4815a560362fb45f965e242001
+      sha256: df0c2ec9ca97adfa171721b2bd46940cc6a90bc43d27db83720d0d79d060239e
     - path: src/modules/bussiness/account/password.policy.spec.ts
-      sha256: fbee07a7ad3404862ae95f98f1e7a78366544c2f93f8aca17cf87b468a039db3
+      sha256: b47f9ed43ab5c850457c53f90f291648161fa9e3b9a4f2827a8e400d0e3bd69c
     - path: src/modules/bussiness/account/password.policy.ts
       sha256: 26c9fc2bfb1a86b71cfc93f0a2074d3d23583eb4864e5a05578b02f9d58b4f65
     - path: src/modules/bussiness/session/session.lifecycle.spec.ts
@@ -24,7 +24,7 @@ codeDigest:
     - path: src/modules/bussiness/session/session.module-definition.ts
       sha256: d439398712cb22e99772e193f32e46512061b2a87444019b456ab682d3617e2e
     - path: src/modules/bussiness/session/session.module.ts
-      sha256: 3ce0efd3171dec17e1244ba80b38afcbc4bb065ae936e0be8f096451d9b8d5ff
+      sha256: 023935e1584dfc9bbcb64ce92343c0f3b37e20122e8698f18926f729c4d2ccf2
     - path: src/modules/bussiness/session/session.repository.spec.ts
       sha256: 6a59d61a6be7ebbb1c0c96a8c21430fe301580c47a168828ba803b3c3e72df12
     - path: src/modules/bussiness/session/session.repository.ts
@@ -33,7 +33,7 @@ codeDigest:
       sha256: b6d8e8d4bbfa8dc5fa6a86f7f62a191fdeb778236a752bd82fedfaad1f760e2c
     - path: src/modules/bussiness/session/session.service.ts
       sha256: c0eb56dea6c736b26979145fa9a97c9d9a6923789eb269fd4d8eb787881b395e
-  digest: d848f1c9c8828e5425cfc6e177ccefdc8d1cd8aa3bfedc77f453b1ee194ed77f
+  digest: 95bf4bab0a17c622a1cdc0bacae1f34069f88497188821b9b9039cca178b251d
 outcome: pass
 assertions:
   - id: br.identity.sign-in#ac.identity.sign-in.known-pair-issues-a-session-token
@@ -48,6 +48,6 @@ assertions:
     observation: npx jest -t ac.identity.sign-in.wrong-pair-is-refused-alike --runInBand exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T16:12:02.253Z
+  capturedAt: 2026-09-22T18:30:08.772Z

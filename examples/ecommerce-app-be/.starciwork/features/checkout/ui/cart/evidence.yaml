@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: ui.checkout.cart
-recordDigest: ae4774c23a130ef50893480397d4f6c1f44e4de4e725c8926c75ce9c7b31bb1a
+recordDigest: 17560f7993483b552ffb6e6981bcbb98b278d486a4adf6ee92b7ae8645827596
 outcome: fail
 assertions:
   - id: direction-asset-custody
@@ -26,6 +26,6 @@ assertions:
       render exited 1
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T15:40:14.352Z
+  capturedAt: 2026-09-22T18:27:52.416Z

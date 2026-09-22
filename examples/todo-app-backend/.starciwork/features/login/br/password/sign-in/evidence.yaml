@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: br.login.password.sign-in
-recordDigest: 59cd554f111f9a39e60d5941a6d895701dd23d71a33b6bb638f6eca20e07da92
+recordDigest: c81c8c57221a8f21ce0b0be2255b061b8ca16fab0cef31246cbc9b8515c6d372
 codeDigest:
   algorithm: sha256
   files:
@@ -30,16 +30,16 @@ codeDigest:
     - path: src/modules/bussiness/session/types/session-record.ts
       sha256: 58e47ebbcc314c8e5a22a9d7c73097d04cdd04deb114ab27e496a8e7b7c437d2
     - path: src/modules/integrations/keycloak/keycloak.client-edge.spec.ts
-      sha256: 94ec2a38f0a48b9b178417e5b7e56df278f0aeca33958e189f07562db8fdfc82
+      sha256: 6dfea6034d692baaaa9beb1543aa113fbfd57812c1863f946f809fe0c70ad41a
     - path: src/modules/integrations/keycloak/keycloak.client.spec.ts
-      sha256: 5850f68135af37f081f209653ab0a521bd74fa0c13a9780975c8db75d4d1d52c
+      sha256: b9e8d54cb28481029419392c9fde3ff675c36c3d4600b1e7468a56de26104a7f
     - path: src/modules/integrations/keycloak/keycloak.client.ts
       sha256: bd1fea8bc0094b59d9a352729f931f18cddc8ea18683811d60c35ed4f79a3240
     - path: src/modules/integrations/keycloak/keycloak.module-definition.ts
       sha256: f8ae2f04c79286f90f231254e556e7c088bdd586a239757bb6601023aee97dc9
     - path: src/modules/integrations/keycloak/keycloak.module.ts
       sha256: 9380c6ea1663a0a35d77bf93c22de0d22cdafd0ef740306e6aa758422fa17cdd
-  digest: da0cd4992e6ab100529dfa848d1b4b153857e6cf3598f5625231cc20618483ee
+  digest: fafc4a50151804a14873e0dfe22a07bea1ffed370230dad731f26c24b7d501e1
 outcome: pass
 assertions:
   - id: br.login.password.sign-in#ac.login.password.sign-in.wrong-pair-is-refused
@@ -54,6 +54,6 @@ assertions:
     observation: npx jest -t "ac.login.password.sign-in.refusal-does-not-name-the-half" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T13:04:27.722Z
+  capturedAt: 2026-09-22T18:20:59.332Z

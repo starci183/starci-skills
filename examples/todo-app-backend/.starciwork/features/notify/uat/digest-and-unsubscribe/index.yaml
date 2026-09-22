@@ -1,7 +1,8 @@
 schema: work/uat-flow@1
 id: uat.notify.digest-and-unsubscribe
 title: Two events settle into one digest, then an unsubscribe silences the next one
-state: inprogress
+state: todo
+activity: verifying
 entry: /notify/preferences
 actor: owner
 accounts: accounts.yaml

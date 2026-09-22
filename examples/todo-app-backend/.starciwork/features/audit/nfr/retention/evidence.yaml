@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: nfr.audit.retention
-recordDigest: b5fb5639446e80d618d04377a23c399398e3eb48c60a1df8d3c7f1885bb74693
+recordDigest: 3e89ca2140908f2f1b56a82a5af6c5ecc271cba3abd9bb83a3bd7e266e48cae1
 outcome: pass
 assertions:
   - id: measurement
@@ -13,6 +13,6 @@ assertions:
     observation: npx jest -t "nfr.audit.retention" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T11:56:01.850Z
+  capturedAt: 2026-09-22T18:18:36.671Z

@@ -4,8 +4,8 @@ title: A visitor becomes a buyer by placing an order
 state: done
 statements:
   - A confirmation succeeds only for a live session, with every cart line in stock at the moment of the call.
-  - A confirmed order is final in this example: the same idempotency key replayed by the same person returns the first answer and never writes a second order; the key is scoped per person, so two buyers never share one answer.
-  - A refused confirmation changes nothing: the cart keeps its lines, no stock moves, no payment exists.
+  - "A confirmed order is final in this example: the same idempotency key replayed by the same person returns the first answer and never writes a second order; the key is scoped per person, so two buyers never share one answer."
+  - "A refused confirmation changes nothing: the cart keeps its lines, no stock moves, no payment exists."
   - Once an order is confirmed, the person has orders - and that is checkout's fact to answer, not identity's to guess.
 authorityRefs:
   - "owner-intent: The whole point of the second example - the first rule in the product that only makes sense across two services."

@@ -3,7 +3,7 @@ id: data.plan.payment-intent
 title: Payment intent
 state: done
 fields:
-  - {name: id, type: text, required: true, note: Opaque, assigned at creation; this is the idempotency key.}
+  - {name: id, type: text, required: true, note: "Opaque, assigned at creation; this is the idempotency key."}
   - {name: subscriptionId, type: text, required: true}
   - {name: gateway, type: text, required: true, default: sepay, note: "References integration.plan.sepay."}
   - {name: gatewayIntentId, type: text, required: true, note: The gateway's own id for the same transaction.}

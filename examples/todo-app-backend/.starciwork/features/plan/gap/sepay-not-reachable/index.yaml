@@ -22,7 +22,7 @@ statement: integration.plan.sepay requires a live proof and none exists, which i
 closedBy: integration.plan.sepay
 change:
   rev: 2
-  kind: clarifying
+  kind: breaking
   at: 2026-09-18T11:32:43.321Z
   withdraws:
     - "no module exists yet at src/plan/payments (gap.plan.unbuilt-module)"

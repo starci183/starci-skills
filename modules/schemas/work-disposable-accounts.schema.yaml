@@ -2,59 +2,57 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: urn:work:disposable-accounts:1
 type: object
 additionalProperties: false
-description: "The identities a UAT flow signs in with, collocated with the flow that uses them. It is the one
-  family whose whole purpose is a prohibition: the values here are synthetic, local and disposable, and a
-  real credential must never be written into this file, because it is tracked, it is read by anybody who can
-  read the tree, and it will still be there long after the walk it was written for. The record carries no id
-  and no state - it is a fixture belonging to its flow, not a unit of work that can be finished - and the
-  flow points at it by filename."
+description: "The identities a UAT flow may sign in with, collocated with the flow that uses them. Its whole
+  purpose is a prohibition: this file is tracked, readable and outlives every walk, so an entry names a
+  sealed identity resource by id and never a credential. A literal username and password pair here is
+  refused - not because the pair might be real, but because a file that can hold one will eventually hold
+  one. It carries no id and no state, because it is a fixture rather than work."
 required:
   - schema
+  - disposable
   - accounts
 properties:
   schema:
     const: work/disposable-accounts@1
     description: Record family discriminator. Every record names its own family so a file can be validated
       without inferring its meaning from the directory it happens to sit in.
+  disposable:
+    const: true
+    description: That every identity below is throwaway. It is only ever true and it is stated rather than
+      implied by the filename, because the claim is what a reader checks the entries against.
   accounts:
     type: array
     minItems: 1
     uniqueItems: true
-    description: The identities the walk uses, one per role it needs. At least one is required, because a
-      fixture with no account cannot sign anybody in; more than one is the normal case, since the
-      interesting half of most walks is what a second person is refused.
+    description: The identities the flow signs in with, one per role it needs. A flow that needs a role this
+      list does not carry cannot be walked, which is a better failure than one that improvises a credential.
     items:
       type: object
       additionalProperties: false
       required:
         - role
-        - username
-        - password
+        - identity
       properties:
         role:
           $ref: "#/$defs/slug"
-          description: What this identity is in the walk - the owner, a stranger. The steps name the role
-            rather than the username, so that a reader follows who is acting without tracking which
-            synthetic account was allocated to them.
-        username:
-          $ref: "#/$defs/prose"
-          description: The synthetic local username to sign in with. It is written plainly because it is
-            disposable by construction; a username that would be recognisable as a real person's is the
-            wrong value for this field.
-        password:
-          $ref: "#/$defs/prose"
-          description: The disposable password for that synthetic account, and nothing that would ever open
-            anything else. It is stored in the clear precisely because it must be worthless - a field that
-            could hold a real secret would eventually hold one, and no schema can tell the difference by
-            looking, so the rule is that every value here is created for the walk and thrown away after it.
+          description: The role the flow's steps name this account by. It is the join between the walk and
+            the custody, so a step naming a role no entry carries is a resolution failure rather than a
+            sign-in that fails confusingly.
+        identity:
+          $ref: "#/$defs/recordId"
+          description: "The sealed identity this account resolves to, as an edge into the _resources
+            family: it must name a work/resource@1 of kind identity, which is where the provider, the
+            disposability and the custody path actually live. It is a ref rather than a value, so rotating
+            the secret is one edit in one place and this file never held it."
 $defs:
-  prose:
-    type: string
-    minLength: 1
-    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
-      a written one, so it is refused at the type.
   slug:
     type: string
     pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
       written twice by two authors is the same string.
+  recordId:
+    type: string
+    pattern: ^(?:environment|identity|fixture)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: The id of a typed resource under _resources, kind prefix included. Requiring the prefix
+      means an account pointed at an environment or a fixture is a malformed id on sight rather than a type
+      error discovered when somebody tries to sign in with it.

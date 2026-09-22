@@ -3,18 +3,20 @@ $id: urn:work:ui-screen:1
 type: object
 additionalProperties: false
 description: "One screen the person actually sees, and every state it can be in. The state list is the point
-  of the record: a screen specified only in its happy state gets built only in its happy state, and the empty,
-  refused and working states are discovered by a person hitting them in production. Because the screen binds
-  the brand by revision, a brand change is a visible input change here rather than a silent divergence
-  between what was captured and what now renders."
+  of the record: a screen specified only in its happy state gets built only in its happy state, and the
+  empty, refused and working states are discovered by a person hitting them in production. Because the
+  screen binds the brand by revision, a brand change is a visible input change here rather than a silent
+  divergence between what was captured and what now renders. A screen reaches done only once at least one
+  of its assets carries a real `generation` record from interface.draw and its coverage map names every
+  state it lists - never by authored claim."
 required:
   - schema
   - id
   - title
   - state
-  - states
   - brand
   - refs
+  - ui
 properties:
   schema:
     const: work/ui-screen@1
@@ -32,15 +34,8 @@ properties:
       the UAT flow will use, so it is settled here once.
   state:
     $ref: "#/$defs/state"
-  states:
-    type: array
-    minItems: 1
-    uniqueItems: true
-    items:
-      $ref: "#/$defs/slug"
-    description: Every state this screen can be in - empty, one item, many, refused, working. Listing them
-      is what turns "design the screen" into a countable piece of work and what a capture set is checked
-      against; an unlisted state is a state nobody designed and nobody captured.
+  activity:
+    $ref: "#/$defs/activity"
   brand:
     type: object
     additionalProperties: false
@@ -55,15 +50,403 @@ properties:
         minimum: 1
         description: The revision of the brand record this screen was designed and captured against. A
           number rather than a copy of the tokens, because a copy is a second source of truth that drifts.
+  ui:
+    type: object
+    additionalProperties: false
+    required:
+      - intent
+      - surfaces
+      - states
+      - coverage
+      - accessibility
+      - responsive
+      - observations
+      - gaps
+    description: "The direction itself - what interface.draw designed and what it recorded about designing
+      it. The nine fields work-layout.yaml names are required; the rest are the op's own record of the
+      inputs it accepted and the review it performed, kept beside the direction rather than in a separate
+      file that could be lost from it."
+    properties:
+      intent:
+        $ref: "#/$defs/prose"
+        description: What this screen is for, composed rather than listed - the sentence a reader checks
+          every state and surface below against.
+      status:
+        $ref: "#/$defs/prose"
+        description: How far the direction has got - a generated proposal, an agent-reviewed one, one an
+          owner has accepted. It is written because a proposal and an accepted direction look identical as
+          images and mean different things to whoever implements them.
+      surfaces:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: The addressable surfaces this screen covers, each with the route that reaches it and
+          the actors who may. One record can own more than one surface when they are the same screen seen by
+          different people.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - name
+            - route
+            - purpose
+            - actors
+          properties:
+            name:
+              $ref: "#/$defs/slug"
+            route:
+              $ref: "#/$defs/prose"
+              description: The path a person reaches this surface at.
+            purpose:
+              $ref: "#/$defs/prose"
+              description: What the person came here to do.
+            actors:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: "#/$defs/slug"
+              description: Who may see this surface, by role.
+      states:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: Every state this screen can be in - empty, one item, many, refused, working. Listing
+          them is what turns "design the screen" into a countable piece of work and what the coverage map is
+          checked against; an unlisted state is a state nobody designed and nobody captured.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - name
+            - trigger
+            - behavior
+          properties:
+            name:
+              $ref: "#/$defs/slug"
+              description: The state's name, which the coverage map must name back.
+            trigger:
+              $ref: "#/$defs/prose"
+              description: What puts the screen into this state.
+            behavior:
+              $ref: "#/$defs/prose"
+              description: What the person sees and can do while it holds.
+      coverage:
+        type: object
+        additionalProperties: false
+        required:
+          - scale
+          - representativeScreens
+          - map
+        description: "Which of the states, viewports and themes the direction actually covers. It exists
+          because a draw is bounded: the honest record is not every combination but a named subset plus the
+          rule for deriving the rest, and the gate refuses a done screen whose map does not name every state
+          the list above declares."
+        properties:
+          scale:
+            $ref: "#/$defs/slug"
+            description: How wide the draw went - bounded, exhaustive - so a reader knows whether an absent
+              combination is undrawn or deliberately derived.
+          representativeScreens:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/slug"
+            description: The surfaces that were drawn in full and from which the rest derive.
+          breakpoints:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/slug"
+            description: The named breakpoints this screen claims to cover. Declaring them is what lets a
+              checker compare what was claimed against what the map and the shots actually carry, instead of
+              reading a pixel width and guessing which breakpoint somebody meant.
+          themes:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/theme"
+            description: The themes this screen claims to cover. A product with a dark theme whose every
+              direction is light has designed half of itself, and the absence is only visible if the claim
+              is written down.
+          map:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            description: One entry per combination the direction covers, binding a state to the shot that
+              shows it. It is the executable half of the coverage claim - the gate reads it against the
+              state list, and a checker reads each entry's asset against what is on disk.
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - screen
+                - state
+                - viewport
+              properties:
+                screen:
+                  $ref: "#/$defs/slug"
+                  description: Which surface this entry is of.
+                state:
+                  $ref: "#/$defs/slug"
+                  description: Which state it shows, by the name the state list gives it.
+                viewport:
+                  $ref: "#/$defs/prose"
+                  description: The viewport it was drawn at, named with its size so two entries at the same
+                    breakpoint and different widths are distinguishable.
+                breakpoint:
+                  $ref: "#/$defs/slug"
+                  description: The named breakpoint that viewport belongs to. It is separate from the
+                    viewport because the viewport is a measurement and the breakpoint is the design
+                    decision, and a check for "is every breakpoint covered" cannot be answered by widths.
+                theme:
+                  $ref: "#/$defs/theme"
+                  description: Which theme this entry shows. It is omitted where the screen has only one,
+                    and stated wherever more than one is claimed, because a theme nobody bound to a shot is
+                    a theme nobody drew.
+                components:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    $ref: "#/$defs/prose"
+                  description: The grammar components the entry composes, each named as it is exported so
+                    an implementer builds from the same vocabulary the direction drew from.
+                derivation:
+                  $ref: "#/$defs/prose"
+                  description: How this entry derives from a representative screen where it was not drawn in
+                    full - which is what makes a bounded coverage claim honest rather than merely short.
+                directionAsset:
+                  $ref: "#/$defs/prose"
+                  description: The asset this entry is shown by, relative to the record's own directory.
+      accessibility:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: What the direction commits to for people who do not use it the way it was drawn -
+          focus order, contrast, labelling, keyboard reach. It is on the design record because retrofitting
+          it to a built screen means rebuilding the screen.
+      responsive:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: How the composition changes with the viewport, stated as rules rather than as one more
+          drawing, so that a width nobody drew still has an answer.
+      artworkSlots:
+        type: array
+        uniqueItems: true
+        description: Where brand artwork may sit on this screen, and what each slot is for. A slot is a
+          place, not an image - the bytes belong to the brand record, and a screen naming a slot is saying
+          where they go rather than copying them.
+        items:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              $ref: "#/$defs/slug"
+            kind:
+              $ref: "#/$defs/prose"
+            screen:
+              $ref: "#/$defs/slug"
+            placement:
+              $ref: "#/$defs/prose"
+            decorative:
+              type: boolean
+              description: Whether the artwork carries meaning or only atmosphere. A decorative slot is one
+                an assistive reader may skip, which is a decision and not an oversight.
+            states:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: "#/$defs/slug"
+            status:
+              $ref: "#/$defs/prose"
+            master:
+              oneOf:
+                - $ref: "#/$defs/prose"
+                - type: object
+                  additionalProperties: false
+                  properties:
+                    path:
+                      $ref: "#/$defs/prose"
+                    record:
+                      type: string
+                      pattern: ^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$
+                      description: The record that owns the bytes, by id - usually the brand, whose id
+                        carries no family prefix because there is one of it per tree.
+              description: The owning artwork, either by path or as an edge into the record that owns the
+                bytes. Consumers refer to the one owner rather than duplicating the file.
+      mascotPolicy:
+        $ref: "#/$defs/prose"
+        description: Whether the mascot appears on this screen and where. It is stated even when the answer
+          is no, because an absent mascot and an undecided one look the same on a drawing.
+      assets:
+        $ref: "#/$defs/uiAssets"
+        description: Every file this direction produced or consumed, each with the role it plays and, for a
+          generated one, the provenance of its generation. It is the ui block's own copy of the record's
+          top-level `assets`, kept here because the draw op writes the block as one document.
+      observations:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: What the draw noticed that the direction does not itself claim - a component that did
+          not exist, a limit of the reference it worked from. It is kept apart from `gaps` because a
+          observation is a fact and a gap is a demand.
+      gaps:
+        type: array
+        uniqueItems: true
+        description: What this direction cannot answer and who must. Each entry carries a code so that the
+          same absence across several screens is one countable thing rather than several sentences.
+        items:
+          oneOf:
+            - $ref: "#/$defs/prose"
+            - type: object
+              additionalProperties: false
+              required:
+                - code
+                - detail
+              properties:
+                code:
+                  type: string
+                  pattern: ^[A-Z][A-Z0-9_]*$
+                  description: The absence's own name, in the screaming form the render and brand checks
+                    already report, so a gap here and a finding there are matchable by string equality.
+                detail:
+                  $ref: "#/$defs/prose"
+                  description: What exactly is missing and what closing it would take.
+      interactions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: What the person can do on this screen beyond reading it, where the states list does not
+          already carry it.
+      links:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: Destinations the direction draws, each with whether the route behind it exists. A drawn
+          link to a route nobody built is a promise the screen makes and the product does not keep, and the
+          status is where that is admitted.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - label
+            - href
+            - status
+          properties:
+            label:
+              $ref: "#/$defs/prose"
+            href:
+              $ref: "#/$defs/prose"
+            status:
+              $ref: "#/$defs/prose"
+      controls:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: The controls the direction draws and where each one leads, with the same honesty about
+          whether the behaviour behind it exists.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - label
+            - status
+          properties:
+            label:
+              $ref: "#/$defs/prose"
+            destination:
+              $ref: "#/$defs/prose"
+            status:
+              $ref: "#/$defs/prose"
+      shell:
+        $ref: "#/$defs/openBlock"
+        description: The application shell this screen sits inside - header, navigation, footer, and which
+          component owns each. Its keys vary with the shell the product actually has, so they are
+          constrained rather than listed.
+      appOwnedRegions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: The parts of the composition the application owns rather than the grammar, each with
+          the anatomy it is built from. Naming them is what stops an implementer reaching for a component
+          that was never meant to carry this region.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - anatomy
+          properties:
+            id:
+              $ref: "#/$defs/slug"
+            name:
+              $ref: "#/$defs/slug"
+            owner:
+              $ref: "#/$defs/slug"
+            anatomy:
+              $ref: "#/$defs/prose"
+            reference:
+              $ref: "#/$defs/prose"
+      acceptedInputs:
+        $ref: "#/$defs/openBlock"
+        description: What the draw read and the digest of each thing it read - the brand at a revision, the
+          business records, the grammar it inspected, the knowledge rules. It is the op's record of its own
+          inputs, so its keys follow what that op accepted rather than a shape fixed here.
+      provenance:
+        $ref: "#/$defs/openBlock"
+        description: Where the direction came from - the commit, the grammar version, the references it was
+          composed against. It is the same kind of op-owned record as acceptedInputs and is constrained the
+          same way.
+      anatomyReview:
+        $ref: "#/$defs/openBlock"
+        description: The before-and-after of a review pass over the drawn anatomy, with who performed it and
+          when. It is kept because a regenerated direction that does not say what it changed is a file
+          somebody has to diff by eye.
+      review:
+        $ref: "#/$defs/openBlock"
+        description: The review this direction has actually had - its method, what it passed, what it could
+          not establish. An agent-reviewed proposal is not owner acceptance and the block says which it is.
+      supersededDirection:
+        type: object
+        additionalProperties: false
+        required:
+          - path
+          - reason
+        description: The direction this one replaced, kept by path and digest rather than deleted. A
+          replaced drawing is history, and history that is removed cannot answer why the current one looks
+          the way it does.
+        properties:
+          path:
+            $ref: "#/$defs/prose"
+          sha256:
+            $ref: "#/$defs/sha256"
+          revision:
+            type: string
+            pattern: ^[a-f0-9]{7,64}$
+          reason:
+            $ref: "#/$defs/prose"
+  assets:
+    $ref: "#/$defs/uiAssets"
+    description: "Every file this record owns under its own assets/, each with the role it plays. A
+      generation-bearing asset is ui-owned only: it is what tells a designed direction apart from a real
+      running-page capture regardless of prose provenance, and the gate refuses one on any other family."
   refs:
-    type: array
-    minItems: 1
-    uniqueItems: true
-    items:
-      $ref: "#/$defs/recordId"
-    description: The records this screen serves, by id - the functional requirements a person carries out
-      through it. It is required because a screen that serves no stated requirement is a picture, and nobody
-      can say whether it is finished or even needed.
+    $ref: "#/$defs/refs"
+  dependsOn:
+    $ref: "#/$defs/dependsOn"
   proves:
     type: array
     minItems: 1
@@ -74,41 +457,732 @@ properties:
       them. It is the same authored forward edge an implementation carries, and it is optional because most
       screens only serve requirements through `refs` and are themselves demonstrated by an implementation or
       a walk.
+  requiresProof:
+    $ref: "#/$defs/requiresProof"
+  provenBy:
+    $ref: "#/$defs/provenBy"
   evidence:
     $ref: "#/$defs/slug"
     description: The single evidence directory under this record's evidence/ folder that carries the proof
       this screen was seen in the states it declares. At most one, because a screen has one current answer to
       whether its captures are real.
+  subscribes:
+    $ref: "#/$defs/subscribes"
   blockedBy:
-    type: array
-    minItems: 1
-    uniqueItems: true
-    items:
-      $ref: "#/$defs/prose"
-    description: What is standing in the way, in sentences that name the record responsible. It is prose
-      rather than lifecycle state because an impediment is a fact about the world, not a status - a capture
-      set taken against an older brand revision is the usual case, and it is stated rather than ignored.
+    $ref: "#/$defs/blockedBy"
+  conflictsWith:
+    $ref: "#/$defs/conflictsWith"
+  blockers:
+    $ref: "#/$defs/blockers"
+  verificationSource:
+    $ref: "#/$defs/verificationSource"
+  because:
+    $ref: "#/$defs/because"
+  change:
+    $ref: "#/$defs/change"
+dependentRequired:
+  because:
+    - verificationSource
+allOf:
+  - if:
+      type: object
+      properties:
+        verificationSource:
+          const: authored-claim
+      required:
+        - verificationSource
+    then:
+      type: object
+      required:
+        - because
+      properties:
+        because: true
+    description: "Done means proven or says so. A record whose done rests on an authored claim rather than
+      a run must carry the sentence saying why no run proves it - without it the label is a done record
+      asserting itself, which is the one shape the rule exists to refuse."
 $defs:
   prose:
     type: string
     minLength: 1
     description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
       a written one, so it is refused at the type.
+  fieldName:
+    type: string
+    pattern: ^[A-Za-z][A-Za-z0-9_]*$
+    description: A field name as the wire carries it. Casing is not normalised, because an event's payload
+      names are the real names a consumer destructures and rewriting them here would describe a different
+      message.
+  recordId:
+    type: string
+    pattern: ^(?:br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event|environment|identity|fixture)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: "The id of any record in the tree, family prefix included, optionally addressing one
+      criterion the record carries inline as `<record id>#<criterion>`. Requiring a known prefix means an
+      unresolvable reference is caught as a malformed id rather than surviving as a plausible-looking
+      string."
+  eventId:
+    type: string
+    pattern: ^event(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: The id of a `work/event@1` record. It is its own type so that a subscription to something
+      that is not an event is a malformed id here rather than a resolution failure later.
+  state:
+    enum:
+      - uninvestigate
+      - todo
+      - done
+    description: "Whether this leaf has not been looked at, is outstanding, or is finished, and nothing
+      else. There is deliberately no in-progress value: `todo` plus `activity` says that, and
+      `effectiveState: suspended` is derived by the runtime when an input a done record was proved against
+      has moved. Authoring either would let a record claim a status something else is supposed to compute."
+  activity:
+    enum:
+      - idle
+      - investigating
+      - implementing
+      - verifying
+    description: What is happening to this record right now, beside its state rather than inside it. `todo`
+      with `idle` is defined work nobody is running; `todo` with any other value is work in flight. It is a
+      separate field because activity changes many times inside one state and a lifecycle that encoded both
+      would record a restart as a change of status.
+  verificationSource:
+    enum:
+      - kernel-observed
+      - observed
+      - authored-claim
+    description: "Where this record's verification came from: kernel-observed means a live kernel workflow
+      ran it and settled the record on what it saw, observed means the listed commands were really run and
+      their results recorded outside any kernel workflow, and authored-claim means a person or an agent
+      wrote the sentence and nothing ran at all. The three read identically as prose and mean completely
+      different things, so the label is written rather than inferred; without it, the cheapest way to make
+      a tree look proven is to write more sentences."
+  because:
+    type: string
+    minLength: 1
+    description: "Why no run proves this record, required whenever `verificationSource: authored-claim` is
+      what carries its done. Without it, an authored claim is indistinguishable from a proof nobody got
+      round to recording."
+  subscribes:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/eventId"
+    description: The events this record consumes, by id. It is the inbound half of the event coupling and
+      is authored on the consumer, because the producer must not have to know who listens.
+  refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: Semantic inputs this record read, by id, without implying any execution order. An edge
+      records what was bound so that a change invalidates exactly the dependents that read the part which
+      moved, and nothing else.
+  dependsOn:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: Prerequisites that must genuinely be effectively done before this record can be. It is
+      deliberately not where a reviewed-but-todo specification seed goes - that is `refs` - because using
+      it for an intentionally todo input would deadlock delivery.
+  blockedBy:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - because
+      properties:
+        record:
+          $ref: "#/$defs/recordId"
+          description: The record this one waits on, by id. It is an edge rather than a sentence so that the
+            gate can resolve it and refuse a wait on something that no longer exists.
+        rev:
+          type: integer
+          minimum: 1
+          description: The blocking record's `change.rev` at the moment this blocker was authored, omitted
+            only when the wait does not depend on a particular revision holding. A blocker whose target has
+            since reached done at or past this rev is stale, and the gate refuses it rather than letting it
+            go quietly out of date.
+        because:
+          $ref: "#/$defs/prose"
+          description: What the wait is actually about, in a sentence that a reader can check against the
+            target. It is required because an edge with no reason is a fact nobody can re-evaluate when the
+            target moves.
+    description: What this record waits on, as edges rather than prose. An absence with no owner is not
+      authored here as a sentence; it becomes a `work/gap@1` record and this list points at its id like any
+      other.
+  conflictsWith:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - because
+      properties:
+        record:
+          $ref: "#/$defs/recordId"
+          description: The record that currently cannot be true at the same time as this one.
+        rev:
+          type: integer
+          minimum: 1
+          description: The revision of the target the conflict was observed against. The gate refuses a
+            mismatch against the target's current rev, so a conflict already settled by an edit surfaces
+            instead of standing.
+        because:
+          $ref: "#/$defs/prose"
+          description: Why the two cannot both hold, stated so that settling the conflict is a decidable
+            question rather than a matter of taste.
+    description: "Pairwise conflicts only. Three or more records that are each individually true and jointly
+      unsatisfiable are a set only a decision can settle, and they are authored as `tension` on the
+      `work/policy-decision@1` that owns settling them."
+  blockers:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+    description: "Impediments that are facts about the world rather than edges into the tree - an
+      unavailable environment, a tool nobody has. They are kept out of lifecycle state deliberately: the
+      record is still todo, and the blocker explains why it has not moved."
+  requiresProof:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: What this record needs before anybody may call it proven, broken down by kind. The kinds
+      are a closed set so that a weaker bar cannot be invented by choosing a new word for it.
+    properties:
+      unit:
+        $ref: "#/$defs/proofDemand"
+      e2e:
+        $ref: "#/$defs/proofDemand"
+      uat:
+        $ref: "#/$defs/proofDemand"
+      perf:
+        $ref: "#/$defs/proofDemand"
+      live:
+        $ref: "#/$defs/proofDemand"
+      implementation:
+        $ref: "#/$defs/proofDemand"
+      measurement:
+        $ref: "#/$defs/proofDemand"
+      requirements:
+        $ref: "#/$defs/proofDemand"
+      transitions:
+        $ref: "#/$defs/proofDemand"
+      provider:
+        $ref: "#/$defs/proofDemand"
+      consumer:
+        $ref: "#/$defs/proofDemand"
+  proofDemand:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: What satisfying one kind means here, stated concretely enough that a checker can decide it
+      rather than a reader judging it. An empty demand would be a kind named and nothing asked of it.
+    not:
+      properties:
+        required:
+          const: true
+        optional:
+          const: true
+      required:
+        - required
+        - optional
+    properties:
+      required:
+        const: true
+        description: This kind must be satisfied. It is only ever true, because the absence of the key
+          already says the kind is not demanded.
+      optional:
+        const: true
+        description: This kind counts when it is present but does not hold the record back. It may not
+          appear beside `required` - a demand that is both is a demand that has not been decided.
+      command:
+        $ref: "#/$defs/prose"
+        description: The exact command that satisfies this kind, runnable as written. Naming it on the
+          record is what stops the demand being satisfiable by whatever run happens to be convenient later.
+      forEach:
+        type: string
+        pattern: ^[a-z][A-Za-z0-9.]*$
+        description: The name of a field on this same record whose every entry must be satisfied separately.
+          It turns a single tick into a count that grows with the record, instead of a proof recorded
+          against an older, shorter list continuing to read as complete.
+      note:
+        $ref: "#/$defs/prose"
+        description: What this kind is actually asking for on this record, where the kind's name alone would
+          leave two readers expecting different runs.
+  provenBy:
+    type: object
+    additionalProperties: false
+    description: What actually satisfied each demanded kind. It is written by the kernel from
+      `requiresProof` and the provers' own `proves` edges; an agent-authored one is a record speaking for
+      other records, and goes quietly false when one of them stops covering the path.
+    properties:
+      unit:
+        $ref: "#/$defs/proofRefs"
+      e2e:
+        $ref: "#/$defs/proofRefs"
+      uat:
+        $ref: "#/$defs/proofRefs"
+      perf:
+        $ref: "#/$defs/proofRefs"
+      live:
+        $ref: "#/$defs/proofRefs"
+      implementation:
+        $ref: "#/$defs/proofRefs"
+      measurement:
+        $ref: "#/$defs/proofRefs"
+      requirements:
+        $ref: "#/$defs/proofRefs"
+      transitions:
+        $ref: "#/$defs/proofRefs"
+      provider:
+        $ref: "#/$defs/proofRefs"
+      consumer:
+        $ref: "#/$defs/proofRefs"
+  proofRefs:
+    type: array
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/proofRef"
+    description: Everything that satisfied one kind. An empty list is information - it says the kind was
+      demanded and nothing has yet answered it, which is a different fact from the kind not being asked for.
+  proofRef:
+    type: string
+    pattern: ^[a-z0-9]+(?:[-.][a-z0-9]+)*(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: "One thing that satisfied a demand: the id of the record that proved it, the name of an
+      evidence directory, or an evidence directory and one assertion inside it written as name#assertion."
+  change:
+    type: object
+    additionalProperties: false
+    required:
+      - rev
+      - kind
+      - at
+    description: One authored edit to this record. Change is authored and staleness is derived, so this
+      block says what a person did and never what the runtime concluded from it.
+    properties:
+      rev:
+        type: integer
+        minimum: 1
+        description: The revision this edit produced, counting from 1. Other records cite it in `blockedBy`
+          and `conflictsWith`, which is what lets the gate tell a wait that is still true from one that has
+          already been answered.
+      kind:
+        enum:
+          - initial
+          - editorial
+          - clarifying
+          - breaking
+        description: "What the edit did to what the record promises: initial is the first write, editorial
+          changes wording without changing meaning, clarifying adds precision without withdrawing anything,
+          and breaking removes or replaces a statement. The set is closed so that a withdrawal cannot be
+          under-reported by inventing a gentler word for it."
+      at:
+        $ref: "#/$defs/timestamp"
+      withdraws:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: The statements this revision removes, quoted verbatim, so that a reader of the next
+          revision can see exactly what the record stopped saying rather than inferring it from a diff. A
+          withdrawn clause is written out rather than deleted silently because evidence exists that proved
+          it, and a reader of that evidence must be able to see what it was proving. What belongs here is
+          normative content this record carried - not a sentence about the work that has since stopped
+          being true, such as a blocker explaining that a run has not happened, which is removed by
+          removing the blocker.
+      retains:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: The statements an editorial pass keeps verbatim. It exists so that an edit which
+          rewrites half a paragraph is not forced to withdraw the whole thing to be honest about what moved.
+      reason:
+        $ref: "#/$defs/prose"
+        description: Why the edit was made, naming what changed outside this record. It is the sentence that
+          makes a revision readable a year later, when the diff alone says only that words are different.
+    allOf:
+      - if:
+          type: object
+          properties:
+            withdraws:
+              type: array
+          required:
+            - withdraws
+        then:
+          type: object
+          properties:
+            kind:
+              const: breaking
+          required:
+            - kind
+        description: Withdrawing content is a breaking change by definition - the record stops saying
+          something it said - so a withdrawal recorded as editorial or clarifying is refused rather than
+          accepted and quietly under-reported. It is the same rule scripts/checks/work-change.mjs runs as
+          WITHDRAWS_WITHOUT_BREAKING, stated here so a record is refused at its shape as well as at the gate.
+  timestamp:
+    type: string
+    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
+    description: An ISO 8601 instant in UTC. The zone is pinned to Z so two records written on two machines
+      are ordered against each other without knowing where either was written.
   slug:
     type: string
     pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
       written twice by two authors is the same string.
-  recordId:
+  featureId:
     type: string
-    pattern: ^(?:br|fr|nfr|data|decision|journey|sds|impl|ui|uat)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
-    description: The id of any record in the tree, family prefix included. Requiring a known prefix means a
-      unresolvable reference is caught as a malformed id rather than surviving as a plausible-looking string.
-  state:
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A feature's own id - the directory name under features/ and the id its
+      features/<feature>/index.yaml carries. It has no family prefix because a feature is the owner of
+      families rather than a member of one.
+  sha256:
+    type: string
+    pattern: ^[a-f0-9]{64}$
+    description: A lowercase hex SHA-256. It is pinned to one case and one length so that two records
+      digesting the same bytes produce the same string.
+  appliesTo:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: "An outbound edge naming a record - owned by any feature - that this one's requirement
+      reaches even though it does not own it and does not edit it. The gate only resolves the ids; it does
+      not require the target to acknowledge the edge back. The derived consequence is one sentence: a done
+      record that acquires an appliesTo edge newer than its proof reads as suspended until it is re-proven
+      against the new constraint. It is authored only on work/business-rule@1 and work/sds-component@1 -
+      work/data@1 in particular does not carry it, because a data record's relationship to the rules it
+      embodies is refs, an inbound reading, not an outbound constraint."
+  checkId:
+    type: string
+    pattern: ^[a-z][A-Za-z0-9]*$
+    description: The name of an observed-feedback check, as the flow declares it and the run manifest
+      reports it back. One spelling on both sides is what lets the two be matched by string equality rather
+      than by a reader pairing them up.
+  stateMachine:
+    type: object
+    additionalProperties: false
+    required:
+      - initial
+      - states
+      - transitions
+    description: The lifecycle this record's subject moves through, written as states and the transitions
+      between them rather than as prose about what usually happens. It is here because a lifecycle
+      described in sentences has no answer to the transition nobody mentioned, and that transition is where
+      the subject ends up in a state no rule covers.
+    properties:
+      initial:
+        $ref: "#/$defs/slug"
+        description: The state a new instance starts in.
+      states:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: Every state the subject can be in. A state reached by a transition and missing from
+          this list is a state nobody designed.
+      terminal:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: The states nothing leaves. It is authored rather than derived from the absence of an
+          outgoing transition, because a state that merely has no transition yet and one that is genuinely
+          final are different facts with the same shape.
+      note:
+        $ref: "#/$defs/prose"
+        description: What a reader must understand about the machine that the states and transitions cannot
+          carry - why a state that looks final is not marked terminal, for instance.
+      transitions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: Every way the subject moves between states, one entry each. The list is the contract a
+          proof demand can iterate, which is how a lifecycle's coverage becomes a count rather than a
+          judgement.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - to
+            - on
+          properties:
+            id:
+              $ref: "#/$defs/slug"
+              description: The transition's own name, so a proof can name which one it exercised.
+            from:
+              oneOf:
+                - $ref: "#/$defs/slug"
+                - type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    $ref: "#/$defs/slug"
+              description: The state or states this transition leaves. A list is the honest shape where the
+                same move is available from several states, rather than the same transition written out
+                several times under different ids.
+            to:
+              $ref: "#/$defs/slug"
+              description: The state it arrives in.
+            on:
+              oneOf:
+                - $ref: "#/$defs/prose"
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - timer
+                  properties:
+                    timer:
+                      $ref: "#/$defs/prose"
+                      description: The duration, or the plain-language description of the clock that fires
+                        the transition.
+              description: What fires the transition - the event, or a timer object where what actually
+                fires it is a clock rather than anything anybody did. Both shapes are accepted because a
+                digest window closing and a person clicking are both real causes, and forcing the first into
+                the language of the second invents an event nobody emits.
+            guard:
+              $ref: "#/$defs/prose"
+              description: What must hold for the transition to be taken. It is separate from the trigger
+                because the trigger arriving and the move being allowed are different questions, and a
+                machine that merges them cannot describe a refused attempt.
+            effect:
+              $ref: "#/$defs/prose"
+              description: What the transition changes besides the state itself.
+  sequence:
+    type: object
+    additionalProperties: false
+    required:
+      - participants
+      - steps
+    description: The observable exchange between this component and the things around it. Only interactions
+      an end-to-end run could actually see are bound here - an internal call nobody can observe is design
+      detail, and binding it would make the design prove itself.
+    properties:
+      participants:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: Who takes part, by the name each step uses. At least two, because a sequence with one
+          participant is a description of a function.
+      note:
+        $ref: "#/$defs/prose"
+        description: What the sequence deliberately leaves out and why - the retry loop that is the same two
+          observable messages again, the internal step no run can see.
+      steps:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: The exchange in order, one message each.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - from
+            - to
+            - message
+          properties:
+            from:
+              $ref: "#/$defs/slug"
+            to:
+              $ref: "#/$defs/slug"
+            message:
+              $ref: "#/$defs/prose"
+              description: What passes, and how it could be observed - the request and the word http, the
+                write and the word write. Naming the observation is what keeps the sequence checkable
+                against a real run.
+  extensions:
+    type: object
+    additionalProperties: false
+    description: Declarations that belong to a numbered extension of the Work model rather than to this
+      family's own vocabulary. They are namespaced so that a field the core model later adopts does not
+      collide with one an extension already used.
+    properties:
+      work3:
+        type: object
+        additionalProperties: false
+        description: The third Work extension, which is where a record declares the external systems it
+          talks to.
+        properties:
+          integrations:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            description: "The external systems this record reaches, each owed exactly one work/integration@1
+              record at features/<feature>/integration/<id>/index.yaml. A declared integration with no
+              record is an incomplete tree: the declaration is the claim that something outside the product
+              is depended on, and the record is where that dependency is proven against the real provider."
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - id
+                - provider
+              properties:
+                id:
+                  $ref: "#/$defs/slug"
+                  description: "The integration this declaration owes a record for, by the name that
+                    record's own folder carries: the tree owes exactly one record at
+                    features/<feature>/integration/<id>/index.yaml, so the declaration and the record it
+                    owes are matched by the folder name rather than by a reader's judgement."
+                provider:
+                  $ref: "#/$defs/slug"
+                  description: The external system by name.
+                sandbox:
+                  oneOf:
+                    - $ref: "#/$defs/prose"
+                    - type: boolean
+                  description: What can be run against without touching the provider's production - the
+                    sandbox described, or a bare true where the provider's whole dev instance is one.
+                credential:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - name
+                    - providedBy
+                    - where
+                  description: The credential this product authenticates with, named and never carried.
+                  properties:
+                    name:
+                      type: string
+                      pattern: ^[A-Z][A-Z0-9_]*$
+                      description: The exact environment variable the client reads.
+                    providedBy:
+                      $ref: "#/$defs/slug"
+                      description: Who supplies the value - the owner, never the agent and never the
+                        repository.
+                    where:
+                      $ref: "#/$defs/prose"
+                      description: The sealed custody path the value is read from.
+  theme:
     enum:
-      - todo
-      - done
-    description: "Whether this leaf is outstanding or finished, and nothing else. There is deliberately no
-      third authored value: `stale` is derived by the checker when an input a done record was proved against
-      has moved, and authoring it would let a record claim a status the checker is supposed to compute -
-      which is how a tree starts reporting its own opinion of its freshness instead of a measured one."
+      - light
+      - dark
+      - system
+    description: Which colour scheme a drawing or a shot is in. It is a closed set because a product either
+      has a second theme or it does not, and a free-form word here would let one screen claim a theme no
+      other screen knows about.
+  openBlock:
+    type: object
+    minProperties: 1
+    propertyNames:
+      type: string
+      pattern: ^[A-Za-z][A-Za-z0-9]*$
+    description: "A block interface.draw writes as its own record of what it read, reviewed or composed
+      against. Its keys follow what that op actually accepted - a grammar version here, a knowledge digest
+      there - so they are constrained to a name shape rather than listed: enumerating them here would make
+      this file the authority for an op's output, which it is not, and a closed list would refuse the next
+      input the op learns to read."
+  uiAssets:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - role
+        - sha256
+      properties:
+        path:
+          $ref: "#/$defs/prose"
+          description: The file's path relative to this record's own directory.
+        role:
+          $ref: "#/$defs/slug"
+          description: What the file is - a direction, the exact prompt beside it, an input a later
+            iteration referenced. The role is what a checker pairs files by, rather than a filename
+            convention nobody enforces.
+        sha256:
+          $ref: "#/$defs/sha256"
+          description: The file's digest, so the record is a statement about specific bytes and a replaced
+            image is a visible edit.
+        provenance:
+          oneOf:
+            - $ref: "#/$defs/prose"
+            - $ref: "#/$defs/openBlock"
+          description: Where the file came from - a sentence for a prompt or an input, or the tool's own
+            structured record for a generated image. A model name appears only where the tool itself
+            exposed one; it is never authored, and it is never the host that ran the tool.
+        generation:
+          type: object
+          additionalProperties: false
+          required:
+            - tool
+            - promptPath
+          description: "What produced this image, present only on a generated direction. It is the single
+            fact that tells a designed direction apart from a real running-page capture: an implementation
+            asset never carries one, and a generation-bearing asset outside a work/ui-screen@1 record is
+            refused."
+          properties:
+            tool:
+              $ref: "#/$defs/prose"
+              description: The tool that generated the image, named as the tool exposes itself. A screen
+                reaches done only with at least one asset whose tool is the real image generator, never by
+                an authored claim that a direction exists.
+            promptPath:
+              $ref: "#/$defs/prose"
+              description: The sibling file holding the exact prompt that was sent. The prompt is kept as
+                its own asset so the image can be regenerated rather than only admired.
+            inputRefs:
+              type: array
+              uniqueItems: true
+              items:
+                $ref: "#/$defs/prose"
+              description: What the generation was given alongside the prompt - reference renders, a prior
+                iteration. An empty list is the claim that the prompt stood alone.
+            mode:
+              $ref: "#/$defs/slug"
+              description: How the tool was driven, where it offers more than one way - a fresh generation
+                against an edit of an existing image.
+            referencedImages:
+              type: array
+              uniqueItems: true
+              items:
+                $ref: "#/$defs/prose"
+              description: The images handed to the tool as visual input, by path, kept apart from
+                `inputRefs` so that a reader can tell what was described from what was shown.
+        width:
+          type: integer
+          minimum: 1
+          description: The image's width in pixels, as produced.
+        height:
+          type: integer
+          minimum: 1
+          description: The image's height in pixels, as produced.
+        viewport:
+          $ref: "#/$defs/prose"
+          description: The viewport this shot is of, where the file is a shot of a screen rather than a
+            prompt or an input. It is the asset's own copy of what the coverage map binds, so a checker
+            reading the assets alone can still tell which width it is looking at.
+        breakpoint:
+          $ref: "#/$defs/slug"
+          description: The named breakpoint that viewport belongs to, so "is every claimed breakpoint
+            shown" is a question about names rather than about pixel arithmetic.
+        theme:
+          $ref: "#/$defs/theme"
+          description: Which theme the shot is in. It is omitted where the screen claims only one, and
+            stated wherever it claims more, because a theme with no shot bound to it was never drawn.
+        selected:
+          type: boolean
+          description: Whether this candidate is the one the direction settled on. Rejected candidates are
+            kept rather than deleted, and the flag is what stops an implementer building from one.
+    description: Files this record owns under its own assets/, each with the role it plays and, where it was
+      generated, the provenance of its generation.

@@ -20,10 +20,10 @@ acceptance:
       Europe/Berlin clocks jump 02:00 -> 03:00 so that 02:30 never happens
     when: The generator materialises the 2026-03-29 occurrence
     then:
-      - The occurrence's dueAtUtc is exactly 2026-03-29T01:30:00.000Z (03:30 CEST local:
+      - "The occurrence's dueAtUtc is exactly 2026-03-29T01:30:00.000Z (03:30 CEST local:
           the nominal 02:30 shifted forward by the one-hour gap), not 2026-03-29T00:30:00.000Z (03:00
           CEST, the transition instant itself) and not any instant that formats to 02:30 local, which
-          does not exist.
+          does not exist."
   - id: ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest
     given: A daily rule (America/New_York, local time 01:30) whose next date is 2024-11-03, the night
       America/New_York clocks fall 02:00 -> 01:00 so that 01:30 happens twice

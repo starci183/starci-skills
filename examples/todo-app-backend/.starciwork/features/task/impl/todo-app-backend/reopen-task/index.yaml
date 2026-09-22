@@ -15,7 +15,7 @@ revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 # old comment claiming "there is no fr.task.reopen ... record" was stale - fr.task.reopen exists and
 # stays todo on its own requiresProof (e2e script absent from this repository, no uat flow yet).
 proves: [br.task.complete.once, sds.task.completion-state]
-change: {rev: 1, kind: clarifying, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
+change: {rev: 1, kind: initial, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
   owners now also claims the shipped reopen-task mutation door,
   src/features/todo/graphql/mutations/task/reopen-task - its resolver dispatches ReopenTaskCommand
   into the module above. Record metadata only; the revision pin and the code are unchanged."}

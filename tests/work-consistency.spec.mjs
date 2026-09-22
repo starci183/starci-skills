@@ -273,11 +273,12 @@ test('concept 6: a catalog entry without its feature node is refused; a title th
 });
 
 test('concept 7: a state outside the family schema is refused where the schema is readable and unclaimed where it is not', () => {
-  assert.deepEqual(declaredStateValues('work/business-rule@1'), ['todo', 'done']);
-  assert.equal(declaredStateValues('work/gap@1'), null, 'work/gap@1 has no per-family schema file, so no enum claim is made');
+  assert.deepEqual(declaredStateValues('work/business-rule@1'), ['uninvestigate', 'todo', 'done']);
+  assert.deepEqual(declaredStateValues('work/gap@1'), ['uninvestigate', 'todo', 'done'], 'every family the layout gives a lifecycle to declares the same three authored values');
+  assert.equal(declaredStateValues('work/catalog@1'), null, 'a parent derives its progress from its descendants and authors no state, so it makes no enum claim');
 
   const invented = consistencySink({
-    'features/f/br/keep/index.yaml': 'schema: work/business-rule@1\nid: br.f.keep\ntitle: t\nstate: uninvestigate\nstatements: [s]\nacceptanceCriteria: [kept]\nmodule: src/f\n',
+    'features/f/br/keep/index.yaml': 'schema: work/business-rule@1\nid: br.f.keep\ntitle: t\nstate: inprogress\nstatements: [s]\nacceptanceCriteria: [kept]\nmodule: src/f\n',
     'features/f/br/keep/ac/kept/index.yaml': criterion('kept', 'br.f.keep'),
   });
   assert.equal(refusedWith(invented, 'STATE_VOCABULARY_UNKNOWN').length, 1, joinAll(invented));
@@ -285,10 +286,15 @@ test('concept 7: a state outside the family schema is refused where the schema i
   // the invented value must not also read as a proof thin spot: it is not done, so coverage rules stay out of it
   assert.equal(refusedWith(invented, 'CONFLICT_WITHOUT_DECISION').length, 0, joinAll(invented));
 
-  const gapInvented = consistencySink({
+  const gapDeclared = consistencySink({
     'features/f/gap/live-proof/index.yaml': 'schema: work/gap@1\nid: gap.f.live-proof\ntitle: t\nstate: uninvestigate\nstatement: s\n',
   });
-  assert.equal(refusedWith(gapInvented, 'STATE_VOCABULARY_UNKNOWN').length, 0, joinAll(gapInvented));
+  assert.equal(refusedWith(gapDeclared, 'STATE_VOCABULARY_UNKNOWN').length, 0, joinAll(gapDeclared));
+  // `inprogress` is the value work-layout.yaml names and refuses by name: todo plus an activity says it.
+  const gapInvented = consistencySink({
+    'features/f/gap/live-proof/index.yaml': 'schema: work/gap@1\nid: gap.f.live-proof\ntitle: t\nstate: inprogress\nstatement: s\n',
+  });
+  assert.equal(refusedWith(gapInvented, 'STATE_VOCABULARY_UNKNOWN').length, 1, joinAll(gapInvented));
 });
 
 test('concept 8: parity reports one line per record family whose authored fields differ between trees', () => {
