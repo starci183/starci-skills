@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {reportsSince,DEFAULT_INTERVAL_MS} from '../scripts/supervisor/poll.mjs';
+import {reportsSince,openAsks,DEFAULT_INTERVAL_MS} from '../scripts/supervisor/poll.mjs';
 
 // scripts/supervisor/poll.mjs is the supervisor's mechanism: a pure observer
 // over the durable ledger. modules/supervisor/supervise.yaml is its contract.
@@ -70,6 +72,98 @@ test('poll.mjs runs from scripts/supervisor and prints one digest per --once cyc
     assert.match(r.stdout,/supervisor-poll \[running\] kernel no-signal/,
       'a workflow with no kernel signal reads no-signal, never a host call');
     assert.match(r.stdout,/report supervisor-poll code\.refactor a1 -> done/);
+  });
+});
+
+/* --------------------------------------------- ask liveness in the digest */
+
+const seedAsk=(ledger,{dispatchId,events=[],workflowId=WORKFLOW})=>{
+  const at=Date.now();
+  ledger.transaction(db=>{
+    db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at)
+      VALUES(?,?,?,?,?,?,?,?)`)
+      .run(workflowId,dispatchId,'owner.ask',1,1,'ask',
+        JSON.stringify({schema:'starci/op-report@1',outcome:'ask',summary:'pick one',
+          question:{text:'which way?',options:['a','b']}}),at);
+  });
+  for(const e of events)
+    ledger.appendEvent({workflowId,entityType:'report',entityId:dispatchId,kind:e.kind,
+      payload:{dispatchId,...(e.url?{url:e.url}:{})}});
+};
+
+const listen=async(t,handler)=>{
+  const server=http.createServer(handler);
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>new Promise(resolve=>server.close(resolve)));
+  return `http://127.0.0.1:${server.address().port}/form`;
+};
+
+// A free port nobody is listening on: bind one, read it back, close it.
+const closedPort=async()=>{
+  const probe=net.createServer();
+  await new Promise(resolve=>probe.listen(0,'127.0.0.1',resolve));
+  const {port}=probe.address();
+  await new Promise(resolve=>probe.close(resolve));
+  return port;
+};
+
+test('a recorded ask-serving-expired tags the ask dead without touching the network',async t=>{
+  await withLedger(t,async({ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAsk(ledger,{dispatchId:'ctx_expired',events:[
+      {kind:'ask-serving',url:'http://127.0.0.1:1/dead-form'},
+      {kind:'ask-serving-expired'},
+    ]});
+
+    const saved=globalThis.fetch;
+    globalThis.fetch=()=>{throw new Error('the digest probed a URL the ledger already called dead');};
+    try{
+      const asks=await openAsks(ledger.db);
+      assert.equal(asks.length,1);
+      assert.equal(asks[0].liveness,'dead');
+      assert.equal(asks[0].url,'http://127.0.0.1:1/dead-form','a dead ask still shows what it served');
+    }finally{globalThis.fetch=saved;}
+  });
+});
+
+test('a serving URL that answers 200 is live; a closed port is stale',async t=>{
+  const url=await listen(t,(req,res)=>{res.writeHead(200,{'content-type':'text/html'});res.end('<form>');});
+  const dead=`http://127.0.0.1:${await closedPort()}/form`;
+  await withLedger(t,async({ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAsk(ledger,{dispatchId:'ctx_live',events:[{kind:'ask-serving',url}]});
+    seedAsk(ledger,{dispatchId:'ctx_stale',events:[{kind:'ask-serving',url:dead}]});
+
+    const byDispatch=Object.fromEntries((await openAsks(ledger.db)).map(a=>[a.dispatch_id,a.liveness]));
+    assert.deepEqual(byDispatch,{ctx_live:'live',ctx_stale:'stale'});
+  });
+});
+
+test('a form that answers non-2xx is stale, and an ask never served is unserved',async t=>{
+  const gone=await listen(t,(req,res)=>{res.writeHead(404);res.end('not found');});
+  await withLedger(t,async({ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAsk(ledger,{dispatchId:'ctx_404',events:[{kind:'ask-serving',url:gone}]});
+    seedAsk(ledger,{dispatchId:'ctx_never',events:[]});
+
+    const byDispatch=Object.fromEntries((await openAsks(ledger.db)).map(a=>[a.dispatch_id,a.liveness]));
+    assert.deepEqual(byDispatch,{ctx_404:'stale',ctx_never:'unserved'});
+  });
+});
+
+test('a re-served ask is probed again, not left dead by the earlier expiry',async t=>{
+  const url=await listen(t,(req,res)=>{res.writeHead(200);res.end('ok');});
+  await withLedger(t,async({ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAsk(ledger,{dispatchId:'ctx_reserved',events:[
+      {kind:'ask-serving',url:'http://127.0.0.1:1/old-form'},
+      {kind:'ask-serving-expired'},
+      {kind:'ask-serving',url},
+    ]});
+
+    const asks=await openAsks(ledger.db);
+    assert.equal(asks[0].liveness,'live');
+    assert.equal(asks[0].url,url,'the newest ask-serving wins — event order is seq, not the random event_id');
   });
 });
 

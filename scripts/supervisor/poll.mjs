@@ -46,7 +46,38 @@ export const reportsSince = (db, sinceId, wanted = new Set()) =>
     .all(sinceId)
     .filter((r) => mine(wanted, r.workflow_id));
 
-export const openAsks = (db, wanted = new Set()) => {
+// How long a form URL gets to answer before the digest calls it stale. The
+// probe is a courtesy to the owner, not a health check: a loopback form that
+// cannot answer in this window is not worth relaying either way.
+export const PROBE_TIMEOUT_MS = 1500;
+
+// events.event_id is a random token; seq is the order. Latest means highest seq.
+const lastEvent = (db, kind, dispatchId) => db.prepare(
+  `SELECT seq, payload_json FROM events WHERE kind=?
+     AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(kind, dispatchId);
+
+const probe = async (url, timeoutMs) => {
+  try {
+    const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+    return res.status >= 200 && res.status < 300 ? 'live' : 'stale';
+  } catch { return 'stale'; }
+};
+
+// An open ask's URL is worth relaying only when it still answers. The ledger
+// already knows when a form server gave up (serve-ask.mjs appends
+// 'ask-serving-expired'), so a dead ask costs no network at all; everything
+// else is probed once per cycle.
+export const askLiveness = async (db, dispatchId, { timeoutMs = PROBE_TIMEOUT_MS } = {}) => {
+  const serving = lastEvent(db, 'ask-serving', dispatchId);
+  if (!serving) return { url: null, liveness: 'unserved' };
+  const url = JSON.parse(serving.payload_json ?? '{}').url ?? null;
+  const expired = lastEvent(db, 'ask-serving-expired', dispatchId);
+  if (expired && expired.seq > serving.seq) return { url, liveness: 'dead' };
+  if (!url) return { url: null, liveness: 'unserved' };
+  return { url, liveness: await probe(url, timeoutMs) };
+};
+
+export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEOUT_MS } = {}) => {
   const asks = db.prepare(
     `SELECT r.workflow_id, r.dispatch_id, r.report_id, r.created_at FROM reports r
       WHERE r.outcome='ask' AND NOT EXISTS (
@@ -57,10 +88,7 @@ export const openAsks = (db, wanted = new Set()) => {
   for (const a of asks) {
     if (seen.has(a.dispatch_id) || !mine(wanted, a.workflow_id)) continue;
     seen.add(a.dispatch_id);
-    const serving = db.prepare(
-      `SELECT payload_json FROM events WHERE kind='ask-serving'
-        AND json_extract(payload_json,'$.dispatchId')=? ORDER BY event_id DESC LIMIT 1`).get(a.dispatch_id);
-    out.push({ ...a, url: JSON.parse(serving?.payload_json ?? '{}').url ?? null });
+    out.push({ ...a, ...(await askLiveness(db, a.dispatch_id, { timeoutMs })) });
   }
   return out;
 };
@@ -96,7 +124,7 @@ export const newArtifacts = (repo, sinceMs) => {
 };
 
 // --- the cycle ---------------------------------------------------------------
-export const cycle = (db, { repo, wanted = new Set(), state }) => {
+export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS }) => {
   const lines = [`===== poll ${ts(Date.now())} =====`];
   const wfs = workflows(db, wanted);
   for (const w of wfs) {
@@ -106,8 +134,8 @@ export const cycle = (db, { repo, wanted = new Set(), state }) => {
   const reps = reportsSince(db, state.first ? state.lastReportId - BASELINE_REPORTS : state.lastReportId, wanted);
   for (const r of reps) lines.push(`  report ${short(r.workflow_id)} ${r.op_id} a${r.attempt} -> ${r.outcome} @${ts(r.created_at)}`);
   if (reps.length) state.lastReportId = Math.max(state.lastReportId, ...reps.map((r) => r.report_id));
-  const asks = openAsks(db, wanted);
-  for (const a of asks) lines.push(`  ASK-OPEN ${short(a.workflow_id)} ${a.dispatch_id} ${a.url ?? '(not serving)'}`);
+  const asks = await openAsks(db, wanted, { timeoutMs });
+  for (const a of asks) lines.push(`  ASK-OPEN ${short(a.workflow_id)} ${a.dispatch_id} [${a.liveness}] ${a.url ?? '(not serving)'}`);
   const arts = newArtifacts(repo, state.lastArtifacts);
   for (const a of arts) lines.push(`  artifact+ ${path.relative(repo, a.path)}`);
   if (arts.length) state.lastArtifacts = Date.now();
@@ -134,18 +162,16 @@ const main = () => {
     lastArtifacts: Date.now(),
     first: true,
   };
-  const run = () => {
-    const out = cycle(db, { repo, wanted, state });
+  const run = async () => {
+    const out = await cycle(db, { repo, wanted, state });
     if (asJson) console.log(JSON.stringify({ at: Date.now(), workflows: out.workflows.map((w) => w.workflow_id), asks: out.asks }, null, 0));
     console.log(out.text);
   };
-  run();
-  if (!once) {
+  return run().then(() => {
+    if (once) { ledger.close(); return; }
     const timer = setInterval(run, intervalMs);
     process.on('SIGINT', () => { clearInterval(timer); process.exit(0); });
-  } else {
-    ledger.close();
-  }
+  });
 };
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) main();

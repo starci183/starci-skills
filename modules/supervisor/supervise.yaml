@@ -39,11 +39,15 @@ loop:
       start-workflow --goal; (3) one watchdog per running workflow is re-spawned
       (node scripts/kernel/watchdog.mjs --repo <repo> --workflow <id>) — kernels yield between
       transitions and only the watchdog wakes them; (4) parked asks re-serve on kernel survey —
-      stale form URLs in the ledger are relayed only after re-verifying they answer 200.
+      the digest tags every open ask live, stale, dead or unserved, and only a `live` tag is
+      relayed to the owner.
   perCycle:
     - step: observe
-      do: read the printed digest — new op reports, open asks + serving URLs, fresh direction
-        artifacts, kernel liveness; open new direction images and check them against the current
+      do: read the printed digest — new op reports, open asks with their liveness tag + serving
+        URL, fresh direction artifacts, kernel liveness; a `dead` tag is a recorded
+        ask-serving-expired, `stale` is a URL that did not answer 2xx inside the probe window,
+        `unserved` is an ask no form was ever started for — each needs a re-serve before it can
+        reach the owner; open new direction images and check them against the current
         contracts (concepts.yaml rules, full-page chrome, concrete data, ui.flow coverage)
     - step: classify
       do: |
@@ -81,8 +85,8 @@ guardrails:
       .starciwork product records — analysis may conclude "the op must redo this" but the redo is
       issued as an owner-worded disposition to the kernel, which re-plans through api.mjs
   - id: owner-word
-    rule: pending asks are surfaced verbatim with their live form URLs; the supervisor relays,
-      never answers — accept/reject stays the owner's word
+    rule: pending asks are surfaced verbatim, with the form URL only while the digest tags it
+      `live`; the supervisor relays, never answers — accept/reject stays the owner's word
   - id: patch-then-restart
     rule: restarting a kernel without a landed contract change is a wasted turn — kernels resume
       from the same durable state and will reproduce the same defect
