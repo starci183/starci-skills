@@ -775,3 +775,24 @@ allocation:
   `dependency`, `circuit-open`, `max-ops`.
 
 Lane M (Opus) làm việc này.
+
+### Lane F2 landed: 8 schema, 4 skip bỏ, evidence replay, boundary `file:` sửa
+
+Record bị từ chối 292 → 2 (hai `accounts.yaml` chứa credential literal của ecommerce, để
+nguyên). Schema là cái lệch, không phải record, trừ 23 input sửa tay có liệt kê trong report.
+`check-scoped-lint` profile `next` giờ chạy thật: 108 `ARCHITECTURE_VIOLATION` thật trong
+`todo-app-frontend`, trước đây bị `ARCH_CONFIG_INVALID` che. 10 manifest ui/brand từng
+claim pass giờ fail thật vì `verify-*.mjs` của chúng trước không load nổi.
+
+**Còn đỏ, và vì sao:**
+
+- `check-example-work` còn 88 record stale digest; 58 evidence cần Docker (Postgres/Keycloak,
+  compose, SePay sandbox) để replay. Máy này Docker Desktop tắt. → Thầy bật Docker Desktop, trò
+  cắm lane F3 replay nốt. Không có bước này thì job `records` của `todo-app-example.yml` đỏ.
+- 26 `ASSERTED_NOT_OBSERVED` đều là `work/gap@1`: gap là record authored-by-nature, cần thêm
+  vào `AUTHORED_BY_NATURE` của `check-evidence-binding.mjs` (lane K).
+- `examples/todo-app-backend/architecture.json`: 8/10 owner entry trỏ barrel `<module>/index.ts`
+  không tồn tại và bị chính rule `must-deep-module-import` cấm. Contract của example tự mâu
+  thuẫn; lane K sửa owner entries theo rule.
+- `CANON_VERSION_MISMATCH`: `code-patterns.yaml:456` pin fe canon 3.0.2 vs `packages/eslint/fe`
+  3.1.0 (lane K).
