@@ -445,7 +445,7 @@ schemas:
       whenNot: Not example CODE itself — the manifest describing it.
       selectedBy: Knowledge authoring review.
 
-  - id: starci/code-example-catalog@1 (enum also accepts starci/code-examples-catalog@1)
+  - id: starci/code-example-catalog@1
     file: modules/schemas/code-example-catalog.schema.yaml
     dialect: json-schema
     subsystem: knowledge
@@ -670,6 +670,143 @@ schemas:
   # --------------------------------------------------------------------------
   # KNOWN GAPS
   # --------------------------------------------------------------------------
+
+# ============================================================================
+# MODULE-LOCAL DOCUMENT KINDS — the other half of the stamp inventory.
+#
+# A contract document under modules/ stamps the kind it IS. These kinds have no
+# schema file: the document is its own contract, and its shape is whatever the
+# file declares. They are listed here, once, so that every `schema:` const in
+# the tree is accounted for in exactly one place —
+# `node scripts/checks/check-schema-catalog.mjs` fails on a stamp that appears
+# in neither list, on a file this block does not name, and on an entry no file
+# stamps. modules/ops/ops/*.yaml is excluded: those manifests all carry the one
+# op kind the generated modules/ops/registry.yaml indexes.
+# ============================================================================
+moduleLocalDocumentKinds:
+  - id: starci/schema@1
+    governs: "This file is a schema document: it `describes` the record const its consumers stamp."
+    files:
+      - modules/schemas/agent-hierarchy.yaml
+      - modules/schemas/application-stacks.schema.yaml
+      - modules/schemas/goal-plan.yaml
+
+  - id: starci/document@1
+    governs: "A sectioned prose policy document (title/blocks)."
+    files: [modules/ops/_common.yaml]
+
+  - id: starci/module-ops-registry@1
+    governs: "The generated op index. Never hand-edited — rebuild with scripts/route/build-ops-registry.mjs."
+    files: [modules/ops/registry.yaml]
+
+  # --- kernel ---------------------------------------------------------------
+  - id: starci/module-kernel-api@1
+    governs: "The scripts/kernel/api.mjs command contract — args, read/write sets, refusal strings."
+    files: [modules/kernel/api.yaml]
+  - id: starci/module-kernel-driver-loop@1
+    governs: "The tick the kernel agent runs."
+    files: [modules/kernel/driver-loop.yaml]
+  - id: starci/module-kernel-dispatch@1
+    governs: "The packet an operation is launched with."
+    files: [modules/kernel/dispatch.yaml]
+  - id: starci/module-kernel-start@1
+    governs: "Claim a queued goal, spawn its kernel."
+    files: [modules/kernel/start-workflow.yaml]
+  - id: starci/module-kernel-verdict@1
+    governs: "What `api settle` accepts and rejects."
+    files: [modules/kernel/verdict-contract.yaml]
+
+  - id: starci/supervisor@1
+    governs: "The chat-facing observe/analyze/patch/restart loop contract."
+    files: [modules/supervisor/supervise.yaml]
+
+  - id: starci/module-quality-bar@1
+    governs: "The one code-quality bar every workflow scores against, layer by layer, with each layer's real enforcement status."
+    files: [modules/quality/quality-bar.yaml]
+
+  # --- goal chain -----------------------------------------------------------
+  - id: starci/module-goal-anatomy@1
+    governs: "What a goal is — record, revision counter, amendments, lifecycle."
+    files: [modules/goal/anatomy.yaml]
+  - id: starci/module-goal-archetypes@1
+    governs: "Memoized delta-to-chain patterns; priors, never templates."
+    files: [modules/goal/archetypes.yaml]
+  - id: starci/module-goal-define@1
+    governs: "The define-goal entry contract — inputs, returns, refusals."
+    files: [modules/goal/define-goal.yaml]
+  - id: starci/module-goal-existing@1
+    governs: "The survey leg — existing-surface detection and extend-vs-add."
+    files: [modules/goal/existing.yaml]
+  - id: starci/module-goal-legality@1
+    governs: "The five legality families a proposed op chain must satisfy."
+    files: [modules/goal/legality.yaml]
+
+  # --- models ---------------------------------------------------------------
+  - id: starci/module-models-index@1
+    governs: "The modules/models coverage manifest."
+    files: [modules/models/index.yaml]
+  - id: starci/module-model-selection@1
+    governs: "Which model may take which workload — qualification, probation, ordering."
+    files: [modules/models/selection.yaml]
+  - id: starci/module-model-profile@1
+    governs: "One routing/capability target: identity, capacity cache, launch shape, position."
+    files:
+      - modules/models/profiles/claude-agent.yaml
+      - modules/models/profiles/claude-fable.yaml
+      - modules/models/profiles/codex-agent.yaml
+      - modules/models/profiles/deepseek-v4-pro.yaml
+      - modules/models/profiles/devin-agent.yaml
+      - modules/models/profiles/gpt-5.6-luna.yaml
+      - modules/models/profiles/qwen-agent.yaml
+      - modules/models/profiles/qwen3.8-max.yaml
+  - id: starci/agent-card@1
+    governs: "One agent's spawn contract. Enforced by scripts/checks/providers.mjs (schema id, agent == file stem) and tests/provider-orca.spec.mjs."
+    files:
+      - modules/models/agents/claude.yaml
+      - modules/models/agents/codex.yaml
+      - modules/models/agents/devin.yaml
+      - modules/models/agents/qwen.yaml
+  - id: starci/runtimes@1
+    governs: "The quota-window runtime pools, allocation policy and roleOfKind table. The only concurrency authority."
+    files: [modules/models/runtimes.yaml]
+  - id: starci/kinds@1
+    governs: "The operation-kind catalog: lanes, routes, blockers, the kernel-agent legality graph."
+    files: [modules/models/kinds.yaml]
+  - id: starci/records@1
+    governs: "The record catalog the kinds graph writes against."
+    files: [modules/models/records.yaml]
+  - id: starci/model-capability-policy@1
+    governs: "A model NAME is an availability fact, never proof of capability — the evidence a qualification must carry."
+    files: [modules/models/capabilities.yaml]
+  - id: starci/model-qualifications@1
+    governs: "The measured-qualification store. Empty in the package: shipping is not certifying."
+    files: [modules/models/qualifications.yaml]
+
+  # --- hosts ----------------------------------------------------------------
+  - id: starci/orca-provider@1
+    governs: "The Orca host contract entry — hierarchy names, environment binding, kernel and op call templates."
+    files: [modules/host/orca/index.yaml]
+  - id: starci/orca-api@1
+    governs: "The observed Orca command inventory and the StarCi allowlist over it."
+    files: [modules/host/orca/api.yaml]
+  - id: starci/orca-capabilities@1
+    governs: "Orca host topology, isolation boundaries and identity sources."
+    files: [modules/host/orca/capabilities.yaml]
+  - id: starci/orca-recipes@1
+    governs: "The ordered call sequences for each launch and settlement shape."
+    files: [modules/host/orca/recipes.yaml]
+  - id: starci/orca-provider-validation@1
+    governs: "Preflight, receipt, dispatch, UI and message assertions for Orca-hosted work."
+    files: [modules/host/orca/validation.yaml]
+  - id: starci/provider-envelopes@1
+    governs: "The normalized operation input/output envelopes a host carries."
+    files: [modules/host/orca/envelopes.yaml]
+  - id: starci/claude-provider@1
+    governs: "What a Claude Code chat is to StarCi: launcher and monitor, never an execution host."
+    files: [modules/host/claude/index.yaml]
+  - id: starci/codex-provider@1
+    governs: "What a Codex chat is to StarCi: launcher and monitor, never an execution host."
+    files: [modules/host/codex/index.yaml]
 
 gaps:
   - "work-layout@1 shape declares 15 families; only 11 have per-family schemas. work/contract@1, work/integration@1, work/gap@1, work/event@1 have NO work-*.schema.yaml file — check-work-consistency.mjs comments confirm contract+integration 'author requiresProof in both live trees and have no per-family schema file of their own' (gap/event likewise unfiled). Their records are covered only by the layout's shape line and the generic work/ walk in check-work-artifacts.mjs."

@@ -11,9 +11,7 @@ required:
 properties:
   schema:
     type: string
-    enum:
-      - starci/code-example-catalog@1
-      - starci/code-examples-catalog@1
+    const: starci/code-example-catalog@1
   title:
     type: string
     minLength: 1

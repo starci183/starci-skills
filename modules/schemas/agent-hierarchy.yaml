@@ -1,4 +1,4 @@
-schema: starci/agent-hierarchy-schema@1
+schema: starci/schema@1
 describes: starci/agent-hierarchy@1
 module: scripts/kernel/api.mjs
 

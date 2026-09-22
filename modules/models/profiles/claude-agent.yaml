@@ -1,6 +1,6 @@
 # Profile: claude-agent — the Anthropic managed-agent pool.
 # Business frame: the "senior default". First choice for hard-tier work and for
-# operations that edit this runtime itself; the persistent supervisors sit here.
+# operations that edit this runtime itself.
 # Every claim below traces to a cited source; inferred analysis is marked.
 
 target: claude-agent            # registry.yaml: targets.claude-agent
