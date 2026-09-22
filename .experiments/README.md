@@ -7,5 +7,6 @@ this folder is part of the official contract yet.
 Promotion path: `draft here → proven by practice → encoded into modules/,
 scripts/, schemas/ → this file shrinks or the entry leaves a pointer`.
 
-Version: see `../VERSION` (`1.0.0-alpha.1`). Alpha ends when OPENSOURCE-GOAL
-S* rows hold with fresh evidence — then contracts freeze for `1.0.0`.
+Version: the `version` field of `../package.json` is the only authority (alpha line,
+currently `1.0.0-alpha.2` in preparation). Alpha ends when OPENSOURCE-GOAL S* rows hold
+with fresh evidence — then contracts freeze for `1.0.0`.

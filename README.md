@@ -27,7 +27,7 @@ StarCi provides:
 comes from locally configured agent CLIs (Devin, Claude Code, Codex, Orca) — StarCi has no API key
 of its own.
 
-**Status:** `2.0.0`, MIT, not yet published to npm. Use the source or a reviewed archive.
+**Status:** `1.0.0-alpha.2` (alpha line; contracts are provisional until `1.0.0`), MIT, not yet published to npm. Use the source or a reviewed archive.
 
 [Install](#install) · [How it runs](#how-it-runs) · [Configuration](#configuration) ·
 [Layout](#layout) · [Documentation](#documentation)

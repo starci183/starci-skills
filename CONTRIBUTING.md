@@ -72,3 +72,31 @@ Large changes are executed by parallel lanes with a write-allowlist each:
 - Verify before committing: run the thing you changed, not just the tests that happen to cover it.
 - Do not commit `config.yaml`, `settings.local.json`, `.starciwork/`, `node_modules/` or anything
   else `.gitignore` covers.
+
+## Editing contracts and prose
+
+Every canonical file — `CONTEXT.md`, `README.md`, `docs/**`, `modules/**`, `skills/**` — says
+one thing, once, in the present tense. These six rules are the bar for any edit on the alpha
+line; a review that finds a violation sends the change back.
+
+1. **Present tense, no ghosts.** Describe the tree as it is. Never define something by negating
+   a state the tree no longer has (`distless`, "former top-level dirs", "no `.dist`", `legacy`,
+   `compat`). History goes to `CHANGELOG.md` or `.experiments/practices/`, never into the
+   sentence that defines the present.
+2. **Replace, never append.** A feedback edit rewrites the sentence that holds the rule. Do not
+   add a second sentence under the first, and do not leave the old condition clause standing
+   when the new rule carries its own. One concept has one paragraph and that paragraph is the
+   latest version. A summary block (`business:` in an op, a README list) is regenerated in the
+   same commit or deleted.
+3. **One place to do, one place to check.** Inside an op manifest a rule appears in exactly one
+   `steps[].action` and in at most one `proofs[]` entry. `reads` and `writes` describe data, not
+   rules. Numbers — rounds, candidates, timeouts, retry limits, cadences — are data in one yaml
+   that code reads; they are never prose repeated in several files.
+4. **Claims must execute.** `citation:`, `enforcedBy:`, `source:`, "validated by", "refuses",
+   "verified before effects" name a file and a behaviour that exist. If the code does not do it,
+   the yaml says so or the claim is removed. On the alpha line the default is to make the yaml
+   tell the truth; add code only where a test shows a real hole.
+5. **Host calls go through `scripts/api/orca/`.** No agent-facing prose tells an agent to run
+   `orca` or to read `modules/host/**`; agents call `scripts/kernel/api.mjs` or a wrapper.
+6. **Every cut lands with evidence.** `node --check` on touched `.mjs`, the specs that cover the
+   touched surface, and — when a rule moved — the check that would catch it moving back.
