@@ -870,6 +870,23 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   nhà cung cấp thanh toán. Thống kê từ 21/9 09:27: AUTH 24 succeeded / 23 failed (13 blocked,
   10 verdict fail); WSPV 39 / 54 (24 blocked, 30 verdict fail). Blocked là chỗ lãng phí cần đào.
 
+### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
+
+| Nhóm | Số | Bản chất | Hướng vá |
+|---|---|---|---|
+| Audit/e2e/integration fail thật | ~20 | vòng chất lượng bắt lỗi sản phẩm | giữ |
+| Chết không report | 27 | hạ tầng: dispatch reject, worker chết, đêm nay lỗi `--parent` | đã vá `--parent`, rejectDispatch đóng terminal (L) |
+| Ask bị tính failed | ~16 | outcome `ask` settle thành blocked, đốt attempt, thổi phồng tỉ lệ hỏng | ask là trạng thái chờ: settle `awaiting-owner`, không tốn attempt |
+| Dispatch khi điều kiện chưa đủ | ~7 | SRS/SDS todo, record audit chưa có, lineage draw chưa có | `api dispatch` kiểm `route.prerequisites` trước khi spawn |
+| `provision.ask` không nói rõ hỏi gì | 5 | kernel gọi op hỏi mà không đưa câu hỏi → `QUESTION_UNCLEAR` | enqueue `provision.ask` bắt buộc params câu hỏi có cấu trúc |
+| Sai công cụ theo provider | 3 | ImageGen/trình duyệt giao cho agent không có | route lọc `riskHints host-tool-required` theo capability agent card |
+| Sai owned path | 1 | | |
+
+Phát hiện lớn nhất: quyền uỷ nhiệm của thầy không tồn tại trong runtime, nên op draw AUTH a5 từ
+chối câu trả lời A+A của supervisor. Vá `dab1859b8`: `config.yaml delegation` (asks, until,
+excludes), packet mang `owner_delegation`, serve-ask ghi `answeredBy`. Op cũng cảnh báo Desktop A
+có nguy cơ trái anatomy Grammar; supervisor sẽ chọn B+B khi ask mới lên để audit sau không fail cứng.
+
 Mở:
 - AUTH chờ hai gate của thầy: chọn direction login (form `ctx_1db4e4509029` đã `dead`, cần
   kernel re-serve khi thầy dậy) và chạy assisted OAuth run-04 (Docker đã bật; cần `npm run
