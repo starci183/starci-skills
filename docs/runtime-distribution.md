@@ -1,6 +1,6 @@
 # Runtime distribution (source runtime)
 
-Published packages ship **sources only**. There is no build step and no generated contract bundle: install and update copy the authored tree, verify it in place, then record success.
+Published packages ship **sources only**: the authored tree is the runtime. Install and update copy it, verify it in place, then record success.
 
 ## Install and update flow
 

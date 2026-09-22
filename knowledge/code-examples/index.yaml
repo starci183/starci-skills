@@ -1,4 +1,4 @@
-schema: starci/code-examples-catalog@1
+schema: starci/code-example-catalog@1
 title: Extracted code examples
 purpose: |
   These focused multi-file excerpts make the pattern rules directly usable. They are examples,

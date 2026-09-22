@@ -109,7 +109,7 @@ The `starci/application-stacks-check@1` result checks the manifest and caller-su
 
 ## Reference pattern
 
-The synthetic `examples/application-stacks/tiny-stateful` kit is a portable shape for the static contract. Its VPS environment is not production-certified; each application supplies its own Swarm cold-host, lifecycle, security, and recovery evidence.
+`modules/schemas/` owns the manifest shape the check reads; `knowledge/application-stacks.yaml` owns the package profiles. A VPS environment is not production-certified by either: each application supplies its own Swarm cold-host, lifecycle, security, and recovery evidence.
 
 ## Primary references
 

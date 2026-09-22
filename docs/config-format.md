@@ -6,20 +6,16 @@ StarCi keeps **local runtime preferences** in ignored `config.yaml` at the skill
 
 | File | Role |
 | --- | --- |
-| `config.example.yaml` | Preferred authored example (defaults: `language: vi`, `model: null`, `effort: medium`). |
-| `config.example.json` | Fallback example; loaders accept it when the YAML example is absent. |
+| `config.example.yaml` | The authored example and the shipped defaults (`language: vi`, `model: null`, `effort: medium`). |
 | `config.yaml` | User-local runtime config. Seeded verbatim — comments included — from `config.example.yaml`, only when missing. |
-| `config.json` | Still honored when `config.yaml` is absent, so existing installs keep working. |
 
 ## Init copy policy
 
 `engine/config.mjs` `loadConfig(root, {initialize:true})`:
 
 1. With `initialize`, copy `config.example.yaml` verbatim to `config.yaml` under `root` when `config.yaml` is absent (best effort).
-2. Read `config.yaml` if present; else `config.json`; else the example (`config.example.yaml`, then `config.example.json`).
-3. Validate the result; an existing owner file is never rewritten by example updates.
-
-The loader translates earlier `supervisor`, `validator` and `critique` sections and earlier `nonOperation` role keys into the current in-memory pools and role map, so an existing local file keeps working without becoming another authored format.
+2. Read `config.yaml` if present; otherwise read `config.example.yaml`.
+3. Validate the result and refuse an unknown key; an existing owner file is never rewritten by example updates.
 
 ## Shape
 
@@ -43,11 +39,17 @@ Optional keys:
   preference; this never forms a fallback chain
 - `debug` — boolean
 
-| non-operation role | typed functions | default pool |
+| non-operation role | required runtime role | default pool |
 | --- | --- | --- |
-| `planner` | `assessGoal`, `planOp` | `fable-astra` |
-| `kernelManager` | `manageWorkflow`, `decide` | `opus-sol` |
-| `validator` | `critiqueGoal`, `validateOp` | `fable-astra` |
+| `planner` | `plan` | `fable-astra` |
+| `kernelManager` | `decide` | `opus-sol` |
+| `validator` | `verify` | `fable-astra` |
+
+The roles and the default pool pairs are `engine/config.mjs`
+(`NON_OPERATION_ROLES`, `DEFAULT_MODEL_POOLS`), which also refuses a pool that
+is not its canonical pair or whose members lack the required role. The kernel's
+own model call kinds are `modules/models/selection.yaml`
+`kernelFunctionKinds`.
 
 The named pools keep provider diversity without making one model a fallback. Before a call, admission chooses
 an eligible, qualified member using actual capacity and fresh known quota. Planner/validator remain in the

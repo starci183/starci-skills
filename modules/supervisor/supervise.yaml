@@ -5,7 +5,7 @@ title: Supervisor — chat-facing observe/analyze/patch/restart loop
 purpose: |
   The supervisor is an owner-proxy monitoring loop run BY A CHAT (Claude Code, Codex, Devin —
   whichever host the owner is talking to), not a daemon and not a second orchestrator. When the
-  owner says "theo dõi" / "supervise" / "monitor" the workflows, the chat runs this loop for the
+  owner says "supervise" / "monitor" the workflows, the chat runs this loop for the
   session's lifetime: if the chat stops, the loop stops.
 
   Its job is the experiment ratchet: observe what the kernels and ops actually produce, diagnose

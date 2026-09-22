@@ -1,10 +1,13 @@
 # Command surface
 
-There are two surfaces: the `starci` install verbs (through a reviewed npm
-archive, or `node <host>/.claude/bin/starci.mjs`), and direct `node scripts/*`
-invocation from an installed `.claude/` tree. There is no `starci <verb>`
-workflow command line — the kernel agent drives work through
-`scripts/kernel/api.mjs`, not a CLI.
+There are two surfaces: `bin/starci.mjs` (through a reviewed npm archive, or
+`node <host>/.claude/bin/starci.mjs`), and direct `node scripts/*` invocation
+from an installed `.claude/` tree. `bin/starci.mjs` is a thin dispatcher — it
+forwards `init|update|doctor|version` to the installer, `api` to
+`scripts/kernel/api.mjs`, `start` to `scripts/kernel/start-workflow.mjs`,
+`goal` to `scripts/goal/define-goal.mjs` and `validate` to
+`scripts/checks/work-validate.mjs`. The kernel agent calls
+`scripts/kernel/api.mjs` itself.
 
 ## Install verbs
 
@@ -16,7 +19,7 @@ workflow command line — the kernel agent drives work through
 | `update --dir <host>` | Replace unchanged installer-owned files, verify the installed tree, preserve local modifications. |
 | `doctor --dir <host> [--quick]` | Run the tree's own validators on the installed copy and report drift. |
 | `version`, `--version` | Print package version. |
-| `help`, `--help` | Print the install verbs. |
+| `help`, `--help` | Print every `starci` verb. |
 
 Flags: `--no-bootstrap` leaves host entry files untouched; `--force` permits
 overwriting locally changed runtime files (review and back up first);
@@ -35,8 +38,13 @@ node scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>"   # r
 node scripts/kernel/start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>]
 # without --goal: claims the earliest pending inbox goal
 
-# The kernel's only ledger gate — thirteen verbs
-node scripts/kernel/api.mjs <survey|status|hierarchy|plan|enqueue|route|dispatch|op-contract|report|consume-report|check|settle|incident|finish> --repo <path> [...]
+# The kernel's only ledger gate. `modules/kernel/api.yaml` names every verb,
+# what it reads, what it writes and when it refuses; `api.mjs --help` prints
+# the same list with each verb's arguments.
+node scripts/kernel/api.mjs <verb> --repo <path> [...]
+
+# Read-only Work record/layout validation
+node scripts/checks/work-validate.mjs <work-root>
 ```
 
 See [workflow-kernel](workflow-kernel.md) for the loop these calls serve.
@@ -52,12 +60,12 @@ node scripts/route/build-ops-registry.mjs [--check]                 # regenerate
 
 ## Agent lifecycle (`node scripts/agent/*`)
 
+Spawning, probing and closing a worker terminal are library calls in
+`scripts/agent/lib.mjs`, driven by `api dispatch` and `api settle`. One shell
+stands beside them:
+
 ```sh
-node scripts/agent/spawn.mjs --agent <devin|qwen|claude|codex> --worktree <path> --title <t> \
-  [--prompt <text> | --prompt-file <f>] [--command <override>] [--kernel] [--json]
 node scripts/agent/send.mjs ...    # deliver a follow-up to a live agent terminal
-node scripts/agent/health.mjs ...  # readiness/activity probe
-node scripts/agent/kill.mjs ...    # close a worker terminal
 ```
 
 Agent flags always come from the agent card

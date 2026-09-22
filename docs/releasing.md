@@ -6,7 +6,8 @@ This is the maintainer workflow, not a requirement for users installing a review
 
 ```sh
 npm ci
-npm test
+npm run check   # node --check on every .mjs, ops registry regen check, host contract
+npm test        # node --test tests/*.spec.mjs
 ```
 
 Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
@@ -17,7 +18,7 @@ Review source changes and test failures. Do not weaken validators to produce a g
 npm pack --json --pack-destination /absolute/release-output
 ```
 
-Create that output directory first, outside the runtime and product trees. `prepack` runs the source verification above in the packing checkout. `prepack` does not replace the full tests above. Inspect the resulting file inventory for local configuration, secrets, `config.yaml`, product records, Git state, `node_modules`, `worktrees/` and unrelated build output. `package.json.files` explicitly bounds the installed payload: sources, `scripts/`, `modules/`, `engine/` (including bundled `engine/yaml.mjs`), `skills/`, `init/`, `knowledge/`, `docs/`, tests and human docs; keep all runtime references available after relocation.
+Create that output directory first, outside the runtime and product trees. Run `npm run check && npm test` in the packing checkout yourself before packing — `npm pack` runs no verification of its own. Inspect the resulting file inventory for local configuration, secrets, `config.yaml`, product records, Git state, `node_modules`, `worktrees/` and unrelated build output. `package.json` `files[]` is the authority on what the payload contains — it is an allowlist with explicit negations for generated output; keep all runtime references available after relocation.
 
 Test the **archive**, not only the source checkout:
 

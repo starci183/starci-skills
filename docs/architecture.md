@@ -9,7 +9,7 @@ lives in **one SQLite ledger**. The kernel reasons; small executables transact.
 
 | Actor | Lifetime | What it does | What it never does |
 | --- | --- | --- | --- |
-| Owner / chat | — | Creates the goal (`node scripts/goal/define-goal.mjs`), answers asks, approves. | Not an agent layer above the kernel; the kernel is spawned, not supervised, by chat. |
+| Owner / chat | — | Creates the goal (`node scripts/goal/define-goal.mjs`), answers asks, approves. As the workflow monitor it relays; asked to supervise, it patches `.claude` and restarts kernels per `modules/supervisor/supervise.yaml`. See `CONTEXT.md` for the three chat roles. | Never an agent layer inside the kernel's loop: it does not plan, enqueue, dispatch, settle or answer an ask on the owner's behalf. |
 | `[Kernel] <workflow>` | One per workflow, long-lived | Surveys the ledger, derives the plan, enqueues ops, routes the model, dispatches, settles verdicts, escalates incidents, finishes the workflow. Spawned by `node scripts/kernel/start-workflow.mjs`. | Never opens the sqlite file, never writes a job row, never spawns a terminal, never calls the host (Orca) API directly. |
 | `[Op] <op-id>` | One per job, ephemeral | Receives one dispatch packet, works inside its `owned_paths`, writes one report, dies. | Never sees the ledger; its report file is its only channel back. |
 
@@ -19,16 +19,13 @@ Every kernel state operation is one command:
 
 ```text
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
-  survey | status | hierarchy | plan | enqueue | route | dispatch | nudge |
-  observe | op-contract | report | consume-report | check | settle | incident |
-  finish
 ```
 
-Reads (`survey`, `status`, `hierarchy`) return projections. Each write runs inside one
-`BEGIN IMMEDIATE` transaction and appends one hash-chained event. A refusal
-exits non-zero with `{ok:false, reason}` — a refusal is a fact the driver loop
-routes, never a crash. The full contract (arguments, reads/writes, refusal
-strings) is `modules/kernel/api.yaml`.
+`modules/kernel/api.yaml` `commands:` names every verb with its arguments,
+reads, writes and refusal strings. Reads return projections. Each write runs
+inside one `BEGIN IMMEDIATE` transaction and appends one hash-chained event. A
+refusal exits non-zero with `{ok:false, reason}` — a refusal is a fact the
+driver loop routes, never a crash.
 
 `hierarchy` is the semantic agent-tree projection. It renders
 `workflow → Kernel → Op` from durable workflow/job identity and includes Orca

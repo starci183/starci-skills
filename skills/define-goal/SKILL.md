@@ -11,6 +11,10 @@ description: >-
 
 # define-goal
 
+You are the owner's chat. This skill is how you turn the owner's prompt into a
+durable goal in the ledger, and the owner's exact `ok` is the only thing that
+lets you persist it.
+
 Contract: `.claude/modules/goal/define-goal.yaml`
 Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 `.claude/scripts/agent/bias.mjs` (routing-bias extraction) ·
@@ -27,9 +31,10 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    receives the goal; `--repo <path>` is single-repo mode where the named
    repository owns the ledger. The two flags are mutually exclusive.
 2. **Extract routing bias** — read the owner prompt yourself and write
-   `{prefer:[], avoid:[]}` from its intent (e.g. "ưu tiên codex", "prefer
-   claude", "đừng dùng qwen" → prefer/avoid those pools; aliases:
-   codex/claude/fable/qwen/devin → `<name>-agent`, `fable` → `claude-fable`).
+   `{prefer:[], avoid:[]}` from its intent (e.g. "prefer codex", "use claude",
+   "don't use qwen" → prefer/avoid those pools, in whatever language the owner
+   wrote it; aliases: codex/claude/fable/qwen/devin → `<name>-agent`, `fable` →
+   `claude-fable`).
    You understand the phrasing — a regex would not. Then normalize it through
    the canonicalizer so casing/aliases are cleaned and `avoid` wins conflicts:
 
@@ -59,26 +64,34 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --plan
    ```
 
-5. Present the plan to the owner plainly, in this table shape:
+5. Show the owner what `--plan` printed, under the labels it prints:
 
    ```
-   STATE      new workflow — nothing persisted yet
-   GOAL       <enriched goal text, including assess findings>
-   BIAS       prefer=[<agents>] avoid=[<agents>]   (routing_bias from step 2)
-   OP CHAIN   op1 (<model tier>, ~<est>) → op2 (<model tier>, ~<est>) → op3 (<model tier>, ~<est>)
-              lanes: {op1, op2} parallel-safe · {op3} sequential
-   WILL-WRITE workflows row · goals revision 0 · inbox pending row · goal-defined event
-   LEDGER     <project-owner-repo>/.starciwork/runtime.sqlite
+   PLAN — goal "<title>"
+     identity: <goalIdentity>
+     scope: <project or repo>
+   STATE (cold scan):
+     <role>  <path>  — <assess line>
+   GOAL:
+     <enriched goal text, including assess findings>
+   OP CHAIN (estimate is cold: easy=…m medium=…m hard=…m):
+     1. <op>  ~<est>m <tier>
+     total ~<n>m — estimate is cold
+   CONFIG: <config.yaml path> — kernel pin agent=… model=… effort=…
+   WILL WRITE:
+     - <row>
+   ledger: <project-owner-repo>/.starciwork/runtime.sqlite
+   re-run without --plan to persist
    ```
 
-   Per-leg model tier and estimate come from the planner
+   Add the step-2 bias (`prefer=[…] avoid=[…]`) in your own words — the planner
+   does not print it. Per-leg estimate and tier come from the planner
    (`.claude/scripts/route/route-plan.mjs` +
-   `.claude/modules/models/selection.yaml`); the lane lines show which legs may
-   run in parallel. Underivable chains are shown as such — never filled in by
-   hand.
+   `.claude/modules/models/selection.yaml`). An underivable chain prints as
+   `underivable (kernel will derive at boot)` — never fill it in by hand.
 6. **Wait for the owner to reply exactly `ok`, `OK`, or `oK`.**
-   Anything else — a question, silence, "sửa X" — means do NOT persist; clarify or
-   adjust the prompt/title and re-plan.
+   Anything else — a question, silence, an edit request — means do NOT persist;
+   clarify or adjust the prompt/title and re-plan.
 7. On `ok`, persist — pass the step-2 extraction through so it lands as
    `routing_bias` in the goal payload:
 

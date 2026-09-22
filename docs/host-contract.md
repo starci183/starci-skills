@@ -1,9 +1,10 @@
 # Host contract — Orca calls and agent cards
 
 Everything StarCi knows about driving a coding agent on the Orca host is
-**data** under `modules/`; the mechanism (`scripts/agent/lib.mjs`,
-`scripts/api/orca/`) is agent-blind. There is no `providers/` registry: the
-host contract and the per-agent cards are two ordinary module trees.
+**data** under `modules/`, in two module trees: `modules/host/orca/` is the
+host contract and `modules/models/agents/` holds the per-agent cards. The
+mechanism that reads them (`scripts/agent/lib.mjs`, `scripts/api/orca/`) is
+agent-blind.
 
 ## `modules/host/orca/` — the typed host contract
 
@@ -108,9 +109,9 @@ capabilities:                    # optional — agent-specific facts
 
 ## How `scripts/agent` consumes a card
 
-`scripts/agent/spawn.mjs` is the thin CLI; `scripts/agent/lib.mjs` is the
-mechanism (`spawnAgent({provider, worktree, title, prompt|promptFile, command,
-kernel})`):
+`scripts/agent/lib.mjs` is the mechanism (`spawnAgent({provider, model, effort,
+worktree, title, prompt|promptFile, command, kernel, dispatchId, attest})`),
+called by `api dispatch`:
 
 ```text
 loadAdapter(provider)            → parse modules/models/agents/<agent>.yaml
@@ -126,9 +127,9 @@ awaitSubmission(handle, card)    → screen must show submission.activityPattern
                                    re-enter while stagedPattern persists
 ```
 
-`api dispatch --spawn` drives the same path. Auth or readiness/submission
-failure means the job is **not** running — the reservation is settled and the
-terminal closed (`spawn-failed`), never a ghost lease. `settle` closes the
+Auth or readiness/submission failure means the job is **not** running — the
+reservation is settled and the terminal closed (`dispatch-rejected`, per
+`modules/kernel/api.yaml`), never a ghost lease. `settle` closes the
 worker terminal via the card's `release` block.
 
 The host launch is only the delivery half of the op lifecycle; the durable

@@ -44,9 +44,9 @@ record and is worse than a red check.
 
 - **One authority per concept.** A rule lives in exactly one file; other surfaces cite it. If you
   find yourself maintaining the same fact twice, one copy is stale — delete it or generate it.
-- **Canonical paths.** New code imports `engine/`, `modules/`, `modules/schemas/`,
-  `scripts/checks/spec/` — never the former top-level dirs (`kernel/`, `core/`, `cli/`,
-  `contracts/`, `schemas/`, `sqlite/`, …).
+- **Canonical import roots.** Mechanism comes from `engine/`, contract data from `modules/`
+  (schemas from `modules/schemas/`), spec validators from `scripts/checks/spec/`, executables from
+  `scripts/`. An import that resolves outside those four roots is the bug.
 - **YAML contracts are data.** `modules/**/*.yaml` files are read by agents and scripts alike;
   keep them declarative — no code, no comments restating the field name.
 - **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not
@@ -55,15 +55,18 @@ record and is worse than a red check.
 - **State:** all runtime state lives in `.starciwork/runtime.sqlite` via `engine/ledger-db.mjs`;
   dispatch artifacts use the OS tmpdir or are deleted after delivery.
 
-## Fleet / lane work
+## Parallel lanes
 
-Large changes are executed by parallel lanes with a write-allowlist each:
+A large change is cut into lanes that run at the same time, each in its own worktree on its own
+branch, each with a write-allowlist naming the paths it may touch:
 
-- A lane touches only its allowlisted paths — it never "fixes" a neighbor's file mid-flight.
-- A lane finishes by submitting its report through the kernel (`api report`) so the ledger records the
-  outcome; no report, the lane is not done.
-- Mass deletions and import rewiring are a separate flip step — lanes must not delete doomed
-  directories early.
+- A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the
+  owning lane, not into a drive-by edit.
+- A lane that depends on another's surface starts after that one merges, and merges `main` before
+  it reads anything.
+- A lane finishes by submitting its report through the kernel (`api report`) so the ledger records
+  the outcome; no report, the lane is not done.
+- Deletions and import rewiring that cross allowlists are their own cut, merged between lanes.
 
 ## Commit bar
 

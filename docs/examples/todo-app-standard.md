@@ -108,8 +108,8 @@ requires both `fr.login.sign-in` and `fr.task.create`.
 
 **`done`, proven with evidence.** `impl.task.todo-app-backend.list` is `state: done` and `proves:
 [br.task.list.owned]`. Its sibling `features/task/impl/todo-app-backend/list/evidence.yaml` is generated, not
-authored by hand: it opens with "Written by scripts/example-evidence.mjs by actually running the assertion
-commands below against --cwd." It carries a `recordDigest` (a sha256 of the record's own `index.yaml` bytes),
+authored by hand: `scripts/example/example-evidence.mjs` writes it by actually running the assertion
+commands below against `--cwd`, and stamps that in its header. It carries a `recordDigest` (a sha256 of the record's own `index.yaml` bytes),
 a `codeDigest` (per-file sha256 over the record's `owners` paths), an `outcome`, per-assertion
 `command`/`exit`/`outcome` rows (`npx jest src/modules/bussiness/task/list-tasks.handler.spec.ts`, `exit: 0`),
 and `provenance` naming the actor. A run is replayable in the sense that its command, its environment and its
@@ -190,8 +190,8 @@ A reader can hold the Work record beside the test file and match them by the quo
 separate traceability document.
 
 **Evidence is generated or captured by a run, never hand-edited into a pass.** Implementation records carry
-sibling `evidence.yaml` files written by `scripts/example/example-evidence.mjs` ("Written by
-scripts/example-evidence.mjs by actually running the assertion commands below against --cwd"); UAT flows
+sibling `evidence.yaml` files written by `scripts/example/example-evidence.mjs`, which runs each
+assertion command against `--cwd` and stamps that in the header; UAT flows
 carry evidence that names the real `runs/<runId>` directory the Playwright harness produced. Each file's
 `recordDigest` is a sha256 over the sibling `index.yaml`'s exact bytes — the same digest
 `scripts/checks/check-example-work.mjs` recomputes to refuse a mismatched, non-stale evidence file.

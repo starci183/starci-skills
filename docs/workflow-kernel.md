@@ -53,22 +53,12 @@ authority, never answers an `ask` itself, and never edits the ledger by hand.
 
 ```text
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
-survey   status                       reads: projections only
-plan     --file <plan.json>           write: plan-derived event + structural diff
-enqueue  --op <opId> --paths <csv> [--cut-id <id> --cut-ordinal <n> --cut-total <N>]
-                                        write: queued job row / bounded same-op cut slice
-dispatch --job <id> [--spawn] [--model <t>] [--worktree <sel>]
-route    --job <id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
-nudge    --job <id>               wakes the exact turn-idle worker; no new authority
-observe  --job <id> [--lines <n>] read-only op-terminal screen tail; context, never evidence
-op-contract --job <id>           worker reads its contracts row
-report   --job <id> --report <file> [--outcome <o>]   files a starci/op-report@1 row
-consume-report --job <id>        kernel marks the report integrated
-check    --job <id> --checks '<json>'    kernel records its re-run
-settle   --job <id> --verdict <pass|fail|blocked> [--report <path>]
-incident --kind <k> --detail <s> [--op <opId>]
-finish
 ```
+
+`modules/kernel/api.yaml` `commands:` is the verb surface: one entry per verb
+naming what it reads, what it writes, what it returns and when it refuses.
+`scripts/checks/check-api-surface.mjs` holds that block and `scripts/kernel/api.mjs`
+in step, and `api.mjs --help` prints each verb with its arguments.
 
 Every write is one transaction + one hash-chained `events` row; every refusal
 exits 1 with `{ok:false, reason}` where the reason string is the contract.
@@ -86,7 +76,7 @@ attested; agent flags injected from `modules/models/agents/<agent>.yaml`).
 The packet is a bounded grant: one op, its brief (`modules/ops/ops/<op>.yaml`),
 a closed read set, a closed write set (`owned_paths`), one model, one budget,
 one lease token. Without `--spawn` it is a dry-run — the packet prints and
-nothing is reserved. A spawn that does not land is `spawn-failed`: the
+nothing is reserved. A spawn that does not land is `dispatch-rejected`: the
 reservation is settled, never left leasing a ghost.
 
 ## Verdicts — `modules/kernel/verdict-contract.yaml`

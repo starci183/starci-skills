@@ -1,11 +1,10 @@
 # Ledger DB — `.starciwork/runtime.sqlite`
 
-Status: keystone contract. The schema is **data**, not prose: the DDL lives in
-`engine/schema.sql` (ledger) and `engine/machine.sql` (machine arbiter),
-extracted verbatim from the `LEDGER_DDL`/`META_TABLE_DDL`/`EVENTS_DIGEST_TRIGGER`
-constants of `engine/ledger-db.mjs`. This document explains the decisions and
-invariants; it does not inline the DDL — when they disagree, the `.sql` files
-and the module win.
+Status: keystone contract. The schema is **data**, not prose: the executed DDL is
+`engine/schema.sql` (ledger), `engine/machine.sql` (machine arbiter) and
+`engine/triggers.sql`, which `engine/ledger-db.mjs` reads at load. This document
+explains the decisions and invariants; it does not inline the DDL — when they
+disagree, the `.sql` files and the module win.
 
 ## 1. Decision
 
@@ -52,15 +51,20 @@ ledger-facing store vocabulary lives in `engine/ledger-db.mjs`.
 ```js
 export const LEDGER_SCHEMA='starci/ledger-db@1';
 export const LEDGER_VERSION=1;
-export const ledgerFileFor=repoRoot=>path.join(repoRoot,'.starciwork','runtime.sqlite');
-export const machineFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'machine.sqlite');
+export const ledgerFileFor=repoRoot=>...;   // <repo>/.starciwork/runtime.sqlite; refuses the runtime root
+export const machineFileFor=(env=process.env)=>...;  // <runtime state root>/machine.sqlite
 
-export function openLedger({file,now,busyTimeoutMs,machine}); // read-write; migrates, FK on, synchronous=FULL, WAL
-export function inspectLedger({file});                        // read-only, no migration — operator inspection
-export function openMachine({file,now,busyTimeoutMs});
-export function ledgerIdOf(handle);                           // identity from the meta row, never the path
-export function verifyChain(db,{workflowId});                 // walk the events hash chain
+export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',machine=null});
+export function inspectLedger({file});      // read-only, no migration — operator inspection
+export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL'});
+export function ledgerIdOf(handle);         // identity from the meta row, never the path
+export function verifyChain(db,{workflowId});// walk the events hash chain
 ```
+
+`ledgerFileFor` refuses a repository root that is itself the StarCi runtime
+(`ledger-root-is-runtime`) — a project routes through `.workspaces` instead.
+`openLedger` is the read-write path: it migrates, turns foreign keys on, sets
+`synchronous=FULL` and opens WAL.
 
 Open facts (applied by `openLedger`, outside the DDL body): `auto_vacuum`,
 `foreign_keys=ON`, `synchronous=FULL`, `journal_mode=WAL` (with the achieved
@@ -145,13 +149,7 @@ anchor with no ledger refuses `ledger-missing`, and a `ledgerId` mismatch is
 
 ## 6. Refusal discipline
 
-Every api write names its refusal strings (`modules/kernel/api.yaml`):
-`workflow-unknown`, `workflow-finished`, `already-queued`, `empty-paths`,
-`empty-field`, `unknown-op`, `job-unknown`, `job-no-op`, `job-settled`,
-`contested-lease`, `path-collision`, `path-illegal`, `contract-missing`,
-`route-refused`, `spawn-failed`, `dispatch-rejected`, `managed-agent`,
-`plan-file-missing`, `plan-file-invalid`, `plan-lineage-missing`,
-`report-missing`, `report-invalid`, `outcome-mismatch`,
-`verdict-outcome-mismatch`, `checks-file-missing`, `checks-invalid`. A
-refusal is a typed fact for the driver loop — never an exception to route
-around, never a silent loss.
+`modules/kernel/api.yaml` names every api write's refusal strings under that
+verb's `refuses:` key, and `scripts/checks/check-api-surface.mjs` holds the two
+in step. A refusal is a typed fact for the driver loop — never an exception to
+route around, never a silent loss.
