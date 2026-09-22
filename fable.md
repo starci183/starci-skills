@@ -820,3 +820,38 @@ Bỏ hẳn `gpt-6-astra`, Claude Fable (pool `claude-fable`, `fable-astra`), m�
 Codex pool: easy/medium `gpt-6-luna`, hard/insane `gpt-6-sol`. Claude pool mọi tier
 `claude-opus-5-5`. Devin, qwen giữ nguyên. Catalog không lưu giá. Lane N làm, kèm danh sách key
 trong `config.yaml` local của thầy cần đổi.
+
+## supervisor night log 2026-09-23
+
+Supervisor: phiên "Nâng cấp .claude context", poll 10 phút (`config.yaml supervisor.pollIntervalMs`),
+theo `modules/supervisor/supervise.yaml`. Hai workflow: AUTH `wf-nivo-app-auth-mub1d7gs`,
+WSPV `wf-nivo-workspace-provision-mub1hxxt`.
+
+- 03:05 WSPV kernel báo mọi dispatch chết ở `task-create`. Nguyên nhân: lane L truyền terminal
+  handle vào `--parent`, Orca chỉ nhận task id; fake Orca chấp nhận nên suite xanh. Vá
+  `3861d7723`, fake Orca giờ từ chối parent không phải task, `calls.yaml` ghi kiểu giá trị. Báo
+  kernel qua `terminal-send`; kernel dispatch lại, audit round 2 bắt đầu báo `done` lúc 20:11.
+- 03:08 `supervisor.pollIntervalMs` vào config (`e749d0c76`); lane M merge (`93536d4b5`).
+- 03:12 `queuedBecause` báo sai: leg intake `request.analyze` chưa từng có job bị coi là chặn
+  mọi job, `actionable` vẫn true. Vá `bd1647a4b`: leg trước chỉ chặn khi có job đang chờ/chạy;
+  `readyOperations` chỉ đếm job `ready`. Lộ ra lỗi thật ở WSPV: 4 cell audit song song cùng giữ
+  path `.starciwork/kernel-evidence/<wf>` nên path lease xếp chúng thành hàng (mở, xem dưới).
+- 03:14 Một phiên khác replace mù `gpt-5.6`→`gpt-6` và ghi output `interface.draw` thẳng vào cây
+  `main`; commit của trò cuốn nhầm rename, đã tách lại. Thay đổi lạ được stash (stash@{0}, không
+  xoá). 03:17 phiên đó commit `43ddc335a` giữa lúc trò giải conflict merge lane N: nội dung đúng
+  (lane N + phần giải conflict), message sai ("astra, Fable unchanged"). Đã nhắn phiên
+  "Starci backend prompt batching".
+- 03:20 Lane N vào `main`: catalog chỉ còn `gpt-6-sol`, `gpt-6-luna`, `claude-opus-5-5`.
+  `config.yaml` của thầy đổi pool `fable-astra`/`opus-sol` → `sol-opus`, validate OK. Spec
+  pool-full của lane M sửa sang `claude-agent` (`9be80cf96`).
+
+Mở:
+- AUTH chờ hai gate của thầy: chọn direction login (form `ctx_1db4e4509029` đã `dead`, cần
+  kernel re-serve khi thầy dậy) và chạy assisted OAuth run-04 (Docker đã bật; cần `npm run
+  dev:env`, API :3068, FE :3067, rồi skill `run-assisted-uat`).
+- `interface.audit` cells dùng chung path `kernel-evidence/<wf>` → serialize; cần mỗi job một
+  thư mục con.
+- `TASK_OUTSIDE_RUN`: 90 dòng, phần lớn thuộc workflow đã finish; cần gộp theo workflow và bỏ
+  qua workflow đã finish trong digest.
+- ORPHAN_TERMINAL `term_b6fa4c43` (audit a4 failed trước lane L) vẫn mở.
+- `owner-gate` chưa là một `queuedBecause`: job chờ thầy vẫn hiện `ready`.
