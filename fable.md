@@ -870,6 +870,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   nhà cung cấp thanh toán. Thống kê từ 21/9 09:27: AUTH 24 succeeded / 23 failed (13 blocked,
   10 verdict fail); WSPV 39 / 54 (24 blocked, 30 verdict fail). Blocked là chỗ lãng phí cần đào.
 
+- 04:40 Thầy chốt: chạy trên `main` mặc định, worktree chỉ khi prompt yêu cầu (`3557748a4`). Xoá worktree
+  accounting (đã nằm trong main); commit WIP refactor 206 file vào nhánh của nó (`bab51287`), không merge.
+  Thầy yêu cầu hai workflow mới (3 module + AgentOS; Collab chat nhóm): plan in chuỗi sai vì thiếu
+  archetype full-stack; phiên fork thêm `feature-build-fullstack` trong lane archetype, chưa persist goal.
+  Lane P (4 vá lãng phí) đang chạy trong worktree vì sửa api.mjs kernel đang chạy. `check-orca-tree` bỏ
+  qua terminal của ledger khác (`0c434ed88`).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
