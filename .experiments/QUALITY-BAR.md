@@ -71,12 +71,19 @@ how it is *proven* — declaration never counts, evidence does.
 
 ## 5. Evidence — proof, not assertion
 
+The section's own premise is enforced by
+`scripts/checks/check-evidence-binding.mjs` (EVIDENCE_ASSERTED_NOT_OBSERVED),
+which refuses a `done` leaf resting on `verificationSource: authored-claim`.
+
 - [ ] Render evidence: shots per breakpoint, per theme, generated via grammar
 - [ ] UAT: video (webm) per journey INCLUDING failure paths, not only happy path
-- [ ] Freshness: evidence younger than the code it proves; code change after
-      evidence → re-verify leg auto-issued
-- [ ] Every `done` claim resolves to artifact paths that exist and match content
-      digests
+- [x] Freshness: evidence younger than the code it proves — enforced by
+      scripts/checks/check-evidence-binding.mjs (EVIDENCE_OLDER_THAN_SOURCE)
+- [ ] Code change after evidence → re-verify leg auto-issued (the check above
+      reports the drift; nothing schedules the re-verification)
+- [x] Every `done` claim resolves to artifact paths that exist and match content
+      digests — enforced by scripts/checks/check-evidence-binding.mjs
+      (EVIDENCE_PATH_MISSING, EVIDENCE_DIGEST_MISMATCH)
 
 ## 6. Process integrity
 

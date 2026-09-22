@@ -51,3 +51,33 @@ unknown, so the verdict stays `weak` and says why.
 
 `proofFinding(result)` returns the single sentence for `open[]` - e.g. *the added spec `lib.spec.mjs` also
 passes at base 5412ae012548: it does not prove the change* - and `null` for `proven` and `checks-only`.
+
+## Evidence binding check
+
+The contrast above proves a change at the moment it lands. `scripts/checks/check-evidence-binding.mjs` asks
+the later question a recorded tree owes: does a `state: done` leaf's proof still bind to the source it claims
+to prove? It walks record -> sibling `evidence.yaml` -> the source bytes that evidence names, reads only, and
+prints one finding per line as `CODE  <record id>  <detail>`.
+
+```sh
+node scripts/checks/check-evidence-binding.mjs --work <.starciwork root> [--repo <id>=<git root>]... [--json]
+```
+
+`--repo` re-points one repository name at an explicit root, for a workspace whose repositories do not sit
+where `workspace.yaml` places them. `--json` emits `{findings:[{code,node,path,detail}]}` instead of lines.
+
+| code | what it refuses |
+| --- | --- |
+| `EVIDENCE_PATH_MISSING` | the proof hashes a source file that is not on disk any more |
+| `EVIDENCE_DIGEST_MISMATCH` | a hashed source file's bytes are no longer the bytes that were proven |
+| `EVIDENCE_OLDER_THAN_SOURCE` | owned source the proof never hashed moved after the capture - after the record's own `revision` where git resolves it, otherwise after `provenance.capturedAt` by commit time, otherwise by file mtime. The finding names which clock answered |
+| `EVIDENCE_ASSERTED_NOT_OBSERVED` | a `done` leaf rests on `verificationSource: authored-claim`, so nothing observed it. The three schemas `modules/schemas/work-layout.yaml` declares true by authorship - `work/data@1`, `work/brand@1`, `work/policy-decision@1` - are exempt |
+
+Exit 0 is clean, 1 reports findings, 2 means invalid arguments or an unreadable declared input - the
+convention `scripts/checks/check-stales.mjs` uses.
+
+Evidence that carries `stale: true` is passed over: it has already said it no longer describes the current
+product, and refusing it for pointing at the past would punish the tree for being honest. Declared artifacts
+- record `assets[]`, `ui.assets[]`, evidence `assets[]`, receipts and run manifests - are
+`scripts/checks/check-work-artifacts.mjs`'s ground, and `recordDigest` plus the aggregate `codeDigest.digest`
+are `scripts/checks/check-example-work.mjs`'s; this check opens neither.
