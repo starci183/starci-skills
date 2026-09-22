@@ -845,13 +845,15 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   `config.yaml` của thầy đổi pool `fable-astra`/`opus-sol` → `sol-opus`, validate OK. Spec
   pool-full của lane M sửa sang `claude-agent` (`9be80cf96`).
 
+- 03:30 Vá `path-kernel-custody` (`1f69780ec`): enqueue từ chối owned path trong
+  `kernel-evidence|kernel-strays|kernel-approvals`. Digest gộp `TASK_OUTSIDE_RUN` (`c7cee13da`).
+  Phiên draw xác nhận `43ddc335a` là của nó (commit nhầm cả index); nó sẽ tự land ui records
+  bằng `git commit --only`. Phiên fork mở lane archetype spec-foundation/greenfield-scaffold,
+  supervisor sẽ merge.
+
 Mở:
 - AUTH chờ hai gate của thầy: chọn direction login (form `ctx_1db4e4509029` đã `dead`, cần
   kernel re-serve khi thầy dậy) và chạy assisted OAuth run-04 (Docker đã bật; cần `npm run
   dev:env`, API :3068, FE :3067, rồi skill `run-assisted-uat`).
-- `interface.audit` cells dùng chung path `kernel-evidence/<wf>` → serialize; cần mỗi job một
-  thư mục con.
-- `TASK_OUTSIDE_RUN`: 90 dòng, phần lớn thuộc workflow đã finish; cần gộp theo workflow và bỏ
-  qua workflow đã finish trong digest.
 - ORPHAN_TERMINAL `term_b6fa4c43` (audit a4 failed trước lane L) vẫn mở.
 - `owner-gate` chưa là một `queuedBecause`: job chờ thầy vẫn hiện `ready`.
