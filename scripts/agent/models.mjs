@@ -3,7 +3,8 @@
 //
 // Routing model (selection.yaml allocationFacts.poolSelection):
 //   0. runtimes.yaml roleOfKind names the kind's role, work and floor; the
-//      measured difficulty is raised to the floor, never lowered.
+//      measured difficulty is raised to the floor, never lowered, and think
+//      work takes the `think` order in step 1 in place of its role's order.
 //   1. chain(role, difficulty) = pools present in BOTH the difficulty tier
 //      (allocation.tiers[difficulty], role key first then the tier default)
 //      AND the per-role order (allocation.preference[role]). Tier position is
@@ -168,7 +169,10 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const d = raiseToFloor(measured, route.floor);
   const resolvedRole = role ?? route.role;
   if (!resolvedRole) return { error: `no role resolves for kind '${kind}'` };
-  const { chain: unbiased, tierSource } = chainFor({ role: resolvedRole, difficulty: d, runtimes: rt });
+  // Think work walks the tier's `think` order whatever its role; the role
+  // still gates each pool below.
+  const chainKey = route.work === 'think' ? 'think' : resolvedRole;
+  const { chain: unbiased, tierSource } = chainFor({ role: chainKey, difficulty: d, runtimes: rt });
   const chain = applyBias(unbiased, bias);
   const rejected = [];
   for (const target of chain) {

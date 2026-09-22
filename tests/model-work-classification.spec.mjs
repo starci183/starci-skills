@@ -54,3 +54,47 @@ test('a floor raises a measured difficulty and never lowers it',()=>{
   assert.equal(selectPool({kind:'backend.implement',difficulty:'insane',runtimes}).difficulty,'insane');
   assert.equal(kindRoute('legacy.kind',{roleOfKind:{'legacy.kind':'implement'}}).role,'implement','a bare role string still resolves');
 });
+
+// Owner rule: thinking work goes to Claude Opus 5.5, or GPT-6 Sol when Claude is unavailable, at every
+// difficulty the work may be measured at — never to Luna, Qwen or Devin.
+const FRONTIER=new Set(['claude-opus-5-5','gpt-6-sol']);
+const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think').map(([kind])=>kind);
+const claudeDown={'claude-agent':{auth:'dead'}};
+
+test('think kinds resolve to a frontier model at every difficulty, Claude first and Sol when Claude is down',()=>{
+  assert.ok(thinkKinds.length>=20);
+  for(const kind of thinkKinds)for(const difficulty of DIFFICULTY){
+    const up=selectPool({kind,difficulty,runtimes});
+    assert.ok(FRONTIER.has(up.modelId),`${kind}@${difficulty} -> ${up.target}/${up.modelId}`);
+    const needsImage=(runtimes.kindRequires?.[kind]??[]).length>0;
+    assert.equal(up.target,needsImage?'codex-agent':'claude-agent',`${kind}@${difficulty} leads with Claude unless a capability forbids it`);
+    const down=selectPool({kind,difficulty,runtimes,capacity:claudeDown});
+    assert.deepEqual([down.target,down.modelId],['codex-agent','gpt-6-sol'],`${kind}@${difficulty} with Claude down`);
+  }
+});
+
+test('a think role with no kind never lands on Luna below the hard tier',()=>{
+  for(const role of ['decide','plan'])for(const difficulty of ['easy','medium']){
+    assert.equal(selectPool({kind:'direct.call',role,difficulty,runtimes}).modelId,'claude-opus-5-5');
+    const down=selectPool({kind:'direct.call',role,difficulty,runtimes,capacity:claudeDown});
+    assert.ok(down.error&&!down.modelId,`${role}@${difficulty} with Claude down must refuse, not take Luna`);
+  }
+});
+
+test('every declared operator chain of a think kind names only frontier pools, Claude first',()=>{
+  const registry=read('modules/models/registry.yaml');
+  const frontier=runtimes.allocation.preference.think;
+  assert.deepEqual(frontier,['claude-agent','codex-agent']);
+  for(const kind of thinkKinds){
+    const chain=registry.operators[kind]?.chain;
+    if(!chain)continue;
+    assert.ok(chain.every(pool=>frontier.includes(pool)),`${kind} chain ${chain}`);
+    if(chain.length>1)assert.equal(chain[0],'claude-agent',`${kind} chain leads with Claude`);
+  }
+});
+
+test('a prefer bias cannot hoist a non-frontier pool into think work',()=>{
+  const r=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['devin-agent','qwen-agent']}});
+  assert.deepEqual(r.chain,['claude-agent','codex-agent']);
+  assert.equal(r.target,'claude-agent');
+});

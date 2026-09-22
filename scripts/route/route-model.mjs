@@ -277,15 +277,16 @@ function loadCandidates(modelsDir) {
 // Candidate order sources, in precedence order:
 //   1. registry.yaml operators[kind].chain — the declared per-op launch chain
 //      ("choosing the first ready runtime/profile", registry.yaml selection).
-//   2. runtimes.yaml allocation.preference[role] — within-family suitability,
-//      used for kinds with no declared chain (kernel functions, unknown kinds).
+//   2. runtimes.yaml allocation.preference[key] — within-family suitability,
+//      used for kinds with no declared chain (kernel functions, unknown kinds);
+//      the key is `think` for think work, else the role.
 // selection.yaml allocationFacts.note: tiers/preference are NOT a workflow
 // provider fallback chain; the declared operator chains decide in a workflow.
-function candidateOrder(kind, role, registry, runtimes) {
+function candidateOrder(kind, key, registry, runtimes) {
   const chain = registry?.operators?.[kind]?.chain;
   if (Array.isArray(chain) && chain.length) return { order: chain, source: `registry.yaml operators.${kind}.chain` };
-  const pref = (role && runtimes?.allocation?.preference?.[role]) || runtimes?.allocation?.preference?.implement || [];
-  return { order: pref, source: `runtimes.yaml allocation.preference[${role ?? 'implement'}]` };
+  const pref = (key && runtimes?.allocation?.preference?.[key]) || runtimes?.allocation?.preference?.implement || [];
+  return { order: pref, source: `runtimes.yaml allocation.preference.${key ?? 'implement'}` };
 }
 
 // --- plan mode: what-if tier preview ---------------------------------------------
@@ -312,7 +313,7 @@ const PLAN_EVIDENCE_ABSENT = new Set([
 function planChain(runtimes, difficulty, role, bias) {
   const { chain, tierSource } = chainFor({ role, difficulty, runtimes });
   const biased = applyBias(chain, bias);
-  const src = `${tierSource} ∩ allocation.preference[${role ?? '(none)'}]` +
+  const src = `${tierSource} ∩ allocation.preference.${role ?? '(none)'}` +
     (bias ? ' + bias' : '');
   return { chain: biased, source: src };
 }
@@ -360,7 +361,7 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
 }
 
 function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profileCap = {}) {
-  const { chain, source } = planChain(runtimes, args.difficulty, w.role, args.bias);
+  const { chain, source } = planChain(runtimes, args.difficulty, w.work === 'think' ? 'think' : w.role, args.bias);
   const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty, profileCap);
   // Pickable = not structurally off the chain, and any rejection rests only on
   // absent/stale evidence (annotation, not a real disqualification) — the point
@@ -505,7 +506,9 @@ async function main() {
   // Kernel functions route inside the configured non-operation pool when the
   // owner config declares one (models.nonOperation.<role> → pools.<name>) —
   // the same binding engine/config.mjs resolves via nonOperationModels().
-  let { order, source: orderSource } = candidateOrder(args.kind, w.role, registry, runtimes);
+  const think = w.work === 'think';
+  const frontier = runtimes?.allocation?.preference?.think ?? [];
+  let { order, source: orderSource } = candidateOrder(args.kind, think ? 'think' : w.role, registry, runtimes);
   if (w.modelFunction && cfgMembers?.length) {
     order = cfgMembers;
     orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;
@@ -523,6 +526,10 @@ async function main() {
 
   const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml');
   const evaluated = ordered.map(c => {
+    // Think work runs on the frontier pools only; neither a declared chain,
+    // a --prefer nor preferredProvider can move it anywhere else.
+    if (think && !frontier.includes(c.id))
+      return { c, eligible: false, mode: null, reasons: ['think work runs only on runtimes.yaml allocation.preference.think'] };
     // A declared operator chain — or a configured non-operation pool — is a
     // closed set: pools absent from it are not on the launch path at all
     // (interface.draw → [codex-agent] only; kernelManager → its pool only).

@@ -54,16 +54,6 @@ defaults:
   devin:
     working: devin-worker
     reasoning: devin-reviewer
-reasoningOps:
-  - decision.prepare
-  - provision.ask
-  - business.decide
-  - architecture.decide
-  - review.verify
-  - work.author
-  - request.analyze
-  - scope.define
-  - goal.revise
 targets:
   # Pool targets are named by the provider-window pool of modules/models/runtimes.yaml; `requestedModel` stays the
   # implement-role model of the pool's models map for compatibility with consumers that read one model.
@@ -183,16 +173,18 @@ skills:
         - claude-agent
         - codex-agent
       reasoning:
-        - codex-agent
         - claude-agent
+        - codex-agent
+# An operator whose kind runtimes.yaml roleOfKind marks think work carries the think order of
+# runtimes.yaml allocation.preference.think and nothing else; scripts/route/route-model.mjs refuses any
+# other pool for it.
 operators:
   architecture.decide:
     skill: starci
-    # Sol first, Opus when the Codex window is full or exhausted, so the decision moves instead of stalling.
-    chain: [codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   backend.implement:
     skill: starci
     chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
@@ -203,21 +195,19 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   brand.decide:
     skill: starci
-    # A decide operation that also produces bytes: when the product has no mascot, this op generates one
-    # placeholder with the image model, and only the Codex runtime carries one ($imagegen). So the chain leads
-    # with Codex for the launch - the same reason interface.draw is Codex-first - and then falls back to the
-    # runtimes that actually own the decide role, which decide the identity and defer the artwork with a brief.
-    chain: [codex-agent, claude-agent]
+    # A decide operation that also produces bytes: when the product has no mascot, the Codex runtime, the only
+    # one carrying the image model ($imagegen), generates one placeholder; Claude decides the identity and
+    # defers that artwork with a brief.
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   decision.prepare:
     skill: starci
-    # Preparing the owner's decision is a reasoning task: the Codex pool first, the Claude pool when it is out.
-    chain: [codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   docs.author:
     skill: starci
     # Authoring reference docs is write-role work over the record tree: the full writing chain.
@@ -231,17 +221,16 @@ operators:
     skill: starci
     # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order,
     # the same downgrade.
-    chain: [codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   business.decide:
     skill: starci
-    # The same order the architecture decision takes: the Codex pool, then the Claude pool.
-    chain: [codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   content.generate:
     skill: starci
     chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
@@ -289,10 +278,10 @@ operators:
   goal.revise:
     skill: starci
     # Revising a live goal is a decision about the work, not work on it: the reasoning chain.
-    chain: [codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   interface.asset:
     skill: starci
     # Generating the artwork a candidate embeds needs the same image model the drawing used, so the chain is
@@ -317,21 +306,17 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   interface.audit:
     skill: starci
-    # Visual/Grammar conformance is independent verification. Codex leads for native image inspection,
-    # then the remaining hard-capable pools.
-    chain: [codex-agent, claude-agent, devin-agent]
+    # Visual/Grammar conformance is an independent verdict about quality: think work.
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
-      - {environment: devin, profiles: [devin-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   knowledge.repair:
     skill: starci
-    chain: [claude-agent, codex-agent, qwen-agent, devin-agent]
+    chain: [claude-agent, codex-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: devin, profiles: [devin-agent]}
   perf.verify:
     skill: starci
     # Measuring a performance budget is the same proof shape as the security audit: the verify chain.
@@ -352,18 +337,16 @@ operators:
   request.analyze:
     skill: starci
     # Turning a raw request into a scoped, checkable goal is planning work: the reasoning chain, the cheap pool never.
-    chain: [codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   review.verify:
     skill: starci
-    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: devin, profiles: [devin-agent]}
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   runtime.operate:
     skill: starci
     chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
@@ -383,25 +366,21 @@ operators:
   scope.define:
     skill: starci
     # Cutting a goal into bounded nodes is a decision about the work: the reasoning chain.
-    chain: [codex-agent, claude-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   security.verify:
     skill: starci
-    # Auditing code against the security baseline is the same proof shape as the API proof: the verify chain.
-    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    # Auditing code against the security baseline is a verdict about quality: think work.
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: devin, profiles: [devin-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   task.execute:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   test.author:
@@ -433,27 +412,23 @@ operators:
       - {environment: qwen, profiles: [qwen-agent]}
   uat.assisted.verify:
     skill: starci
-    # Receipt acceptance is elevated evidence work and therefore uses the independent verify chain.
-    chain: [codex-agent, claude-agent, devin-agent]
+    # Receipt acceptance is an elevated verdict over evidence: think work.
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
-      - {environment: devin, profiles: [devin-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   work.author:
     skill: starci
     # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every
-    # later operation is measured against: it runs on the strongest reasoning runtimes first and never on the
-    # cheap pool, and it moves to the Claude pool rather than waiting for the Codex window to reset.
-    chain: [codex-agent, claude-agent]
+    # later operation is measured against: think work.
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   workspace.manage:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [claude-agent, codex-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
 fallback:

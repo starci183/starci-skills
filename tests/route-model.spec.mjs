@@ -76,15 +76,18 @@ test('kindRequires capability gate: interface.draw cannot be hoisted onto a pool
   // only the codex pool provides — one burned dispatch. kindRequires makes the
   // rejection structural and named.
   const ownerRoot=fixture(t).dir();
-  const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','devin-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
+  // interface.draw is think work, so a non-frontier pool is not on its chain at all; the frontier pool
+  // without imagegen is on it and must be rejected by name.
+  const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','devin-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
-  const devin=(body.candidates??[]).find(c=>c.target==='devin-agent'||c.id==='devin-agent');
-  assert.ok(devin,'devin-agent must appear in the walked chain');
-  assert.equal(devin.status,'rejected');
-  assert.ok((devin.reasons??[]).some(x=>/imagegen/.test(x)),`devin rejection must name the imagegen capability, got ${JSON.stringify(devin.reasons)}`);
-  assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a devin prefer');
+  assert.ok(!(body.candidates??[]).some(c=>c.target==='devin-agent'),'a prefer bias cannot put devin-agent on a think chain');
+  const claude=(body.candidates??[]).find(c=>c.target==='claude-agent');
+  assert.ok(claude,'claude-agent must appear in the walked chain');
+  assert.equal(claude.status,'rejected');
+  assert.ok((claude.reasons??[]).some(x=>/imagegen/.test(x)),`claude rejection must name the imagegen capability, got ${JSON.stringify(claude.reasons)}`);
+  assert.equal(body.pick?.primary?.target,'codex-agent','the only imagegen pool takes the pick even under a prefer bias');
 });
 
 test('--plan writes nothing to the working directory',t=>{
@@ -113,8 +116,8 @@ const planModels=(t,kind,difficulty)=>{
 
 test('codex-agent launches gpt-6-sol on the hard tier and gpt-6-luna on the easy tier',t=>{
   const hard=planModels(t,'architecture.decide','hard');
-  assert.deepEqual(hard.body.tier?.chain,['codex-agent','claude-agent'],'reasoning roles lead with the Codex pool');
-  assert.equal(hard.body.pick?.primary?.target,'codex-agent');
+  assert.deepEqual(hard.body.tier?.chain,['claude-agent','codex-agent'],'think work leads with the Claude pool');
+  assert.equal(hard.body.pick?.primary?.target,'claude-agent');
   assert.equal(hard.model('codex-agent'),'gpt-6-sol');
   assert.equal(planModels(t,'architecture.decide','insane').model('codex-agent'),'gpt-6-sol');
   assert.equal(planModels(t,'code.refactor','easy').model('codex-agent'),'gpt-6-luna');
@@ -143,4 +146,35 @@ test('an explicit --model naming a removed catalog id fails closed as unknown',(
     assert.equal(r.status,0,r.stderr);
     assert.equal(out(r)?.constraints?.model??out(r)?.packet?.constraints?.model,current);
   }
+});
+
+const pick=(t,args,config=null)=>{
+  const ownerRoot=fixture(t).dir();
+  if(config)fs.writeFileSync(path.join(ownerRoot,'config.yaml'),config);
+  const r=run([...args,'--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  return out(r);
+};
+
+test('a decide op measured medium routes to Claude Opus 5.5, and to GPT-6 Sol when Claude is unavailable',t=>{
+  const body=pick(t,['--kind','business.decide','--difficulty','medium']);
+  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.deepEqual(body.workload.difficulty,{measured:'medium',floor:'hard',effective:'hard'});
+  const fallback=pick(t,['--kind','business.decide','--difficulty','medium','--avoid','claude-agent']);
+  assert.deepEqual([fallback.pick.target,fallback.pick.model],['codex-agent','gpt-6-sol']);
+});
+
+test('the unpinned kernel route resolves to Claude Opus 5.5',t=>{
+  const body=pick(t,['--kind','model.manageWorkflow']);
+  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
+  assert.equal(body.workload.work,'think');
+});
+
+test('preferredProvider never moves think work onto a non-frontier pool',t=>{
+  const config='language: vi\nmodel: null\neffort: medium\nallocation: {mode: adaptive, preferredProvider: devin}\n';
+  const body=pick(t,['--kind','review.verify','--difficulty','easy'],config);
+  assert.equal(body.config.preferredProvider,'devin');
+  assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
+  const devin=body.rejected.find(r=>r.target==='devin-agent');
+  assert.match(devin?.reasons?.[0]??'',/think work runs only on/);
 });

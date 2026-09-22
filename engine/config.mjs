@@ -6,7 +6,7 @@ import {parseYaml} from './yaml.mjs';
 
 export const configRoot=skillRoot;
 export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
-export const DEFAULT_MODEL_POOLS={'sol-opus':['codex-agent','claude-agent']};
+export const DEFAULT_MODEL_POOLS={'sol-opus':['claude-agent','codex-agent']};
 export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
 export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
