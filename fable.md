@@ -720,3 +720,21 @@ không để lại terminal hay Task sống; Run của workflow luôn bind với
 - [ ] `check`: một check đọc ledger + `terminal-list` và báo terminal sống không thuộc job
       sống nào (`ORPHAN_TERMINAL`), workflow có >1 terminal kernel (`DUPLICATE_KERNEL`)
 - [ ] Practice entry cho vòng này
+
+**Root cause chính xác (đọc code 2026-09-23):**
+
+1. `scripts/kernel/start-workflow.mjs:563-565`: restart kernel `UPDATE jobs SET payload_json=?`
+   thay **toàn bộ** payload của kernel job, nên `orca.runId` mất. Dispatch kế tiếp gọi
+   `ensureWorkflowRun` (`api.mjs:1465`), không thấy runId, `run-create` một Run **mới** bind
+   với terminal kernel mới. Task cũ ở Run cũ, Task mới ở Run mới: đó là hai cây trong sidebar.
+2. `start-workflow.mjs:438-455`: kernel stale chỉ được `releaseManagedWorker` khi là managed
+   dispatch; kernel Devin (`launch: terminal`) không bao giờ bị `terminal-close`. Signal bị xoá,
+   job bị đánh `stopped`, nhưng terminal sống tiếp.
+3. `createOperationTask` (`api.mjs:1506`) tạo Task với `run` + `from`, không dùng flag `parent`
+   mà `task-create` có. Cây Orca suy từ Run, nên (1) là đủ để vỡ.
+
+`.claude` **có** enforce lúc tạo: mọi op là một Task trong Run của workflow, `from` terminal
+kernel, và ledger `hierarchy` là nguồn quan hệ. `.claude` **không** enforce liên tục: restart
+không giữ Run, không đóng terminal cũ; reject không đóng terminal; settle không dọn Task; không
+check nào so ledger với `terminal-list`. Lane L sửa đúng ba điểm này: giữ `orca.runId` qua
+restart (merge payload thay vì thay), đóng terminal kernel cũ mọi adapter, và check.
