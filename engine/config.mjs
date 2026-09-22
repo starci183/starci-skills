@@ -13,6 +13,19 @@ export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 function runtimeProfile(){const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));if(!fs.existsSync(source))throw Error('Missing modules/models/runtimes.yaml');return parseYaml(fs.readFileSync(source,'utf8'));}
+/**
+ * modules/models/runtimes.yaml `allocation` — where the fleet's operating numbers live: the dispatch lease
+ * TTL, the liveness and cadence windows, the slicing weights, the failure cooldowns. Code reads them from
+ * here; a literal copy of any of them in a source file would be a second authority.
+ */
+export function allocationSettings(){return runtimeProfile()?.allocation??{};}
+/** One positive millisecond value out of `allocation`, by dotted key. Refuses when the contract omits it. */
+export function allocationMs(dotted){
+  const raw=dotted.split('.').reduce((node,key)=>(node==null?node:node[key]),allocationSettings());
+  const value=Number(raw);
+  if(!Number.isFinite(value)||value<=0)throw Error(`modules/models/runtimes.yaml allocation.${dotted} must declare a positive number of milliseconds`);
+  return value;
+}
 export function validateConfig(config){
   const allowed=['language','model','effort','models','debug','allocation','kernel','budgets'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));

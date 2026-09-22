@@ -38,6 +38,7 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { ownedPathLeaseRequests } from '../../engine/admission.mjs';
+import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
@@ -184,6 +185,11 @@ const emit = (out, human, asJson) => {
   else console.log(human);
 };
 
+// How recently a terminal must have printed for an unclassifiable screen to
+// still count as a live turn. One authority: modules/models/runtimes.yaml
+// allocation.liveness.activeUnclassifiedMs.
+const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
+
 const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
 const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
@@ -214,7 +220,7 @@ const observeOperationWorker = (job, now = Date.now()) => {
       : screenState === 'turn-idle' ? 'turn-idle'
       : screenState === 'interactive-gate' ? 'interactive-gate'
       : screenState === 'failed' ? 'failed'
-      : outputAgeMs != null && outputAgeMs <= 120000 ? 'active-unclassified'
+      : outputAgeMs != null && outputAgeMs <= ACTIVE_UNCLASSIFIED_MS ? 'active-unclassified'
       : 'live-idle';
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness, connected, writable,
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
@@ -642,13 +648,16 @@ function cmdPlan(ledger, args) {
 // model's guess. W = sum(weight * count) agent-minutes; slices =
 // clamp(ceil(W / targetMinutes[1]), 1, maxSlices).
 function cmdEstimate(ledger, args) {
-  const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
-  const slicing = (fs.existsSync(rtFile) ? parseYaml(fs.readFileSync(rtFile, 'utf8')) : null)
-    ?.allocation?.slicing ?? {};
-  const weights = { file: 4, assertion: 3, component: 12, record: 2, ...(slicing.weights ?? {}) };
-  const target = Array.isArray(slicing.targetMinutes) && slicing.targetMinutes.length === 2
-    ? slicing.targetMinutes.map(Number) : [15, 30];
-  const maxSlices = Math.max(1, Number(slicing.maxSlices) || 15);
+  const slicing = allocationSettings().slicing ?? {};
+  const weights = slicing.weights ?? {};
+  const target = Array.isArray(slicing.targetMinutes) ? slicing.targetMinutes.map(Number) : [];
+  const maxSlices = Number(slicing.maxSlices);
+  if (target.length !== 2 || target.some((n) => !Number.isFinite(n) || n <= 0)
+    || !Number.isFinite(maxSlices) || maxSlices < 1) {
+    throw Object.assign(
+      new Error('modules/models/runtimes.yaml allocation.slicing must declare {weights, targetMinutes:[lo,hi], maxSlices}'),
+      { code: 'slicing-undeclared' });
+  }
   const counts = {
     file: Math.max(0, Number(args.files) || 0),
     assertion: Math.max(0, Number(args.assertions) || 0),
@@ -660,7 +669,13 @@ function cmdEstimate(ledger, args) {
       new Error('estimate needs at least one of --files/--assertions/--components/--records'),
       { code: 'estimate-no-measure' });
   }
-  const minutes = Object.entries(counts).reduce((sum, [k, n]) => sum + (weights[k] ?? 0) * n, 0);
+  const unweighted = Object.entries(counts).filter(([k, n]) => n > 0 && !Number.isFinite(Number(weights[k])));
+  if (unweighted.length) {
+    throw Object.assign(
+      new Error(`modules/models/runtimes.yaml allocation.slicing.weights declares no weight for ${unweighted.map(([k]) => k).join(', ')}`),
+      { code: 'slicing-undeclared' });
+  }
+  const minutes = Object.entries(counts).reduce((sum, [k, n]) => sum + (Number(weights[k]) || 0) * n, 0);
   const slices = Math.min(maxSlices, Math.max(1, Math.ceil(minutes / target[1])));
   const perSliceMinutes = Math.round((minutes / slices) * 10) / 10;
   const out = {
@@ -1106,7 +1121,9 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
 // ledger and would hold any machineNeeds) — the same openMachine handle
 // settle already uses. An open failure returns !ok: a dispatch that cannot
 // fence must not launch.
-const DISPATCH_LEASE_TTL_MS = 30 * 60 * 1000; // bounds a crashed worker's fence; settle releases early
+// Bounds a crashed worker's fence; settle releases early. One authority:
+// modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs.
+const DISPATCH_LEASE_TTL_MS = allocationMs('dispatchLeaseTtlMs');
 // engine/admission.mjs owns owned-path normalization and the capacity-1 lease
 // request per minimal prefix — the same function the ledger's conflict finder
 // resolves paths with, so a request and a held lease can never disagree.

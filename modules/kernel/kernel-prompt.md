@@ -111,8 +111,9 @@ BOUNDARY — hard rules, non-negotiable:
     evidence. Require `full-regression-final` green on the final ordinal before
     advancing the semantic leg.
   - LONG-LIVED means the durable Kernel identity survives model-turn boundaries.
-    The external canonical watchdog, not this model turn, owns the five-minute
-    cadence. When the frontier is legitimately waiting for an active Op, lease,
+    The external canonical watchdog, not this model turn, owns the cadence
+    ({skillRoot}/modules/models/runtimes.yaml allocation.watchdogCadenceMs).
+    When the frontier is legitimately waiting for an active Op, lease,
     not-before time, report or message, persist/name that exact wait reason and
     yield immediately. The watchdog will wake this same terminal after the turn
     falls back to its input prompt; treat that as liveness maintenance, not new
@@ -147,7 +148,8 @@ LOOP:
     writes the contracts row, holds the leases) → when no transition remains,
     yield to the external event/watchdog wake → on wake, api status → on each
     status
-    poll/wake a running op may be observed at ~3min cadence via
+    poll/wake a running op may be observed at the allocation.observeCadenceMs
+    cadence via
     `api observe --job <id>` (read-only context before nudge/settle, never
     evidence) → `turn-idle` worker with no report gets exactly `api nudge --job <id>` → worker files
     api report → api consume-report (integrated) → re-run the op's checks →
@@ -176,7 +178,8 @@ LOOP:
     concurrently and intersecting scopes serialize.
   - Finish: all jobs settled + final verify pass → api finish (goal finished,
     history preserved; Kernel singleton/job/terminal live custody released).
-  - Stuck: an op idle >10min = wedged → api incident; a job holding a lease is
+  - Stuck: an op idle longer than allocation.stallAfterMs = wedged → api
+    incident; a job holding a lease is
     never re-dispatched — settle the wedged attempt first, then retry is a NEW
     job row at attempt+1 (oneOpOneAgent).
     A `dispatch-rejected` attempt may return to queued only when its durable

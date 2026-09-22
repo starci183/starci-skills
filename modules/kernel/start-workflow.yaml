@@ -20,7 +20,7 @@ about:
 
 watchdog:
   executable: scripts/kernel/watchdog.mjs
-  cadenceMs: 300000
+  cadence: modules/models/runtimes.yaml allocation.watchdogCadenceMs
   boundary: >-
     Liveness only. It reads canonical status/survey and the attested Kernel
     terminal. A connected terminal at its provider input prompt is turn-idle

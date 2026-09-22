@@ -309,6 +309,7 @@ commands:
 
   dispatch:
     args: '--job <job_id> [--spawn] [--model <target>] [--worktree <sel>] [--lease-ttl <ms>]'
+    leaseTtl: 'modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or payload.leaseTtlMs overrides it'
     reads: >-
       the job row + its workflow — including the PERSISTED `api route`
       decision on jobs.payload_json (model/modelId/effort; dispatch launches
@@ -476,7 +477,8 @@ commands:
       - job-not-operation: 'only an operation job has an observable worker terminal'
       - no-live-worker: 'the job binds no live worker terminal (never dispatched, or no handle recorded) — typed, not a crash'
     usedBy: >-
-      drive.wait — a ~180s observation cadence on a running op keeps
+      drive.wait — the modules/models/runtimes.yaml allocation.observeCadenceMs
+      observation cadence on a running op keeps
       reasoning context alive before nudge/settle-fail decisions;
       observation never substitutes for report/checks
 
@@ -510,8 +512,8 @@ commands:
       events 'report-filed'. After the transaction commits, the api
       best-effort wakes the SAME Kernel terminal when its provider frame is
       turn-idle and records `kernel-transition-woken`; terminal failure never
-      rolls back or weakens the authoritative report row. The five-minute
-      watchdog is only the fallback for a missed/racing event wake. The file stays the artifact the row binds —
+      rolls back or weakens the authoritative report row. The watchdog
+      (modules/models/runtimes.yaml allocation.watchdogCadenceMs) is only the fallback for a missed/racing event wake. The file stays the artifact the row binds —
       the ROW is the record, and `api status` projects it so the kernel
       knows exactly when an op answered and with what outcome.
     returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}}'

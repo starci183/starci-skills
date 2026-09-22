@@ -295,7 +295,8 @@ tick:
         Between dispatch and the next report the kernel WAITS durably, not
         inside one model turn. Once no immediately executable transition
         remains, it records/names the exact wait reason and yields immediately.
-        The external watchdog owns the five-minute cadence and wakes the same
+        The external watchdog owns the cadence
+        (modules/models/runtimes.yaml allocation.watchdogCadenceMs) and wakes the same
         Kernel identity; the resumed turn begins with `api status`. The Kernel
         never runs Start-Sleep, shell sleep, a timer, or an in-turn polling loop.
         It does not poll for work to invent. The report discipline is durable:
@@ -308,8 +309,9 @@ tick:
       observe: >-
         While a running op owes a report the kernel may keep reasoning
         context on it: `api observe --job <id> [--lines <n>]` reads the exact
-        worker terminal's liveness plus a bounded screen tail, on roughly a
-        three-minute cadence and especially before a nudge or settle-fail
+        worker terminal's liveness plus a bounded screen tail, on the cadence
+        modules/models/runtimes.yaml allocation.observeCadenceMs declares and
+        especially before a nudge or settle-fail
         decision — an op that dies without filing leaves `result.report:
         null`, so the screen is how the kernel learns what the op was doing.
         The screen is context, never evidence: only `api report` plus the
@@ -663,7 +665,8 @@ failureHandling:
       Terminal liveness is classified from the last screen lines:
       NEED-TRUST / NEED-PERM / CRASH / WORKING / DONE / IDLE? / EXITED /
       UNKNOWN. WORKING with an UNCHANGED context meter
-      ('Context: Nk / Mk tokens (P%)') for >=5-8 minutes is STALL? —
+      ('Context: Nk / Mk tokens (P%)') for longer than
+      modules/models/runtimes.yaml allocation.stallAfterMs is STALL? —
       output staleness is the child-exit detector: a live agent's context
       never stops moving. The api reads the terminal
       (scripts/agent/lib.mjs health/liveness) — the kernel never runs the
@@ -761,7 +764,8 @@ supervision:
   chain: >-
     owner chat (trigger only) -> [Kernel] agent (one per project, long-lived)
     -> [Op] agents (one per op, ephemeral). Above the kernel:
-    watchdog (scripts/kernel/watchdog.mjs) — a five-minute liveness loop over
+    watchdog (scripts/kernel/watchdog.mjs) — a liveness loop at
+    modules/models/runtimes.yaml allocation.watchdogCadenceMs over
     canonical status/survey and the attested Kernel terminal; start-workflow
     (scripts/kernel/start-workflow.mjs) — a one-shot
     claim -> spawn -> attest; re-running it on a dead kernel claims the stale

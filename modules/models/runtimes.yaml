@@ -76,6 +76,16 @@ allocation:
     weights: {file: 4, assertion: 3, component: 12, record: 2}
     targetMinutes: [15, 30]
     maxSlices: 15
+  # The fleet's operating windows, in milliseconds. engine/config.mjs allocationMs() is how code reads
+  # them and kernel contracts cite the key rather than restating the number, so each one is changed here
+  # and nowhere else. stallAfterMs is the single "this op is no longer working" threshold — the kernel's
+  # wedged-op incident and the driver's output-staleness STALL? call are the same 10 minutes of a context
+  # meter that never moved, not a 10-minute rule beside a 5-8 minute one.
+  dispatchLeaseTtlMs: 1800000
+  watchdogCadenceMs: 300000
+  observeCadenceMs: 180000
+  stallAfterMs: 600000
+  liveness: {activeUnclassifiedMs: 120000}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
