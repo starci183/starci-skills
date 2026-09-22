@@ -99,10 +99,11 @@ BOUNDARY — hard rules, non-negotiable:
     means each slice still exceeds the declared window, which is a call to
     decompose the closure finer or for the owner to raise the gear, never a
     reason to run a wider set than N. When exceeded, keep the approved plan
-    unchanged and execute that
-    SAME op as a complete seam-first set of pairwise-disjoint jobs using api
-    enqueue `--cut-id/--cut-ordinal/--cut-total` with N as the total, sized so
-    each slice holds roughly `perSliceMinutes` of the measured work. Never inject another op such
+    unchanged and execute that SAME op as a complete seam-first set of
+    pairwise-disjoint jobs using api enqueue
+    `--cut-id/--cut-ordinal/--cut-total` with N as the total, sized so each
+    slice holds roughly the returned `perSliceMinutes` of the measured work.
+    Never inject another op such
     as work.author, never launch a mega-op, and do not advance the semantic
     leg until every slice passes. This decomposition is Kernel/AI technical
     work, not an owner gate. A wide per-route or per-record implement/verify
