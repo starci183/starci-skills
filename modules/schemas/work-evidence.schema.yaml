@@ -5,67 +5,121 @@ additionalProperties: false
 description: "What was actually observed, when, by whom, and against which version of the record and of the
   source. A manifest is never rewritten to agree with today's product and never deleted when it expires - it
   is marked stale, with a reason, because it remains a true statement about a past moment and the history of
-  what was proven is what makes a claim of done worth anything. It carries `recordDigest` so that expiry is
-  computed rather than noticed: the digest of the record as it stood when the observation was made, sitting
-  beside the observations it describes."
+  what was proven is what makes a claim of done worth anything. It carries `recordDigest` and `codeDigest`
+  so that expiry is computed rather than noticed: the digest of the record as it stood when the observation
+  was made, and the digest of the code the record owns, sitting beside the observations they describe."
 required:
   - schema
-  - id
   - record
-  - recordDigest
   - outcome
-  - assertions
   - provenance
 properties:
   schema:
     const: work/evidence@1
     description: Record family discriminator. Every record names its own family so a file can be validated
       without inferring its meaning from the directory it happens to sit in.
-  id:
-    $ref: "#/$defs/slug"
-    description: This manifest's name, matching its directory under the owning record's evidence/ folder;
-      example proves-ownership. It is a readable name rather than a hash so that a record's pointer at it
-      says what the proof was for.
   record:
     $ref: "#/$defs/recordId"
     description: The record this evidence is about, by id. It is stated explicitly rather than inferred from
       the directory so that a manifest which has been moved, copied or pasted into the wrong tree is caught
       instead of silently attaching itself to a new owner.
   recordDigest:
-    type: string
-    pattern: ^[a-f0-9]{64}$
-    description: "The normative digest of the record as it stood at the moment this evidence was captured,
-      lowercase SHA-256. It is required, not optional, because it is the single input that makes staleness
-      computable: a checker digests the record now, compares, and says PROOF_STALE without asking anybody's
-      opinion. Left out, expiry can only be noticed by a person who happens to remember that the record
-      changed, which is to say it is not noticed."
+    $ref: "#/$defs/sha256"
+    description: "The digest of the record as it stood at the moment this evidence was captured - sha256 of
+      its index.yaml bytes, the digest work-layout.yaml declares for staleness. It is what makes expiry
+      computable: a checker digests the record now, compares, and refuses the manifest unless it carries
+      `stale: true`. It is omitted only by a manifest nothing digested - a live run written down by hand
+      rather than produced by scripts/example/example-evidence.mjs - and such a manifest is exactly the one
+      whose expiry nobody can compute, which is the cost of writing proof by hand. It is never edited to
+      match a moved record; only a fresh run clears staleness."
+  codeDigest:
+    type: object
+    additionalProperties: false
+    required:
+      - algorithm
+      - files
+      - digest
+    description: "The source this record's proof covers, hashed file by file at capture time - written by
+      scripts/example/example-evidence.mjs from the directories the record's own `owners[].path`/`module`
+      name. It is what lets a code change expire a proof without anybody touching the record:
+      scripts/checks/check-example-work.mjs recomputes the aggregate and refuses a mismatch (CODE_DIGEST_STALE),
+      and scripts/checks/check-evidence-binding.mjs opens the per-file rows underneath it. It is omitted
+      entirely when the record owns no resolvable directory at all - nothing to digest is a different fact
+      from an empty digest of nothing."
+    properties:
+      algorithm:
+        const: sha256
+        description: The hash the rows and the aggregate were computed with. It is pinned rather than
+          described, because a digest whose algorithm can change is a digest two readers can compute
+          differently and both be right.
+      files:
+        type: array
+        uniqueItems: true
+        description: One row per file under the record's owner directories, sorted by path so that two runs
+          over the same bytes produce the same aggregate regardless of walk order. Test files are included
+          - a test changing is a proof change like any other.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - path
+            - sha256
+          properties:
+            path:
+              $ref: "#/$defs/prose"
+              description: The file's path, keyed owner-relative as `<owner dir's declared path>/<path
+                inside it>`. It is owner-relative rather than repository-relative because a record whose
+                owners span two repositories has rows from both in one flat list, and this key is the only
+                thing that tells them apart.
+            sha256:
+              $ref: "#/$defs/sha256"
+              description: That file's own digest at capture time.
+      digest:
+        $ref: "#/$defs/sha256"
+        description: The aggregate over every row above. It is stored as well as derivable so a checker can
+          answer "has anything moved" without rehashing the tree, and rehash only when the answer is yes.
   outcome:
     $ref: "#/$defs/outcome"
-    description: Whether the observation as a whole passed or failed. It is recorded even when it failed,
-      because a failed run is evidence - it is how a regression is dated and how a record that was never
-      really proven is told apart from one that was.
+    description: Whether the observation as a whole passed, failed, or got part of the way. It is recorded
+      even when it failed, because a failed run is evidence - it is how a regression is dated and how a
+      record that was never really proven is told apart from one that was.
   assertions:
     type: array
     minItems: 1
     uniqueItems: true
-    description: What was checked, one entry per thing observed. At least one is required, because a
-      manifest with an outcome and no assertion is a verdict with no basis.
+    description: What was checked, one entry per thing observed. A manifest with an outcome and no assertion
+      is a verdict with no basis, so the list is never empty where it is present at all; a run-settling
+      manifest that points at a UAT run instead carries `run` and no assertions, because the run directory
+      holds its own observations.
     items:
       type: object
       additionalProperties: false
       required:
         - id
+        - command
+        - exit
         - outcome
         - observation
       properties:
         id:
           $ref: "#/$defs/assertionId"
           description: What this entry checked. Where the record has acceptance criteria it is one of their
-            ids, so the proof lines up with the criteria one to one and a missing criterion is visible as a
-            gap; where the record has none - an implementation, a composed flow - it is a short name for the
-            thing observed.
+            ids - in the compact form, `<record>#<criterion>` - so the proof lines up with the criteria one
+            to one and a missing criterion is visible as a gap; where the record has none, it is a short
+            name for the thing observed.
+        command:
+          $ref: "#/$defs/prose"
+          description: "The exact command that was run, as run. It is required and not merely nice to have:
+            scripts/example/example-verify.mjs replays it and compares outcomes, and
+            scripts/checks/check-example-work.mjs refuses an assertion without one (PROOF_NOT_REPLAYABLE).
+            A prose observation alone cannot be replayed, only read."
+        exit:
+          type: integer
+          description: The command's numeric exit code. It is kept beside the outcome because the outcome is
+            this file's interpretation and the exit code is what actually happened, and a replay compares
+            the second.
         outcome:
-          $ref: "#/$defs/outcome"
+          $ref: "#/$defs/assertionOutcome"
           description: Whether this particular check passed or failed. Per-assertion rather than only
             overall, because a manifest that passed on aggregate while one criterion failed is exactly the
             situation a reader needs to see.
@@ -74,6 +128,58 @@ properties:
           description: What was actually seen, specifically enough that somebody else could look for the
             same thing - the command and its exit code, the step of the walk and what was on the screen. A
             restatement of the assertion is not an observation; it is the assertion written twice.
+  run:
+    type: string
+    pattern: ^runs/[0-9]{8}T[0-9]{6}Z-[a-f0-9]+$
+    description: The one append-only UAT run this manifest settled on, as a path relative to the record's
+      own directory. A done work/uat-flow@1 must name exactly one, and the gate then requires that run to
+      hold at least one screenshot, at least one recording and a result.md reporting a pass. It is a pointer
+      rather than a copy, because the run directory is the evidence and this file is what chose it.
+  assets:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: Output artifacts this evidence points at, with the bytes they had when it was written.
+      Output evidence is never also declared as a semantic input, which is what stops a proof invalidating
+      itself.
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - sha256
+      properties:
+        path:
+          $ref: "#/$defs/prose"
+          description: The artifact's path relative to the record's own directory.
+        sha256:
+          $ref: "#/$defs/sha256"
+          description: The artifact's digest, so the manifest is a statement about specific bytes rather
+            than about a filename.
+  proof:
+    type: object
+    additionalProperties: false
+    required:
+      - boundary
+      - fakes
+    description: "How far out the run actually reached. A work/integration@1 is done only through a run
+      whose proof says `boundary: live` with an empty `fakes`, because an external dependency proven against
+      a stand-in is not proven; and an integration that appears in another run's `fakes` is named as what
+      that run stood in for."
+    properties:
+      boundary:
+        enum:
+          - live
+          - fake
+        description: Whether the run crossed to the real provider or stopped at a stand-in. There is no
+          third value, because "mostly live" is the claim this field exists to make impossible.
+      fakes:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/recordId"
+        description: The integrations this run stood in for, by id. An empty list is the claim that nothing
+          was faked, stated explicitly so that a live boundary cannot be asserted by leaving the field out.
   provenance:
     type: object
     additionalProperties: false
@@ -81,31 +187,42 @@ properties:
       - actor
       - tool
       - environment
-      - servedVersions
       - capturedAt
-    description: Who made this observation, with what, where, against which code, and when. All five are
-      required because evidence is only worth as much as the ability to go back and repeat it, and each
-      missing part removes one of the ways somebody could.
+    description: Who made this observation, with what, where and when. Each part is required because
+      evidence is only worth as much as the ability to go back and repeat it, and every missing part removes
+      one of the ways somebody could.
     properties:
       actor:
         $ref: "#/$defs/slug"
-        description: Who or what performed the observation. It is recorded because a run by the kernel and a
-          run by a person carry different weight, and a reader is entitled to know which this was.
+        description: "Who or what performed the observation, and the value is a claim that must be true
+          rather than a label of convenience. `starci-kernel` means a live kernel workflow's own markDone
+          write settled the record, re-running the checks itself. `example-evidence` means
+          scripts/example/example-evidence.mjs produced the file by actually running the given commands
+          outside any kernel workflow. Neither authors `state` on the record beside it; only a person or a
+          kernel operation does that."
       tool:
-        $ref: "#/$defs/slug"
-        description: What performed it - the runtime, the harness, the driver. Together with the actor it
-          says how the observation was made rather than only that it was.
+        $ref: "#/$defs/prose"
+        description: What performed it - the script, the harness, the driver, by the path or name a reader
+          could go and run. Together with the actor it says how the observation was made rather than only
+          that it was, and it is prose because a script's own path is its truest name.
       environment:
         $ref: "#/$defs/slug"
         description: Where it ran - local, dev, staging, production. Two numbers from two environments are
           not comparable, and an unlabelled one will be compared anyway.
+      capturedAt:
+        $ref: "#/$defs/timestamp"
+        description: When the observation was made, UTC. It is the manifest's own clock and the only copy -
+          a record pointing at this manifest does not repeat the time, because a second copy of one fact is
+          a second thing that can be wrong.
       servedVersions:
         type: array
         minItems: 1
         uniqueItems: true
-        description: The exact code that was running when this was observed, one entry per repository. At
-          least one is required, because an observation of an unidentified build proves something about
-          nothing in particular.
+        description: "The exact code that was running when this was observed, one entry per repository. It
+          is optional because the tool that writes most of this tree's evidence runs commands against a
+          working directory and never resolves a commit, and a field it would have to guess at is a field
+          that would be guessed; where a run does know what it served - a UAT walk, a kernel workflow - the
+          entry is what makes the observation reproducible instead of merely believable."
         items:
           type: object
           additionalProperties: false
@@ -121,24 +238,41 @@ properties:
             commit:
               type: string
               pattern: ^(?:[a-f0-9]{40}|[a-f0-9]{64})$
-              description: The commit that was served, as a full hex sha. It is what makes the observation
-                reproducible instead of merely believable.
-              minLength: 40
+              description: The commit that was served, as a full hex sha.
             artifact:
               $ref: "#/$defs/slug"
               description: What was actually served from that commit - a worktree, a built image, a release
                 tag. The same commit run from a dirty worktree and from a published build are different
                 observations, and the difference is where a proof most often stops being true.
-      capturedAt:
-        $ref: "#/$defs/timestamp"
-        description: When the observation was made, UTC. It is the manifest's own clock, and it is the only
-          copy - a record pointing at this manifest does not repeat the time, because a second copy of one
-          fact is a second thing that can be wrong.
+      stack:
+        $ref: "#/$defs/prose"
+        description: The running system the observation was made against, where that is not simply the
+          machine - a shared compose project somebody else booted, a run-owned one this lane started. A walk
+          against a stack another lane owns proves something different from one against a stack this run
+          controlled, and the sentence is where that difference is kept.
+      authorization:
+        $ref: "#/$defs/prose"
+        description: The permission under which a run was allowed to do something it would otherwise not -
+          the exact environment flags that opened a live sign-in. It is recorded because a run that needed
+          authorization is a run somebody must be able to account for afterwards.
+      observed_effect:
+        $ref: "#/$defs/prose"
+        description: What the run left behind in the system it walked - a session row written, a fixture
+          created. It is stated so that a reader can tell a read-only observation from one that changed the
+          thing it was observing, which is the difference between repeating a run and having to clean up
+          first.
+      recording:
+        $ref: "#/$defs/prose"
+        description: The capture kept beside this manifest, described by the properties a reader would check
+          - its path, its size, its codec, its duration. A named recording that turns out to be an empty
+          container is the most common way a run looks proven without being it.
   note:
     $ref: "#/$defs/prose"
     description: What a reader must understand about what this evidence does and does not show - that it
       proves a flow wires its rules in the right order rather than proving the rules themselves, for
       instance. It is where an honest limit on the proof is stated, next to the proof.
+  verificationSource:
+    $ref: "#/$defs/verificationSource"
   stale:
     const: true
     description: Marks this evidence as no longer describing the current record or the current product. It
@@ -149,6 +283,23 @@ properties:
     description: Why it expired, naming what changed - the revision that withdrew the clause this run
       proved, the input that moved. It is required alongside the mark so that expired evidence remains
       readable history rather than becoming a file nobody can interpret and therefore deletes.
+  staleSince:
+    type: object
+    additionalProperties: false
+    required:
+      - record
+    description: The edit that expired this proof, named as an edge rather than described in the reason.
+      Where the reason is for a reader, this is for a checker - it is what lets the tree answer which change
+      cost which proof without parsing a sentence.
+    properties:
+      record:
+        $ref: "#/$defs/recordId"
+        description: The record whose change expired this evidence.
+      rev:
+        type: integer
+        minimum: 1
+        description: That record's `change.rev` at the moment of expiry, so a later reader can tell whether
+          the expiry has since been answered by a fresh run or still stands.
 dependentRequired:
   stale:
     - staleReason
@@ -171,8 +322,8 @@ allOf:
               outcome:
                 const: pass
     description: A manifest that reports pass while one of its own assertions failed is not a summary, it is
-      a contradiction, and it is the shape a green tree hides a red check in. The overall outcome may be fail
-      while individual assertions passed; the reverse is refused.
+      a contradiction, and it is the shape a green tree hides a red check in. The overall outcome may be
+      fail or partial-pass while individual assertions passed; the reverse is refused.
 $defs:
   prose:
     type: string
@@ -182,19 +333,28 @@ $defs:
   slug:
     type: string
     pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
       written twice by two authors is the same string.
+  sha256:
+    type: string
+    pattern: ^[a-f0-9]{64}$
+    description: A lowercase hex SHA-256. It is pinned to one case and one length so that two records
+      digesting the same bytes produce the same string.
   recordId:
     type: string
-    pattern: ^(?:br|fr|nfr|data|decision|journey|sds|impl|ui|uat)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
-    description: The id of any record in the tree, family prefix included. Requiring a known prefix means a
-      unresolvable reference is caught as a malformed id rather than surviving as a plausible-looking string.
+    pattern: ^(?:br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event|environment|identity|fixture)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$|^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: "The id of anything evidence can be about: a family-prefixed record id, optionally
+      addressing one criterion the record carries inline as `<record id>#<criterion>`, or one of the
+      tree-level records whose id carries no family prefix at all - the brand, the workspace, a feature.
+      Requiring one of those two shapes means an unresolvable reference is caught as a malformed id rather
+      than surviving as a plausible-looking string."
   assertionId:
     type: string
-    pattern: ^[a-z0-9]+(?:[-.][a-z0-9]+)*$
-    description: Either an acceptance-criterion id, when the record being proven has criteria, or a short
-      lowercase name for an observation that has no criterion to point at. One pattern covers both so that a
-      criterion id keeps its dotted form and is matchable against the criterion record by string equality.
+    pattern: ^[a-z0-9]+(?:[-.][a-z0-9]+)*(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: Either an acceptance-criterion id - in the compact form, the owning record's id, a hash and
+      the criterion's own - or a short lowercase name for an observation that has no criterion to point at.
+      One pattern covers both so that a criterion id keeps its dotted form and is matchable against the
+      record that carries it by string equality.
   timestamp:
     type: string
     pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
@@ -204,6 +364,27 @@ $defs:
     enum:
       - pass
       - fail
-    description: The verdict of an observation. There is no third value - an observation that was not made
-      has no entry at all, rather than an entry saying it is unknown, because an unknown in a proof reads as
-      a pass to everybody scanning a list.
+      - partial-pass
+    description: "The verdict of an observation as a whole. `partial-pass` is a real third value rather than
+      a softened pass: a walk against a live system genuinely stops halfway when a dependency this run was
+      not authorized to touch refuses it, and calling that a pass claims proof the run does not have while
+      calling it a fail reports a product defect that did not happen. There is no value for an observation
+      that was not made - it has no entry at all, because an unknown in a proof reads as a pass to everybody
+      scanning a list."
+  assertionOutcome:
+    enum:
+      - pass
+      - fail
+    description: The verdict of one check. It has only two values because a single command either exited
+      zero or it did not, and the partial answer belongs to the run above it, never to the command.
+  verificationSource:
+    enum:
+      - kernel-observed
+      - observed
+      - authored-claim
+    description: "Where this record's verification came from: kernel-observed means a live kernel workflow
+      ran it and settled the record on what it saw, observed means the listed commands were really run and
+      their results recorded outside any kernel workflow, and authored-claim means a person or an agent
+      wrote the sentence and nothing ran at all. The three read identically as prose and mean completely
+      different things, so the label is written rather than inferred; without it, the cheapest way to make
+      a tree look proven is to write more sentences."
