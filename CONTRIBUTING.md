@@ -57,8 +57,10 @@ record and is worse than a red check.
 
 ## Parallel lanes
 
-A large change is cut into lanes that run at the same time, each in its own worktree on its own
-branch, each with a write-allowlist naming the paths it may touch:
+A large change is cut into lanes that run at the same time on the main checkout, each with a
+write-allowlist naming the paths it may touch; disjoint allowlists, not separate checkouts, keep
+lanes apart. A lane gets its own worktree only when the owner's prompt asks for one. Commit with
+`git commit --only -- <your paths>`, never a bare `git commit`: the index is shared.
 
 - A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the
   owning lane, not into a drive-by edit.

@@ -677,34 +677,35 @@ test('route admits only agents that carry the op host tool; none at the difficul
   const fx=fixture(t);
   fx.writeConfig();
   const wf='wf-host-tools';
+  // interface.audit is think work (claude-agent then codex-agent); only the codex card lists browser-dom.
   seedOp(fx,wf,'job-audit-medium','interface.audit');
   const audit=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--json');
   assert.equal(audit.status,0,audit.stderr||audit.stdout);
   const decided=json(audit.stdout);
-  assert.equal(decided.decision.model,'devin-agent','browser-dom is on the devin card only');
-  assert.ok(decided.rejected.some(r=>r.target==='codex-agent'&&/lacks host tool 'browser-dom'/.test(r.reason)),
-    `codex must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
+  assert.equal(decided.decision.model,'codex-agent','the think order passes claude for want of browser-dom');
+  assert.ok(decided.rejected.some(r=>r.target==='claude-agent'&&/lacks host tool 'browser-dom'/.test(r.reason)),
+    `claude must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
 
   seedOp(fx,wf,'job-draw','interface.draw');
-  const draw=fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--prefer','devin-agent','--json');
+  const draw=fx.run(API,'route','--repo',fx.repo,'--job','job-draw','--difficulty','medium','--prefer','claude-agent','--json');
   assert.equal(draw.status,0,draw.stderr||draw.stdout);
   assert.equal(json(draw.stdout).decision.model,'codex-agent','a prefer bias never hoists an agent past a missing tool');
 
-  seedOp(fx,wf,'job-audit-easy','interface.audit');
-  const easy=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-easy','--difficulty','easy','--json');
-  assert.equal(easy.status,1);
-  const refusal=json(easy.stdout);
+  seedOp(fx,wf,'job-audit-avoid','interface.audit');
+  const avoid=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-avoid','--avoid','codex-agent','--json');
+  assert.equal(avoid.status,1);
+  const refusal=json(avoid.stdout);
   assert.equal(refusal.reason,'tool-unavailable');
   assert.deepEqual(refusal.tools,['browser-dom']);
-  assert.match(refusal.detail,/devin-agent \(difficulty medium\|hard\)/);
-  assert.match(refusal.detail,/Re-run api route --job job-audit-easy with --difficulty/);
-  assert.equal(json(jobRow(fx.repo,'job-audit-easy').payload_json).model,undefined,'a refused route persists no decision');
+  assert.match(refusal.detail,/codex-agent has it and is excluded by the avoid bias/);
+  assert.match(refusal.detail,/Re-run api route --job job-audit-avoid without --avoid codex-agent/);
+  assert.equal(json(jobRow(fx.repo,'job-audit-avoid').payload_json).model,undefined,'a refused route persists no decision');
 });
 
 test('dispatch --spawn refuses tool-unavailable before any Orca call when the routed agent lacks the tool',t=>{
   const fx=fixture(t);
   fx.writeConfig();
-  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'codex-agent'});
+  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'claude-agent'});
   const r=fx.run(API,'dispatch','--repo',fx.repo,'--job','job-audit-codex','--spawn','--json');
   assert.equal(r.status,1);
   const out=json(r.stdout);

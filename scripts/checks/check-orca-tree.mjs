@@ -137,8 +137,13 @@ export function orcaTreeFindings(db, terminals) {
   // A terminal a DUPLICATE_KERNEL already names is that finding, not a second
   // one: the answer is to close the loser, and it is already on the report.
   const named = new Set(findings.flatMap((f) => f.terminals ?? []));
+  const ledgerWorkflows = new Set(workflows.map((w) => w.workflowId));
   for (const terminal of live) {
-    const ours = knownHandles.has(terminal.handle) || STARCI_TITLE.test(terminal.title ?? '');
+    // A [Kernel]/[Op] title that names a workflow this ledger does not hold is
+    // another project's terminal: several ledgers share one Orca host.
+    const titledWorkflow = /\bwf-[a-z0-9-]+/i.exec(terminal.title ?? '')?.[0] ?? null;
+    const foreign = titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow);
+    const ours = knownHandles.has(terminal.handle) || (STARCI_TITLE.test(terminal.title ?? '') && !foreign);
     if (!ours || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;
     const owner = jobs.find((job) => handlesOf(job).includes(terminal.handle)) ?? null;
     findings.push({ code: 'ORPHAN_TERMINAL', workflowId: owner?.workflow_id ?? null, terminal: terminal.handle,

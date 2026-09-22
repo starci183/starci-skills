@@ -25,7 +25,7 @@ Required keys:
 - `model` — `null` (inherit host) or non-empty host model name
 - `effort` — one of `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`
 - `models.selection` — `quota-aware`; selection happens before a call
-- `models.pools` — the one closed cross-provider pool, `sol-opus` (`codex-agent` and `claude-agent`, in route
+- `models.pools` — the one closed cross-provider pool, `sol-opus` (`claude-agent` and `codex-agent`, in route
   order); every member is a known runtime with the role its consumers require
 - `models.nonOperation` — the closed mapping from the three non-operation roles to one declared pool
 
@@ -80,10 +80,22 @@ pool name, a pool that is not its canonical pair, or members that lack the
 required role. The kernel's own model call kinds are
 `modules/models/selection.yaml` `kernelFunctionKinds`.
 
-The pool keeps provider diversity without making one model a fallback. Before a call, admission chooses an
-eligible, qualified member using actual capacity and fresh known quota; member order is the route order, so an
-owner who lists `claude-agent` first leads with Claude Opus 5.5. Adaptive allocation does not invent Qwen or
-Devin support for these functions — neither runtime carries `plan` or `decide`. Functions
+## Model routing
+
+Model routing holds the owner's rules as data. The `[Kernel]` seat defaults to Claude Opus 5.5
+(`config.example.yaml` `kernel`; unpinned, `scripts/route/route-model.mjs` orders `model.manageWorkflow`
+Claude first), and GPT-6 Sol on `codex-agent` is the fallback when Claude is unavailable. Every kind has one
+entry in `modules/models/runtimes.yaml` `roleOfKind` — its role, whether its work is `think` or `hands-on`,
+and the difficulty `floor` read from what its op does. Think work is any op whose output is a canonical
+record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
+runs only on `allocation.preference.think`, Claude Opus 5.5 then GPT-6 Sol, at a hard floor where
+`codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
+order. Hands-on work — implementing, testing, refactoring, running and measuring under a settled record —
+walks the `allocation.tiers` implement, write and verify orders: Qwen and Devin first, the frontier pools as
+overflow. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
+its scope measures and may land on any pool. A floor raises a measured difficulty and never lowers it
+(`scripts/agent/models.mjs` `selectPool`). The non-operation pool lists its members in route order, Claude
+first; Qwen and Devin carry neither `plan` nor `decide`, so these functions never reach them. Functions
 retain separate typed inputs and independent contexts even though they share a pool.
 
 Operation candidates still come from the operation policy and runtime catalog, but adaptive allocation treats

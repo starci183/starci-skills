@@ -870,6 +870,34 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   nhà cung cấp thanh toán. Thống kê từ 21/9 09:27: AUTH 24 succeeded / 23 failed (13 blocked,
   10 verdict fail); WSPV 39 / 54 (24 blocked, 30 verdict fail). Blocked là chỗ lãng phí cần đào.
 
+- 04:40 Thầy chốt: chạy trên `main` mặc định, worktree chỉ khi prompt yêu cầu (`3557748a4`). Xoá worktree
+  accounting (đã nằm trong main); commit WIP refactor 206 file vào nhánh của nó (`bab51287`), không merge.
+  Thầy yêu cầu hai workflow mới (3 module + AgentOS; Collab chat nhóm): plan in chuỗi sai vì thiếu
+  archetype full-stack; phiên fork thêm `feature-build-fullstack` trong lane archetype, chưa persist goal.
+  Lane P (4 vá lãng phí) đang chạy trong worktree vì sửa api.mjs kernel đang chạy. `check-orca-tree` bỏ
+  qua terminal của ledger khác (`0c434ed88`).
+
+- 04:45 Thầy gõ `ok` cho hai goal mới (nivo-modules-agentos, nivo-collab-group-chat), có điều kiện: chỉ
+  persist + start-kernel khi plan lập lại in đúng chuỗi `request.analyze > scope.define > business.decide >
+  architecture.decide > interface.draw > work.author > backend.implement > interface.implement >
+  interface.audit > e2e.verify > uat.verify > review.verify` (brand.decide chỉ khi chưa có brand đã duyệt).
+  Lệch thì không persist, để sáng.
+
+- 05:05 Merge lane archetype của phiên fork (`533f76be1`). Plan lại hai goal: prompt gốc khớp nhầm
+  spec-foundation (5 leg, không implement) vì cụm "đóng SRS/SDS còn thiếu"; prompt modules khớp nhầm refactor
+  vì tên nhánh WIP. Diễn đạt lại (giữ ý, bỏ hai cụm gây nhầm) thì cả hai ra 13 leg full-stack, nhưng có
+  `brand.decide` trong khi nivo đã có brand duyệt (rev 1, 21/9) → trái điều kiện của thầy, KHÔNG persist.
+  Phiên fork sửa cả hai lỗi planner (ưu tiên spec-foundation, điều kiện brand) trong nhánh mới.
+  Prompt đã diễn đạt lại dùng để persist: bỏ "SRS/SDS còn thiếu" → "chốt nốt quyết định nghiệp vụ và kiến
+  trúc"; bỏ câu nhánh refactor WIP khỏi prompt modules (WIP chỉ tham khảo, ghi ở đây).
+
+- 05:20 Lane Q (routing theo độ khó của phiên fork) xanh nhưng HOÃN merge tới sáng: nó đổi route của mọi op
+  cho hai kernel đang chạy; việc suy nghĩ sẽ thử claude-agent trước, mà Claude Code trên máy chưa xong
+  onboarding (probe quota vẫn báo ok, không thấy màn onboarding) → mỗi dispatch think bị readiness từ
+  chối, nghỉ 5 phút, rồi vẫn sang codex; implement medium chuyển sang qwen3.8-flash giữa các vòng sửa
+  audit. Sáng: thầy xong onboarding Claude Code → merge lane Q (trial merge chỉ conflict
+  tests/config.spec.mjs) → thầy quyết pin kernel.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |

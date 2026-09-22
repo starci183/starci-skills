@@ -1306,10 +1306,11 @@ async function cmdRoute(ledger, args) {
   if (decision?.toolUnavailable) {
     const { tools, holders } = decision.toolUnavailable;
     const serving = holders.filter((h) => h.roles.includes(decision.role));
-    const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no ${decision.role} agent in the ${decision.difficulty} chain [${decision.chain.join(', ')}] has it`
-      + (serving.length
-        ? `; agents that have it: ${serving.map((h) => `${h.target} (difficulty ${h.difficulties.join('|')})`).join(', ')}. Re-run api route --job ${jobId} with --difficulty one of those serves${bias.avoid.some((p) => serving.some((h) => h.target === p)) ? ` and without --avoid ${bias.avoid.filter((p) => serving.some((h) => h.target === p)).join(',')}` : ''}.`
-        : `; no agent card lists it under capabilities.hostTools. Raise api incident --kind tool-unavailable for the owner.`)
+    const avoided = bias.avoid.filter((p) => serving.some((h) => h.target === p));
+    const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no agent in its ${decision.work ?? decision.role} order at ${decision.difficulty} [${decision.chain.join(', ')}] has it`
+      + (avoided.length
+        ? `; ${avoided.join(', ')} has it and is excluded by the avoid bias. Re-run api route --job ${jobId} without --avoid ${avoided.join(',')}.`
+        : `; ${serving.length ? `the agents that have it (${serving.map((h) => h.target).join(', ')}) are outside that order` : 'no agent card lists it under capabilities.hostTools'}. Raise api incident --kind tool-unavailable for the owner.`)
       + ' The job stays queued; never dispatch it on an agent without the tool.';
     const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, reason: 'tool-unavailable', tools, holders: serving, detail };
     emit(out, `route REFUSED for ${jobId} (${kind}): tool-unavailable — ${detail}`, args.json);

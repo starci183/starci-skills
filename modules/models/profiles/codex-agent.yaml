@@ -1,8 +1,7 @@
 # Profile: codex-agent — the OpenAI managed-agent pool.
 # Business frame: the generalist workhorse with the widest role coverage, the
-# first seat for decide/plan reasoning, AND the fleet's only image generator.
-# Leads every verify and reasoning chain and owns the entire
-# interface.draw/interface.asset route; last on cost for plain implement.
+# Sol fallback for think work when Claude is unavailable, AND the fleet's only
+# image generator. Owns the entire interface.draw/interface.asset route.
 
 target: codex-agent           # registry.yaml + runtimes.yaml
 provider: codex               # runtimes.yaml
@@ -25,44 +24,28 @@ capacity:
 
 launch:
   orca: {kind: managed-agent, agent: codex}
-  imageGeneration: >-
-    The codex agent card lists image_gen.imagegen under capabilities.hostTools
-    (modules/models/agents/codex.yaml) — the ONLY image-capable pool in the fleet. interface.draw and interface.asset carry
-    single-target chains that are exactly this route; asset generation has NO
-    deferral fallback. profiles/gpt-6-sol.yaml carries the model-level flag.
+  hostTools: >-
+    modules/models/agents/codex.yaml capabilities.hostTools — image_gen.imagegen and browser-dom. It is
+    the only image-capable pool: interface.draw and interface.asset route nowhere else, and asset
+    generation has NO deferral fallback.
 
-position:
-  # Sources: modules/models/runtimes.yaml allocation.tiers, registry.yaml operators.<op>.chain.
-  hardTier: first in decide/plan; second in verify; third in default/implement/write
-  insaneTier: first in decide/plan; second in default/implement/write/verify
-  mediumTier: first in default and in decide/plan
-  easyTier: third
-  chainLeads: [architecture.decide, brand.decide, business.decide, decision.prepare, e2e.verify, goal.revise, integration.verify, interface.asset, interface.audit, interface.draw, perf.verify, provision.ask, request.analyze, scope.define, security.verify, uat.assisted.prepare, uat.assisted.verify, work.author]
-  chainLast: [backend.implement, code.refactor, content.generate, docs.author, interface.implement, release.deliver, runtime.operate, scope.finish, task.execute, test.author, uat.verify, workspace.manage]
-  rationale: >-
-    Two opposite positions, both deliberate (registry.yaml costPolicy): it leads
-    verify and reasoning because independent judgment is the product there, and
-    it trails implement/write because the established cost order is
-    Qwen→Devin→Claude→Codex. It leads brand.decide/interface.* because it owns
-    the image tool.
+position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 
 business:
   question: >-
-    "Which pool judges the work others did, decides, and can draw?" —
-    codex-agent is the primary verifier and reasoning seat and the sole
-    visual-design route.
+    "Which pool thinks when Claude is out, overflows hands-on work, and can draw?" —
+    codex-agent, on gpt-6-sol for every think kind and the sole visual-design route.
   whenNeeded:
-    - verify-role operations — first in every verify chain (e2e, integration, security, perf, uat.assisted.verify); interface.audit needs browser-dom, which the codex card does not list.
-    - decide/plan operations — first in every reasoning chain; hard and insane work runs on gpt-6-sol.
+    - Think work (runtimes.yaml roleOfKind work think) when claude-agent is unavailable — its hard floor pins gpt-6-sol.
     - interface.draw / interface.asset — the ONLY route; no other pool can produce the representative ImageGen candidates.
-    - Medium-tier general work as first default.
+    - Hands-on overflow after the Qwen and Devin pools.
   whenNot:
-    - As first pick for routine implement/write — the declared cost order deliberately spends Qwen/Devin/Claude capacity first.
+    - As first pick for hands-on work — the declared order spends Qwen/Devin capacity first.
     - For anything where image output is needed but the observed host tools lack it — availability is observed, never assumed (registry.yaml examplesNote).
   pickedBy: >-
-    Allocator role preference + tier lists; verify, decide/plan and the image
-    routes are where it structurally dominates.
+    Allocator work/role order + tier lists; the image routes are where it
+    structurally dominates.
   failureModes:
     - "Confusing requestedModel (luna) with the hard-tier model (sol): the pool pins per-difficulty models; attestation reads the difficulty's model, not the target's request."
     - Provider-level quota exhaustion disables Luna and Sol at once — the interface.draw route then has no fallback; a failed image op is parked, not rerouted to a non-image pool.
-    - "INFERRED: using its 10-slot pool to parallelize easy implementation burns the shared quota the verify and reasoning lanes depend on."
+    - "INFERRED: using its 10-slot pool to parallelize easy implementation burns the shared quota the think and image lanes depend on."

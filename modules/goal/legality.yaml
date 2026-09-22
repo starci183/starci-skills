@@ -71,6 +71,7 @@ producesVocabulary:
     - "ui.X: drawn"              # interface design record (artworkSlots declared)
     - "ui.X: assets"             # generated artwork real
     - "impl.X: done"             # code built, behavior delivered
+    - "impl.X: scaffolded"       # new source tree carries the repository baseline and a runnable skeleton
     - "records.X: authored"      # Work records written/remapped
     - "node.X: cut into disjoint children"  # seam-first split landed, node is a derived parent (work.author cut mode - the implementation.plan kind)
     - "tests.X: authored"        # regression coverage exists
@@ -112,6 +113,9 @@ producesVocabulary:
     interface.implement:  ["impl.X: done (frontend)"]
     interface.audit:      ["ui.X: audited"]
     backend.implement:    ["impl.X: done (backend)"]
+    backend.scaffold:     ["impl.X: scaffolded (backend)"]
+    interface.scaffold:   ["impl.X: scaffolded (frontend)"]
+    package.scaffold:     ["impl.X: scaffolded (package)"]
     code.refactor:        ["impl.X: done (restructured, behavior-invariant)"]
     work.author:          ["records.X: authored", "node.X: cut into disjoint children"]
     test.author:          ["tests.X: authored"]
@@ -135,6 +139,8 @@ producesVocabulary:
     knowledge.repair:     ["knowledge: repaired"]
     workspace.manage:     ["workspace: managed"]
     task.execute:         ["task: executed"]
+  settledOutOfBand:  # a variable a Work record settles without a chain leg; route-plan --work reads the record (path relative to the Work root) and drops the producing leg when its state matches
+    - {var: "brand: settled", record: brand/index.yaml, state: done}
   stalenessNote: >-
     A produced variable is only as good as its evidence binding: DEP_STALE /
     evidence-invalidation flips it back to unsettled (check-work-deep.mjs,

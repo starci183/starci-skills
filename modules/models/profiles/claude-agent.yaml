@@ -1,6 +1,6 @@
 # Profile: claude-agent — the Anthropic managed-agent pool.
-# Business frame: the "senior default". First choice for hard-tier work and for
-# operations that edit this runtime itself.
+# Business frame: the thinking seat. First choice for every think kind and for
+# the [Kernel]; overflow for hands-on work.
 # Every claim below traces to a cited source; inferred analysis is marked.
 
 target: claude-agent            # registry.yaml: targets.claude-agent
@@ -29,33 +29,19 @@ capacity:
 
 launch:
   orca: {kind: managed-agent, agent: claude}   # registry.yaml orcaLaunch — worker-start path
-  imageGeneration: false        # agents/claude.yaml capabilities.hostTools lists no image_gen.imagegen
 
-position:
-  # Where this pool sits in declared order. Sources: modules/models/runtimes.yaml
-  # allocation.tiers, modules/models/registry.yaml operators.<op>.chain.
-  hardTier: first in default/implement/write/verify; second in decide/plan (after codex-agent)
-  insaneTier: first in default/implement/write/verify; second in decide/plan
-  mediumTier: second in default and in decide/plan
-  easyTier: last
-  chainLeads: [grammar.update, knowledge.repair]   # registry.yaml operators — only these two lead with claude-agent
-  rationale: >-
-    grammar.update and knowledge.repair lead with Claude because they mutate the
-    installed grammar/this runtime — highest blast radius per unit of work
-    (modules/models/registry.yaml costPolicy).
+position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 
 business:
   question: >-
-    "Which pool do I trust with the heaviest bounded mutation?" — claude-agent is
-    the hard-tier default.
+    "Which pool thinks?" — claude-agent leads every think kind and the kernel seat.
   whenNeeded:
-    - Hard-tier implement/write/verify work where the cheaper Qwen/Devin order has already failed or is unsuitable (prefer-then-overflow, runtimes.yaml allocation.policy).
-    - grammar.update / knowledge.repair — runtime self-editing ops whose chains lead here.
-    - decide/plan work when the Codex window is full or cooling — every reasoning chain ends here (registry.yaml operators).
+    - Think work (runtimes.yaml roleOfKind work think) — canonical records and quality verdicts lead here at every tier.
+    - The [Kernel] seat — config.example.yaml pins `kernel.model: claude-opus-5-5`.
+    - Hands-on overflow when the Qwen, Devin and Codex pools cannot take the work (prefer-then-overflow, runtimes.yaml allocation.policy).
   whenNot:
-    - "Host-tool routes: the agent card lists no host tool — interface.draw/interface.asset (image_gen.imagegen) and interface.audit (browser-dom) never route here (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools)."
-    - "Cost-sensitive easy work: easy tier orders it last; picking it first wastes the strongest pool on the weakest work (inference from tier order)."
-    - "INFERRED: bulk medium-tier implementation — the medium default order puts codex-agent ahead, so default routing keeps Opus for harder slices."
+    - "Host-tool routes: the agent card lists no host tool, so interface.draw/interface.asset (image_gen.imagegen) and interface.audit (browser-dom) pass it for codex-agent (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools)."
+    - "Hands-on work as first pick: every hands-on order puts it last, keeping Opus for thinking."
   pickedBy: >-
     The kernel allocator via role preference + tier + qualification (selection.yaml);
     humans only via the declared chains in registry.yaml operators.

@@ -251,18 +251,16 @@ allocationFacts:
   difficultyVocabulary:               # pool models/effort maps and tier keys
     canonical: [easy, medium, hard, insane]
     aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
-  tiers:                              # role-ordered pool preference per difficulty tier
-    insane: "claude-agent → codex-agent (decide/plan lead codex-agent)"
-    hard: "claude-agent → devin-agent → codex-agent (verify = claude → codex → devin; decide/plan lead codex-agent)"
-    medium: "codex-agent → claude-agent → qwen-agent → devin-agent"
-    easy: "qwen-agent → devin-agent → codex-agent → claude-agent"
-  preference: "per-role order: implement/write/verify = codex→claude→qwen→devin; decide/plan = codex→claude"
+  tiers: modules/models/runtimes.yaml allocation.tiers        # pool order per difficulty, keyed by role or `think`
+  preference: modules/models/runtimes.yaml allocation.preference  # per-role order; `think` is the frontier order
   poolSelection:
     # The (role, difficulty) candidate chain — scripts/agent/models.mjs selectPool executes this.
     chainRule: >-
-      chain(role, difficulty) = pools present in BOTH tiers[difficulty] (role key first, then the
-      tier's default) AND preference[role]. Tier position is the outer sort; the per-role preference
-      order breaks ties. A pool missing from either list is not on the chain at all.
+      chain(key, difficulty) = pools present in BOTH tiers[difficulty] (key first, then the tier's
+      default) AND preference[key], where key is `think` for a kind runtimes.yaml roleOfKind marks think
+      work and the role otherwise, and difficulty is the measured one raised to the kind's roleOfKind
+      floor (a floor never lowers it). Tier position is the outer sort; the preference order breaks
+      ties. A pool missing from either list is not on the chain at all.
     bias: >-
       {prefer: [pools], avoid: [pools]} — prefer hoists the named pools to the front preserving their
       relative chain order; avoid removes them. Bias is applied AFTER the chain is built and NEVER

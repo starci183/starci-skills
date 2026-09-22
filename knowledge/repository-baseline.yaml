@@ -1,0 +1,240 @@
+schema: starci/knowledge-source@1
+id: repository-baseline
+title: Repository baseline for a new StarCi TypeScript repository
+purpose: |
+  What a new StarCi repository carries from its first commit, for the Nest (backend) and Next
+  (frontend) profiles: manifest and engines, strict TypeScript, the house ESLint canon with zero
+  warnings, the test runner with coverage thresholds, git hooks, CI gates, coverage and quality
+  dashboards, ignore rules and line endings. backend.scaffold and interface.scaffold write it; the
+  stack itself is fixed by CONTEXT.md. This file decides toolchain wiring only - never product
+  layout, dependencies an SDS owns, or business behaviour.
+appliesTo: [backend, frontend]
+family: cross-cutting
+provenance:
+  readAt: '2026-09-23'
+  observedReference:
+    - repository: nivo-backend
+      commit: a44246f1c9b7dcbaa0f36432b38375159321cb43
+      files: [package.json, tsconfig.json, eslint.config.mjs, .husky/pre-commit, .husky/pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore, .gitattributes]
+    - repository: nivo-fe
+      commit: aae8d15c8097ec767227fcc14bfe231f07f0213b
+      files: [package.json, apps/*/tsconfig.json, eslint.config.mjs, vitest.config.ts, .husky/pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore]
+  limitations: |
+    The owner's current repositories are the observed reference, not certification; where they
+    differ from each other or from this baseline, the observations below say so and the baseline
+    value wins for a new repository. Package versions are the observed pins at readAt; recheck the
+    published kit versions when scaffolding.
+guidance:
+  - id: BASELINE-ONE-SOURCE
+    requirement: |
+      Every value a scaffold writes into manifests, hooks, CI, coverage and quality configuration
+      comes from the shapes below for the repository's profile. A profile shape extends common;
+      angle-bracket key placeholders and common.* references resolve to the value they name. A value the
+      shapes do not carry is a named gap in the scaffold evidence, never an improvised choice.
+  - id: BASELINE-CHECK-ONLY-GATES
+    requirement: |
+      CI and pre-push run check-only commands (lint:check, typecheck, test:ci, build). Only the
+      pre-commit hook and the local lint script may fix, and only the staged files.
+  - id: BASELINE-ONE-COVERAGE-RUN
+    requirement: |
+      One test run writes one lcov report; Codecov and Sonar both read that file from the same
+      successful execution. Two runs for two dashboards produce numbers that disagree.
+  - id: BASELINE-ZERO-WARNINGS
+    requirement: |
+      Lint gates use the profile's canon kit with the shared max-warnings value; a warning fails the
+      gate exactly like an error.
+  - id: BASELINE-HOOKS-RUN
+    requirement: |
+      The hooks are proven by running them: a staged change makes the pre-commit hook execute
+      lint-staged, and the pre-push hook runs typecheck and affected tests. A hook file that was
+      never executed is not a baseline.
+  - id: BASELINE-HEALTH-SURFACE
+    requirement: |
+      The skeleton exposes only process-local liveness per docs/application-runtime-config-and-health.md.
+      Readiness over dependencies arrives with the SDS that declares those dependencies.
+shapes:
+  - id: common
+    packageManager: npm@11.6.2
+    lockfile: package-lock.json
+    install: npm ci
+    engines:
+      node: '>=<nodeMajor>'
+    nodeMajor: 22
+    typescript:
+      strict: true
+      noEmitCheck: tsc --noEmit --pretty false
+    lint:
+      maxWarnings: 0
+      config: eslint.config.mjs
+    scripts:
+      lint: eslint . --fix --max-warnings=<lint.maxWarnings>
+      lint:check: eslint . --max-warnings=<lint.maxWarnings>
+      typecheck: tsc --noEmit --pretty false
+      prepare: husky
+    coverage:
+      reportsDirectory: coverage
+      lcov: coverage/lcov.info
+      thresholds:
+        statements: 80
+        lines: 80
+        functions: 80
+        branches: 75
+    hooks:
+      manager: husky@^9.1.7
+      preCommit: npx lint-staged
+      prePush: npm run typecheck && npm run test:affected
+      lintStaged:
+        '*.{ts,tsx,mts,cts,js,mjs,cjs}': eslint --fix --max-warnings=<lint.maxWarnings>
+    ci:
+      file: .github/workflows/ci.yml
+      triggers:
+        push: [main]
+        pullRequest: true
+      permissions:
+        contents: read
+        id-token: write
+      gates: [lint, typecheck, test, build]
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-node@v4
+          with: {node-version: <nodeMajor>, cache: npm}
+        - run: npm ci
+        - name: lint
+          run: npm run lint:check
+        - name: typecheck
+          run: npm run typecheck
+        - name: test
+          run: npm run test:ci
+        - name: build
+          run: npm run build
+        - uses: codecov/codecov-action@v5
+          with: {files: coverage/lcov.info, disable_search: true, fail_ci_if_error: true, use_oidc: true}
+        - uses: SonarSource/sonarqube-scan-action@v7
+          env: {SONAR_TOKEN: secrets.SONAR_TOKEN, SONAR_HOST_URL: vars.SONAR_HOST_URL}
+        - uses: SonarSource/sonarqube-quality-gate-action@v1
+          timeoutMinutes: 10
+    codecov:
+      file: codecov.yml
+      projectTarget: 80%
+      patchTarget: 90%
+      informational: false
+      comment: false
+    sonar:
+      file: sonar-project.properties
+      projectKey: <repository name>
+      hostUrl: https://sonar.starci.org
+      sourceEncoding: UTF-8
+      lcovReportPaths: coverage/lcov.info
+      nodeMaxspace: 8192
+    gitignore:
+      - node_modules/
+      - dist/
+      - coverage/
+      - .env
+      - .env.*
+      - '!.env.example'
+      - .starciwork/runtime.sqlite*
+      - .starciwork/_local/
+      - config.yaml
+    editorconfig:
+      root: true
+      charset: utf-8
+      end_of_line: lf
+      insert_final_newline: true
+      trim_trailing_whitespace: true
+    gitattributes:
+      - '* text=auto eol=lf'
+      - '*.enc -text'
+      - '*.key -text'
+      - '*.identity -text'
+      - '*.age -text'
+  - id: nest
+    appliesTo: backend
+    extends: common
+    eslintKit: '@starci/eslint-canon-be'
+    testRunner: jest
+    testDependencies: [jest, ts-jest, '@types/jest', '@nestjs/testing', supertest]
+    scripts:
+      build: nest build
+      start: nest start
+      start:dev: nest start --watch
+      start:prod: node dist/main
+      test: jest
+      test:ci: jest --ci --coverage --coverageReporters=lcov --coverageReporters=text-summary
+      test:affected: jest --changedSince=origin/main --passWithNoTests
+    jestCoverageThreshold: common.coverage.thresholds
+    sonar:
+      sources: src
+      tests: src
+      exclusions: '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**'
+      testInclusions: '**/*.spec.ts'
+    health: liveness adapter at the path docs/application-runtime-config-and-health.md names for Nest
+  - id: next
+    appliesTo: frontend
+    extends: common
+    eslintKit: '@starci/eslint-canon-fe'
+    testRunner: vitest
+    testDependencies: [vitest, '@vitest/coverage-v8', '@vitejs/plugin-react', jsdom, '@testing-library/react', '@testing-library/jest-dom']
+    scripts:
+      build: next build
+      dev: next dev
+      start: next start
+      test: vitest run
+      test:ci: vitest run --coverage
+      test:affected: vitest run --changed origin/main --passWithNoTests
+    vitestCoverage:
+      provider: v8
+      reporter: [text-summary, json-summary, lcov]
+      thresholds: common.coverage.thresholds
+    gitignore: [.next/]
+    sonar:
+      sources: src
+      tests: src
+      exclusions: '**/*.spec.ts,**/*.spec.tsx,**/.next/**,**/node_modules/**,**/coverage/**'
+      testInclusions: '**/*.spec.ts,**/*.spec.tsx'
+      typescriptTsconfigPaths: tsconfig.json
+    grammar: the bound grammar package interface.scaffold resolves; the baseline adds no UI library
+    health: liveness route at the path docs/application-runtime-config-and-health.md names for Next
+observations:
+  - id: package-manager
+    observed: Both repositories pin packageManager npm@11.6.2 and install with npm ci in CI. nivo-fe also
+      carries a stray pnpm-lock.yaml beside package-lock.json; the baseline keeps one lockfile.
+  - id: node
+    observed: Both ci.yml files set up Node 22; neither package.json declares engines, so the baseline
+      adds the engines line.
+  - id: strict
+    observed: nivo-fe app tsconfigs set strict true. nivo-backend sets only strictNullChecks with
+      noImplicitAny false - the gap a new repository does not inherit.
+  - id: lint
+    observed: Both use a flat eslint.config.mjs over the canon kit (@starci/eslint-canon-be ^1.2.1,
+      @starci/eslint-canon-fe 3.0.2). nivo-fe lint:check passes the zero-warning budget to eslint;
+      nivo-backend lint:check passes none. Both alias format:check to the lint check - formatting is the canon's
+      stylistic rules, not a separate formatter.
+  - id: tests
+    observed: nivo-backend runs jest with ts-jest and test:ci writes lcov plus text-summary. nivo-fe runs
+      one root vitest invocation with the v8 provider writing a single coverage/lcov.info.
+  - id: coverage-thresholds
+    observed: nivo-fe package.json starci.deliveryAssurance.unitCoverage and its codecov.yml
+      (informational false) carry the threshold values the shapes adopt; nivo-backend codecov.yml is
+      informational only and its jest config declares no coverageThreshold.
+  - id: hooks
+    observed: Both run husky through the prepare script. Both pre-push hooks run lint:check and
+      test:unit; nivo-backend pre-commit runs a secrets guard, nivo-fe has no pre-commit, and neither
+      uses lint-staged - the baseline adds staged lint on commit and moves typecheck plus affected
+      tests to push.
+  - id: ci
+    observed: Both ci.yml files trigger on push to main and pull requests, run npm ci, lint:check,
+      typecheck, build and test:ci, then upload coverage/lcov.info with codecov-action v5 (OIDC,
+      fail_ci_if_error) and scan with sonarqube-scan-action v7 followed by the quality-gate action.
+  - id: sonar
+    observed: Both sonar-project.properties point at sonar.starci.org with UTF-8 sources, spec
+      exclusions, lcov report paths and the analyzer heap raised for large trees.
+  - id: ignore-and-eol
+    observed: Both .gitignore files exclude node_modules, coverage, .env and .env.* with .env.example
+      re-included; nivo-backend also ignores .starciwork/_local/. nivo-backend .gitattributes keeps
+      encrypted payloads out of text conversion and forces LF on scripts. Neither repository has an
+      .editorconfig.
+related:
+  - architecture-rules.yaml
+  - application-stacks.yaml
+  - ../docs/application-runtime-config-and-health.md

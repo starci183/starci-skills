@@ -19,7 +19,6 @@ identity:
 
 launch:
   orca: {kind: managed-agent, agent: codex}
-  imageGeneration: false
 
 business:
   question: >-

@@ -551,7 +551,8 @@ try {
     worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}` });
   if (!spawned.ok)
     failStart(spawned.step, spawned.error, spawned.terminal ?? null,
-      { agent: route.agent, requestedModel: route.model, ...(spawned.signal ? { signal: spawned.signal } : {}) });
+      { agent: route.agent, requestedModel: route.model, ...(spawned.signal ? { signal: spawned.signal } : {}),
+        ...(spawned.gate ? { gate: spawned.gate } : {}), ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}) });
   const handle = spawned.terminal;
   const workerId = handle;
   const kernelModel = route.model;

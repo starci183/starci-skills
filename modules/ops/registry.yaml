@@ -121,6 +121,7 @@ ops:
       summary: owned source edits
     reads:
       - target
+      - baseline
       - architecture
       - business
       - repo
@@ -144,8 +145,9 @@ ops:
         - bootstrap
         - init
       prerequisites:
-        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - repository bound
+        - a settled SDS only when wiring SDS-owned dependencies or business layout beyond the
+          baseline health surface
       riskHints:
         - source-edits
         - new-tree
@@ -730,6 +732,7 @@ ops:
       summary: owned source edits
     reads:
       - target
+      - baseline
       - architecture
       - grammar
       - brand
@@ -755,9 +758,9 @@ ops:
         - bootstrap
         - init
       prerequisites:
-        - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - grammar bound
         - repository bound
+        - a settled SDS only when wiring SDS-owned dependencies or routing beyond the first shell
       riskHints:
         - source-edits
         - new-tree
@@ -1423,7 +1426,11 @@ ops:
     family: workspace
     goal: Create or reconstruct one canonical .starciwork workspace from a new purpose or selected
       existing source and old worktrees, with verified bindings, preserved provenance and validated
-      scope.
+      scope, and declar
+    params:
+      mode:
+        default: select
+        setBy: kernel
     nodeKinds:
       - operations
     completionProfile: operations
