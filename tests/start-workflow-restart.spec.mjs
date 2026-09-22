@@ -176,6 +176,8 @@ test('a kernel restart closes the previous kernel terminal before the new one is
   assert.deepEqual(state.closed,[firstKernel],'the restart closes exactly the previous kernel terminal');
   const live=Object.values(state.terminals).filter(term=>!term.closed).map(term=>term.handle);
   assert.deepEqual(live,[secondKernel],'a workflow has exactly one live kernel terminal');
+  assert.equal(state.terminals[secondKernel].title,`[Kernel] ${workflowId}`,
+    'the kernel terminal carries its semantic name from creation');
   const closeCall=f.callArgv().find(argv=>argv.slice(0,2).join(' ')==='terminal close');
   assert.equal(closeCall?.[closeCall.indexOf('--terminal')+1],firstKernel);
 

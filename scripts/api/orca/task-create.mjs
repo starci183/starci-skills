@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // task-create.mjs — the calls.yaml `task-create` call as a callable function.
-//   node scripts/api/orca/task-create.mjs --run <run_id> --spec <text|path> [--task-title <t>] [--display-name <n>] [--deps <json_array>] [--parent <task_id>] [--from <handle>]
+//   node scripts/api/orca/task-create.mjs --run <run_id> --spec <text|path> [--task-title <t>] [--display-name <n>] [--deps <json_array>] [--parent <task_id|handle>] [--from <handle>]
+// --parent is the node this Task hangs under; the kernel passes the workflow's
+// current kernel terminal handle so the Orca tree does not have to be inferred
+// from the Run.
 // Returns {ok, taskId, task} — taskId is result.task.id. --spec is passed through verbatim.
 import { orcaCall, arg } from './lib.mjs';
 

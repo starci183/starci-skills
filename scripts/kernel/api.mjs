@@ -1293,6 +1293,12 @@ function cmdDispatch(ledger, args, repo) {
   const prompt = buildPrompt(packet, jobId, repo, priorFailures);
   const worktree = args.worktree ?? repo;
   const title = `[Op] ${op}`;
+  // The Task display name is `[Op] <op>` — it hangs under its parent, which
+  // says the rest. A command terminal is a flat sidebar row with no parent to
+  // read, and left untitled it shows the provider's own auto-summary
+  // ("devin.exe: Kernel orchestration for…"), so its title carries the
+  // attempt and the workflow as well.
+  const terminalTitle = `[Op] ${op} a${job.attempt} · ${job.workflow_id}`;
   // The composed command is what a spawn would actually run — card env prefix
   // + credential strip + requirements (the --yolo/dangerous flags). Dry-run
   // prints it so reviewers see the injected flags, not just the profile body.
@@ -1303,14 +1309,14 @@ function cmdDispatch(ledger, args, repo) {
   const orcaCommands = model.kind === 'command-terminal'
     ? [
       { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow; later operations reuse it' },
-      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
-      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', composedCommand ?? '<command>', '--json'] },
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
+      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', terminalTitle, '--command', composedCommand ?? '<command>', '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle>', '--screen', '--json'], note: 'readiness — verify the prompt landed before sending' },
       { step: 'dispatch', argv: ['orchestration', 'dispatch', '--task', '<operation-task-id>', '--to', '<handle>', '--from', '<kernel-terminal>', '--run', '<workflow-run-id>', '--return-preamble', '--json'] },
       { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle>', '--text', '<dispatch-preamble>', '--enter', '--json'] },
     ]
     : [
-      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
       { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--model', '<resolved-model-id>', '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'], note: `${model.target} is a managed agent; worker-start owns dispatch/injection and must not be followed by orchestration dispatch` },
     ];
 
@@ -1321,7 +1327,7 @@ function cmdDispatch(ledger, args, repo) {
       spawnCommand: spawnCmd
         ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null, ...(spawnCmd.error ? { error: spawnCmd.error } : {}) }
         : { command: null, error: `${model.target} is launch kind '${model.kind}' — composed by 'orca orchestration worker-start', not terminal create` },
-      orca: { worktree, title, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
+      orca: { worktree, title, terminalTitle, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
     };
     emit(out, [
@@ -1411,7 +1417,7 @@ function cmdDispatch(ledger, args, repo) {
   // spawnAgent assembles the command and attests readiness/model, but prompt
   // delivery is delayed until Orca returns this Task's authoritative preamble.
   const spawned = spawnAgent({
-    provider: model.provider, worktree, title, prompt: null,
+    provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
   });
   const handle = spawned.terminal ?? null;
@@ -1559,12 +1565,18 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }) {
   return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };
 }
 
+// Every operation Task is created in the workflow's Run with the CURRENT
+// kernel terminal as both `from` (who issues it) and `parent` (whose child it
+// is). `from` alone left the Orca tree to be inferred from the Run, so a Task
+// whose Run was bound to a replaced kernel terminal fell out to the sidebar
+// root (fable.md orca-hierarchy, root cause 3).
 const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle }) =>
   taskCreate({
     run: runId,
     spec: prompt,
     taskTitle: `${op} #${attempt}`,
     displayName: title,
+    parent: kernelHandle,
     from: kernelHandle,
   });
 

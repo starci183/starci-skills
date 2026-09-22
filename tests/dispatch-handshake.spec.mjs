@@ -81,6 +81,8 @@ test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   for(const step of ['terminal create','terminal read','terminal send'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
   const create=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='terminal create');
+  assert.equal(create?.[create.indexOf('--title')+1],'[Op] code.refactor a1 · wf-dispatch',
+    'a command terminal is a flat sidebar row: it carries the semantic name at creation, not the provider auto-summary');
   const command=create?.[create.indexOf('--command')+1]??'';
   assert.match(command,/--yolo\b/,'the real API dispatch path must inject Qwen yolo into the profile command');
   assert.match(command,/--exclude-tools agent\b/,'the real API dispatch path must preserve the nested-agent exclusion');
