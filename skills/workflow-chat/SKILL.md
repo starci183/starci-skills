@@ -20,7 +20,7 @@ kernel and never an operation.
 
 The current Codex, Claude or Devin chat is the **launcher** and monitor only.
 **Host** means Orca. **Agent** means the execution adapter/Orca agent id such
-as `codex`; **model** means the concrete id such as `gpt-5.6-sol`; **profile**
+as `codex`; **model** means the concrete id such as `gpt-6-sol`; **profile**
 means a StarCi routing/capability target such as `codex-agent`; **runtimePool**
 means a quota/capacity window. Do not collapse these roles into “provider”.
 

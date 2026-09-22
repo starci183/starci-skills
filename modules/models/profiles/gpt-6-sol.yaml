@@ -1,0 +1,40 @@
+# Profile: gpt-6-sol — a named Codex operation target (not a pool).
+# Business frame: GPT-6 Sol is the Codex window's hard and insane model and its
+# reasoning model. The codex-agent pool launches it for every hard or insane
+# operation; this target is the explicit route an owner names with
+# `--model gpt-6-sol` to reach Sol at any difficulty.
+
+target: gpt-6-sol             # registry.yaml targets — a TARGET, distinct from the codex-agent pool entry
+provider: codex
+runtime: codex                # registry.yaml targets.gpt-6-sol.runtime
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: gpt-6-sol   # the slug `codex debug models` lists (codex-cli 0.155.1)
+  profiles:
+    working: gpt-6-sol
+    reasoning: gpt-6-sol
+  sharedQuota: >-
+    Sol consumes the same observed Codex provider capacity as Luna — naming
+    this target adds no headroom to the codex-agent window.
+
+launch:
+  orca: {kind: managed-agent, agent: codex}
+  imageGeneration: true       # unverified for GPT-6 Sol until the first interface.draw dispatch attests it
+
+business:
+  question: >-
+    "Which Codex model decides, plans and carries hard work?" — Sol.
+  whenNeeded:
+    - Hard and insane operations routed to codex-agent — runtimes.yaml pins Sol there.
+    - decide/plan operations at hard or insane difficulty — the reasoning chains lead with codex-agent.
+    - The [Kernel] seat — config.example.yaml pins `kernel.model: gpt-6-sol`.
+    - An owner-named explicit route to Sol for an easy or medium operation.
+  whenNot:
+    - Easy/medium bulk work on the pool — the pool pins Luna there.
+    - "Never as a way to buy qualification: naming a target changes capacity, never qualification or effect authority (runtimes.yaml runtimes.codex-agent)."
+  pickedBy: >-
+    The allocator through the codex-agent pool's difficulty pin, or an owner who
+    names this target explicitly.
+  failureModes:
+    - Assuming this target is a second Codex window — provider-level quota failure parks the pool and this target together.

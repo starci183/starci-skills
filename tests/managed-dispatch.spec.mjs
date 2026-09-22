@@ -40,7 +40,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   // callers may rewrite the pin line.
   const example=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8');
   const writeConfig=(kernelLine)=>{
-    const canonical=kernelLine??'kernel: {agent: codex, model: gpt-5.6-sol, effort: high}';
+    const canonical=kernelLine??'kernel: {agent: codex, model: gpt-6-sol, effort: high}';
     const body=example.replace(/^kernel:.*$/m,canonical);
     assert.match(body,/^kernel:/m,'fixture config keeps the kernel: line');
     fs.writeFileSync(path.join(ownerRoot,'config.yaml'),body);
@@ -81,7 +81,7 @@ const ledgerRead=(repo,fn)=>{
 /* ------------------------------------------------ kernel pin precedence */
 
 test('kernel pin precedence: config selects the agent/model for a dedicated Orca terminal',t=>{
-  // The fixture pins kernel {agent: codex, model: gpt-5.6-sol, effort: high}.
+  // The fixture pins kernel {agent: codex, model: gpt-6-sol, effort: high}.
   // A plan must resolve routedBy 'config' without ever asking
   // route-model. Ingress may be any human chat surface; Orca still owns a
   // dedicated Kernel terminal.
@@ -94,12 +94,12 @@ test('kernel pin precedence: config selects the agent/model for a dedicated Orca
   assert.equal(plan.routedBy,'config');
   assert.equal(plan.executionHost,'orca');
   assert.equal(plan.launch,'terminal');
-  assert.equal(plan.model,'gpt-5.6-sol');
+  assert.equal(plan.model,'gpt-6-sol');
   assert.equal(plan.effort,'high');
   assert.equal(plan.route,undefined,'route-model must not be consulted when the pin decides');
   assert.equal(plan.config?.agent,'codex');
   assert.match(plan.command??'',/\bcodex\b/i);
-  assert.match(plan.command??'',/(?:^|\s)--model\s+['"]?gpt-5\.6-sol['"]?(?:\s|$)/i);
+  assert.match(plan.command??'',/(?:^|\s)--model\s+['"]?gpt-6-sol['"]?(?:\s|$)/i);
   assert.match(plan.command??'',/--ask-for-approval\s+never/);
   assert.match(plan.command??'',/--sandbox\s+danger-full-access/);
   assert.match(plan.command??'',/model_reasoning_effort/);
@@ -138,7 +138,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
     ledger.enqueueJob({jobId:'kernel-wf-managed',workflowId:'wf-managed',kind:'kernel',role:'kernel',
-      payload:{route:{host:'orca',agent:'codex',model:'gpt-5.6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-managed',parentNodeId:'workflow:wf-managed',role:'kernel'}}});
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-managed',parentNodeId:'workflow:wf-managed',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-managed'").run();
     ledger.enqueueJob({jobId,workflowId:'wf-managed',opId:'code.refactor',kind:'op',
       payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent'}});
@@ -246,7 +246,7 @@ test('finish closes the kernel terminal and every Task the Run still holds open'
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.taskClosed?.ok,true);
 });
 
-test('Claude auth rejection circuits every shared-auth pool and reuses the logical operation attempt',t=>{
+test('Claude auth rejection circuits the shared-auth provider for every job and reuses the logical operation attempt',t=>{
   const fx=fixture(t,{stale:['claude']});
   fx.env.STARCI_FAKE_ORCA_MODE='auth';
   const jobId='job-claude-auth-circuit';
@@ -254,7 +254,7 @@ test('Claude auth rejection circuits every shared-auth pool and reuses the logic
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
     ledger.enqueueJob({jobId:'kernel-wf-claude-auth',workflowId:'wf-claude-auth',kind:'kernel',role:'kernel',
-      payload:{route:{host:'orca',agent:'codex',model:'gpt-5.6-sol'}}});
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-claude-auth'").run();
     ledger.enqueueJob({jobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
@@ -262,9 +262,10 @@ test('Claude auth rejection circuits every shared-auth pool and reuses the logic
       payload:{opId:'architecture.decide',owned_paths:['docs/sibling/'],difficulty:'hard'}});
   }finally{ledger.close();}
 
-  const firstRoute=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
+  const firstRoute=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard',
+    '--prefer','claude-agent','--json');
   assert.equal(firstRoute.status,0,firstRoute.stderr||firstRoute.stdout);
-  assert.equal(json(firstRoute.stdout)?.decision?.model,'claude-fable',
+  assert.equal(json(firstRoute.stdout)?.decision?.model,'claude-agent',
     'a refreshable stale token is allowed one real launch attempt');
   const siblingRoute=fx.run(API,'route','--repo',fx.repo,'--job',siblingJobId,'--difficulty','hard',
     '--prefer','claude-agent','--json');
@@ -295,16 +296,15 @@ test('Claude auth rejection circuits every shared-auth pool and reuses the logic
   assert.equal(fx.calls().filter(call=>call==='orchestration worker-start').length,1,
     'the circuit rejects the already-routed sibling before a second Claude worker-start');
 
-  // Before the circuit existed, avoiding Fable (or merely advancing the
-  // chain) selected claude-agent here even though it uses the same OAuth.
+  // The circuit, not the chain, decides here: a route that still prefers
+  // claude-agent crosses to the other provider while the Claude OAuth is out.
   const fallback=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard',
     '--prefer','claude-agent','--json');
   assert.equal(fallback.status,0,fallback.stderr||fallback.stdout);
   const decision=json(fallback.stdout)?.decision;
   assert.equal(decision?.model,'codex-agent','fallback must cross the failed auth provider boundary');
   const rejectedTargets=new Set((decision?.routeRejected??[]).map(item=>item.target));
-  assert.ok(rejectedTargets.has('claude-fable'),'Fable is excluded by the Claude circuit');
-  assert.ok(rejectedTargets.has('claude-agent'),'the sibling Claude pool is excluded by the same circuit');
+  assert.ok(rejectedTargets.has('claude-agent'),'the Claude pool is excluded by the provider circuit');
   assert.equal(ledgerRead(fx.repo,db=>db.prepare('SELECT attempt FROM jobs WHERE job_id=?').get(jobId)?.attempt),1);
 });
 
@@ -493,7 +493,7 @@ test('reconcile converts a fenced effect_unknown prompt stall into the same queu
 /* -------------------------------------------- dedicated Kernel terminal */
 
 test('kernel launch: Codex boots in a dedicated Orca terminal and never creates an orchestration run',t=>{
-  const fx=fixture(t);fx.writeConfig(); // shipped pin: codex / gpt-5.6-sol / high
+  const fx=fixture(t);fx.writeConfig(); // shipped pin: codex / gpt-6-sol / high
   const workflowId=defineGoal(fx);
   const r=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
   assert.equal(r.status,0,`Kernel terminal launch failed: ${r.stderr||r.stdout}`);
@@ -505,15 +505,15 @@ test('kernel launch: Codex boots in a dedicated Orca terminal and never creates 
   assert.equal(out?.terminal,'fake-terminal-1');
   assert.equal(out?.dispatch,undefined);
   assert.equal(out?.run,undefined);
-  assert.equal(out?.model,'gpt-5.6-sol');
+  assert.equal(out?.model,'gpt-6-sol');
   assert.equal(out?.modelAttested,true);
   const job=jobRow(fx.repo,`kernel-${workflowId}`);
   assert.equal(job?.status,'running');
   assert.equal(job?.worker_id,'fake-terminal-1','the Kernel job persists its dedicated terminal handle');
-  assert.match(job?.payload_json??'',/"model":\s*"gpt-5\.6-sol"/);
+  assert.match(job?.payload_json??'',/"model":\s*"gpt-6-sol"/);
   assert.deepEqual(kernelSignal(fx.repo,workflowId),{
     terminal:'fake-terminal-1',host:'orca',agent:'codex',routedBy:'config',
-    model:'gpt-5.6-sol',effort:'high',launch:'terminal',modelAttested:true,
+    model:'gpt-6-sol',effort:'high',launch:'terminal',modelAttested:true,
   });
   const seen=fx.calls();
   for(const step of ['terminal create','terminal read','terminal send'])
@@ -523,7 +523,7 @@ test('kernel launch: Codex boots in a dedicated Orca terminal and never creates 
   const create=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='terminal create');
   const command=create?.[create.indexOf('--command')+1]??'';
   assert.match(command,/\bcodex\b/i);
-  assert.match(command,/(?:^|\s)--model\s+['"]?gpt-5\.6-sol['"]?(?:\s|$)/i);
+  assert.match(command,/(?:^|\s)--model\s+['"]?gpt-6-sol['"]?(?:\s|$)/i);
   assert.match(command,/--ask-for-approval\s+never/);
   assert.match(command,/--sandbox\s+danger-full-access/);
   assert.match(command,/model_reasoning_effort/);
@@ -549,14 +549,14 @@ test('kernel launch is independent of orchestration run-create launcher context'
 
 test('kernel launch fails closed when the terminal does not attest the requested model',t=>{
   const fx=fixture(t);fx.writeConfig();
-  fx.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL='gpt-5.6-terra';
+  fx.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL='gpt-6-luna';
   const workflowId=defineGoal(fx);
   const r=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
   assert.notEqual(r.status,0,'a different rendered model must reject the Kernel boot');
   const failure=json(r.stderr)||json(r.stdout);
   assert.equal(failure?.step,'model-attestation');
-  assert.equal(failure?.requestedModel,'gpt-5.6-sol');
-  assert.match(failure?.error??'',/gpt-5\.6-sol|model/i);
+  assert.equal(failure?.requestedModel,'gpt-6-sol');
+  assert.match(failure?.error??'',/gpt-6-sol|model/i);
   const job=jobRow(fx.repo,`kernel-${workflowId}`);
   assert.notEqual(job?.status,'running','an unattested Kernel must never be recorded running');
 });

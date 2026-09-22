@@ -902,11 +902,11 @@ moduleLocalDocumentKinds:
     governs: "One routing/capability target: identity, capacity cache, launch shape, position."
     files:
       - modules/models/profiles/claude-agent.yaml
-      - modules/models/profiles/claude-fable.yaml
       - modules/models/profiles/codex-agent.yaml
       - modules/models/profiles/deepseek-v4-pro.yaml
       - modules/models/profiles/devin-agent.yaml
-      - modules/models/profiles/gpt-5.6-luna.yaml
+      - modules/models/profiles/gpt-6-luna.yaml
+      - modules/models/profiles/gpt-6-sol.yaml
       - modules/models/profiles/qwen-agent.yaml
       - modules/models/profiles/qwen3.8-max.yaml
   - id: starci/agent-card@1

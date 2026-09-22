@@ -14,8 +14,7 @@
 //     usedPercent: number | null (weekly window percent when the probe sees it)
 //     detail: human-readable reason string
 //
-// Provider names are normalized: lowercase, '-agent' suffix stripped, and the
-// fable aliases resolve to the orca-managed claude account.
+// Provider names are normalized: lowercase, '-agent' suffix stripped.
 import { pathToFileURL } from 'node:url';
 import { probe as probeClaude } from './claude.mjs';
 import { probe as probeCodex } from './codex.mjs';
@@ -31,7 +30,6 @@ const PROBES = {
 
 export function normalizeProvider(provider) {
   const p = String(provider ?? '').trim().toLowerCase();
-  if (p === 'fable' || p === 'claude-fable') return 'claude';
   return p.replace(/-agent$/, '');
 }
 

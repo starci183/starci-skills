@@ -1,0 +1,38 @@
+# Profile: gpt-6-luna — a named Codex operation target (not a pool).
+# Business frame: GPT-6 Luna is the Codex window's easy and medium model. The
+# codex-agent pool launches it for every easy or medium operation; this target
+# is the explicit route an owner names with `--model gpt-6-luna`.
+
+target: gpt-6-luna            # registry.yaml targets — a TARGET, distinct from the codex-agent pool entry
+provider: codex
+runtime: codex                # registry.yaml targets.gpt-6-luna.runtime
+schema: starci/module-model-profile@1
+
+identity:
+  requestedModel: gpt-6-luna  # the slug `codex debug models` lists (codex-cli 0.155.1)
+  profiles:
+    working: gpt-6-luna
+    reasoning: gpt-6-luna
+  sharedQuota: >-
+    Luna consumes the same observed Codex provider capacity as Sol — naming
+    this target adds no headroom to the codex-agent window.
+
+launch:
+  orca: {kind: managed-agent, agent: codex}
+  imageGeneration: false
+
+business:
+  question: >-
+    "Which Codex model carries bounded easy and medium work?" — Luna.
+  whenNeeded:
+    - Easy and medium operations routed to codex-agent — runtimes.yaml pins Luna there.
+    - An owner-named explicit route to Luna for bounded implement/verify/write work.
+  whenNot:
+    - Hard or insane work — the pool pins Sol there; Luna's reasoning levels stop at `max` (no `ultra`).
+    - ImageGen routes — interface.draw/interface.asset run on the codex-agent pool, never on this target.
+    - "Never as a way to buy qualification: naming a target changes capacity, never qualification or effect authority (runtimes.yaml runtimes.codex-agent)."
+  pickedBy: >-
+    The allocator through the codex-agent pool's difficulty pin, or an owner who
+    names this target explicitly.
+  failureModes:
+    - Assuming this target is a second Codex window — provider-level quota failure parks the pool and this target together.

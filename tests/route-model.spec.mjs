@@ -94,3 +94,53 @@ test('--plan writes nothing to the working directory',t=>{
   assert.equal(r.status,0,r.stderr);
   assert.deepEqual(fs.readdirSync(dir),before,'--plan is a view: it must not leave files behind');
 });
+
+test('--help prints the CLI usage and exits 0',()=>{
+  const r=run(['--help']);
+  assert.equal(r.status,0,r.stderr);
+  assert.match(r.stdout,/--kind <kind>/);
+});
+
+// The model catalog is GPT-6 Sol/Luna on the codex-agent window and Claude Opus 5.5 on
+// claude-agent (modules/models/runtimes.yaml). The launch model is the pool's difficulty pin.
+const planModels=(t,kind,difficulty)=>{
+  const r=run(['--kind',kind,'--difficulty',difficulty,'--plan','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
+  assert.equal(r.status,0,r.stderr||r.error?.message);
+  const body=out(r);
+  assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
+  return {body,model:target=>body.candidates.find(c=>c.target===target)?.model};
+};
+
+test('codex-agent launches gpt-6-sol on the hard tier and gpt-6-luna on the easy tier',t=>{
+  const hard=planModels(t,'architecture.decide','hard');
+  assert.deepEqual(hard.body.tier?.chain,['codex-agent','claude-agent'],'reasoning roles lead with the Codex pool');
+  assert.equal(hard.body.pick?.primary?.target,'codex-agent');
+  assert.equal(hard.model('codex-agent'),'gpt-6-sol');
+  assert.equal(planModels(t,'architecture.decide','insane').model('codex-agent'),'gpt-6-sol');
+  assert.equal(planModels(t,'code.refactor','easy').model('codex-agent'),'gpt-6-luna');
+  assert.equal(planModels(t,'code.refactor','medium').model('codex-agent'),'gpt-6-luna');
+});
+
+test('claude-agent launches claude-opus-5-5 at the default difficulty and every tier',t=>{
+  const r=run(['--kind','architecture.decide','--prefer','claude-agent','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
+  assert.equal(r.status,0,r.stderr||r.error?.message);
+  assert.deepEqual([out(r)?.pick?.target,out(r)?.pick?.model],['claude-agent','claude-opus-5-5']);
+  for(const difficulty of ['easy','medium','hard','insane'])
+    assert.equal(planModels(t,'code.refactor',difficulty).model('claude-agent'),'claude-opus-5-5',difficulty);
+});
+
+test('an explicit --model naming a removed catalog id fails closed as unknown',()=>{
+  const DISPATCH=path.join(ROOT,'scripts','route','dispatch-op.mjs');
+  const dispatch=model=>spawnSync(process.execPath,[DISPATCH,'--op','code.refactor','--model',model,'--dry-run','--json'],
+    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
+  for(const removed of ['gpt-5.6-sol','claude-fable']){
+    const r=dispatch(removed);
+    assert.equal(r.status,1,`--model ${removed} must refuse, got ${r.status}: ${r.stdout}`);
+    assert.match(r.stderr,new RegExp(`no model profile ${removed.replaceAll('.','\\.')}`));
+  }
+  for(const current of ['gpt-6-sol','gpt-6-luna']){
+    const r=dispatch(current);
+    assert.equal(r.status,0,r.stderr);
+    assert.equal(out(r)?.constraints?.model??out(r)?.packet?.constraints?.model,current);
+  }
+});

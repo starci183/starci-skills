@@ -27,6 +27,7 @@
 //                               operator chain; missing or stale qualification
 //                               evidence is ANNOTATED, not fatal
 //       [--json] [--modelsDir <dir>] [--verbose]
+//   node scripts/route/route-model.mjs --help   prints this usage
 //
 // Prints: picked target (+model for the role), the rule that fired, the ordered
 // fallback chain, and per-candidate rejection reasons. Exit 1 on refusal
@@ -121,6 +122,13 @@ function parseArgs(argv) {
   };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
+    if (k === '--help' || k === '-h') {
+      const header = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n');
+      const from = header.findIndex(line => line.startsWith('// CLI:'));
+      const to = header.findIndex(line => line.startsWith('// Owner config:'));
+      console.log(header.slice(from, to).map(line => line.replace(/^\/\/ ?/, '')).join('\n').trimEnd());
+      process.exit(0);
+    }
     if (k === '--kind') a.kind = take(i), i++;
     else if (k === '--role') a.role = take(i), i++;
     else if (k === '--domain') a.domain = take(i), i++;

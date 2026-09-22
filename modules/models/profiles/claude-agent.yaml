@@ -9,16 +9,19 @@ runtime: claude                 # registry.yaml: targets.claude-agent.runtime
 schema: starci/module-model-profile@1  # module-local document kind; no upstream schema
 
 identity:
-  requestedModel: claude-opus-5   # registry.yaml targets.claude-agent.requestedModel
+  requestedModel: claude-opus-5-5   # registry.yaml targets.claude-agent.requestedModel; runtimes.yaml pins it at every difficulty
   profiles:                     # registry.yaml targets.claude-agent.profiles
-    working: opus               # → registry.yaml targets profiles.opus → model claude-opus-5
-    reasoning: opus-reviewer    # → registry.yaml targets profiles.opus-reviewer → model claude-opus-5
+    working: opus
+    reasoning: opus-reviewer
   note: >-
-    The stable `claude-opus` runtime ID names the exact `claude-opus-5` model for
-    both operation profiles and non-operation calls; an unversioned host default
-    is not proof of Opus 5 (modules/models/registry.yaml). modelPolicy in registry.yaml targets:
-    "use-declared-profile-model-and-attest-effective-runtime;
-    undeclared-models-inherit-current-host-configuration".
+    Claude Opus 5.5 (`claude-opus-5-5`): 1M-token context, 128K output tokens,
+    adaptive thinking always on. The API's default effort is `medium`; StarCi
+    passes the effort its own routing decides (config.yaml `effort`/`kernel.effort`,
+    agents/claude.yaml effortArgs), so the API default applies only when no effort
+    is sent. The stable `claude-opus` alias names this exact model; an
+    unversioned host default is not proof of it — the dispatch's model
+    attestation is (modules/models/registry.yaml examplesNote, selection.yaml
+    pool-name-as-model).
 
 capacity:
   maxParallel: 6                # cached from runtimes.yaml; route-model.mjs reports drift
@@ -26,13 +29,14 @@ capacity:
 
 launch:
   orca: {kind: managed-agent, agent: claude}   # registry.yaml orcaLaunch — worker-start path
-  imageGeneration: false        # registry.yaml targets: every profile imageGeneration:false
+  imageGeneration: false        # runtimes.yaml: claude-agent provides no imagegen
 
 position:
   # Where this pool sits in declared order. Sources: modules/models/runtimes.yaml
   # allocation.tiers, modules/models/registry.yaml operators.<op>.chain.
-  hardTier: first in default/implement/write; second in verify/decide/plan (after claude-fable)
-  mediumTier: second in default; third in decide/plan
+  hardTier: first in default/implement/write/verify; second in decide/plan (after codex-agent)
+  insaneTier: first in default/implement/write/verify; second in decide/plan
+  mediumTier: second in default and in decide/plan
   easyTier: last
   chainLeads: [grammar.update, knowledge.repair]   # registry.yaml operators — only these two lead with claude-agent
   rationale: >-
@@ -45,16 +49,16 @@ business:
     "Which pool do I trust with the heaviest bounded mutation?" — claude-agent is
     the hard-tier default.
   whenNeeded:
-    - Hard-tier implement/write work where the cheaper Qwen/Devin order has already failed or is unsuitable (prefer-then-overflow, runtimes.yaml allocation.policy).
+    - Hard-tier implement/write/verify work where the cheaper Qwen/Devin order has already failed or is unsuitable (prefer-then-overflow, runtimes.yaml allocation.policy).
     - grammar.update / knowledge.repair — runtime self-editing ops whose chains lead here.
-    - decide/plan/verify work when claude-fable's weekly window is saturated or cooling — opus-reviewer exists precisely as the reasoning half of the pool (registry.yaml targets.claude-agent.profiles.reasoning).
+    - decide/plan work when the Codex window is full or cooling — every reasoning chain ends here (registry.yaml operators).
   whenNot:
-    - "Image-generation routes: no profile carries imageGeneration — interface.draw/interface.asset never route here (costPolicy: only the Codex pool carries an image generator)."
+    - "Image-generation routes: the pool provides no imagegen — interface.draw/interface.asset never route here (runtimes.yaml kindRequires)."
     - "Cost-sensitive easy work: easy tier orders it last; picking it first wastes the strongest pool on the weakest work (inference from tier order)."
-    - "INFERRED: bulk medium-tier implementation — the medium default order puts codex-agent and qwen-agent ahead, so default routing keeps Opus for harder slices."
+    - "INFERRED: bulk medium-tier implementation — the medium default order puts codex-agent ahead, so default routing keeps Opus for harder slices."
   pickedBy: >-
     The kernel allocator via role preference + tier + qualification (selection.yaml);
     humans only via the declared chains in registry.yaml operators.
   failureModes:
-    - "Treating the alias `claude-opus` as proof of model: attestation must show claude-opus-5 (modules/models/registry.yaml)."
+    - "Treating the alias `claude-opus` as proof of model: attestation must show claude-opus-5-5 (modules/models/registry.yaml)."
     - Burning the strongest pool on easy fan-out — an availability/cost mistake, not an eligibility error.

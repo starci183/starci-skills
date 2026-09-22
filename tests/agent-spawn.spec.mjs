@@ -39,15 +39,15 @@ test('devin op command is unattended and uses commandRequirements (dangerous)',(
 test('every supported terminal launch shape is unattended',()=>{
   const qwen=buildSpawnCommand({provider:'qwen'});
   const devin=buildSpawnCommand({provider:'devin'});
-  const codex=buildSpawnCommand({provider:'codex',model:'gpt-5.6-sol',effort:'high'});
-  const claude=buildSpawnCommand({provider:'claude',model:'claude-opus-5',effort:'high'});
+  const codex=buildSpawnCommand({provider:'codex',model:'gpt-6-sol',effort:'high'});
+  const claude=buildSpawnCommand({provider:'claude',model:'claude-opus-5-5',effort:'high'});
   for(const launch of [qwen,devin,codex,claude]) assert.ok(!launch.error,launch.error);
   assert.match(qwen.command,/--yolo\b/);
   assert.match(devin.command,/--permission-mode dangerous\b/);
   assert.match(codex.command,/--ask-for-approval never\b/);
   assert.match(codex.command,/--sandbox danger-full-access\b/);
   assert.match(claude.command,/--dangerously-skip-permissions\b/);
-  assert.match(claude.command,/--model\s+'claude-opus-5'/);
+  assert.match(claude.command,/--model\s+'claude-opus-5-5'/);
   assert.match(claude.command,/--effort\s+'high'/);
 });
 
@@ -75,8 +75,8 @@ test('every command-terminal profile keeps its card-owned unattended mode',()=>{
 });
 
 test('explicit Codex and Claude commands cannot bypass terminal unattended flags',()=>{
-  const codex=buildSpawnCommand({provider:'codex',command:'codex --model gpt-5.6-sol'});
-  const claude=buildSpawnCommand({provider:'claude',command:'claude --model claude-opus-5'});
+  const codex=buildSpawnCommand({provider:'codex',command:'codex --model gpt-6-sol'});
+  const claude=buildSpawnCommand({provider:'claude',command:'claude --model claude-opus-5-5'});
   assert.ok(!codex.error,codex.error);assert.ok(!claude.error,claude.error);
   assert.match(codex.command,/--ask-for-approval never\b/);
   assert.match(codex.command,/--sandbox danger-full-access\b/);

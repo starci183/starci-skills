@@ -252,11 +252,11 @@ allocationFacts:
     canonical: [easy, medium, hard, insane]
     aliases: "S|M|L|XL map to easy|medium|hard|insane; 'high' reads as 'hard'. Resolvers normalize both spellings."
   tiers:                              # role-ordered pool preference per difficulty tier
-    insane: "claude-agent → codex-agent (verify/decide/plan lead claude-fable)"
-    hard: "claude-agent → devin-agent → codex-agent (verify/decide/plan lead claude-fable)"
+    insane: "claude-agent → codex-agent (decide/plan lead codex-agent)"
+    hard: "claude-agent → devin-agent → codex-agent (verify = claude → codex → devin; decide/plan lead codex-agent)"
     medium: "codex-agent → claude-agent → qwen-agent → devin-agent"
     easy: "qwen-agent → devin-agent → codex-agent → claude-agent"
-  preference: "per-role order: implement/write = codex→claude→qwen→devin; verify = codex→fable→claude→qwen→devin; decide/plan = fable→codex→claude"
+  preference: "per-role order: implement/write/verify = codex→claude→qwen→devin; decide/plan = codex→claude"
   poolSelection:
     # The (role, difficulty) candidate chain — scripts/agent/models.mjs selectPool executes this.
     chainRule: >-
