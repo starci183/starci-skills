@@ -319,8 +319,15 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
   let artifact = null;
   const fail = (step, error, signal = null, extra = {}) => {
     cleanupDeliveryArtifact(artifact);
-    if (handle) terminalClose({ terminal: handle });
-    return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, terminal: handle, provider, command: built.command };
+    let terminalClosed = null;
+    if (handle) {
+      let closed;
+      try { closed = terminalClose({ terminal: handle }); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
+      terminalClosed = { handle, ok: closed?.ok === true,
+        ...(closed?.error ? { error: typeof closed.error === 'string' ? closed.error : JSON.stringify(closed.error) } : {}) };
+    }
+    return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, terminal: handle, provider, command: built.command,
+      ...(terminalClosed ? { terminalClosed } : {}) };
   };
   if (!handle) return fail('create', create.error || 'no terminal handle', null, create.errorCode ? { errorCode: create.errorCode } : {});
   const ready = awaitReadiness(handle, built.adapter);

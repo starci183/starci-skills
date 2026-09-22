@@ -4,7 +4,8 @@
 // Ordering facts come from the files
 // selection.yaml cites: modules/models/runtimes.yaml (preference/tiers) and
 // modules/models/qualifications.yaml (the shipped evidence store — empty means
-// no measured qualification, so eligible routes are probation or refusal).
+// no measured qualification, so eligible routes are probation, the
+// kernel-function step for the kernel's own calls, or refusal).
 //
 // CLI:
 //   node scripts/route/route-model.mjs --kind <kind>
@@ -27,6 +28,8 @@
 //                               (∩ per-role preference) instead of the declared
 //                               operator chain; missing or stale qualification
 //                               evidence is ANNOTATED, not fatal
+//       [--repo <path>]         kernel-function kinds also read that repository
+//                               ledger's provider-health circuit (open → unavailable)
 //       [--json] [--modelsDir <dir>] [--verbose]
 //   node scripts/route/route-model.mjs --help   prints this usage
 //
@@ -45,8 +48,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel, kindRoute, raiseToFloor, missingHostTools } from '../agent/models.mjs';
+import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel, kindRoute, raiseToFloor, missingHostTools,
+  providerAvailability, providerCircuitOf } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
@@ -148,6 +153,7 @@ function parseArgs(argv) {
     else if (k === '--json') a.json = true;
     else if (k === '--verbose') a.verbose = true;
     else if (k === '--modelsDir') a.modelsDir = take(i), i++;
+    else if (k === '--repo') a.repo = take(i), i++;
     else { console.error(`unknown arg ${k}`); process.exit(2); }
   }
   a.tools = [...new Set(a.tools.map(s => s.trim()).filter(Boolean))].sort();
@@ -445,6 +451,38 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profil
   if (!primary) process.exit(1);
 }
 
+// --- availability (config.yaml models.selection: quota-aware) ----------------------
+// Kernel-function kinds are the non-operation pool config.yaml declares
+// quota-aware: each candidate provider's quota probe and, with --repo, that
+// ledger's provider-health circuit decide availability (scripts/agent/models.mjs
+// providerAvailability). Memoized per provider; a probe that cannot answer is
+// 'unknown' and never blocks.
+async function availabilityReader(repo) {
+  let probeQuota = null;
+  try { ({ probeQuota } = await import('../api/quota/index.mjs')); } catch { /* probe not installed */ }
+  let db = null;
+  if (repo) {
+    try {
+      const file = ledgerFileFor(path.resolve(repo));
+      if (fs.existsSync(file)) db = inspectLedger({ file }).db;
+    } catch { /* no readable ledger — circuits unknown */ }
+  }
+  const cache = new Map();
+  const read = (provider) => {
+    if (!provider) return { state: 'available', reason: 'pool declares no provider' };
+    if (cache.has(provider)) return cache.get(provider);
+    let probe;
+    try { probe = probeQuota ? probeQuota(provider) : { state: 'unknown', detail: 'quota probe not installed' }; }
+    catch (e) { probe = { state: 'unknown', detail: `quota probe threw: ${e.message}` }; }
+    let circuit = null;
+    try { circuit = db ? providerCircuitOf(db, provider) : null; } catch { circuit = null; }
+    const availability = { provider, quota: probe?.state ?? 'unknown', ...providerAvailability({ probe, circuit }) };
+    cache.set(provider, availability);
+    return availability;
+  };
+  return { read, close: () => { try { db?.close(); } catch { /* read-only */ } } };
+}
+
 // --- main -------------------------------------------------------------------------
 
 async function main() {
@@ -524,6 +562,7 @@ async function main() {
   });
 
   const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml');
+  const availability = w.modelFunction ? await availabilityReader(args.repo) : null;
   const evaluated = ordered.map(c => {
     // Think work runs on the frontier pools only; neither a declared chain,
     // a --prefer nor preferredProvider can move it anywhere else.
@@ -544,15 +583,29 @@ async function main() {
       return { c, eligible: false, mode: null, reasons: missingTools.map(tool => `pool agent '${c.provider}' lacks host tool '${tool}' required by kind '${args.kind}' (route.riskHints host-tool-required:${tool})`) };
     const lm = resolveLaunchModel(c.id, difficulty, { runtimes });
     if (lm.error) return { c, eligible: false, mode: null, reasons: [lm.error] };
+    const avail = availability?.read(c.provider) ?? null;
+    if (avail?.state === 'unavailable')
+      return { c, eligible: false, mode: null, availability: avail, reasons: [`provider ${c.provider} unavailable: ${avail.reason}`] };
     const qr = qualificationReasons({ provider: c.provider, model: lm.modelId ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
-    if (!qr.length) return { c, eligible: true, mode: 'qualified', reasons: [] };
+    if (!qr.length) return { c, eligible: true, mode: 'qualified', reasons: [], availability: avail };
     const pr = probationAdmissionReasons(w, rules);
-    if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr };
-    return { c, eligible: false, mode: null, reasons: [...qr, ...pr] };
+    if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr, availability: avail };
+    // selection.yaml decisionFlow kernel-function: the kernel's own calls on the
+    // frontier think group need no qualification record.
+    if (w.modelFunction && frontier.includes(c.id))
+      return { c, eligible: true, mode: 'kernel-function', reasons: [], qualifiedFailed: qr, availability: avail };
+    return { c, eligible: false, mode: null, reasons: [...qr, ...pr], availability: avail };
   });
+  availability?.close();
 
-  const qualified = evaluated.filter(e => e.eligible && e.mode === 'qualified');
-  const probationEligible = evaluated.filter(e => e.eligible && e.mode === 'probation');
+  // Quota-aware order among the eligible of one mode: available before limited,
+  // declared order otherwise (a stable sort).
+  const availabilityRank = e => (e.availability?.state === 'limited' ? 1 : 0);
+  const byMode = mode => evaluated.filter(e => e.eligible && e.mode === mode)
+    .map((e, i) => ({ e, i })).sort((a, b) => availabilityRank(a.e) - availabilityRank(b.e) || a.i - b.i).map(x => x.e);
+  const qualified = byMode('qualified');
+  const probationEligible = byMode('probation');
+  const kernelFunctionEligible = byMode('kernel-function');
   // providerFilter: qualified set wins outright; else probation admits exactly
   // ONE target per durable job (non-kernel) — the declared chain is still the
   // fallback order — while kernel functions keep all eligible members.
@@ -561,6 +614,9 @@ async function main() {
   else if (probationEligible.length) {
     pickedSet = probationEligible;
     rule = 'decisionFlow.probation-fallback: no qualification evidence; scoped probation admitted';
+  } else if (kernelFunctionEligible.length) {
+    pickedSet = kernelFunctionEligible;
+    rule = 'decisionFlow.kernel-function: kernel function on the frontier think group; no qualification record required';
   } else { pickedSet = []; rule = 'decisionFlow.verdict: no eligible model'; }
 
   const pick = pickedSet[0] ?? null;
@@ -588,6 +644,8 @@ async function main() {
     fallbackChain: pickedSet.slice(1).map(e => ({ target: e.c.target, model: modelFor(e.c), mode: e.mode })),
     fallbackPolicy: rules.fallbackAdvanceWhen,
     rejected: evaluated.filter(e => !e.eligible).map(e => ({ target: e.c.target, reasons: e.reasons })),
+    ...(availability ? { availability: Object.fromEntries(evaluated.filter(e => e.availability)
+      .map(e => [e.c.target, { provider: e.availability.provider, state: e.availability.state, quota: e.availability.quota, reason: e.availability.reason }])) } : {}),
   };
   if (pick && !w.modelFunction && pick.mode === 'probation')
     result.note = 'probation admits exactly one target for one durable job; fallbackChain lists order, not parallel admission';
@@ -609,6 +667,7 @@ async function main() {
       console.log(`PICK ${pick.c.target}  model=${modelFor(pick.c)}  mode=${pick.mode}`);
       console.log(`  rule: ${rule}`);
       console.log(`  order: ${orderSource}`);
+      if (result.availability) console.log(`  availability: ${Object.entries(result.availability).map(([t, a]) => `${t}=${a.state}`).join(' ')}`);
       if (args.bias) console.log(`  bias: prefer=[${args.bias.prefer}] avoid=[${args.bias.avoid}]`);
       if (result.fallbackChain.length) {
         console.log('fallback chain:');

@@ -76,7 +76,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    OP CHAIN (estimate is cold: easy=…m medium=…m hard=…m):
      1. <op>  ~<est>m <tier>
      total ~<n>m — estimate is cold
-   CONFIG: <config.yaml path> — kernel pin agent=… model=… effort=…
+   CONFIG: <config.yaml path> — kernel group <agent>/<model> → … effort=…   (or: kernel pin agent=… model=… effort=…)
    WILL WRITE:
      - <row>
    ledger: <project-owner-repo>/.starciwork/runtime.sqlite

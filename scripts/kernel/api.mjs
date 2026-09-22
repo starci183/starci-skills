@@ -59,7 +59,7 @@ import { classifyAgentScreen } from './terminal-liveness.mjs';
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
-import { selectPool, resolveLaunchModel, missingHostTools } from '../agent/models.mjs';
+import { selectPool, resolveLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
@@ -1139,7 +1139,6 @@ const probeQuotaSafe = async (provider) => {
 const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))
   .map((s) => String(s).trim()).filter(Boolean));
 
-const PROVIDER_HEALTH_SCOPE = 'provider-health';
 const normalizeProviderId = (provider) => {
   const id = String(provider ?? '').trim().toLowerCase();
   return id.replace(/-agent$/, '');
@@ -1156,15 +1155,7 @@ const confirmedAuthFailure = ({ step, signal, error, details } = {}) => {
   const text = failureText(signal, error, details).toLowerCase();
   return /(?:\b401\b|not[_ -]?authenticated|authentication (?:failed|required)|oauth[^\n]*(?:expired|invalid|rejected)|(?:access[_ -]?)?token[^\n]*(?:expired|invalid|rejected)|invalid api[- ]?key|missing credentials|credential[^\n]*(?:expired|invalid|rejected))/.test(text);
 };
-const providerHealthOf = (db, provider, now = Date.now()) => {
-  const key = normalizeProviderId(provider);
-  if (!key) return null;
-  const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?')
-    .get(PROVIDER_HEALTH_SCOPE, key);
-  if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
-  const value = parseJson(row.value_json, {});
-  return value?.status === 'unavailable' ? { ...value, at: row.at, expiresAt: row.expires_at } : null;
-};
+const providerHealthOf = providerCircuitOf;
 const allocationOf = (section) => {
   try {
     const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));

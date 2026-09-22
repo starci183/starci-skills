@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const ROUTE=path.join(ROOT,'scripts','route','route-model.mjs');
@@ -12,7 +14,13 @@ const ROUTE=path.join(ROOT,'scripts','route','route-model.mjs');
 // evidence instead of failing on it) and must never write. A route is a pick
 // or a typed refusal ('no eligible model', exit 1) — never a silent swap.
 
-const run=(args,cwd=ROOT,env={})=>spawnSync(process.execPath,[ROUTE,...args],{cwd,encoding:'utf8',windowsHide:true,timeout:60000,env:{...process.env,...env}});
+// Kernel-function kinds probe provider quota through Orca `account list`; every run here answers from
+// the canned Orca so no spec reads a real account window.
+const FAKE_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'starci-route-orca-'));
+const FAKE=path.join(FAKE_DIR,'fake-orca.mjs');fs.writeFileSync(FAKE,FAKE_ORCA);
+process.on('exit',()=>fs.rmSync(FAKE_DIR,{recursive:true,force:true}));
+const run=(args,cwd=ROOT,env={})=>spawnSync(process.execPath,[ROUTE,...args],{cwd,encoding:'utf8',windowsHide:true,timeout:60000,
+  env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([FAKE]),...env}});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
 const fixture=t=>{
@@ -55,19 +63,61 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','claude-agent']);
 });
 
-test('--kind model.manageWorkflow --risk high resolves or fails typed, never silently',t=>{
-  const r=run(['--kind','model.manageWorkflow','--risk','high','--json']);
-  const body=out(r);
-  if(r.status===0){
-    assert.ok(body?.pick,'exit 0 without a pick is a silent route');
-  }else{
-    // Elevated kernel-function work with no qualification store: the only honest answer is a typed refusal.
-    assert.equal(r.status,1,`route refusal must exit 1, got ${r.status}: ${r.stderr}`);
-    assert.ok(body,`a refusal must still print the JSON verdict, got: ${r.stdout}`);
-    assert.match(body.rule??'',/no eligible model/);
-    assert.ok((body.rejected??[]).length>0&&body.rejected.every(c=>(c.reasons??[]).length>0),
-      'every rejected candidate must name its reasons');
-  }
+// The kernel route is the think group: Claude Opus 5.5 first, GPT-6 Sol when Claude is unavailable.
+// selection.yaml decisionFlow kernel-function admits it with an empty qualification store.
+const kernelRoute=(t,env={},extra=[])=>{
+  const r=run(['--kind','model.manageWorkflow','--risk','high',...extra,'--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir(),...env});
+  return {r,body:out(r)};
+};
+
+test('the unpinned --risk high kernel route resolves through the think group to Claude Opus 5.5',t=>{
+  const {r,body}=kernelRoute(t);
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  assert.deepEqual([body.pick.target,body.pick.model,body.pick.mode],['claude-agent','claude-opus-5-5','kernel-function']);
+  assert.match(body.rule,/decisionFlow\.kernel-function/);
+  assert.deepEqual(body.fallbackChain.map(f=>[f.target,f.model]),[['codex-agent','gpt-6-sol']]);
+  assert.equal(body.availability['claude-agent'].state,'available');
+});
+
+test('Claude limited or dead routes the kernel to GPT-6 Sol',t=>{
+  const limited=kernelRoute(t,{STARCI_FAKE_ORCA_LIMITED:'claude'});
+  assert.equal(limited.r.status,0,limited.r.stderr);
+  assert.deepEqual([limited.body.pick.target,limited.body.pick.model],['codex-agent','gpt-6-sol']);
+  assert.deepEqual(limited.body.fallbackChain.map(f=>f.target),['claude-agent'],'a limited member stays launchable, last');
+  const dead=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'claude'});
+  assert.equal(dead.r.status,0,dead.r.stderr);
+  assert.deepEqual([dead.body.pick.target,dead.body.pick.model],['codex-agent','gpt-6-sol']);
+  assert.deepEqual(dead.body.fallbackChain,[]);
+  assert.match(dead.body.rejected.find(x=>x.target==='claude-agent').reasons[0],/provider claude unavailable: quota probe dead/);
+});
+
+test('an open provider circuit in the --repo ledger routes the kernel to GPT-6 Sol',t=>{
+  const repo=fixture(t).dir();
+  const ledger=openLedger({file:ledgerFileFor(repo)});
+  try{
+    const now=Date.now();
+    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','claude',NULL,NULL,?,?,?)")
+      .run(JSON.stringify({schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth'}),now,now+3600000);
+  }finally{ledger.close();}
+  const {r,body}=kernelRoute(t,{},['--repo',repo]);
+  assert.equal(r.status,0,r.stderr);
+  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6-sol']);
+  assert.match(body.rejected.find(x=>x.target==='claude-agent').reasons[0],/provider circuit open \(auth\)/);
+});
+
+test('both think-group members unavailable is a typed refusal naming both',t=>{
+  const {r,body}=kernelRoute(t,{STARCI_FAKE_ORCA_DEAD:'claude,codex'});
+  assert.equal(r.status,1,`route refusal must exit 1, got ${r.status}: ${r.stderr}`);
+  assert.equal(body.pick,null);
+  assert.match(body.rule,/no eligible model/);
+  for(const [target,provider] of [['claude-agent','claude'],['codex-agent','codex']])
+    assert.match(body.rejected.find(x=>x.target===target)?.reasons?.[0]??'',new RegExp(`provider ${provider} unavailable`));
+});
+
+test('operation kinds never take the kernel-function step',t=>{
+  const r=run(['--kind','architecture.decide','--risk','high','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
+  assert.equal(r.status,1,r.stdout);
+  assert.match(out(r).rule,/no eligible model/);
 });
 
 test('host-tool gate: interface.draw cannot be hoisted onto a pool whose agent lacks image_gen.imagegen',t=>{

@@ -6,16 +6,18 @@
 //
 // Orca is always the execution host. The kernel agent/model is chosen by
 // layered routing: explicit --agent >
-// config.yaml kernel.agent/kernel.model > route-model. Without an override
+// config.yaml kernel (pin or group) > route-model. Without an override
 // this script first reads the owner config <skillRoot>/config.yaml
 // (gitignored, seeded from config.example.yaml by the installer): a kernel
 // agent or model pin decides the seat outright (routedBy: config). An
 // explicit pin is authoritative and fails closed when its agent is dead or
-// its model cannot be resolved; it is never substituted. With no pin this
-// script asks scripts/route/route-model.mjs for the
-// model.manageWorkflow kernelFunctionKind (risk high) and maps the picked
-// runtimePool to its agent via modules/models/profiles/<target>.yaml. Router
-// refusal or exhaustion is a typed failure, never an implicit Devin kernel.
+// its model cannot be resolved; it is never substituted. A kernel group
+// ({group: [{agent, model?}...]}) is an ordered member list tried with the
+// provider availability signals. With neither this script asks
+// scripts/route/route-model.mjs for the model.manageWorkflow
+// kernelFunctionKind (risk high, --repo for the provider circuit) and maps
+// its pick and fallback chain to agents via modules/models/profiles/<target>.yaml.
+// Router refusal or exhaustion is a typed failure, never an implicit Devin kernel.
 // Spawn flags come from the agent's adapter card
 // modules/models/agents/<agent>.yaml, not a hardcoded map.
 //
@@ -39,7 +41,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
-import { resolveLaunchModel, selectPool } from '../agent/models.mjs';
+import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -52,6 +54,15 @@ const planOnly = process.argv.includes('--plan');
 
 const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
 const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
+// The launch steps that fail before the model took any input — the only ones a
+// group boot falls through on. An unreadable contract falls through on none.
+const FALL_THROUGH_STEPS = (() => {
+  try {
+    const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'start-workflow.yaml'), 'utf8'));
+    const steps = doc?.spawn?.fallThrough?.noEffectSteps;
+    return new Set(Array.isArray(steps) ? steps.filter(s => typeof s === 'string') : []);
+  } catch { return new Set(); }
+})();
 
 // Owner config: <skillRoot>/config.yaml — the per-project config seeded from
 // config.example.yaml by the installer (gitignored), read through the one
@@ -118,38 +129,13 @@ function agentForTarget(target) {
   try { return parseYaml(fs.readFileSync(file, 'utf8'))?.provider ?? null; } catch { return null; }
 }
 
-// Next eligible runtimePool after a dead routed agent: live probe state is fed into
-// scripts/agent/models.mjs selectPool's capacity map (a dead agent
-// disqualifies every pool it owns), the dead pick's target is biased out, and
-// selection walks the tier∩role chain for the kernel-manager role (decide).
-// Explicit owner pins never enter this function: they fail closed.
-async function nextEligiblePool(excludeTarget, warnings) {
-  const runtimesFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
-  let runtimes = null;
-  try { runtimes = parseYaml(fs.readFileSync(runtimesFile, 'utf8')); } catch { return null; }
-  const capacity = {};
-  for (const [target, spec] of Object.entries(runtimes?.runtimes ?? {})) {
-    const agent = spec?.provider;
-    if (!agent) continue;
-    const probe = await probeAgent(agent);
-    if (probe?.state === 'dead') {
-      capacity[target] = { auth: 'dead', quota: { state: 'dead' } };
-      const warning = `runtimePool '${target}' ineligible — agent '${agent}' probe is dead (${probe.detail ?? 'not authenticated'})`;
-      warnings.push(warning);
-      console.error(`start-workflow: warning: ${warning}`);
-    }
-  }
-  let pool = null;
-  try {
-    pool = selectPool({
-      kind: KERNEL_ROUTE.kind, role: 'decide', difficulty: KERNEL_ROUTE.risk,
-      bias: excludeTarget ? { avoid: [excludeTarget] } : null,
-      capacity, runtimes,
-    });
-  } catch { return null; }
-  if (!pool?.target) return null;
-  const agent = agentForTarget(pool.target);
-  return agent ? { agent, target: pool.target, modelId: pool.modelId ?? null, effort: pool.effort ?? null } : null;
+// One provider's availability for a kernel group member: the quota probe plus
+// this ledger's provider-health circuit (scripts/agent/models.mjs).
+async function memberAvailability(agent, db) {
+  const probe = await probeAgent(agent);
+  let circuit = null;
+  try { circuit = db ? providerCircuitOf(db, agent) : null; } catch { circuit = null; }
+  return providerAvailability({ probe, circuit });
 }
 
 async function completeKernelRoute(route) {
@@ -172,29 +158,63 @@ async function completeKernelRoute(route) {
 // Resolve the dedicated Kernel terminal's agent/model. Config pins and CLI
 // overrides are authority, not preferences: a dead agent, unknown bare model
 // or agent/model mismatch fails closed instead of choosing a substitute.
-async function resolveKernelRoute() {
+// A config.yaml kernel group and the unpinned think-group route are ordered
+// member lists instead: `members` is the launch order after availability
+// (unavailable skipped, limited last) and `fallThrough` lets the boot move to
+// the next member on a no-effect launch refusal (modules/kernel/start-workflow.yaml
+// spawn.fallThrough). The route's top-level agent/model are members[0].
+const single = (route) => (route.error ? route : { ...route, members: [route], fallThrough: false });
+const groupRoute = (members, extra) => ({ ...members[0], members, fallThrough: true, ...extra });
+const memberLabel = (m) => `${m.agent}/${m.model ?? '(pool model)'}`;
+const memberSummary = (m) => ({ agent: m.agent, model: m.model ?? null, effort: m.effort ?? null,
+  runtimePool: m.runtimePool ?? null, ...(m.availability ? { availability: m.availability.state } : {}) });
+
+async function resolveKernelRoute(db) {
   if (agentOverride) {
     const probe = await probeAgent(agentOverride);
     if (probe?.state === 'dead')
       return { agent: agentOverride, routedBy: 'override', warnings: [],
         errorStep: 'kernel-pin-unavailable',
         error: `explicit kernel agent '${agentOverride}' probe is dead (${probe.detail ?? 'not authenticated'})` };
-    return completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] });
+    return single(await completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] }));
   }
   const owner = inspectOwnerConfig(ownerRoot);
   const kc = owner.config?.kernel;
-  const cfgAgent = typeof kc?.agent === 'string' && kc.agent.trim() ? kc.agent.trim() : null;
-  const cfgModel = typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
+  const cfgGroup = Array.isArray(kc?.group) ? kc.group.filter(m => typeof m?.agent === 'string' && m.agent.trim())
+    .map(m => ({ agent: m.agent.trim(), model: typeof m.model === 'string' && m.model.trim() ? m.model.trim() : null })) : null;
+  const cfgAgent = !cfgGroup && typeof kc?.agent === 'string' && kc.agent.trim() ? kc.agent.trim() : null;
+  const cfgModel = !cfgGroup && typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
   const cfgEffort = (typeof kc?.effort === 'string' && kc.effort.trim() ? kc.effort.trim() : null)
     ?? (typeof owner.config?.effort === 'string' && owner.config.effort.trim() ? owner.config.effort.trim() : null);
   const config = owner.config || owner.error ? {
     file: owner.config ? ownerFileLabel(owner.file) : null,
     agent: cfgAgent, model: cfgModel, effort: cfgEffort,
+    ...(cfgGroup ? { group: cfgGroup } : {}),
     budgets: owner.config?.budgets ?? null,
     ...(owner.error ? { error: owner.error } : {}),
     ...(owner.invalid ? { configInvalid: owner.invalid } : {}),
   } : null;
   const warnings = [];
+  const warn = (warning) => { warnings.push(warning); console.error(`start-workflow: warning: ${warning}`); };
+  if (cfgGroup?.length) {
+    const availability = new Map();
+    for (const m of cfgGroup) if (!availability.has(m.agent)) availability.set(m.agent, await memberAvailability(m.agent, db));
+    const { ordered, unavailable } = orderByAvailability(cfgGroup, m => availability.get(m.agent));
+    for (const u of unavailable) warn(`kernel group member ${memberLabel(u)} skipped — ${u.availability.reason}`);
+    const members = [];
+    for (const m of ordered) {
+      const modelAgent = m.model ? agentForModel(m.model) : null;
+      if (modelAgent && modelAgent !== m.agent) { warn(`kernel group member ${memberLabel(m)} skipped — model is owned by agent '${modelAgent}'`); continue; }
+      const completed = await completeKernelRoute({ agent: m.agent, routedBy: 'config', model: m.model, effort: cfgEffort, config, warnings, availability: m.availability });
+      if (completed.error) { warn(`kernel group member ${memberLabel(m)} skipped — ${completed.error}`); continue; }
+      members.push(completed);
+    }
+    if (!members.length)
+      return { agent: cfgGroup[0].agent, routedBy: 'config', model: cfgGroup[0].model, effort: cfgEffort, config, warnings,
+        members: [], fallThrough: true, errorStep: 'kernel-group-unavailable',
+        error: `kernel group has no available member: ${warnings.join('; ')}` };
+    return groupRoute(members);
+  }
   if (cfgAgent) {
     const modelAgent = cfgModel ? agentForModel(cfgModel) : null;
     if (modelAgent && modelAgent !== cfgAgent)
@@ -205,7 +225,7 @@ async function resolveKernelRoute() {
       return { agent: cfgAgent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings,
         errorStep: 'kernel-pin-unavailable',
         error: `kernel pin failed closed: agent '${cfgAgent}' probe is dead (${probe.detail ?? 'not authenticated'})` };
-    return completeKernelRoute({ agent: cfgAgent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings });
+    return single(await completeKernelRoute({ agent: cfgAgent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings }));
   } else if (cfgModel) {
     const agent = agentForModel(cfgModel);
     if (!agent)
@@ -216,10 +236,13 @@ async function resolveKernelRoute() {
       return { agent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings,
         errorStep: 'kernel-pin-unavailable',
         error: `kernel model pin '${cfgModel}' failed closed: agent '${agent}' probe is dead (${probe.detail ?? 'not authenticated'})` };
-    return completeKernelRoute({ agent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings });
+    return single(await completeKernelRoute({ agent, routedBy: 'config', model: cfgModel, effort: cfgEffort, config, warnings }));
   }
+  // Unpinned: route-model resolves the think group quota-aware (selection.yaml
+  // decisionFlow kernel-function + kernel-availability) and reads this repo's
+  // provider-health circuit; its pick and fallbackChain are the members.
   const r = spawnSync(process.execPath,
-    [ROUTE_MODEL, '--kind', KERNEL_ROUTE.kind, '--risk', KERNEL_ROUTE.risk, '--json'],
+    [ROUTE_MODEL, '--kind', KERNEL_ROUTE.kind, '--risk', KERNEL_ROUTE.risk, '--repo', repo, '--json'],
     { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
   let result = null;
   try { result = JSON.parse(r.stdout || 'null'); } catch { /* non-JSON output */ }
@@ -227,39 +250,31 @@ async function resolveKernelRoute() {
   if (r.error || r.status !== 0 || !pick?.target) {
     return {
       agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
-      error: r.error?.message ?? (r.status === 0 ? 'route-model returned no pick' : result?.rule ?? `route-model exited ${r.status}`),
+      error: r.error?.message ?? (r.status === 0 ? 'route-model returned no pick' : result?.rule ?? `route-model exited ${r.status}`)
+        + ((result?.rejected ?? []).length ? ` — ${result.rejected.map(x => `${x.target}: ${(x.reasons ?? [])[0] ?? 'rejected'}`).join('; ')}` : ''),
     };
   }
-  const profileFile = path.join(skillRoot, 'modules', 'models', pick.profile ?? `profiles/${pick.target}.yaml`);
-  let agent = null;
-  try { agent = parseYaml(fs.readFileSync(profileFile, 'utf8'))?.provider ?? null; } catch { /* unreadable profile */ }
-  if (!agent) {
-    return { agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
-      error: `profile for runtimePool '${pick.target}' declares no execution agent` };
-  }
-  // Unpinned routing may walk another eligible runtimePool, but never invents
-  // a hard-coded Devin fallback.
-  const routedProbe = await probeAgent(agent);
-  if (routedProbe?.state === 'dead') {
-    const warning = `routed agent '${agent}' (${pick.target}) probe is dead (${routedProbe.detail ?? 'not authenticated'}) — taking the next eligible runtimePool`;
-    warnings.push(warning);
-    console.error(`start-workflow: warning: ${warning}`);
-    const next = await nextEligiblePool(pick.target, warnings);
-    if (!next) {
-      return { agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
-        error: `routed agent '${agent}' is dead and no eligible runtimePool remained` };
-    }
-    return completeKernelRoute({
-      agent: next.agent, routedBy: 'route-model', effort: cfgEffort ?? next.effort ?? null, config, warnings,
-      route: { kind: KERNEL_ROUTE.kind, risk: KERNEL_ROUTE.risk, target: next.target, model: next.modelId ?? null,
-        effort: next.effort ?? null, profile: pick.profile ?? null, mode: pick.mode ?? null, rule: result.rule ?? null, skippedDead: pick.target },
+  const members = [];
+  for (const [i, c] of [pick, ...(result.fallbackChain ?? [])].entries()) {
+    const agent = agentForTarget(c.target);
+    if (!agent) { warn(`profile for runtimePool '${c.target}' declares no execution agent`); continue; }
+    // Unpinned routing never invents a hard-coded Devin fallback: only
+    // route-model's own members, re-probed so a dead agent is never launched.
+    const probe = await probeAgent(agent);
+    if (probe?.state === 'dead') { warn(`routed agent '${agent}' (${c.target}) probe is dead (${probe.detail ?? 'not authenticated'}) — taking the next member`); continue; }
+    const completed = await completeKernelRoute({
+      agent, routedBy: 'route-model', effort: cfgEffort, config, warnings,
+      ...(result.availability?.[c.target] ? { availability: result.availability[c.target] } : {}),
+      route: { kind: KERNEL_ROUTE.kind, risk: KERNEL_ROUTE.risk, target: c.target, model: c.model ?? null,
+        profile: i === 0 ? (pick.profile ?? null) : `profiles/${c.target}.yaml`, mode: c.mode ?? null, rule: result.rule ?? null },
     });
+    if (completed.error) { warn(completed.error); continue; }
+    members.push(completed);
   }
-  return completeKernelRoute({
-    agent, routedBy: 'route-model', effort: cfgEffort, config, warnings,
-    route: { kind: KERNEL_ROUTE.kind, risk: KERNEL_ROUTE.risk, target: pick.target, model: pick.model ?? null,
-      profile: pick.profile ?? null, mode: pick.mode ?? null, rule: result.rule ?? null },
-  });
+  if (!members.length)
+    return { agent: null, routedBy: 'route-model', effort: cfgEffort, config, warnings,
+      error: `no routed kernel member is launchable (${warnings.join('; ')})` };
+  return groupRoute(members);
 }
 
 // Spawn command + terminal lifecycle live in scripts/agent/lib.mjs —
@@ -388,7 +403,7 @@ try {
     const signal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(target);
     const health = await signalHealth(signal);
     const chain = (() => { try { return JSON.parse(g?.json || '{}').opChain?.legs?.map(l => l.op) ?? null; } catch { return null; } })();
-    const route = await resolveKernelRoute();
+    const route = await resolveKernelRoute(ledger.db);
     const cmd = route.error
       ? { error: route.error }
       : buildSpawnCommand({ provider: route.agent, kernel: true, model: route.model, effort: route.effort });
@@ -406,6 +421,7 @@ try {
       ...(route.route ? { route: route.route } : {}),
       ...(route.error ? { step: route.errorStep ?? 'kernel-route', routeError: route.error } : {}),
       ...(route.warnings?.length ? { warnings: route.warnings } : {}),
+      ...(route.members ? { group: route.members.map(memberSummary), fallThrough: route.fallThrough === true } : {}),
       sourceHost: sourceRoot, projectBinding: context?.file ?? null,
       ledger: ledgerFileFor(repo), frontend: context?.fe ?? null,
       kernel: health.live
@@ -419,7 +435,7 @@ try {
       ...(cmd.error ? { commandError: cmd.error } : {}),
     };
     const routeLine = `  host: orca | agent: ${route.agent ?? '(unresolved)'} | model: ${route.model ?? '(unresolved)'} (routedBy: ${route.routedBy}`
-      + (route.routedBy === 'config' ? ` — ${route.config?.file} kernel.${route.config?.agent ? 'agent' : 'model'} pin` : '')
+      + (route.routedBy === 'config' ? ` — ${route.config?.file} ${route.config?.group ? 'kernel.group' : `kernel.${route.config?.agent ? 'agent' : 'model'} pin`}` : '')
       + (route.route ? ` — ${route.route.target} ${route.route.model ?? ''} [${route.route.mode}]` : '')
       + (route.error ? ` — ${route.error}` : '') + ')';
     const budgets = route.config?.budgets;
@@ -427,8 +443,11 @@ try {
       ? `\n  budgets (config.yaml): ${['maxOps', 'perOpMs', 'dailyTokens'].map(k => `${k}=${budgets[k] ?? 'unbounded'}`).join('  ')}`
       : '';
     const warningLine = (route.warnings ?? []).map((w) => `\n  warning: ${w}`).join('');
+    const groupLine = route.members?.length > 1
+      ? `\n  group: ${route.members.map(m => memberLabel(m) + (m.availability?.state && m.availability.state !== 'available' ? ` (${m.availability.state})` : '')).join(' → ')} — a no-effect launch refusal falls through to the next member`
+      : '';
     console.log(asJson ? JSON.stringify(out, null, 2)
-      : `PLAN — start workflow ${target}\n  title: ${wf?.title}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${chain ? chain.join(' → ') : 'kernel derives at boot'}\n  kernel: ${out.kernel}\n${routeLine}\n  launch: ${out.launch}\n  config: ${out.config.file ?? 'absent — routing falls to route-model'}${route.effort ? `  effort=${route.effort}` : ''}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`);
+      : `PLAN — start workflow ${target}\n  title: ${wf?.title}\n  phase: ${wf?.phase} | goal rev ${out.goalRevision} (${out.goalIdentity}) | inbox: ${out.inbox}\n  op chain: ${chain ? chain.join(' → ') : 'kernel derives at boot'}\n  kernel: ${out.kernel}\n${routeLine}${groupLine}\n  launch: ${out.launch}\n  config: ${out.config.file ?? 'absent — routing falls to route-model'}${route.effort ? `  effort=${route.effort}` : ''}${budgetLine}${warningLine}\n  command: ${out.command ?? '(unavailable)'}\n  command source: ${out.commandSource ?? '(unavailable)'}`);
     process.exit(route.error || cmd.error ? 1 : 0);
   }
 
@@ -529,7 +548,7 @@ try {
 
   // 3. Launch one dedicated [Kernel] Orca terminal. A Kernel is not an Orca
   // operation worker, so boot performs no run/task/dispatch mutation.
-  const route = await resolveKernelRoute();
+  let route = await resolveKernelRoute(ledger.db);
   for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
   const title = `[Kernel] ${workflowId}`;
   const goal = ledger.db.prepare('SELECT revision FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
@@ -547,12 +566,41 @@ try {
   };
   if (route.error)
     failStart(route.errorStep ?? 'kernel-route', route.error, null, { agent: route.agent ?? null, requestedModel: route.model ?? null });
-  const spawned = spawnAgent({ provider: route.agent, model: route.model, effort: route.effort,
-    worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}` });
-  if (!spawned.ok)
-    failStart(spawned.step, spawned.error, spawned.terminal ?? null,
-      { agent: route.agent, requestedModel: route.model, ...(spawned.signal ? { signal: spawned.signal } : {}),
-        ...(spawned.gate ? { gate: spawned.gate } : {}), ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}) });
+  // modules/kernel/start-workflow.yaml spawn.fallThrough: a group member refused
+  // before the model took any input, with its terminal closed, hands the same
+  // boot and reservation to the next member. Anything else ends the boot.
+  const members = route.members?.length ? route.members : [route];
+  const fellThrough = [];
+  let spawned = null;
+  for (const [index, member] of members.entries()) {
+    spawned = spawnAgent({ provider: member.agent, model: member.model, effort: member.effort,
+      worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}` });
+    if (spawned.ok) { route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough }; break; }
+    const failure = { agent: member.agent, requestedModel: member.model, ...(spawned.signal ? { signal: spawned.signal } : {}),
+      ...(spawned.state ? { state: spawned.state } : {}), ...(spawned.gate ? { gate: spawned.gate } : {}),
+      ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}),
+      ...(spawned.terminalClosed ? { terminalClosed: spawned.terminalClosed } : {}) };
+    const next = members[index + 1] ?? null;
+    const noEffect = FALL_THROUGH_STEPS.has(spawned.step);
+    const closed = !spawned.terminal || spawned.terminalClosed?.ok === true;
+    if (!route.fallThrough || !next || !noEffect || !closed)
+      failStart(spawned.step, spawned.error, spawned.terminal ?? null,
+        { ...failure, ...(fellThrough.length ? { fellThrough } : {}),
+          ...(route.fallThrough && next ? { fallThroughRefused: !noEffect ? `step '${spawned.step}' may have had effect` : 'the failed terminal was not closed' } : {}) });
+    const at = Date.now();
+    const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
+    ledger.transaction(() => {
+      ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
+        kind: 'kernel-start-failed', createdAt: at,
+        payload: { step: spawned.step, error: spawned.error, terminal: spawned.terminal ?? null, ...failure,
+          fellThroughTo: { agent: next.agent, model: next.model ?? null } } });
+      // The next member gets a full startup window of its own.
+      ledger.db.prepare("UPDATE signals SET expires_at=? WHERE scope='kernel' AND key=? AND token=?").run(at + 120000, workflowId, token);
+    });
+    fellThrough.push({ agent: member.agent, model: member.model ?? null, step: spawned.step, error: spawned.error,
+      ...(spawned.gate ? { gate: spawned.gate } : {}) });
+    console.error(`start-workflow: warning: kernel member ${memberLabel(member)} refused at ${spawned.step} (${spawned.error}) — falling through to ${memberLabel(next)}`);
+  }
   const handle = spawned.terminal;
   const workerId = handle;
   const kernelModel = route.model;
@@ -625,7 +673,8 @@ try {
         model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true,
         inboxId: claim.inbox_id, attempt,
         nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`,
-        sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}) },
+        sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}),
+        ...(fellThrough.length ? { fellThrough } : {}) },
       createdAt: now });
   });
 
@@ -635,6 +684,7 @@ try {
     ...(route.route?.profile ? { profile: route.route.profile } : {}),
     ...(route.runtimePool ? { runtimePool: route.runtimePool } : {}),
     ...(route.warnings?.length ? { warnings: route.warnings } : {}),
+    ...(fellThrough.length ? { fellThrough } : {}),
     hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}` },
     replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true };
   console.log(asJson ? JSON.stringify(out, null, 2)
