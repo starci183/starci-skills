@@ -2,4 +2,3 @@
 # per line. An entry belongs here only while the lane that owns the file has
 # not rewritten that line yet; it is deleted in the commit that fixes it.
 CONTEXT.md:31 # lane-E-rewrite-pending
-scripts/api/quota/orca-account.mjs:24 # stale-fallback: the inline `orca account list` read predates scripts/api/orca/account-list.mjs, which now exists — delete the fallback and the orcaRun import with it
