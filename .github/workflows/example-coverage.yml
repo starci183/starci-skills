@@ -2,9 +2,9 @@ name: example-coverage
 
 # Uploads unit-test coverage for the example apps that have a unit suite. Each app uploads under its
 # own Codecov flag so the examples stay separable from each other and from the main repository's
-# coverage (root ci.yml already uploads coverage/lcov.info without flags for the main tree).
-# ecommerce-app-fe is intentionally absent: it has no unit suite today. Additive lane — this file
-# edits no existing workflow; OIDC usage mirrors root ci.yml's codecov-action@v5 wiring.
+# gate (root ci.yml runs `npm run check` and `npm test` for the main tree and uploads no coverage,
+# so every lcov.info Codecov holds comes from this workflow and carries a flag).
+# ecommerce-app-fe is intentionally absent: it has no unit suite today.
 
 on:
   push:
