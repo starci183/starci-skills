@@ -969,8 +969,8 @@ ops:
   - id: provision.ask
     family: provision
     goal: Ask the owner for the one thing only they can give - a credential, an account on an outside
-      system, a dataset, a legal authority, or the go-ahead for an irreversible effect - exactly
-      named, in this op
+      system, a dataset, a legal authority, a decision between real alternatives (candidate picks,
+      accept/reject o
     nodeKinds:
       - business
     completionProfile: business

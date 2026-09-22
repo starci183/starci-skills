@@ -47,10 +47,10 @@ pools:
   - {target: claude-fable,  profile: profiles/claude-fable.yaml,  provider: claude, roles: [verify, decide, plan, write],             automaticChains: true, budgetWindow: fableWeekly}
   - {target: codex-agent,   profile: profiles/codex-agent.yaml,   provider: codex,  roles: [implement, verify, write, decide, plan], automaticChains: true, note: "sole image-generation route"}
   - {target: qwen-agent,    profile: profiles/qwen-agent.yaml,    provider: qwen,   roles: [implement, verify, write],                automaticChains: true, note: "orchestration default operation target"}
-  - {target: devin-agent,   profile: profiles/devin-agent.yaml,   provider: devin,  roles: [implement, verify, write],                automaticChains: true, note: "closed at rest — maxParallel 0 until explicit workflow quota; Orca-only"}
+  - {target: devin-agent,   profile: profiles/devin-agent.yaml,   provider: devin,  roles: [implement, verify, write],                automaticChains: true, note: "Orca-only; capacityAuthority explicit-workflow-quota — slots come from the owner, see runtimes.yaml"}
 
 exceptionTargets:
-  # registry.json targets not present in runtimes.json — installed but off all
+  # registry.yaml targets not present in runtimes.yaml — installed but off all
   # automatic chains; explicit benchmark/user-approved selection only
   - {target: gpt-5.6-luna,    profile: profiles/gpt-5.6-luna.yaml,    provider: codex, automaticChains: false, note: "bounded-allocation Codex route; easy/medium only; bare name also aliases to codex-agent"}
   - {target: qwen3.8-max,     profile: profiles/qwen3.8-max.yaml,     provider: qwen,  automaticChains: false, note: "benchmark/user-approved exception only"}
@@ -58,8 +58,7 @@ exceptionTargets:
 
 notTargets:
   # things an agent might mistake for operation targets — they are not
-  - {name: "supervisor chains (planCoordinator, workflowMonitor)", source: registry.json supervisors, note: "persistent coordinator seats, not operation pools"}
-  - {name: "nonOperation model functions (assessGoal, planOp, decide, validateOp, critiqueGoal, ...)", source: "kernel model-function vocabulary (MODEL_KINDS)", note: "separately typed Fable/Astra + Opus/Sol pools; never consume operation probation budget"}
+  - {name: "nonOperation model functions (assessGoal, planOp, decide, validateOp, critiqueGoal, ...)", source: "modules/models/selection.yaml closedSets.kernelFunctionKinds", note: "separately typed Fable/Astra + Opus/Sol pools; never consume operation probation budget"}
 
 selection: selection.yaml   # the eligibility/probation/ordering rules —
                           # start here for "may this model take this job"

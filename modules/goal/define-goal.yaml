@@ -64,13 +64,14 @@ derives:
   assess: 'per-repo cold signals from scripts/goal/assess.mjs (--repo <p> [--repo <p2>] --json); plan-only, advisory, null when unavailable'
 
 writes:
-  - table: workflows
-    row: {workflow_id, title, created_at, ledger_mode, phase: 'queued'}
-  - table: goals
-    row: {workflow_id, revision: 0, goal_identity, markdown, json: {opChain, star}}
-  - table: inbox
-    row: {workflow_id, kind: 'goal', key: workflow_id, payload_json: {prompt, at}, status: 'pending'}
-    note: THE QUEUE. pending = unclaimed; start-workflow claims it atomically.
+  create:
+    - table: workflows
+      row: {workflow_id, title, created_at, ledger_mode, phase: 'queued'}
+    - table: goals
+      row: {workflow_id, revision: 0, goal_identity, markdown, json: {opChain, star}}
+    - table: inbox
+      row: {workflow_id, kind: 'goal', key: workflow_id, payload_json: {prompt, at}, status: 'pending'}
+      note: THE QUEUE. pending = unclaimed; start-workflow claims it atomically.
   revision:
     - table: goals
       row: '{same workflow_id, revision: latest+1, same goal_identity, markdown, json: {opChain, revision lineage}, amendment_json: owner approval receipt}'

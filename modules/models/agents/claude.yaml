@@ -6,20 +6,19 @@ start:
   agentArgument: claude
 readiness: worker-start-receipt
 roles:
-  - plan-coordinator
-  - workflow-coordinator
-  - operation-fallback
+  - workflow-kernel
+  - operation-agent
 name:
   api: terminal.rename
 release:
   api: orchestration.worker-release
 terminalFallback:
-  when: orchestration.worker-start is unavailable or a plain-command lane is wanted
+  when: orchestration.worker-start is unavailable or a plain command terminal is wanted
   command: claude
   modelArgs: ['--model', '<model>']
   effortArgs: ['--effort', '<effort>']
   bypassArgs: ['--dangerously-skip-permissions']
-  bypassReason: Unattended lanes stall on per-tool permission menus; same rule as qwen --yolo / devin bypass mode.
+  bypassReason: An unattended agent stalls on per-tool permission menus; same rule as qwen --yolo / devin bypass mode.
 verifiedAt: 2026-09-21
 verifiedAgainst: 'claude CLI 2.1.274'
 forbidden:
@@ -27,21 +26,12 @@ forbidden:
   - unsupervised-dispatch-inject-as-success
 capabilities:
   schema: starci/claude-capabilities@1
-  hostModes:
-    solo: supported
-    orchestrated: bootstrap-only-to-orca
-  solo:
-    controlPlane: current-chat
-    operationIsolation: Task-subagent
-    maximumConcurrentOperationAgents: 3
-    childWorktrees: forbidden
   orca:
     nativeManagedAgent: supported
     agentId: claude
     roles:
-      - plan-coordinator
-      - workflow-coordinator
-      - operation-fallback
+      - workflow-kernel
+      - operation-agent
 quota:
   probe: orca-account
   window: weekly

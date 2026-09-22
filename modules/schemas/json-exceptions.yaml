@@ -177,18 +177,6 @@ exceptions:
   - path: packages/grammar/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
-  - path: packages/grammar/storybook-static/index.json
-    reason: >
-      Storybook build output inside the grammar package; Storybook emits JSON manifests.
-  - path: packages/grammar/storybook-static/manifests/components.json
-    reason: >
-      Storybook build output inside the grammar package; Storybook emits JSON manifests.
-  - path: packages/grammar/storybook-static/manifests/docs.json
-    reason: >
-      Storybook build output inside the grammar package; Storybook emits JSON manifests.
-  - path: packages/grammar/storybook-static/project.json
-    reason: >
-      Storybook build output inside the grammar package; Storybook emits JSON manifests.
   - path: packages/grammar/tsconfig.build.json
     reason: >
       TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).

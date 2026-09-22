@@ -3,32 +3,32 @@
 # orchestration profile and first seat in nearly every implement/write chain —
 # bounded, ceiling-guarded work it can fail cheaply and hand upward.
 
-target: qwen-agent            # registry.json + runtimes.json
-provider: qwen                # runtimes.json — provider family qwencloud-token-plan (qwen.json)
-runtime: qwen                 # registry.json targets.qwen-agent.runtime
+target: qwen-agent            # registry.yaml + runtimes.yaml
+provider: qwen                # runtimes.yaml — provider family qwencloud-token-plan (registry.yaml targets)
+runtime: qwen                 # registry.yaml targets.qwen-agent.runtime
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: qwen3.8-flash   # registry.json
+  requestedModel: qwen3.8-flash   # registry.yaml
   profiles:
-    working: qwen3.8-flash-worker     # qwen.json — fast bounded implementation/content/repair
-    reasoning: qwen3.8-flash-reviewer # qwen.json — "lower-cost reasoning fallback when the Max reviewer is unavailable"
-  modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # qwen.json
+    working: qwen3.8-flash-worker     # registry.yaml targets — fast bounded implementation/content/repair
+    reasoning: qwen3.8-flash-reviewer # registry.yaml targets — "lower-cost reasoning fallback when the Max reviewer is unavailable"
+  modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # registry.yaml targets
 
 capacity:
-  maxParallel: 10             # runtimes.yaml
+  maxParallel: 10             # cached from runtimes.yaml; route-model.mjs reports drift
   roles: [implement, verify, write]   # NO decide, NO plan
 
 launch:
-  orca:                       # registry.json orcaLaunch — command-terminal, NOT managed-agent
+  orca:                       # registry.yaml orcaLaunch — command-terminal, NOT managed-agent
     kind: command-terminal
     command: "qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
-    reasoningCommand: same command shape             # registry.json reasoningCommand
+    reasoningCommand: same command shape             # registry.yaml reasoningCommand
     dispatch: return-preamble-and-send               # launcher: dispatch --return-preamble, terminal send, verify submission
     adapter: qwen
     nestedAgents: forbidden                          # every Qwen command excludes the `agent` tool
   whyCommandTerminal: >-
-    registry.json selection: "Orca 1.4.188's native qwen-code adapter cannot
+    registry.yaml selection: "Orca 1.4.188's native qwen-code adapter cannot
     deliver a prompt to Qwen Code 0.23.3" — so the canonical launcher creates one
     terminal per attempt, waits for the rendered prompt, sends via terminal, and
     attests assignee + rendered model.
@@ -37,11 +37,11 @@ launch:
     is a FAILED attempt, never proof of completion (costPolicy).
 
 position:
-  easyTier: first             # runtimes.json allocation.tiers.easy
+  easyTier: first             # runtimes.yaml allocation.tiers.easy
   mediumTier: third in default
   hardTier: absent — not listed in any hard-tier order
   chainLeads: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.finish, task.execute, uat.verify, workspace.manage, review.verify]
-  orchestrationDefault: qwen-agent   # registry.json orchestration.defaultOperationTarget
+  orchestrationDefault: qwen-agent   # registry.yaml orchestration.defaultOperationTarget
 
 business:
   question: >-
@@ -49,9 +49,9 @@ business:
     pools only see what survives escalation?" — qwen-agent.
   whenNeeded:
     - Routine bounded implement/write/test/content work — the established Qwen→Devin→Claude→Codex cost order spends its capacity first.
-    - review.verify — it LEADS the independent-review chain (registry.json), the cost-aware front seat for judging.
-    - Easy-tier fan-out (allocation.fanOut seamFirst, maxPerGroup 9) — cheap parallelism.
-    - Default operation dispatch in orchestrated mode.
+    - review.verify — it LEADS the independent-review chain (registry.yaml), the cost-aware front seat for judging.
+    - Easy-tier fan-out (runtimes.yaml allocation.fanOut) — cheap parallelism.
+    - The default operation target (registry.yaml orchestration.defaultOperationTarget).
   whenNot:
     - decide/plan work — the pool has no such roles; business/architecture decisions never route here.
     - Hard-tier lists exclude it entirely — high-risk or high-floor workloads get Claude/Devin/Codex orders instead.

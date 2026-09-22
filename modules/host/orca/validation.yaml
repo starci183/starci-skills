@@ -1,14 +1,4 @@
 schema: starci/orca-provider-validation@1
-liveDiscovery:
-  call: orca agent-context --json
-  expectedSchemaVersion: 1
-  compare:
-    - command-count
-    - command-name
-    - usage
-    - flags
-    - positional-arguments
-  onMismatch: stop-before-effects-and-request-runtime-contract-upgrade
 preflight:
   - orca status --json
   - orca agent-context --json
@@ -20,7 +10,7 @@ callContract:
   runner: scripts/api/orca/*.mjs (one wrapper per verb over shared lib.mjs)
   envelope: starci/orca-call-result@1
   rules:
-    - Every argv StarCi issues is built from calls.yaml; prose templates in index.yaml are documentation of the same calls, never a second construction path.
+    - Each wrapper holds its verb's argv as a literal and calls.yaml declares that verb and its flags; tests/provider-orca.spec.mjs refuses a wrapper the file does not declare. Prose templates in index.yaml document the same calls and are never a second construction path.
     - An Orca exit code 1 is a classified result with outcome and effectState; only a contract violation throws.
     - A mutation whose result is unknown is replayed once with --retry-request; a still-unknown result blocks fallback until a read-only reconciliation proves state.
     - Fallback to the next candidate requires effectState none, proven by settlement (worker-stop, worker-release released or already_released) when the failed attempt created a Dispatch.

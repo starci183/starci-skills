@@ -2,7 +2,7 @@ schema: starci/runtimes@1
 purpose: |-
   Every runtime is a provider-window pool with real parallel slots and a cooldown: the pool boundary IS the
   quota-window boundary, so one pool never spans two independently metered windows and one window never splits
-  into two pools. The workflow-bound profile applies adaptive capacity from config.json: role, tier, tools,
+  into two pools. The workflow-bound profile applies adaptive capacity from config.yaml: role, tier, tools,
   qualification, independent review, fresh provider quota, shared admitted load and recent observed service
   filter and score provider families before one runtime is handed to the typed launcher. The preference/tier
   lists below are within-family suitability and a compatibility policy for direct low-level consumers; they are
@@ -18,9 +18,15 @@ purpose: |-
   that declares no model for a difficulty is ineligible there, never silently rerouted to another model.
   `effort` pins the per-difficulty effort where the provider exposes one. The canonical difficulty vocabulary
   is easy|medium|hard|insane; resolvers accept the S|M|L|XL spellings (and 'high' for 'hard').
+# CONCURRENCY LIVES HERE AND NOWHERE ELSE. `runtimes.<pool>.maxParallel` below is the enforced slot
+# count: scripts/kernel/api.mjs (route capacity), scripts/agent/models.mjs (selectPool) and
+# scripts/route/route-model.mjs read it, and route-model reports any model profile whose cached
+# `capacity.maxParallel` has drifted from it. `maxParallelOps` is the fleet-wide ceiling the kernel
+# reasons against (modules/kernel/driver-loop.yaml); no code enforces it. Every other contract cites
+# this file instead of restating a number.
 maxParallelOps: 20
 allocation:
-  # The workflow-bound profile applies adaptive capacity from validated config.json; this is the default it overrides.
+  # The workflow-bound profile applies adaptive capacity from validated config.yaml; this is the default it overrides.
   policy: prefer-then-overflow
   # A tier may order its runtimes per role. The coding roles keep the tier they always had; decide and plan -
   # the roles Fable and the Codex reasoning model carry - name the reasoning pools first and their downgrade

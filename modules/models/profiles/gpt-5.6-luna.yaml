@@ -3,34 +3,34 @@
 # codex-agent but pinned to Luna as both worker and reviewer, with its own small
 # default slot count an owner can explicitly resize per workflow.
 
-target: gpt-5.6-luna          # registry.json targets — a TARGET, distinct from the codex-agent pool entry
+target: gpt-5.6-luna          # registry.yaml targets — a TARGET, distinct from the codex-agent pool entry
 provider: codex
-runtime: codex                # registry.json targets.gpt-5.6-luna.runtime
+runtime: codex                # registry.yaml targets.gpt-5.6-luna.runtime
 schema: starci/module-model-profile@1
 
 identity:
   requestedModel: gpt-5.6-luna
   profiles:
-    working: gpt-5.6-luna           # codex.json — bounded implementation/content/maintenance
-    reasoning: gpt-5.6-luna-reviewer # codex.json — independent review of bounded implementation
+    working: gpt-5.6-luna           # registry.yaml targets — bounded implementation/content/maintenance
+    reasoning: gpt-5.6-luna-reviewer # registry.yaml targets — independent review of bounded implementation
   sharedQuota: >-
     Luna consumes the same observed Codex provider capacity as Sol and Astra —
-    its slot count does not add headroom (docs/model-catalog.md).
+    its slot count does not add headroom (modules/models/registry.yaml).
 
 capacity:
-  defaultSlots: 2             # model-catalog.md: "default capacity is two slots;
+  defaultSlots: 2             # modules/models/registry.yaml: "default capacity is two slots;
                             # an owner can explicitly allocate a different bounded
                             # count for a workflow"
-  tiers: [easy, medium]       # model-catalog.md: "eligible for easy/medium
+  tiers: [easy, medium]       # modules/models/registry.yaml: "eligible for easy/medium
                             # operation tiers by default" — NOT hard tier
-  roles: [implement, verify, write]   # INFERRED from model-catalog.md scope
+  roles: [implement, verify, write]   # INFERRED from modules/models/registry.yaml scope
                                     # ("implementation, verification and
-                                    # writing") — not declared in runtimes.json,
+                                    # writing") — not declared in runtimes.yaml,
                                     # which only lists the five pool runtimes.
 
 launch:
   orca: {kind: managed-agent, agent: codex}
-  imageGeneration: false      # codex.json gpt-5.6-luna profile
+  imageGeneration: false      # registry.yaml targets gpt-5.6-luna profile
 
 business:
   question: >-
@@ -38,15 +38,15 @@ business:
     rather than the shared codex-agent pool?" — this target.
   whenNeeded:
     - Easy/medium implement/verify/write where an owner wants a bounded Luna allocation.
-    - As an ordinary Codex operation model — model-catalog.md is explicit that it is "an ordinary Codex operation model", not a special gate.
+    - As an ordinary Codex operation model — modules/models/registry.yaml is explicit that it is "an ordinary Codex operation model", not a special gate.
   whenNot:
-    - "\"business-decision, planning or ImageGen routes\" — model-catalog.md excludes all three verbatim."
+    - "\"business-decision, planning or ImageGen routes\" — modules/models/registry.yaml excludes all three verbatim."
     - Hard-tier work — easy/medium eligibility only.
-    - "Never as a way to buy qualification: \"a requested allocation never supplies missing model qualification, permits prohibited tools, weakens independent review or expands write authority\" (model-catalog.md)."
+    - "Never as a way to buy qualification: \"a requested allocation never supplies missing model qualification, permits prohibited tools, weakens independent review or expands write authority\" (modules/models/registry.yaml)."
   pickedBy: >-
     Explicit target selection only — an owner names it; the allocator does not
     spontaneously prefer it over the pool. Note the bare name is
-    double-bound in registry.json — `targets["gpt-5.6-luna"]` is this route while
+    double-bound in registry.yaml — `targets["gpt-5.6-luna"]` is this route while
     `targetAliases["gpt-5.6-luna"]` resolves the same string to `codex-agent`
     (as do `codex-gpt-5.6-luna` / `codex-gpt-5.6-luna-reviewer`). Which binding a
     caller gets depends on whether it resolves through targets or aliases;

@@ -10,6 +10,11 @@
 #                  comes from the output — never from the agent's say-so
 #   partial      — some metrics covered, some not
 #   gap          — nothing verifies it today; audits must report it, not skip
+#
+# `tools:` names what a project would run; `enforcedBy:` names a script in this
+# tree that runs it. A layer with tools and no enforcedBy entry is a `gap` until
+# a project wires the tool itself — the audit reports that, it never assumes it.
+schema: starci/module-quality-bar@1
 version: 2
 
 layers:
@@ -66,7 +71,7 @@ layers:
       - injection-safe queries
     tools: [gitleaks, npm audit, osv-scanner, sonar security-hotspots]
     enforcedBy: []
-    status: tool-covered
+    status: gap                # no script here runs these; a project wires them or the audit reports the gap
 
   performance:
     summary: budgets and no pathological patterns
@@ -87,7 +92,7 @@ layers:
       - zero dead code, bounded TODO count
     tools: [sonar (complexity/duplication/smells), depcheck, knip]
     enforcedBy: []
-    status: tool-covered
+    status: gap                # same: listed tools, no runner in this tree
 
   observability:
     summary: logs, metrics, tracing, health
@@ -108,7 +113,7 @@ layers:
       - minimal footprint, no unused deps
     tools: [npm outdated, license-checker, depcheck]
     enforcedBy: []
-    status: tool-covered
+    status: gap                # same: listed tools, no runner in this tree
 
   starciwork-artifacts:
     summary: the durable tree is complete — nodes, media, UAT, evidence
@@ -127,6 +132,7 @@ aggregator:
   sonar:
     covers: [static-correctness, tests, security, maintainability]
     rule: server-result-or-blocked
+    note: A real server result is the only thing that lifts security and maintainability off `gap`.
 
 verdict-rule:
   # Best effort is acceptable where hard enforcement doesn't exist — but the

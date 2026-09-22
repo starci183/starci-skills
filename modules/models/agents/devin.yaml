@@ -31,7 +31,7 @@ kernelPermissionReason: |-
   The long-lived kernel is not an implementation worker: its required loop repeatedly invokes the declared
   Node kernel API and Orca observation commands. Per-command menus deadlock an unattended kernel. Dangerous
   mode is scoped to this dedicated terminal; the kernel packet still forbids direct ledger writes, source
-  implementation and self-spawned operation terminals. Operation lanes also launch unattended, but remain
+  implementation and self-spawned operation terminals. Operation agents also launch unattended, but remain
   bounded by their narrower operation contract and owned-path leases.
 readiness:
   screenPattern: '(?:Ask Devin|Message Devin|Type your message|Enter a prompt|(^|\n)\s*[>❯❭]\s*$)'
@@ -85,10 +85,10 @@ knownFailures:
     action: Fix the model pin in the route or config — do not retry the same id.
   - signal: 'Agent connection lost: agent child exited: exit code: 0'
     meaning: The spawned agent child process died; queued sends will not be processed.
-    action: Close the terminal and spawn a fresh lane; do not keep sending into the dead TUI.
+    action: Close the terminal and spawn a fresh agent; do not keep sending into the dead TUI.
     seenAt: 2026-09-20
   - signal: 'TUI sits at a permission menu (1 Yes / 2-4 allow-variants / 5 bypass / 8 No)'
-    meaning: Command approval is being asked per tool; the lane is stalled waiting for input.
+    meaning: Command approval is being asked per tool; the agent is stalled waiting for input.
     action: 'Send "5" + Enter once (session bypass) — do not answer individual allows, they re-prompt per command kind.'
     seenAt: 2026-09-20
   - signal: 'devin opens a login menu instead of a prompt'
@@ -97,7 +97,7 @@ knownFailures:
     seenAt: 2026-09-20
   - signal: 'Spinner "Thinking" for >60 min with no output and no writes to disk'
     meaning: Wedged agent, not a slow task — output freshness is the health signal.
-    action: Kill and respawn the lane; work is recovered by the next lane surveying the tree.
+    action: Kill and respawn the agent; work is recovered by the next attempt surveying the tree.
     seenAt: 2026-09-20
 verifiedAt: 2026-09-20
 verifiedAgainst: 'devin CLI v3000.10.27'

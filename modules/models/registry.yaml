@@ -11,41 +11,23 @@ aliases:
   alibaba: qwen
   deepseek: qwen
   cognition: devin
-executionModes:
-  solo:
-    hosts: [codex, claude, orca]
-    controlPlane: current-chat-session
-    operationAgent: isolated-background-agent
-    maxConcurrentOperationAgents: 3
-    isolation: isolated-per-operation
-    worktree: current-session-worktree
-    scheduling: dependency-dag
-    fanOutWithinOperation: forbidden
-  orchestrated:
-    controlPlane: orca
-    bootstrapHosts: [codex, claude, orca]
-    bootstrapRole: retain-user-designated-coordinator
-    coordinatorAgent: current-user-designated-session
-    coordinatorAuthority: owns-approved-boundaries-and-review
-    workers: [codex, claude, qwen, devin]
-    workflowWrapperAgent: deterministic-workflow-kernel
-    workflowManagerAuthority: sole-state-writer-and-operation-dag
-    workflowManagerReportsTo: active-user-designated-coordinator
-    workflowManagerExecutionPolicy: typed-kernel-loop
-    higherLayerSubstitution: forbidden
-    operationAgent: supervised-native-agent-in-workflow-worktree
-    maxConcurrentOperationAgents: 3
-    isolation: isolated-per-operation
-    worktree: isolated-child-per-workflow-attempt
-    scheduling: dependency-dag
-    fanOutWithinOperation: forbidden
-agentArchitecture:
-  levels: [user-coordinator, workflow-kernel, operation-agent]
-  flexibleLayers: [user-coordinator]
-  isolationBoundary: operation
-  wrapperResponsibilities: [resolve-dependencies, normalize-input, resolve-agent-chain, validate-output, route-output, retry-no-effect]
+executionModel:
+  # Two agent levels, one host. A chat submits the goal and then monitors; it is
+  # never an agent layer above the kernel.
+  levels: [workflow-kernel, operation-agent]
+  host: orca
+  chat: trigger-and-monitor-only
+  workflowKernel: one-long-lived-agent-per-workflow
+  kernelAuthority: sole-workflow-state-writer-through-scripts/kernel/api.mjs
+  operationAgent: one-ephemeral-agent-per-job
   operationMapping: one-operation-instance-one-agent
+  isolationBoundary: operation
+  worktree: isolated-child-per-job
+  scheduling: dependency-dag
+  fanOutWithinOperation: forbidden
   concreteAgentBinding: provider-profile-model
+  # Concurrency is one number per pool and it lives in one file.
+  concurrency: modules/models/runtimes.yaml runtimes.<pool>.maxParallel
 orchestration:
   runtime: orca
   owner: source-host
@@ -55,12 +37,10 @@ orchestration:
   # (define-goal, start-kernel) plus settle-time evidence verdicts — there is no
   # separate approvals engine or policy file.
   approvalMode: entry-skill-owner-ok
-  dispatch: The current user-designated coordinator remains the coordinator, including when it is an external
-    Codex or Claude chat driving Orca. It creates an isolated child worktree for each ready workflow and starts
-    the deterministic workflow kernel there; no replacement Coordinator or state-owning Workflow Manager agent
-    is forced. The kernel is the sole workflow-state writer and launches one isolated agent for each ready
-    operation using the first eligible target in that operation's chain. The coordinator and kernel never
-    implement, repair or test on behalf of an operation agent.
+  dispatch: An entry skill claims a queued goal and spawns that workflow's one long-lived kernel agent
+    (scripts/kernel/start-workflow.mjs). The kernel is the sole workflow-state writer; `api dispatch --spawn`
+    launches one isolated agent per ready operation in its own worktree, using the first eligible target in
+    that operation's chain. The kernel never implements, repairs or tests on behalf of an operation agent.
 defaults:
   codex:
     working: gpt-5.6-sol
@@ -210,16 +190,6 @@ skills:
       reasoning:
         - claude-fable
         - codex-agent
-supervisors:
-  schema: starci/supervisor-chains@1
-  note: Persistent native agents that only decide, dispatch and wait. Session stability outranks
-    model depth here, so the working Claude profile leads and Codex Sol is the managed fallback.
-  planCoordinator:
-    chain: [claude-agent, codex-agent]
-    effort: high
-  workflowMonitor:
-    chain: [claude-agent, codex-agent]
-    effort: high
 operators:
   architecture.decide:
     skill: starci
@@ -542,8 +512,7 @@ costPolicy: |-
   entry - so it carries the execution `implement` role but drops the image model entirely and leads with
   the Claude pool, then the Codex pool; nothing in it is drawn, and a publish is irreversible, so the chain is
   limited to declared coding runtimes. knowledge.repair edits
-  this runtime and therefore leads with the Claude pool. Plan Coordinator and Workflow Monitor supervisors lead with the Claude pool and
-  fall back to the Codex pool. Every automatic chain contains only managed-agent or return-preamble
+  this runtime and therefore leads with the Claude pool. Every automatic chain contains only managed-agent or return-preamble
   command-terminal candidates and
   advances only after a verified no-effect failure. DeepSeek V4 Pro and Qwen 3.8 Max remain installed
   explicit or user-approved exception targets but are excluded from automatic chains; Orca

@@ -86,14 +86,14 @@ operationAgent:
       notify: Type one message into a live operation agent's own terminal and prove delivery from the screen; the only way the kernel speaks to a working agent.
       report: The typed operation report, written exactly once by the operation agent at its boundary.
       wait: One owned boundary tick that classifies every live worker and scans the report files.
-      verify: Read-only live agent-context check of every declared call before the first effect.
+      verify: Read-only contract check of the provider tree before the first effect (node scripts/checks/providers.mjs).
       workflow-commands: workflow-goal, workflow-approve, workflow-run and workflow-status are the four kernel commands; the loop itself is code, not an agent.
     input: [workflow-run, workflow-task, from, worktree, operation, scope, spec-file]
     candidateAuthority: |-
       The runtime allocator names one runtime per operation and startOperation({candidates}) hands the
       launcher exactly that resolved selection; a chain is walked only when no candidate is given.
     guarantees:
-      - verifies-declared-calls-against-live-agent-context-before-effects
+      - issues only the verbs and flags calls.yaml declares (tests/provider-orca.spec.mjs parity)
       - attests-from-is-the-workflow-run-owner-handle
       - creates-canonical-operation-task-once-per-invocation
       - tries-only-the-allocated-candidate-or-walks-the-whole-resolved-chain-in-order

@@ -6,20 +6,19 @@ start:
   agentArgument: codex
 readiness: worker-start-receipt
 roles:
-  - plan-coordinator
-  - workflow-coordinator
-  - operation-fallback
+  - workflow-kernel
+  - operation-agent
 name:
   api: terminal.rename
 release:
   api: orchestration.worker-release
 terminalFallback:
-  when: orchestration.worker-start is unavailable or a plain-command lane is wanted
+  when: orchestration.worker-start is unavailable or a plain command terminal is wanted
   command: codex
   modelArgs: ['--model', '<model>']
   effortArgs: ['-c', 'model_reasoning_effort="<effort>"']
   bypassArgs: ['--ask-for-approval', 'never', '--sandbox', 'danger-full-access']
-  bypassReason: Unattended lanes stall on per-tool permission menus; use the current explicit approval and sandbox flags declared by bypassArgs.
+  bypassReason: An unattended agent stalls on per-tool permission menus; use the current explicit approval and sandbox flags declared by bypassArgs.
   note: 'codex self-update can leave the binary broken (TUI missing dist files; a reinstall fixes it). Probe `codex --version` before relying on it.'
 verifiedAt: 2026-09-20
 verifiedAgainst: 'codex v0.155.1'
@@ -28,21 +27,12 @@ forbidden:
   - unsupervised-dispatch-inject-as-success
 capabilities:
   schema: starci/codex-capabilities@1
-  hostModes:
-    solo: supported
-    orchestrated: bootstrap-only-to-orca
-  solo:
-    controlPlane: current-chat
-    operationIsolation: collaboration-subagent
-    maximumConcurrentOperationAgents: 3
-    childWorktrees: forbidden
   orca:
     nativeManagedAgent: supported
     agentId: codex
     roles:
-      - plan-coordinator
-      - workflow-coordinator
-      - operation-fallback
+      - workflow-kernel
+      - operation-agent
 quota:
   probe: orca-account
   window: weekly
