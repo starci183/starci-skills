@@ -865,6 +865,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   cùng file. F3 báo hai lỗi script: `example-derive.mjs:215` bỏ qua outcome evidence (record fail
   vẫn derive `done`), `check-example-work.mjs:557` cho qua record `done` có evidence fail.
 
+- 04:10 Ask WSPV mới `ctx_8cc8fa06b8bd` đúng chuẩn (tiếng Việt, 4 chỗ lệch, mỗi hướng có hình và chi
+  phí). Supervisor chọn A (giữ như sản phẩm thật): không hiển thị điều chưa có thật; A không chốt
+  nhà cung cấp thanh toán. Thống kê từ 21/9 09:27: AUTH 24 succeeded / 23 failed (13 blocked,
+  10 verdict fail); WSPV 39 / 54 (24 blocked, 30 verdict fail). Blocked là chỗ lãng phí cần đào.
+
 Mở:
 - AUTH chờ hai gate của thầy: chọn direction login (form `ctx_1db4e4509029` đã `dead`, cần
   kernel re-serve khi thầy dậy) và chạy assisted OAuth run-04 (Docker đã bật; cần `npm run
