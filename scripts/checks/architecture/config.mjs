@@ -36,6 +36,32 @@ function exactKeys(value, allowed, label) {
   if (unknown.length) throw Error(`${label} has unsupported fields: ${unknown.sort().join(', ')}.`);
 }
 
+/**
+ * The git repository `root` sits in, found by walking up for a `.git` entry (a directory in a clone, a
+ * file in a worktree), or null when there is none. It is the outer boundary a `file:` dependency may
+ * resolve into: a checked project is routinely one package of a repository that also ships the packages
+ * it consumes, and `--root` is the project, not the repository.
+ */
+function repositoryRoot(root) {
+  let cursor = path.resolve(root);
+  for (;;) {
+    if (fs.existsSync(path.join(cursor, '.git'))) return cursor;
+    const parent = path.dirname(cursor);
+    if (parent === cursor) return null;
+    cursor = parent;
+  }
+}
+
+function existingPackageDirectory(absolute) {
+  try {
+    if (!fs.lstatSync(absolute).isDirectory()) return false;
+    const manifest = fs.lstatSync(path.join(absolute, 'package.json'));
+    return manifest.isFile() && !manifest.isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 function existingDirectory(root, relative) {
   try {
     return fs.lstatSync(path.join(root, relative)).isDirectory();
@@ -65,6 +91,7 @@ function workspaceDirectories(root) {
   const directories = new Set();
   const queue = [root];
   const visited = new Set();
+  const repository = repositoryRoot(root);
   const admit = (candidate, label = 'local package', strict = false) => {
     const absolute = path.resolve(candidate);
     if (!isInside(root, absolute) || absolute === root || !existingDirectory(root, slash(path.relative(root, absolute)))) {
@@ -116,7 +143,17 @@ function workspaceDirectories(root) {
     }
     for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
       for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
-        if (typeof value === 'string' && value.startsWith('file:')) admit(path.resolve(packageRoot, value.slice('file:'.length)), `${section}.${name} file dependency`, true);
+        if (typeof value !== 'string' || !value.startsWith('file:')) continue;
+        const absolute = path.resolve(packageRoot, value.slice('file:'.length));
+        const label = `${section}.${name} file dependency`;
+        if (isInside(root, absolute)) { admit(absolute, label, true); continue; }
+        // A sibling package of the same repository: this project consumes it, so the path is real and
+        // resolvable, but it is not part of this project's own source layout and must not become one of
+        // its workspaces - collecting it would pull another package's src into these roots. Refusing it
+        // instead would fail the whole check closed over an ordinary monorepo shape.
+        if (!repository || !isInside(repository, absolute) || !existingPackageDirectory(absolute)) {
+          throw Error(`${label} must resolve to a package directory inside the repository.`);
+        }
       }
     }
   }
