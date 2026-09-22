@@ -3,17 +3,48 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {configuredAllocationPolicy,DEFAULT_MODEL_POOLS,effectiveNonOperationModels,loadConfig,nonOperationModels,validateConfig} from '../engine/config.mjs';
+import {configuredAllocationPolicy,DEFAULT_MODEL_POOLS,defaultParallelGear,effectiveNonOperationModels,loadConfig,nonOperationModels,parallelGear,slicingGears,validateConfig} from '../engine/config.mjs';
 import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 // config.example.yaml is the shipped default — the installer seeds config.yaml from it verbatim, so it
 // is what loadConfig({initialize:true}) must produce. The spec reads it rather than keeping a copy.
 const EXAMPLE_NON_OPERATION={...parseYaml(fs.readFileSync(new URL('../config.example.yaml',import.meta.url),'utf8')).models.nonOperation};
-const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{agent:'codex',model:'gpt-5.6-sol',effort:'high'},budgets:{maxOps:null,perOpMs:null,dailyTokens:null},allocation:{mode:'adaptive',preferredProvider:null},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}}});
+const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{agent:'codex',model:'gpt-5.6-sol',effort:'high'},parallel:{gear:1},budgets:{maxOps:null,perOpMs:null,dailyTokens:null},allocation:{mode:'adaptive',preferredProvider:null},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}}});
 test('local config initializes the three canonical quota-aware non-operation roles and rejects unknown roles, models and shapes',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));try{fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));assert.deepEqual(loadConfig(root,{initialize:true}),expected());assert.deepEqual(effectiveNonOperationModels(loadConfig(root)).kernelManager,{pool:'opus-sol',runtimes:['claude-agent','codex-agent'],selection:'quota-aware'});const badRole=expected();badRole.models.nonOperation.rescuer='opus-sol';assert.throws(()=>validateConfig(badRole),/closed quota-aware/);fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(badRole));assert.throws(()=>loadConfig(root),/closed quota-aware/,'loadConfig must not reinterpret an unknown non-operation role');const badModel=expected();badModel.models.pools['opus-sol']=['unknown-model','codex-agent'];assert.throws(()=>validateConfig(badModel),/opus-sol/);const badCapability=expected();badCapability.models.nonOperation.kernelManager='fable-astra';assert.equal(validateConfig(badCapability),badCapability,'both reasoning peers carry decide');const duplicate=expected();duplicate.models.pools['opus-sol']=['claude-agent','claude-agent'];assert.throws(()=>validateConfig(duplicate),/canonical pair/);assert.throws(()=>nonOperationModels('ownerAuthority',expected()),/Unknown non-operation/);const custom={...expected(),language:'en',model:'test-host-model'};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(custom));assert.deepEqual(loadConfig(root),custom);fs.writeFileSync(path.join(root,'config.yaml'),'null\n');assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('top-level supervisor/validator/critique sections are refused as unknown keys',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-old-'));try{const old=expected();old.supervisor={runtimes:['codex-agent','claude-agent']};old.critique={runtimes:['claude-fable','codex-agent']};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(old));assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('six-role nonOperation drafts are refused by the closed schema',()=>{const draft=expected();draft.models.nonOperation={goalAssessment:['claude-fable','codex-agent'],operationPlanner:['claude-fable','codex-agent'],kernelManager:['claude-agent','codex-agent'],technicalDecision:['claude-fable','codex-agent'],goalCritic:['claude-fable','codex-agent'],validator:['claude-fable','codex-agent']};assert.throws(()=>validateConfig(draft),/Invalid config/);});
 test('a lone config.json is not honored — config.yaml is the only owner file',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-json-'));try{fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({language:'vi',model:null,effort:'medium',models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}}}));assert.throws(()=>loadConfig(root),/Missing config\.example\.yaml/,'config.json must not be read; with no example file the loader fails closed');}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('relocated installed config reads the source model registry',async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-installed-'));try{for(const file of ['engine/config.mjs','engine/runtime-root.mjs','engine/yaml.mjs','config.example.yaml','modules/models/runtimes.yaml']){const target=path.join(root,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(new URL(`../${file}`,import.meta.url),target);}const installed=await import(`${new URL(`file:///${path.join(root,'engine/config.mjs').replaceAll('\\','/')}`)}?fixture=${Date.now()}`);assert.deepEqual(installed.nonOperationModels('kernelManager',installed.loadConfig(root)),['claude-agent','codex-agent']);assert.equal(fs.existsSync(path.join(root,'model','runtimes.yaml')),false);}finally{fs.rmSync(root,{recursive:true,force:true});}});
+
+// parallel.gear is the owner's ONE parallelism knob: an integer from
+// modules/models/runtimes.yaml allocation.slicing.gears, defaulting to the first
+// declared gear when the block is absent, failing closed on anything else.
+test('parallel.gear accepts a declared gear, defaults to the first one and fails closed on the rest',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-gear-'));
+  try{
+    fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
+    const gears=slicingGears();
+    assert.deepEqual(gears,[1,2],'the declared gear vocabulary is data in runtimes.yaml');
+    assert.equal(defaultParallelGear(),1);
+    const base=loadConfig(root,{initialize:true});
+    assert.deepEqual(base.parallel,{gear:1},'the shipped example ships the owner knob at gear 1');
+    assert.equal(parallelGear(base),1);
+    for(const gear of gears){
+      const geared={...base,parallel:{gear}};
+      fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(geared));
+      assert.equal(parallelGear(loadConfig(root)),gear,`gear ${gear} is declared and must load`);
+    }
+    const absent={...base};
+    delete absent.parallel;
+    fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(absent));
+    assert.equal(parallelGear(loadConfig(root)),defaultParallelGear(),'an absent parallel block is the first declared gear, not an error');
+    assert.throws(()=>validateConfig({...base,parallel:{gear:3}}),/not declared by modules\/models\/runtimes\.yaml/,'an undeclared gear fails closed');
+    assert.throws(()=>validateConfig({...base,parallel:{gear:'2'}}),/parallel must be \{gear: <integer>\}/);
+    assert.throws(()=>validateConfig({...base,parallel:{gear:1,agents:6}}),/parallel must be \{gear: <integer>\}/,'the knob is one key; an agent count is runtimes.yaml data');
+    assert.throws(()=>validateConfig({...base,gear:2}),/Invalid config/,'a top-level gear is an unknown key');
+    fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml({...base,parallel:{gear:9}}));
+    assert.throws(()=>loadConfig(root),/parallel\.gear 9/,'loadConfig must not reinterpret an undeclared gear');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
 
 test('adaptive capacity is the default and the owner may prefer one declared provider without creating a chain',()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-providers-'));

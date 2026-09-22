@@ -25,8 +25,26 @@ export function allocationMs(dotted){
   if(!Number.isFinite(value)||value<=0)throw Error(`modules/models/runtimes.yaml allocation.${dotted} must declare a positive number of milliseconds`);
   return value;
 }
+/**
+ * modules/models/runtimes.yaml allocation.slicing.gears — the declared gear vocabulary. A gear is an
+ * index into allocation.slicing.size.<class>.agents, so the two lists are one authority; code never
+ * carries a literal gear. Refuses when the contract omits the list or spells it with a non-integer.
+ */
+export function slicingGears(){
+  const gears=allocationSettings()?.slicing?.gears;
+  if(!Array.isArray(gears)||!gears.length||gears.some(value=>!Number.isInteger(value)||value<1))
+    throw Error('modules/models/runtimes.yaml allocation.slicing.gears must declare a non-empty list of positive integers');
+  return [...gears];
+}
+/** The gear an absent `parallel` block means. The first declared gear, never a literal. */
+export const defaultParallelGear=()=>slicingGears()[0];
+/** The owner's parallelism gear: config.yaml `parallel.gear`, or the first declared gear when absent. */
+export function parallelGear(config=loadConfig()){
+  validateConfig(config);
+  return config?.parallel?.gear??defaultParallelGear();
+}
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','parallel'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){
@@ -43,6 +61,13 @@ export function validateConfig(config){
       throw Error(`Invalid config.yaml: kernel.agent ${kernel.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     if(typeof kernel.effort==='string'&&!EFFORT_LEVELS.includes(kernel.effort))
       throw Error('Invalid config.yaml: kernel.effort must use the effort vocabulary.');
+  }
+  if(config?.parallel!==undefined){
+    const parallel=config.parallel,gears=slicingGears();
+    if(!plain(parallel)||Object.keys(parallel).some(key=>key!=='gear')||!Number.isInteger(parallel.gear))
+      throw Error('Invalid config.yaml: parallel must be {gear: <integer>}.');
+    if(!gears.includes(parallel.gear))
+      throw Error(`Invalid config.yaml: parallel.gear ${parallel.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')}).`);
   }
   if(config?.budgets!==undefined){
     const budgets=config.budgets;

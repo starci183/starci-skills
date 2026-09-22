@@ -33,11 +33,40 @@ Optional keys:
 
 - `kernel` — `{agent?, model?, effort?}` route pin for the `[Kernel]` seat; null means routing decides
 - `budgets` — `{maxOps?, perOpMs?, dailyTokens?}` owner ceilings; positive integers or null
+- `parallel` — `{gear}`; the one parallelism knob, below
 - `allocation.mode` — `adaptive`; fresh quota, current admitted load, recent service and task/model suitability
   are recomputed before every future assignment
 - `allocation.preferredProvider` — `null` for automatic capacity or one declared provider id for a bounded
   preference; this never forms a fallback chain
 - `debug` — boolean
+
+## Parallelism
+
+`parallel.gear` is the only knob for how wide one operation runs. It is an integer that indexes the
+agent table in `modules/models/runtimes.yaml` `allocation.slicing.size`, whose keys are the classes
+`api estimate` assigns a measured write closure:
+
+| size | what it is | agents at each declared gear |
+| --- | --- | --- |
+| `s` | the whole closure fits inside `allocation.slicing.targetMinutes[0]` | always 1 |
+| `m` | larger than `s`, below the `l` bounds | always 1 |
+| `l` | a count reaches `size.l.from` | `size.l.agents[gear]` |
+| `xl` | a count reaches `size.xl.from` | `size.xl.agents[gear]` |
+
+The classes' bounds and the agent counts are data in `runtimes.yaml`, not here — read them there.
+The declared gears are `allocation.slicing.gears`; a `gear` outside that list fails closed like any
+other unknown key, and an absent `parallel` block means the first declared gear
+(`engine/config.mjs` `slicingGears`, `parallelGear`).
+
+Three rules hold at every gear:
+
+1. **`s` and `m` operations are always one agent.** The table applies to `l` and `xl` only.
+2. **A gear never raises a ceiling.** It raises only what `api estimate` *requests*. A pool's
+   `runtimes.<pool>.maxParallel`, the fleet's `maxParallelOps` and the workflow's `budgets.maxOps`
+   all clamp it afterwards, and the lowest one admits.
+3. **Requested is not achievable.** `api estimate` returns `agentsRequested` from this table and
+   `agentsAchievable` after the closure's disjoint path partition bounds it — a two-directory
+   closure runs two agents however high the gear is, and `reason` says so.
 
 | non-operation role | required runtime role | default pool |
 | --- | --- | --- |

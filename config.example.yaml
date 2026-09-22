@@ -22,11 +22,20 @@ effort: medium
 # authentication probe, unsupported CLI flag or model-attestation mismatch
 # fails closed instead of substituting another agent.
 kernel: {agent: codex, model: gpt-5.6-sol, effort: high}
+# parallel — the one knob for how wide the fleet runs. `gear` indexes the agent
+# table in modules/models/runtimes.yaml allocation.slicing.size: a long (`l`)
+# operation asks for the `l.agents[gear]` agents, an extra-long (`xl`) one for
+# `xl.agents[gear]`; `s` and `m` operations are always one agent. Declared gears
+# are allocation.slicing.gears — an undeclared value fails closed. Absent means
+# the first declared gear. A gear raises only what `api estimate` requests; it
+# never raises a pool's maxParallel, maxParallelOps or budgets.maxOps below.
+parallel: {gear: 1}
 # budgets — owner-declared ceilings surfaced by every plan before `ok`, so the
 # envelope the owner approves shows the caps the kernel was configured with.
 # Null = unbounded. These are caps, not targets.
 budgets:
-  maxOps: null       # max concurrent dispatched ops the kernel may hold open
+  maxOps: null       # max concurrent dispatched ops one workflow may hold open;
+                     # route/dispatch refuse `max-ops` at min(this, maxParallelOps)
   perOpMs: null      # per-op wall-clock ceiling in milliseconds
   dailyTokens: null  # daily token ceiling across kernel + ops
 # Adaptive mode combines fresh quota, live reservations and task/model suitability. Set preferredProvider to a
