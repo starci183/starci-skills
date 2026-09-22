@@ -461,3 +461,67 @@ test('kernel launch fails closed when the terminal does not attest the requested
   const job=jobRow(fx.repo,`kernel-${workflowId}`);
   assert.notEqual(job?.status,'running','an unattested Kernel must never be recorded running');
 });
+
+/* ------------------------------------------ worker-start feeds provider health */
+
+test('an unclassified worker-start refusal is a strike; the second one opens the provider circuit',t=>{
+  const fx=fixture(t);
+  fx.env.STARCI_FAKE_ORCA_MODE='worker-start-refused';
+  const workflowId='wf-worker-start-strikes';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
+      .run(`kernel-${workflowId}`);
+    for(const n of [1,2,3])
+      ledger.enqueueJob({jobId:`job-ws-${n}`,workflowId,opId:'architecture.decide',kind:'op',
+        payload:{opId:'architecture.decide',owned_paths:[`docs/ws-${n}/`],difficulty:'hard'}});
+  }finally{ledger.close();}
+
+  const dispatchClaude=jobId=>{
+    const routed=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--prefer','claude-agent','--json');
+    assert.equal(routed.status,0,routed.stderr||routed.stdout);
+    return {routed:json(routed.stdout)?.decision?.model,
+      dispatched:fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json')};
+  };
+  const health=()=>ledgerRead(fx.repo,db=>json(
+    db.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='claude'").get()?.value_json??'null'));
+  const unavailableEvents=()=>ledgerRead(fx.repo,db=>db.prepare(
+    "SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind='provider-unavailable'").get(workflowId).n);
+
+  const first=dispatchClaude('job-ws-1');
+  assert.equal(first.routed,'claude-agent','precondition: the pool is healthy before the first refusal');
+  assert.notEqual(first.dispatched.status,0,'a refused worker-start rejects the dispatch');
+  const firstReject=json(first.dispatched.stdout);
+  assert.equal(firstReject?.rejection?.status,'queued','effectState none keeps the candidate reusable');
+  assert.equal(firstReject?.rejection?.providerHealth,null,'one refusal is a strike, not an outage');
+  assert.equal(health()?.status,'striking','the strike is durable so the next refusal can count it');
+  assert.equal(health()?.failureKind,'worker-start');
+  assert.equal(health()?.failures,1);
+  assert.equal(unavailableEvents(),0,'a strike does not announce a provider outage');
+
+  const second=dispatchClaude('job-ws-2');
+  assert.equal(second.routed,'claude-agent','a striking pool is still routable');
+  assert.notEqual(second.dispatched.status,0);
+  const secondReject=json(second.dispatched.stdout);
+  assert.equal(secondReject?.rejection?.providerHealth?.failureKind,'worker-start',
+    'the second refusal opens the typed circuit under its own failure kind');
+  assert.equal(secondReject?.rejection?.status,'queued','opening a circuit never consumes the attempt');
+  assert.equal(health()?.status,'unavailable');
+  assert.equal(health()?.failures,2);
+  assert.equal(unavailableEvents(),1,'the open circuit is announced exactly once');
+  const cooldown=ledgerRead(fx.repo,db=>db.prepare(
+    "SELECT expires_at FROM signals WHERE scope='provider-health' AND key='claude'").get()?.expires_at);
+  assert.ok(cooldown>Date.now(),'the worker-start circuit carries its declared cooldown');
+  assert.ok(cooldown<=Date.now()+120000,'runtimes.yaml allocation.cooldownMs.worker-start owns the number');
+
+  // The point of the circuit: routing stops sending work at the broken pool.
+  const third=fx.run(API,'route','--repo',fx.repo,'--job','job-ws-3','--difficulty','hard','--prefer','claude-agent','--json');
+  assert.equal(third.status,0,third.stderr||third.stdout);
+  const decision=json(third.stdout)?.decision;
+  assert.notEqual(decision?.model,'claude-agent','route must skip the pool whose launch path is refusing');
+  assert.ok(new Set((decision?.routeRejected??[]).map(item=>item.target)).has('claude-agent'),
+    'the skipped pool is named with its reason, not silently dropped');
+  assert.equal(fx.calls().filter(call=>call==='orchestration worker-start').length,2,
+    'no third launch is burned on the circuited pool');
+});

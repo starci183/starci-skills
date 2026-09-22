@@ -167,6 +167,11 @@ else if (verb === 'orchestration worker-start') {
       residualResources: ['dispatch-fake-1']
     } });
   }
+  // The shape Devin logged: a refusal the host never classified — no stage, no
+  // residual resources, an empty message. calls.yaml classifies it failed with
+  // effectState none, so the candidate is reusable and nothing said why.
+  if (mode === 'worker-start-refused')
+    fail({ ok: false, error: { code: 'worker_start_failed', message: '' }, result: {} });
   state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = 'dispatch-fake-1'; save();
   out({ ok: true, result: { runId: arg('run'), taskId: arg('task'), dispatchId: 'dispatch-fake-1',
     state: 'ready', stage: 'ready',

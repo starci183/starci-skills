@@ -95,7 +95,13 @@ allocation:
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
-  cooldownMs: {rate-limited: 600000, quota: 3600000, auth: 86400000, other: 300000}
+  # worker-start is a managed launch the host refused without classifying it. Two minutes is long
+  # enough for the kernel to reroute the attempt to a different pool, short enough that a one-off
+  # host hiccup does not park a healthy pool for the rest of the leg.
+  cooldownMs: {rate-limited: 600000, quota: 3600000, auth: 86400000, other: 300000, worker-start: 120000}
+  # Observations of one failure kind before its circuit opens. A kind absent here opens on the first:
+  # a provider answering 401 is not a flake, a single refused launch can be.
+  providerStrikes: {worker-start: 2}
   backoffFactor: 2
   maxCooldownMs: 3600000
 runtimes:

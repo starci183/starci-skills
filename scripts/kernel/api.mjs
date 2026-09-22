@@ -815,31 +815,57 @@ const providerHealthOf = (db, provider, now = Date.now()) => {
   const value = parseJson(row.value_json, {});
   return value?.status === 'unavailable' ? { ...value, at: row.at, expiresAt: row.expires_at } : null;
 };
-const providerCooldownMs = (failureKind) => {
+const allocationOf = (section) => {
   try {
     const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-    const map = doc?.allocation?.cooldownMs ?? {};
-    const value = Number(map[failureKind] ?? map.other);
-    if (Number.isFinite(value) && value > 0) return value;
-  } catch { /* contract fallback below */ }
-  return 5 * 60 * 1000;
+    return doc?.allocation?.[section] ?? {};
+  } catch { return {}; }
 };
+const providerCooldownMs = (failureKind) => {
+  const map = allocationOf('cooldownMs');
+  const value = Number(map[failureKind] ?? map.other);
+  return Number.isFinite(value) && value > 0 ? value : 5 * 60 * 1000;
+};
+// How many observations of one failure kind open the pool's circuit. A kind
+// with no declared limit opens on the first: an authenticated provider that
+// answers 401 is not a flake. runtimes.yaml allocation.providerStrikes.
+const providerStrikeLimit = (failureKind) => {
+  const value = Number(allocationOf('providerStrikes')[failureKind]);
+  return Number.isInteger(value) && value > 0 ? value : 1;
+};
+// The raw provider-health row, open circuit or not: providerHealthOf answers
+// only for an OPEN circuit, so it cannot count the strikes leading to one.
+const providerSignalOf = (db, provider, now = Date.now()) => {
+  const key = normalizeProviderId(provider);
+  if (!key) return null;
+  const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?')
+    .get(PROVIDER_HEALTH_SCOPE, key);
+  if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
+  return { ...parseJson(row.value_json, {}), at: row.at, expiresAt: row.expires_at };
+};
+// Records one provider failure. Below the kind's strike limit the row is a
+// durable 'striking' strike counter that routing ignores; on the limit it
+// becomes the 'unavailable' circuit route/dispatch skip. The return value is
+// the OPEN circuit or null — a strike is not yet provider health.
 const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error, now, failureKind = 'auth' }) => {
   const key = normalizeProviderId(provider);
   if (!key) return null;
   const expiresAt = now + providerCooldownMs(failureKind);
-  const prior = providerHealthOf(db, key, now);
+  const prior = providerSignalOf(db, key, now);
+  const failures = (prior?.failureKind === failureKind ? Number(prior.failures ?? 0) : 0) + 1;
+  const strikeLimit = providerStrikeLimit(failureKind);
   const value = {
-    schema: 'starci/provider-health@1', provider: key, status: 'unavailable',
-    failureKind, model: model ?? null, jobId, step,
+    schema: 'starci/provider-health@1', provider: key,
+    status: failures >= strikeLimit ? 'unavailable' : 'striking',
+    failureKind, strikeLimit, model: model ?? null, jobId, step,
     signal: signal ?? null, detail: error ?? null, observedAt: now,
-    failures: Number(prior?.failures ?? 0) + 1,
+    failures,
   };
   db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at)
     VALUES(?,?,NULL,NULL,?,?,?)
     ON CONFLICT(scope,key) DO UPDATE SET holder_pid=NULL,token=NULL,value_json=excluded.value_json,at=excluded.at,expires_at=excluded.expires_at`)
     .run(PROVIDER_HEALTH_SCOPE, key, JSON.stringify(value), now, expiresAt);
-  return { ...value, expiresAt };
+  return value.status === 'unavailable' ? { ...value, expiresAt } : null;
 };
 
 // `api route` — resolve the pool/model for one job and persist the decision on
@@ -1073,6 +1099,16 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       providerHealth = writeProviderCircuit(ledger.db, {
         provider: model.provider, model: model.target, jobId, step, signal, error, now,
         failureKind: 'readiness',
+      });
+    } else if (step === 'worker-start' && model?.provider) {
+      // A managed launch the host refused without saying why is still the
+      // provider's launch path failing. Left unclassified it fed nothing, so
+      // the kernel rerouted straight back to the same pool and burned another
+      // launch. It is a strike (runtimes.yaml allocation.providerStrikes) —
+      // one flake never parks a pool, the second one does.
+      providerHealth = writeProviderCircuit(ledger.db, {
+        provider: model.provider, model: model.target, jobId, step, signal, error, now,
+        failureKind: 'worker-start',
       });
     }
     const priorPayload = jobPayloadOf(job);
