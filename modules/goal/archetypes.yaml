@@ -55,7 +55,7 @@ about:
     an empty-ish S₀ (nothing of the feature exists yet); existing.yaml's survey
     may shorten every chain below to its EXTEND shape.
   matchingRule: >-
-    Match on signals, then run SURVEY (existing.yaml) before proposing — the
+    Match on signals (signalMatching below), then run SURVEY (existing.yaml) before proposing — the
     chain below is the BUILD shape; EXTEND and ADD shapes shorten or reroute it
     per the extend-vs-add decision. Then VERIFY every leg's prerequisites
     against the route blocks. Order within a chain follows the registry stage
@@ -111,17 +111,64 @@ legRationale:
     legs — see anatomy.yaml questions.
 
 # ----------------------------------------------------------------------------
+# How an owner prompt, in any language the phrases cover, selects archetypes.
+# ----------------------------------------------------------------------------
+signalMatching:
+  normalization: >-
+    The prompt and every phrase are Unicode NFC-normalized, lower-cased and
+    whitespace-collapsed. Diacritics are kept: Vietnamese "chậm" (slow) never
+    matches "chấm" (grade), and an unaccented spelling matches only when it is
+    listed as its own phrase.
+  phrase: >-
+    A phrase hits where no letter, mark, digit or underscore touches either of
+    its word-character ends; a phrase that starts with punctuation
+    (".starciwork") needs no boundary before it, and a trailing "*" drops the
+    end boundary so the phrase matches as a word prefix ("integrat*").
+  archetypeMatch: >-
+    An archetype's signals is one alternative {phrases, requires, excludes} or a
+    list of them. An alternative matches when one of its phrases hits, every
+    requires group has a hit and no excludes phrase hits; the archetype matches
+    when any alternative does. A signals block without phrases is structural
+    (fanout) and is decided by the planner, not by phrases.
+  order: >-
+    Archetypes are tested in the order below; the first surviving match names
+    the scope kind and later matches' hints override earlier ones.
+  sequence:
+    - workspace-canonicalization
+    - investigate-first
+    - refactor
+    - external-integration
+    - assisted-uat-prepare
+    - assisted-uat-verify
+    - verify-only
+    - feature-build-with-ui
+    - feature-build-backend
+  precedence: >-
+    A matched archetype's supersedes list removes those archetypes from the
+    match set before the union is taken — a lifecycle scope (specification,
+    scaffold) names repositories and surfaces as nouns without asking to build
+    them, so the generic build priors it supersedes never join its chain.
+  noMatch: >-
+    No surviving match means S* cannot be formed: route-plan reports the INTENT
+    tier (needs-owner) and define-goal prints the chain as `underivable (kernel
+    will derive at boot)`. No archetype is a default.
+  enforcedBy: scripts/route/route-plan.mjs (loadArchetypeSignals, intentToStar) + tests/goal-planner.spec.mjs
+
 archetypes:
 
   # ==========================================================================
   # WORKSPACE-CANONICALIZATION
   # ==========================================================================
   - id: workspace-canonicalization
-    signals: >-
-      An explicit canonicalize/normalize/migrate/refactor request naming
-      .starciwork, .starcistacks, the Work tree or the application-stack
-      package. Merely describing a product/landing experience as "canonical"
-      does not match this lifecycle scope.
+    signals:
+      note: >-
+        An explicit canonicalize/normalize/migrate/refactor request naming
+        .starciwork, .starcistacks, the Work tree or the application-stack
+        package. Merely describing a product/landing experience as "canonical"
+        does not match this lifecycle scope.
+      phrases: [canonicaliz*, canonicalis*, normaliz*, normalis*, migrat*, refactor, chuẩn hoá, chuẩn hóa, tái cấu trúc, di trú]
+      requires:
+        - [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack, cây work]
     chain:
       - {op: scope.define,     leg: scopeDefine, note: "bound legacy-to-canonical mapping, preservation and live-workflow quiescence before effects"}
       - {op: test.author,      leg: implement,   note: "author migration-focused regression coverage first"}
@@ -146,9 +193,11 @@ archetypes:
   # 1 — FEATURE-BUILD-WITH-UI
   # ==========================================================================
   - id: feature-build-with-ui
-    signals: >-
-      "code fe X", "build the X screen/page", "add a UI for X", "implement the
-      X frontend" — a new feature whose scope names an interface.
+    signals:
+      note: >-
+        "code fe X", "build the X screen/page", "add a UI for X", "implement the
+        X frontend" — a new feature whose scope names an interface.
+      phrases: [code fe, frontend, front-end, ui, screen, page, dashboard, giao diện, màn hình, trang chủ, trang web, giao dien, man hinh]
     chain:
       - {op: request.analyze,     leg: intake,       note: "external; chat-side intake"}
       - {op: scope.define,        leg: scopeDefine,  note: "bounds the feature before any decide"}
@@ -191,11 +240,27 @@ archetypes:
   # 1B — ASSISTED UAT FOR GENUINE HUMAN CHECKPOINTS
   # ========================================================================
   - id: assisted-uat
-    signals: >-
-      "prepare assisted UAT", "run manual UAT", "verify the human-gated
-      browser flow", "test the OTP/CAPTCHA/3DS/external consent checkpoint".
-      A third-party dependency alone is not this signal when it remains fully
-      automatable.
+    signals:
+      note: >-
+        "prepare assisted UAT", "run manual UAT", "verify the human-gated
+        browser flow", "test the OTP/CAPTCHA/3DS/external consent checkpoint".
+        A third-party dependency alone is not this signal when it remains fully
+        automatable. The two stages match separately (variants).
+    variants:
+      - id: assisted-uat-prepare
+        signals:
+          phrases: [prepare, generate, package, author, chuẩn bị, soạn]
+          requires:
+            - [assisted uat, manual uat, human-gated uat, human gated uat, uat thủ công, uat có hỗ trợ]
+          excludes: [receipt*, biên nhận, run assisted, run manual, run the assisted, execute assisted, verify assisted, verify manual, accept assisted, reconcile assisted, chạy uat]
+      - id: assisted-uat-verify
+        signals:
+          - phrases: [run, execute, verify, accept, reconcile, receipt*, chạy, xác minh, nghiệm thu, biên nhận]
+            requires:
+              - [assisted uat, manual uat, human-gated uat, human gated uat, uat thủ công, uat có hỗ trợ]
+          - phrases: [otp, captcha, 3ds, external consent]
+            requires:
+              - [uat, acceptance, browser flow, nghiệm thu]
     chain:
       - {op: request.analyze,      leg: intake, note: "classify genuine human gate versus automatable integration"}
       - {op: uat.assisted.prepare, leg: verify, note: "freeze request/session/scripts/redaction/cleanup and exact digests; no journey execution or pass"}
@@ -223,9 +288,11 @@ archetypes:
   # 2 — FEATURE-BUILD-BACKEND
   # ==========================================================================
   - id: feature-build-backend
-    signals: >-
-      "build the X API/endpoint/service", "implement X in the backend", "add
-      the X worker/job" — a feature with no interface surface.
+    signals:
+      note: >-
+        "build the X API/endpoint/service", "implement X in the backend", "add
+        the X worker/job" — a feature with no interface surface.
+      phrases: [api, endpoint, backend, back-end, service, worker, job, code be, webhook, dịch vụ, máy chủ]
     chain:
       - {op: request.analyze,     leg: intake}
       - {op: scope.define,        leg: scopeDefine}
@@ -254,9 +321,13 @@ archetypes:
   # 3 — REFACTOR
   # ==========================================================================
   - id: refactor
-    signals: >-
-      "refactor X", "clean up X", "rename/restructure X without changing
-      behaviour" — a behaviour-invariant change to existing delivered code.
+    signals:
+      note: >-
+        "refactor X", "clean up X", "rename/restructure X without changing
+        behaviour" — a behaviour-invariant change to existing delivered code.
+        A request naming the Work or stack roots is workspace-canonicalization.
+      phrases: [refactor, clean up, cleanup, clean-up, restructure, rename, tái cấu trúc, dọn dẹp code, dọn code, đổi tên]
+      excludes: [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack]
     chain:
       - {op: request.analyze, leg: intake}
       - {op: code.refactor,   leg: implement, note: "prereq: 'delivered code + existing regression coverage'; test-gap blocker routes to test.author first if coverage is missing"}
@@ -289,9 +360,11 @@ archetypes:
   # 4 — EXTERNAL-INTEGRATION
   # ==========================================================================
   - id: external-integration
-    signals: >-
-      "integrate X", "connect to <provider>", "wire up payments/SMS/email/SSO/
-      invoicing with Y" — a declared external system the product must reach.
+    signals:
+      note: >-
+        "integrate X", "connect to <provider>", "wire up payments/SMS/email/SSO/
+        invoicing with Y" — a declared external system the product must reach.
+      phrases: [integrat*, connect to*, wire up*, vnpay*, stripe*, paypal*, momo*, sso*, oauth*, payment*, sms*, email provider*, tích hợp, kết nối với, thanh toán, cổng thanh toán]
     chain:
       - {op: request.analyze,     leg: intake}
       - {op: scope.define,        leg: scopeDefine}
@@ -329,9 +402,14 @@ archetypes:
   # 5 — VERIFY-ONLY
   # ==========================================================================
   - id: verify-only
-    signals: >-
-      "lint check the repo", "verify X", "review the Y changes", "run the
-      checks on Z" — an audit request with no build intent.
+    signals:
+      note: >-
+        "lint check the repo", "verify X", "review the Y changes", "run the
+        checks on Z" — an audit request with no build intent. A build or
+        refactor verb anywhere means the audit word names the target ("refactor
+        the audit module"), not the request.
+      phrases: [lint, verify, review, audit, check repo, check the repo, inspect, kiểm tra, rà soát, đánh giá code]
+      excludes: [build, implement, add, create, code, làm, integrate, refactor, clean up, cleanup, clean-up, restructure, rename, fix, xây, xây dựng, thêm, tạo, sửa, viết, tích hợp, tái cấu trúc, assisted uat, manual uat, human-gated uat, human gated uat]
     chain:
       - {op: request.analyze, leg: intake}
       - {op: review.verify,   leg: verify, note: "read-only inspection of a delivered slice; 'a delivery to inspect' is its only prerequisite — for a lint-the-repo ask, the delivery IS the repo state"}
@@ -358,10 +436,12 @@ archetypes:
   # 6 — INVESTIGATE-FIRST
   # ==========================================================================
   - id: investigate-first
-    signals: >-
-      "the app is a bit laggy", "X is slow", "Y feels broken", "Z
-      takes forever" — a symptom report with no named fix. The build target is
-      UNKNOWN until evidence says where the cost/defect lives.
+    signals:
+      note: >-
+        "the app is a bit laggy", "X is slow", "Y feels broken", "Z
+        takes forever" — a symptom report with no named fix. The build target is
+        UNKNOWN until evidence says where the cost/defect lives.
+      phrases: [lag, laggy, slow, sluggish, feels broken, takes forever, chậm, hơi lag, giật lag, bị đơ, tải lâu, load lâu]
     chain:
       - {op: request.analyze, leg: intake}
       - {op: perf.verify,     leg: verify, note: "the diagnostic leg — measure the symptom against the running product BEFORE any build; its finding becomes the scope"}
@@ -390,11 +470,13 @@ archetypes:
   # 7 — FAN-OUT
   # ==========================================================================
   - id: fanout
-    signals: >-
-      A goal whose scope holds >= 2 nodes with DISJOINT write scopes — e.g. a
-      feature spanning two independent surfaces, or one Work node too big for a
-      single op (>12 files / >8 assertions / >=3 SDS components triggers
-      implementation.plan cutOpFor).
+    signals:
+      structural: >-
+        A goal whose scope holds >= 2 nodes with DISJOINT write scopes — e.g. a
+        feature spanning two independent surfaces, or one Work node too big for a
+        single op (>12 files / >8 assertions / >=3 SDS components triggers
+        implementation.plan cutOpFor). The planner flags it when matched
+        archetypes target two or more state-variable families.
     chain:
       - {op: request.analyze, leg: intake}
       - {op: scope.define,    leg: scopeDefine, note: "bounds ALL siblings before any is built — the disjointness is checked against this scope"}

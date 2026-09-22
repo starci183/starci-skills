@@ -58,6 +58,32 @@ test('assisted UAT verification consumes the exact prepared package before accep
   assert.ok(!plan.legs.some(leg => leg.op === 'uat.verify'));
 });
 
+test('Vietnamese prompts select archetypes through the archetypes.yaml phrase data', () => {
+  const cases = [
+    ['ứng dụng hơi chậm khi mở khoá học', 'investigate-first'],
+    ['tích hợp VNPay cho thanh toán khoá học', 'external-integration'],
+    ['tái cấu trúc module enrolment', 'refactor'],
+    ['làm giao diện màn hình đăng ký khoá học', 'feature-build-with-ui'],
+    ['xây dịch vụ đăng ký khoá học', 'feature-build-backend'],
+    ['kiểm tra lint toàn repo', 'verify-only'],
+  ];
+  for (const [prompt, scopeKind] of cases) {
+    for (const form of [prompt, prompt.normalize('NFD')]) {
+      const result = run(form);
+      assert.equal(result.status, 0, result.stderr || result.error?.message);
+      assert.equal(body(result).scopeKind, scopeKind, `${JSON.stringify(form)} should select ${scopeKind}`);
+    }
+  }
+});
+
+test('diacritics are kept: "chấm điểm" (grade) is not the "chậm" (slow) signal', () => {
+  const result = run('chấm điểm bài nộp');
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  const plan = body(result);
+  assert.equal(plan.status, 'needs-owner');
+  assert.equal(plan.ambiguity?.tier, 'INTENT');
+});
+
 test('an ordinary behavior-invariant refactor retains the Work remap', () => {
   const result = run('refactor the enrolment service without changing behavior');
   assert.equal(result.status, 0, result.stderr || result.error?.message);

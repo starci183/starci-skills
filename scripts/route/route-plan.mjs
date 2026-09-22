@@ -131,19 +131,15 @@ function loadProducesTable(goalDir) {
 
 // ------------------------------------------------------------ PARSE -> S* --
 
-// The small intent->S* table for the archetypes in modules/goal/archetypes.yaml.
-// Signals are regexes over the owner prompt; each hit contributes target state
-// variables plus chain hints the backward chainer consumes (producer
+// The intent->S* table for the archetypes in modules/goal/archetypes.yaml. The
+// signals (which prompt phrases select an archetype, in which order, which
+// archetypes a match supersedes) are data in that file's signalMatching and
+// per-archetype signals; this table holds only what a match contributes: target
+// state variables plus chain hints the backward chainer consumes (producer
 // preference, custody pre-mark, diagnostic-first). Archetypes COMPOSE: union
 // of matched vars (archetypes.yaml composition.unionNotOverride).
-const ARCHETYPES = [
-  {
-    id: 'workspace-canonicalization',
-    // A canonical Work/stack-root migration is not ordinary record authoring.
-    // Keep this signal narrow so product requests such as "canonical NIVO
-    // landing" remain feature work even when they share the same project
-    // ledger with a workspace migration.
-    signals: [/(?:\b(?:canonicali[sz](?:e|ation)|normal(?:i[sz]e|ization)|migrat\w*|refactor)\b[\s\S]{0,240}(?:\.starciwork|\.starcistacks|\.stacks\b|\bwork tree\b|\bapplication[- ]stack(?: package)?\b))|(?:(?:\.starciwork|\.starcistacks)[\s\S]{0,240}\b(?:canonicali[sz](?:e|ation)|normal(?:i[sz]e|ization)|migrat\w*|refactor)\b)/i],
+const ARCHETYPE_STAR = {
+  'workspace-canonicalization': {
     vars: () => [
       { family: 'impl', suffix: 'workspace-path-consumers', state: 'done' },
       { family: 'workspace', suffix: '', state: 'managed' },
@@ -155,76 +151,111 @@ const ARCHETYPES = [
       scopeKind: 'workspace-canonicalization',
     },
   },
-  {
-    id: 'investigate-first',
-    signals: [/\b(lag|laggy|slow|sluggish|feels broken|takes forever|chậm|hơi lag)\b/i],
+  'investigate-first': {
     vars: () => [{ family: 'perf', suffix: 'X', state: 'verified' }],
     hints: { diagnosticFirst: true },
   },
-  {
-    id: 'refactor',
-    signals: [/\b(refactor|clean[ -]?up|restructure|rename|split .* into .* module)\b/i],
-    excludes: [/(?:\.starciwork|\.starcistacks|\.stacks\b|\bwork tree\b|\bapplication[- ]stack(?: package)?\b)/i],
+  refactor: {
     vars: a => [{ family: 'impl', suffix: a.surfaceName, state: 'done' }],
     hints: { preferProducer: 'code.refactor', needsCoverage: true, scopeProvided: true },
   },
-  {
-    id: 'external-integration',
-    signals: [/\b(integrat|connect to|wire up|vnpay|stripe|paypal|momo|sso|oauth|payment|sms|email provider)\w*/i],
+  'external-integration': {
     vars: a => [{ family: 'integration', suffix: a.surfaceName, state: 'verified' }],
     hints: { custody: true, implQualifier: 'backend' },
   },
-  {
-    id: 'assisted-uat-prepare',
-    signals: [/(?:\b(?:prepare|generate|package|author)\b[\s\S]{0,80}\b(?:assisted|manual|human[- ]gated)\s+uat\b)|(?:\b(?:assisted|manual|human[- ]gated)\s+uat\b[\s\S]{0,80}\b(?:prepare|generate|package|author)\b)/i],
-    excludes: [/\b(?:run|execute|verify|accept|reconcile)\b[\s\S]{0,40}\b(?:receipt|session|assisted|manual|human[- ]gated)\b/i],
+  'assisted-uat-prepare': {
     vars: a => [{ family: 'uat', suffix: a.surfaceName, state: 'assisted-ready' }],
     hints: { assistedUat: true, assistedMode: 'prepare' },
   },
-  {
-    id: 'assisted-uat-verify',
-    signals: [/(?:\b(?:run|execute|verify|accept|reconcile)\b[\s\S]{0,80}\b(?:assisted|manual|human[- ]gated)\s+uat\b)|(?:\b(?:assisted|manual|human[- ]gated)\s+uat\b[\s\S]{0,80}\b(?:run|execute|verify|accept|reconcile|receipt)\b)|\b(?:otp|captcha|3ds|external consent)\b[\s\S]{0,80}\b(?:uat|acceptance|browser flow)\b/i],
+  'assisted-uat-verify': {
     vars: a => [{ family: 'uat', suffix: a.surfaceName, state: 'assisted-verified' }],
     hints: { assistedUat: true, assistedMode: 'verify' },
   },
-  {
-    id: 'verify-only',
-    signals: [/\b(lint|verify|review|audit|check( the)? repo|inspect)\b/i],
-    // a build/refactor verb anywhere means the audit word names the target
-    // ("refactor the audit module"), not the request
-    excludes: [/\b(build|implement|add|create|code|làm|integrate|refactor|clean[ -]?up|restructure|rename|fix)\b/i, /\b(?:assisted|manual|human[- ]gated)\s+uat\b/i],
+  'verify-only': {
     vars: a => [{ family: 'slice', suffix: a.surfaceName, state: 'reviewed' }],
     hints: {},
   },
-  {
-    id: 'feature-build-with-ui',
-    signals: [/\b(code fe|frontend|front-end|ui|screen|page|dashboard|giao diện|màn hình)\b/i],
+  'feature-build-with-ui': {
     vars: a => [{ family: 'ui', suffix: a.surfaceName, state: 'verified' }],
     hints: { implQualifier: 'frontend' },
   },
-  {
-    id: 'feature-build-backend',
-    signals: [/\b(api|endpoint|backend|back-end|service|worker|job|code be|webhook)\b/i],
+  'feature-build-backend': {
     vars: a => [{ family: 'api', suffix: a.surfaceName, state: 'verified' }],
     hints: { implQualifier: 'backend' },
   },
-];
+};
 
-function intentToStar(text, args) {
+// Phrase matching per archetypes.yaml signalMatching: NFC + lower-case +
+// collapsed whitespace on both sides, diacritics kept, Unicode word
+// boundaries (JS \b is ASCII-only and never fires beside "đ" or "ệ").
+const normalizeText = s => String(s ?? '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+const WORD_CHAR = /[\p{L}\p{M}\p{N}_]/u;
+const isWordChar = ch => !!ch && WORD_CHAR.test(ch);
+
+function phraseHits(text, phrase) {
+  let p = normalizeText(phrase);
+  const prefix = p.endsWith('*');
+  if (prefix) p = p.slice(0, -1).trimEnd();
+  if (!p) return false;
+  const chars = [...p];
+  const needStart = isWordChar(chars[0]);
+  const needEnd = !prefix && isWordChar(chars.at(-1));
+  for (let i = text.indexOf(p); i >= 0; i = text.indexOf(p, i + 1)) {
+    const before = [...text.slice(Math.max(0, i - 2), i)].at(-1);
+    const after = [...text.slice(i + p.length, i + p.length + 2)][0];
+    if ((!needStart || !isWordChar(before)) && (!needEnd || !isWordChar(after))) return true;
+  }
+  return false;
+}
+
+const asArray = v => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]);
+
+function alternativeMatches(text, alt) {
+  const phrases = asArray(alt?.phrases);
+  if (!phrases.length || !phrases.some(p => phraseHits(text, p))) return false;
+  if (!asArray(alt.requires).every(group => asArray(group).some(p => phraseHits(text, p)))) return false;
+  return !asArray(alt.excludes).some(p => phraseHits(text, p));
+}
+
+/** Load archetypes.yaml signalMatching into ordered matchers. Every sequenced
+ *  id must carry phrase signals here and an S* entry in ARCHETYPE_STAR. */
+function loadArchetypeSignals(goalDir) {
+  const file = path.join(goalDir, 'archetypes.yaml');
+  const doc = parseYaml(fs.readFileSync(file, 'utf8'));
+  const byId = new Map();
+  for (const arch of asArray(doc?.archetypes)) {
+    for (const entry of arch?.variants ? asArray(arch.variants) : [arch]) {
+      byId.set(String(entry.id), { id: String(entry.id), signals: asArray(entry.signals), supersedes: asArray(entry.supersedes ?? arch.supersedes), extra: entry });
+    }
+  }
+  const sequence = asArray(doc?.signalMatching?.sequence).map(String);
+  if (!sequence.length) throw Error(`${file}: signalMatching.sequence is empty`);
+  return sequence.map(id => {
+    const entry = byId.get(id);
+    if (!entry) throw Error(`${file}: signalMatching.sequence names '${id}', which no archetype or variant declares`);
+    if (!entry.signals.some(alt => asArray(alt?.phrases).length)) throw Error(`${file}: archetype '${id}' is sequenced but has no signal phrases`);
+    if (!ARCHETYPE_STAR[id]) throw Error(`${file}: archetype '${id}' has no S* entry in scripts/route/route-plan.mjs`);
+    return { ...entry, ...ARCHETYPE_STAR[id] };
+  });
+}
+
+function matchArchetypes(rawText, archetypes) {
+  const text = normalizeText(rawText);
+  const hits = archetypes.filter(arch => arch.signals.some(alt => alternativeMatches(text, alt)));
+  const superseded = new Set(hits.flatMap(arch => arch.supersedes));
+  return hits.filter(arch => !superseded.has(arch.id));
+}
+
+function intentToStar(text, args, archetypes) {
   const a = { surfaceName: 'X' };
   const sm = /\b(?:the|for|of)\s+([a-z][a-z0-9-]{2,})\s+(?:screen|page|api|endpoint|service|feature|module)/i.exec(text);
   if (sm) a.surfaceName = sm[1];
-  const matched = [];
-  for (const arch of ARCHETYPES) {
-    if (!arch.signals.some(s => s.test(text))) continue;
-    if (arch.excludes?.some(s => s.test(text))) continue;
-    matched.push(arch);
-  }
+  const matched = matchArchetypes(text, archetypes);
   if (!matched.length) return null;
   const vars = [];
   const hints = { archetypes: matched.map(m => m.id) };
   for (const arch of matched) {
-    vars.push(...arch.vars(a));
+    vars.push(...arch.vars(a, arch, normalizeText(text)));
     Object.assign(hints, arch.hints);
   }
   // fanout: two or more disjoint verify surfaces in one prompt.
@@ -798,7 +829,7 @@ function main() {
   }
   if (args.targets.length) parseNotes.push('explicit --target vars');
   if (!sstar.length && args.text) {
-    const hit = intentToStar(args.text, args);
+    const hit = intentToStar(args.text, args, loadArchetypeSignals(goalDir));
     if (hit) { sstar = hit.vars; hints = hit.hints; parseNotes.push(`intent->S* via archetypes [${hints.archetypes.join(', ')}]`); }
   }
   sstar = dedupeVars(sstar);
