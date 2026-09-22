@@ -648,3 +648,32 @@ Việc rơi sang lane khác:
   `node scripts/checks/check-contract-cites.mjs --scan modules --scan docs --scan CONTEXT.md --scan skills`).
 - C đã xử lý: `selection.yaml` model-policy cites, profiles model-catalog, `work-layout.yaml:38`,
   `schemas/index.yaml:520`.
+
+### Lane I landed: host boundary thực thi
+
+`lib.mjs` đọc `calls.yaml` để lắp argv, live `agent-context` chạy một lần mỗi process trước
+mutation đầu tiên, `providers.mjs --live`, `check-host-boundary.mjs` vào `npm run check`,
+ba skill orca-cli/orchestration/computer-use ghi rõ "for the owner's chat only". 8 entry
+`calls.yaml` không có wrapper đã xoá; `check` và `send` giữ vì recipes cần, ghi rõ thiếu wrapper.
+Fable xoá fallback `orca account list` inline trong `scripts/api/quota/orca-account.mjs`.
+
+### Lane E landed: prose nói một điều, một lần
+
+`CONTEXT.md` 38 đoạn → 29, chín mâu thuẫn gỡ (chat ba vai, watchdog liveness-only, settle enum,
+work layout cite, host boundary một câu). README/CONTRIBUTING/CHANGELOG cite authority; docs
+khớp code; skills nêu người đọc và label đúng script in; `.experiments` S* row là layout thật.
+
+Còn lại cho lane chốt K (sau H, G, F2):
+
+- 16 cite bare filename cần path đầy đủ: `modules/goal/anatomy.yaml:345`,
+  `modules/goal/legality.yaml:313,326,352,415,422,429`,
+  `modules/schemas/relationships.yaml:46,49,52,55,55,58,61,64,137`.
+- `config.example.yaml:37` `model/runtimes.yaml` → `modules/models/runtimes.yaml`.
+- `scripts/example/example-render-proof.mjs:9` cite `docs/examples/todo-app-grit.md`;
+  `scripts/checks/check-example-work.mjs:484,504` cite `docs/kinds.md` (F2 có thể đã sửa).
+- `engine/schema.sql:118` cite `ledger-db.mjs:46-51` sai dòng → cite tên symbol, không số dòng.
+- `.gitignore:2` `/.dist*/` ghost.
+- `readDistJson` đổi tên + `check-scoped-lint.mjs:7,186`.
+- `check-contract-cites --scan modules --scan docs --scan CONTEXT.md --scan skills` phải sạch;
+  wire scan rộng này vào `npm run check` thay vì chỉ `modules/kernel`.
+- `check-evidence-binding.mjs` và `check-op-manifest.mjs` (H) vào `npm run check`.
