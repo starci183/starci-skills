@@ -515,9 +515,17 @@ A, D, B, C rồi mới cắm E. Devin làm trên `main` trực tiếp theo allow
    thể so chiếu nhưng không bao giờ là proof. Áp trước audit round 2. Vùng này thuộc allowlist
    Devin; nếu Devin chưa làm khi lane B, C, D merge xong thì lane G làm.
 
-**Phạm vi `1.0.0-alpha.2`:** toàn bộ inventory P0–P2, bảy điểm của Devin, bốn quyết định trên,
-lane E prose, lane F examples (workflow + record + 8 schema). Sang `alpha.3`: op-shape và
-`params`, `lib.mjs` đọc `calls.yaml` + live agent-context, QUALITY-BAR thành check.
+**Phạm vi `1.0.0-alpha.2`: mọi drift đã tìm thấy trong file này, không để lại gì.** Thầy chốt
+2026-09-22: "tất cả các drift trò tìm thấy". Lane theo phụ thuộc:
+
+| Lane | Chờ | Việc |
+|---|---|---|
+| E prose | B, C | mục feedback-sediment + ghost-context + P1.21–23, 25–29 phần docs/skills/CONTEXT |
+| F2 examples | C | 8 schema thiếu từ record thật, bỏ 4 skip, evidence sinh lại bằng script |
+| G supervisor | Devin | những mục Devin chưa landed khi B, C, D xong: poll.mjs sang scripts/supervisor, `WHERE report_id > ?`, ask-serving-expired, ask-superseded, worker-start failureKind, A7 contracts binding, A1 audit tự đo, riskHints |
+| H op-shape | B, C | schema `starci/op@1`, `check-op-manifest.mjs`, `params` typed + `api enqueue --params` + packet.params, bỏ handoff/matrixHandoff không consumer, bỏ `business` block, migrate 35 op, sửa case interface.draw |
+| I host-boundary | C, D | `lib.mjs` đọc `calls.yaml`, live `agent-context` một lần mỗi process, `providers.mjs --live`, `check-host-boundary.mjs`, `orca-cli` skill tách khỏi load path kernel |
+| J quality-bar | C | QUALITY-BAR nhóm Evidence thành check (`done` → artifact tồn tại + digest khớp), tick checkbox bằng tên check |
 
 **Điều kiện ra alpha.2:** `npm run check` xanh, `npm test` không skip nào ngoài PowerShell
 7, CI `ci.yml` và `todo-app-example.yml` xanh trên `main`, CHANGELOG mục alpha.2 liệt kê
