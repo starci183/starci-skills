@@ -931,6 +931,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   hỏng); WSPV implement a29 partial. 8 lần claude bị từ chối ở worker-start trong 50 phút (onboarding) → circuit 2
   phút reset → vòng lặp. Vá backoff (`7a8281413`): mở lại cùng lỗi trong 1h thì nghỉ x5, tối đa 1h.
 
+- 06:55 tick: AUTH interface.draw a6 done (direction B+B). Collab business.decide 6 done, 1 partial, 1 blocked,
+  transition-ready. Modules 3 job ready. Watchdog đúng việc: thấy active thì không đụng, AUTH báo idle-waiting khi
+  frontier không actionable. Không vá gì.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
