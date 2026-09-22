@@ -891,6 +891,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   Prompt đã diễn đạt lại dùng để persist: bỏ "SRS/SDS còn thiếu" → "chốt nốt quyết định nghiệp vụ và kiến
   trúc"; bỏ câu nhánh refactor WIP khỏi prompt modules (WIP chỉ tham khảo, ghi ở đây).
 
+- 05:20 Lane Q (routing theo độ khó của phiên fork) xanh nhưng HOÃN merge tới sáng: nó đổi route của mọi op
+  cho hai kernel đang chạy; việc suy nghĩ sẽ thử claude-agent trước, mà Claude Code trên máy chưa xong
+  onboarding (probe quota vẫn báo ok, không thấy màn onboarding) → mỗi dispatch think bị readiness từ
+  chối, nghỉ 5 phút, rồi vẫn sang codex; implement medium chuyển sang qwen3.8-flash giữa các vòng sửa
+  audit. Sáng: thầy xong onboarding Claude Code → merge lane Q (trial merge chỉ conflict
+  tests/config.spec.mjs) → thầy quyết pin kernel.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
