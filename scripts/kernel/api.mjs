@@ -636,7 +636,11 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
   // Lease-row existence is the fence, expiry only a recovery signal
   // (engine/admission.mjs findOwnedPathLeaseConflicts) — an expired row still
   // answers "why is this queued", because the prior attempt's effect may exist.
-  const conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload), { excludeJobId: job.job_id })[0];
+  // A projection never throws on a malformed stored path: dispatch admission is
+  // where that row is refused, and status must still answer for its siblings.
+  let conflict = null;
+  try { conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload), { excludeJobId: job.job_id })[0] ?? null; }
+  catch { conflict = null; }
   if (conflict) {
     return {
       queuedBecause: 'path-lease',

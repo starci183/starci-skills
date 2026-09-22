@@ -152,6 +152,10 @@ always one agent.
   files, so they are structurally `s`/`m` under a file-weighted measure regardless of how long
   they actually take — the file weight is the wrong measure for them. A per-op `from` override
   under `size` would fix that without a second authority.
+- **Only `files` and `assertions` carry a class bound.** `components` and `records` are weighted by
+  `allocation.slicing.weights` and count toward `minutes` (so they can push a closure from `s` to
+  `m`) but neither has a `from` bound, so a record-heavy or component-heavy closure with few files
+  never classifies `l`. Adding one is a line of yaml; the ledger holds nothing to set it from.
 - **The thresholds need a real closure measure.** They will stay guesses until `api estimate`'s
   own inputs are recorded. The cheapest fix: have the kernel pass the measured counts on
   `enqueue` so `job-enqueued` carries `{files, assertions, components}`, then re-derive this

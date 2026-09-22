@@ -246,6 +246,7 @@ commands:
       - estimate-no-measure: 'every count is absent or zero — there is nothing to size'
       - estimate-paths-invalid: '--paths holds a glob, an absolute path, a parent traversal or nothing concrete (engine/admission.mjs normalizeOwnedPath)'
       - gear-undeclared: '--gear names an integer allocation.slicing.gears does not declare'
+      - 'the owner config being unparsable or schema-short (UNTYPED): estimate reads parallel.gear strictly and refuses with the validation message rather than sizing a fan-out against a guessed gear. `--gear` does not consult the file and answers anyway. Admission (route/dispatch) keeps the opposite tolerance — see route.maxOps'
       - slicing-undeclared: 'allocation.slicing omits weights/targetMinutes/maxSlices/gears/size, a weight for a supplied count, or an agent count for this size at this gear'
     usedBy: 'the cut-bound evaluation before enqueue — the agent count the --cut-total flags carry (kernel-prompt.md)'
 
