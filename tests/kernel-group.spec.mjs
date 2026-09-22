@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
-import {openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 
 // The kernel is a model GROUP: config.yaml `kernel: {group: [...]}` (the shipped default) or the unpinned
 // think-group route. Members are tried in order with the provider availability signals; a single pin keeps
@@ -79,6 +79,68 @@ test('a single pin keeps its meaning: authoritative, one member, no fall-through
   const dead=f.plan({STARCI_FAKE_ORCA_DEAD:'claude'});
   assert.equal(dead.r.status,1,'a dead pinned agent is never substituted');
   assert.equal(dead.body.step,'kernel-pin-unavailable');
+});
+
+const kernelEvents=(repo,workflowId)=>{
+  const ledger=inspectLedger({file:ledgerFileFor(repo)});
+  try{
+    return ledger.db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind LIKE 'kernel-%' ORDER BY seq").all(workflowId)
+      .map(row=>({kind:row.kind,payload:json(row.payload_json)}));
+  }finally{ledger.close();}
+};
+const readState=f=>json(fs.readFileSync(f.state,'utf8'));
+const boot=(f,extra={})=>{const r=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],extra);return {r,body:json(r.stdout)};};
+
+test('a Claude onboarding gate falls through to GPT-6 Sol in the same boot and closes the gated terminal',t=>{
+  const f=fixture(t,GROUP);
+  const {r,body}=boot(f,{STARCI_FAKE_ORCA_GATE:'claude'});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  assert.deepEqual([body.agent,body.model,body.routedBy],['codex','gpt-6-sol','config']);
+  assert.deepEqual(body.fellThrough.map(x=>[x.agent,x.model,x.step,x.gate]),[['claude','claude-opus-5-5','readiness','claude-first-run-onboarding']]);
+  const events=kernelEvents(f.repo,f.workflowId);
+  assert.deepEqual(events.map(e=>e.kind),['kernel-start-failed','kernel-booted']);
+  const [failed,booted]=events;
+  assert.equal(failed.payload.gate,'claude-first-run-onboarding');
+  assert.equal(failed.payload.state,'interactive-gate');
+  assert.deepEqual(failed.payload.fellThroughTo,{agent:'codex',model:'gpt-6-sol'});
+  assert.equal(failed.payload.terminalClosed?.ok,true);
+  assert.deepEqual([booted.payload.agent,booted.payload.model],['codex','gpt-6-sol']);
+  assert.equal(booted.payload.fellThrough.length,1);
+  const state=readState(f);
+  assert.equal(state.counter,2,'one terminal per member tried');
+  assert.deepEqual(state.closed,[failed.payload.terminal],'the gated terminal is closed');
+  const live=Object.values(state.terminals).filter(term=>!term.closed).map(term=>term.handle);
+  assert.deepEqual(live,[body.terminal],'exactly one live kernel terminal, the booted one');
+  assert.match(state.terminals[body.terminal].command,/\bcodex\b/);
+});
+
+test('fall-through never happens for a single pin, a refused close, or the last member',t=>{
+  const pinned=fixture(t,'kernel: {agent: claude, model: claude-opus-5-5, effort: high}');
+  const p=boot(pinned,{STARCI_FAKE_ORCA_GATE:'claude'});
+  assert.equal(p.r.status,1,'a gated single pin fails closed');
+  assert.deepEqual(kernelEvents(pinned.repo,pinned.workflowId).map(e=>e.kind),['kernel-start-failed']);
+  assert.equal(readState(pinned).counter,1,'no second member is tried');
+
+  const refused=fixture(t,GROUP);
+  const c=boot(refused,{STARCI_FAKE_ORCA_GATE:'claude',STARCI_FAKE_ORCA_CLOSE_FAILS:'*'});
+  assert.equal(c.r.status,1,'a gated member whose terminal stays open must not fall through');
+  const [event]=kernelEvents(refused.repo,refused.workflowId);
+  assert.equal(event.payload.terminalClosed?.ok,false);
+  assert.match(event.payload.fallThroughRefused,/not closed/);
+  assert.equal(readState(refused).counter,1);
+
+  const both=fixture(t,GROUP);
+  const b=boot(both,{STARCI_FAKE_ORCA_GATE:'claude,codex'});
+  assert.equal(b.r.status,1);
+  const events=kernelEvents(both.repo,both.workflowId);
+  assert.deepEqual(events.map(e=>[e.kind,e.payload.agent,e.payload.gate]),
+    [['kernel-start-failed','claude','claude-first-run-onboarding'],['kernel-start-failed','codex','codex-directory-trust']]);
+  assert.deepEqual(events[1].payload.fellThrough?.map(x=>x.agent),['claude']);
+  const state=readState(both);
+  assert.equal(Object.values(state.terminals).filter(term=>!term.closed).length,0,'no orphan terminal after an exhausted group');
+  const ledger=inspectLedger({file:ledgerFileFor(both.repo)});
+  try{assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM signals WHERE scope='kernel' AND key=?").get(both.workflowId).n,0,'the startup reservation is released');}
+  finally{ledger.close();}
 });
 
 test('with no kernel key the unpinned route is the think group',t=>{

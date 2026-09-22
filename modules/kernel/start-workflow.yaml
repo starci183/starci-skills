@@ -61,10 +61,29 @@ spawn:
   routing: >-
     Orca is always the execution host. The Kernel agent and concrete model are
     resolved by owner config first, otherwise scripts/route/route-model.mjs
-    --kind model.manageWorkflow --risk high. A config or launcher override is
-    an explicit Kernel identity pin and fails closed when unavailable; it is
-    never silently replaced by Devin or another agent. Operation jobs retain
+    --kind model.manageWorkflow --risk high --repo <repo>. A config single pin
+    or launcher override is an explicit Kernel identity pin and fails closed
+    when unavailable; it is never silently replaced by Devin or another agent.
+    A config kernel group and the unpinned think-group route are an ordered
+    member list (docs/config-format.md "Kernel group"). Operation jobs retain
     their own independent profile/runtime-pool routing and fallback policy.
+  fallThrough:
+    rule: >-
+      A group boot (config kernel group or unpinned route) launches its members
+      in order within one boot and one startup reservation. A member whose
+      launch fails at a noEffectSteps step — before the model took any input:
+      the command could not be built, the terminal was not created, readiness
+      refused (an interactive gate such as the Claude first-run onboarding or
+      Codex directory trust, an auth death screen, a readiness timeout) or the
+      model did not attest — is recorded as one kernel-start-failed event
+      (fellThroughTo names the next member), its terminal is closed, and the
+      next member launches. A failure at any later step (send, submission,
+      attestation) has partial or unknown effect and never falls through; a
+      failed member whose terminal close is refused never falls through either,
+      so a boot never leaves an orphan terminal beside a new kernel. The last
+      member's refusal, a single pin and an --agent override end the boot as
+      before. Success records kernel-booted/kernel-restarted with fellThrough.
+    noEffectSteps: [command, create, readiness, model-attestation]
   command: >-
     Every Kernel boots as one dedicated Orca terminal, including Codex and
     Claude agents that use managed workers for operation jobs. The command is

@@ -54,6 +54,15 @@ const planOnly = process.argv.includes('--plan');
 
 const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
 const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
+// The launch steps that fail before the model took any input — the only ones a
+// group boot falls through on. An unreadable contract falls through on none.
+const FALL_THROUGH_STEPS = (() => {
+  try {
+    const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'kernel', 'start-workflow.yaml'), 'utf8'));
+    const steps = doc?.spawn?.fallThrough?.noEffectSteps;
+    return new Set(Array.isArray(steps) ? steps.filter(s => typeof s === 'string') : []);
+  } catch { return new Set(); }
+})();
 
 // Owner config: <skillRoot>/config.yaml — the per-project config seeded from
 // config.example.yaml by the installer (gitignored), read through the one
@@ -539,7 +548,7 @@ try {
 
   // 3. Launch one dedicated [Kernel] Orca terminal. A Kernel is not an Orca
   // operation worker, so boot performs no run/task/dispatch mutation.
-  const route = await resolveKernelRoute(ledger.db);
+  let route = await resolveKernelRoute(ledger.db);
   for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
   const title = `[Kernel] ${workflowId}`;
   const goal = ledger.db.prepare('SELECT revision FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
@@ -557,12 +566,41 @@ try {
   };
   if (route.error)
     failStart(route.errorStep ?? 'kernel-route', route.error, null, { agent: route.agent ?? null, requestedModel: route.model ?? null });
-  const spawned = spawnAgent({ provider: route.agent, model: route.model, effort: route.effort,
-    worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}` });
-  if (!spawned.ok)
-    failStart(spawned.step, spawned.error, spawned.terminal ?? null,
-      { agent: route.agent, requestedModel: route.model, ...(spawned.signal ? { signal: spawned.signal } : {}),
-        ...(spawned.gate ? { gate: spawned.gate } : {}), ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}) });
+  // modules/kernel/start-workflow.yaml spawn.fallThrough: a group member refused
+  // before the model took any input, with its terminal closed, hands the same
+  // boot and reservation to the next member. Anything else ends the boot.
+  const members = route.members?.length ? route.members : [route];
+  const fellThrough = [];
+  let spawned = null;
+  for (const [index, member] of members.entries()) {
+    spawned = spawnAgent({ provider: member.agent, model: member.model, effort: member.effort,
+      worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}` });
+    if (spawned.ok) { route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough }; break; }
+    const failure = { agent: member.agent, requestedModel: member.model, ...(spawned.signal ? { signal: spawned.signal } : {}),
+      ...(spawned.state ? { state: spawned.state } : {}), ...(spawned.gate ? { gate: spawned.gate } : {}),
+      ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}),
+      ...(spawned.terminalClosed ? { terminalClosed: spawned.terminalClosed } : {}) };
+    const next = members[index + 1] ?? null;
+    const noEffect = FALL_THROUGH_STEPS.has(spawned.step);
+    const closed = !spawned.terminal || spawned.terminalClosed?.ok === true;
+    if (!route.fallThrough || !next || !noEffect || !closed)
+      failStart(spawned.step, spawned.error, spawned.terminal ?? null,
+        { ...failure, ...(fellThrough.length ? { fellThrough } : {}),
+          ...(route.fallThrough && next ? { fallThroughRefused: !noEffect ? `step '${spawned.step}' may have had effect` : 'the failed terminal was not closed' } : {}) });
+    const at = Date.now();
+    const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
+    ledger.transaction(() => {
+      ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
+        kind: 'kernel-start-failed', createdAt: at,
+        payload: { step: spawned.step, error: spawned.error, terminal: spawned.terminal ?? null, ...failure,
+          fellThroughTo: { agent: next.agent, model: next.model ?? null } } });
+      // The next member gets a full startup window of its own.
+      ledger.db.prepare("UPDATE signals SET expires_at=? WHERE scope='kernel' AND key=? AND token=?").run(at + 120000, workflowId, token);
+    });
+    fellThrough.push({ agent: member.agent, model: member.model ?? null, step: spawned.step, error: spawned.error,
+      ...(spawned.gate ? { gate: spawned.gate } : {}) });
+    console.error(`start-workflow: warning: kernel member ${memberLabel(member)} refused at ${spawned.step} (${spawned.error}) — falling through to ${memberLabel(next)}`);
+  }
   const handle = spawned.terminal;
   const workerId = handle;
   const kernelModel = route.model;
@@ -635,7 +673,8 @@ try {
         model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true,
         inboxId: claim.inbox_id, attempt,
         nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`,
-        sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}) },
+        sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}),
+        ...(fellThrough.length ? { fellThrough } : {}) },
       createdAt: now });
   });
 
@@ -645,6 +684,7 @@ try {
     ...(route.route?.profile ? { profile: route.route.profile } : {}),
     ...(route.runtimePool ? { runtimePool: route.runtimePool } : {}),
     ...(route.warnings?.length ? { warnings: route.warnings } : {}),
+    ...(fellThrough.length ? { fellThrough } : {}),
     hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}` },
     replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true };
   console.log(asJson ? JSON.stringify(out, null, 2)
