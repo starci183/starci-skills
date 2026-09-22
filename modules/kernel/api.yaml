@@ -73,7 +73,8 @@ conventions:
   stdout: >-
     one JSON object — {ok:true, ...} on success. A refusal prints ok:false and
     names itself in one of four fields: `code` (the thrown refusals, the
-    common case), `reason` (nudge, observe, reconcile), `rejected` (every
+    common case), `reason` (nudge, observe, reconcile, and the `max-ops`
+    concurrency refusal route and dispatch share), `rejected` (every
     dispatch launch failure) or `refused` (dispatch admission drift). The
     kebab string is the contract callers match on; each command's `refuses:`
     below names the string it prints and every untyped refusal says so
@@ -326,16 +327,27 @@ commands:
       the job row + its payload (payload.difficulty is the fallback when
       --difficulty is absent); the workflow goal's routing_bias {prefer[],
       avoid[]} — flag entries lead the merged list; modules/models/runtimes.yaml
-      pool cards (maxParallel, provider); live running counts; provider quota
-      probes; typed expiring provider-health signals. Free-form incident text
-      is evidence for the Kernel but never provider-health input
+      pool cards (maxParallel, provider) and maxParallelOps; the owner's
+      budgets.maxOps; the workflow's own slot-holding operation count; live
+      running counts; provider quota probes; typed expiring provider-health
+      signals. Free-form incident text is evidence for the Kernel but never
+      provider-health input
     writes: >-
       jobs.payload_json gains {model, modelId, effort, routeChain,
       routeRejected, difficulty} — the PERSISTED route dispatch then launches
       exactly (dispatch reads payload.model/modelId/effort, never re-decides);
       events 'route-decided' {kind, difficulty, bias, ...decided}
     returns: '{ok:true, jobId, kind, difficulty, bias, decision:{model, modelId, effort, routeChain, routeRejected}}'
+    maxOps: >-
+      the workflow's concurrent-operation ceiling is min(budgets.maxOps, maxParallelOps) —
+      the owner's per-workflow budget and the fleet-wide one, lower wins
+      (engine/admission.mjs opSlotCeiling). A slot is held from the lease forward: leased,
+      running, answering and the fenced effect_unknown. A queued job holds none. An unreadable
+      owner config leaves budgets.maxOps unbounded and the fleet ceiling admits alone; a
+      parallelism gear never raises either number. Pool maxParallel is a separate fence the
+      capacity block above applies
     refuses:
+      - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations, so there is no slot for this decision to be spent on. Prints {ok:false, jobId, kind, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued and `api status` reports it queuedBecause max-ops'
       - job-unknown: 'no jobs row for --job'
       - job-reconcile-required: 'effect_unknown remains fenced until api reconcile proves no effect'
       - job-settled: 'a settled job takes no route — the decision was already spent'
@@ -408,6 +420,7 @@ commands:
       routed refusal, never a running ghost.
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
+      - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'

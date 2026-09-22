@@ -38,8 +38,12 @@ import {
   newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { deriveRetryLineage, normalizeOwnedPaths, ownedPathLeaseRequests } from '../../engine/admission.mjs';
-import { allocationMs, allocationSettings, defaultParallelGear, loadConfig, slicingGears } from '../../engine/config.mjs';
+import {
+  admitOpSlot, deriveRetryLineage, normalizeOwnedPaths, ownedPathLeaseRequests,
+} from '../../engine/admission.mjs';
+import {
+  allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
+} from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
@@ -196,6 +200,43 @@ const emit = (out, human, asJson) => {
 // still count as a live turn. One authority: modules/models/runtimes.yaml
 // allocation.liveness.activeUnclassifiedMs.
 const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
+
+// Operation statuses that hold one of the workflow's concurrent slots. A queued
+// job has not been dispatched and holds nothing; everything from the lease
+// forward does, including a fenced launch whose effect may exist.
+const SLOT_HOLDING_STATUSES = [...JOB_STATUSES.dispatchable.filter((status) => status !== 'queued'), ...JOB_STATUSES.fenced];
+// The fleet-wide concurrency ceiling. modules/models/runtimes.yaml
+// maxParallelOps; the number lives there and nowhere else.
+const fleetMaxParallelOps = () => {
+  try {
+    const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
+    const value = Number(doc?.maxParallelOps);
+    return Number.isInteger(value) && value > 0 ? value : null;
+  } catch { return null; }
+};
+/**
+ * The owner's concurrent-operation budget. A missing, unparsable or schema-short config.yaml must
+ * never stop a workflow from routing (the same tolerance start-workflow and route-model keep), so
+ * an unreadable owner file leaves `maxOps` unbounded and the fleet ceiling admits alone.
+ */
+const ownerMaxOps = () => {
+  const owner = inspectOwnerConfig(ownerRoot);
+  if (owner.error || owner.invalid) return null;
+  const value = Number(owner.config?.budgets?.maxOps);
+  return Number.isInteger(value) && value > 0 ? value : null;
+};
+/**
+ * Admission against min(budgets.maxOps, maxParallelOps) for one workflow: how many of its
+ * operations already hold a slot, against the lower of the two declared ceilings
+ * (engine/admission.mjs admitOpSlot). The refusal string is `max-ops`.
+ */
+const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
+  const running = db.prepare(
+    `SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND job_id<>?
+       AND status IN (${SLOT_HOLDING_STATUSES.map(() => '?').join(',')})`
+  ).get(workflowId, excludeJobId ?? '', ...SLOT_HOLDING_STATUSES).n;
+  return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: fleetMaxParallelOps() });
+};
 
 const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
@@ -1015,6 +1056,16 @@ async function cmdRoute(ledger, args) {
   const kind = job.op_id ?? payload.opId;
   if (!kind) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
 
+  // Concurrency admission BEFORE the pool decision: a route that lands on a
+  // full workflow is a decision the kernel cannot spend. The ceiling is the
+  // lower of the owner's budgets.maxOps and the fleet's maxParallelOps.
+  const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
+  if (!slots.ok) {
+    const out = { ok: false, jobId, kind, reason: 'max-ops', slots };
+    emit(out, `route REFUSED for ${jobId} (${kind}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource})`, args.json);
+    process.exit(1);
+  }
+
   const gj = goalJsonOf(latestGoal(db, job.workflow_id));
   const goalBias = gj.routing_bias ?? {};
   const bias = {
@@ -1353,6 +1404,18 @@ function cmdDispatch(ledger, args, repo) {
   const payload = jobPayloadOf(job);
   const op = job.op_id ?? payload.opId;
   if (!op) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+
+  // Concurrency admission, before the packet and before any Orca call: the
+  // workflow may hold min(budgets.maxOps, maxParallelOps) operations at once
+  // and a job above that line stays queued rather than launching
+  // (engine/admission.mjs admitOpSlot). Pool maxParallel is a separate fence
+  // route already applies; this one is the workflow's own ceiling.
+  const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
+  if (!slots.ok) {
+    const out = { ok: false, jobId, op, reason: 'max-ops', slots };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource}); job stays queued`, args.json);
+    process.exit(1);
+  }
 
   const model = resolveModel(args.model ?? payload.model ?? 'qwen-agent'); // orchestrationDefault: qwen-agent
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });

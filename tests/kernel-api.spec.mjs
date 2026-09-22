@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
@@ -16,6 +17,19 @@ const API=path.join(ROOT,'scripts','kernel','api.mjs');
 // wrapping kernel/ledger-db.mjs tables (workflows, goals, inbox, jobs,
 // signals, incidents, events).
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+/** The same call with an owner-config root: STARCI_OWNER_ROOT is the one seam engine/config.mjs reads config.yaml through. */
+const runApiAsOwner=(ownerRoot,...args)=>spawnSync(process.execPath,[API,...args],
+  {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:ownerRoot}});
+/** A temp owner root holding a valid config.yaml — the shipped example with `patch` merged over it. */
+const ownerConfig=(t,patch)=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const example=path.join(ROOT,'config.example.yaml');
+  fs.copyFileSync(example,path.join(dir,'config.example.yaml'));
+  const config=parseYaml(fs.readFileSync(example,'utf8'));
+  fs.writeFileSync(path.join(dir,'config.yaml'),stringifyYaml({...config,...patch}));
+  return dir;
+};
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
 /** One temp Work root per test: a plain directory; openLedger creates .starciwork/runtime.sqlite on demand. */
@@ -291,6 +305,51 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
   assert.doesNotMatch(preview?.prompt??'',/CONTEXT\.md \(repo root\)/);
   const job=read(repo,l=>l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId));
   assert.notEqual(job?.status,'running','a packet print must not mark the job running — nothing was spawned');
+});
+
+// budgets.maxOps is the owner's per-workflow concurrency ceiling and it is
+// ENFORCED: min(budgets.maxOps, runtimes.yaml maxParallelOps) is the line, and a
+// job that meets it stays queued instead of launching.
+test('budgets.maxOps refuses the second concurrent operation with max-ops and leaves it queued',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-max-ops';
+  const owner=ownerConfig(t,{budgets:{maxOps:1,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const first=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/a','--json');
+  assert.equal(first.status,0,first.stderr);
+  const second=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/b','--json');
+  assert.equal(second.status,0,second.stderr);
+  const [jobA,jobB]=read(repo,l=>l.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=? ORDER BY attempt').all(wf)).map(r=>r.job_id);
+
+  // Nothing is dispatched yet: two queued jobs hold no slot, so the first one is admitted.
+  const admitted=runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobA,'--json');
+  assert.equal(admitted.status,0,admitted.stderr||admitted.stdout);
+
+  // The first operation now holds the workflow's one slot.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobA));
+  const refused=runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json');
+  assert.notEqual(refused.status,0,'a second dispatch at budgets.maxOps:1 must refuse');
+  const body=out(refused);
+  assert.equal(body?.ok,false);
+  assert.equal(body?.reason,'max-ops');
+  assert.equal(body?.slots?.ceiling,1);
+  assert.equal(body?.slots?.ceilingSource,'budgets.maxOps','the owner budget is the lower of the two ceilings');
+  assert.equal(body?.slots?.running,1);
+  assert.equal(read(repo,l=>l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobB)).status,'queued',
+    'a refused dispatch reserves nothing — the job stays queued for the next slot');
+  // route spends a model decision on a slot that does not exist; it refuses first.
+  const routed=runApiAsOwner(owner,'route','--repo',repo,'--job',jobB,'--json');
+  assert.notEqual(routed.status,0);
+  assert.equal(out(routed)?.reason,'max-ops');
+
+  // Free the slot and the same job is admitted with nothing else changed.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(jobA));
+  assert.equal(runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
+    'a settled sibling releases the slot');
+  // With no owner budget the fleet ceiling (runtimes.yaml maxParallelOps) admits alone.
+  const unbounded=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobA));
+  assert.equal(runApiAsOwner(unbounded,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
+    'one running operation is nowhere near maxParallelOps');
 });
 
 test('settle --verdict fail --report marks the job settled and appends an event',t=>{

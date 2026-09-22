@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {deriveRetryLineage,normalizeOwnedPath,normalizeOwnedPaths,ownedPathLeaseKey,ownedPathsIntersect,retryDisposition} from '../engine/admission.mjs';
+import {admitOpSlot,deriveRetryLineage,normalizeOwnedPath,normalizeOwnedPaths,opSlotCeiling,ownedPathLeaseKey,ownedPathsIntersect,retryDisposition} from '../engine/admission.mjs';
 import {reserveTwoPhase} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {withLedger} from './_ledger-fixture.mjs';
@@ -21,6 +21,31 @@ test('owned path sets collapse duplicate descendants but preserve disjoint Nivo 
   ]);
   assert.equal(ownedPathsIntersect('nivo-fe/apps/landing','nivo-fe/apps/landing/src/page.tsx'),true);
   assert.equal(ownedPathsIntersect('nivo-fe/apps/landing','.starciwork/migration'),false);
+});
+
+// Two declared ceilings meet at one line: budgets.maxOps (owner, per workflow)
+// and modules/models/runtimes.yaml maxParallelOps (fleet). The lower admits and
+// the refusal string is `max-ops`.
+test('the concurrent-operation ceiling is the lower of the owner budget and the fleet ceiling',()=>{
+  assert.deepEqual(opSlotCeiling({maxOps:1,maxParallelOps:20}),{ceiling:1,source:'budgets.maxOps'});
+  assert.deepEqual(opSlotCeiling({maxOps:40,maxParallelOps:20}),{ceiling:20,source:'maxParallelOps'});
+  assert.deepEqual(opSlotCeiling({maxOps:20,maxParallelOps:20}),{ceiling:20,source:'budgets.maxOps'},'a tie names the owner budget — the one the owner can move');
+  assert.deepEqual(opSlotCeiling({maxOps:null,maxParallelOps:20}),{ceiling:20,source:'maxParallelOps'},'no owner budget still meets the fleet ceiling');
+  assert.deepEqual(opSlotCeiling({maxOps:8,maxParallelOps:null}),{ceiling:8,source:'budgets.maxOps'});
+  assert.deepEqual(opSlotCeiling({}),{ceiling:null,source:null},'two absent ceilings are unbounded, not zero');
+  assert.deepEqual(opSlotCeiling({maxOps:0,maxParallelOps:-3}),{ceiling:null,source:null},'a non-positive ceiling is not a ceiling');
+});
+
+test('admitOpSlot refuses max-ops at the ceiling and never above or below it',()=>{
+  assert.deepEqual(admitOpSlot({running:0,maxOps:1,maxParallelOps:20}),
+    {ok:true,running:0,ceiling:1,ceilingSource:'budgets.maxOps',reason:null});
+  assert.deepEqual(admitOpSlot({running:1,maxOps:1,maxParallelOps:20}),
+    {ok:false,running:1,ceiling:1,ceilingSource:'budgets.maxOps',reason:'max-ops'},'at the ceiling is refused — the cap is a ceiling, not a target');
+  assert.deepEqual(admitOpSlot({running:5,maxOps:1,maxParallelOps:20}).reason,'max-ops','drift above the ceiling stays refused');
+  assert.equal(admitOpSlot({running:19,maxParallelOps:20}).ok,true);
+  assert.deepEqual(admitOpSlot({running:20,maxParallelOps:20}),
+    {ok:false,running:20,ceiling:20,ceilingSource:'maxParallelOps',reason:'max-ops'},'the fleet ceiling admits alone when the owner declared none');
+  assert.equal(admitOpSlot({running:9999}).ok,true,'unbounded is unbounded');
 });
 
 test('durable prefix leases serialize parent and child scopes across workflows while disjoint scopes run together',t=>withLedger(t,({ledger,machine})=>{
