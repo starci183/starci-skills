@@ -50,8 +50,13 @@ loop:
         <repo> --goal <id> --agent <recorded-agent>`; the ledger carries all durable state so the
         replacement resumes without loss
     - step: report
-      do: summarize to the owner in one block — what changed, what was patched, what restarted,
-        what now waits on the owner (ask URLs rendered with inline artifacts)
+      do: |
+        EVERY cycle ends with a brief situation report in chat — polling is never silent.
+        Per workflow one or two lines: kernel state, last report, what is running, and what
+        waits on the owner. When anything moved — new reports, asks, blockers, artifacts —
+        say what changed, what was patched, what restarted, and render owner-gate URLs
+        verbatim with inline artifacts. A quiet cycle still gets a one-line "no change"
+        note so the owner knows the loop is alive; silence reads as a dead loop.
     - step: sleep
       do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
 
