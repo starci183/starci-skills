@@ -851,6 +851,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   bằng `git commit --only`. Phiên fork mở lane archetype spec-foundation/greenfield-scaffold,
   supervisor sẽ merge.
 
+- 03:50 Thầy uỷ quyền: "thầy ngủ trò tự duyệt, miễn dậy xong workflows". Supervisor trả lời ask
+  giao diện/direction thay thầy, ghi rõ trong note của receipt là trả lời theo uỷ quyền, kèm lý do.
+  Không làm: UAT có người (đăng nhập, OAuth consent của thầy), chốt nhà cung cấp thanh toán
+  (`decision.workspace-provision.payment-provider-shortlist` còn open). Vá thêm: ask theo ngôn
+  ngữ thầy + mỗi lựa chọn có hình (`759b02af0`), runner UAT spawn npx trên Windows (`ca21ddb89`,
+  `cc3d29d93`), watchdog `--repair` + chỉ wake khi actionable (`e21a2e77d`).
+
 Mở:
 - AUTH chờ hai gate của thầy: chọn direction login (form `ctx_1db4e4509029` đã `dead`, cần
   kernel re-serve khi thầy dậy) và chạy assisted OAuth run-04 (Docker đã bật; cần `npm run
