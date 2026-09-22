@@ -193,8 +193,13 @@ tick:
       saturating one pool. Do not inject work.author, duplicate the op in the
       derived goal plan, or create a mega-op. The semantic leg advances only
       after every ordinal in the cut set settles pass and the union of their
-      declared paths equals the preflight closure. A failed slice retries only
-      that ordinal with the same cut id/total and never reruns a passed slice.
+      declared paths equals the preflight closure. A failed slice, or any
+      settled job `api status` lists in `staleInput` (a law input it read
+      changed after dispatch), is redone as a new attempt of that same op and
+      cut ordinal with the same cut id/total — a stale cut seam-first, its
+      seam ordinal (the lowest, owning the root configs) alone before the
+      rest — a passed slice whose inputs are unchanged is never rerun, and a
+      stale job never counts toward its leg until its redo passes.
       When the operation contract declares cut-set-aware integration proof,
       each non-final slice reruns the unchanged full regression but may retain
       only failures mapped to unsettled sibling ordinals; its independent
