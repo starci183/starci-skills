@@ -7,21 +7,16 @@ import {spawnSync} from 'node:child_process';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const PACK=path.join(ROOT,'scripts','context','pack.mjs');
-// Lane m13, contract from lane m7: context assembly is a function, not the op
-// agent's discretion — `pack.mjs --op <id> --json` returns
+// Context assembly is a function, not the op agent's discretion —
+// `pack.mjs --op <id> --json` returns
 // {mandatory:[{path,why}], ownedFiles, truncated, missing} so the dispatch
 // prompt can enumerate the real read list instead of 'read CONTEXT.md'.
-// scripts/context/pack.mjs lands in a sibling lane; until it does every test
-// here is skipped.
-const PACK_EXISTS=fs.existsSync(PACK);
-const skip=PACK_EXISTS?false:'scripts/context/pack.mjs has not landed yet — written against the m7 lane contract';
-
 const run=(...args)=>spawnSync(process.execPath,[PACK,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const norm=p=>String(p).replaceAll('\\','/');
 const mandatoryPaths=body=>(body?.context?.mandatory??body?.mandatory??[]).map(e=>norm(typeof e==='string'?e:e?.path));
 
-test('--op code.refactor --json emits the mandatory reads in load order',{skip},t=>{
+test('--op code.refactor --json emits the mandatory reads in load order',t=>{
   const r=run('--op','code.refactor','--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
@@ -33,7 +28,7 @@ test('--op code.refactor --json emits the mandatory reads in load order',{skip},
   assert.ok(paths.some(p=>/verdict-contract\.yaml$/.test(p)),`mandatory reads must carry the verdict contract, got: ${paths.join(', ')}`);
 });
 
-test('missing --state degrades: exit 0, mandatory reads still resolve',{skip},t=>{
+test('missing --state degrades: exit 0, mandatory reads still resolve',t=>{
   const fx=fs.mkdtempSync(path.join(os.tmpdir(),'starci-pack-'));
   t.after(()=>fs.rmSync(fx,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   // A --state dir that was never created is the cold-checkout case — no .starciwork yet.

@@ -22,7 +22,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
-import { sleep } from '../api/orca/lib.mjs';
+import { sleepSync } from '../api/orca/lib.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -162,7 +162,7 @@ function awaitReadiness(handle, adapter) {
     const failure = failureOnScreen(adapter, screen);
     if (read.ok && failure) return { ok: false, reason: `terminal rejected readiness: ${failure.signal}`, screen, ...failure };
     if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen };
-    if (elapsed < timeoutMs) sleep(intervalMs);
+    if (elapsed < timeoutMs) sleepSync(intervalMs);
   }
   return { ok: false, reason: `terminal readiness timeout after ${timeoutMs}ms`, screen };
 }
@@ -192,7 +192,7 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
     if (failure) return { ok: false, screen, reason: `terminal rejected model attestation: ${failure.signal}`, ...failure };
     if (expected.test(screen)) return { ok: true, screen, model: expectedModel };
     if (elapsed >= timeoutMs) break;
-    sleep(intervalMs);
+    sleepSync(intervalMs);
     const read = terminalRead({ terminal: handle });
     screen = read.screen ?? '';
     if (!read.ok || read.terminal?.connected === false)
@@ -213,7 +213,7 @@ export function awaitSubmission(handle, adapter) {
   const maxEnter = Math.max(1, Number(spec.maxEnter) || 2);
   let enters = 1, screen = '';
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += settleMs) {
-    if (elapsed > 0) sleep(settleMs);
+    if (elapsed > 0) sleepSync(settleMs);
     const read = terminalRead({ terminal: handle });
     screen = read.screen;
     const failure = failureOnScreen(adapter, screen);
@@ -243,7 +243,7 @@ export function awaitAttestation(handle, adapter) {
     'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens');
   let screen = '', activitySeen = false;
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
-    if (elapsed > 0) sleep(intervalMs);
+    if (elapsed > 0) sleepSync(intervalMs);
     const read = terminalRead({ terminal: handle });
     screen = read.screen ?? '';
     if (!read.ok || read.terminal?.connected === false) {

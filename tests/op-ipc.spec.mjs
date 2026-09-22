@@ -10,12 +10,9 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 
-// The op-IPC layer rides the pinned sibling lane d1 in scripts/kernel/api.mjs.
-// Until it lands every lifecycle test skips; the gates below read api.mjs's
-// source for the verb/implementation markers (the same skip-if-absent pattern
-// managed-dispatch.spec.mjs uses) so a half-landed lane skips precisely.
+// The op-IPC layer lives in scripts/kernel/api.mjs.
 //
-// Pinned contract under test:
+// Contract under test:
 //   api dispatch --spawn            writes a contracts row (markdown,
 //                                   dispatch_id), one lease row per owned_path
 //                                   (resource_key 'path:<normalized p>'), sets
@@ -30,31 +27,6 @@ const API=path.join(ROOT,'scripts','kernel','api.mjs');
 //   api consume-report --job        sets reports.consumed_at
 //   api settle                      sets reports.consumed_at for the job's
 //                                   dispatch and deletes its lease rows
-const API_SRC=fs.readFileSync(API,'utf8');
-const has=(...res)=>res.some(re=>re.test(API_SRC));
-const LANDED={
-  // dispatch's IPC half: a contracts row (raw SQL or a ledger helper), one
-  // path: lease per owned_path, and the pinned phase-transition event. Every
-  // marker is absent from api.mjs today — 'contract'/'lease_token' alone would
-  // false-positive on the existing prompt-builder and rejectDispatch code.
-  dispatchIpc:has(/\bINTO\s+contracts\b/i,/\b(writeContract|upsertContract|putContract|fileContract)\b/)
-    &&has(/phase-transition/)
-    &&has(/\bINTO\s+leases\b/i,/\breserveTwoPhase\b/,/\bacquireLease\b/),
-  report:has(/\breport-filed\b/,/\bcmdReport\b/,/\bcase 'report'/,/\breport:\s*\[/),
-  opContract:has(/\bop-contract\b/,/\bcmdOpContract\b/),
-  check:has(/\bchecks-recorded\b/,/\bcmdCheck\b/,/\bcase 'check'/,/\bcheck:\s*\[/),
-  consumeReport:has(/\bconsume-report\b/,/\bcmdConsumeReport\b/),
-  // settle's half of consume: any consumed_at write in api.mjs (consume-report
-  // or settle). A lane that lands consume-report but not the settle write runs
-  // and fails the settle test — that is the contract gap being surfaced.
-  consumeWrite:has(/\bconsumed_at\b/),
-};
-const skipFor=names=>{
-  const missing=names.filter(n=>!LANDED[n]);
-  return missing.length
-    ?`op-IPC lane has not landed in scripts/kernel/api.mjs yet — missing marker(s): ${missing.join(', ')}`
-    :false;
-};
 
 const WORKFLOW='wf-op-ipc';
 const OP='code.refactor';
@@ -141,7 +113,7 @@ const fileReport=(fx,jobId,opts={})=>{
 
 /* ------------------------------------------- dispatch writes the IPC half */
 
-test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=running and a phase-transition event',{skip:skipFor(['dispatchIpc'])},t=>{
+test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=running and a phase-transition event',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   const {job}=dispatchRunning(fx,jobId);
@@ -178,7 +150,7 @@ test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=runn
 
 /* ------------------------------------------------ worker → kernel: report */
 
-test('api report upserts the dispatch report; api op-contract prints the stored markdown',{skip:skipFor(['dispatchIpc','report','opContract'])},t=>{
+test('api report upserts the dispatch report; api op-contract prints the stored markdown',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   dispatchRunning(fx,jobId);
@@ -209,7 +181,7 @@ test('api report upserts the dispatch report; api op-contract prints the stored 
   assert.equal(oc.stdout.trim(),contract.markdown.trim(),'op-contract must print the stored contract markdown verbatim');
 });
 
-test('api report immediately wakes an idle Kernel after committing the durable report',{skip:skipFor(['dispatchIpc','report'])},t=>{
+test('api report immediately wakes an idle Kernel after committing the durable report',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx,'job-op-ipc-report-wake');
   dispatchRunning(fx,jobId);
@@ -236,7 +208,7 @@ test('api report immediately wakes an idle Kernel after committing the durable r
 
 /* ------------------------------------- consume-report + checks durability */
 
-test('api consume-report marks the dispatch report consumed; api check upserts the checks row',{skip:skipFor(['dispatchIpc','report','check','consumeReport'])},t=>{
+test('api consume-report marks the dispatch report consumed; api check upserts the checks row',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   const {job}=dispatchRunning(fx,jobId);
@@ -271,7 +243,7 @@ test('api consume-report marks the dispatch report consumed; api check upserts t
   assert.ok(eventKinds(fx).includes('checks-recorded'),'api check must emit the checks-recorded event');
 });
 
-test('api check rejects scalar and double-encoded payloads before recording evidence',{skip:skipFor(['check'])},t=>{
+test('api check rejects scalar and double-encoded payloads before recording evidence',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx,'job-op-ipc-check-shape');
   const valid=checkEnvelope({name:'validator',command:'starci validate',exitCode:0,evidence:'green'});
@@ -293,7 +265,7 @@ test('api check rejects scalar and double-encoded payloads before recording evid
   assert.deepEqual(JSON.parse(checkRows(fx)[0].checks_json),valid);
 });
 
-test('queued jobs cannot self-file reports, record green checks, or settle pass without an operation dispatch',{skip:skipFor(['report','check','consumeWrite'])},t=>{
+test('queued jobs cannot self-file reports, record green checks, or settle pass without an operation dispatch',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx,'job-op-ipc-undispatched-claim');
   const report=writeEnvelope(fx,{outcome:'done',name:'undispatched-report.json'});
@@ -317,7 +289,7 @@ test('queued jobs cannot self-file reports, record green checks, or settle pass 
 
 /* ------------------------------------------------------ settle integrates */
 
-test('settle consumes the dispatch report and releases every owned-path lease',{skip:skipFor(['dispatchIpc','report','consumeWrite'])},t=>{
+test('settle consumes the dispatch report and releases every owned-path lease',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   dispatchRunning(fx,jobId);
@@ -337,7 +309,7 @@ test('settle consumes the dispatch report and releases every owned-path lease',{
 
 /* ------------------------------------ regression: a rejection claims nothing */
 
-test('dispatch-rejected regression: a dead provider claims no contract, no leases, no running phase',{skip:skipFor(['dispatchIpc'])},t=>{
+test('dispatch-rejected regression: a dead provider claims no contract, no leases, no running phase',t=>{
   const fx=fixture(t,{mode:'auth'}); // fake-orca serves the observed 401 death screen
   const jobId=enqueue(fx,'job-op-ipc-rejected');
   const r=dispatch(fx,jobId);
@@ -399,7 +371,7 @@ test('api report enforces the starci/op-report@1 envelope',t=>{
 
 /* ------------------------------------------------ kernel reads the answer */
 
-test('api status projects filed reports; settle works row-first without --report and enforces verdict↔outcome',{skip:skipFor(['dispatchIpc','report','check','consumeWrite'])},t=>{
+test('api status projects filed reports; settle works row-first without --report and enforces verdict↔outcome',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   dispatchRunning(fx,jobId);
@@ -429,7 +401,7 @@ test('api status projects filed reports; settle works row-first without --report
   assert.ok(reportRows(fx)[0]?.consumed_at);
 });
 
-test('a red Kernel check overrules an Op done claim, settles fail, and releases the worker',{skip:skipFor(['dispatchIpc','report','check','consumeWrite'])},t=>{
+test('a red Kernel check overrules an Op done claim, settles fail, and releases the worker',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx,'job-op-ipc-red-done');
   dispatchRunning(fx,jobId);

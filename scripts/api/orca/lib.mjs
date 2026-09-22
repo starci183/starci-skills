@@ -1,8 +1,8 @@
 // scripts/api/orca/lib.mjs — shared mechanics for every Orca API wrapper.
 // One place owns: binary resolution (orca.cmd cannot spawn on Windows without
 // a shell), STARCI_ORCA_COMMAND/STARCI_ORCA_ARGS overrides, receipt parsing,
-// terminal frame extraction and the synchronous sleep. Callers get normalized
-// {status, error, stdout, stderr} — never a raw SpawnResult.
+// terminal frame extraction and sleepSync (blocks the thread on Atomics.wait).
+// Callers get normalized {status, error, stdout, stderr} — never a raw SpawnResult.
 import { spawnSync } from 'node:child_process';
 
 export const ORCA = (() => {
@@ -22,7 +22,7 @@ export function orcaRun(args, { timeout = 120000 } = {}) {
   return { status: r.status, error: r.error?.message, stdout: r.stdout?.trim(), stderr: r.stderr?.trim() };
 }
 
-export const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 export const jsonOf = (text) => { try { return JSON.parse(text || 'null'); } catch { return null; } };
 export const terminalOf = (receipt) => jsonOf(receipt?.stdout)?.result?.terminal ?? null;
 

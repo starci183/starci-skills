@@ -9,16 +9,12 @@ import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
-// Lane k7: this spec is written against the lane contract for api.mjs —
+// api.mjs surface under test:
 //   survey|status|hierarchy|plan|enqueue|dispatch|settle|incident|finish
 //   --repo <path> --workflow <id> [--job <id>] [--kind <k>] [--op <id>]
 //   [--verdict pass|fail] [--report <file>] --json
 // wrapping kernel/ledger-db.mjs tables (workflows, goals, inbox, jobs,
-// signals, incidents, events). api.mjs lands in a sibling lane; until it does
-// every test here is skipped (the gate lane runs them after all lanes land).
-const API_EXISTS=fs.existsSync(API);
-const skip=API_EXISTS?false:'scripts/kernel/api.mjs has not landed yet — written against the lane contract';
-
+// signals, incidents, events).
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
@@ -45,7 +41,7 @@ const seedGoal=(repo,workflowId)=>{
   });
 };
 
-test('survey on an empty workflow exits 0 with a sane empty result',{skip},t=>{
+test('survey on an empty workflow exits 0 with a sane empty result',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-empty';
   seed(repo,ledger=>ledger.ensureWorkflow({workflowId:wf,title:'empty'}));
   const r=runApi('survey','--repo',repo,'--workflow',wf,'--json');
@@ -57,7 +53,7 @@ test('survey on an empty workflow exits 0 with a sane empty result',{skip},t=>{
     if(Array.isArray(body[key]))assert.equal(body[key].length,0,`empty workflow but survey.${key} is non-empty`);
 });
 
-test('enqueue writes a queued job row the ledger can see',{skip},t=>{
+test('enqueue writes a queued job row the ledger can see',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-enqueue';
   seedGoal(repo,wf);
   const r=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/',
@@ -77,7 +73,7 @@ test('enqueue writes a queued job row the ledger can see',{skip},t=>{
     'enqueue must durably bind one bounded slice to its stable cut set');
 });
 
-test('status marks a running workflow with no operation frontier as orphaned-frontier',{skip},t=>{
+test('status marks a running workflow with no operation frontier as orphaned-frontier',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-orphaned';
   seedGoal(repo,wf);
   seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf));
@@ -89,7 +85,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   });
 });
 
-test('hierarchy projects workflow -> Kernel -> Op from durable job identity',{skip},t=>{
+test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
@@ -118,7 +114,7 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',{sk
   assert.ok(body?.edges?.some(e=>e.parentNodeId===kernel.nodeId&&e.childNodeId===op.nodeId));
 });
 
-test('status projects exact host liveness and live jobs cannot route or dispatch again',{skip},t=>{
+test('status projects exact host liveness and live jobs cannot route or dispatch again',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-liveness',jobId='op-k7-live';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
@@ -179,7 +175,7 @@ test('status projects exact host liveness and live jobs cannot route or dispatch
   assert.equal(repaired.leases,1);
 });
 
-test('status distinguishes a turn-idle Op and nudge wakes the exact worker without creating a job',{skip},t=>{
+test('status distinguishes a turn-idle Op and nudge wakes the exact worker without creating a job',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-nudge',jobId='op-k7-idle';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
@@ -217,7 +213,7 @@ test('status distinguishes a turn-idle Op and nudge wakes the exact worker witho
   assert.equal(out(after)?.workers?.find(item=>item.jobId===jobId)?.liveness,'active');
 });
 
-test('dispatch --job without --spawn prints the packet and leaves the job unclaimed',{skip},t=>{
+test('dispatch --job without --spawn prints the packet and leaves the job unclaimed',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-dispatch';
   seedGoal(repo,wf);
   const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/',
@@ -245,7 +241,7 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
   assert.notEqual(job?.status,'running','a packet print must not mark the job running — nothing was spawned');
 });
 
-test('settle --verdict fail --report marks the job settled and appends an event',{skip},t=>{
+test('settle --verdict fail --report marks the job settled and appends an event',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-settle';
   seedGoal(repo,wf);
   const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
@@ -266,7 +262,7 @@ test('settle --verdict fail --report marks the job settled and appends an event'
   assert.ok(after.events>before,'settle appended no event');
 });
 
-test('cut pass requires the cut-aware green check names before settlement',{skip},t=>{
+test('cut pass requires the cut-aware green check names before settlement',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-cut-settle',jobId='op-k7-cut';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
@@ -296,7 +292,7 @@ test('cut pass requires the cut-aware green check names before settlement',{skip
   assert.equal(read(repo,ledger=>ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status),'succeeded');
 });
 
-test('incident writes an incidents row for the workflow',{skip},t=>{
+test('incident writes an incidents row for the workflow',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-incident';
   seedGoal(repo,wf);
   const r=runApi('incident','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--kind','test','--detail','k7 incident smoke','--json');
@@ -305,7 +301,7 @@ test('incident writes an incidents row for the workflow',{skip},t=>{
   assert.ok(n>=1,'incident produced no incidents row');
 });
 
-test('finish finishes the workflow, closes its inbox and keeps the goals rows',{skip},t=>{
+test('finish finishes the workflow, closes its inbox and keeps the goals rows',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-finish';
   seedGoal(repo,wf);
   const fakeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-finish-'));
@@ -348,7 +344,7 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',{
     'finish must request close of the exact Kernel terminal');
 });
 
-test('estimate sizes same-op slices from measured counts, never a guess',{skip},t=>{
+test('estimate sizes same-op slices from measured counts, never a guess',t=>{
   const fx=fixture(t),repo=fx.repo();
   seed(repo,ledger=>ledger.ensureWorkflow({workflowId:'wf-k7-estimate',title:'estimate smoke'}));
   const big=runApi('estimate','--repo',repo,'--files','40','--assertions','20','--components','9','--json');
