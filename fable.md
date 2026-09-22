@@ -975,6 +975,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   nên wake theo report và watchdog đều bỏ qua. Vá `667195c4c` (từ trạng thái + ":"/"now" là văn xuôi) + spec; đã đánh
   thức WSPV, kernel đang chạy. Modules đã tiêu thụ báo cáo, chạy 7 op song song và dọn bản ghi scope lạc. AUTH, Collab chờ đúng.
 
+- 08:35 Yên. Collab sang interface.draw (worker active). Modules 7 op chạy, scope.define a2 done (dọn scope lạc).
+  WSPV kernel active, 1 job leased đang dispatch. AUTH chờ owner-gate. Watchdog: 3 idle-waiting, 1 active. Không vá gì.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
