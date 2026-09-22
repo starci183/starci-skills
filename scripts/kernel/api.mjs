@@ -960,7 +960,9 @@ function cmdEstimate(ledger, args) {
     `estimate: ${minutes} agent-min -> size ${size} at gear ${gear} (${gearSource})`,
     `  agents: requested ${agentsRequested}, achievable ${agentsAchievable} (${achievableBasis})${reason ? ` — ${reason}` : ''}`,
     `  ${slices} slice(s) ~${perSliceMinutes}min each (target ${target[0]}-${target[1]}min, cap ${maxSlices})`,
-    ...(out.overTarget ? [`  each slice still exceeds ${target[1]}min — gear up or decompose the closure finer before enqueue`] : []),
+    // What would actually move the number: a gear only helps while the gear is
+    // what bounds the set. Once the partition does, a wider closure decomposition is the only lever.
+    ...(out.overTarget ? [`  each slice still exceeds ${target[1]}min — ${reason ? 'decompose the closure into more disjoint prefixes' : 'raise the gear or decompose the closure finer'} before enqueue`] : []),
   ].join('\n'), args.json);
 }
 
