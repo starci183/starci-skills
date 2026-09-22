@@ -738,3 +738,40 @@ kernel, và ledger `hierarchy` là nguồn quan hệ. `.claude` **không** enfor
 không giữ Run, không đóng terminal cũ; reject không đóng terminal; settle không dọn Task; không
 check nào so ledger với `terminal-list`. Lane L sửa đúng ba điểm này: giữ `orca.runId` qua
 restart (merge payload thay vì thay), đóng terminal kernel cũ mọi adapter, và check.
+
+## parallel-gear: số agent song song theo cỡ task, owner vặn một nút (2026-09-23)
+
+Ý thầy: task dài 3 agent, siêu dài 6; vặn lên thì 5 và 10. Owner chỉ chỉnh một thứ.
+
+**Hiện trạng.** `config.yaml budgets.maxOps` chỉ được validate, không ai enforce. Số thật là
+`runtimes.<pool>.maxParallel`. `api estimate` tính slice từ `allocation.slicing` theo cửa sổ
+15–30 phút, không theo lớp cỡ. Owner không có nút nào.
+
+**Thiết kế.**
+
+```yaml
+# config.yaml (owner)
+parallel:
+  gear: 1          # 1 = thường, 2 = cao; mở rộng được, không đổi tên
+budgets:
+  maxOps: 8        # trần op đang chạy của một workflow, giờ enforce thật
+
+# modules/models/runtimes.yaml (runtime data)
+allocation:
+  slicing:
+    size:                                   # lớp cỡ theo closure đo được
+      l:  {from: {files: 12, assertions: 40},  agents: {1: 3, 2: 5}}
+      xl: {from: {files: 40, assertions: 150}, agents: {1: 6, 2: 10}}
+```
+
+- `api estimate` trả `size: s|m|l|xl`, `agentsRequested` (từ bảng × gear), `agentsAchievable`
+  (số slice path-disjoint thực tế cắt được) và `reason` khi achievable < requested.
+- Task `s`/`m` luôn 1 agent. Bảng chỉ áp cho `l`, `xl`.
+- Trần cứng vẫn là `runtimes.<pool>.maxParallel` + slot provider + `budgets.maxOps`. Gear
+  không nới trần; thiếu slot thì slice còn lại queued và `api status` nói vì sao.
+- Ngưỡng `from` lấy từ số liệu thật: closure của các job implement/refactor trong ledger
+  nivo (đọc bản copy, read-only), không đoán.
+- `api status` thêm `queuedBecause` cho mỗi job queued: `pool-full`, `path-lease`,
+  `dependency`, `circuit-open`, `max-ops`.
+
+Lane M (Opus) làm việc này.
