@@ -1,7 +1,0 @@
-schema: work/workspace@1
-id: fake-app
-project: fake-app
-description: Minimal workspace for the fake-provenBy negative case.
-repositories:
-  - role: be
-    name: fake-be

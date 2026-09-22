@@ -1,7 +1,0 @@
-schema: work/catalog@1
-id: stale-case
-description: Negative-corpus fixture tree - one record whose evidence predates its code.
-features:
-  - id: worker
-    directory: features/worker
-    description: The worker feature.

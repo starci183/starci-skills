@@ -1,8 +1,0 @@
-schema: work/uat-flow@1
-id: uat.lease.drift
-title: Flow whose two runs disagree about fixture ownership
-state: todo
-entry: /drift
-actor: person
-steps:
-  - {order: 1, actor: person, action: "Run the flow twice.", expected: "the ledgers agree", checks: [{id: ledgersAgree, expected: yes}]}
