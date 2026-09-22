@@ -386,11 +386,10 @@ jobs:
           npx playwright install --with-deps chromium
           npm run uat
 
-      # ops/uat.verify's run-folder shape (operator.yaml `writes.evidence`): the harness writes each run
-      # into the backend's own Work tree, the one .starciwork this product owns, as
-      # `runs/<runId>/{manifest.yaml,result.md,screens/*.png,videos/*}`. Videos are uploaded here by run id
-      # and referenced from the run manifest by sha256 - they are never committed to the repository,
-      # matching layoutPolicy in ops/uat.verify/operator.yaml.
+      # `uat/lib/paths.ts` writes each run into the backend's Work tree, the one `.starciwork` this product
+      # owns, as `features/<feature>/uat/<flow>/runs/<runId>/{manifest.yaml,result.md,screens/,videos/}`,
+      # with every screen and video referenced from that manifest by sha256. Uploading them by run id is
+      # what makes a failed run readable without re-running it.
       - name: Upload UAT run evidence (manifest, result, screens, videos)
         if: always()
         uses: actions/upload-artifact@v4
