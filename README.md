@@ -14,7 +14,8 @@ StarCi provides:
   op chain in the ledger — the plan survives sessions, restarts and context loss.
 - **A kernel agent per workflow:** `start-kernel` claims a queued goal and boots one long-lived
   `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
-  through `node scripts/kernel/api.mjs <survey|status|plan|enqueue|dispatch|settle|incident|finish>`.
+  through one `node scripts/kernel/api.mjs <verb>` call. `modules/kernel/api.yaml` is the verb
+  contract; [docs/cli.md](docs/cli.md) is the human list.
 - **Ephemeral op agents:** `api dispatch` spawns one short-lived `[Op]` agent per job through the
   per-agent cards (`modules/models/agents/`). Adapter flags are injected by the spawner — the kernel
   cannot forget them; `settle` records the verdict and closes the worker.
@@ -49,8 +50,8 @@ is reachable directly at `node scripts/install/install.mjs init --dir <host>`.
 
 The installer:
 
-1. Copies the declared payload (`package.json` `files[]`) into `<host>/.claude` — the runtime reads
-   source directly, there is no build step.
+1. Copies the declared payload (`package.json` `files[]`) into `<host>/.claude` — the installed
+   source is the runtime and `node` reads it directly.
 2. Writes the `AGENTS.md` bootstrap pointing agents at `.claude/CONTEXT.md` (other host bootstrap
    names are opt-in).
 3. Installs the two entry skills — `define-goal` and `start-kernel` — into the host's skills
@@ -91,10 +92,10 @@ modules/            contracts as data — goal, kernel, ops, models, quality, sc
 engine/             mechanism — ledger-db, schema.sql, yaml (vendored), config, constants
 scripts/            executables — kernel/api.mjs, kernel/start-workflow.mjs, goal/, route/,
                     agent/, checks/, context/, example/, install/
-bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal
+bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal | validate
 modules/host/       per-host contracts — orca call surface (data only)
-skills/             user-facing skills — define-goal, start-kernel, computer-use, orca-cli,
-                    orchestration, workflow-chat
+skills/             user-facing skills — define-goal, start-kernel, workflow-chat,
+                    run-assisted-uat, orca-cli, orchestration, computer-use
 init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 docs/               documentation
@@ -113,10 +114,12 @@ node bin/starci.mjs doctor --dir <host>    # verify an install (runs its own spe
 node bin/starci.mjs api <verb>             # kernel api gate
 node bin/starci.mjs start                  # start-workflow
 node bin/starci.mjs goal                   # define-goal
+node bin/starci.mjs validate <work-root>   # read-only Work record/layout validation
 ```
 
 Inside an install the same entry is `<host>/.claude/bin/starci.mjs`. Checks and tools are invoked
-directly, e.g. `node .claude/scripts/checks/check-stales.mjs` — there is no wrapper command layer.
+directly, e.g. `node .claude/scripts/checks/check-stales.mjs`. The full surface — install verbs, the
+api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli.md).
 
 ## Documentation
 
