@@ -298,8 +298,14 @@ tick:
     wait:
       rule: >-
         Between dispatch and the next report the kernel WAITS durably, not
-        inside one model turn. Once no immediately executable transition
-        remains, it records/names the exact wait reason and yields immediately.
+        inside one model turn. It yields only after an `api status` issued
+        AFTER its last settle or consume-report comes back
+        `frontier.actionable: false`; on `true` it does the work that field
+        names — route/dispatch the queued jobs, reconcile the fenced ones,
+        consume the filed reports, nudge the idle workers — and asks again.
+        A status read before that last transition is stale and never
+        authorizes a yield. When the fresh status is not actionable, the
+        kernel records/names the exact wait reason and yields immediately.
         The external watchdog owns the cadence
         (modules/models/runtimes.yaml allocation.watchdogCadenceMs) and wakes the same
         Kernel identity; the resumed turn begins with `api status`. The Kernel

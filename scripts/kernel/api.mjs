@@ -510,6 +510,10 @@ function cmdSurvey(ledger, args) {
 }
 
 /* ---------------------------------------------------------------- status */
+// Frontier states that are themselves a call to act. 'engaged' is not one —
+// it only becomes actionable when the workflow also holds a ready operation.
+// frontier.actionable is the single boolean the driver's yield rule reads.
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'orphaned-frontier', 'idle'];
 function cmdStatus(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -543,6 +547,11 @@ function cmdStatus(ledger, args) {
     .map((job) => observeOperationWorker(job, now));
   const openOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
       AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).get(workflowId, ...FINAL_SETTLED).n;
+  // Operations the Kernel can move right now with no wait at all: a queued job
+  // to route/dispatch, a fenced launch to reconcile. An 'engaged' frontier that
+  // holds one of these is not a reason to yield.
+  const readyOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
+      AND status IN ('queued','effect_unknown')`).get(workflowId).n;
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
@@ -552,20 +561,25 @@ function cmdStatus(ledger, args) {
     : openOperations > 0 ? 'engaged'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0;
   const frontier = {
     state: frontierState,
+    actionable,
     openOperations,
+    readyOperations,
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
     reason: frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
         ? 'one or more exact running workers are at an idle provider prompt without a report; Kernel must call api nudge for each listed job now'
+      : actionable && readyOperations > 0
+        ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : null,
   };
   const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, activeLeases: leases, inboxPending, reports, workers };
   emit(out,
-    `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+    `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
     args.json);
 }
 

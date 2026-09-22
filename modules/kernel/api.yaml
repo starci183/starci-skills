@@ -149,7 +149,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,openOperations,unconsumedReports,nudgeReadyJobs[],reason} — worker-nudge-ready and orphaned-frontier are immediately executable Kernel transitions, never wait/completion states'
+      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,unconsumedReports,nudgeReadyJobs[],reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile)'
       jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
