@@ -2,8 +2,9 @@
 
 ## Requirements and trust
 
-Node.js 20+ and npm. The runtime ships sources only — it bundles its own YAML
-parser (`engine/yaml.mjs`) and needs no dependency install to run. Review the
+Node.js 22.13+ (`package.json` `engines`; `node:sqlite` is unflagged there) and
+npm. The runtime ships sources only — it bundles its own YAML parser
+(`engine/yaml.mjs`) and runs with no dependency install. Review the
 downloaded archive before executing it; `npx` executes package code. Pin a
 reviewed version instead of assuming `latest` is safe.
 
@@ -18,19 +19,18 @@ not automatically a project backend or frontend.
 ## What `init` does
 
 The installer (`bin/starci.mjs` → `scripts/install/install.mjs`) copies the
-declared **source** payload — `skills/`, `modules/`, `engine/`,
-`scripts/`, `knowledge/`, `docs/`, `init/AGENTS.md` — into `/absolute/host/.claude`,
-then:
+payload `package.json` `files[]` declares into `/absolute/host/.claude`, then:
 
 1. Writes the managed agent bootstrap into the host's entry files. There is
    **one** template — `init/AGENTS.md`; every supported host file (AGENTS.md,
    CLAUDE.md, DEVIN.md) receives the same entry between the
    `starci:prompt-entry` markers. Locally written instructions outside the
    markers are preserved.
-2. Installs the user-facing skills (`skills/define-goal`, `start-kernel`,
-   `computer-use`, `orca-cli`, `orchestration`, `workflow-chat`) so the host's
-   agent surfaces them (for example `.devin/skills/` is install output —
-   `skills/` in this tree is the canonical source).
+2. Copies the two lifecycle entry skills — `define-goal` and `start-kernel` —
+   into each host skills directory that already exists (`.devin/skills/`,
+   `.agents/skills/`), so the host's agent surfaces them. The whole `skills/`
+   tree also lands under `.claude/skills/` as payload; this tree is its
+   canonical source.
 3. Seeds an **untracked** `config.yaml` from `config.example.yaml` — the
    per-project owner config: kernel model, effort, budgets. `route-model` and
    `start-workflow` read it: owner config overrides the route-model default,

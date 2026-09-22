@@ -1,12 +1,12 @@
 # Authoring knowledge in YAML
 
-Humans maintain structured knowledge under `knowledge/**/*.yaml`. Agents and operators consume the same YAML sources directly; there is no compiled knowledge bundle. Do not create a parallel JSON copy of authored rules.
+Humans maintain structured knowledge under `knowledge/**/*.yaml`. Agents and operators read those YAML sources directly, so each rule has one copy. Do not create a parallel JSON copy of authored rules.
 
 ## Authority
 
 | Layer | Location | Role |
 | --- | --- | --- |
-| Authored source | `knowledge/**/*.yaml` (and multi-file example `.ts`/`.tsx`) | Edit here. Schema `starci/knowledge-source@1` for topics; `starci/code-example@1` for example manifests; catalogs may use `starci/code-examples-catalog@1`. |
+| Authored source | `knowledge/**/*.yaml` (and multi-file example `.ts`/`.tsx`) | Edit here. Schema `starci/knowledge-source@1` for topics; `starci/code-example@1` for example manifests; catalogs use `starci/code-example-catalog@1`. |
 | Calibration data | `knowledge/ui/proof/calibration/calibration.json` | Explicit data exception; all other authored JSON knowledge is rejected. |
 | Runtime | `knowledge/**/*.yaml` | Read directly from source. Public names are the authored files: `index.yaml`, `foo.yaml`. |
 

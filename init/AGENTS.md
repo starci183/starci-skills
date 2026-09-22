@@ -2,7 +2,7 @@
 
 <!-- starci:prompt-entry -->
 Before planning, reading target source, or running a skill, read
-[`<Source>/.claude/CONTEXT.md`](.claude/CONTEXT.md) and follow its load order — the runtime tree is canonical source, there is no build step.
+[`<Source>/.claude/CONTEXT.md`](.claude/CONTEXT.md) and follow its load order — the runtime tree is canonical source that `node` reads directly.
 
 Project lifecycle entry points are skills: `define-goal` (owner prompt → durable goal + op chain
 queued in `.starciwork/runtime.sqlite`) and `start-kernel` (claim a queued goal → boot its

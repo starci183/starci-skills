@@ -6,8 +6,9 @@ data, not code. The kernel never reads a whole manifest to route: routing
 reads only the `route:` block; the rest is the brief the dispatched agent
 executes under.
 
-The full authored vocabulary is exercised by the 31 shipped manifests; this
-page is the anatomy, using `backend.implement` as the example.
+The full authored vocabulary is exercised by the shipped manifests
+(`ls modules/ops/ops` is the count); this page is the anatomy, using
+`backend.implement` as the example.
 
 ## Anatomy of `modules/ops/ops/<op>.yaml`
 
