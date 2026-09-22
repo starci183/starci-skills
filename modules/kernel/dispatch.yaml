@@ -152,8 +152,9 @@ fields:
     meaning: >-
       The closed WRITE set — the op's allowlist. Disjointness of sibling
       allowlists is what makes fan-out legal at all
-      (modules/goal/legality.yaml splitRules; goal-plan.json makes disjoint
-      path-prefix allowlists a schema constraint on independent ops).
+      (modules/goal/legality.yaml splitRules; modules/schemas/goal-plan.yaml
+      makes disjoint path-prefix allowlists a schema constraint on
+      independent ops).
     enforcedBy: >-
       Four independent walls, so a slip is caught before enqueue, at plan
       time, at report time and at effect time:
