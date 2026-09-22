@@ -27,8 +27,8 @@ business:
     "Which Codex model decides, plans and carries hard work?" — Sol.
   whenNeeded:
     - Hard and insane operations routed to codex-agent — runtimes.yaml pins Sol there.
-    - decide/plan operations at hard or insane difficulty — the reasoning chains lead with codex-agent.
-    - The [Kernel] seat — config.example.yaml pins `kernel.model: gpt-6-sol`.
+    - Think work when claude-agent is unavailable — think kinds route at a hard floor, so codex-agent launches Sol.
+    - "The [Kernel] seat when the owner pins `kernel: {agent: codex, model: gpt-6-sol}` (config.example.yaml)."
     - An owner-named explicit route to Sol for an easy or medium operation.
   whenNot:
     - Easy/medium bulk work on the pool — the pool pins Luna there.

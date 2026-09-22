@@ -16,9 +16,10 @@
 //       [--unapproved]          workflow not approved (probation forbidden)
 //       [--no-review]           no fresh independent review planned
 //       [--no-checks]           op declares no machine checks
-//       [--difficulty <easy|medium|hard|insane>]   (with --plan) which allocation
-//                               tier to preview; alias spellings (s|m|l|xl,
-//                               'high') are normalized
+//       [--difficulty <easy|medium|hard|insane>]   measured difficulty (default
+//                               medium; required with --plan), raised to the
+//                               kind's runtimes.yaml roleOfKind floor; alias
+//                               spellings (s|m|l|xl, 'high') are normalized
 //       [--prefer <pool>[,<pool>...]] [--avoid <pool>[,<pool>...]]
 //                               bounded pool bias over the walked chain (prefer
 //                               hoists, avoid removes; never bypasses eligibility)
@@ -44,7 +45,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel } from '../agent/models.mjs';
+import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel, kindRoute, raiseToFloor } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -276,15 +277,16 @@ function loadCandidates(modelsDir) {
 // Candidate order sources, in precedence order:
 //   1. registry.yaml operators[kind].chain — the declared per-op launch chain
 //      ("choosing the first ready runtime/profile", registry.yaml selection).
-//   2. runtimes.yaml allocation.preference[role] — within-family suitability,
-//      used for kinds with no declared chain (kernel functions, unknown kinds).
+//   2. runtimes.yaml allocation.preference[key] — within-family suitability,
+//      used for kinds with no declared chain (kernel functions, unknown kinds);
+//      the key is `think` for think work, else the role.
 // selection.yaml allocationFacts.note: tiers/preference are NOT a workflow
 // provider fallback chain; the declared operator chains decide in a workflow.
-function candidateOrder(kind, role, registry, runtimes) {
+function candidateOrder(kind, key, registry, runtimes) {
   const chain = registry?.operators?.[kind]?.chain;
   if (Array.isArray(chain) && chain.length) return { order: chain, source: `registry.yaml operators.${kind}.chain` };
-  const pref = (role && runtimes?.allocation?.preference?.[role]) || runtimes?.allocation?.preference?.implement || [];
-  return { order: pref, source: `runtimes.yaml allocation.preference[${role ?? 'implement'}]` };
+  const pref = (key && runtimes?.allocation?.preference?.[key]) || runtimes?.allocation?.preference?.implement || [];
+  return { order: pref, source: `runtimes.yaml allocation.preference.${key ?? 'implement'}` };
 }
 
 // --- plan mode: what-if tier preview ---------------------------------------------
@@ -311,7 +313,7 @@ const PLAN_EVIDENCE_ABSENT = new Set([
 function planChain(runtimes, difficulty, role, bias) {
   const { chain, tierSource } = chainFor({ role, difficulty, runtimes });
   const biased = applyBias(chain, bias);
-  const src = `${tierSource} ∩ allocation.preference[${role ?? '(none)'}]` +
+  const src = `${tierSource} ∩ allocation.preference.${role ?? '(none)'}` +
     (bias ? ' + bias' : '');
   return { chain: biased, source: src };
 }
@@ -359,7 +361,7 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
 }
 
 function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profileCap = {}) {
-  const { chain, source } = planChain(runtimes, args.difficulty, w.role, args.bias);
+  const { chain, source } = planChain(runtimes, args.difficulty, w.work === 'think' ? 'think' : w.role, args.bias);
   const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty, profileCap);
   // Pickable = not structurally off the chain, and any rejection rests only on
   // absent/stale evidence (annotation, not a real disqualification) — the point
@@ -463,11 +465,17 @@ async function main() {
   // layoutPolicy.checks (every record-writing op runs e.g. starci-validate).
   const opYaml = readYaml(path.join(skillRoot, 'modules', 'ops', 'ops', `${args.kind}.yaml`));
   const declaredChecks = [...(kindEntry?.checks ?? []), ...(opYaml?.layoutPolicy?.checks ?? [])];
+  // runtimes.yaml roleOfKind is the allocator's reading of the kind: its role,
+  // think/hands-on work and difficulty floor. The floor raises the requested
+  // difficulty (default medium) and never lowers it.
+  const route = kindRoute(args.kind, runtimes);
+  const measured = args.difficulty ?? 'medium';
+  const difficulty = raiseToFloor(measured, route.floor) ?? measured;
   const w = args.plan
-    // Plan mode derives the role from runtimes.yaml roleOfKind (the allocator's
-    // own kind→role map), falling back to kinds.yaml like the live path.
-    ? deriveWorkload({ ...args, role: args.role ?? runtimes?.roleOfKind?.[args.kind] ?? kindEntry?.role }, rules, kindEntry, declaredChecks)
-    : deriveWorkload(args, rules, kindEntry, declaredChecks);
+    ? deriveWorkload({ ...args, role: args.role ?? route.role ?? kindEntry?.role }, rules, kindEntry, declaredChecks)
+    : deriveWorkload({ ...args, role: args.role ?? kindEntry?.role ?? route.role }, rules, kindEntry, declaredChecks);
+  w.work = route.work;
+  w.difficulty = { measured, floor: route.floor, effective: difficulty };
 
   // Owner config (config.yaml): models.nonOperation pools bind kernel-function
   // kinds to a configured pool, allocation.preferredProvider is a bounded owner
@@ -491,14 +499,16 @@ async function main() {
   const profileCap = Object.fromEntries(candidates.map(c => [c.id, c.profileMaxParallel]));
   if (args.plan) {
     if (!PLAN_COLD_MINUTES[args.difficulty]) { console.error('--plan requires --difficulty <easy|medium|hard|insane>'); process.exit(2); }
-    runPlan(args, rules, runtimes, w, evidenceByRuntime, owner, profileCap);
+    runPlan({ ...args, difficulty }, rules, runtimes, w, evidenceByRuntime, owner, profileCap);
     return;
   }
 
   // Kernel functions route inside the configured non-operation pool when the
   // owner config declares one (models.nonOperation.<role> → pools.<name>) —
   // the same binding engine/config.mjs resolves via nonOperationModels().
-  let { order, source: orderSource } = candidateOrder(args.kind, w.role, registry, runtimes);
+  const think = w.work === 'think';
+  const frontier = runtimes?.allocation?.preference?.think ?? [];
+  let { order, source: orderSource } = candidateOrder(args.kind, think ? 'think' : w.role, registry, runtimes);
   if (w.modelFunction && cfgMembers?.length) {
     order = cfgMembers;
     orderSource = `config.yaml models.nonOperation.${cfgRole} → pools.${cfgPoolName}`;
@@ -516,6 +526,10 @@ async function main() {
 
   const chainDeclared = orderSource.startsWith('registry.yaml') || orderSource.startsWith('config.yaml');
   const evaluated = ordered.map(c => {
+    // Think work runs on the frontier pools only; neither a declared chain,
+    // a --prefer nor preferredProvider can move it anywhere else.
+    if (think && !frontier.includes(c.id))
+      return { c, eligible: false, mode: null, reasons: ['think work runs only on runtimes.yaml allocation.preference.think'] };
     // A declared operator chain — or a configured non-operation pool — is a
     // closed set: pools absent from it are not on the launch path at all
     // (interface.draw → [codex-agent] only; kernelManager → its pool only).
@@ -526,8 +540,9 @@ async function main() {
           : `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
     if (w.role && c.roles.length && !c.roles.includes(w.role))
       return { c, eligible: false, mode: null, reasons: [`pool does not serve role '${w.role}'`] };
-    const lm = resolveLaunchModel(c.id, args.difficulty ?? 'medium', { runtimes });
-    const qr = qualificationReasons({ provider: c.provider, model: lm.modelId ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
+    const lm = resolveLaunchModel(c.id, difficulty, { runtimes });
+    if (lm.error) return { c, eligible: false, mode: null, reasons: [lm.error] };
+    const qr =qualificationReasons({ provider: c.provider, model: lm.modelId ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
     if (!qr.length) return { c, eligible: true, mode: 'qualified', reasons: [] };
     const pr = probationAdmissionReasons(w, rules);
     if (!pr.length) return { c, eligible: true, mode: 'probation', reasons: [], qualifiedFailed: qr };
@@ -547,7 +562,7 @@ async function main() {
   } else { pickedSet = []; rule = 'decisionFlow.verdict: no eligible model'; }
 
   const pick = pickedSet[0] ?? null;
-  const modelFor = c => resolveLaunchModel(c.id, args.difficulty ?? 'medium', { runtimes }).modelId ?? c.target;
+  const modelFor = c => resolveLaunchModel(c.id, difficulty, { runtimes }).modelId ?? c.target;
   const result = {
     workload: w,
     config: {
@@ -577,7 +592,8 @@ async function main() {
 
   if (args.json) console.log(JSON.stringify(result, null, 2));
   else {
-    console.log(`workload: kind=${w.kind} role=${w.role ?? '(none)'} risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
+    console.log(`workload: kind=${w.kind} role=${w.role ?? '(none)'} work=${w.work ?? '(unclassified)'} difficulty=${difficulty}` +
+      (difficulty !== measured ? ` (raised from ${measured} to floor ${route.floor})` : '') + ` risk=${w.risk} floor=${w.qualityFloor} tools=[${w.tools}] ctx=${w.contextTokens}` +
       (w.elevated ? '  ELEVATED' : '') + (w.modelFunction ? '  KERNEL-FUNCTION' : ''));
     console.log(`assumed: approved=${w.approved} local noExternalEffects=${w.noExternalEffects} strictMachineGates=${w.strictMachineGates} freshIndependentReview=${w.freshIndependentReview}`);
     console.log(`config: ${result.config.file ?? 'absent'}` +

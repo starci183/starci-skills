@@ -16,12 +16,12 @@ effort: medium
 #     model supplies the agent. An unknown id fails closed.
 #   effort: effort for the kernel seat (same vocabulary as `effort` above);
 #     recorded on the kernel job and shown in plans. null inherits `effort`.
-# Owner default: the codex pool on GPT-6 Sol at high effort. The Claude
-# alternative is `kernel: {agent: claude, model: claude-opus-5-5,
-# effort: high}`. An explicit pin is authoritative: a missing agent, dead
-# authentication probe, unsupported CLI flag or model-attestation mismatch
-# fails closed instead of substituting another agent.
-kernel: {agent: codex, model: gpt-6-sol, effort: high}
+# Owner default: the claude pool on Claude Opus 5.5 at high effort. The Codex
+# alternative for when Claude is unavailable is `kernel: {agent: codex,
+# model: gpt-6-sol, effort: high}`. An explicit pin is authoritative: a missing
+# agent, dead authentication probe, unsupported CLI flag or model-attestation
+# mismatch fails closed instead of substituting another agent.
+kernel: {agent: claude, model: claude-opus-5-5, effort: high}
 # parallel — the one knob for how wide the fleet runs. `gear` indexes the agent
 # table in modules/models/runtimes.yaml allocation.slicing.size: a long (`l`)
 # operation asks for the `l.agents[gear]` agents, an extra-long (`xl`) one for
@@ -53,13 +53,13 @@ budgets:
 # an explicit workflow allocation such as `devin-agent=2@implement+verify+write` before it has any capacity.
 allocation: {mode: adaptive, preferredProvider: null}
 # Non-operation models are a quota-aware peer pool over the provider-window runtime pools of
-# modules/models/runtimes.yaml: codex-agent (GPT-6 Sol/Luna) and claude-agent (Claude Opus 5.5), the two
+# modules/models/runtimes.yaml: claude-agent (Claude Opus 5.5) and codex-agent (GPT-6 Sol), the two
 # runtimes that carry plan, decide and verify. Member order is the route order; eligibility and qualification
 # still admit every actual call.
 models:
   selection: quota-aware
   pools:
-    sol-opus: [codex-agent, claude-agent]
+    sol-opus: [claude-agent, codex-agent]
   nonOperation:
     planner: sol-opus
     kernelManager: sol-opus

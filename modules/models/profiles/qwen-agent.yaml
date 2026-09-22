@@ -1,6 +1,6 @@
 # Profile: qwen-agent — the Qwen command-terminal pool.
 # Business frame: the cost-first executor. Default operation target of the
-# orchestration profile and first seat in nearly every implement/write chain —
+# orchestration profile and first seat in every easy and medium hands-on order —
 # bounded, ceiling-guarded work it can fail cheaply and hand upward.
 
 target: qwen-agent            # registry.yaml + runtimes.yaml
@@ -36,25 +36,19 @@ launch:
     max-session-turns 240, max-wall-time 90m, max-tool-calls 600. A ceiling stop
     is a FAILED attempt, never proof of completion (costPolicy).
 
-position:
-  easyTier: first             # runtimes.yaml allocation.tiers.easy
-  mediumTier: third in default
-  hardTier: absent — not listed in any hard-tier order
-  chainLeads: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.finish, task.execute, uat.verify, workspace.manage, review.verify]
-  orchestrationDefault: qwen-agent   # registry.yaml orchestration.defaultOperationTarget
+position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 
 business:
   question: >-
     "Which pool takes the first, cheapest shot at bounded execution so expensive
     pools only see what survives escalation?" — qwen-agent.
   whenNeeded:
-    - Routine bounded implement/write/test/content work — the established Qwen→Devin→Claude→Codex cost order spends its capacity first.
-    - review.verify — it LEADS the independent-review chain (registry.yaml), the cost-aware front seat for judging.
+    - Easy and medium hands-on work (runtimes.yaml roleOfKind work hands-on) — every hands-on order spends its capacity first.
     - Easy-tier fan-out (runtimes.yaml allocation.fanOut) — cheap parallelism.
     - The default operation target (registry.yaml orchestration.defaultOperationTarget).
   whenNot:
-    - decide/plan work — the pool has no such roles; business/architecture decisions never route here.
-    - Hard-tier lists exclude it entirely — high-risk or high-floor workloads get Claude/Devin/Codex orders instead.
+    - Think work — canonical records and quality verdicts run on the frontier pools only.
+    - Hard and insane work — the pool pins no model there, so a hard floor starts the order at Devin.
     - Image routes — no imageGeneration on any profile.
     - Any work needing nested/sub agents — the `agent` tool is excluded and nestedAgents is forbidden.
   pickedBy: >-

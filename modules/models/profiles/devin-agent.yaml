@@ -40,14 +40,7 @@ launch:
     the workspace-trust dialog is disabled because Orca already selected the
     workflow worktree.
 
-position:
-  easyTier: second
-  mediumTier: last in default
-  hardTier: second in default/implement/write; last in verify
-  chainSecond: [backend.implement, interface.implement, docs.author, content.generate, code.refactor, test.author, release.deliver, runtime.operate, scope.finish, task.execute, uat.verify, workspace.manage, review.verify]
-  note: >-
-    It is second in most execution chains; slots are owner-granted capacity, so
-    quota grants, not position, decide availability.
+position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 
 business:
   question: >-
@@ -55,8 +48,7 @@ business:
     a workflow?" — devin-agent, and only then.
   whenNeeded:
     - Bounded implement/verify/write inside an Orca workflow worktree after explicit slot grant.
-    - Second-seat execution behind qwen-agent in the declared cost order.
-    - Hard-tier execution behind claude-agent when a quota is open.
+    - Hands-on work behind qwen-agent at medium, and first at hard where Qwen pins no model; slots are owner-granted, so quota grants, not position, decide availability.
   whenNot:
     - Anywhere outside Orca — the pool launches only as an Orca command-terminal inside the workflow worktree.
     - decide/plan/manager/planner/validator/ImageGen roles — none exist (modules/models/registry.yaml lists these exclusions verbatim).
@@ -65,6 +57,6 @@ business:
     Allocator by role + tier + quota; the explicit-workflow-quota gate sits before
     eligibility — capacity is an owner decision, not a scheduler guess.
   failureModes:
-    - "Reading chain-second position as unbounded capacity: the quota gate still bounds admission."
+    - "Reading an early chain position as unbounded capacity: the quota gate still bounds admission."
     - Trusting `auth status` for login state — the adapter checks `devin models list` because auth status can pass while logged out.
     - "INFERRED: expecting cloud handoff/subagent behavior — both are forbidden; the op's boundary is the worktree."

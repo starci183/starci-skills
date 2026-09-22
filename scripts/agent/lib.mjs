@@ -23,6 +23,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
+import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -161,6 +162,12 @@ function awaitReadiness(handle, adapter) {
     screen = read.screen;
     const failure = failureOnScreen(adapter, screen);
     if (read.ok && failure) return { ok: false, reason: `terminal rejected readiness: ${failure.signal}`, screen, ...failure };
+    // A screen waiting on a human answer never turns ready by itself: fail at
+    // once and name the gate; answering it stays the owner's decision.
+    const screenState = read.ok ? classifyAgentScreen(screen) : null;
+    if (screenState?.state === 'interactive-gate')
+      return { ok: false, state: 'interactive-gate', signal: 'interactive-gate', gate: screenState.gate,
+        reason: `terminal is blocked on interactive gate '${screenState.gate}' and needs the owner's answer`, screen };
     if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen };
     if (elapsed < timeoutMs) sleepSync(intervalMs);
   }
@@ -315,9 +322,10 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
     if (handle) terminalClose({ terminal: handle });
     return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, terminal: handle, provider, command: built.command };
   };
-  if (!handle) return fail('create', create.error || 'no terminal handle');
+  if (!handle) return fail('create', create.error || 'no terminal handle', null, create.errorCode ? { errorCode: create.errorCode } : {});
   const ready = awaitReadiness(handle, built.adapter);
-  if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null, { screen: ready.screen, matched: ready.matched });
+  if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null,
+    { screen: ready.screen, matched: ready.matched, ...(ready.gate ? { state: ready.state, gate: ready.gate } : {}) });
   const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen);
   if (!modelAttested.ok) return fail('model-attestation', modelAttested.reason, modelAttested.signal ?? null,
     { requestedModel: model, screen: modelAttested.screen, matched: modelAttested.matched });
