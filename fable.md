@@ -948,6 +948,14 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   read-scope shared-office-read, safe-mode mandatory-category-gate, quality-targets ngưỡng tạm 2s/5s/3s p95.
   Mâu thuẫn scope.define (ghi work/node@1) với work-layout (cấm work/node mới) giao cho một lane nền.
 
+- 07:35 Lane nền xong `b3469b05d`: scope.define ghi scope lên bản ghi feature (extensions.work3.scope), bỏ
+  work/node@1; spec scope-define-layout. Trò thêm `034fbe6bb`: business.decide giữ nguyên scope khi viết lại
+  overview. Báo kernel Modules về bản ghi work/node lạc ở features/project-overview/scope. Collab: 6 slice
+  business.decide done với câu trả lời ủy quyền. WSPV audit vòng 3 blocked vì bằng chứng lệch revision
+  (aae8d15 vs 02b3c0d) và hash accessibility tính trên JSON thu gọn; lỗi op (runtime.json do op tự viết),
+  kernel đang xử lý. Backlog: workspace.manage vẫn ghi "setup scope record" gốc (work/node@1) và _common.yaml
+  vẫn nói bản ghi gốc mang work/node@1; kinds.yaml còn work/node@1 cho workspace.manage và scope.finish.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
