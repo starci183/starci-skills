@@ -796,3 +796,27 @@ claim pass giờ fail thật vì `verify-*.mjs` của chúng trước không loa
   thuẫn; lane K sửa owner entries theo rule.
 - `CANON_VERSION_MISMATCH`: `code-patterns.yaml:456` pin fe canon 3.0.2 vs `packages/eslint/fe`
   3.1.0 (lane K).
+
+### Lane L landed: cây Orca theo ledger liên tục
+
+Run sống qua restart (payload merge thay vì thay), terminal kernel cũ đóng trước khi ghi signal
+mới, Task có `parent` và title `[Op] <op> a<n> · <wf>` ngay khi tạo, reject/settle/finish đóng
+terminal, worker và Task (`task-update --status done`, wrapper khôi phục), `check-orca-tree.mjs`
+báo `DUPLICATE_KERNEL`/`ORPHAN_TERMINAL`/`DEAD_KERNEL`/`TASK_OUTSIDE_RUN` mỗi vòng poll. Luật ở
+`modules/kernel/start-workflow.yaml orcaTree.rule`. Còn mở: Orca không có verb archive Task;
+`TASK_OUTSIDE_RUN` chỉ báo, không reparent được.
+
+## Model catalog (thầy chốt 2026-09-23)
+
+Bỏ hẳn `gpt-6-astra`, Claude Fable (pool `claude-fable`, `fable-astra`), mọi `gpt-5.6-*`,
+`claude-opus-5`. Catalog chỉ còn:
+
+| Model | Id | Giá in/out per MTok | Nguồn |
+|---|---|---|---|
+| GPT‑6 Sol | `gpt-6-sol` | $2 / $10 | thầy, 2026-09-23 |
+| GPT‑6 Luna | `gpt-6-luna` | $0.10 / $0.50 | thầy, 2026-09-23 |
+| Claude Opus 5.5 | `claude-opus-5-5` | $4 / $20 | platform.claude.com models overview; 1M ctx, 128K out, adaptive thinking luôn bật, effort mặc định API `medium` |
+
+Codex pool: easy/medium `gpt-6-luna`, hard/insane `gpt-6-sol`. Claude pool mọi tier
+`claude-opus-5-5`. Devin, qwen giữ nguyên. Catalog không lưu giá. Lane N làm, kèm danh sách key
+trong `config.yaml` local của thầy cần đổi.
