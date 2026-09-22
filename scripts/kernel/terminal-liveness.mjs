@@ -31,7 +31,11 @@ export function classifyAgentScreen(screen) {
     .filter(line => !/^\s*[│┃┆┊]/u.test(line))
     .join('\n');
   const failure = /not logged in|authentication (?:failed|required)|session expired|fatal error|agent child exited|process exited/i;
-  const active = /(?:^|\n)\s*[•*]?\s*(?:Working|Thinking|Running)\b|esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
+  // A status word counts only as a spinner/status line, never as the Kernel's
+  // own prose: a yield summary headed "Running now:" once read as activity,
+  // and both the watchdog and the report wake skipped a Kernel that sat at its
+  // prompt with a filed report.
+  const active = /(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)\b(?!\s*:|\s+now\b)|esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
   // prompt row is turn-idle unless a current activity marker above wins.

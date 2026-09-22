@@ -53,6 +53,26 @@ Enter to select · Tab/Arrow keys to navigate · Esc to cancel`;
   assert.equal(classifyAgentScreen('● Canceled. What should Devin do?\n❭ Ask Devin to build features').state,'turn-idle','a cancelled dialog back at the prompt is idle again');
 });
 
+// A WSPV Kernel yielded with a summary headed "Running now:"; the word read as a
+// spinner, so the report wake and the watchdog both skipped it for 13 minutes.
+test('a Kernel yield summary that says "Running now:" is turn-idle, not active',()=>{
+  const screen=[
+    ' Running now:',
+    '   •  ctx_0a4ab01608a3  — draw-lineage binding repair',
+    ' After they settle: fresh audit cells.',
+    ' Yielding — wait reason: reports from the 3 running workers.',
+    '───── (bypass permissions on) ─',
+    '❭ Ask Devin to build features, fix bugs, or work on your code',
+    '─────',
+    'SWE-2 Max   Context: 140k / 262k tokens (53%)',
+    '3 shells · ↓ select',
+  ].join('\n');
+  assert.equal(classifyAgentScreen(screen).state,'turn-idle');
+  assert.equal(classifyAgentScreen('Running: provisioning r3\n❭ Ask Devin to build features').state,'turn-idle');
+  assert.equal(classifyAgentScreen('○ Running command\n│ $ node api.mjs status\n❭ Guide Devin while it works').state,'active','a real status line still wins');
+  assert.equal(classifyAgentScreen('• Running canonical status\n› Ask Codex to do anything').state,'active');
+});
+
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
   assert.match(prompt,/external watchdog owns the 5-minute cadence/i);
