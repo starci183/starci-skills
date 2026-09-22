@@ -1,4 +1,3 @@
 # scripts/checks/check-host-boundary.mjs exemptions: one `path:line # reason`
 # per line. An entry belongs here only while the lane that owns the file has
 # not rewritten that line yet; it is deleted in the commit that fixes it.
-CONTEXT.md:31 # lane-E-rewrite-pending

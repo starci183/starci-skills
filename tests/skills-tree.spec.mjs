@@ -33,7 +33,7 @@ test('the workflow-chat skill supervises the kernel through api.mjs and names no
 test('the workflow-chat skill is product-agnostic, forbids writing the store and is routed from the entry',()=>{
   const skill=read('skills/workflow-chat/SKILL.md');
   assert.equal(/starci-academy|nivo|miamia|tayson|[A-Z]:\\/i.test(skill),false,'no repository names or machine paths');
-  assert.ok(/## Never[\s\S]*state\.json/.test(skill),'the Never section covers state.json');
+  assert.ok(/## Never[\s\S]*runtime\.sqlite/.test(skill),'the Never section covers writing the ledger');
   assert.ok(/## Never[\s\S]*second workflow/.test(skill),'the Never section covers a second workflow');
   assert.ok(/inbox/.test(skill)&&/kernel terminal|api\.mjs/.test(skill),'a live kernel is driven through inbox rows and its terminal');
   assert.ok(/Never approve/.test(skill),'approval is the owner\'s');
