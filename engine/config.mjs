@@ -44,7 +44,7 @@ export function parallelGear(config=loadConfig()){
   return config?.parallel?.gear??defaultParallelGear();
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){
@@ -73,6 +73,11 @@ export function validateConfig(config){
     const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs;
     if(!plain(supervisor)||Object.keys(supervisor).some(key=>key!=='pollIntervalMs')||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
       throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?} with an integer of at least 60000 ms, or null.');
+  }
+  if(config?.delegation!==undefined&&config.delegation!==null){
+    const d=config.delegation;
+    if(!plain(d)||Object.keys(d).some(key=>!['asks','until','excludes','note'].includes(key))||typeof d.asks!=='string'||!d.asks.trim()||typeof d.until!=='string'||Number.isNaN(Date.parse(d.until))||(d.excludes!==undefined&&(!Array.isArray(d.excludes)||d.excludes.some(x=>typeof x!=='string'))))
+      throw Error('Invalid config.yaml: delegation must be {asks: <delegate>, until: <ISO time>, excludes?: [<class>], note?} or null.');
   }
   if(config?.budgets!==undefined){
     const budgets=config.budgets;
@@ -133,3 +138,6 @@ export function loadConfig(root=configRoot,{initialize=false}={}){
   return readOwnerConfig(root)??readExample(root);
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){try{process.stdout.write(JSON.stringify(loadConfig(configRoot,{initialize:true}))+'\n');}catch(error){process.stderr.write(error.message+'\n');process.exitCode=1;}}
+
+/** The owner's standing delegation of ask answers (config.yaml `delegation`), or null when absent or expired. */
+export function activeDelegation(config=loadConfig(),now=Date.now()){const d=config?.delegation;if(!d||Date.parse(d.until)<=now)return null;return {asks:d.asks,until:d.until,excludes:d.excludes??[],note:d.note??null};}

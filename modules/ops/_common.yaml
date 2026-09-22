@@ -45,7 +45,10 @@ sections:
         procedural confirmations and raises no repetitive command, worktree, retry, integration or
         technical-review questions; a changed goal, widened scope/authority, missing credential,
         unresolved business alternative, safety block, reserved checkpoint or partial/unknown
-        effect returns to the owner as an api incident or an owner ask."
+        effect returns to the owner as an api incident or an owner ask. While the packet carries
+        owner_delegation, an answer receipt whose answeredBy is that delegate, inside its window and
+        outside its excluded classes, is the owner's answer and binds like one; the receipt carries
+        the delegate's reason."
       - Every selected workflow finishes through the kernel's gate/finish contract
         (modules/kernel/api.yaml `finish`). Missing .starciwork routes to
         workspace-bootstrap; invalid .starciwork is not overwritten. Preserve the original request
