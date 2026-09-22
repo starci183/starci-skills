@@ -35,6 +35,7 @@ import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
@@ -351,6 +352,20 @@ function releaseManagedWorker(dispatchId) {
   try { workerRelease({ dispatch: dispatchId }); } catch { /* best-effort */ }
 }
 
+// A stale command-terminal kernel (launch: terminal — the Devin/Codex/Qwen
+// seat) leaves a live Orca terminal behind: clearing the signal removes the
+// ledger's handle on it, not the PTY. That is how one workflow grew two
+// [Kernel] rows in the sidebar (fable.md orca-hierarchy, root cause 2). The
+// close is best-effort but never silent: a failure is returned and recorded
+// as kernel-stale-terminal-unclosed.
+function closeStaleKernelTerminal(handle) {
+  if (!handle) return null;
+  let closed;
+  try { closed = terminalClose({ terminal: handle }); }
+  catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
+  return { handle, ok: closed?.ok === true, ...(closed?.error ? { error: String(closed.error) } : {}) };
+}
+
 const ledger = openLedger({ file: ledgerFileFor(repo) });
 try {
   const pendingTarget = goalId
@@ -442,16 +457,34 @@ try {
     // A stale managed kernel may still hold a live Orca worker — settle the
     // exact old dispatch (stop + release) before the seat is cleared so the
     // replacement never runs beside a zombie.
+    // A restart closes the previous kernel terminal BEFORE the new one is
+    // recorded — one workflow, one live kernel terminal.
     if (priorHealth.value?.dispatch) releaseManagedWorker(priorHealth.value.dispatch);
+    else staleKernel.terminalClosed = closeStaleKernelTerminal(staleKernel.terminal);
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(target);
     const at = Date.now();
+    const unclosed = staleKernel.terminalClosed && staleKernel.terminalClosed.ok !== true
+      ? staleKernel.terminalClosed : null;
     ledger.transaction(() => {
       ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=? AND token=?").run(target, priorSignal.token);
       ledger.db.prepare("UPDATE jobs SET status='stopped', result_json=?, updated_at=? WHERE job_id=? AND status='running'")
         .run(JSON.stringify({ reason: priorHealth.reason, terminal: staleKernel.terminal }), at, `kernel-${target}`);
       ledger.appendEvent({ workflowId: target, entityType: 'kernel', entityId: target,
         generation: workflow?.generation ?? 0, kind: 'kernel-stale-cleared', payload: staleKernel, createdAt: at });
+      // A terminal the host refused to close outlives this restart and becomes
+      // the duplicate kernel nobody owns. The restart still proceeds — a dead
+      // kernel must be replaced — but the residue is an open incident, so
+      // survey and check-orca-tree both see it.
+      if (unclosed) {
+        ledger.appendEvent({ workflowId: target, entityType: 'kernel', entityId: target,
+          generation: workflow?.generation ?? 0, kind: 'kernel-stale-terminal-unclosed',
+          payload: { ...unclosed, reason: priorHealth.reason }, createdAt: at });
+        ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,NULL,0,0,0,0,?,'open',?)")
+          .run(`inc-${crypto.randomBytes(6).toString('hex')}`, target,
+            `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', ...unclosed })}`, at);
+      }
     });
+    if (unclosed) console.error(`start-workflow: warning: stale kernel terminal ${unclosed.handle} could not be closed (${unclosed.error ?? 'no reason given'}) — incident opened`);
   }
 
   // 1. Claim the goal atomically — the named one, or the oldest pending.

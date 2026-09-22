@@ -25,12 +25,13 @@ const fixture=t=>{
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot};
-  const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
+  const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{})}});
+  const f={};
   const callArgv=()=>fs.existsSync(log)
     ?fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv)
     :[];
   const calls=()=>callArgv().map(argv=>argv.slice(0,2).join(' '));
-  return {repo,state,run,calls,callArgv};
+  return Object.assign(f,{repo,state,run,calls,callArgv});
 };
 
 const readState=f=>json(fs.readFileSync(f.state,'utf8'));
@@ -147,5 +148,72 @@ test('the workflow Orca Run survives a kernel restart — one run-create, one ru
     const created=ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='run-created'").all(workflowId);
     assert.equal(created.length,1,'run-created is emitted once for the workflow');
     assert.equal(json(created[0].payload_json)?.runId,'run-fake-1');
+  }finally{ledger.close();}
+});
+
+test('a kernel restart closes the previous kernel terminal before the new one is recorded',t=>{
+  // fable.md orca-hierarchy root cause 2: clearing the stale signal removed
+  // the ledger's handle on the old terminal, not the PTY. Only the managed
+  // kernel was settled; the command-terminal kernel lived on as a second
+  // [Kernel] row nobody owned.
+  const f=fixture(t);
+  const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','one live kernel terminal per workflow','--json');
+  assert.equal(defined.status,0,defined.stderr);
+  const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
+
+  const first=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(first.status,0,first.stderr);
+  const firstKernel=json(first.stdout)?.terminal;assert.ok(firstKernel);
+  assert.deepEqual(readState(f).closed??[],[],'precondition: nothing closed yet');
+
+  killTerminal(f,firstKernel);
+  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(restarted.status,0,restarted.stderr);
+  const secondKernel=json(restarted.stdout)?.terminal;
+  assert.notEqual(secondKernel,firstKernel);
+
+  const state=readState(f);
+  assert.deepEqual(state.closed,[firstKernel],'the restart closes exactly the previous kernel terminal');
+  const live=Object.values(state.terminals).filter(term=>!term.closed).map(term=>term.handle);
+  assert.deepEqual(live,[secondKernel],'a workflow has exactly one live kernel terminal');
+  const closeCall=f.callArgv().find(argv=>argv.slice(0,2).join(' ')==='terminal close');
+  assert.equal(closeCall?.[closeCall.indexOf('--terminal')+1],firstKernel);
+
+  const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
+  try{
+    const cleared=ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-stale-cleared'").get(workflowId);
+    assert.equal(json(cleared?.payload_json)?.terminalClosed?.ok,true,'the close is recorded on kernel-stale-cleared');
+    assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind='kernel-stale-terminal-unclosed'").get(workflowId).n,0);
+    assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM incidents WHERE workflow_id=?").get(workflowId).n,0);
+  }finally{ledger.close();}
+});
+
+test('a stale kernel terminal the host refuses to close is an incident, not silence — the restart still proceeds',t=>{
+  const f=fixture(t);
+  const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','a refused close must not be swallowed','--json');
+  assert.equal(defined.status,0,defined.stderr);
+  const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
+
+  const first=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(first.status,0,first.stderr);
+  const firstKernel=json(first.stdout)?.terminal;assert.ok(firstKernel);
+
+  killTerminal(f,firstKernel);
+  f.closeFails=firstKernel;
+  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(restarted.status,0,`a dead kernel must still be replaced: ${restarted.stderr}`);
+  const secondKernel=json(restarted.stdout)?.terminal;
+  assert.notEqual(secondKernel,firstKernel);
+  assert.deepEqual(readState(f).closed??[],[],'the refused close left the terminal alive');
+  assert.match(restarted.stderr,/kernel terminal .* could not be closed/i);
+
+  const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
+  try{
+    const unclosed=ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-stale-terminal-unclosed'").get(workflowId);
+    assert.ok(unclosed,'a failed close is recorded, never silent');
+    assert.equal(json(unclosed.payload_json)?.handle,firstKernel);
+    const incident=ledger.db.prepare("SELECT last_progress,status FROM incidents WHERE workflow_id=?").get(workflowId);
+    assert.equal(incident?.status,'open');
+    assert.match(incident?.last_progress??'',/kernel-stale-terminal-unclosed/);
   }finally{ledger.close();}
 });

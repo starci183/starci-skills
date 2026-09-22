@@ -38,6 +38,10 @@
 //                          fake-terminal-1 — the kernel-restart spec proves the
 //                          replacement terminal is a different one.
 //
+//   STARCI_FAKE_ORCA_CLOSE_FAILS comma-separated terminal handles whose
+//                          `terminal close` is refused ('*' refuses every
+//                          close) — drives the unclosed-stale-kernel spec.
+//
 //   STARCI_FAKE_ORCA_OMIT_COMMAND comma-separated Orca commands ('terminal
 //                          send') the agent-context listing leaves out — drives
 //                          the host-contract-drift refusal spec.
@@ -50,10 +54,13 @@
 // of being skipped; the two omit knobs above are the only way it drifts.
 //
 // State the specs read back: `commands` (every --command in creation order),
-// `counter` (terminals created) and `terminals[handle]` = {handle, connected,
-// writable, sent, prompt, command, model}. A spec may write connected:false
-// onto one terminal record between runs; `terminal show`/`read` then report
-// that exact terminal dead while the others stay live.
+// `counter` (terminals created), `closed` (every handle `terminal close` took,
+// in order) and `terminals[handle]` = {handle, connected, writable, sent,
+// prompt, command, model, title, worktree, closed}. A spec may write
+// connected:false onto one terminal record between runs; `terminal show`/
+// `read` then report that exact terminal dead while the others stay live.
+// `terminal list` answers with every terminal that is not closed — the
+// listing scripts/checks/check-orca-tree.mjs projects.
 import path from 'node:path';
 
 const FAKE_ORCA_SOURCE = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
@@ -78,6 +85,8 @@ const commandModel = command => {
   return match?.[1] ?? null;
 };
 const uniqueTerminals = process.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS === '1';
+// Handles that terminal close refuses ('*' refuses every close).
+const closeFails = new Set((process.env.STARCI_FAKE_ORCA_CLOSE_FAILS || '').split(',').map(s => s.trim()).filter(Boolean));
 const record = handle => (state.terminals || {})[handle] || null;
 const renderedModel = handle => effectiveModelOverride || record(handle)?.model || state.terminalModel || 'gpt-5.6-sol';
 const isQwen = handle => /(?:^|\s)qwen(?:\.exe)?(?:\s|$)/i.test(String(record(handle)?.command ?? state.terminalCommand ?? ''));
@@ -114,7 +123,8 @@ if (verb === 'terminal create') {
   state.commands = [...(state.commands || []), state.terminalCommand];
   const handle = uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1';
   state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: true, writable: true,
-    sent: false, prompt: null, command: state.terminalCommand, model: state.terminalModel } };
+    sent: false, prompt: null, command: state.terminalCommand, model: state.terminalModel,
+    title: arg('title'), worktree: arg('worktree'), closed: false } };
   save();
   out({ ok: true, result: { terminal: { handle, title: arg('title'), connected: true, writable: true } } });
 }
@@ -128,7 +138,23 @@ else if (verb === 'terminal send') {
   if (r) { r.sent = true; r.prompt = arg('text'); }
   state.sends += 1; save(); out({ ok: true, result: { sent: true } });
 }
-else if (verb === 'terminal close') out({ ok: true, result: { closed: arg('terminal') } });
+else if (verb === 'terminal close') {
+  const handle = arg('terminal');
+  if (closeFails.has('*') || closeFails.has(handle))
+    fail({ ok: false, error: { code: 'terminal_close_refused', message: 'terminal is held by the host' } });
+  const r = record(handle);
+  if (r) { r.closed = true; r.connected = false; r.writable = false; }
+  state.closed = [...(state.closed || []), handle];
+  save();
+  out({ ok: true, result: { closed: handle } });
+}
+// terminal list is the listing scripts/checks/check-orca-tree.mjs reads:
+// every terminal this stub created and has not closed.
+else if (verb === 'terminal list')
+  out({ ok: true, result: { terminals: Object.values(state.terminals || {})
+    .filter(t => !t.closed)
+    .map(t => ({ handle: t.handle, title: t.title ?? null, worktree: t.worktree ?? null,
+      connected: t.connected !== false, writable: t.writable !== false })) } });
 else if (verb === 'terminal show')
   isDead(arg('terminal'))
     ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })
