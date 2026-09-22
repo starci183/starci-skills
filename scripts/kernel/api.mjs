@@ -522,6 +522,10 @@ function cmdSurvey(ledger, args) {
 }
 
 /* ---------------------------------------------------------------- status */
+// Frontier states that are themselves a call to act. 'engaged' is not one —
+// it only becomes actionable when the workflow also holds a ready operation.
+// frontier.actionable is the single boolean the driver's yield rule reads.
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'orphaned-frontier', 'idle'];
 function cmdStatus(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -555,6 +559,11 @@ function cmdStatus(ledger, args) {
     .map((job) => observeOperationWorker(job, now));
   const openOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
       AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).get(workflowId, ...FINAL_SETTLED).n;
+  // Operations the Kernel can move right now with no wait at all: a queued job
+  // to route/dispatch, a fenced launch to reconcile. An 'engaged' frontier that
+  // holds one of these is not a reason to yield.
+  const readyOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
+      AND status IN ('queued','effect_unknown')`).get(workflowId).n;
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
@@ -564,20 +573,25 @@ function cmdStatus(ledger, args) {
     : openOperations > 0 ? 'engaged'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0;
   const frontier = {
     state: frontierState,
+    actionable,
     openOperations,
+    readyOperations,
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
     reason: frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
         ? 'one or more exact running workers are at an idle provider prompt without a report; Kernel must call api nudge for each listed job now'
+      : actionable && readyOperations > 0
+        ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : null,
   };
   const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, activeLeases: leases, inboxPending, reports, workers };
   emit(out,
-    `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+    `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
     args.json);
 }
 
@@ -843,31 +857,57 @@ const providerHealthOf = (db, provider, now = Date.now()) => {
   const value = parseJson(row.value_json, {});
   return value?.status === 'unavailable' ? { ...value, at: row.at, expiresAt: row.expires_at } : null;
 };
-const providerCooldownMs = (failureKind) => {
+const allocationOf = (section) => {
   try {
     const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-    const map = doc?.allocation?.cooldownMs ?? {};
-    const value = Number(map[failureKind] ?? map.other);
-    if (Number.isFinite(value) && value > 0) return value;
-  } catch { /* contract fallback below */ }
-  return 5 * 60 * 1000;
+    return doc?.allocation?.[section] ?? {};
+  } catch { return {}; }
 };
+const providerCooldownMs = (failureKind) => {
+  const map = allocationOf('cooldownMs');
+  const value = Number(map[failureKind] ?? map.other);
+  return Number.isFinite(value) && value > 0 ? value : 5 * 60 * 1000;
+};
+// How many observations of one failure kind open the pool's circuit. A kind
+// with no declared limit opens on the first: an authenticated provider that
+// answers 401 is not a flake. runtimes.yaml allocation.providerStrikes.
+const providerStrikeLimit = (failureKind) => {
+  const value = Number(allocationOf('providerStrikes')[failureKind]);
+  return Number.isInteger(value) && value > 0 ? value : 1;
+};
+// The raw provider-health row, open circuit or not: providerHealthOf answers
+// only for an OPEN circuit, so it cannot count the strikes leading to one.
+const providerSignalOf = (db, provider, now = Date.now()) => {
+  const key = normalizeProviderId(provider);
+  if (!key) return null;
+  const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?')
+    .get(PROVIDER_HEALTH_SCOPE, key);
+  if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
+  return { ...parseJson(row.value_json, {}), at: row.at, expiresAt: row.expires_at };
+};
+// Records one provider failure. Below the kind's strike limit the row is a
+// durable 'striking' strike counter that routing ignores; on the limit it
+// becomes the 'unavailable' circuit route/dispatch skip. The return value is
+// the OPEN circuit or null — a strike is not yet provider health.
 const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error, now, failureKind = 'auth' }) => {
   const key = normalizeProviderId(provider);
   if (!key) return null;
   const expiresAt = now + providerCooldownMs(failureKind);
-  const prior = providerHealthOf(db, key, now);
+  const prior = providerSignalOf(db, key, now);
+  const failures = (prior?.failureKind === failureKind ? Number(prior.failures ?? 0) : 0) + 1;
+  const strikeLimit = providerStrikeLimit(failureKind);
   const value = {
-    schema: 'starci/provider-health@1', provider: key, status: 'unavailable',
-    failureKind, model: model ?? null, jobId, step,
+    schema: 'starci/provider-health@1', provider: key,
+    status: failures >= strikeLimit ? 'unavailable' : 'striking',
+    failureKind, strikeLimit, model: model ?? null, jobId, step,
     signal: signal ?? null, detail: error ?? null, observedAt: now,
-    failures: Number(prior?.failures ?? 0) + 1,
+    failures,
   };
   db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at)
     VALUES(?,?,NULL,NULL,?,?,?)
     ON CONFLICT(scope,key) DO UPDATE SET holder_pid=NULL,token=NULL,value_json=excluded.value_json,at=excluded.at,expires_at=excluded.expires_at`)
     .run(PROVIDER_HEALTH_SCOPE, key, JSON.stringify(value), now, expiresAt);
-  return { ...value, expiresAt };
+  return value.status === 'unavailable' ? { ...value, expiresAt } : null;
 };
 
 // `api route` — resolve the pool/model for one job and persist the decision on
@@ -1104,13 +1144,29 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
         provider: model.provider, model: model.target, jobId, step, signal, error, now,
         failureKind: 'readiness',
       });
+    } else if (step === 'worker-start' && model?.provider) {
+      // A managed launch the host refused without saying why is still the
+      // provider's launch path failing. Left unclassified it fed nothing, so
+      // the kernel rerouted straight back to the same pool and burned another
+      // launch. It is a strike (runtimes.yaml allocation.providerStrikes) —
+      // one flake never parks a pool, the second one does.
+      providerHealth = writeProviderCircuit(ledger.db, {
+        provider: model.provider, model: model.target, jobId, step, signal, error, now,
+        failureKind: 'worker-start',
+      });
     }
     const priorPayload = jobPayloadOf(job);
+    // A rejected dispatch is EVIDENCE, never a binding. Overwriting
+    // managed.dispatchId with it made one field mean two things, and the
+    // readers that resolve a report's dispatch could not tell them apart:
+    // a valid report from the live retry was refused because the payload
+    // still pointed at the dispatch that never got a contract. The rejected
+    // id goes on its own list; reconcile reads it there.
     if (terminal && MANAGED_KINDS.includes(model.kind)) {
-      priorPayload.managed = {
-        ...(priorPayload.managed ?? {}), dispatchId: terminal,
-        rejectedBeforeContract: true,
-      };
+      priorPayload.rejectedDispatches = [
+        ...(Array.isArray(priorPayload.rejectedDispatches) ? priorPayload.rejectedDispatches : []),
+        { dispatchId: terminal, step, at: now, effectState },
+      ];
     }
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
@@ -1764,7 +1820,14 @@ function cmdReconcile(ledger, args) {
   if (job.status !== 'effect_unknown') {
     throw Object.assign(new Error(`job ${jobId} is ${job.status}; reconcile requires effect_unknown`), { code: 'job-not-reconcilable' });
   }
-  const dispatchId = payload.managed?.dispatchId
+  // What reconcile must prove no-effect is the launch that left the job
+  // effect_unknown — the newest rejected dispatch that is not already settled
+  // (payload.rejectedDispatches, where rejectDispatch records the evidence it
+  // used to write over managed.dispatchId). Only when no rejection owns this
+  // state is the job's own managed binding the thing to reconcile.
+  const unsettledRejection = [...(payload.rejectedDispatches ?? [])].reverse()
+    .find((entry) => entry?.dispatchId && entry.effectState && entry.effectState !== 'none')?.dispatchId ?? null;
+  const dispatchId = unsettledRejection ?? payload.managed?.dispatchId
     ?? (String(job.worker_id ?? '').startsWith('ctx_') || String(job.worker_id ?? '').startsWith('dispatch-') ? job.worker_id : null);
   if (!dispatchId) throw Object.assign(new Error(`job ${jobId} has no managed dispatch identity`), { code: 'dispatch-identity-missing' });
 
@@ -1796,6 +1859,12 @@ function cmdReconcile(ledger, args) {
     leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
     const nextPayload = jobPayloadOf(job);
     delete nextPayload.managed;
+    // The rejection is settled now: keep it as evidence, but stop it naming
+    // the state a later reconcile would have to prove again.
+    if (Array.isArray(nextPayload.rejectedDispatches)) {
+      nextPayload.rejectedDispatches = nextPayload.rejectedDispatches.map((entry) =>
+        entry?.dispatchId === dispatchId ? { ...entry, effectState: 'none', reconciledAt: now } : entry);
+    }
     if (nextPayload.hierarchy?.runtime) {
       const { taskId, dispatchId: ignoredDispatch, terminalHandle, ...runtime } = nextPayload.hierarchy.runtime;
       nextPayload.hierarchy.runtime = runtime;
@@ -1864,13 +1933,13 @@ function cmdSettle(ledger, args, repo) {
     // a --report file that is itself a valid op-report@1 envelope is filed on
     // the job's behalf first; anything else (markdown, absent — a dead worker)
     // settles on the kernel's verdict alone.
-    const dispatchId = reportDispatchIdOf(job);
+    const dispatchId = reportDispatchIdOf(db, job);
     const row = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, dispatchId);
     let envelope = null;
     if (row) envelope = parseJson(row.report_json);
     if (!row && reportAbs) {
       const ownedPaths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths, identity: reportIdentityOf(job) });
+      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths, identity: reportIdentityOf(db, job) });
       if (valid.ok) {
         envelope = valid.report;
         db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
@@ -1916,7 +1985,7 @@ function cmdSettle(ledger, args, repo) {
     // worker→kernel signal is spent exactly once (dispatch_id is the worker's
     // handle, falling back to the job id when none was ever bound).
     reportsConsumed = db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL')
-      .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(job)).changes > 0;
+      .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(db, job)).changes > 0;
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefs, reportsConsumed },
@@ -2070,14 +2139,31 @@ const jobOpOf = (job) => job.op_id ?? jobPayloadOf(job).opId ?? null;
 // reports.dispatch_id is the orchestration Dispatch id whenever one exists.
 // command-terminal jobs retain their terminal handle in worker_id for exact
 // cleanup, so payload.orca.dispatchId is the durable report identity.
-const reportDispatchIdOf = (job) => {
+// The contracts row for (workflow, op, attempt) IS the dispatch authority —
+// `api dispatch` writes it before the job goes running, on both launch kinds.
+// The payload is a cache of the same fact and can lag it (a launch rejected
+// after an earlier one succeeded leaves a stale id behind), so the contract
+// answers first and the payload only fills in for an attempt that has none.
+const contractDispatchIdOf = (db, job) => db
+  .prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+  .get(job.workflow_id, jobOpOf(job), job.attempt)?.dispatch_id ?? null;
+const rejectedDispatchIdsOf = (job) => new Set(
+  (jobPayloadOf(job).rejectedDispatches ?? []).map((entry) => entry?.dispatchId).filter(Boolean));
+const reportDispatchIdOf = (db, job) => {
   const payload = jobPayloadOf(job);
-  return payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? job.worker_id ?? job.job_id;
+  return contractDispatchIdOf(db, job) ?? explicitReportDispatchIdOf(db, job)
+    ?? payload.orca?.dispatchId ?? job.worker_id ?? job.job_id;
 };
 const REPORTABLE_JOB_STATUSES = new Set(['running', 'answering', 'effect_unknown']);
-const explicitReportDispatchIdOf = (job) => {
+const explicitReportDispatchIdOf = (db, job) => {
+  const contract = contractDispatchIdOf(db, job);
+  if (contract) return contract;
+  // No contract for this attempt: the payload is the only binding there is,
+  // and a dispatch that was rejected is never one.
   const payload = jobPayloadOf(job);
-  return payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? null;
+  const rejected = rejectedDispatchIdsOf(job);
+  const bound = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? null;
+  return bound && !rejected.has(bound) ? bound : null;
 };
 const requireDispatchedReportBinding = (db, job) => {
   if (!REPORTABLE_JOB_STATUSES.has(job.status)) {
@@ -2085,13 +2171,12 @@ const requireDispatchedReportBinding = (db, job) => {
       code: 'report-job-not-active', status: job.status,
     });
   }
-  const dispatchId = explicitReportDispatchIdOf(job);
+  const dispatchId = explicitReportDispatchIdOf(db, job);
   if (!dispatchId) {
     throw Object.assign(new Error(`job ${job.job_id} has no bound operation dispatch`), { code: 'report-dispatch-unbound' });
   }
-  const contract = db.prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(job.workflow_id, jobOpOf(job), job.attempt);
-  if (!contract || contract.dispatch_id !== dispatchId) {
+  const contract = contractDispatchIdOf(db, job);
+  if (!contract || contract !== dispatchId) {
     throw Object.assign(new Error(`job ${job.job_id} has no contract bound to dispatch ${dispatchId}`), {
       code: 'report-contract-unbound', dispatchId,
     });
@@ -2112,11 +2197,11 @@ const parseAttempt = (v) => {
 // run/task/dispatch/from from the job row; a file that claims a different
 // identity is report-invalid. --outcome is optional consistency: when given it
 // must equal the envelope's outcome.
-const reportIdentityOf = (job) => {
+const reportIdentityOf = (db, job) => {
   const payload = jobPayloadOf(job);
   return { run: payload.managed?.runId ?? payload.orca?.runId ?? null,
            task: payload.managed?.taskId ?? payload.orca?.taskId ?? null,
-           dispatch: reportDispatchIdOf(job), from: job.job_id };
+           dispatch: reportDispatchIdOf(db, job), from: job.job_id };
 };
 function cmdReport(ledger, args, repo) {
   const db = ledger.db, job = resolveJob(db, args.job);
@@ -2126,7 +2211,7 @@ function cmdReport(ledger, args, repo) {
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
   const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
   const ownedPaths = (jobPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(job) });
+  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(db, job) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)
@@ -2229,7 +2314,7 @@ function cmdCheck(ledger, args, repo) {
 // as a live answer again.
 function cmdConsumeReport(ledger, args) {
   const db = ledger.db, job = resolveJob(db, args.job);
-  const dispatchId = reportDispatchIdOf(job);
+  const dispatchId = reportDispatchIdOf(db, job);
   let consumed = false;
   ledger.transaction(() => {
     const now = Date.now();

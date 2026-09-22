@@ -17,6 +17,11 @@
 // paths only — never values) lands in kernel-evidence, an `ask-answered`
 // event is appended, and the workflow's Kernel is woken through its Orca
 // terminal so it can re-verify custody presence and settle the ask.
+//
+// Ask-report lifecycle in the ledger (modules/kernel/api.yaml askLifecycle):
+// `ask-serving` on bind, `ask-serving-expired` on --ttl, `ask-superseded`
+// when this run parks a replacement for an earlier ask of the same op, and
+// `ask-answered` on submission.
 
 import fs from 'node:fs';
 import http from 'node:http';
@@ -423,6 +428,30 @@ const main = async () => {
   ).get(args.workflow, report.dispatch_id);
   const readonly = Boolean(args.review);
   if (answered && !readonly) { console.error(JSON.stringify({ ok: false, error: `ask ${report.dispatch_id} already answered` })); process.exit(1); }
+
+  // Parking a replacement ask retires the ones it replaces. An earlier
+  // unanswered ask of the SAME op is superseded the moment a later one is
+  // served: without the event it stays open forever in every projection of
+  // the ledger, and the owner can act on a question the workflow moved past.
+  // --review reads; it never retires anything.
+  const superseded = readonly ? [] : db.prepare(
+    `SELECT r.dispatch_id FROM reports r
+      WHERE r.workflow_id=? AND r.outcome='ask' AND r.op_id IS ? AND r.report_id < ?
+        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
+          AND e.kind IN ('ask-answered','ask-superseded')
+          AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
+      ORDER BY r.report_id`).all(args.workflow, report.op_id ?? null, report.report_id);
+  if (superseded.length) {
+    ledger.transaction(() => {
+      for (const row of superseded) {
+        ledger.appendEvent({
+          workflowId: args.workflow, entityType: 'report', entityId: row.dispatch_id,
+          kind: 'ask-superseded',
+          payload: { dispatchId: row.dispatch_id, by: report.dispatch_id, opId: report.op_id ?? null },
+        });
+      }
+    });
+  }
 
   const rj = parseJson(report.report_json, {});
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };

@@ -113,12 +113,18 @@ BOUNDARY — hard rules, non-negotiable:
   - LONG-LIVED means the durable Kernel identity survives model-turn boundaries.
     The external canonical watchdog, not this model turn, owns the cadence
     ({skillRoot}/modules/models/runtimes.yaml allocation.watchdogCadenceMs).
-    When the frontier is legitimately waiting for an active Op, lease,
-    not-before time, report or message, persist/name that exact wait reason and
-    yield immediately. The watchdog will wake this same terminal after the turn
-    falls back to its input prompt; treat that as liveness maintenance, not new
-    approval. Never run `Start-Sleep`, shell sleep, a timer, or an in-turn polling
-    loop. Yield is neither workflow completion nor an owner escalation.
+    Yield only after an `api status` issued AFTER your last settle or
+    consume-report answers `frontier.actionable: false`; if it is `true`, do
+    what `frontier.reason`, `frontier.readyOperations` and
+    `frontier.nudgeReadyJobs` name and read status again. A status from before
+    that last transition is stale and never authorizes a yield. When the fresh
+    status is not actionable the frontier is genuinely waiting on an active Op,
+    lease, not-before time, report or message: persist/name that exact wait
+    reason and yield immediately. The watchdog will wake this same terminal
+    after the turn falls back to its input prompt; treat that as liveness
+    maintenance, not new approval. Never run `Start-Sleep`, shell sleep, a
+    timer, or an in-turn polling loop. Yield is neither workflow completion nor
+    an owner escalation.
 
 LOOP:
   - Boot: api survey --workflow {workflowId} → read goal rev {goalRevision} → derive
@@ -145,8 +151,9 @@ LOOP:
     migrations and novel builds are hard/insane; bounded verifies and small
     writes are easy/medium; pass `--difficulty` explicitly, never default
     everything to medium) → dispatch eligible (disjoint owned_paths, capacity —
-    writes the contracts row, holds the leases) → when no transition remains,
-    yield to the external event/watchdog wake → on wake, api status → on each
+    writes the contracts row, holds the leases) → re-read api status and yield
+    to the external event/watchdog wake only on frontier.actionable:false →
+    on wake, api status → on each
     status
     poll/wake a running op may be observed at the allocation.observeCadenceMs
     cadence via

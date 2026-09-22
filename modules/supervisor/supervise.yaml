@@ -27,8 +27,9 @@ lanes:
       product code, or finishes/retries an op itself
 
 loop:
-  command: node <skillRoot>/modules/supervisor/poll.mjs --repo <ledger-owner> [--workflow <id>]... [--interval-ms 180000]
-  cadence: one digest per interval; 180000 ms default — owner may override
+  command: node <skillRoot>/scripts/supervisor/poll.mjs --repo <ledger-owner> [--workflow <id>]... [--interval-ms <ms>]
+  cadence: one digest per interval; the default is DEFAULT_INTERVAL_MS in scripts/supervisor/poll.mjs,
+    the only place the number lives — the owner overrides it with --interval-ms
   recovery:
     do: |
       On session start after an outage (power loss, host reboot, Orca restart) the supervisor
@@ -36,13 +37,18 @@ loop:
       if absent, its CLI answers but cannot spawn terminals while the app is down; (2) each
       running workflow's kernel signal is probed — a dead terminal is replaced via
       start-workflow --goal; (3) one watchdog per running workflow is re-spawned
-      (node scripts/kernel/watchdog.mjs --repo <repo> --workflow <id>) — kernels yield between
-      transitions and only the watchdog wakes them; (4) parked asks re-serve on kernel survey —
-      stale form URLs in the ledger are relayed only after re-verifying they answer 200.
+      (node scripts/kernel/watchdog.mjs --repo <repo> --workflow <id>) — a kernel that yields is
+      woken by the transition that has work for it (api report, an answered ask) and the watchdog
+      is the fallback for a missed or racing wake; (4) parked asks re-serve on kernel survey —
+      the digest tags every open ask live, stale, dead or unserved, and only a `live` tag is
+      relayed to the owner.
   perCycle:
     - step: observe
-      do: read the printed digest — new op reports, open asks + serving URLs, fresh direction
-        artifacts, kernel liveness; open new direction images and check them against the current
+      do: read the printed digest — new op reports, open asks with their liveness tag + serving
+        URL, fresh direction artifacts, kernel liveness; a `dead` tag is a recorded
+        ask-serving-expired, `stale` is a URL that did not answer 2xx inside the probe window,
+        `unserved` is an ask no form was ever started for — each needs a re-serve before it can
+        reach the owner; open new direction images and check them against the current
         contracts (concepts.yaml rules, full-page chrome, concrete data, ui.flow coverage)
     - step: classify
       do: |
@@ -80,8 +86,8 @@ guardrails:
       .starciwork product records — analysis may conclude "the op must redo this" but the redo is
       issued as an owner-worded disposition to the kernel, which re-plans through api.mjs
   - id: owner-word
-    rule: pending asks are surfaced verbatim with their live form URLs; the supervisor relays,
-      never answers — accept/reject stays the owner's word
+    rule: pending asks are surfaced verbatim, with the form URL only while the digest tags it
+      `live`; the supervisor relays, never answers — accept/reject stays the owner's word
   - id: patch-then-restart
     rule: restarting a kernel without a landed contract change is a wasted turn — kernels resume
       from the same durable state and will reproduce the same defect

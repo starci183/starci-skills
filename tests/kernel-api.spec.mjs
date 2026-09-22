@@ -80,9 +80,61 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
-    state:'orphaned-frontier',openOperations:0,unconsumedReports:0,nudgeReadyJobs:[],
+    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,unconsumedReports:0,nudgeReadyJobs:[],
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish',
   });
+});
+
+// driver-loop.yaml wait: the Kernel yields only on frontier.actionable:false.
+// The field has to tell an engaged-and-waiting workflow from an engaged one
+// that is still holding work nobody has picked up.
+test('status: frontier.actionable is false only when nothing is waiting on the Kernel',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-actionable';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf));
+  const frontier=()=>{
+    const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
+    assert.equal(r.status,0,r.stderr||r.error?.message);
+    return out(r).frontier;
+  };
+
+  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
+  assert.equal(enq.status,0,enq.stderr);
+  const jobId=read(repo,l=>l.db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND op_id='docs.author'").get(wf)).job_id;
+  const queued=frontier();
+  assert.equal(queued.state,'engaged','a queued job is an open operation');
+  assert.equal(queued.readyOperations,1);
+  assert.equal(queued.actionable,true,'an undispatched job is work, not a wait — the Kernel must not yield on it');
+  assert.match(queued.reason??'',/route\/dispatch or reconcile them before yielding/);
+
+  // The same job, running and owing a report: this is the wait the yield rule
+  // exists for.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId));
+  const running=frontier();
+  assert.equal(running.state,'engaged');
+  assert.equal(running.readyOperations,0);
+  assert.equal(running.actionable,false,'an engaged frontier with nothing ready is the one state that may yield');
+  assert.equal(running.reason,null);
+
+  // A fenced launch needs reconcile before anything else can move.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='effect_unknown' WHERE job_id=?").run(jobId));
+  const fenced=frontier();
+  assert.equal(fenced.readyOperations,1,'an effect_unknown launch is the Kernel’s to reconcile');
+  assert.equal(fenced.actionable,true);
+
+  // A settled workflow with nothing open is idle, and idle is the Kernel's
+  // cue to plan the next leg or finish — never to yield.
+  seed(repo,ledger=>{
+    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(jobId);
+    ledger.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(wf);
+  });
+  const idle=frontier();
+  assert.equal(idle.state,'idle');
+  assert.equal(idle.actionable,true);
+
+  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf));
+  assert.deepEqual([frontier().state,frontier().actionable],['finished',false],
+    'a finished workflow is the other state with nothing to act on');
 });
 
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
