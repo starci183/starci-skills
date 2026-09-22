@@ -888,6 +888,9 @@ ops:
       system, a dataset, a legal authority, a decision between real alternatives (candidate picks,
       accept/reject o
     params:
+      subject:
+        required: true
+        setBy: kernel
       minOptions:
         default: 2
         setBy: kernel

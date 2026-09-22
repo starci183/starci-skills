@@ -52,6 +52,20 @@ test('define-goal --plan STATE shows each role its own compact assess summary', 
   assert.ok(!fs.existsSync(path.join(source, 'be', '.starciwork')), '--plan writes nothing to the owner repository');
 });
 
+test('define-goal passes the owner Work root, so a settled brand record drops brand.decide', t => {
+  const source = projectSource(t);
+  const prompt = 'build Collab group chat end to end';
+  const without = JSON.parse(plan(source, prompt, '--json').stdout);
+  assert.ok(without.opChain.includes('brand.decide'), 'no brand record: brand.decide stays');
+  fs.mkdirSync(path.join(source, 'be', '.starciwork', 'brand'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'be', '.starciwork', 'brand', 'index.yaml'), 'schema: work/brand@1\nid: pair.brand\nstate: done\n');
+  const r = plan(source, prompt);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stdout, /brand\.decide/);
+  assert.match(r.stdout, /\n {2}assumed: brand: settled record brand\/index\.yaml state done — satisfied out-of-band, no chain leg\n/);
+  assert.ok(!fs.existsSync(path.join(source, 'be', '.starciwork', 'runtime.sqlite')), '--plan writes nothing');
+});
+
 test('an unmatched prompt prints the chain as underivable instead of a guessed leg list', t => {
   const source = projectSource(t);
   const r = plan(source, 'xin chào, hôm nay thế nào');

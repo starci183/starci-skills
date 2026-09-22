@@ -28,6 +28,7 @@ graphPolicy:
 reads:
   - id: target
     path: .starciwork/features/<feature>/operations/<audit>/index.yaml
+    mustExist: true
     purpose:
       en: Read the existing selected audit scope, exact route/state/viewport/theme matrix, assertion IDs,
         dependencies, attempt number and evidence lineage. An absent target or audit-expanded matrix

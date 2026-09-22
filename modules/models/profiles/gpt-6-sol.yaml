@@ -20,7 +20,6 @@ identity:
 
 launch:
   orca: {kind: managed-agent, agent: codex}
-  imageGeneration: true       # unverified for GPT-6 Sol until the first interface.draw dispatch attests it
 
 business:
   question: >-

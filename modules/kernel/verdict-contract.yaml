@@ -185,6 +185,17 @@ retryAccounting:
     retryable:true and attemptConsumed:false. The queued job keeps
     its durable attempt and businessAttempt while consuming the separately
     bounded infrastructure restart allowance.
+  ownerWait: >-
+    An ask is a wait on the owner, not a failure. `api settle --verdict
+    blocked` on a filed `ask` report records result_json.verdict
+    `awaiting-owner` (kernelVerdict `blocked`, askDispatchId the ask's
+    dispatch); jobs.status stays `failed`, so the worker is released and the
+    answered ask is re-enqueued as a new attempt exactly as before. That
+    attempt spends no business retry (engine/admission.mjs retryDisposition,
+    retryClass `owner-answer`), and `api status` counts it under
+    `failures.awaitingOwner` and lists the open wait in `awaitingOwner[]`,
+    never under failures. A job a kernel settled `blocked` on an `ask` report
+    before this verdict existed reads the same.
   failClosed: >-
     Missing, unknown or partial effect state is not a free resume. It consumes
     the normal business retry budget and must reconcile possible effects before

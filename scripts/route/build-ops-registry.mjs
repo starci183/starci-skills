@@ -70,7 +70,9 @@ function entryFor(file, doc) {
   if (doc?.params && typeof doc.params === 'object') {
     const params = {};
     for (const [name, def] of Object.entries(doc.params)) {
-      params[name] = { default: def?.default ?? null, setBy: String(def?.setBy ?? '') };
+      params[name] = def?.required === true
+        ? { required: true, setBy: String(def?.setBy ?? '') }
+        : { default: def?.default ?? null, setBy: String(def?.setBy ?? '') };
     }
     if (Object.keys(params).length) entry.params = params;
   }

@@ -24,11 +24,10 @@ capacity:
 
 launch:
   orca: {kind: managed-agent, agent: codex}
-  imageGeneration: >-
-    The pool provides imagegen (runtimes.yaml provides, kindRequires) — the ONLY
-    image-capable pool in the fleet. interface.draw and interface.asset carry
-    single-target chains that are exactly this route; asset generation has NO
-    deferral fallback. profiles/gpt-6-sol.yaml carries the model-level flag.
+  hostTools: >-
+    modules/models/agents/codex.yaml capabilities.hostTools — image_gen.imagegen and browser-dom. It is
+    the only image-capable pool: interface.draw and interface.asset route nowhere else, and asset
+    generation has NO deferral fallback.
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 

@@ -73,8 +73,11 @@ conventions:
   stdout: >-
     one JSON object — {ok:true, ...} on success. A refusal prints ok:false and
     names itself in one of four fields: `code` (the thrown refusals, the
-    common case), `reason` (nudge, observe, reconcile, and the `max-ops`
-    concurrency refusal route and dispatch share), `rejected` (every
+    common case), `reason` (nudge, observe, reconcile, the `max-ops`
+    concurrency refusal route and dispatch share, and every refusal that
+    carries a `detail` telling the Kernel its next call — enqueue's missing
+    required param, dispatch's prerequisite-unmet, route and dispatch's
+    tool-unavailable), `rejected` (every
     dispatch launch failure) or `refused` (dispatch admission drift). The
     kebab string is the contract callers match on; each command's `refuses:`
     below names the string it prints and every untyped refusal says so
@@ -177,6 +180,8 @@ commands:
         pool to be full of
       'frontier.queuedCauses': '{<cause>: <count>} — the same rows tallied by cause, omitting causes with no rows'
       jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
+      failures: '{failed, awaitingOwner} — the `failed` rows split: an attempt settled awaiting-owner (verdict-contract.yaml retryAccounting.ownerWait) is a wait, never a failure'
+      awaitingOwner: '[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means the Kernel re-enqueues the op now, `pending` means the owner has not answered'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
@@ -192,7 +197,7 @@ commands:
     returns:
       schema: 'starci/agent-hierarchy@1'
       workflow: '{nodeId, role: workflow, workflowId, title, status, generation}'
-      nodes: '[{nodeId,parentNodeId,role,workflowId,jobId,opId,attempt,generation,status,runtime:{host,agent,provider,model,profile,runtimePool,runId,taskId,dispatchId,terminalHandle}}]'
+      nodes: '[{nodeId,parentNodeId,role,workflowId,jobId,opId,attempt,generation,status,verdict,runtime:{host,agent,provider,model,profile,runtimePool,runId,taskId,dispatchId,terminalHandle}}] — verdict is result_json.verdict (pass|fail|blocked|awaiting-owner), null while unsettled'
       edges: '[{parentNodeId,childNodeId,relation: coordinates|dispatches}]'
     identityRules:
       - 'titles such as [Kernel]/[Op], tab order and parentPaneKey never define ownership'
@@ -315,7 +320,9 @@ commands:
       resumed, reusesDurableAttempt, consumesBusinessRetry}. `attempt` is
       durable dispatch identity; `businessAttempt` is what a route's retry
       limit is budgeted against, and it does not advance for a launch the
-      prior result proved rejected before any effect.
+      prior result proved rejected before any effect (retryClass
+      infrastructure) nor after an attempt that settled awaiting-owner
+      (retryClass owner-answer).
       `records` is the explicit closed read binding carried
       unchanged into the dispatch packet; omission means no Work record is
       bound and never licenses repository-wide discovery.
@@ -335,6 +342,7 @@ commands:
       - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
       - params-invalid: '--params is not a JSON object, names a param the brief does not declare, carries a value of the wrong type or outside its min/max/enum, sets a `setBy: owner` param the approved goal leg does not carry, or a goal leg carries a `setBy: kernel` param (scripts/route/dispatch-op.mjs resolveOpParams)'
+      - 'params-invalid (field `reason`) for a missing `required: true` param: prints {ok:false, workflowId, op, reason:"params-invalid", param, detail} on stdout and exits 1, no job written. detail reads "<op> requires params.<name> (<type>, set by <setBy>): <doc> — none was given; re-run enqueue with --params ''{"<name>": <type>}''" (a `setBy: owner` param names the approved goal leg instead). provision.ask requires params.subject, the one-sentence provision or decision it asks'
     duplicates: >-
       enqueue does not refuse a second live job for the same op: cutExecution
       (driver-loop.yaml) enqueues N disjoint same-op slices at once, each its
@@ -354,7 +362,9 @@ commands:
       the job row + its payload (payload.difficulty is the fallback when
       --difficulty is absent); the workflow goal's routing_bias {prefer[],
       avoid[]} — flag entries lead the merged list; modules/models/runtimes.yaml
-      pool cards (maxParallel, provider) and maxParallelOps; the owner's
+      pool cards (maxParallel, provider) and maxParallelOps; the op
+      manifest's route.riskHints host-tool-required entries against each
+      pool's agent card capabilities.hostTools; the owner's
       budgets.maxOps; the workflow's own slot-holding operation count; live
       running counts; provider quota probes; typed expiring provider-health
       signals. Free-form incident text is evidence for the Kernel but never
@@ -381,6 +391,7 @@ commands:
       - job-not-queued: 'a live/leased/answering job cannot be rerouted; inspect status.workers and settle or reconcile its exact attempt'
       - job-live-worker: 'ledger says queued but the prior exact terminal is still connected+writable; reconcile it, never route a duplicate'
       - job-no-op: 'the job carries no op identity to route for'
+      - 'tool-unavailable (field `reason`): the op''s manifest declares route.riskHints host-tool-required:<tool> and no pool in the kind''s order (its work/role order at the floor-raised difficulty, after bias) whose role and difficulty pin fit has an agent card listing that tool under capabilities.hostTools (scripts/agent/models.mjs missingHostTools). Capacity cannot fix it, so it is typed apart from the wait below. Prints {ok:false, jobId, kind, difficulty, bias, reason:"tool-unavailable", tools, holders:[{target, difficulties, roles}], detail} and exits 1, no decision persisted. detail reads "<op> needs host tool <tool> (...) and no agent in its <work> order at <difficulty> [...] has it; <pool> has it and is excluded by the avoid bias. Re-run api route --job <id> without --avoid <pool>." — or, when no holder is only avoided, "...; the agents that have it (...) are outside that order | no agent card lists it under capabilities.hostTools. Raise api incident --kind tool-unavailable for the owner." — both end "The job stays queued; never dispatch it on an agent without the tool."'
       - 'no decision (UNTYPED): selectPool returned none — capacity, eligibility or quota; a wait reason, not a failure. This one refusal prints {ok:false, jobId, kind, difficulty, bias, error:<selectPool message>} and exits 1 with no code string for the caller to match on'
     usedBy: >-
       drive.dispatch — `api route` runs BEFORE every `api dispatch`: the model
@@ -398,7 +409,9 @@ commands:
       the job row + its workflow — including the PERSISTED `api route`
       decision on jobs.payload_json (model/modelId/effort; dispatch launches
       what route wrote, it does not re-decide); resources/leases/budgets for
-      admission; the op brief modules/ops/ops/<op>.yaml; the model resolution
+      admission; the op brief modules/ops/ops/<op>.yaml; in the target
+      repository, the records its `mustExist` reads resolve to and the bound
+      records' dependsOn (prerequisite-unmet below); the model resolution
       through route-model (modules/models/selection.yaml — eligibility first,
       budget orders the eligible)
     writes: >-
@@ -448,12 +461,14 @@ commands:
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
       - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
+      - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done. An unresolved placeholder, a record outside a Work tree or an invalid tree is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
       - job-no-op: 'the job row carries no op identity to dispatch'
       - model-unknown: 'no model profile at modules/models/profiles/<target>.yaml'
       - brief-missing: '--spawn with no brief at modules/ops/ops/<op>.yaml — the packet would cite a contract that is not there'
+      - 'tool-unavailable (field `reason`): --spawn whose launch agent (the persisted route, --model, or the unrouted default) lacks a host tool the op''s route.riskHints requires. Checked before leases and before any Orca call; prints {ok:false, jobId, op, reason:"tool-unavailable", tools, model, detail} and exits 1, the job stays queued. detail reads "<pool> (agent <provider>) lacks host tool <tool> that <op> requires (...). Re-run api route --job <id> — it now selects only agents whose card lists the tool — then dispatch again. The job stays queued." A dry run does not refuse; it carries `toolUnavailable`'
       - managed-agent: '--spawn on a launch kind that is neither command-terminal nor managed — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
       - 'reserve-failed (UNTYPED, field `refused`): admission threw on job identity/status drift — the job row is left untouched, an operator error rather than a dispatch rejection'
       - dispatch-rejected: >-
@@ -680,7 +695,9 @@ commands:
       checks row the kernel''s re-run recorded
     writes: >-
       jobs.status -> succeeded|failed + result_json {verdict,...} (a blocked
-      verdict settles failed; the typed blocker rides the report); the
+      verdict settles failed; the typed blocker rides the report; a blocked
+      verdict on a filed `ask` report records verdict awaiting-owner —
+      verdict-contract.yaml retryAccounting.ownerWait); the
       reports row''s
       consumed_at is set — consumption the kernel did not mark via
       `api consume-report` is enforced by settle itself, so a report is
@@ -713,7 +730,7 @@ commands:
       verdict, recorded reportFiled:false. A --report file with no reports
       row is validated and filed on the job's behalf first — an invalid one
       is simply not filed (the settle stands on the kernel's verdict).
-    returns: '{ok:true, jobId, verdict, status, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?}'
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'

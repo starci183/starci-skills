@@ -496,3 +496,61 @@ test('A7: a job whose only dispatch was rejected binds nothing at all',t=>{
   assert.match(`${refused.stderr}${refused.stdout}`,/report-dispatch-unbound/);
   assert.equal(reportRows(fx).length,0);
 });
+
+/* ------------------------------------- an ask is a wait on the owner, not a failure */
+
+test('an ask settles awaiting-owner: no business attempt spent, projected apart from failures',t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-ask');
+  dispatchRunning(fx,jobId);
+  fileReport(fx,jobId,{outcome:'ask',name:'ask.json'});
+  const askDispatch=reportRows(fx)[0].dispatch_id;
+
+  const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','blocked','--json');
+  assert.equal(settled.status,0,settled.stderr||settled.stdout);
+  assert.equal(JSON.parse(settled.stdout).awaitingOwner,true);
+  const row=jobRow(fx,jobId);
+  assert.equal(row.status,'failed','jobs.status keeps the vocabulary a running kernel reads');
+  const result=JSON.parse(row.result_json);
+  assert.equal(result.verdict,'awaiting-owner');
+  assert.equal(result.kernelVerdict,'blocked');
+  assert.equal(result.askDispatchId,askDispatch);
+
+  const status=()=>JSON.parse(fx.run(API,'status','--repo',fx.repo,'--workflow',WORKFLOW,'--json').stdout);
+  let st=status();
+  assert.deepEqual(st.failures,{failed:0,awaitingOwner:1},'an ask is never counted as a failure');
+  assert.deepEqual(st.awaitingOwner,[{jobId,opId:OP,attempt:1,dispatchId:askDispatch,answer:'pending'}]);
+
+  const hierarchy=JSON.parse(fx.run(API,'hierarchy','--repo',fx.repo,'--workflow',WORKFLOW,'--json').stdout);
+  assert.equal(hierarchy.nodes.find(n=>n.jobId===jobId)?.verdict,'awaiting-owner');
+
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{ledger.transaction(()=>ledger.appendEvent({workflowId:WORKFLOW,entityType:'job',entityId:jobId,kind:'ask-answered',payload:{dispatchId:askDispatch}}));}
+  finally{ledger.close();}
+  st=status();
+  assert.equal(st.awaitingOwner[0].answer,'answered','the answered ask tells the Kernel to re-enqueue');
+
+  const again=fx.run(API,'enqueue','--repo',fx.repo,'--workflow',WORKFLOW,'--op',OP,'--paths','docs/','--json');
+  assert.equal(again.status,0,again.stderr||again.stdout);
+  const next=JSON.parse(jobRow(fx,JSON.parse(again.stdout).job_id).payload_json);
+  assert.equal(next.retry.attempt,2,'the answered ask runs as a new durable attempt');
+  assert.equal(next.retry.businessAttempt,1,'the ask spent no business attempt');
+  assert.equal(next.retry.retryClass,'owner-answer');
+  assert.deepEqual(status().awaitingOwner,[],'a re-enqueued op no longer waits');
+});
+
+test('a blocked verdict on an ask report settled before awaiting-owner existed reads as a wait',t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-old-ask');
+  dispatchRunning(fx,jobId);
+  fileReport(fx,jobId,{outcome:'ask',name:'old-ask.json'});
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id=?").run(JSON.stringify({verdict:'blocked'}),jobId);
+  }finally{ledger.close();}
+  const st=JSON.parse(fx.run(API,'status','--repo',fx.repo,'--workflow',WORKFLOW,'--json').stdout);
+  assert.deepEqual(st.failures,{failed:0,awaitingOwner:1});
+  const again=fx.run(API,'enqueue','--repo',fx.repo,'--workflow',WORKFLOW,'--op',OP,'--paths','docs/','--json');
+  assert.equal(again.status,0,again.stderr||again.stdout);
+  assert.equal(JSON.parse(jobRow(fx,JSON.parse(again.stdout).job_id).payload_json).retry.businessAttempt,1);
+});

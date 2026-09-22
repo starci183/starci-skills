@@ -82,7 +82,9 @@ function resolveProject(name) {
   const ownerRole = binding?.work?.ownerRole ?? null;
   const owner = repos.find(r => r.role === ownerRole);
   if (!owner) { console.error(`${file}: work.ownerRole '${ownerRole}' names no repository with a pathFromSource`); process.exit(2); }
-  return { project: typeof binding?.project === 'string' && binding.project.trim() ? binding.project.trim() : name, file, ownerRole, ownerRepo: owner.path, repos };
+  const workPath = typeof binding?.work?.pathFromRepository === 'string' && binding.work.pathFromRepository.trim()
+    ? binding.work.pathFromRepository.trim() : '.starciwork';
+  return { project: typeof binding?.project === 'string' && binding.project.trim() ? binding.project.trim() : name, file, ownerRole, ownerRepo: owner.path, workRoot: path.resolve(owner.path, workPath), repos };
 }
 
 const project = projectName ? resolveProject(projectName) : null;
@@ -91,11 +93,16 @@ const project = projectName ? resolveProject(projectName) : null;
 const repo = project ? project.ownerRepo : path.resolve(repoArg ?? process.cwd());
 const scanRepos = project ? project.repos : [{ role: null, path: repo }];
 
+// The owner repository's Work root, when it exists: route-plan --work reads
+// the records that settle a variable out of band (a done brand record).
+const workRoot = project ? project.workRoot : path.join(repo, '.starciwork');
+
 // Derive the ideal op chain through the same planner the kernel uses —
 // advisory only; the kernel re-derives at boot and diffs, never trusts blindly.
 function deriveOpChain(prompt) {
+  const work = fs.existsSync(workRoot) ? ['--work', workRoot] : [];
   const r = spawnSync(process.execPath,
-    [path.join(skillRoot, 'scripts', 'route', 'route-plan.mjs'), '--text', prompt, '--json'],
+    [path.join(skillRoot, 'scripts', 'route', 'route-plan.mjs'), '--text', prompt, '--json', ...work],
     { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
   if (r.status !== 0) return null;
   try { return JSON.parse(r.stdout); } catch { return null; }
@@ -322,6 +329,7 @@ if (planOnly) {
     return { seq: l.seq, op: legLabel(l), tier, estimateMinutes: COLD_MINUTES[tier], ...(l.params ? { params: l.params } : {}) };
   });
   const totalMinutes = legs.length ? legs.reduce((n, l) => n + l.estimateMinutes, 0) : null;
+  const outOfBandAssumed = [...new Set((chain?.legs ?? []).flatMap(l => l.assumed ?? []).filter(a => /satisfied out-of-band, no chain leg$/.test(a)))];
   const out = {
     plan: true,
     mode: revisionBase ? 'revise' : 'define',
@@ -333,6 +341,7 @@ if (planOnly) {
     opChain: chain?.legs?.map(l => l.op) ?? null,
     underivable: underivable ?? undefined,
     legs,
+    assumed: outOfBandAssumed.length ? outOfBandAssumed : undefined,
     estimate: { basis: 'cold', minutesPerTier: COLD_MINUTES, totalMinutes },
     assess: assess.available ? assess.data : null,
     assessNote: assess.available ? undefined : assess.note,
@@ -357,6 +366,7 @@ if (planOnly) {
   if (legs.length) {
     for (const l of legs) lines.push(`  ${l.seq}. ${l.op}  ~${l.estimateMinutes}m ${l.tier}${l.params ? `  params ${Object.entries(l.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''}`);
     lines.push(`  total ~${totalMinutes}m — estimate is cold`);
+    for (const a of outOfBandAssumed) lines.push(`  assumed: ${a}`);
   } else {
     lines.push('  underivable (kernel will derive at boot)');
     lines.push(`  reason: ${underivable.status} — ${underivable.reason}`);
