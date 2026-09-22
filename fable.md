@@ -912,6 +912,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   được tới khi Orca hết kẹt; đã báo 4 kernel giữ job codex ở queued, một incident, không retry vòng.
   Lane Q2 (kernel theo nhóm) conflict với lane P → phiên fork merge main vào Q2.
 
+- 06:05 tick: WSPV implement a27 done, 1 implement đang chạy, 1 ask chờ re-enqueue. Modules: scope.define a1
+  done, frontier orphaned-frontier (kernel sắp suy leg kế). Collab: scope.define a1 blocked, a2 done. AUTH: kernel
+  đang đọc report draw a5 để serve lại ask login (unserved > 1h). Không vá gì.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
