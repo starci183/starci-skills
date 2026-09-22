@@ -50,10 +50,10 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
-// Pool selection + launch-model resolution (pinned lane: scripts/agent/models.mjs)
-// and the Orca orchestration wrappers the managed-agent dispatch path drives —
-// one thin wrapper per calls.yaml verb (run-create/task-create/worker-start/
-// dispatch/dispatch-show/worker-show/worker-stop/worker-release).
+// Pool selection and launch-model resolution, plus the Orca orchestration
+// wrappers the managed-agent dispatch path drives — one thin wrapper per
+// calls.yaml verb (run-create/task-create/worker-start/dispatch/
+// dispatch-show/worker-show/worker-stop/worker-release).
 import { selectPool, resolveLaunchModel } from '../agent/models.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
@@ -759,10 +759,10 @@ function cmdEnqueue(ledger, args) {
 }
 
 /* ----------------------------------------------------------------- route */
-// scripts/api/quota is a pinned sibling lane: the module is imported lazily
-// and every probe degrades to {state:'unknown'} when it is absent or throws —
-// routing still decides on the capacity rows it can prove (running counts,
-// maxParallel, open incidents).
+// The quota probe shells out to a provider CLI, so it is imported lazily and
+// every probe degrades to {state:'unknown'} when it throws — routing still
+// decides on the capacity rows it can prove (running counts, maxParallel,
+// open incidents). A probe is evidence, never a verdict.
 const quotaModule = import('../api/quota/index.mjs').catch(() => null);
 const probeQuotaSafe = async (provider) => {
   try {
@@ -1454,7 +1454,7 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }) {
     }
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'run-created', payload: { runId, coordinatorTerminal: kernelJob?.worker_id ?? null, storedOn: kernelJob ? kernelJob.job_id : jobId },
+      kind: 'run-created', payload: { runId, kernelTerminal: kernelJob?.worker_id ?? null, storedOn: kernelJob ? kernelJob.job_id : jobId },
     });
   });
   return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };

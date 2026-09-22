@@ -51,11 +51,11 @@ export const LEDGER_VERSION=1;
 export const MACHINE_SCHEMA='starci/machine-db@1';
 export const MACHINE_VERSION=1;
 /**
- * `.claude` is the runtime every project loads, never a Work root of its own: the Work root is the project's
- * backend, reached through `.workspaces`. But the runtime is its own git checkout, and the Work root is
- * resolved with `git rev-parse --git-common-dir` - so any CLI or worker whose cwd sat inside the runtime
- * resolved the runtime as its own Work root and quietly opened a SECOND ledger there. One was found holding
- * a live workflow's id. A parallel record is worse than no record, so this refuses by name instead.
+ * The runtime tree is never a Work root of its own: a project's Work root is its backend, reached through
+ * `.workspaces`. The runtime is its own git checkout, so `git rev-parse --git-common-dir` resolves it as a
+ * root for any CLI or worker whose cwd sits inside it — and a second ledger opened there is a parallel
+ * record of live workflows, which is worse than no record. A ledger path rooted at the runtime is refused
+ * by name.
  */
 const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'bin','starci.mjs'))
   &&fs.existsSync(path.join(root,'engine','ledger-db.mjs'));

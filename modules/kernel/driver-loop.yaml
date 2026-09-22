@@ -92,11 +92,8 @@ boundary:
     until dispatch is a defect.
   terminalLifecycle: >-
     `api settle` closes the worker terminal — the kernel never reuses an op
-    terminal and never re-dispatches into a settled job's handle. A retry
-    is a NEW job row at attempt+1 with a fresh dispatch. A launch rejected
-    before any accepted contract/effect is the narrow exception: explicit
-    infrastructure + effectState:none returns that same job/attempt to queued
-    for rerouting, while businessAttempt and business route budget stay fixed.
+    terminal and never re-dispatches into a settled job's handle. What a retry
+    costs in rows and attempts is tick.drive.oneOpOneAgent below.
   opTerminalObservation: >-
     The one sanctioned look at an op's screen is `api observe --job <id>` —
     read-only reasoning context through the api on the job's own exact
@@ -157,9 +154,11 @@ tick:
       status='queued' with the op's explicit Work-record reads and write-set
       on the row. A downstream op that consumes a scope.define proposal binds
       that exact predecessor scope record here; it never discovers a
-      repository-wide substitute. A duplicate is a refusal, not a hazard — an
-      existing queued or in-flight row IS the queue entry and is never
-      re-enqueued (api.yaml already-queued). A settled dispatch-rejected job
+      repository-wide substitute. One row per planned op the queue lacks:
+      `api enqueue` does not refuse a second live row for the same op
+      (cutExecution needs N of them), so not doubling a leg is the kernel's
+      own discipline and the durable fence is the capacity-1 path lease
+      dispatch admission takes. A settled dispatch-rejected job
       is different: when its result explicitly proves infrastructure failure
       and effectState:none, it returns the same durable row/attempt to queued
       with the same businessAttempt. Repeating recovery creates no successor
@@ -169,8 +168,12 @@ tick:
       execution decomposition INSIDE the already approved semantic op, not a
       new semantic plan leg and not an owner gate. The slice count is
       computed, not guessed: measure the closure's files/assertions/
-      components/records and call `api estimate`; its `slices` (from
-      runtimes.yaml allocation.slicing, 15-30min per slice, cap 15) is N.
+      components/records and call `api estimate`; its `slices` (weights and
+      bounds: modules/models/runtimes.yaml allocation.slicing) is N.
+      A cut is not fan-out within an operation: the slices are DISJOINT jobs
+      of the same approved op, each still one job with one agent and one
+      verdict (dispatch.yaml oneOpOneAgent), never several agents sharing one
+      operation — which is what fanOutWithinOperation forbids.
       Derive a stable cut id and a complete seam-first partition of concrete,
       pairwise-disjoint path slices; enqueue one job per slice with the SAME
       approved op id using `--cut-id <id> --cut-ordinal <n> --cut-total <N>`.
@@ -323,8 +326,9 @@ tick:
         call `api nudge --job <id>`; that wakes the exact worker with its existing
         contract and grants no new authority. If the bounded wake returns idle
         without a report, record worker-idle-without-report and settle fail from
-        the missing-report evidence before retrying at attempt+1. Never wait
-        indefinitely and never spawn a duplicate over the original lease.
+        the missing-report evidence before the retry (drive.oneOpOneAgent).
+        Never wait indefinitely and never spawn a duplicate over the original
+        lease.
       workerDonePing: >-
         An op's `worker_done` / terminal-done signal is a completion PING,
         never an outcome — the durable outcome is the reports row filed via
@@ -380,8 +384,9 @@ tick:
     repair:
       onFail: >-
         verdict fail -> retry inside the route's limit: `api enqueue` the
-        same op at attempt+1 with the failure named back (modules/models/
-        kinds.yaml routes — the full table is verdictTable below). A
+        same op with the failure named back (modules/models/
+        kinds.yaml routes — the full table is verdictTable below;
+        drive.oneOpOneAgent owns what the new row costs). A
         dispatch-rejected/no-effect infrastructure recovery reroutes the same
         queued durable attempt and does not consume this route limit.
       onBlocked: >-
@@ -684,7 +689,7 @@ failureHandling:
   respawnPolicy:
     ownFault: >-
       A dead agent with no infrastructure cause and nothing to say: the op
-      attempt is settled and a retry re-enqueues at attempt+1 — past the
+      attempt is settled and the route's retry re-enqueues it — past the
       route's limit it is blocked and the owner is told
       (the api's reconciliation; kinds.yaml route limits). Re-brief with the
       failure named and relaunch — never
@@ -742,9 +747,9 @@ failureHandling:
       (scripts/kernel/watchdog.mjs; scripts/kernel/start-workflow.mjs;
       modules/kernel/start-workflow.yaml claim.onDeadKernel).
     respawn: >-
-      start-workflow re-opens the `[Kernel] <id>` coordinator terminal and
+      start-workflow re-opens the `[Kernel] <id>` terminal and
       re-sends the workflow-run command (kernel attempt+1, same workflow
-      generation); stale coordinator terminals of the dead kernel are
+      generation); stale Kernel terminals of the dead kernel are
       closed by handle first (scripts/agent/lib.mjs terminal close).
     singleton: >-
       One kernel per workflow, one supervisor per ledger — kernel-lock and
@@ -769,9 +774,9 @@ supervision:
     canonical status/survey and the attested Kernel terminal; start-workflow
     (scripts/kernel/start-workflow.mjs) — a one-shot
     claim -> spawn -> attest; re-running it on a dead kernel claims the stale
-    binding and spawns the replacement (kernel attempt+1). Beside the
-    kernel: nothing — there is no Coordinator and
-    no per-module Monitor.
+    binding and spawns the replacement (kernel attempt+1). The chain ends
+    there: one kernel orchestrates its whole workflow, and every other agent
+    inside it is an ephemeral Op that kernel dispatched.
   auditTrail: >-
     Every transition is an event in the ledger (engine/ledger-db.mjs events
     table, hash-chained — verifyChain; engine/schema.sql); persist-as-you-

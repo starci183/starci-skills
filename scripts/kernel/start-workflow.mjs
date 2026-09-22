@@ -35,6 +35,10 @@ import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { workerShow } from '../api/orca/worker-show.mjs';
+import { workerStop } from '../api/orca/worker-stop.mjs';
+import { workerRelease } from '../api/orca/worker-release.mjs';
+import { resolveLaunchModel, selectPool } from '../agent/models.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -59,9 +63,10 @@ const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRo
 
 // Provider liveness probe: scripts/api/quota/index.mjs exports
 // probeQuota(provider) → {state, usedPercent, detail}; 'dead' means the
-// provider is not authenticated. The module is a pinned sibling-lane dep —
-// absent or broken is 'unknown', never a crash and never a verdict. Probes
-// are memoized per process — one account-list read serves every candidate.
+// provider is not authenticated. It is imported lazily and every failure
+// degrades to 'unknown' — a probe is evidence, never a verdict, and a kernel
+// must still boot when the provider CLI cannot answer. Probes are memoized
+// per process — one account-list read serves every candidate.
 const probeCache = new Map();
 async function probeAgent(agent) {
   if (probeCache.has(agent)) return probeCache.get(agent);
@@ -77,29 +82,6 @@ async function probeAgent(agent) {
   }
   probeCache.set(agent, probe && typeof probe === 'object' ? probe : { state: 'unknown' });
   return probeCache.get(agent);
-}
-
-// The orchestration wrappers (run-create, task-create, worker-start,
-// dispatch, worker-show, worker-stop, worker-release, …) land in
-// scripts/api/orca/ as thin per-verb modules over lib.mjs — same pattern as
-// terminal-*.mjs. Merged lazily from every sibling file so a checkout where
-// they have not landed yet still runs the command-terminal kernel path.
-async function loadOrchestrationApi() {
-  const dir = path.join(skillRoot, 'scripts', 'api', 'orca');
-  const fns = {};
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort()) {
-    try { Object.assign(fns, await import(pathToFileURL(path.join(dir, file)).href)); } catch { /* half-landed lane — keep looking */ }
-  }
-  return fns;
-}
-
-// scripts/agent/models.mjs (pinned sibling lane) resolves the launch model a
-// pool target carries: resolveLaunchModel(target, difficulty) →
-// {modelId, effort}. Absent lane → null, the caller keeps its own value.
-async function loadModelSelection() {
-  const file = path.join(skillRoot, 'scripts', 'agent', 'models.mjs');
-  if (!fs.existsSync(file)) return null;
-  try { return await import(pathToFileURL(file).href); } catch { return null; }
 }
 
 // The pool target a provider pin launches on: the runtimes.yaml pool owned by
@@ -141,8 +123,6 @@ function agentForTarget(target) {
 // selection walks the tier∩role chain for the kernel-manager role (decide).
 // Explicit owner pins never enter this function: they fail closed.
 async function nextEligiblePool(excludeTarget, warnings) {
-  const sel = await loadModelSelection();
-  if (typeof sel?.selectPool !== 'function') return null;
   const runtimesFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
   let runtimes = null;
   try { runtimes = parseYaml(fs.readFileSync(runtimesFile, 'utf8')); } catch { return null; }
@@ -160,7 +140,7 @@ async function nextEligiblePool(excludeTarget, warnings) {
   }
   let pool = null;
   try {
-    pool = sel.selectPool({
+    pool = selectPool({
       kind: KERNEL_ROUTE.kind, role: 'decide', difficulty: KERNEL_ROUTE.risk,
       bias: excludeTarget ? { avoid: [excludeTarget] } : null,
       capacity, runtimes,
@@ -176,15 +156,12 @@ async function completeKernelRoute(route) {
   let model = route.model ?? route.route?.model ?? null;
   let effort = route.effort ?? route.route?.effort ?? null;
   const runtimePool = route.route?.target ?? poolTargetForAgent(route.agent);
-  if (!model || !effort) {
-    const selection = await loadModelSelection();
-    if (typeof selection?.resolveLaunchModel === 'function' && runtimePool) {
-      try {
-        const resolved = selection.resolveLaunchModel(runtimePool, KERNEL_ROUTE.risk);
-        model = model ?? resolved?.modelId ?? null;
-        effort = effort ?? resolved?.effort ?? null;
-      } catch { /* converted to a typed route error below */ }
-    }
+  if ((!model || !effort) && runtimePool) {
+    try {
+      const resolved = resolveLaunchModel(runtimePool, KERNEL_ROUTE.risk);
+      model = model ?? resolved?.modelId ?? null;
+      effort = effort ?? resolved?.effort ?? null;
+    } catch { /* converted to a typed route error below */ }
   }
   if (!model)
     return { ...route, runtimePool, error: `kernel agent '${route.agent}' has no resolvable model for ${KERNEL_ROUTE.kind}/${KERNEL_ROUTE.risk}` };
@@ -351,10 +328,7 @@ async function signalHealth(signal) {
     return { live: true, reason: 'startup reservation active', terminal: null, value };
   }
   if (value.dispatch) {
-    const orch = await loadOrchestrationApi();
-    if (typeof orch.workerShow !== 'function')
-      return { live: true, reason: 'managed kernel dispatch recorded; worker-show probe unavailable', terminal: null, value };
-    const shown = orch.workerShow({ dispatch: value.dispatch });
+    const shown = workerShow({ dispatch: value.dispatch });
     const state = shown?.state ?? null;
     const live = shown?.ok === true && !(state && MANAGED_DEAD_STATE.test(state));
     return {
@@ -371,11 +345,10 @@ async function signalHealth(signal) {
 // Best-effort settlement of a managed dispatch (stale kernel replacement or a
 // failed launch with residual effects): worker-stop then worker-release,
 // matching calls.yaml's settle-dispatch recovery. Never throws.
-async function releaseManagedWorker(dispatchId) {
+function releaseManagedWorker(dispatchId) {
   if (!dispatchId) return;
-  const orch = await loadOrchestrationApi();
-  try { orch.workerStop?.({ dispatch: dispatchId }); } catch { /* best-effort */ }
-  try { orch.workerRelease?.({ dispatch: dispatchId }); } catch { /* best-effort */ }
+  try { workerStop({ dispatch: dispatchId }); } catch { /* best-effort */ }
+  try { workerRelease({ dispatch: dispatchId }); } catch { /* best-effort */ }
 }
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
