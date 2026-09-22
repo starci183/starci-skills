@@ -916,6 +916,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   done, frontier orphaned-frontier (kernel sắp suy leg kế). Collab: scope.define a1 blocked, a2 done. AUTH: kernel
   đang đọc report draw a5 để serve lại ask login (unserved > 1h). Không vá gì.
 
+- 06:15 Merge lane Q2 (`6dd4bdd20`): kernel không ghim tự chọn trong nhóm Claude Opus 5.5 → GPT-6 Sol theo quota,
+  boot tự chuyển thành viên khi launch hỏng không để lại gì. config.example ship nhóm; config.yaml của thầy vẫn
+  ghim devin/swe-2-max, load OK. check + 63 spec xanh.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
