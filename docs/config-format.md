@@ -31,7 +31,8 @@ Required keys:
 
 Optional keys:
 
-- `kernel` — `{agent?, model?, effort?}` route pin for the `[Kernel]` seat; null means routing decides
+- `kernel` — the `[Kernel]` seat: a single pin `{agent?, model?, effort?}` or a group
+  `{group: [{agent, model?}, ...], effort?}` (below); absent or all-null means routing decides
 - `budgets` — `{maxOps?, perOpMs?, dailyTokens?}` owner ceilings; positive integers or null
 - `parallel` — `{gear}`; the one parallelism knob, below
 - `allocation.mode` — `adaptive`; fresh quota, current admitted load, recent service and task/model suitability
@@ -39,6 +40,21 @@ Optional keys:
 - `allocation.preferredProvider` — `null` for automatic capacity or one declared provider id for a bounded
   preference; this never forms a fallback chain
 - `debug` — boolean
+
+## Kernel group
+
+The kernel is a model group, not a single model. The shipped default is
+`kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6-sol}], effort: high}`:
+`scripts/kernel/start-workflow.mjs` tries the members in order, skips one whose provider quota probe reads
+`dead` or whose ledger provider-health circuit is open, puts a `limited` one last, and — when a member's
+launch is refused before the model took any input (an interactive gate such as the Claude first-run screen,
+an auth screen, a readiness or model-attestation failure) — closes that terminal and boots the next member in
+the same start (the rule and its step list are `modules/kernel/start-workflow.yaml` `spawn.fallThrough`).
+`engine/config.mjs` refuses an empty group, an agent named twice, an unknown agent, a model no runtime of
+that agent declares, and a group mixed with `agent`/`model` keys. A single pin `{agent, model, effort}` keeps
+its meaning: it is authoritative and fails closed rather than substituting. With no `kernel` key the unpinned
+route is the same think group, resolved by `scripts/route/route-model.mjs` (`modules/models/selection.yaml`
+`decisionFlow` `kernel-function` and `kernel-availability`).
 
 ## Parallelism
 
@@ -82,9 +98,8 @@ required role. The kernel's own model call kinds are
 
 ## Model routing
 
-Model routing holds the owner's rules as data. The `[Kernel]` seat defaults to Claude Opus 5.5
-(`config.example.yaml` `kernel`; unpinned, `scripts/route/route-model.mjs` orders `model.manageWorkflow`
-Claude first), and GPT-6 Sol on `codex-agent` is the fallback when Claude is unavailable. Every kind has one
+Model routing holds the owner's rules as data. The `[Kernel]` seat is the Claude Opus 5.5 then GPT-6 Sol
+group ([Kernel group](#kernel-group)). Every kind has one
 entry in `modules/models/runtimes.yaml` `roleOfKind` — its role, whether its work is `think` or `hands-on`,
 and the difficulty `floor` read from what its op does. Think work is any op whose output is a canonical
 record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
