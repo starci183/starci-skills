@@ -44,7 +44,7 @@ export function parallelGear(config=loadConfig()){
   return config?.parallel?.gear??defaultParallelGear();
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','parallel'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){
@@ -68,6 +68,11 @@ export function validateConfig(config){
       throw Error('Invalid config.yaml: parallel must be {gear: <integer>}.');
     if(!gears.includes(parallel.gear))
       throw Error(`Invalid config.yaml: parallel.gear ${parallel.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')}).`);
+  }
+  if(config?.supervisor!==undefined){
+    const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs;
+    if(!plain(supervisor)||Object.keys(supervisor).some(key=>key!=='pollIntervalMs')||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?} with an integer of at least 60000 ms, or null.');
   }
   if(config?.budgets!==undefined){
     const budgets=config.budgets;

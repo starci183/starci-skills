@@ -27,9 +27,17 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
+import { loadConfig } from '../../engine/config.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 
 export const DEFAULT_INTERVAL_MS = 180000;
+
+// The owner's cadence: config.yaml supervisor.pollIntervalMs. Precedence is
+// --interval-ms > config.yaml > DEFAULT_INTERVAL_MS; an unreadable config falls
+// back to the default so a broken file never stops the observer.
+export function ownerPollIntervalMs() {
+  try { return loadConfig()?.supervisor?.pollIntervalMs ?? null; } catch { return null; }
+}
 // The digest's first cycle has no previous cycle to diff against: it prints
 // this many trailing reports so the chat starts from a state, not a blank.
 export const BASELINE_REPORTS = 8;
@@ -182,7 +190,7 @@ const main = () => {
   const has = (n) => argv.includes(`--${n}`);
 
   const repo = path.resolve(valueOf('repo') ?? '.');
-  const intervalMs = Number(valueOf('interval-ms', DEFAULT_INTERVAL_MS));
+  const intervalMs = Number(valueOf('interval-ms', null) ?? ownerPollIntervalMs() ?? DEFAULT_INTERVAL_MS);
   const once = has('once');
   const asJson = has('json');
   const wanted = new Set(valuesOf('workflow'));

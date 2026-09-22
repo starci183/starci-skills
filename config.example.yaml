@@ -30,6 +30,11 @@ kernel: {agent: codex, model: gpt-5.6-sol, effort: high}
 # the first declared gear. A gear raises only what `api estimate` requests; it
 # never raises a pool's maxParallel, maxParallelOps or budgets.maxOps below.
 parallel: {gear: 1}
+# supervisor — the monitoring chat's cadence. pollIntervalMs is how often
+# scripts/supervisor/poll.mjs prints a digest (at least 60000). null uses the
+# script default; --interval-ms on the command line wins over this key.
+supervisor:
+  pollIntervalMs: null
 # budgets — owner-declared ceilings surfaced by every plan before `ok`, so the
 # envelope the owner approves shows the caps the kernel was configured with.
 # Null = unbounded. These are caps, not targets.
