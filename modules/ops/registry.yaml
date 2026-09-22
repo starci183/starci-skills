@@ -35,6 +35,10 @@ ops:
     goal: Design the selected implementation slice with the minimum complete flow-led,
       source-independent architecture needed to build safely, then refine it from concrete
       implementation evidence.
+    params:
+      readingsStated:
+        default: 3
+        setBy: kernel
     nodeKinds:
       - architecture
     completionProfile: architecture
@@ -46,11 +50,9 @@ ops:
       - constraints
       - specification
       - feasibility
-      - matrix
       - profile
     writes:
       - node
-      - matrixHandoff
     route:
       nodeKinds:
         - architecture
@@ -82,13 +84,11 @@ ops:
       - business
       - architecture
       - repo
-      - matrix
       - profile
     writes:
       - node
       - source
       - evidence
-      - matrixHandoff
       - apiDelivery
     route:
       nodeKinds:
@@ -195,6 +195,10 @@ ops:
     family: business
     goal: Specify the selected business slice with the minimum complete observable behavior needed to
       implement and independently accept it, then refine that contract from authoritative feedback.
+    params:
+      readingsStated:
+        default: 3
+        setBy: kernel
     nodeKinds:
       - business
       - business-overview
@@ -204,11 +208,9 @@ ops:
       - repo
       - intent
       - specification
-      - matrix
       - profile
     writes:
       - node
-      - matrixHandoff
     route:
       nodeKinds:
         - business
@@ -243,13 +245,11 @@ ops:
       - coverage
       - conventions
       - machines
-      - matrix
       - profile
     writes:
       - node
       - source
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - implementation
@@ -281,13 +281,11 @@ ops:
       - business
       - repo
       - brief
-      - matrix
       - profile
     writes:
       - node
       - source
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - implementation
@@ -342,13 +340,11 @@ ops:
       - records
       - repo
       - conventions
-      - matrix
       - profile
     writes:
       - node
       - docs
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - operations
@@ -384,13 +380,10 @@ ops:
       - effects
       - profile
       - workflow
-      - matrix
     writes:
       - node
       - source
       - evidence
-      - handoff
-      - matrixHandoff
     route:
       nodeKinds:
         - implementation
@@ -503,7 +496,6 @@ ops:
     writes:
       - node
       - evidence
-      - handoff
     route:
       nodeKinds:
         - integration
@@ -565,6 +557,10 @@ ops:
     goal: "Audit selected real interface renders against the exact latest explicitly owner-accepted
       interface.draw receipt and its image, prompt and content hashes, accepted product intent, the
       actual installed "
+    params:
+      maxRounds:
+        default: 5
+        setBy: kernel
     nodeKinds:
       - operations
     completionProfile: operations
@@ -582,16 +578,16 @@ ops:
       - brand-assets
       - repo
       - implementation-captures
+      - producer-measurements
       - environment
       - identity
       - previous
       - workflow
-      - matrix
+      - runner
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - operations
@@ -611,12 +607,12 @@ ops:
           hashes
         - accepted UI direction and installed Grammar binding
       riskHints:
-        - browser-required
+        - host-tool-required:browser-dom
         - read-only-product-source
         - owner-accepted-draw-lineage
         - exact-cell-side-by-side
         - grammar-hard-authority
-        - bounded-five-round-loop
+        - bounded-round-loop
     lifecyclePosition: verify | post-implementation
     kindInferred: audit
   - id: interface.draw
@@ -694,17 +690,16 @@ ops:
       - design
       - environment
       - workflow
-      - matrix
       - profile
       - assetSources
     writes:
       - node
       - source
+      - runningPage
       - evidence
-      - handoff
       - flows
-      - matrixHandoff
       - assetManifest
+      - realizationCheck
     route:
       nodeKinds:
         - implementation
@@ -745,6 +740,7 @@ ops:
       - node
       - source
       - evidence
+      - firstRender
     route:
       nodeKinds:
         - implementation
@@ -781,13 +777,11 @@ ops:
       - target
       - repo
       - rule
-      - matrix
       - profile
     writes:
       - node
       - source
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - implementation
@@ -866,12 +860,10 @@ ops:
       - environment
       - metrics
       - effects
-      - matrix
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - implementation
@@ -892,6 +884,10 @@ ops:
     goal: Ask the owner for the one thing only they can give - a credential, an account on an outside
       system, a dataset, a legal authority, a decision between real alternatives (candidate picks,
       accept/reject o
+    params:
+      minOptions:
+        default: 2
+        setBy: kernel
     nodeKinds:
       - business
     completionProfile: business
@@ -931,12 +927,10 @@ ops:
       - application-stacks
       - target
       - selection
-      - matrix
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - operations
@@ -998,12 +992,10 @@ ops:
       - application-stacks
       - target
       - selection
-      - matrix
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - operations
@@ -1033,12 +1025,10 @@ ops:
       - application-stacks
       - target
       - selection
-      - matrix
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - operations
@@ -1104,12 +1094,10 @@ ops:
       - repo
       - inventory
       - authority
-      - matrix
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - operations
@@ -1146,12 +1134,10 @@ ops:
       - machines
       - checks
       - effects
-      - matrix
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - implementation
@@ -1212,13 +1198,11 @@ ops:
       - repo
       - suite
       - conventions
-      - matrix
       - profile
     writes:
       - node
       - source
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - implementation
@@ -1254,7 +1238,6 @@ ops:
       - automation
       - authority
       - workflow
-      - matrix
       - profile
     writes:
       - request
@@ -1263,8 +1246,6 @@ ops:
       - redaction
       - cleanup
       - evidence
-      - handoff
-      - matrixHandoff
     route:
       nodeKinds:
         - uat.ux
@@ -1311,13 +1292,10 @@ ops:
       - postconditions
       - cleanup
       - workflow
-      - matrix
       - profile
     writes:
       - verification
       - evidence
-      - handoff
-      - matrixHandoff
     route:
       nodeKinds:
         - uat.ux
@@ -1360,15 +1338,12 @@ ops:
       - scripts
       - effects
       - workflow
-      - matrix
       - profile
     writes:
       - node
       - source
       - resources
       - evidence
-      - handoff
-      - matrixHandoff
     route:
       nodeKinds:
         - uat.ux
@@ -1393,6 +1368,16 @@ ops:
     goal: Author the canonical Work records one slice needs before it can be launched - in record mode
       each record's own write scope, testable proof demands and one runnable check per demand; in
       cut mode the ch
+    params:
+      maxFiles:
+        default: 12
+        setBy: kernel
+      maxProofDemands:
+        default: 8
+        setBy: kernel
+      componentsTriggeringCut:
+        default: 3
+        setBy: kernel
     nodeKinds:
       - implementation
       - uat
@@ -1445,12 +1430,10 @@ ops:
     reads:
       - target
       - selection
-      - matrix
       - profile
     writes:
       - node
       - evidence
-      - matrixHandoff
     route:
       nodeKinds:
         - operations

@@ -1,14 +1,9 @@
-# modules/ops/ops/package.scaffold.yaml — new reusable package/module creation.
-# Creates a NEW package/library source tree inside a bound repository (or a fresh
-# repo the binding already names): manifest, exports map, toolchain, harness —
-# proven by pack/build + a real smoke consumer, not just written.
-
+schema: starci/op@1
 id: package.scaffold
 goal:
-  en: Create one new package or library module at the declared path and prove its public
-    contract surface — the package builds and a real consumer import resolves.
-nodeKinds:
-  - implementation
+  en: Create one new package or library module at the declared path and prove its public contract
+    surface — the package builds and a real consumer import resolves.
+nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
   - owned source edits
@@ -25,52 +20,42 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read the selected implementation node this package realises: declared path, package
-        identity (name/scope), public surface refs, assertions. No selected node is a scope gap."
+      en: "Read the selected implementation node this package realises: declared path, package identity
+        (name/scope), public surface refs, assertions. No selected node is a scope gap."
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
-      en: "REQUIRED. Package boundaries — name, exports shape, dependency policy, consumer contract —
-        are settled architecture. Undecided boundaries report sds-gap; the scaffold never invents
-        a public API."
+      en: REQUIRED. Package boundaries — name, exports shape, dependency policy, consumer contract — are
+        settled architecture.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
-      en: Resolve the actual checkout and read sibling packages/manifests for house conventions —
-        a new package in an existing repo inherits that repo's toolchain wiring, not a parallel one.
+      en: Resolve the actual checkout and read sibling packages/manifests for house conventions — a new
+        package in an existing repo inherits that repo's toolchain wiring, not a parallel one.
   - id: conventions
     path: knowledge/patterns/be/* + knowledge/code-pattern-enforcement.yaml
     purpose:
-      en: Read the kit contracts the package must satisfy (eslint kits, grammar packaging,
-        exports-map policy) before writing the manifest.
+      en: "The kit contracts a package satisfies: eslint kits, grammar packaging and the exports-map
+        policy."
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve the request-bound profile; capabilities are the intersection of actual tools and
-        profile policy.
+      en: Resolve the request-bound profile; capabilities are the intersection of actual tools and profile
+        policy.
 writes:
   - id: node
     path: N/index.yaml
-    fields:
-      - state
-      - activity
-      - codeRefs
-      - evidence
+    fields: [state, activity, codeRefs, evidence]
     content:
       en: Record the realised package root, its manifest identity and evidence.
   - id: source
     path: repository:<repo-id>/<declared-package-root>/**
-    fields:
-      - manifest
-      - exports
-      - toolchainConfig
-      - layout
-      - harness
+    fields: [manifest, exports, toolchainConfig, layout, harness]
     content:
-      en: "The new package tree only: package.json with declared name/scope/exports, toolchain
-        configs inheriting house kits, declared layout, minimal public surface and its harness."
+      en: "The new package tree only: package.json with declared name/scope/exports, toolchain configs
+        inheriting house kits, declared layout, minimal public surface and its harness."
   - id: evidence
-    path: E/result.json + E/effects.json + E/verification.json + E/artifacts
+    path: E/**
     fields:
       - request
       - scope
@@ -83,41 +68,55 @@ writes:
       - codeRefs
       - remaining
       - recovery
+    artifacts: [result.json, effects.json, verification.json, artifacts]
+    content:
+      en: The scaffold result, the effects it had, the verification it ran and the artifacts it produced
+        for the selected package scope.
 steps:
-  - reads: [target, architecture]
+  - reads:
+      - target
+      - architecture
     writes: [evidence]
     action:
-      en: Resolve package identity, public surface and dependency policy from settled records.
-        Every export the manifest declares traces to a record.
-  - reads: [repo, conventions]
+      en: Resolve package identity, public surface and dependency policy from settled records. Every
+        export the manifest declares traces to a record. Undecided boundaries report sds-gap; the
+        scaffold never invents a public API.
+  - reads:
+      - repo
+      - conventions
     writes: [evidence]
     action:
-      en: Resolve the checkout, confirm the declared package root is empty-or-absent, read sibling
-        package manifests and the kit contracts this package inherits.
-  - reads: [architecture, conventions]
+      en: Resolve the checkout, confirm the declared package root is empty-or-absent, read sibling package
+        manifests and the kit contracts this package inherits. Read the kit contracts the package
+        must satisfy (eslint kits, grammar packaging, exports-map policy) before writing the
+        manifest.
+  - reads:
+      - architecture
+      - conventions
     writes: [source]
     action:
-      en: Write the manifest (name/scope/exports per the settled boundary), toolchain configs wired
-        to house kits, declared layout, minimal public surface and harness.
-  - reads: [repo]
+      en: Write the manifest (name/scope/exports per the settled boundary), toolchain configs wired to
+        house kits, declared layout, minimal public surface and harness.
+  - reads:
+      - repo
     writes: [source, evidence]
     action:
-      en: Install, build, lint and test for real; prove the public contract with a real consumer
-        smoke — pack or workspace-import the package and resolve its declared export from an actual
-        consumer file.
-  - reads: [target]
+      en: Install, build, lint and test for real; prove the public contract with a real consumer smoke —
+        pack or workspace-import the package and resolve its declared export from an actual consumer
+        file.
+  - reads:
+      - target
     writes: [node, evidence]
     action:
-      en: Record the package root and codeRefs on the node; return the evidence bundle including
-        the consumer-smoke output.
+      en: Record the package root and codeRefs on the node; return the evidence bundle including the
+        consumer-smoke output.
 proofs:
   - id: package-builds
     requirement:
       en: The declared toolchain ran green against the new package and real output is recorded.
   - id: contract-resolves
     requirement:
-      en: A real consumer resolved the declared export — pack or workspace import executed, not
-        asserted.
+      en: A real consumer resolved the declared export — pack or workspace import executed, not asserted.
   - id: conventions-inherited
     requirement:
       en: The package uses the house kits/toolchain wiring of its repo — no parallel toolchain.
@@ -147,33 +146,13 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-business:
-  question: >-
-    "For a new package/module: what exact boundary does the settled design declare,
-    and does a real consumer resolve its public surface?"
-  whenNeeded:
-    - A workflow needs a new reusable package/module inside a bound repo (packages/* shape)
-      or a fresh bound repo.
-    - The public contract must be proven before consumers are built on it.
-  whenNot:
-    - Not for editing an existing package's internals — code.refactor / the owning implement op.
-    - Not for publishing — release.deliver owns release effects.
-  consumes:
-    - The selected implementation node; settled architecture boundary; the bound repository and
-      its existing package conventions; house kits.
-  produces:
-    - A buildable package under the declared root whose declared export a real consumer resolves,
-      plus its evidence bundle.
-  failureModes:
-    - SDS_MISSING, REPO_UNBOUND, CONVENTION_CONFLICT, TOOLCHAIN_UNAVAILABLE, OUTSIDE_SCOPE.
-
 route:
   nodeKinds: [implementation]
   phase: [implement]
   intent: [scaffold, greenfield, new-source, package, library, module, bootstrap, init]
-  prerequisites: ["architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)", "repository bound"]
+  prerequisites:
+    - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
+    - repository bound
   riskHints: [source-edits, new-tree]

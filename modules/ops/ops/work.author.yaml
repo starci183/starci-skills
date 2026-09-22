@@ -1,17 +1,33 @@
-# modules/ops/ops/work.author.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: work.author
 goal:
-  en: Author the canonical Work records one slice needs before it can be launched - in record mode each record's own write
-    scope, testable proof demands and one runnable check per demand; in cut mode the child records a scope too big
-    for one operation is split into, seam first - without anyone inventing a scope.
-nodeKinds:
-  - implementation
-  - uat
-  - ui
-  - operations
+  en: Author the canonical Work records one slice needs before it can be launched - in record mode
+    each record's own write scope, testable proof demands and one runnable check per demand; in cut
+    mode the child records a scope too big for one operation is split into, seam first - without
+    anyone inventing a scope.
+params:
+  maxFiles:
+    type: integer
+    default: 12
+    min: 1
+    setBy: kernel
+    doc:
+      en: The write-scope size above which the kernel treats a record as too big for one operation.
+  maxProofDemands:
+    type: integer
+    default: 8
+    min: 1
+    setBy: kernel
+    doc:
+      en: The number of proof demands above which the kernel treats a record as too big for one operation.
+  componentsTriggeringCut:
+    type: integer
+    default: 3
+    min: 2
+    setBy: kernel
+    doc:
+      en: How many components the referenced design may name before the record is cut.
+nodeKinds: [implementation, uat, ui, operations]
 completionProfile: operations
 sideEffects: []
 graphPolicy:
@@ -21,47 +37,49 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md +
+      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
-        credential custody, lifecycle commands and existing consumers. Run the static stacks
-        check when validating a materialized stack; bind its exact inputs and limitations.
-        Acceptance additionally requires the selected real startup, persistence, recovery and
-        application checks. This conditional read grants no extra deployment or source scope.
+        credential custody, lifecycle commands and existing consumers. Run the static stacks check
+        when validating a materialized stack; bind its exact inputs and limitations. Acceptance
+        additionally requires the selected real startup, persistence, recovery and application
+        checks. This conditional read grants no extra deployment or source scope.
   - id: target
     path: .starciwork/features/<feature>/{impl,uat,integration}/**/index.yaml
     purpose:
       en: "Read the selected record exactly as authored: its title, refs, dependencies, proof demands,
-        state and whatever write scope or checks it already declares. The authored intent
-        governs; an absent field is the gap to complete, never a licence to restate the record's purpose."
+        state and whatever write scope or checks it already declares."
   - id: neighbours
     path: sibling record index.yaml files of the selected feature scope
     purpose:
       en: Read the feature scope and the sibling records so the completed scope neither duplicates nor
-        contradicts work another record already owns. An overlap belongs to the owning record, not to this one.
+        contradicts work another record already owns. An overlap belongs to the owning record, not
+        to this one.
   - id: specification
     path: accepted requirement and design records the target declares in refs or dependsOn
     purpose:
-      en: Read the accepted requirement and design records the target references, so every proof demand restates
-        an accepted outcome. A behaviour the accepted records do not state is a reported gap, not an invention.
+      en: Read the accepted requirement and design records the target references, so every proof demand
+        restates an accepted outcome. A behaviour the accepted records do not state is a reported
+        gap, not an invention.
   - id: source
     path: selected repositories and the modules the referenced design names
     purpose:
       en: Inspect the actual code an implementation of this node would change, so the declared write scope
-        names files that exist in the shape the design prescribes. Never write a path that was not inspected.
+        names files that exist in the shape the design prescribes.
   - id: scripts
     path: repository package manifests, task runners and existing check commands
     purpose:
-      en: Read the commands this repository already exposes, so every declared check is a command that can be
-        run verbatim and that actually exercises the assertion it claims. Never invent a runner or a script name.
+      en: Read the commands this repository already exposes, so every declared check is a command that can
+        be run verbatim and that actually exercises the assertion it claims.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability proof.
-        Capabilities are the intersection of actual tools, selected profile policy, op permissions and existing
-        task authority.
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof. Capabilities are the intersection of actual tools, selected profile
+        policy, op permissions and existing task authority.
 writes:
   - id: node
     path: .starciwork/features/<feature>/{impl/<repository>,uat}/<name>/index.yaml
@@ -80,66 +98,44 @@ writes:
       - steps
       - blockedBy
     content:
-      en: "Author only the fields that make the flat work/implementation@1 or work/uat-flow@1 record launchable: its
-        proves edges to the accepted records it proves, the write scope as real inspected owners/files, one
-        requiresProof demand per observable outcome with a verbatim runnable command, and the exclusive
-        runtime resources those checks need. The authored proof demands include the record-class
-        validator `starci validate` so wrong path, name or schema fails the record's own checks. Preserve every
-        other authored line, including the record's
-        title, refs, dependsOn and state. Never write completion, never write the kernel's
-        own extension block, never write anything under the record's evidence folder, and never edit another record."
+      en: "Author only the fields that make the flat work/implementation@1 or work/uat-flow@1 record
+        launchable: its proves edges to the accepted records it proves, the write scope as real
+        inspected owners/files, one requiresProof demand per observable outcome with a verbatim
+        runnable command, and the exclusive runtime resources those checks need. The authored proof
+        demands include the record-class validator `starci validate` so wrong path, name or schema
+        fails the record's own checks. Preserve every other authored line, including the record's
+        title, refs, dependsOn and state. Never write completion, never write the kernel's own
+        extension block, never write anything under the record's evidence folder, and never edit
+        another record."
   - id: integration
     path: .starciwork/features/<feature>/integration/<integration-id>/index.yaml
-    fields:
-      - schema
-      - id
-      - title
-      - state
-      - provider
-      - boundary
-      - endpoints
-      - credential
-      - sandbox
-      - refs
-      - requiresProof
+    fields: [schema, id, title, state, provider, boundary, endpoints, credential, sandbox, refs, requiresProof]
     content:
-      en: One todo work/integration@1 record per integration the feature declares (state todo), naming the outside
-        system, its provider/boundary/endpoints/sandbox and the credential by variable name only; the record the
-        tree owes for the declaration, whose live proof is another operation's. Never a credential value.
+      en: One todo work/integration@1 record per integration the feature declares (state todo), naming the
+        outside system, its provider/boundary/endpoints/sandbox and the credential by variable name
+        only; the record the tree owes for the declaration, whose live proof is another operation's.
+        Never a credential value.
   - id: parts
     path: .starciwork/features/<feature>/impl/<repository>/<part>/index.yaml
-    fields:
-      - schema
-      - id
-      - title
-      - state
-      - repository
-      - owners
-      - proves
-      - requiresProof
-      - dependsOn
+    fields: [schema, id, title, state, repository, owners, proves, requiresProof, dependsOn]
     content:
-      en: "Cut mode only. One child record per observable behaviour, written as work/implementation@1, state
-        todo: its title, its proves edges, its write scope of at most
-        twelve inspected files disjoint from every sibling and from the seam, and one runnable proof demand per
-        outcome plus the record-class validator `starci validate` so wrong path, name or schema fails
-        the child's own checks. Exactly one child is the seam - the one that owns the module wiring, dependency registration,
-        migrations, shared contracts and shared types every other child would otherwise touch - and every other
-        child names the seam in dependsOn, so it is built first and alone and the rest fan out behind it. Never
-        author a child outside the feature's own impl/<repository>/ folder and never write product code."
+      en: "Cut mode only. One child record per observable behaviour, written as work/implementation@1,
+        state todo: its title, its proves edges, its write scope of at most twelve inspected files
+        disjoint from every sibling and from the seam, and one runnable proof demand per outcome
+        plus the record-class validator `starci validate` so wrong path, name or schema fails the
+        child's own checks. Exactly one child is the seam - the one that owns the module wiring,
+        dependency registration, migrations, shared contracts and shared types every other child
+        would otherwise touch - and every other child names the seam in dependsOn, so it is built
+        first and alone and the rest fan out behind it. Never author a child outside the feature's
+        own impl/<repository>/ folder and never write product code."
   - id: evidence
-    path: E/manifest.yaml + E/result.json
-    fields:
-      - id
-      - nodeId
-      - inputDigest
-      - outcome
-      - assertions
-      - provenance
-      - extensions
+    path: E/**
+    fields: [id, nodeId, inputDigest, outcome, assertions, provenance, extensions]
+    artifacts: [manifest.yaml, result.json]
     content:
-      en: Record which records and which source modules were inspected, the assertion-to-check mapping that was
-        authored, and every scope question that stayed open. Record an honest not-run or failed validator result.
+      en: Record which records and which source modules were inspected, the assertion-to-check mapping
+        that was authored, and every scope question that stayed open. Record an honest not-run or
+        failed validator result.
 steps:
   - reads:
       - application-stacks
@@ -147,136 +143,136 @@ steps:
       - neighbours
       - specification
       - profile
-    writes:
-      - evidence
+    writes: [evidence]
     action:
-      en: Read the selected record, its feature scope and sibling records and the accepted requirement and design
-        records it references. Restate what this record must deliver and where its boundary against its siblings
-        runs. Do not restate the record's purpose as a new requirement and do not widen its scope.
+      en: Read the selected record, its feature scope and sibling records and the accepted requirement and
+        design records it references. Restate what this record must deliver and where its boundary
+        against its siblings runs. Do not restate the record's purpose as a new requirement and do
+        not widen its scope. The authored intent governs; an absent field is the gap to complete,
+        never a licence to restate the record's purpose.
   - reads:
       - target
       - specification
       - source
-    writes:
-      - node
+    writes: [node]
     action:
-      en: Inspect the actual modules the referenced design names and record the exact files an implementation of
-        this record would change as its owners/write scope. Every path is a file or directory that was opened;
-        a path that cannot be resolved from the design and the source is an open question, never a guess.
+      en: Inspect the actual modules the referenced design names and record the exact files an
+        implementation of this record would change as its owners/write scope. Every path is a file
+        or directory that was opened; a path that cannot be resolved from the design and the source
+        is an open question, never a guess. Never write a path that was not inspected.
   - reads:
       - target
       - specification
-    writes:
-      - node
+    writes: [node]
     action:
-      en: Write the record's proof demands as testable claims, one per observable outcome the accepted records state.
-        A demand nobody can run is not a demand; a claim the accepted records do not support is removed
-        rather than softened.
+      en: Write the record's proof demands as testable claims, one per observable outcome the accepted
+        records state. A demand nobody can run is not a demand; a claim the accepted records do not
+        support is removed rather than softened.
   - reads:
       - scripts
       - source
-    writes:
-      - node
+    writes: [node]
     action:
-      en: Write one runnable check per proof demand, each a command this repository already exposes, each actually
-        exercising the demand it declares, and each naming the exclusive runtime resources it needs. A
-        missing runner is a reported blocker, never a command written in the hope that it exists.
+      en: Write one runnable check per proof demand, each a command this repository already exposes, each
+        actually exercising the demand it declares, and each naming the exclusive runtime resources
+        it needs. A missing runner is a reported blocker, never a command written in the hope that
+        it exists. Never invent a runner or a script name.
   - reads:
       - target
       - scripts
-    writes:
-      - node
-      - evidence
+    writes: [node, evidence]
     action:
-      en: Run the record-class validator `starci validate` over the edited tree and confirm the record still validates and now
-        declares both a write scope and proof demands. Record the demand-to-check mapping and any open question.
-        Build nothing and change no product source; the kernel launches the record's own work afterwards.
+      en: Run the record-class validator `starci validate` over the edited tree and confirm the record
+        still validates and now declares both a write scope and proof demands. Record the
+        demand-to-check mapping and any open question. Build nothing and change no product source;
+        the kernel launches the record's own work afterwards.
   - reads:
       - target
-    writes:
-      - integration
+    writes: [integration]
     action:
-      en: >-
-        Intake and migrate modes. For every integration the feature declares at extensions.work3.integrations, author
-        one todo work/integration@1 record at features/<feature>/integration/<integration-id>/index.yaml when none exists:
-        state todo, a title naming the outside system, its provider/boundary/endpoints/sandbox, the credential
-        by variable name, and one requiresProof.live demand for the run a live proof must show. Never a value.
+      en: "Intake and migrate modes. For every integration the feature declares at
+        extensions.work3.integrations, author one todo work/integration@1 record at
+        features/<feature>/integration/<integration-id>/index.yaml when none exists: state todo, a
+        title naming the outside system, its provider/boundary/endpoints/sandbox, the credential by
+        variable name, and one requiresProof.live demand for the run a live proof must show. Never a
+        value."
   - reads:
       - target
       - specification
       - source
-    writes:
-      - parts
+    writes: [parts]
     action:
-      en: "Cut mode. When the kernel selected this record's scope as too big for one operation - its write scope names more
-        than twelve files, it states more than eight proof demands, or the design it references names three or more
-        components - read the record, its demands and the referenced design, open the code its write scope
-        names, and NAME THE SEAM FIRST: the one child record that owns the module wiring, dependency registration,
-        migrations, shared contracts and shared types every other child would otherwise touch. Then cut the rest
-        by acceptance, one observable behaviour each, every child disjoint from every sibling and from the seam,
-        every child demand traced to the same requirement and design ids the parent traced to, and every
-        non-seam child naming the seam in dependsOn. A scope that really is one observable behaviour is not split:
-        report done with cut: none and the reason."
+      en: "Cut mode. When the kernel selected this record's scope as too big for one operation - its write
+        scope names more files than `params.maxFiles`, it states more proof demands than
+        `params.maxProofDemands`, or the design it references names `params.componentsTriggeringCut`
+        or more components - read the record, its demands and the referenced design, open the code
+        its write scope names, and NAME THE SEAM FIRST: the one child record that owns the module
+        wiring, dependency registration, migrations, shared contracts and shared types every other
+        child would otherwise touch. Then cut the rest by acceptance, one observable behaviour each,
+        every child disjoint from every sibling and from the seam, every child demand traced to the
+        same requirement and design ids the parent traced to, and every non-seam child naming the
+        seam in dependsOn. A scope that really is one observable behaviour is not split: report done
+        with cut: none and the reason."
   - reads:
       - target
       - scripts
-    writes:
-      - node
-      - evidence
+    writes: [node, evidence]
     action:
       en: "Cut mode. Turn the cut record into the seam record: it keeps its id and owns the module wiring,
-        shared contracts and shared types every sibling would otherwise touch, and every sibling names it in
-        dependsOn. Then run the record-class validator `starci validate` over
-        the edited tree and confirm every child is launchable on its own. Record the
-        seam, the children and the write scope of each. Build nothing and change no product source; the kernel
-        launches the seam first, fans the rest out behind it and proves the whole group once."
+        shared contracts and shared types every sibling would otherwise touch, and every sibling
+        names it in dependsOn. Then run the record-class validator `starci validate` over the edited
+        tree and confirm every child is launchable on its own. Record the seam, the children and the
+        write scope of each. Build nothing and change no product source; the kernel launches the
+        seam first, fans the rest out behind it and proves the whole group once."
 proofs:
   - id: launchable
     requirement:
-      en: The record declares a non-empty write scope and at least one proof demand, every authored demand is named
-        by a check that proves it, and the workspace validator passes over the edited tree. An honest not-run
-        or failing validator cannot earn done.
+      en: The record declares a non-empty write scope and at least one proof demand, every authored demand
+        is named by a check that proves it, and the workspace validator passes over the edited tree.
+        An honest not-run or failing validator cannot earn done.
   - id: inspected-scope
     requirement:
       en: Every path in the write scope was inspected in the actual source and is consistent with the
-        referenced design; every check command exists in the repository and was run or explicitly reported as
-        unrunnable. A fabricated path or command is a failure, not a draft.
+        referenced design; every check command exists in the repository and was run or explicitly
+        reported as unrunnable. A fabricated path or command is a failure, not a draft.
   - id: preserved-record
     requirement:
-      en: "In record mode the record's title, refs, dependsOn and state are byte-identical to
-        what was authored. In cut mode the record keeps its id, title and refs and becomes the seam, owning
-        the shared wiring every sibling would otherwise touch. In both modes no completion or
-        kernel extension block was written, nothing under the evidence folder of the record was edited, and no
-        record outside the feature's own scope changed."
+      en: In record mode the record's title, refs, dependsOn and state are byte-identical to what was
+        authored. In cut mode the record keeps its id, title and refs and becomes the seam, owning
+        the shared wiring every sibling would otherwise touch. In both modes no completion or kernel
+        extension block was written, nothing under the evidence folder of the record was edited, and
+        no record outside the feature's own scope changed.
   - id: seam-first-disjoint-parts
     requirement:
-      en: "Cut mode: exactly one child is named the seam, every other child names it in dependsOn, and no two
-        children share a path - each write scope is at most twelve inspected files and is disjoint from every
-        sibling and from the seam. Every child is one observable behaviour with one runnable check per proof
-        demand and every demand traced to the same requirement and design ids the parent traced to, and the seam
-        record keeps its id and owns the shared wiring. A scope reported as cut: none left the tree byte-identical.
-        Overlapping children are a failure, not a
-        draft: two operations that write the same file are one merge conflict with two authors, never parallel work."
+      en: "Cut mode: exactly one child is named the seam, every other child names it in dependsOn, and no
+        two children share a path - each write scope is at most twelve inspected files and is
+        disjoint from every sibling and from the seam. Every child is one observable behaviour with
+        one runnable check per proof demand and every demand traced to the same requirement and
+        design ids the parent traced to, and the seam record keeps its id and owns the shared
+        wiring. A scope reported as cut: none left the tree byte-identical. Overlapping children are
+        a failure, not a draft: two operations that write the same file are one merge conflict with
+        two authors, never parallel work."
 blockers:
   - code: SCOPE_UNDETERMINED
     condition:
-      en: The accepted requirement and design records and the actual source do not determine which files this
-        record would change, so any write scope would be invented. Report the exact question instead.
+      en: The accepted requirement and design records and the actual source do not determine which files
+        this record would change, so any write scope would be invented. Report the exact question
+        instead.
   - code: CHECK_RUNNER_MISSING
     condition:
       en: A proof demand has no command in this repository that could prove it, so declaring a check would
         declare a command that does not run.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
-      en: A referenced requirement or design record is missing or not effectively done, so the demands would
-        rest on material that was never accepted. Report the node/resource IDs; never weaken refs or dependsOn
-        and never author the missing record here.
+      en: A referenced requirement or design record is missing or not effectively done, so the demands
+        would rest on material that was never accepted. Report the node/resource IDs; never weaken
+        refs or dependsOn and never author the missing record here.
   - code: SEAM_UNDETERMINED
     condition:
-      en: "Cut mode: the accepted records and the actual source do not determine which shared ground the children
-        would contend for, so either the seam or the boundary between two children would be invented. Report the
-        exact question - which module wiring, which contract, which migration is shared - never a cut that leaves
-        two children writing the same file."
+      en: "Cut mode: the accepted records and the actual source do not determine which shared ground the
+        children would contend for, so either the seam or the boundary between two children would be
+        invented. Report the exact question - which module wiring, which contract, which migration
+        is shared - never a cut that leaves two children writing the same file."
 placeholders:
   feature: Feature folder of the intake or migration, inside the operation allowlist
   repository: The bound repository the implementation record names
@@ -286,37 +282,10 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "Is this record launchable - record mode: real write scope + testable
-    proof demands + one runnable check each; cut mode: a seam-first split into
-    disjoint children?"
-  whenNeeded:
-    - Before a record's work can be launched: completing its launch metadata (write scope, proof demands, checks).
-    - When a scope is too big for one operation (>12 files, >8 proof demands, 3+ components) - cut mode splits it seam-first.
-    - Authoring integration records for declared integrations (intake/migrate modes).
-  whenNot:
-    - Never writes completion/kernel blocks or evidence on behalf of a run; never edits other records.
-    - Cut mode never leaves two children writing the same file; a genuinely single-behavior scope reports cut: none instead of forcing a split.
-  consumes:
-    - The target record + its siblings; referenced requirements/design; actual source modules; repo scripts.
-  produces:
-    - Record launch fields (proves, owners, requiresProof, verification, accounts, steps); integration todo records; cut-mode children + the seam record.
-  failureModes:
-    - SCOPE_UNDETERMINED, CHECK_RUNNER_MISSING, SEAM_UNDETERMINED, DECLARED_DEPENDENCY_UNMET (declared blockers).
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [implementation, uat, ui, operations]
   phase: [scope, pre-implementation]
   intent: [work, author, nodes, launchable, decompose]
-  prerequisites: ["scope defined"]
+  prerequisites: [scope defined]

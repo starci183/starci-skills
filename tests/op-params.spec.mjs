@@ -81,11 +81,17 @@ test('resolveOpParams refuses an undeclared name, a bad type and an out-of-range
   assert.equal(stranger.reason, 'params-invalid');
   assert.match(stranger.detail, /does not declare/);
 
-  const wrongType = resolveOpParams(doc, { leg: { [name]: 'two' }, flag: { [name]: 'two' } });
+  // The value's source has to be the one the brief allows, or the setter
+  // refusal fires before the range one.
+  const from = (value) => (def.setBy === 'owner'
+    ? { leg: { [name]: value }, flag: { [name]: value } }
+    : { flag: { [name]: value } });
+
+  const wrongType = resolveOpParams(doc, from('two'));
   assert.equal(wrongType.ok, false);
   assert.equal(wrongType.reason, 'params-invalid');
 
-  const tooBig = resolveOpParams(doc, { leg: { [name]: def.max + 1 }, flag: { [name]: def.max + 1 } });
+  const tooBig = resolveOpParams(doc, from(def.max + 1));
   assert.equal(tooBig.ok, false);
   assert.match(tooBig.detail, /above its maximum/);
 });

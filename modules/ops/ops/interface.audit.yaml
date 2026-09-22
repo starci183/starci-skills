@@ -1,13 +1,20 @@
-# modules/ops/ops/interface.audit.yaml
-# Read-only render/UX-UI drift audit. This op diagnoses and routes; it never repairs.
-
+schema: starci/op@1
 id: interface.audit
 goal:
-  en: >-
-    Audit selected real interface renders against the exact latest explicitly owner-accepted interface.draw
-    receipt and its image, prompt and content hashes, accepted product intent, the actual installed Grammar,
-    declared brand/assets and applicable UI proof rules; emit reproducible hard-check findings, a calibrated
-    bounded visual rubric and an actionable repair route until the selected matrix has no actionable drift.
+  en: Audit selected real interface renders against the exact latest explicitly owner-accepted
+    interface.draw receipt and its image, prompt and content hashes, accepted product intent, the
+    actual installed Grammar, declared brand/assets and applicable UI proof rules; emit reproducible
+    hard-check findings, a calibrated bounded visual rubric and an actionable repair route until the
+    selected matrix has no actionable drift.
+params:
+  maxRounds:
+    type: integer
+    default: 5
+    min: 1
+    max: 10
+    setBy: kernel
+    doc:
+      en: How many audit rounds the kernel schedules for one scope before exhaustion is terminal.
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects:
@@ -18,102 +25,81 @@ graphPolicy:
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated evidence
   prerequisiteState: done
   dispatch: never
-readOnlyPolicy:
-  productSource: true
-  productData: true
-  allowedEffects:
-    - read repository, runtime, DOM, accessibility tree, computed style, network metadata and image bytes
-    - inspect implementation-produced real route x viewport captures
-    - write only the audit node and its evidence bundle
-  forbiddenEffects:
-    - edit, format, generate or commit product, design, asset or Grammar source
-    - generate, retouch or replace product renders or captures
-    - change accepted direction, assertions, baselines or expected values
-    - treat an auditor/implementer explanation, taste judgement or deviation rationale as owner approval
-    - select an older canonical/generated direction over the latest explicit owner acceptance
-    - substitute lint, unit, integration, build or other technical test success for visual equivalence
-    - dispatch or perform a repair
-    - certify review.verify or uat.verify
 reads:
   - id: target
     path: .starciwork/features/<feature>/operations/<audit>/index.yaml
     purpose:
-      en: >-
-        Read the existing selected audit scope, exact route/state/viewport/theme matrix, assertion IDs,
-        dependencies, attempt number and evidence lineage. An absent target or audit-expanded matrix is a scope
-        gap, not permission to invent coverage.
+      en: Read the existing selected audit scope, exact route/state/viewport/theme matrix, assertion IDs,
+        dependencies, attempt number and evidence lineage. An absent target or audit-expanded matrix
+        is a scope gap, not permission to invent coverage.
   - id: intent
-    path: .starciwork/features/<feature>/{business,architecture,ui}/**/index.yaml + accepted direction assets
+    path: .starciwork/features/<feature>/{business,architecture,ui}/**/index.yaml + accepted direction
+      assets
     purpose:
-      en: >-
-        Read accepted content, states, SDS behavior, UI coverage/component/state mapping, brand revision, artwork
-        slots and declared exceptions. Source and screenshots do not redefine intent. An ImageGen direction is a
-        design input, not component anatomy or runtime proof. When direction records conflict, the exact latest
-        explicit owner acceptance selected by accepted-draw-lineage is authoritative for this audit; do not rewrite
-        older records or let an older canonical/generated direction silently win.
+      en: Read accepted content, states, SDS behavior, UI coverage/component/state mapping, brand
+        revision, artwork slots and declared exceptions. Source and screenshots do not redefine
+        intent. An ImageGen direction is a design input, not component anatomy or runtime proof.
+        When direction records conflict, the exact latest explicit owner acceptance selected by
+        accepted-draw-lineage is authoritative for this audit; do not rewrite older records or let
+        an older canonical/generated direction silently win.
   - id: accepted-draw-lineage
-    path: >-
-      selected interface.draw E/response.yaml + E/manifest.yaml + E/draws.yaml + retained direction images/prompts +
-      append-only owner acceptance receipts/events in the selected workflow lineage
+    path: selected interface.draw E/response.yaml + E/manifest.yaml + E/draws.yaml + retained direction
+      images/prompts + append-only owner acceptance receipts/events in the selected workflow lineage
     purpose:
-      en: >-
-        Enumerate the applicable interface.draw receipts and explicit owner acceptance events without editing
-        history. Select exactly the latest causally ordered explicit owner acceptance for this scope, then bind its
-        receipt path and sha256, draw receipt/run ID, acceptance event ID/order, coverage/content digest, and every
-        selected direction image path/sha256 plus exact prompt path/sha256. Filesystem mtime, `done`, generation
-        time, current source, an agent statement or a newer unaccepted draw is not owner acceptance. Missing bytes,
-        mismatched hashes, incomparable/conflicting latest acceptances or an acceptance that does not identify one
-        draw receipt is ambiguous and blocks the audit.
+      en: Enumerate the applicable interface.draw receipts and explicit owner acceptance events without
+        editing history. Select exactly the latest causally ordered explicit owner acceptance for
+        this scope, then bind its receipt path and sha256, draw receipt/run ID, acceptance event
+        ID/order, coverage/content digest, and every selected direction image path/sha256 plus exact
+        prompt path/sha256. Filesystem mtime, `done`, generation time, current source, an agent
+        statement or a newer unaccepted draw is not owner acceptance. Missing bytes, mismatched
+        hashes, incomparable/conflicting latest acceptances or an acceptance that does not identify
+        one draw receipt is ambiguous and blocks the audit.
   - id: realization-map
-    path: selected interface.draw E/realization-map.json + selected interface.implement E/realization-check.json
+    path: selected interface.draw E/realization-map.json + selected interface.implement
+      E/realization-check.json
     purpose:
-      en: >-
-        Bind every accepted direction region to its declared `raster-asset` or `code-native` mode and the actual
-        implementation evidence. Rich authored imagery must retain asset identity/provenance; layout, panels, cards,
-        controls, typography, system icons, responsive structure and representable effects must remain semantic
-        DOM/Grammar/CSS/SVG rather than flattened screenshots.
+      en: Bind every accepted direction region to its declared `raster-asset` or `code-native` mode and
+        the actual implementation evidence.
   - id: grammar
-    path: consuming manifest/lockfile + resolved installed Grammar package/public entry/types/renderers/CSS/tokens + matching reference renders
+    path: consuming manifest/lockfile + resolved installed Grammar package/public
+      entry/types/renderers/CSS/tokens + matching reference renders
     purpose:
-      en: >-
-        Resolve the consuming application's Grammar and record package name, exact version, lockfile identity,
-        resolved path, public entry, inspected source hashes and matching real reference renders for every audited
-        primitive/state/theme. Inspect DOM anatomy, slots, state attributes, computed geometry and winning
-        token/declaration provenance. Never infer anatomy, tokens, borders, surfaces, shadows or radii from a
-        component name or product screenshot alone.
+      en: Resolve the consuming application's Grammar and record package name, exact version, lockfile
+        identity, resolved path, public entry, inspected source hashes and matching real reference
+        renders for every audited primitive/state/theme. Inspect DOM anatomy, slots, state
+        attributes, computed geometry and winning token/declaration provenance.
   - id: knowledge
-    path: knowledge/ui/{composition,presentation,proof}/**/*.yaml + selected knowledge/grammars/<family>/{DNA,family,idioms,playbook}.yaml
+    path: knowledge/ui/{composition,presentation,proof}/**/*.yaml + selected
+      knowledge/grammars/<family>/{DNA,family,idioms,playbook}.yaml
     purpose:
-      en: >-
-        Load only applicable stable rule IDs, including anatomy-source, brand, accessibility, contrast, focus,
-        motion, render-truth, UX and taste. Knowledge snapshots cannot replace current installed Grammar source
-        and reference renders.
+      en: Knowledge snapshots cannot replace current installed Grammar source and reference renders.
   - id: brand-assets
     path: .starciwork/brand/index.yaml + declared masters/assets + selected UI asset manifest
     purpose:
-      en: >-
-        Resolve current brand tokens/rules and every selected icon, image, font and artwork-slot master, including
-        identity/hash, rights, aspect/crop, semantic role and alt/announcement contract.
+      en: Resolve current brand tokens/rules and every selected icon, image, font and artwork-slot master,
+        including identity/hash, rights, aspect/crop, semantic role and alt/announcement contract.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
-      en: >-
-        Read the exact delivered frontend source, dependency graph, routes, component ownership, styles and asset
-        imports to attribute a measured delta. Repository access is read-only and authorizes no repair or commit.
+      en: Read the exact delivered frontend source, dependency graph, routes, component ownership, styles
+        and asset imports to attribute a measured delta. Repository access is read-only and
+        authorizes no repair or commit.
   - id: implementation-captures
-    path: selected interface.implement E/screens/**/*.png + E/runtime.json + E/measurements.json
+    path: selected interface.implement E/screens/**/*.png with E/runtime.json
     purpose:
-      en: >-
-        Inspect fresh real route x state x viewport x theme captures produced by interface.implement for this
-        delivered revision. Each draw-backed representative cell must match the selected accepted draw's exact
-        surface/state/viewport/theme identity so a true side-by-side comparison can be made; a mobile draw cannot
-        baseline a desktop capture and a different state/theme is not equivalent. This audit never generates
-        replacement renders. Every repair must return through interface.implement, produce fresh captures, and
-        bind them before the next audit.
+      en: Fresh real route x state x viewport x theme captures produced by interface.implement for this
+        delivered revision, with the served origin, environment revision, driver, route/state,
+        viewport/theme and probe result of each one.
+  - id: producer-measurements
+    path: selected interface.implement E/measurements.json
+    purpose:
+      en: "The producer's own DOM and computed-style numbers for its captures: a self-report about the
+        same revision, read as context."
   - id: environment
     path: .starciwork/_resources/environments/<environment>/resource.yaml
     purpose:
-      en: Bind expected origin, environment revision, probes and served-version mechanism; HEAD is not served proof.
+      en: Bind expected origin, environment revision, probes and served-version mechanism; HEAD is not
+        served proof.
   - id: identity
     path: .starciwork/_resources/identities/<identity>/resource.yaml
     purpose:
@@ -121,328 +107,333 @@ reads:
   - id: previous
     path: selected prior E/audit-summary.json + E/findings.json + E/matrix.json + E/routing.json
     purpose:
-      en: >-
-        For rounds 2 through 5, read the immediate predecessor and ancestry. Compare immutable signatures,
-        matrix cells, delivered revision and measurements; never relabel old evidence as new observation.
+      en: For every round after the first, the immediate predecessor and its ancestry.
   - id: workflow
-    path: selected workflow request + .starciwork/runtime.sqlite job lineage + modules/kernel/verdict-contract.yaml
+    path: selected workflow request + .starciwork/runtime.sqlite job lineage +
+      modules/kernel/verdict-contract.yaml
     purpose:
-      en: >-
-        Read the kernel-assigned audit round and attempt lineage. The kernel owns scheduling and the five-round
-        ceiling; this operation reports a route and stops.
-  - id: matrix
-    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
+      en: Read the kernel-assigned audit round and attempt lineage. The kernel owns scheduling and the
+        round ceiling.
+  - id: runner
+    path: docs/browser-testing.md with repository:<repo-id>/<playwright-manifest-and-lockfile>
     purpose:
-      en: Bind only an explicitly selected request cell, inputs, criteria and output schema.
+      en: The project's locked Playwright dependency, local runner and browser installation — the same
+        runner uat.assisted.prepare's contract binds.
   - id: profile
-    path: modules/models/registry.yaml + modules/models/runtimes.yaml + selected runtime + actual host/browser tools
+    path: modules/models/registry.yaml + modules/models/runtimes.yaml + selected runtime + actual
+      host/browser tools
     purpose:
-      en: >-
-        Prove the actual image, DOM/accessibility and computed-style inspection capabilities used. Missing required
-        instrumentation is blocked, never replaced with model judgement.
+      en: Prove the actual image, DOM/accessibility and computed-style inspection capabilities used.
 writes:
   - id: node
     path: .starciwork/features/<feature>/operations/<audit>/index.yaml
     fields: [state, blockedBy, completion.inputDigest, completion.evidence]
     content:
-      en: >-
-        Update only this audit record's state/blocker/completion binding. Completion says the selected matrix has
-        no actionable drift; it never completes UI, implementation, UAT or review nodes.
+      en: Update only this audit record's state/blocker/completion binding. Completion says the selected
+        matrix has no actionable drift; it never completes UI, implementation, UAT or review nodes.
   - id: evidence
-    path: >-
-      E/manifest.yaml + E/audit-summary.json + E/findings.json + E/routing.json + E/matrix.json +
-      E/grammar.json + E/measurements.json + E/interactions.json + E/assets.json + E/taste.json +
-      E/trend.json + E/runtime.json + E/inspected-captures.json + E/draw-lineage.json +
-      E/side-by-side.json + E/realization.json + E/deviations.json + E/deviation-brief.md + E/result.md
-    fields: [id,nodeId,inputDigest,outcome,assertions,assets,provenance,codeRefs,extensions]
+    path: E/**
+    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    artifacts:
+      - manifest.yaml
+      - audit-summary.json
+      - findings.json
+      - routing.json
+      - matrix.json
+      - grammar.json
+      - measurements.json
+      - interactions.json
+      - assets.json
+      - taste.json
+      - trend.json
+      - runtime.json
+      - inspected-captures.json
+      - draw-lineage.json
+      - side-by-side.json
+      - realization.json
+      - deviations.json
+      - deviation-brief.md
+      - result.md
     content:
-      en: >-
-        Retain references/hashes for the implementation-produced captures actually inspected, DOM/accessibility/
-        computed-style observations, measurement units/tolerances, Grammar and asset provenance, hard-check
-        results, calibrated taste rows, attempt lineage, trend and routing. `draw-lineage.json` records the selected
-        latest explicit owner acceptance and exact receipt/image/prompt/content hashes. `side-by-side.json` records
-        paired accepted-direction and implementation-capture artifacts at identical cells plus per-lens comparison
-        results. `deviations.json` and `deviation-brief.md` preserve every claimed intentional departure, its exact
-        visual delta and the full case for/against accepting it. Evidence is diagnostic, not a patch, baseline
-        mutation or independent acceptance.
-  - id: matrixHandoff
-    path: E/job-result.json
-    fields: [requestId,requestDigest,op,operation when selected,status,criteria,outputs,artifacts]
-    content:
-      en: Return exact request-bound audit, finding and routing artifacts only for a selected job matrix.
+      en: Retain references/hashes for the implementation-produced captures actually inspected,
+        DOM/accessibility/ computed-style observations, measurement units/tolerances, Grammar and
+        asset provenance, hard-check results, calibrated taste rows, attempt lineage, trend and
+        routing. `draw-lineage.json` records the selected latest explicit owner acceptance and exact
+        receipt/image/prompt/content hashes. `side-by-side.json` records paired accepted-direction
+        and implementation-capture artifacts at identical cells plus per-lens comparison results.
+        `deviations.json` and `deviation-brief.md` preserve every claimed intentional departure, its
+        exact visual delta and the full case for/against accepting it. Evidence is diagnostic, not a
+        patch, baseline mutation or independent acceptance.
 steps:
-  - reads: [target,intent,accepted-draw-lineage,grammar,knowledge,brand-assets,repo,implementation-captures,environment,identity,previous,workflow,profile]
+  - reads:
+      - target
+      - intent
+      - accepted-draw-lineage
+      - grammar
+      - knowledge
+      - brand-assets
+      - repo
+      - implementation-captures
+      - environment
+      - identity
+      - previous
+      - workflow
+      - profile
     writes: [evidence]
     action:
-      en: >-
-        Resolve all applicable draw receipts and explicit owner acceptances first. Select exactly the latest
-        causally ordered explicit acceptance for the scope and recompute its receipt, image, prompt and
-        coverage/content hashes; never select by mtime or overwrite/relabel prior history. Freeze round 1's route x
-        state x viewport x theme matrix, accepted-draw receipt identity and hard-rule IDs. Later rounds recheck the
-        exact matrix and accepted baseline unless a newer explicit owner acceptance is itself selected as a new
-        lineage input; they may add newly reachable cells but never remove, rename or silently exempt an old cell.
-        Bind one served build, the installed Grammar and fresh implementation-produced capture for every cell.
-        Reject a round outside 1..5, skipped lineage, missing/ambiguous draw acceptance, hash mismatch, stale
-        capture or capture made before the routed repair.
-  - reads: [implementation-captures,target,intent,accepted-draw-lineage,environment,identity,repo,profile]
+      en: Resolve all applicable draw receipts and explicit owner acceptances first. Select exactly the
+        latest causally ordered explicit acceptance for the scope and recompute its receipt, image,
+        prompt and coverage/content hashes; never select by mtime or overwrite/relabel prior
+        history. Freeze round 1's route x state x viewport x theme matrix, accepted-draw receipt
+        identity and hard-rule IDs. Later rounds recheck the exact matrix and accepted baseline
+        unless a newer explicit owner acceptance is itself selected as a new lineage input; they may
+        add newly reachable cells but never remove, rename or silently exempt an old cell. Bind one
+        served build, the installed Grammar and fresh implementation-produced capture for every
+        cell. Reject a round outside 1..`params.maxRounds`, skipped lineage, missing/ambiguous draw
+        acceptance, hash mismatch, stale capture or capture made before the routed repair. Never
+        infer anatomy, tokens, borders, surfaces, shadows or radii from a component name or product
+        screenshot alone. Load only applicable stable rule IDs, including anatomy-source, brand,
+        accessibility, contrast, focus, motion, render-truth, UX and taste. Each draw-backed
+        representative cell must match the selected accepted draw's exact
+        surface/state/viewport/theme identity so a true side-by-side comparison can be made; a
+        mobile draw cannot baseline a desktop capture and a different state/theme is not equivalent.
+        This audit never generates replacement renders. Every repair must return through
+        interface.implement, produce fresh captures, and bind them before the next audit. Compare
+        immutable signatures, matrix cells, delivered revision and measurements; never relabel old
+        evidence as new observation. Missing required instrumentation is blocked, never replaced
+        with model judgement.
+  - reads:
+      - implementation-captures
+      - target
+      - intent
+      - accepted-draw-lineage
+      - environment
+      - identity
+      - repo
+      - profile
+      - producer-measurements
+      - runner
     writes: [evidence]
     action:
-      en: >-
-        Inspect, but do not create or alter, every selected real render. For every draw-backed representative cell,
-        place the accepted direction bytes and implementation capture side by side only when surface, state,
-        viewport and theme identities are equal, and record both paths/hashes plus the pairing key. Do not resize,
-        recolor, crop, regenerate or compare across cells to manufacture similarity. Corroborate each capture with
-        route, state, actor, viewport, theme, served build, DOM, accessibility tree, computed styles, element
-        rectangles, scroll/overflow ownership and event-state observations. Product writes needed for business
-        outcomes belong to UAT, not this audit.
-  - reads: [intent,accepted-draw-lineage,realization-map,grammar,knowledge,brand-assets,repo,implementation-captures]
+      en: Inspect, but do not create or alter, every selected real render. For every draw-backed
+        representative cell, place the accepted direction bytes and implementation capture side by
+        side only when surface, state, viewport and theme identities are equal, and record both
+        paths/hashes plus the pairing key. Do not resize, recolor, crop, regenerate or compare
+        across cells to manufacture similarity. Measure the served render for every selected cell
+        with the project's locked Playwright runner, and record the DOM, accessibility tree,
+        computed styles, element rectangles, scroll/overflow ownership and event-state observations
+        it returns alongside the route, state, actor, viewport, theme and served build the capture
+        claims. Those measurements are this audit's numbers. The producer's own measurements are
+        read as context and compared against them; a disagreement is a finding, and the producer's
+        self-report is never the proof a cell passed. Product writes needed for business outcomes
+        belong to UAT, not this audit.
+  - reads:
+      - intent
+      - accepted-draw-lineage
+      - realization-map
+      - grammar
+      - knowledge
+      - brand-assets
+      - repo
+      - implementation-captures
     writes: [evidence]
     action:
-      en: >-
-        Execute deterministic checks for geometry, content, icons, assets, responsive composition and interaction
-        states. From each valid side-by-side pair explicitly classify composition/hierarchy, section order,
-        light-dark rhythm, imagery and creative-intent equivalence as pass/fail/inconclusive with observed regions
-        and artifact refs; a systemic loss or inversion is actionable drift even when DOM, lint, tests and build
-        pass. Compare each mapped Grammar instance's structure and computed border, surface, shadow and radius with
-        its matching installed-version reference, tracing values to winning Grammar/family/application declarations
-        and tokens. If the canonical primitive/reference has no border and the product render adds one, emit a hard
-        `grammar.anatomy` finding; attractiveness, taste score or preference cannot waive it. Verify the realization
-        map region by region: a flattened screenshot used for code-native UI or an improvised CSS/SVG replacement for
-        required authored imagery is a hard `realization.mode` finding even if the screenshot looks similar. Audit
-        every prominent symbol as a product claim: identify its intended concept, strongest plausible alternate
-        reading without its label, audience maturity, cliché/generic-stock risk, distinction from sibling symbols,
-        family coherence across camera/base/material/light/scale/density, reduced-scale legibility and truthful
-        raster-asset versus code-native medium. A label cannot rescue a childish, ambiguous or interchangeable image;
-        record `symbol.fit` or `symbol.family` drift and route by cause and blast radius.
-  - reads: [intent,knowledge,grammar,brand-assets,implementation-captures]
+      en: "Execute deterministic checks for geometry, content, icons, assets, responsive composition and
+        interaction states. From each valid side-by-side pair explicitly classify
+        composition/hierarchy, section order, light-dark rhythm, imagery and creative-intent
+        equivalence as pass/fail/inconclusive with observed regions and artifact refs; a systemic
+        loss or inversion is actionable drift even when DOM, lint, tests and build pass. Compare
+        each mapped Grammar instance's structure and computed border, surface, shadow and radius
+        with its matching installed-version reference, tracing values to winning
+        Grammar/family/application declarations and tokens. If the canonical primitive/reference has
+        no border and the product render adds one, emit a hard `grammar.anatomy` finding;
+        attractiveness, taste score or preference cannot waive it. Verify the realization map region
+        by region: a flattened screenshot used for code-native UI or an improvised CSS/SVG
+        replacement for required authored imagery is a hard `realization.mode` finding even if the
+        screenshot looks similar. Audit every prominent symbol as a product claim: identify its
+        intended concept, strongest plausible alternate reading without its label, audience
+        maturity, cliché/generic-stock risk, distinction from sibling symbols, family coherence
+        across camera/base/material/light/scale/density, reduced-scale legibility and truthful
+        raster-asset versus code-native medium. A label cannot rescue a childish, ambiguous or
+        interchangeable image; record `symbol.fit` or `symbol.family` drift and route by cause and
+        blast radius. Rich authored imagery must retain asset identity/provenance; layout, panels,
+        cards, controls, typography, system icons, responsive structure and representable effects
+        must remain semantic DOM/Grammar/CSS/SVG rather than flattened screenshots."
+  - reads:
+      - intent
+      - knowledge
+      - grammar
+      - brand-assets
+      - implementation-captures
     writes: [evidence]
     action:
-      en: >-
-        Apply selected proof lenses. Hard constraints are pass/fail/not-run/inconclusive and gate the audit.
-        Separately score only applicable TASTE-1..TASTE-12 rows using named measurements and same-round low/mid/
-        high calibration anchors, then compute TASTE-13 exactly. Void calibration, missing measurement or
-        fix-first is actionable. Creative scoring never changes a hard failure or Grammar authority.
-  - reads: [target,intent,accepted-draw-lineage,repo,grammar,previous,workflow]
+      en: Apply selected proof lenses. Hard constraints are pass/fail/not-run/inconclusive and gate the
+        audit. Separately score only applicable TASTE-1..TASTE-12 rows using named measurements and
+        same-round low/mid/ high calibration anchors, then compute TASTE-13 exactly. Void
+        calibration, missing measurement or fix-first is actionable. Creative scoring never changes
+        a hard failure or Grammar authority.
+  - reads:
+      - target
+      - intent
+      - accepted-draw-lineage
+      - repo
+      - grammar
+      - previous
+      - workflow
     writes: [evidence]
     action:
-      en: >-
-        Normalize findings and group shared causes. Attribute from the latest explicitly owner-accepted draw
-        receipt, accepted intent, winning declarations and source ownership; root cause and blast radius outrank raw
-        finding count. Technical checks are corroborating evidence only and cannot close or waive failed,
-        inconclusive, unpaired or unrun visual-equivalence lenses. Route `interface.implement` when
-        intent/Grammar are explicit and the repair is bounded implementation/content/asset work. Route
-        `interface.draw` when intent is missing, contradictory, generic or creatively inadequate, or systemic
-        multi-surface composition needs revised direction/coverage. `code.refactor` is optional secondary advice
-        only for proven behavior-invariant structural mechanics with an existing before/after regression. When an
-        implementer or auditor claims a visible departure is intentional, keep the finding open and write an
-        append-only deviation case bound to the accepted draw and fresh capture hashes. The case must identify the
-        exact regions/cells and measurements, state the necessity and user/product benefit, cite violated and
-        preserved rules, compare at least the accepted-conformant option and the proposed departure, disclose
-        accessibility/responsive/brand risks, and give rollback plus exact recheck scope. Unsupported preference is
-        not a reason. The auditor must also write the strongest counterargument. Never promote the departure to a
-        baseline or mark its finding resolved without a later explicit owner decision bound to that exact deviation
-        case digest; approval, rejection or requested revision is append-only lineage and never inferred from chat
-        silence, a passed technical test or the auditor's verdict.
-  - reads: [target,previous,workflow,matrix]
-    writes: [node,evidence,matrixHandoff]
+      en: Normalize findings and group shared causes. Attribute from the latest explicitly owner-accepted
+        draw receipt, accepted intent, winning declarations and source ownership; root cause and
+        blast radius outrank raw finding count. Technical checks are corroborating evidence only and
+        cannot close or waive failed, inconclusive, unpaired or unrun visual-equivalence lenses.
+        Route `interface.implement` when intent/Grammar are explicit and the repair is bounded
+        implementation/content/asset work. Route `interface.draw` when intent is missing,
+        contradictory, generic or creatively inadequate, or systemic multi-surface composition needs
+        revised direction/coverage. `code.refactor` is optional secondary advice only for proven
+        behavior-invariant structural mechanics with an existing before/after regression. When an
+        implementer or auditor claims a visible departure is intentional, keep the finding open and
+        write an append-only deviation case bound to the accepted draw and fresh capture hashes. The
+        case must identify the exact regions/cells and measurements, state the necessity and
+        user/product benefit, cite violated and preserved rules, compare at least the
+        accepted-conformant option and the proposed departure, disclose
+        accessibility/responsive/brand risks, and give rollback plus exact recheck scope.
+        Unsupported preference is not a reason. The auditor must also write the strongest
+        counterargument. Never promote the departure to a baseline or mark its finding resolved
+        without a later explicit owner decision bound to that exact deviation case digest; approval,
+        rejection or requested revision is append-only lineage and never inferred from chat silence,
+        a passed technical test or the auditor's verdict.
+  - reads:
+      - target
+      - previous
+      - workflow
+    writes: [node, evidence]
     action:
-      en: >-
-        Compare the current attempt with its predecessor on the same matrix and signatures. Record resolved,
-        unchanged, new and reopened findings, deltas, no-progress and oscillation. No relevant delivered revision
-        or no diminished actionable finding is no-progress; a resolved signature that reopens or alternates
-        beyond tolerance is oscillation. Both fail with an explicit route/recheck matrix. On round 5 any known
-        actionable finding fails and missing authority/instrumentation blocks; neither can pass. Complete only as
-        `no-actionable-drift`, validate, report and stop without dispatch. A pending intentional-deviation case is
-        actionable drift: report `OWNER_DEVIATION_DECISION_REQUIRED` with its digest and requested decision, retain
-        the evidence for later owner inspection, and stop. review.verify and uat.verify remain independent.
-findingSchema:
-  schema: starci/interface-audit-finding@1
-  required: [id,signature,category,constraintClass,ruleRefs,matrixCells,expected,observed,measurements,evidenceRefs,sourceAttribution,severity,status,rootCause,blastRadius,routing]
-  categories: [geometry,content,icon,asset,responsive,interaction,grammar.anatomy,grammar.token,realization.mode,symbol.fit,symbol.family,accessibility,render.truth,composition.hierarchy,section.order,light-dark.rhythm,imagery,creative.intent,taste]
-  constraintClasses: [hard, creative-rubric]
-  statuses: [open,resolved,unchanged,new,reopened,blocked]
-  routing:
-    required: [primaryOp,rationale,affectedPaths,recheckMatrix,nextChain]
-    primaryOps: [interface.implement, interface.draw]
-    optionalMechanicalOp: code.refactor
-auditPolicy:
-  roundLimit: 5
-  lineage: immediate-predecessor-required
-  matrixRecheck: immutable-route-state-viewport-theme-plus-additions
-  hardConstraintRule: every-required-hard-cell-pass
-  freshCaptureRule: every-repair-produces-new-interface-implement-captures-before-audit
-  acceptedDrawLineage:
-    selection: latest-causally-ordered-explicit-owner-acceptance-for-selected-scope
-    requiredBindings: [acceptanceEventId,acceptanceOrder,drawReceiptPath,drawReceiptSha256,drawRunId,coverageContentSha256,imagePathsAndSha256,promptPathsAndSha256]
-    precedence: latest-explicit-owner-acceptance-over-older-canonical-or-generated-directions
-    unacceptedDraws: never-baseline-and-never-silent-supersession
-    ambiguity: block
-    history: append-only-never-rewrite-or-relabel
-  sideBySide:
-    cellIdentity: [surface,state,viewport,theme]
-    requiredFor: every-draw-backed-representative-cell
-    artifacts: [acceptedDirectionPathAndSha256,implementationCapturePathAndSha256,pairingKey,comparisonLenses]
-    transformsForbidden: [resize,crop,recolor,retouch,regenerate,cross-cell-substitution]
-    lenses: [composition-hierarchy,section-order,light-dark-rhythm,imagery,creative-intent]
-    resultStates: [pass,fail,inconclusive]
-  visualEquivalenceRule: every-required-side-by-side-lens-pass
-  technicalEvidenceRule: corroborating-only-never-substitutes-for-visual-equivalence
-  deviationGovernance:
-    defaultState: drift-open
-    evidence: [deviations.json, deviation-brief.md, accepted-draw-hash, implementation-capture-hash, measured-regions, alternatives, counterargument, risks, rollback, recheck-matrix]
-    rationaleMinimum: necessity-plus-user-product-benefit-plus-rule-impact-plus-accepted-conformant-alternative
-    approvalAuthority: explicit-owner-only
-    approvalBinding: exact-deviation-case-digest-and-exact-draw/capture-hashes
-    approvalEffect: new-accepted-direction-lineage-input-never-audit-self-waiver
-    implicitApprovalForbidden: [silence, technical-pass, auditor-verdict, implementer-claim, taste-score, newer-unaccepted-render]
-    history: append-only-and-queryable-after-the-run
-  creativeRubric:
-    rules: TASTE-1..TASTE-13
-    calibration: same-round-low-mid-high-required
-    completionVerdict: ship
-  symbolReview:
-    questions: [exact-product-concept,alternate-reading-without-label,audience-category-maturity,generic-cliche-risk,sibling-distinction,family-camera-base-material-light-scale-density,reduced-scale-legibility,truthful-realization-medium]
-    labelCannotRescue: [childish-metaphor,ambiguous-metaphor,interchangeable-siblings,incoherent-family]
-    boundedDriftRoute: interface.implement
-    systemicLanguageRoute: interface.draw
-  routingPriority: root-cause-then-blast-radius-never-raw-finding-count
-  primaryRoutes:
-    boundedImplementation:
-      op: interface.implement
-      chain: [interface.implement, interface.audit]
-    systemicDirection:
-      op: interface.draw
-      chain: [interface.draw, interface.implement, interface.audit]
-  optionalMechanicalRoute:
-    op: code.refactor
-    onlyWhen: behavior-invariant-structural-change-with-covering-before-after-regression
-  completion:
-    status: no-actionable-drift
-    requires:
-      - latest explicit owner-accepted interface.draw receipt and all receipt/image/prompt/content hashes are exact and unambiguous
-      - every draw-backed representative cell has an untransformed side-by-side pair at identical surface/state/viewport/theme
-      - composition hierarchy, section order, light-dark rhythm, imagery and creative intent equivalence all passed
-      - every prominent symbol passed concept fit, audience maturity, family coherence, sibling distinction, reduced-scale legibility and truthful-medium review
-      - every selected matrix cell was freshly inspected on one verified served revision
-      - every required hard constraint passed with actual measurements and authority
-      - no open, unchanged, new, reopened or blocked actionable finding remains
-      - calibrated taste verdict is ship for the selected applicable scope
-      - round and trend lineage are valid and the immutable matrix was rechecked
-    neverMeans: [review.verify acceptance, uat.verify business journey proof, permission to waive hard constraints]
-  reportMapping:
-    noActionableDrift: {outcome: done, route: none}
-    boundedImplementationDrift: {outcome: failed, route: interface.implement}
-    systemicOrDirectionDrift: {outcome: blocked, blocker: interface-gap, route: interface.draw}
-    intentionalDeviationPendingOwner: {outcome: blocked, blocker: interface-gap, code: OWNER_DEVIATION_DECISION_REQUIRED, route: interface.draw}
-    grammarMissingFromCanonicalPackage: {outcome: blocked, blocker: grammar-gap, route: grammar.update}
-    note: >-
-      Existing Grammar violated by product code is bounded implementation drift, not grammar-gap.
-      On audit round 5 every actionable mapping is terminal for this five-round loop: the Kernel
-      records exhaustion and never schedules audit round 6.
+      en: "Compare the current attempt with its predecessor on the same matrix and signatures. Record
+        resolved, unchanged, new and reopened findings, deltas, no-progress and oscillation. No
+        relevant delivered revision or no diminished actionable finding is no-progress; a resolved
+        signature that reopens or alternates beyond tolerance is oscillation. Both fail with an
+        explicit route/recheck matrix. On the last round any known actionable finding fails and
+        missing authority/instrumentation blocks; neither can pass. Complete only as
+        `no-actionable-drift`, validate, report and stop without dispatch. A pending
+        intentional-deviation case is actionable drift: report `OWNER_DEVIATION_DECISION_REQUIRED`
+        with its digest and requested decision, retain the evidence for later owner inspection, and
+        stop. review.verify and uat.verify remain independent."
 proofs:
   - id: accepted-draw-lineage
     requirement:
-      en: >-
-        The audit selects exactly the latest causally ordered explicit owner acceptance for the selected scope and
-        recomputes its draw receipt, image, prompt and coverage/content hashes. Latest owner acceptance outranks
-        older canonical/generated direction without rewriting history; missing, conflicting or ambiguous lineage
-        blocks rather than falling back.
+      en: The audit selects exactly the latest causally ordered explicit owner acceptance for the selected
+        scope and recomputes its draw receipt, image, prompt and coverage/content hashes. Latest
+        owner acceptance outranks older canonical/generated direction without rewriting history;
+        missing, conflicting or ambiguous lineage blocks rather than falling back.
   - id: side-by-side-visual-equivalence
     requirement:
-      en: >-
-        Every draw-backed representative cell has an untransformed accepted-direction/capture pair with identical
-        surface, state, viewport and theme. Composition hierarchy, section order, light-dark rhythm, imagery and
-        creative intent are each classified from those pairs; technical tests can corroborate but never substitute
-        for visual equivalence.
+      en: Every draw-backed representative cell has an untransformed accepted-direction/capture pair with
+        identical surface, state, viewport and theme. Composition hierarchy, section order,
+        light-dark rhythm, imagery and creative intent are each classified from those pairs;
+        technical tests can corroborate but never substitute for visual equivalence.
   - id: deterministic-coverage
     requirement:
-      en: Every matrix cell has fresh capture and measurement evidence; required not-run/inconclusive cannot pass.
+      en: Every matrix cell has fresh capture and measurement evidence; required not-run/inconclusive
+        cannot pass.
   - id: grammar-hard-authority
     requirement:
-      en: >-
-        Every Grammar result binds installed version, public entry, anatomy/reference and winning declaration/token
-        provenance. Unexpected border, surface, shadow, radius, containment, slot or state anatomy is hard failure;
-        no visual or creative score can waive it.
+      en: Every Grammar result binds installed version, public entry, anatomy/reference and winning
+        declaration/token provenance. Unexpected border, surface, shadow, radius, containment, slot
+        or state anatomy is hard failure; no visual or creative score can waive it.
   - id: realization-fidelity
     requirement:
-      en: >-
-        Every draw region matches its accepted realization mode. Raster artwork binds exact retained asset identity,
-        provenance and placement; code-native regions bind semantic DOM, installed Grammar, responsive CSS and
-        repository-native SVG. Flattened UI and silent CSS approximations of required authored imagery both fail.
+      en: Every draw region matches its accepted realization mode. Raster artwork binds exact retained
+        asset identity, provenance and placement; code-native regions bind semantic DOM, installed
+        Grammar, responsive CSS and repository-native SVG. Flattened UI and silent CSS
+        approximations of required authored imagery both fail.
   - id: symbolic-integrity
     requirement:
-      en: >-
-        Every prominent symbol is semantically defensible without its label, appropriate for the product audience,
-        distinct from siblings, coherent with its family at the same camera/base/material/light/scale/density and
-        legible at required responsive sizes. Generic, childish or interchangeable imagery remains actionable drift.
+      en: Every prominent symbol is semantically defensible without its label, appropriate for the product
+        audience, distinct from siblings, coherent with its family at the same
+        camera/base/material/light/scale/density and legible at required responsive sizes. Generic,
+        childish or interchangeable imagery remains actionable drift.
   - id: bounded-creative-rubric
     requirement:
       en: Applicable TASTE rows have measurements/calibration and never override deterministic findings.
   - id: actionable-routing
     requirement:
-      en: >-
-        Every actionable finding has cause, blast radius, affected paths and recheck cells; bounded drift routes
-        interface.implement, while systemic or unclear direction/creative drift routes interface.draw.
+      en: Every actionable finding has cause, blast radius, affected paths and recheck cells; bounded
+        drift routes interface.implement, while systemic or unclear direction/creative drift routes
+        interface.draw.
   - id: owner-governed-deviation
     requirement:
-      en: >-
-        Every claimed intentional visual departure remains an open finding and has a durable, hash-bound deviation
-        case with measured side-by-side evidence, necessity, benefits, alternatives, strongest counterargument,
-        risks, rollback and recheck scope. Only an explicit owner decision bound to that exact case digest may create
-        a newer accepted direction; the audit never approves its own argument or rewrites prior evidence.
+      en: Every claimed intentional visual departure remains an open finding and has a durable, hash-bound
+        deviation case with measured side-by-side evidence, necessity, benefits, alternatives,
+        strongest counterargument, risks, rollback and recheck scope. Only an explicit owner
+        decision bound to that exact case digest may create a newer accepted direction; the audit
+        never approves its own argument or rewrites prior evidence.
   - id: bounded-loop
     requirement:
-      en: >-
-        Rounds preserve lineage/matrix, report no-progress/oscillation and never exceed five; round 5 with drift
-        is failed or blocked, never passed. Every repair supplies fresh implementation captures before re-audit.
+      en: Rounds preserve lineage/matrix, report no-progress/oscillation and never exceed
+        `params.maxRounds`; a last round with drift is failed or blocked, never passed. Every repair
+        supplies fresh implementation captures before re-audit.
   - id: no-actionable-drift
     requirement:
-      en: >-
-        Pass is `no-actionable-drift`: complete hard coverage, calibrated taste ship and zero actionable findings.
-        It proves this audit scope only and leaves review.verify and UAT independent.
+      en: "Pass is `no-actionable-drift`: complete hard coverage, calibrated taste ship and zero
+        actionable findings. It proves this audit scope only and leaves review.verify and UAT
+        independent."
   - id: binding
     requirement:
-      en: "`starci validate` passes and evidence hashes, served versions, Grammar, codeRefs and lineage agree."
+      en: "`starci validate` passes and evidence hashes, served versions, Grammar, codeRefs and lineage
+        agree."
 blockers:
   - code: ACCEPTED_DRAW_LINEAGE_MISSING
     condition:
-      en: No exact explicit owner acceptance identifies one interface.draw receipt and its image/prompt/content hashes.
+      en: No exact explicit owner acceptance identifies one interface.draw receipt and its
+        image/prompt/content hashes.
   - code: ACCEPTED_DRAW_LINEAGE_AMBIGUOUS
     condition:
-      en: Applicable latest owner acceptances conflict or cannot be causally ordered, or retained bytes disagree with their hashes.
+      en: Applicable latest owner acceptances conflict or cannot be causally ordered, or retained bytes
+        disagree with their hashes.
   - code: SIDE_BY_SIDE_CELL_MISMATCH
     condition:
-      en: A required draw-backed representative cell lacks an untransformed capture with identical surface/state/viewport/theme identity.
+      en: A required draw-backed representative cell lacks an untransformed capture with identical
+        surface/state/viewport/theme identity.
   - code: AUDIT_SCOPE_INCOMPLETE
-    condition: {en: Required matrix cells, expectations, rules or immediate lineage are missing or ambiguous.}
+    condition:
+      en: Required matrix cells, expectations, rules or immediate lineage are missing or ambiguous.
   - code: RUNTIME_UNVERIFIED
-    condition: {en: Selected routes/states cannot bind to the environment and observed served versions.}
+    condition:
+      en: Selected routes/states cannot bind to the environment and observed served versions.
   - code: CAPTURE_OR_MEASUREMENT_UNAVAILABLE
-    condition: {en: Fresh implementation captures or required inspection evidence cannot be obtained.}
+    condition:
+      en: Fresh implementation captures or required inspection evidence cannot be obtained.
   - code: GRAMMAR_AUTHORITY_UNPROVEN
     condition:
-      en: Installed Grammar version, entry, matching reference or declaration/token provenance is unresolved.
+      en: Installed Grammar version, entry, matching reference or declaration/token provenance is
+        unresolved.
   - code: DESIGN_INTENT_UNCLEAR
     condition:
       en: Material intent is absent/contradictory; route detailed interface.draw and do not guess.
   - code: REALIZATION_MODE_UNRESOLVED
     condition:
-      en: The accepted raster-asset/code-native mode or its actual implementation binding is missing or contradictory.
+      en: The accepted raster-asset/code-native mode or its actual implementation binding is missing or
+        contradictory.
   - code: SYMBOL_INTENT_UNRESOLVED
     condition:
-      en: A prominent symbol's intended concept, audience maturity, family grammar or smallest-size reading is missing or contradictory; route detailed interface.draw and do not infer acceptance from its label.
+      en: A prominent symbol's intended concept, audience maturity, family grammar or smallest-size
+        reading is missing or contradictory; route detailed interface.draw and do not infer
+        acceptance from its label.
   - code: OWNER_DEVIATION_DECISION_REQUIRED
     condition:
-      en: >-
-        A measured departure from the accepted draw is claimed as intentional and has a complete durable deviation
-        case, but no explicit owner decision is bound to that exact case digest and draw/capture hashes.
+      en: A measured departure from the accepted draw is claimed as intentional and has a complete durable
+        deviation case, but no explicit owner decision is bound to that exact case digest and
+        draw/capture hashes.
   - code: AUDIT_INPUT_CHANGED
-    condition: {en: Product, environment, Grammar, brand, asset, matrix or intent changes during inspection.}
+    condition:
+      en: Product, environment, Grammar, brand, asset, matrix or intent changes during inspection.
   - code: AUDIT_ROUND_LIMIT
     condition:
-      en: Round exceeds five, or round 5 lacks required proof; the kernel must not enqueue a sixth audit.
+      en: Round exceeds `params.maxRounds`, or the last round lacks required proof; the kernel enqueues no
+        further audit.
   - code: DECLARED_DEPENDENCY_UNMET
-    condition: {en: A prerequisite is not effectively done or a required selected input is absent.}
+    condition:
+      en: A prerequisite is not effectively done or a required selected input is absent.
 placeholders:
   feature: Selected feature slug
   audit: Stable selected audit slug
@@ -450,27 +441,201 @@ placeholders:
   bound-paths: Inspected product source read set
   environment: Resolved environment resource slug
   identity: Selected actor resource slug
+  playwright-manifest-and-lockfile: Actual package manifest and lockfile that pin Playwright
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-business:
-  question: >-
-    "Does the selected real interface have actionable render, UX or UI drift, and where must repair resume?"
-  whenNeeded:
-    - After interface.implement and after each routed repair, on the same selected matrix and fresh captures.
-  whenNot:
-    - Not source/design/asset repair, render generation, behavioral UAT or review.verify acceptance.
-  consumes:
-    - Exact latest explicitly owner-accepted interface.draw receipt and image/prompt/content hashes; accepted SRS/SDS/UI direction, brand/assets, installed Grammar/references, delivered source/runtime, fresh implementation captures, selected matrix and prior attempt.
-  produces:
-    - Owner-accepted draw lineage, exact-cell side-by-side comparisons, structured drift findings, durable deviation cases with arguments/counterarguments, hard matrices, calibrated taste, lineage/trend and a repair route or no-actionable-drift.
-  failureModes:
-    - ACCEPTED_DRAW_LINEAGE_MISSING, ACCEPTED_DRAW_LINEAGE_AMBIGUOUS, SIDE_BY_SIDE_CELL_MISMATCH, AUDIT_SCOPE_INCOMPLETE, RUNTIME_UNVERIFIED, CAPTURE_OR_MEASUREMENT_UNAVAILABLE, GRAMMAR_AUTHORITY_UNPROVEN, DESIGN_INTENT_UNCLEAR, REALIZATION_MODE_UNRESOLVED, SYMBOL_INTENT_UNRESOLVED, OWNER_DEVIATION_DECISION_REQUIRED, AUDIT_INPUT_CHANGED, AUDIT_ROUND_LIMIT, DECLARED_DEPENDENCY_UNMET.
+policy:
+  readOnlyPolicy:
+    productSource: true
+    productData: true
+    allowedEffects:
+      - read repository, runtime, DOM, accessibility tree, computed style, network metadata and
+        image bytes
+      - inspect implementation-produced real route x viewport captures
+      - write only the audit node and its evidence bundle
+    forbiddenEffects:
+      - edit, format, generate or commit product, design, asset or Grammar source
+      - generate, retouch or replace product renders or captures
+      - change accepted direction, assertions, baselines or expected values
+      - treat an auditor/implementer explanation, taste judgement or deviation rationale as owner
+        approval
+      - select an older canonical/generated direction over the latest explicit owner acceptance
+      - substitute lint, unit, integration, build or other technical test success for visual
+        equivalence
+      - dispatch or perform a repair
+      - certify review.verify or uat.verify
+  findingSchema:
+    schema: starci/interface-audit-finding@1
+    required:
+      - id
+      - signature
+      - category
+      - constraintClass
+      - ruleRefs
+      - matrixCells
+      - expected
+      - observed
+      - measurements
+      - evidenceRefs
+      - sourceAttribution
+      - severity
+      - status
+      - rootCause
+      - blastRadius
+      - routing
+    categories:
+      - geometry
+      - content
+      - icon
+      - asset
+      - responsive
+      - interaction
+      - grammar.anatomy
+      - grammar.token
+      - realization.mode
+      - symbol.fit
+      - symbol.family
+      - accessibility
+      - render.truth
+      - composition.hierarchy
+      - section.order
+      - light-dark.rhythm
+      - imagery
+      - creative.intent
+      - taste
+    constraintClasses: [hard, creative-rubric]
+    statuses: [open, resolved, unchanged, new, reopened, blocked]
+    routing:
+      required: [primaryOp, rationale, affectedPaths, recheckMatrix, nextChain]
+      primaryOps: [interface.implement, interface.draw]
+      optionalMechanicalOp: code.refactor
+  auditPolicy:
+    roundLimit: params.maxRounds
+    lineage: immediate-predecessor-required
+    matrixRecheck: immutable-route-state-viewport-theme-plus-additions
+    hardConstraintRule: every-required-hard-cell-pass
+    freshCaptureRule: every-repair-produces-new-interface-implement-captures-before-audit
+    acceptedDrawLineage:
+      selection: latest-causally-ordered-explicit-owner-acceptance-for-selected-scope
+      requiredBindings:
+        - acceptanceEventId
+        - acceptanceOrder
+        - drawReceiptPath
+        - drawReceiptSha256
+        - drawRunId
+        - coverageContentSha256
+        - imagePathsAndSha256
+        - promptPathsAndSha256
+      precedence: latest-explicit-owner-acceptance-over-older-canonical-or-generated-directions
+      unacceptedDraws: never-baseline-and-never-silent-supersession
+      ambiguity: block
+      history: append-only-never-rewrite-or-relabel
+    sideBySide:
+      cellIdentity: [surface, state, viewport, theme]
+      requiredFor: every-draw-backed-representative-cell
+      artifacts: [acceptedDirectionPathAndSha256, implementationCapturePathAndSha256, pairingKey, comparisonLenses]
+      transformsForbidden: [resize, crop, recolor, retouch, regenerate, cross-cell-substitution]
+      lenses: [composition-hierarchy, section-order, light-dark-rhythm, imagery, creative-intent]
+      resultStates: [pass, fail, inconclusive]
+    visualEquivalenceRule: every-required-side-by-side-lens-pass
+    technicalEvidenceRule: corroborating-only-never-substitutes-for-visual-equivalence
+    deviationGovernance:
+      defaultState: drift-open
+      evidence:
+        - deviations.json
+        - deviation-brief.md
+        - accepted-draw-hash
+        - implementation-capture-hash
+        - measured-regions
+        - alternatives
+        - counterargument
+        - risks
+        - rollback
+        - recheck-matrix
+      rationaleMinimum: necessity-plus-user-product-benefit-plus-rule-impact-plus-accepted-conformant-alternative
+      approvalAuthority: explicit-owner-only
+      approvalBinding: exact-deviation-case-digest-and-exact-draw/capture-hashes
+      approvalEffect: new-accepted-direction-lineage-input-never-audit-self-waiver
+      implicitApprovalForbidden:
+        - silence
+        - technical-pass
+        - auditor-verdict
+        - implementer-claim
+        - taste-score
+        - newer-unaccepted-render
+      history: append-only-and-queryable-after-the-run
+    creativeRubric: {rules: TASTE-1..TASTE-13, calibration: same-round-low-mid-high-required, completionVerdict: ship}
+    symbolReview:
+      questions:
+        - exact-product-concept
+        - alternate-reading-without-label
+        - audience-category-maturity
+        - generic-cliche-risk
+        - sibling-distinction
+        - family-camera-base-material-light-scale-density
+        - reduced-scale-legibility
+        - truthful-realization-medium
+      labelCannotRescue: [childish-metaphor, ambiguous-metaphor, interchangeable-siblings, incoherent-family]
+      boundedDriftRoute: interface.implement
+      systemicLanguageRoute: interface.draw
+    routingPriority: root-cause-then-blast-radius-never-raw-finding-count
+    primaryRoutes:
+      boundedImplementation:
+        op: interface.implement
+        chain: [interface.implement, interface.audit]
+      systemicDirection:
+        op: interface.draw
+        chain: [interface.draw, interface.implement, interface.audit]
+    optionalMechanicalRoute:
+      op: code.refactor
+      onlyWhen: behavior-invariant-structural-change-with-covering-before-after-regression
+    completion:
+      status: no-actionable-drift
+      requires:
+        - latest explicit owner-accepted interface.draw receipt and all receipt/image/prompt/content
+          hashes are exact and unambiguous
+        - every draw-backed representative cell has an untransformed side-by-side pair at identical
+          surface/state/viewport/theme
+        - composition hierarchy, section order, light-dark rhythm, imagery and creative intent
+          equivalence all passed
+        - every prominent symbol passed concept fit, audience maturity, family coherence, sibling
+          distinction, reduced-scale legibility and truthful-medium review
+        - every selected matrix cell was freshly inspected on one verified served revision
+        - every required hard constraint passed with actual measurements and authority
+        - no open, unchanged, new, reopened or blocked actionable finding remains
+        - calibrated taste verdict is ship for the selected applicable scope
+        - round and trend lineage are valid and the immutable matrix was rechecked
+      neverMeans: [review.verify acceptance, uat.verify business journey proof, permission to waive hard constraints]
+    reportMapping:
+      noActionableDrift: {outcome: done, route: none}
+      boundedImplementationDrift: {outcome: failed, route: interface.implement}
+      systemicOrDirectionDrift: {outcome: blocked, blocker: interface-gap, route: interface.draw}
+      intentionalDeviationPendingOwner:
+        outcome: blocked
+        blocker: interface-gap
+        code: OWNER_DEVIATION_DECISION_REQUIRED
+        route: interface.draw
+      grammarMissingFromCanonicalPackage: {outcome: blocked, blocker: grammar-gap, route: grammar.update}
+      note: "Existing Grammar violated by product code is bounded implementation drift, not grammar-gap.
+        On the last round every actionable mapping is terminal for this bounded loop: the Kernel
+        records exhaustion and schedules no further audit."
+    measurementAuthority: audit-measures-the-served-render-with-the-locked-playwright-runner-never-the-producer-self-report
 route:
   nodeKinds: [operations]
   phase: [verify, post-implementation]
   intent: [audit, interface-audit, ui-drift, ux-drift, render-drift]
-  prerequisites: ["interface.implement settled pass with fresh real captures", "verified served build", "exact latest explicit owner-accepted interface.draw receipt with image/prompt/content hashes", "accepted UI direction and installed Grammar binding"]
-  riskHints: [browser-required, read-only-product-source, owner-accepted-draw-lineage, exact-cell-side-by-side, grammar-hard-authority, bounded-five-round-loop]
+  prerequisites:
+    - interface.implement settled pass with fresh real captures
+    - verified served build
+    - exact latest explicit owner-accepted interface.draw receipt with image/prompt/content hashes
+    - accepted UI direction and installed Grammar binding
+  riskHints:
+    - host-tool-required:browser-dom
+    - read-only-product-source
+    - owner-accepted-draw-lineage
+    - exact-cell-side-by-side
+    - grammar-hard-authority
+    - bounded-round-loop

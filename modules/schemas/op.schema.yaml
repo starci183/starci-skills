@@ -93,6 +93,12 @@ properties:
           minItems: 1
           items: {type: string, minLength: 1}
           description: The field names the written document carries.
+        artifacts:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1}
+          description: "The files a bundle at `path` holds, each relative to it — the list a joined
+            path used to hide. Data, so a reader counts the artifacts without parsing prose."
         content:
           $ref: "#/$defs/prose"
           description: What the written data holds.

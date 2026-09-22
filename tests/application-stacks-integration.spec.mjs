@@ -15,7 +15,7 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
     'runtime.operate':['inspect','serve','service'],'release.deliver':['deploy','migrate'],'review.verify':['delivery','api']};
   for(const [id,modes] of Object.entries(consumers)){
     const op=parseYaml(fs.readFileSync(path.join(root,'modules/ops/ops',`${id}.yaml`),'utf8'));
-    for(const contract of [op,...modes.map(mode=>op.executionModes[mode])]){
+    for(const contract of [op,...modes.map(mode=>op.policy.executionModes[mode])]){
       assert.ok(contract.reads.some(read=>read.id==='application-stacks'),id);
       assert.ok(contract.steps[0].reads.includes('application-stacks'),id);
     }

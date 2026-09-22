@@ -1,0 +1,41 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:realization-check:1
+type: object
+additionalProperties: false
+description: "How interface.implement realized each region of an accepted direction
+  (E/realization-check.json), and the evidence for the choice. interface.audit reads this file as
+  its realization map: rich authored imagery binds a retained raster asset, and layout, controls,
+  typography, system icons and representable effects bind semantic DOM plus installed Grammar. A
+  flattened screenshot standing in for a code-native region is visible here before it is visible
+  on screen."
+required: [schema, regions]
+properties:
+  schema:
+    const: starci/realization-check@1
+  regions:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, drawId, mode, evidence]
+      properties:
+        id: {type: string, minLength: 1}
+        drawId:
+          type: string
+          minLength: 1
+          description: The accepted direction this region came from.
+        mode:
+          enum: [raster-asset, code-native]
+        assetId:
+          type: string
+          minLength: 1
+          description: The asset-manifest entry the region binds, when the mode is raster-asset.
+        component:
+          type: string
+          minLength: 1
+          description: The installed Grammar component or semantic element the region renders as, when the mode is code-native.
+        evidence:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1}
+          description: Repository or capture paths that show the region realized this way.

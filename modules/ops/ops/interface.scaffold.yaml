@@ -1,15 +1,9 @@
-# modules/ops/ops/interface.scaffold.yaml — greenfield frontend source creation.
-# Creates a NEW interface source tree: framework scaffold written in the installed
-# grammar, brand tokens wired, first route/shell rendering — proven by build +
-# capture, not just written. Distinct from interface.implement (fills an
-# existing tree) and interface.draw (decides the drawing, not the source).
-
+schema: starci/op@1
 id: interface.scaffold
 goal:
-  en: Create one new interface source tree in the bound repository and prove it renders —
-    build green plus a captured first shell.
-nodeKinds:
-  - implementation
+  en: Create one new interface source tree in the bound repository and prove it renders — build green
+    plus a captured first shell.
+nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
   - owned source edits
@@ -31,24 +25,23 @@ reads:
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
-      en: "REQUIRED for greenfield. Framework choice, app shell shape, routing root and data
-        boundaries come from the settled SDS — never guessed. Missing decisions report sds-gap."
+      en: REQUIRED for greenfield. Missing decisions report sds-gap.
   - id: grammar
     path: knowledge/grammars/* + grammar package (repository:<repo-id> binding)
     purpose:
-      en: "REQUIRED. The markup is written in the installed grammar, not in ad-hoc JSX/HTML.
-        Resolve the bound grammar package and its version before writing any component; a missing
-        or unbound grammar reports grammar-gap."
+      en: REQUIRED. The markup is written in the installed grammar, not in ad-hoc JSX/HTML. Resolve the
+        bound grammar package and its version before writing any component; a missing or unbound
+        grammar reports grammar-gap.
   - id: brand
     path: .starciwork/brand/index.yaml (settled tokens inside)
     purpose:
-      en: Read settled brand tokens the scaffold wires into the theme layer. Absent brand decisions
-        report brand-gap rather than shipping placeholder styling as settled.
+      en: Read settled brand tokens the scaffold wires into the theme layer. Absent brand decisions report
+        brand-gap rather than shipping placeholder styling as settled.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
-      en: Resolve the actual checkout, HEAD and dirty state; the declared app path may be empty —
-        that is the greenfield case.
+      en: Resolve the actual checkout, HEAD and dirty state; the declared app path may be empty — that is
+        the greenfield case.
   - id: conventions
     path: knowledge/patterns/fe/* + knowledge/ui/* + knowledge/code-pattern-enforcement.yaml
     purpose:
@@ -57,33 +50,23 @@ reads:
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve the request-bound profile; capabilities are the intersection of actual tools and
-        profile policy.
+      en: Resolve the request-bound profile; capabilities are the intersection of actual tools and profile
+        policy.
 writes:
   - id: node
     path: N/index.yaml
-    fields:
-      - state
-      - activity
-      - codeRefs
-      - evidence
+    fields: [state, activity, codeRefs, evidence]
     content:
       en: Record the realised source root, scaffolded paths and evidence the checks produced.
   - id: source
     path: repository:<repo-id>/<declared-source-root>/**
-    fields:
-      - manifest
-      - toolchainConfig
-      - layout
-      - themeWiring
-      - firstShell
-      - harness
+    fields: [manifest, toolchainConfig, layout, themeWiring, firstShell, harness]
     content:
       en: "The new tree only: manifest, framework/toolchain configs, declared layout, grammar-based
         theme/token wiring, the minimal first shell (root route renders), and its test/build
         harness."
   - id: evidence
-    path: E/result.json + E/effects.json + E/verification.json + E/artifacts + captured first render
+    path: E/**
     fields:
       - request
       - scope
@@ -96,43 +79,59 @@ writes:
       - codeRefs
       - remaining
       - recovery
+    artifacts: [result.json, effects.json, verification.json, artifacts/**]
     content:
-      en: Includes the captured first-shell render (image bytes under the node's evidence assets) —
-        a scaffold claim without a capture is unproven.
+      en: The scaffold result, the effects it had, the verification it ran and the artifacts it produced.
+  - id: firstRender
+    path: <node>/assets/first-shell-render.png
+    content:
+      en: The captured first-shell render, in image bytes, under the node's evidence assets.
 steps:
-  - reads: [target, architecture, grammar, brand]
-    writes: [evidence]
+  - reads:
+      - target
+      - architecture
+      - grammar
+      - brand
+    writes: [evidence, firstRender]
     action:
       en: Resolve what the new app must be — framework, shell shape, grammar version, token source.
-        Undecided inputs are named gaps, never improvised.
-  - reads: [repo, conventions]
-    writes: [evidence]
+        Undecided inputs are named gaps, never improvised. Framework choice, app shell shape,
+        routing root and data boundaries come from the settled SDS — never guessed.
+  - reads:
+      - repo
+      - conventions
+    writes: [evidence, firstRender]
     action:
-      en: Resolve the real checkout, confirm the declared app path is empty-or-absent, read the house
-        FE layout and lint contracts.
-  - reads: [architecture, grammar, brand]
+      en: Resolve the real checkout, confirm the declared app path is empty-or-absent, read the house FE
+        layout and lint contracts.
+  - reads:
+      - architecture
+      - grammar
+      - brand
     writes: [source]
     action:
-      en: Write manifest + toolchain configs, then the declared layout, then grammar-based theme
-        wiring, then the minimal first shell. No screens or behaviour beyond what the shell proves.
-  - reads: [repo]
-    writes: [source, evidence]
+      en: Write manifest + toolchain configs, then the declared layout, then grammar-based theme wiring,
+        then the minimal first shell. No screens or behaviour beyond what the shell proves.
+  - reads:
+      - repo
+    writes: [source, evidence, firstRender]
     action:
-      en: Install, build, lint and run the harness for real; serve the shell locally and capture the
-        first render. The capture is evidence, recorded under the node's assets.
-  - reads: [target]
-    writes: [node, evidence]
+      en: Install, build, lint and run the harness for real; serve the shell locally and capture the first
+        render. The capture is evidence, recorded under the node's assets.
+  - reads:
+      - target
+    writes: [node, evidence, firstRender]
     action:
-      en: Record the realised source root and codeRefs on the node; return the evidence bundle with
-        the capture.
+      en: Record the realised source root and codeRefs on the node; return the evidence bundle with the
+        capture.
 proofs:
   - id: scaffold-runs
     requirement:
       en: The declared toolchain commands ran against the new tree and real output is recorded.
   - id: renders
     requirement:
-      en: The first shell rendered and the capture bytes exist in evidence — build-green alone does
-        not prove an interface scaffold.
+      en: The first shell rendered and the capture bytes exist in evidence — build-green alone does not
+        prove an interface scaffold.
   - id: grammar-conforms
     requirement:
       en: Written markup uses the installed grammar's units; no ad-hoc markup bypassed it.
@@ -162,32 +161,14 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-business:
-  question: >-
-    "For a greenfield frontend: what exact app tree do the settled design, grammar and
-    brand require, and does the scaffolded shell actually render?"
-  whenNeeded:
-    - A workflow needs a new interface app where no source tree exists yet.
-    - Grammar-conformant skeleton + theme wiring must be proven before implement ops build screens.
-  whenNot:
-    - Not for building settled screens in an existing tree — interface.implement.
-    - Not for deciding what the product looks like — interface.draw / brand.decide.
-  consumes:
-    - The selected implementation node; settled architecture; installed grammar; brand tokens;
-      the bound (possibly empty) repository; house FE conventions.
-  produces:
-    - A buildable, renderable interface skeleton under the declared source root plus its evidence
-      bundle including the first-shell capture.
-  failureModes:
-    - SDS_MISSING, GRAMMAR_UNBOUND, BRAND_MISSING, TOOLCHAIN_UNAVAILABLE, OUTSIDE_SCOPE.
-
 route:
   nodeKinds: [implementation]
   phase: [implement]
   intent: [scaffold, greenfield, new-source, frontend, interface, bootstrap, init]
-  prerequisites: ["architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)", "grammar bound", "repository bound"]
+  prerequisites:
+    - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
+    - grammar bound
+    - repository bound
   riskHints: [source-edits, new-tree]

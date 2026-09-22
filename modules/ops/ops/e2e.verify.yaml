@@ -1,13 +1,9 @@
-# modules/ops/ops/e2e.verify.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: e2e.verify
 goal:
   en: Prove one selected delivered slice through its public API on a real stack the suite starts
     itself, with one scenario per assertion and the listed checks run verbatim.
-nodeKinds:
-  - implementation
+nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
   - end-to-end scenario spec authoring inside the selected allowlist
@@ -23,26 +19,23 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent target
-        is a scope/graph gap; report it and propose a separately selected scope op. Do not create a
-        target or invent its assertions here, and never rewrite an assertion so an existing scenario
-        can pass."
+      en: Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
+        and validator freshness. This consumer op requires its target node to exist. An absent
+        target is a scope/graph gap; report it and propose a separately selected scope op.
   - id: business
     path: .starciwork/features/<feature>/{br,ac,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
       en: Read the accepted requirements, rules, denials and acceptance IDs declared as relevant inputs in
-        the selected .starciwork graph. Intent governs the expected observable effect; current source
-        behavior is not a replacement for it. A needed missing input is a reported graph/scope gap,
-        not a silently added dependency.
+        the selected .starciwork graph. Intent governs the expected observable effect; current
+        source behavior is not a replacement for it. A needed missing input is a reported
+        graph/scope gap, not a silently added dependency.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
       en: Read the declared operations, contracts, data ownership, authorization and error identity,
         transaction and idempotency boundaries and eventual-consistency expectations of the slice
-        under proof. These define, per assertion, the request a client sends and the effect the stack
-        must show. Where the design is silent about the observable effect, report the gap instead of
-        inventing an expectation.
+        under proof. Where the design is silent about the observable effect, report the gap instead
+        of inventing an expectation.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -54,21 +47,17 @@ reads:
     purpose:
       en: Inspect the existing end-to-end suite - how it starts its own dependencies as containers for the
         run, its lifecycle hooks, isolation per run, fixtures, helpers, spec naming convention and
-        the assertions it already owns. Reuse that harness; never stand up a second parallel harness
-        and never substitute a hand-started shared service for the stack the suite brings up.
+        the assertions it already owns.
   - id: stack
     path: .starciwork/_resources/environments/<environment>/resource.yaml + selected request resources[]
     purpose:
       en: Resolve the end-to-end runtime this run may use - the declared container services, images and
-        configuration revision, its owner and allowed effects. Only the run-owned ephemeral stack may
-        be started; a shared or production target is never a proof surface for this op, and identity
-        is validated by observation rather than inferred from a hostname.
+        configuration revision, its owner and allowed effects.
   - id: checks
     path: selected request checks[] + repository:<repo-id>/<manifest-paths>
     purpose:
       en: Read the exact check commands the request lists and the manifest scripts that define them. These
-        commands are run verbatim and nothing else is added, narrowed or substituted. A listed
-        command that does not exist is a reported blocker, never a locally invented equivalent.
+        commands are run verbatim and nothing else is added, narrowed or substituted.
   - id: effects
     path: current request authorization + selected stack resource declared allowed effects
     purpose:
@@ -79,33 +68,23 @@ reads:
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority.
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof. Capabilities are the intersection of actual tools, selected profile
+        policy, op permissions and existing task authority.
   - id: workflow
     path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
     purpose:
       en: When selected inside the named workflow, read the exact request, strict response contract and
-        primary/secondary authority JSON. Standalone op execution does not invent a workflow request.
-  - id: matrix
-    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
-    purpose:
-      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
-        input bindings, requested output JSON shapes and required criteria. Standalone execution
-        needs no fabricated matrix request. A template is not authority for extra effects.
+        primary/secondary authority JSON. Standalone op execution does not invent a workflow
+        request.
 writes:
   - id: node
     path: N/index.yaml
-    fields:
-      - state
-      - blocker
-      - completion.inputDigest
-      - completion.evidence
-      - completion.codeRefs
+    fields: [state, blocker, completion.inputDigest, completion.evidence, completion.codeRefs]
     content:
-      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only
-        state/blocker/completion here; actual observations, red scenarios, findings and commit
+      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
+        only state/blocker/completion here; actual observations, red scenarios, findings and commit
         mapping belong to the evidence result, not semantic node prose. Missing
         refs/dependencies/assertions require a reported gap or a separately selected scope update;
         never add or remove them to obtain pass.
@@ -122,64 +101,18 @@ writes:
         under proof, no in-process shortcut around its public entry point, no assertion weakened or
         scenario skipped to reach green, and no generated record of a run that did not happen.
   - id: evidence
-    path: E/manifest.yaml + E/scenarios.json + E/run-output.txt + E/stack.json + E/readback.json +
-      E/result.md
-    fields:
-      - id
-      - nodeId
-      - inputDigest
-      - outcome
-      - assertions
-      - assets
-      - provenance
-      - codeRefs
-      - extensions
+    path: E/**
+    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    artifacts: [manifest.yaml, scenarios.json, run-output.txt, stack.json, readback.json, result.md]
     content:
-      en: "Keep the original assertion IDs and map each one to its scenario, the request it sends, the
+      en: Keep the original assertion IDs and map each one to its scenario, the request it sends, the
         expected observable effect and the observed response. Record the exact commands, cwd, tested
         tree/commit, container services with their observed identity, exit codes, counts and
         sanitized output, including every attempt when a scenario was retried. Operator-specific
         observed result in E/result.md - report per assertion pass, fail with the observed response,
         or not-run with the reason. An unrun, skipped or partial scenario stays not-run outside the
         pass column, a green run whose stack never started is recorded as a spec defect, and
-        credentials or personal data are redacted before the assets are hashed."
-  - id: handoff
-    path: E/response.json
-    fields:
-      - schema
-      - requestId
-      - requestDigest
-      - op
-      - step
-      - slot
-      - runId
-      - workflow
-      - status
-      - criteria
-      - outputs
-      - artifacts
-    content:
-      en: Only for the selected named workflow, emit the response defined by modules/kernel/verdict-contract.yaml.
-        Return outputs.results for every input assertion with its scenario path, the verbatim check
-        commands and their exit codes, and the run output reference. A failed or blocked response
-        preserves evidence with outputs null.
-  - id: matrixHandoff
-    path: E/job-result.json
-    fields:
-      - requestId
-      - requestDigest
-      - op
-      - operation when selected
-      - status
-      - criteria
-      - outputs
-      - artifacts
-    content:
-      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
-        cell output with actual canonical Work/source references or produced JSON artifacts from this
-        job; retain real artifact bytes and hashes. Do not rename or regenerate upstream
-        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
-        The selected request freezes output field schemas before execution.
+        credentials or personal data are redacted before the assets are hashed.
 steps:
   - reads:
       - target
@@ -187,55 +120,57 @@ steps:
       - architecture
       - repo
       - profile
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Freeze the assertion set before any effect and restate every assertion as a client request plus
         the observable effect the stack must show - status and error identity, response body,
-        authorization denial and the persisted or emitted consequence. One assertion is one scenario;
-        no assertion is merged, dropped or re-worded, and no expectation is inferred from how the
-        code currently behaves. Where the requirement or the design is silent about the observable
-        effect, record the gap and report it rather than guessing. Resolve the execution profile and
-        actual tool availability before selecting instruments; this does not switch the
-        model/runtime or spawn workers.
+        authorization denial and the persisted or emitted consequence. One assertion is one
+        scenario; no assertion is merged, dropped or re-worded, and no expectation is inferred from
+        how the code currently behaves. Where the requirement or the design is silent about the
+        observable effect, record the gap and report it rather than guessing. Resolve the execution
+        profile and actual tool availability before selecting instruments; this does not switch the
+        model/runtime or spawn workers. Do not create a target or invent its assertions here, and
+        never rewrite an assertion so an existing scenario can pass. These define, per assertion,
+        the request a client sends and the effect the stack must show.
   - reads:
       - suite
       - repo
       - stack
       - checks
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Inspect the existing suite and the declared stack before writing anything - how the suite starts
         its container services for the run, how it isolates and disposes them, which fixtures and
         helpers already exist, the naming convention of its specs, and the exact listed check
         commands with the manifest scripts behind them. Record that start path and the container
         identities. If the suite has no way to bring the real stack up itself, that is the reported
-        blocker, not a reason to point the scenarios at a shared service.
+        blocker, not a reason to point the scenarios at a shared service. Reuse that harness; never
+        stand up a second parallel harness and never substitute a hand-started shared service for
+        the stack the suite brings up. Only the run-owned ephemeral stack may be started; a shared
+        or production target is never a proof surface for this op, and identity is validated by
+        observation rather than inferred from a hostname. A listed command that does not exist is a
+        reported blocker, never a locally invented equivalent.
   - reads:
       - architecture
       - repo
       - suite
       - target
-    writes:
-      - source
-      - evidence
+    writes: [source, evidence]
     action:
       en: Write or extend one scenario per assertion at the allowlisted spec paths, exercising the slice
         only through its public API - the transport contract a client actually calls - against the
         real stack the suite starts. Cover the positive path, the declared denial, invalid input and
         the applicable concurrency or replay case, and read the persisted effect back through that
-        same public surface where one exists. Seed only the preconditions the scenario needs, through
-        the suite's own fixtures, and never pre-create the outcome under proof. No mock, stub, fake or
-        spy of the unit under proof and no in-process call that bypasses its entry point. Product
-        code and declared expectations stay unchanged here.
+        same public surface where one exists. Seed only the preconditions the scenario needs,
+        through the suite's own fixtures, and never pre-create the outcome under proof. No mock,
+        stub, fake or spy of the unit under proof and no in-process call that bypasses its entry
+        point. Product code and declared expectations stay unchanged here.
   - reads:
       - checks
       - stack
       - effects
       - suite
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Run exactly the listed check commands, verbatim, with the suite starting the real stack in this
         run; add no command, narrow no selection and skip no scenario. Keep the command, cwd, tested
@@ -248,37 +183,29 @@ steps:
       - effects
       - suite
       - target
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Read the observed responses back against the frozen expectations, assertion by assertion, and
         keep every red scenario with the request it sent and the response it got. Then confirm the
-        suite disposed the run-owned containers, volumes and scenario data it created, that no shared
-        or production target was touched, and that no authorized external effect is left open. A
-        leftover ephemeral resource is recorded with its exact identity and a resumable disposal
-        command; unresolved effects cannot be presented as a clean run.
+        suite disposed the run-owned containers, volumes and scenario data it created, that no
+        shared or production target was touched, and that no authorized external effect is left
+        open. A leftover ephemeral resource is recorded with its exact identity and a resumable
+        disposal command; unresolved effects cannot be presented as a clean run.
   - reads:
       - target
       - checks
       - repo
       - workflow
-      - matrix
-    writes:
-      - node
-      - evidence
-      - handoff
-      - matrixHandoff
+    writes: [node, evidence]
     action:
-      en: "Report done exactly once, and only with a green run - every assertion covered by a scenario that
+      en: Report done exactly once, and only with a green run - every assertion covered by a scenario that
         ran on the real stack, the verbatim check commands with their exit codes, the run output and
         the spec paths, bound to the exact tested tree. A red scenario is failed, naming the
         assertion and the observed response; a stack that cannot start is failed with the exact
         reason; blocked with reason environment only when the cause is provably unfixable from the
         allowlist. Never report done on an unrun, skipped or partial spec, and never claim a proof
         from an earlier run. Validate bound evidence, keep the repair of any defect found here as a
-        separate operation, and stop; never self-advance. For workflow execution submit the exact
-        response to the coordinator gate, and when selected in a job matrix produce E/job-result.json
-        bound to the exact request, its output schema and every required criterion."
+        separate operation, and stop; never self-advance.
 proofs:
   - id: binding
     requirement:
@@ -298,14 +225,14 @@ proofs:
   - id: stack
     requirement:
       en: The dependencies the slice needs ran for real in this run, brought up by the suite itself as
-        run-owned containers with observed identities, and the scenarios were served by them. A green
-        result with the stack absent is a spec defect, and a shared or production target is not an
-        accepted substitute.
+        run-owned containers with observed identities, and the scenarios were served by them. A
+        green result with the stack absent is a spec defect, and a shared or production target is
+        not an accepted substitute.
   - id: run
     requirement:
       en: Exactly the listed check commands ran verbatim, with recorded exit codes, counts and retained
-        sanitized output and every retry visible. A claimed pass without its output is not a run, and
-        a stack that did not start is failed with the exact reason.
+        sanitized output and every retry visible. A claimed pass without its output is not a run,
+        and a stack that did not start is failed with the exact reason.
   - id: scope
     requirement:
       en: Only allowlisted scenario spec paths changed, proven by the actual repository status against the
@@ -352,51 +279,25 @@ placeholders:
   manifest-paths: Manifest and script files defining the listed check commands
   write-ceiling: Explicit owned scenario spec paths
   environment: Resolved end-to-end runtime label
-e2ePolicy:
-  proofSurface: public-api-only
-  interfaceDriving: false
-  stack: real-started-by-the-suite
-  mocks: none-for-the-unit-under-proof
-  scenarios: one-per-assertion
-  checks: listed-commands-verbatim
-  productCode: unchanged
-  environmentBlocker: provably-unfixable-only
-  teardown: run-owned-ephemeral-disposed
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "Does the delivered slice prove every assertion through its public API on a
-    real stack the suite starts itself - one scenario per assertion, declared
-    checks run verbatim?"
-  whenNeeded:
-    - Post-implementation API-level proof of a delivered backend slice.
-    - When a job or workflow names e2e.verify for a target node's assertions.
-  whenNot:
-    - Not browser UAT (uat.verify owns real-UI proof); not through mocks or in-process calls.
-    - Not on shared/production targets; never edits product code or expectations - a wrong behavior is a finding, not a fix here.
-    - A green run against an absent stack is a spec defect, not a pass (proof rules).
-  consumes:
-    - Target assertions, business acceptance, architecture contracts; repo slice + existing suite; stack resource; declared checks; effects authorization.
-  produces:
-    - Scenario specs inside the test allowlist; evidence: scenarios/run-output/stack/readback; E/response.json workflow handoff; matrix job-result when selected.
-  failureModes:
-    - ASSERTION_REQUEST_INCOMPLETE, PROOF_SURFACE_UNAVAILABLE, STACK_UNAVAILABLE, CHECK_UNRUNNABLE, SCOPE_OUTSIDE_ALLOWLIST, DECLARED_DEPENDENCY_UNMET (declared blockers).
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
+policy:
+  e2ePolicy:
+    proofSurface: public-api-only
+    interfaceDriving: false
+    stack: real-started-by-the-suite
+    mocks: none-for-the-unit-under-proof
+    scenarios: one-per-assertion
+    checks: listed-commands-verbatim
+    productCode: unchanged
+    environmentBlocker: provably-unfixable-only
+    teardown: run-owned-ephemeral-disposed
 route:
   nodeKinds: [implementation]
   phase: [verify, post-implementation]
   intent: [e2e, api, verify, test]
-  prerequisites: ["implementation done"]
+  prerequisites: [implementation done]
   riskHints: [served-target]

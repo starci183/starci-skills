@@ -31,15 +31,15 @@ test('assisted UAT operations are valid distinct catalog contracts with closed s
     assert.equal(contract.completionProfile,'uat.ux');
     assert.equal(contract.route.phase[0],'verify');
     assert.equal(contract.graphPolicy.dispatch,'never');
-    assert.equal(contract.canonicalWorkPolicy.targetState,'todo');
-    assert.equal(contract.canonicalWorkPolicy.nodeWrites,'forbidden');
-    assert.equal(contract.canonicalWorkPolicy.completion,'final-reconciliation-only');
-    assert.equal(contract.canonicalWorkPolicy.runtimeSqliteWrites,'forbidden');
+    assert.equal(contract.policy.canonicalWorkPolicy.targetState,'todo');
+    assert.equal(contract.policy.canonicalWorkPolicy.nodeWrites,'forbidden');
+    assert.equal(contract.policy.canonicalWorkPolicy.completion,'final-reconciliation-only');
+    assert.equal(contract.policy.canonicalWorkPolicy.runtimeSqliteWrites,'forbidden');
     assert.ok(!(contract.writes??[]).some(write=>write.id==='node'));
     assertClosedStepReferences(contract);
   }
-  assert.equal(automatic.uatPolicy.flowOrder,'request-sequential');
-  assert.equal(verify.assistedUatVerifyPolicy.automaticUatVerify,'distinct-operation-never-invoked');
+  assert.equal(automatic.policy.uatPolicy.flowOrder,'request-sequential');
+  assert.equal(verify.policy.assistedUatVerifyPolicy.automaticUatVerify,'distinct-operation-never-invoked');
 });
 
 test('assisted preparation freezes exact artifacts and classifies real human gates instead of third parties',()=>{
@@ -65,9 +65,9 @@ test('assisted preparation freezes exact artifacts and classifies real human gat
   for(const gateClass of ['secret-entry','anti-automation-challenge','cross-device-action','subjective-observation','reserved-manual-action']){
     assert.match(text,new RegExp(gateClass));
   }
-  assert.equal(contract.assistedUatPreparePolicy.minimumHumanGates,1);
-  assert.equal(contract.assistedUatPreparePolicy.thirdPartyIsGate,false);
-  assert.equal(contract.assistedUatPreparePolicy.executesJourney,false);
+  assert.equal(contract.policy.assistedUatPreparePolicy.minimumHumanGates,1);
+  assert.equal(contract.policy.assistedUatPreparePolicy.thirdPartyIsGate,false);
+  assert.equal(contract.policy.assistedUatPreparePolicy.executesJourney,false);
   assert.match(text,/flow with no genuine human gate belongs to uat\.verify/i);
   assert.match(text,/third-party API, provider[\s\S]*is not a human gate/i);
   assert.match(text,/actual Chromium launch/i);
@@ -83,10 +83,10 @@ test('assisted verification derives pass from immutable current proof and never 
 
   assert.equal(receipt.path,'selected uat.assisted.prepare E/assisted-uat/receipts/<run-id>.yaml');
   assert.equal(verification.path,'E/assisted-uat/verification.yaml');
-  assert.equal(contract.assistedUatVerifyPolicy.inputSelection,'explicit-paths-only');
-  assert.equal(contract.assistedUatVerifyPolicy.latestRunDiscovery,'forbidden');
-  assert.equal(contract.assistedUatVerifyPolicy.completionSignal,'execution-finished-only');
-  assert.deepEqual(contract.assistedUatVerifyPolicy.passDerivedFrom,[
+  assert.equal(contract.policy.assistedUatVerifyPolicy.inputSelection,'explicit-paths-only');
+  assert.equal(contract.policy.assistedUatVerifyPolicy.latestRunDiscovery,'forbidden');
+  assert.equal(contract.policy.assistedUatVerifyPolicy.completionSignal,'execution-finished-only');
+  assert.deepEqual(contract.policy.assistedUatVerifyPolicy.passDerivedFrom,[
     'immutable-current-bindings','complete-controlled-sequence','machine-checks',
     'genuine-redacted-evidence','independent-postconditions','verified-cleanup',
   ]);

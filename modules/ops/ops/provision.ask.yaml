@@ -1,22 +1,25 @@
-# modules/ops/ops/provision.ask.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: provision.ask
 goal:
-  en: >-
-    Ask the owner for the one thing only they can give - a credential, an account on an outside system, a
-    dataset, a legal authority, a decision between real alternatives (candidate picks, accept/reject of a
-    reviewable artifact), or the go-ahead for an irreversible effect - exactly named, in this operation's
-    own workflow, and wait for it. Credential input belongs to the kernel's Orca GUI after official-documentation
-    preparation; no model agent asks for a value.
-    This operation verifies only that the provision is present.
-    An ask is information or a decision flowing FROM the owner, never task delegation: a step performed
-    inside a running browser or application (an OAuth consent click-through, a captcha, a 2FA prompt, a
-    payment confirmation on a live page) is a human-gated UAT checkpoint and belongs to
-    `uat.assisted.{prepare,verify}` with an evidence receipt, not to a provision ask.
-nodeKinds:
-  - business
+  en: "Ask the owner for the one thing only they can give - a credential, an account on an outside
+    system, a dataset, a legal authority, a decision between real alternatives (candidate picks,
+    accept/reject of a reviewable artifact), or the go-ahead for an irreversible effect - exactly
+    named, in this operation's own workflow, and wait for it. Credential input belongs to the
+    kernel's Orca GUI after official-documentation preparation; no model agent asks for a value.
+    This operation verifies only that the provision is present. An ask is information or a decision
+    flowing FROM the owner, never task delegation: a step performed inside a running browser or
+    application (an OAuth consent click-through, a captcha, a 2FA prompt, a payment confirmation on
+    a live page) is a human-gated UAT checkpoint and belongs to `uat.assisted.{prepare,verify}` with
+    an evidence receipt, not to a provision ask."
+params:
+  minOptions:
+    type: integer
+    default: 2
+    min: 2
+    setBy: kernel
+    doc:
+      en: How many real alternatives a non-credential ask presents for the owner to pick between.
+nodeKinds: [business]
 completionProfile: business
 sideEffects: []
 graphPolicy:
@@ -26,93 +29,92 @@ graphPolicy:
   dispatch: never
 reads:
   - id: question
-    path: "the operation goal (section 'Question for the owner') and the operation that asked it"
+    path: the operation goal (section 'Question for the owner') and the operation that asked it
     purpose:
       en: Read what is asked for exactly as it was raised - which operation, what it blocks, which kind of
-        provision (credential, account, dataset, authority, irreversible) - before anything is printed.
+        provision (credential, account, dataset, authority, irreversible) - before anything is
+        printed.
   - id: environment
     path: repository:<repo-id>/<bound-paths>
     purpose:
-      en: For a credential, read where the code reads the value - the exact variable name - and which identity
-        custody of this tree (.starciwork/_resources/identity/<slug>/) will hold it. Never the value itself.
+      en: For a credential, read where the code reads the value - the exact variable name - and which
+        identity custody of this tree (.starciwork/_resources/identity/<slug>/) will hold it.
 writes:
   - id: report
     path: E/manifest.yaml
-    fields:
-      - summary
+    fields: [summary]
     content:
-      en: The report of the attempt itself - the fact that the provision is present, and nothing else; never a value, never a record in the tree.
+      en: The report of the attempt itself - the fact that the provision is present, and nothing else;
+        never a value, never a record in the tree.
 steps:
   - reads:
       - question
       - environment
     writes: []
     action:
-      en: >-
-        Name the provision exactly: a credential names the variable the code reads, the outside system it belongs
-        to and the custody it will live in (identity:<slug>); an account, a dataset or an authority names what
-        and for which system. Never invent, stub, default or skip it.
+      en: "Name the provision exactly: a credential names the variable the code reads, the outside system
+        it belongs to and the custody it will live in (identity:<slug>); an account, a dataset or an
+        authority names what and for which system. Never invent, stub, default or skip it. Never the
+        value itself."
   - reads:
       - question
     writes: []
     action:
-      en: >-
-        For a credential, return the exact declared requirement to the kernel; do not open an input terminal,
-        ask the owner to compose a command, or wait for a "set" reply. The workflow owns the researched form
-        in Orca and resumes its satisfied requesters automatically.
-        For anything else, the ask must name a deliverable the requester can verify afterwards
-        (the OAuth app's client id, the DNS record, the granted account) or present at least two
-        real alternatives for the owner to pick between. A bare single-option "reply provided"
-        confirmation is degenerate: either the deliverable is named and re-verified, or the ask
-        is the wrong lane — interactive actions inside a running product are uat.assisted
-        checkpoints, and informational answers carry the answer itself, not a confirmation flag.
-        When the ask presents alternatives the owner must judge (candidate draws, artifacts,
-        plans), the report's question.assets must list the exact repo-relative artifact paths —
-        optionally {path, label} — so the owner reviews the artifacts themselves, never a text
-        description or a bare hash of them. When the owner must pick per dimension (one
-        candidate per screen, per variant, per plan), question.picks declares each dimension
-        as {id, label, choices} so the form renders a required radio group per dimension and
-        the receipt records structured picks — a free-text "type your picks in the note"
-        instruction is not an answer schema.
-        Wait as long as the contract lets you.
+      en: "For a credential, return the exact declared requirement to the kernel; do not open an input
+        terminal, ask the owner to compose a command, or wait for a \"set\" reply. The workflow owns
+        the researched form in Orca and resumes its satisfied requesters automatically. For anything
+        else, the ask must name a deliverable the requester can verify afterwards (the OAuth app's
+        client id, the DNS record, the granted account) or present at least `params.minOptions` real
+        alternatives for the owner to pick between. A bare single-option \"reply provided\"
+        confirmation is degenerate: either the deliverable is named and re-verified, or the ask is
+        the wrong lane — interactive actions inside a running product are uat.assisted checkpoints,
+        and informational answers carry the answer itself, not a confirmation flag. When the ask
+        presents alternatives the owner must judge (candidate draws, artifacts, plans), the report's
+        question.assets must list the exact repo-relative artifact paths — optionally {path, label}
+        — so the owner reviews the artifacts themselves, never a text description or a bare hash of
+        them. When the owner must pick per dimension (one candidate per screen, per variant, per
+        plan), question.picks declares each dimension as {id, label, choices} so the form renders a
+        required radio group per dimension and the receipt records structured picks — a free-text
+        \"type your picks in the note\" instruction is not an answer schema. Wait as long as the
+        contract lets you."
   - reads:
       - question
       - environment
-    writes:
-      - report
+    writes: [report]
     action:
-      en: >-
-        For a credential the kernel verifies encrypted-custody presence through the canonical verifier and
-        settles the waiting ask itself; this operation runs no credential probe and reports no credential
-        success. Stored presence does not establish provider validity. For anything else, when the owner
-        replies verify PRESENCE alone and report done with "provided: <what the owner provided, in a few words>". If the wait
-        ends with no answer, report blocked with blocker kind authority naming the provision; the kernel keeps it
-        on the owner's list and nothing else waits for it.
+      en: "For a credential the kernel verifies encrypted-custody presence through the canonical verifier
+        and settles the waiting ask itself; this operation runs no credential probe and reports no
+        credential success. Stored presence does not establish provider validity. For anything else,
+        when the owner replies verify PRESENCE alone and report done with \"provided: <what the
+        owner provided, in a few words>\". If the wait ends with no answer, report blocked with
+        blocker kind authority naming the provision; the kernel keeps it on the owner's list and
+        nothing else waits for it."
 proofs:
   - id: named-exactly
     requirement:
-      en: The provision is named exactly - the variable, the system, the custody - and nothing was invented,
-        stubbed, defaulted or skipped in its place.
+      en: The provision is named exactly - the variable, the system, the custody - and nothing was
+        invented, stubbed, defaulted or skipped in its place.
   - id: asked-in-the-workflow
     requirement:
-      en: The workflow provided a researched credential form in Orca, or
-        asked for the non-credential provision in this operation's terminal before any report.
+      en: The workflow provided a researched credential form in Orca, or asked for the non-credential
+        provision in this operation's terminal before any report.
   - id: no-secret
     requirement:
       en: No value of any credential or secret appears in the report, the terminal or anywhere else; a
-        credential is put into the tree's encrypted identity custody by the workflow's input service and this
-        operation verifies only that it is present.
+        credential is put into the tree's encrypted identity custody by the workflow's input service
+        and this operation verifies only that it is present.
 blockers:
   - code: QUESTION_UNCLEAR
     condition:
-      en: The question names no provision and no system; the operation that asked it is sent back to state it.
+      en: The question names no provision and no system; the operation that asked it is sent back to state
+        it.
   - code: NOT_A_PROVISION
     condition:
-      en: >-
-        The request is a delegated action, not information or a decision from the owner — e.g. an interactive
-        step inside a running product (OAuth consent, captcha, 2FA, live payment confirmation). Those are
-        human-gated UAT checkpoints routed to uat.assisted.{prepare,verify}; the asking operation is sent
-        back to re-plan through that lane.
+      en: The request is a delegated action, not information or a decision from the owner — e.g. an
+        interactive step inside a running product (OAuth consent, captcha, 2FA, live payment
+        confirmation). Those are human-gated UAT checkpoints routed to
+        uat.assisted.{prepare,verify}; the asking operation is sent back to re-plan through that
+        lane.
 placeholders:
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
@@ -120,37 +122,11 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "What is the one thing only the owner can give - credential, account,
-    dataset, authority, irreversible go-ahead - and is it now present?"
-  whenNeeded:
-    - When an operation needs an owner-only provision; this is the only op that actually waits for the owner.
-    - When presence must be checked (e.g., a sealed credential variable exists in custody) before an effect is attempted.
-  whenNot:
-    - Not for decisions - decision.prepare prepares those provisionally without waiting.
-    - Never asks for a credential value in a terminal or model context - the kernel's Orca GUI owns secret entry.
-    - Presence is not provider validity - a present-but-expired credential is still a failure downstream.
-  consumes:
-    - The question as raised; environment facts (variable name + custody - never the value).
-  produces:
-    - E/manifest.yaml report of presence only; the provision itself enters through owner channels, never through this file.
-  failureModes:
-    - QUESTION_UNCLEAR (declared blocker); no answer inside the wait window = blocked authority, not an assumed grant.
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [business]
   phase: [decide, cross-cutting]
   intent: [provision, ask, owner-input, credential]
-  prerequisites: ["an owner-only input is needed"]
+  prerequisites: [an owner-only input is needed]
   riskHints: [waits-on-owner]

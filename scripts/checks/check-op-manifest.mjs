@@ -87,8 +87,9 @@ const UNITS = [
   { unit: 'file', prose: 'files', stems: ['file'] },
   { unit: 'option', prose: 'options', stems: ['option'] },
 ];
+// `five rounds` and `five-round` are the same restatement.
 const NUMBER_RE = new RegExp(
-  `\\b(${NUMBER_WORDS.join('|')}|\\d+)\\s+(${UNITS.map((u) => u.prose).join('|')})\\b`, 'gi');
+  `\\b(${NUMBER_WORDS.join('|')}|\\d+)[\\s-]+(${UNITS.map((u) => u.prose).join('|')})\\b`, 'gi');
 
 const flatten = (s) => String(s).replace(/\s+/g, ' ').trim();
 const normalize = (s) => flatten(s).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -101,9 +102,11 @@ const sentencesOf = (text) => flatten(text)
   .map((s) => s.trim())
   .filter(Boolean);
 
-/** Every prose string in the document, with the key path that holds it. */
+/** Every prose string in the document, with the key path that holds it. Prose is
+ *  what sits under an `en` key — a path, a field name or a policy token is data,
+ *  and two entries naming the same data are not one rule written twice. */
 function proseStrings(node, at = '$', out = []) {
-  if (typeof node === 'string') out.push({ at, text: node });
+  if (typeof node === 'string') { if (at.endsWith('.en')) out.push({ at, text: node }); }
   else if (Array.isArray(node)) node.forEach((item, i) => proseStrings(item, `${at}[${i}]`, out));
   else if (node && typeof node === 'object') for (const [k, v] of Object.entries(node)) proseStrings(v, at === '$' ? `$.${k}` : `${at}.${k}`, out);
   return out;
@@ -180,7 +183,8 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
     for (const [i, read] of (Array.isArray(doc?.reads) ? doc.reads : []).entries()) {
       const purpose = read?.purpose?.en;
       if (typeof purpose !== 'string') continue;
-      const words = [...new Set([...purpose.matchAll(/\b(must|never|only|reject)\b/gi)].map((m) => m[1].toLowerCase()))];
+      // A hyphenated compound is a name, not a rule: `read-only` access is data.
+      const words = [...new Set([...purpose.matchAll(/(?<![-\w])(must|never|only|reject)(?![-\w])/gi)].map((m) => m[1].toLowerCase()))];
       if (words.length) add(id, 'RULE_IN_DATA', 'warn', `reads[${i}] (${read?.id ?? '?'}).purpose.en carries a rule (${words.join(', ')}) — move it to the step that applies it`);
     }
 

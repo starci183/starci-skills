@@ -2,187 +2,216 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {parseYaml} from '../engine/yaml.mjs';
+import { loadOp, root, proof, blocker, readOf, writeOf, statesOnce, states, assertParam } from './helpers/op-contract.mjs';
 
-const root=path.resolve(import.meta.dirname,'..');
-const op=parseYaml(fs.readFileSync(path.join(root,'modules/ops/ops/interface.audit.yaml'),'utf8'));
-const docs=fs.readFileSync(path.join(root,'docs/interface-audit.md'),'utf8');
-const prose=value=>JSON.stringify(value);
+// What interface.audit promises, asserted as structure. The manifest's wording
+// is free to change; its params, proof ids, blocker codes, policy keys and the
+// one place each rule lives are not.
+const op = loadOp('interface.audit');
+const docs = fs.readFileSync(path.join(root, 'docs/interface-audit.md'), 'utf8');
+const policy = op.policy.auditPolicy;
 
-test('interface audit only inspects implementation captures and cannot replace acceptance',()=>{
-  assert.equal(op.id,'interface.audit');
-  assert.equal(op.graphPolicy.mode,'read-only');
-  assert.equal(op.readOnlyPolicy.productSource,true);
-  assert.equal(op.readOnlyPolicy.productData,true);
-  assert.ok(op.writes.every(write=>!String(write.path).startsWith('repository:')));
-  assert.match(prose(op.readOnlyPolicy.forbiddenEffects),/edit, format, generate or commit product, design, asset or Grammar source/);
-  assert.match(prose(op.readOnlyPolicy.forbiddenEffects),/generate, retouch or replace product renders or captures/);
-  assert.match(prose(op.readOnlyPolicy.forbiddenEffects),/technical test success for visual equivalence/);
-  assert.match(prose(op.auditPolicy.completion.neverMeans),/review\.verify acceptance/);
-  assert.match(prose(op.auditPolicy.completion.neverMeans),/uat\.verify business journey proof/);
-  assert.match(prose(op.proofs),/leaves review\.verify and UAT independent/);
-});
-
-test('latest explicit owner-accepted draw receipt is the immutable visual baseline',()=>{
-  const lineage=op.reads.find(read=>read.id==='accepted-draw-lineage');
-  assert.ok(lineage);
-  assert.match(prose(lineage),/latest causally ordered explicit owner acceptance/);
-  assert.match(prose(lineage),/receipt path and sha256/);
-  assert.match(prose(lineage),/image path\/sha256 plus exact prompt path\/sha256/);
-  assert.match(prose(lineage),/coverage\/content digest/);
-  assert.equal(op.auditPolicy.acceptedDrawLineage.selection,'latest-causally-ordered-explicit-owner-acceptance-for-selected-scope');
-  assert.equal(op.auditPolicy.acceptedDrawLineage.precedence,'latest-explicit-owner-acceptance-over-older-canonical-or-generated-directions');
-  assert.equal(op.auditPolicy.acceptedDrawLineage.history,'append-only-never-rewrite-or-relabel');
-  assert.equal(op.auditPolicy.acceptedDrawLineage.ambiguity,'block');
-  assert.ok(op.blockers.some(blocker=>blocker.code==='ACCEPTED_DRAW_LINEAGE_MISSING'));
-  assert.ok(op.blockers.some(blocker=>blocker.code==='ACCEPTED_DRAW_LINEAGE_AMBIGUOUS'));
-  assert.match(docs,/latest explicit\s+owner acceptance outranks older canonical or generated directions/);
-  assert.match(docs,/later generated but unaccepted draw is not a\s+baseline/);
-  assert.match(docs,/not rewritten, relabelled or deleted/);
-});
-
-test('visual equivalence uses untransformed side-by-side pairs at identical cells',()=>{
-  assert.deepEqual(op.auditPolicy.sideBySide.cellIdentity,['surface','state','viewport','theme']);
-  assert.equal(op.auditPolicy.sideBySide.requiredFor,'every-draw-backed-representative-cell');
-  assert.deepEqual(op.auditPolicy.sideBySide.lenses,[
-    'composition-hierarchy','section-order','light-dark-rhythm','imagery','creative-intent',
-  ]);
-  assert.deepEqual(op.auditPolicy.sideBySide.resultStates,['pass','fail','inconclusive']);
-  assert.equal(op.auditPolicy.visualEquivalenceRule,'every-required-side-by-side-lens-pass');
-  assert.equal(op.auditPolicy.technicalEvidenceRule,'corroborating-only-never-substitutes-for-visual-equivalence');
-  assert.ok(op.blockers.some(blocker=>blocker.code==='SIDE_BY_SIDE_CELL_MISMATCH'));
-  for(const category of ['composition.hierarchy','section.order','light-dark.rhythm','imagery','creative.intent']){
-    assert.ok(op.findingSchema.categories.includes(category),`missing ${category}`);
+test('the manifest holds the one op shape, with its policy in one map', () => {
+  assert.equal(op.schema, 'starci/op@1');
+  assert.equal(op.id, 'interface.audit');
+  assert.ok(!Object.hasOwn(op, 'business'), 'the business summary is generated into modules/ops/registry.yaml, not authored here');
+  for (const stray of ['readOnlyPolicy', 'auditPolicy', 'findingSchema']) {
+    assert.ok(!Object.hasOwn(op, stray), `${stray} belongs under policy:`);
+    assert.ok(Object.hasOwn(op.policy, stray), `policy.${stray} is missing`);
   }
-  assert.match(prose(op.steps),/place the accepted direction bytes and implementation capture side by side/);
-  assert.match(prose(op.steps),/surface, state, viewport and theme identities are equal/);
-  assert.match(prose(op.steps),/DOM, lint, tests and build\s+pass/);
-  assert.match(docs,/a mobile image cannot stand\s+in for desktop/);
-  assert.match(docs,/never substitute for\s+visual equivalence/);
+  for (const write of op.writes) assert.ok(!write.path.includes(' + '), `${write.id} joins paths: ${write.path}`);
 });
 
-test('hard coverage is deterministic and Grammar anatomy cannot be taste-waived',()=>{
-  assert.deepEqual(op.findingSchema.categories,[
-    'geometry','content','icon','asset','responsive','interaction','grammar.anatomy','grammar.token',
-    'realization.mode','symbol.fit','symbol.family','accessibility','render.truth','composition.hierarchy','section.order','light-dark.rhythm','imagery',
-    'creative.intent','taste',
+test('audit inspects and routes; it never repairs and never accepts', () => {
+  assert.equal(op.graphPolicy.mode, 'read-only');
+  assert.equal(op.graphPolicy.dispatch, 'never');
+  assert.equal(op.policy.readOnlyPolicy.productSource, true);
+  assert.equal(op.policy.readOnlyPolicy.productData, true);
+  assert.ok(op.writes.every((write) => !String(write.path).startsWith('repository:')));
+  const forbidden = JSON.stringify(op.policy.readOnlyPolicy.forbiddenEffects).toLowerCase();
+  for (const effect of ['commit', 'replace product renders', 'dispatch or perform a repair', 'certify review.verify'])
+    assert.ok(forbidden.includes(effect), `forbiddenEffects should cover ${effect}`);
+  assert.deepEqual(policy.completion.neverMeans,
+    ['review.verify acceptance', 'uat.verify business journey proof', 'permission to waive hard constraints']);
+  states(assert, op, ['review.verify', 'independent'], { section: '$.proofs' });
+});
+
+test('the round ceiling is a param, not a number spelled into the prose', () => {
+  assertParam(assert, op, 'maxRounds', { type: 'integer', default: 5, setBy: 'kernel' });
+  assert.equal(policy.roundLimit, 'params.maxRounds');
+  // Whatever the ceiling is set to, the manifest cites it by name.
+  const spelled = JSON.stringify([op.steps, op.proofs, op.blockers]).match(/\b(five|5)[\s-]+rounds?\b/i);
+  assert.equal(spelled, null, `the round ceiling is restated as a literal: ${spelled?.[0]}`);
+  assert.ok(blocker(op, 'AUDIT_ROUND_LIMIT'), 'no AUDIT_ROUND_LIMIT blocker');
+  assert.ok(proof(op, 'bounded-loop'), 'no bounded-loop proof');
+  statesOnce(assert, op, ['params.maxRounds'], { section: '$.proofs', label: 'the loop never exceeds the ceiling' });
+});
+
+test('the audit measures the served render itself and reads the producer as context', () => {
+  const runner = readOf(op, 'runner');
+  assert.ok(runner, 'the audit declares no runner read');
+  assert.match(runner.path, /playwright/i);
+  const selfReport = readOf(op, 'producer-measurements');
+  assert.ok(selfReport, 'the producer self-report is not a distinct read');
+  assert.match(selfReport.path, /interface\.implement/);
+  assert.match(selfReport.purpose.en, /self-report|context/i);
+
+  const measuring = op.steps.find((s) => s.reads.includes('runner'));
+  assert.ok(measuring, 'no step reads the runner');
+  assert.ok(measuring.reads.includes('producer-measurements'), 'the measuring step does not read the producer self-report');
+  statesOnce(assert, op, ['playwright', 'measure'], { section: '$.steps', label: 'the audit measures with the locked runner' });
+  assert.match(policy.measurementAuthority, /audit-measures/);
+  // A1: the producer's own numbers never close a cell.
+  states(assert, op, ['self-report', 'never'], { section: '$.steps' });
+});
+
+test('the audit declares the host tool it cannot work without', () => {
+  assert.ok(op.route.riskHints.includes('host-tool-required:browser-dom'),
+    `route.riskHints must name the browser-dom requirement, got ${op.route.riskHints.join(', ')}`);
+  assert.ok(blocker(op, 'CAPTURE_OR_MEASUREMENT_UNAVAILABLE'), 'no blocker for missing instrumentation');
+});
+
+test('the latest explicit owner acceptance is the baseline, and ambiguity blocks', () => {
+  const lineage = readOf(op, 'accepted-draw-lineage');
+  assert.ok(lineage);
+  assert.equal(policy.acceptedDrawLineage.selection, 'latest-causally-ordered-explicit-owner-acceptance-for-selected-scope');
+  assert.equal(policy.acceptedDrawLineage.precedence, 'latest-explicit-owner-acceptance-over-older-canonical-or-generated-directions');
+  assert.equal(policy.acceptedDrawLineage.history, 'append-only-never-rewrite-or-relabel');
+  assert.equal(policy.acceptedDrawLineage.ambiguity, 'block');
+  for (const binding of ['acceptanceEventId', 'drawReceiptSha256', 'imagePathsAndSha256', 'promptPathsAndSha256', 'coverageContentSha256'])
+    assert.ok(policy.acceptedDrawLineage.requiredBindings.includes(binding), `missing required binding ${binding}`);
+  assert.ok(blocker(op, 'ACCEPTED_DRAW_LINEAGE_MISSING'));
+  assert.ok(blocker(op, 'ACCEPTED_DRAW_LINEAGE_AMBIGUOUS'));
+  assert.ok(proof(op, 'accepted-draw-lineage'));
+});
+
+test('visual equivalence is an untransformed pair at one identical cell', () => {
+  assert.deepEqual(policy.sideBySide.cellIdentity, ['surface', 'state', 'viewport', 'theme']);
+  assert.equal(policy.sideBySide.requiredFor, 'every-draw-backed-representative-cell');
+  assert.deepEqual(policy.sideBySide.lenses,
+    ['composition-hierarchy', 'section-order', 'light-dark-rhythm', 'imagery', 'creative-intent']);
+  assert.deepEqual(policy.sideBySide.resultStates, ['pass', 'fail', 'inconclusive']);
+  assert.equal(policy.visualEquivalenceRule, 'every-required-side-by-side-lens-pass');
+  assert.equal(policy.technicalEvidenceRule, 'corroborating-only-never-substitutes-for-visual-equivalence');
+  for (const forbidden of ['resize', 'crop', 'recolor', 'regenerate', 'cross-cell-substitution'])
+    assert.ok(policy.sideBySide.transformsForbidden.includes(forbidden), `missing forbidden transform ${forbidden}`);
+  assert.ok(blocker(op, 'SIDE_BY_SIDE_CELL_MISMATCH'));
+  assert.ok(proof(op, 'side-by-side-visual-equivalence'));
+  // Each lens is a finding category, so a failed lens has somewhere to land.
+  for (const category of ['composition.hierarchy', 'section.order', 'light-dark.rhythm', 'imagery', 'creative.intent'])
+    assert.ok(op.policy.findingSchema.categories.includes(category), `missing finding category ${category}`);
+  statesOnce(assert, op, ['side by side'], { section: '$.steps', label: 'the pairing rule' });
+  states(assert, op, ['identical'], { section: '$.proofs', label: 'the pair is at one identical cell' });
+});
+
+test('hard coverage is deterministic and Grammar anatomy cannot be taste-waived', () => {
+  assert.equal(policy.hardConstraintRule, 'every-required-hard-cell-pass');
+  assert.deepEqual(op.policy.findingSchema.constraintClasses, ['hard', 'creative-rubric']);
+  assert.deepEqual(op.policy.findingSchema.statuses, ['open', 'resolved', 'unchanged', 'new', 'reopened', 'blocked']);
+  for (const category of ['geometry', 'content', 'icon', 'asset', 'responsive', 'interaction',
+    'grammar.anatomy', 'grammar.token', 'realization.mode', 'symbol.fit', 'symbol.family',
+    'accessibility', 'render.truth', 'taste'])
+    assert.ok(op.policy.findingSchema.categories.includes(category), `missing finding category ${category}`);
+  assert.ok(proof(op, 'grammar-hard-authority'));
+  assert.ok(proof(op, 'deterministic-coverage'));
+  assert.ok(blocker(op, 'GRAMMAR_AUTHORITY_UNPROVEN'));
+  statesOnce(assert, op, ['grammar.anatomy', 'waive'], { label: 'a taste score cannot waive a Grammar anatomy finding' });
+  assert.equal(policy.creativeRubric.calibration, 'same-round-low-mid-high-required');
+  assert.equal(policy.creativeRubric.completionVerdict, 'ship');
+  assert.ok(proof(op, 'bounded-creative-rubric'));
+});
+
+test('a prominent symbol is a product claim its label cannot rescue', () => {
+  assert.deepEqual(policy.symbolReview.questions, [
+    'exact-product-concept', 'alternate-reading-without-label', 'audience-category-maturity', 'generic-cliche-risk',
+    'sibling-distinction', 'family-camera-base-material-light-scale-density', 'reduced-scale-legibility', 'truthful-realization-medium',
   ]);
-  const grammar=op.reads.find(read=>read.id==='grammar');
-  assert.match(prose(grammar),/exact version/);
-  assert.match(prose(grammar),/matching real reference renders/);
-  assert.match(prose(grammar),/winning token\/declaration provenance/);
-  assert.match(prose(op.steps),/canonical primitive\/reference has no border/);
-  assert.match(prose(op.steps),/hard `grammar\.anatomy` finding/);
-  assert.match(prose(op.proofs),/Unexpected border, surface, shadow, radius/);
-  assert.match(prose(op.proofs),/no visual or creative score can waive it/);
-  assert.match(docs,/border-style: none/);
-  assert.match(docs,/border-width: 0/);
-  assert.match(docs,/taste score of 5/);
-  assert.match(docs,/A screenshot alone cannot establish this finding/);
+  assert.equal(policy.symbolReview.boundedDriftRoute, 'interface.implement');
+  assert.equal(policy.symbolReview.systemicLanguageRoute, 'interface.draw');
+  assert.ok(proof(op, 'symbolic-integrity'));
+  assert.ok(blocker(op, 'SYMBOL_INTENT_UNRESOLVED'));
+  statesOnce(assert, op, ['alternate', 'label'], { section: '$.steps', label: 'the reading a symbol has without its label' });
 });
 
-test('audit treats prominent symbols as defensible product claims',()=>{
-  assert.ok(op.findingSchema.categories.includes('symbol.fit'));
-  assert.ok(op.findingSchema.categories.includes('symbol.family'));
-  assert.deepEqual(op.auditPolicy.symbolReview.questions,[
-    'exact-product-concept','alternate-reading-without-label','audience-category-maturity','generic-cliche-risk',
-    'sibling-distinction','family-camera-base-material-light-scale-density','reduced-scale-legibility','truthful-realization-medium',
-  ]);
-  assert.equal(op.auditPolicy.symbolReview.boundedDriftRoute,'interface.implement');
-  assert.equal(op.auditPolicy.symbolReview.systemicLanguageRoute,'interface.draw');
-  assert.match(prose(op.steps),/strongest plausible alternate\s+reading without its label/);
-  assert.match(prose(op.steps),/camera\/base\/material\/light\/scale\/density/);
-  assert.ok(op.proofs.some(proof=>proof.id==='symbolic-integrity'));
-  assert.ok(op.blockers.some(blocker=>blocker.code==='SYMBOL_INTENT_UNRESOLVED'));
-  assert.match(docs,/A symbol is a product claim/);
-  assert.match(docs,/A label does not rescue/);
+test('every region keeps the realization mode the accepted direction gave it', () => {
+  const map = readOf(op, 'realization-map');
+  assert.ok(map);
+  assert.match(map.path, /realization-check\.json/, 'the audit reads what interface.implement actually writes');
+  assert.ok(op.policy.findingSchema.categories.includes('realization.mode'));
+  assert.ok(proof(op, 'realization-fidelity'));
+  assert.ok(blocker(op, 'REALIZATION_MODE_UNRESOLVED'));
+  statesOnce(assert, op, ['flattened screenshot', 'code-native'], { section: '$.steps', label: 'a flattened screenshot cannot stand for code-native UI' });
 });
 
-test('audit enforces raster artwork versus code-native UI realization',()=>{
-  const realization=op.reads.find(read=>read.id==='realization-map');
-  assert.ok(realization);
-  assert.match(prose(realization),/raster-asset/);
-  assert.match(prose(realization),/code-native/);
-  assert.ok(op.findingSchema.categories.includes('realization.mode'));
-  assert.match(prose(op.steps),/flattened screenshot used for code-native UI/);
-  assert.match(prose(op.proofs),/Raster artwork binds exact retained asset identity/);
-  assert.ok(op.blockers.some(blocker=>blocker.code==='REALIZATION_MODE_UNRESOLVED'));
-  assert.match(docs,/textured planet/);
-  assert.match(docs,/flatten code-native UI into a\s+screenshot/);
-  assert.match(docs,/hard `realization\.mode` finding/);
+test('repair routes by cause and blast radius, and refactor is secondary only', () => {
+  assert.equal(policy.routingPriority, 'root-cause-then-blast-radius-never-raw-finding-count');
+  assert.deepEqual(op.policy.findingSchema.routing.primaryOps, ['interface.implement', 'interface.draw']);
+  assert.deepEqual(policy.primaryRoutes.boundedImplementation.chain, ['interface.implement', 'interface.audit']);
+  assert.deepEqual(policy.primaryRoutes.systemicDirection.chain, ['interface.draw', 'interface.implement', 'interface.audit']);
+  assert.equal(policy.optionalMechanicalRoute.op, 'code.refactor');
+  assert.match(policy.optionalMechanicalRoute.onlyWhen, /behavior-invariant/);
+  assert.ok(proof(op, 'actionable-routing'));
+  for (const required of ['primaryOp', 'rationale', 'affectedPaths', 'recheckMatrix', 'nextChain'])
+    assert.ok(op.policy.findingSchema.routing.required.includes(required), `routing must require ${required}`);
 });
 
-test('repair routing follows cause and blast radius, with refactor secondary only',()=>{
-  assert.equal(op.auditPolicy.routingPriority,'root-cause-then-blast-radius-never-raw-finding-count');
-  assert.deepEqual(op.findingSchema.routing.primaryOps,['interface.implement','interface.draw']);
-  assert.deepEqual(op.auditPolicy.primaryRoutes.boundedImplementation.chain,['interface.implement','interface.audit']);
-  assert.deepEqual(op.auditPolicy.primaryRoutes.systemicDirection.chain,['interface.draw','interface.implement','interface.audit']);
-  assert.equal(op.auditPolicy.optionalMechanicalRoute.op,'code.refactor');
-  assert.match(op.auditPolicy.optionalMechanicalRoute.onlyWhen,/behavior-invariant/);
-  assert.match(prose(op.steps),/optional secondary advice/);
-  assert.match(docs,/Root cause and blast radius outrank raw finding count/);
+test('a repair produces fresh captures before the next audit', () => {
+  assert.equal(policy.freshCaptureRule, 'every-repair-produces-new-interface-implement-captures-before-audit');
+  const captures = readOf(op, 'implementation-captures');
+  assert.match(captures.path, /interface\.implement/);
+  statesOnce(assert, op, ['stale capture'], { section: '$.steps', label: 'a stale capture is rejected' });
 });
 
-test('repairs create fresh real renders before the audit-only recheck',()=>{
-  assert.equal(op.auditPolicy.freshCaptureRule,'every-repair-produces-new-interface-implement-captures-before-audit');
-  const captures=op.reads.find(read=>read.id==='implementation-captures');
-  assert.match(prose(captures),/fresh real route x state x viewport x theme captures produced by interface\.implement/);
-  assert.match(prose(captures),/never generates replacement renders/);
-  assert.match(prose(op.steps),/stale capture or capture made before the routed repair/);
-  assert.match(docs,/interface\.audit \(inspect only\)/);
-  assert.match(docs,/Reusing pre-repair captures, model-generating\s+a\s+replacement/);
+test('a claimed intentional departure stays open until the owner decides', () => {
+  const governance = policy.deviationGovernance;
+  assert.equal(governance.defaultState, 'drift-open');
+  assert.equal(governance.approvalAuthority, 'explicit-owner-only');
+  assert.equal(governance.approvalBinding, 'exact-deviation-case-digest-and-exact-draw/capture-hashes');
+  assert.equal(governance.approvalEffect, 'new-accepted-direction-lineage-input-never-audit-self-waiver');
+  assert.equal(governance.history, 'append-only-and-queryable-after-the-run');
+  for (const evidence of ['deviations.json', 'deviation-brief.md', 'accepted-draw-hash', 'implementation-capture-hash',
+    'measured-regions', 'alternatives', 'counterargument', 'risks', 'rollback', 'recheck-matrix'])
+    assert.ok(governance.evidence.includes(evidence), `missing deviation evidence ${evidence}`);
+  for (const implicit of ['silence', 'technical-pass', 'auditor-verdict', 'implementer-claim', 'taste-score'])
+    assert.ok(governance.implicitApprovalForbidden.includes(implicit), `${implicit} must not imply approval`);
+  assert.ok(blocker(op, 'OWNER_DEVIATION_DECISION_REQUIRED'));
+  assert.ok(proof(op, 'owner-governed-deviation'));
+  assert.deepEqual(policy.reportMapping.intentionalDeviationPendingOwner,
+    { outcome: 'blocked', blocker: 'interface-gap', code: 'OWNER_DEVIATION_DECISION_REQUIRED', route: 'interface.draw' });
+  statesOnce(assert, op, ['counterargument'], { section: '$.steps', label: 'the auditor writes the strongest counterargument' });
 });
 
-test('intentional visual departures stay open until an exact owner-bound decision',()=>{
-  const policy=op.auditPolicy.deviationGovernance;
-  assert.equal(policy.defaultState,'drift-open');
-  assert.equal(policy.approvalAuthority,'explicit-owner-only');
-  assert.equal(policy.approvalBinding,'exact-deviation-case-digest-and-exact-draw/capture-hashes');
-  assert.equal(policy.approvalEffect,'new-accepted-direction-lineage-input-never-audit-self-waiver');
-  assert.equal(policy.history,'append-only-and-queryable-after-the-run');
-  for(const evidence of [
-    'deviations.json','deviation-brief.md','accepted-draw-hash','implementation-capture-hash',
-    'measured-regions','alternatives','counterargument','risks','rollback','recheck-matrix',
-  ]) assert.ok(policy.evidence.includes(evidence),`missing deviation evidence ${evidence}`);
-  assert.match(prose(op.readOnlyPolicy.forbiddenEffects),/deviation rationale as owner approval/);
-  assert.match(prose(op.steps),/strongest counterargument/);
-  assert.match(prose(op.steps),/exact deviation\s+case digest/);
-  assert.ok(op.blockers.some(blocker=>blocker.code==='OWNER_DEVIATION_DECISION_REQUIRED'));
-  assert.deepEqual(op.auditPolicy.reportMapping.intentionalDeviationPendingOwner,{
-    outcome:'blocked',blocker:'interface-gap',code:'OWNER_DEVIATION_DECISION_REQUIRED',route:'interface.draw',
-  });
-  assert.match(docs,/finding stays open/);
-  assert.match(docs,/exact deviation-case digest plus the draw\/capture hashes/);
-  assert.match(docs,/strongest counterargument/);
-  assert.match(docs,/queryable when the owner asks why the implementation diverged/);
+test('no-actionable-drift is the only pass, and it needs the whole proof', () => {
+  assert.equal(policy.completion.status, 'no-actionable-drift');
+  assert.equal(policy.completion.requires.length, 9);
+  const required = policy.completion.requires.join(' | ').toLowerCase();
+  for (const term of ['owner-accepted', 'side-by-side', 'symbol', 'freshly inspected', 'hard constraint',
+    'actionable finding', 'taste verdict', 'lineage'])
+    assert.ok(required.includes(term), `completion.requires should cover ${term}`);
+  assert.ok(proof(op, 'no-actionable-drift'));
+  assert.deepEqual(policy.reportMapping.noActionableDrift, { outcome: 'done', route: 'none' });
+  assert.equal(policy.reportMapping.boundedImplementationDrift.route, 'interface.implement');
+  assert.equal(policy.reportMapping.systemicOrDirectionDrift.route, 'interface.draw');
+  assert.equal(policy.reportMapping.grammarMissingFromCanonicalPackage.route, 'grammar.update');
 });
 
-test('five-round lineage rechecks one matrix and never converts exhaustion into pass',()=>{
-  assert.equal(op.auditPolicy.roundLimit,5);
-  assert.equal(op.auditPolicy.lineage,'immediate-predecessor-required');
-  assert.equal(op.auditPolicy.matrixRecheck,'immutable-route-state-viewport-theme-plus-additions');
-  assert.equal(op.auditPolicy.completion.status,'no-actionable-drift');
-  assert.match(prose(op.steps),/no-progress/);
-  assert.match(prose(op.steps),/oscillation/);
-  assert.match(prose(op.steps),/On round 5 any known/);
-  assert.ok(op.blockers.some(blocker=>blocker.code==='AUDIT_ROUND_LIMIT'));
-  assert.match(docs,/There is no sixth audit and no last-round courtesy pass/);
+test('the audit writes one evidence bundle and nothing else', () => {
+  assert.deepEqual(op.writes.map((w) => w.id).sort(), ['evidence', 'node']);
+  const evidence = writeOf(op, 'evidence');
+  for (const artifact of ['findings.json', 'routing.json', 'draw-lineage.json', 'side-by-side.json',
+    'realization.json', 'deviations.json', 'deviation-brief.md', 'measurements.json'])
+    assert.ok(evidence.artifacts.includes(artifact), `the evidence bundle should name ${artifact}`);
+  assert.deepEqual(writeOf(op, 'node').fields, ['state', 'blockedBy', 'completion.inputDigest', 'completion.evidence']);
 });
 
-test('no-actionable-drift needs complete hard proof and calibrated bounded taste',()=>{
-  assert.equal(op.auditPolicy.hardConstraintRule,'every-required-hard-cell-pass');
-  assert.equal(op.auditPolicy.creativeRubric.calibration,'same-round-low-mid-high-required');
-  assert.equal(op.auditPolicy.creativeRubric.completionVerdict,'ship');
-  assert.deepEqual(op.auditPolicy.completion.requires,[
-    'latest explicit owner-accepted interface.draw receipt and all receipt/image/prompt/content hashes are exact and unambiguous',
-    'every draw-backed representative cell has an untransformed side-by-side pair at identical surface/state/viewport/theme',
-    'composition hierarchy, section order, light-dark rhythm, imagery and creative intent equivalence all passed',
-    'every prominent symbol passed concept fit, audience maturity, family coherence, sibling distinction, reduced-scale legibility and truthful-medium review',
-    'every selected matrix cell was freshly inspected on one verified served revision',
-    'every required hard constraint passed with actual measurements and authority',
-    'no open, unchanged, new, reopened or blocked actionable finding remains',
-    'calibrated taste verdict is ship for the selected applicable scope',
-    'round and trend lineage are valid and the immutable matrix was rechecked',
-  ]);
-  assert.match(prose(op.proofs),/zero actionable findings/);
+test('docs/interface-audit.md explains this op by its stable identifiers', () => {
+  // The doc's prose is Lane E's to rewrite; what it must keep naming are the
+  // ids this manifest owns — the op, its completion status, its repair routes
+  // and the rubric rows its policy bounds.
+  assert.match(docs, /interface\.audit/);
+  assert.ok(docs.includes(policy.completion.status), `the doc never names the completion status ${policy.completion.status}`);
+  for (const route of [...op.policy.findingSchema.routing.primaryOps, policy.optionalMechanicalRoute.op])
+    assert.ok(docs.includes(route), `the doc never names the repair route ${route}`);
+  const [first, last] = policy.creativeRubric.rules.split('..');
+  assert.ok(docs.includes(first) && docs.includes(last), `the doc never names the rubric range ${policy.creativeRubric.rules}`);
 });

@@ -1,12 +1,12 @@
 schema: starci/op@1
 id: interface.draw
 goal:
-  en: >-
-    Establish an image-first interface direction before frontend implementation. Select the smallest useful
-    representative set of critical screens, generate those directions with built-in ImageGen from accepted
-    business/SDS, brand, relevant UI knowledge and actual installed Grammar anatomy/reference inputs, retain
-    prompts and actual tool provenance, classify every visible region as a reusable raster asset or code-native
-    DOM/CSS/SVG realization, and map every remaining screen/state/component explicitly.
+  en: Establish an image-first interface direction before frontend implementation. Select the smallest
+    useful representative set of critical screens, generate those directions with built-in ImageGen
+    from accepted business/SDS, brand, relevant UI knowledge and actual installed Grammar
+    anatomy/reference inputs, retain prompts and actual tool provenance, classify every visible
+    region as a reusable raster asset or code-native DOM/CSS/SVG realization, and map every
+    remaining screen/state/component explicitly.
 params:
   candidatesPerScreen:
     type: integer
@@ -15,7 +15,8 @@ params:
     max: 3
     setBy: owner
     doc:
-      en: How many alternative directions to generate for one screen. Above the default the owner is asked to pick.
+      en: How many alternative directions to generate for one screen. Above the default the owner is asked
+        to pick.
   representativeScreensMax:
     type: integer
     default: 5
@@ -23,11 +24,11 @@ params:
     max: 12
     setBy: kernel
     doc:
-      en: The ceiling on the representative screen set; every remaining screen is accounted for by the coverage map.
+      en: The ceiling on the representative screen set; every remaining screen is accounted for by the
+        coverage map.
 nodeKinds: [ui]
 completionProfile: ui
-sideEffects:
-  - generated representative direction images and exact prompt files under the owning UI node assets
+sideEffects: [generated representative direction images and exact prompt files under the owning UI node assets]
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -37,70 +38,68 @@ reads:
   - id: target
     path: .starciwork/features/<feature>/ui/<name>/index.yaml
     purpose:
-      en: >-
-        The selected ui record: its feature's scope, proof demands, refs/dependencies, existing directions and
-        freshness. For an explicitly new target the record is absent, and the nearest existing ancestor/workspace
-        carries the surrounding scope.
+      en: "The selected ui record: its feature's scope, proof demands, refs/dependencies, existing
+        directions and freshness. For an explicitly new target the record is absent, and the nearest
+        existing ancestor/workspace carries the surrounding scope."
   - id: business
     path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
     purpose:
-      en: The accepted requirements, decisions, actors, journeys, states, content and acceptance IDs in scope.
+      en: The accepted requirements, decisions, actors, journeys, states, content and acceptance IDs in
+        scope.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
-      en: >-
-        The accepted design flows, component boundaries, data/API contracts, security and failure behavior
-        relevant to the interface.
+      en: The accepted design flows, component boundaries, data/API contracts, security and failure
+        behavior relevant to the interface.
   - id: brand
     path: .starciwork/brand/index.yaml with its declared brand/assets/** masters
     purpose:
-      en: >-
-        The current brand record and its actual masters: tokens, typography, logo/mascot placement, imagery
-        rules, rights, rev and forbidden treatments.
+      en: "The current brand record and its actual masters: tokens, typography, logo/mascot placement,
+        imagery rules, rights, rev and forbidden treatments."
   - id: knowledge
     path: knowledge/index.yaml with the applicable UI composition, presentation, proof and family topics
     purpose:
-      en: >-
-        The applicable UI rules and references for hierarchy, density, states, accessibility, responsive
-        behavior and visual review. When a Grammar family is resolved for the consuming app, composition law
-        comes from two tiers: the installed package's shipped `concepts.yaml` — its authored normative
-        vocabulary, selection map, composition rule ids and anti-patterns, resolved via
-        `node_modules/<pkg>/concepts.yaml`, then a project-vendored
-        `.starciwork/_resources/grammar-concepts.yaml`, then a source checkout — and the family's cataloged
-        reusableStyle (idioms) and productComposition (playbook) under knowledge/grammars/<family>/ as
-        observed-evidence supplement.
+      en: "The applicable UI rules and references for hierarchy, density, states, accessibility,
+        responsive behavior and visual review. When a Grammar family is resolved for the consuming
+        app, composition law comes from two tiers: the installed package's shipped `concepts.yaml` —
+        its authored normative vocabulary, selection map, composition rule ids and anti-patterns,
+        resolved via `node_modules/<pkg>/concepts.yaml`, then a project-vendored
+        `.starciwork/_resources/grammar-concepts.yaml`, then a source checkout — and the family's
+        cataloged reusableStyle (idioms) and productComposition (playbook) under
+        knowledge/grammars/<family>/ as observed-evidence supplement."
   - id: grammar
-    path: consuming manifest/lockfile with the resolved Grammar exports/types/renderers/CSS and actual anatomy/reference captures
+    path: consuming manifest/lockfile with the resolved Grammar exports/types/renderers/CSS and actual
+      anatomy/reference captures
     purpose:
-      en: >-
-        The Grammar resolved from the consuming application, including aliases and lockfile: package identity,
-        version, resolved path, inspected hashes/anchors, real public exports, prop types, component anatomy,
-        state contracts, CSS/tokens and relevant reference imagery. When the resolved package ships a
-        `captures/` directory — per-story rendered component PNGs with an index.json, produced by the package's
-        storybook capture harness — those are the package's own ground-truth renders. Resolution order: the
-        consuming app's installed `node_modules/<grammar-pkg>/captures/`, then a project-vendored
-        `.starciwork/_resources/grammar-captures/` (a verbatim copy of the package's captures dir), then a
-        source checkout of the Grammar repo. Captures carry the family they were rendered under.
+      en: "The Grammar resolved from the consuming application, including aliases and lockfile: package
+        identity, version, resolved path, inspected hashes/anchors, real public exports, prop types,
+        component anatomy, state contracts, CSS/tokens and relevant reference imagery. When the
+        resolved package ships a `captures/` directory — per-story rendered component PNGs with an
+        index.json, produced by the package's storybook capture harness — those are the package's
+        own ground-truth renders. Resolution order: the consuming app's installed
+        `node_modules/<grammar-pkg>/captures/`, then a project-vendored
+        `.starciwork/_resources/grammar-captures/` (a verbatim copy of the package's captures dir),
+        then a source checkout of the Grammar repo. Captures carry the family they were rendered
+        under."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
-      en: >-
-        The existing source's manifests, active family/root and selected current UI context. Greenfield work
-        records source not-yet-created honestly.
+      en: The existing source's manifests, active family/root and selected current UI context. Greenfield
+        work records source not-yet-created honestly.
   - id: profile
-    path: modules/models/registry.yaml with modules/models/runtimes.yaml, the selected runtime and the actual host tools
+    path: modules/models/registry.yaml with modules/models/runtimes.yaml, the selected runtime and the
+      actual host tools
     purpose:
-      en: >-
-        Whether this host exposes built-in `image_gen.imagegen`, and which tool was actually invoked. Image-model
-        selection is not exposed by the tool, so no model name is available from it.
+      en: Whether this host exposes built-in `image_gen.imagegen`, and which tool was actually invoked.
+        Image-model selection is not exposed by the tool, so no model name is available from it.
   - id: generatedDirection
     path: N/assets/**/<asset>
     purpose:
-      en: >-
-        The image and prompt bytes created earlier in this same operation, reopened for visual review, coverage
-        binding and final hash verification.
+      en: The image and prompt bytes created earlier in this same operation, reopened for visual review,
+        coverage binding and final hash verification.
   - id: workflow
-    path: the selected workflow request with modules/kernel/verdict-contract.yaml and this op's authority.json
+    path: the selected workflow request with modules/kernel/verdict-contract.yaml and this op's
+      authority.json
     purpose:
       en: The exact request, outputs and authority when this operation belongs to a named workflow.
 writes:
@@ -114,181 +113,209 @@ writes:
       - state
       - brand
       - refs
-      - "ui: {status,intent,surfaces,states,coverage,flow,accessibility,responsive,assets,artworkSlots,observations,gaps}"
+      - "ui:
+        {status,intent,surfaces,states,coverage,flow,accessibility,responsive,assets,artworkSlots,o\
+        bservations,gaps}"
       - assets:[{path}]
       - blockedBy
     content:
-      en: >-
-        The selected image-first direction in the approved ui record. `ui.coverage` holds scale,
-        representativeScreens and a map of screen/state/viewport to actual Grammar components, derivation and
-        optional directionAsset. `ui.flow` holds the durable interaction-flow map derived from accepted
-        journeys/SDS: every transition with its trigger and landing state, every screen's reachable
-        loading/empty/error/success states, and the explicitly named edge cases — refresh mid-flow, external
-        redirect return, double-submit, tab close, failure/retry and dead-end paths. Accessibility, responsive
-        rules, copy, interactions and artwork slots are described alongside them, and every generated image and
-        prompt appears in both ui.assets and the node assets list.
+      en: "The selected image-first direction in the approved ui record. `ui.coverage` holds scale,
+        representativeScreens and a map of screen/state/viewport to actual Grammar components,
+        derivation and optional directionAsset. `ui.flow` holds the durable interaction-flow map
+        derived from accepted journeys/SDS: every transition with its trigger and landing state,
+        every screen's reachable loading/empty/error/success states, and the explicitly named edge
+        cases — refresh mid-flow, external redirect return, double-submit, tab close, failure/retry
+        and dead-end paths. Accessibility, responsive rules, copy, interactions and artwork slots
+        are described alongside them, and every generated image and prompt appears in both ui.assets
+        and the node assets list."
   - id: designSource
     path: N/assets/**/<asset>
     fields:
       - ui.assets:[{path,role,provenance,generation?}]
       - assets:[{path}]
     content:
-      en: >-
-        Each representative generated image and its exact sibling prompt, stored under the owning UI node. Image
-        metadata records `generation.tool: image_gen.imagegen`, promptPath and accepted inputRefs, plus an
-        observed model when the tool itself exposed one. Reference inputs stay under their existing owner and are
-        cited rather than copied.
+      en: "Each representative generated image and its exact sibling prompt, stored under the owning UI
+        node. Image metadata records `generation.tool: image_gen.imagegen`, promptPath and accepted
+        inputRefs, plus an observed model when the tool itself exposed one. Reference inputs stay
+        under their existing owner and are cited rather than copied."
   - id: evidence
     path: E/**
-    fields: [id,nodeId,inputDigest,outcome,assertions,assets,provenance,codeRefs,extensions]
+    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    artifacts: [manifest.yaml, direction.png, prompt.txt, visual-review.md, symbol-review.json, realization-map.json]
     content:
-      en: >-
-        The evidence bundle: `manifest.yaml`, the generated `direction.png` bytes, the exact `prompt.txt` bytes,
-        `visual-review.md`, `symbol-review.json` and `realization-map.json`, with the actual ImageGen tool
-        provenance and all accepted input refs. `symbol-review.json` records, for every prominent symbol family,
-        its exact product concept, likely alternate reading without labels, audience maturity, metaphor
-        specificity, sibling distinction, family coherence, reduced-scale legibility and why raster-asset or
-        code-native is the truthful medium. `realization-map.json` classifies each visible region as
-        `raster-asset` or `code-native` with its rationale, responsive/state behavior, asset/artwork-slot binding
-        when raster, and Grammar component plus CSS/SVG/DOM anatomy when code-native.
+      en: "The evidence bundle: `manifest.yaml`, the generated `direction.png` bytes, the exact
+        `prompt.txt` bytes, `visual-review.md`, `symbol-review.json` and `realization-map.json`,
+        with the actual ImageGen tool provenance and all accepted input refs. `symbol-review.json`
+        records, for every prominent symbol family, its exact product concept, likely alternate
+        reading without labels, audience maturity, metaphor specificity, sibling distinction, family
+        coherence, reduced-scale legibility and why raster-asset or code-native is the truthful
+        medium. `realization-map.json` classifies each visible region as `raster-asset` or
+        `code-native` with its rationale, responsive/state behavior, asset/artwork-slot binding when
+        raster, and Grammar component plus CSS/SVG/DOM anatomy when code-native."
   - id: draws
     path: E/draws.yaml
-    fields: [draws,coverage]
+    fields: [draws, coverage]
     content:
-      en: >-
-        The readable mapping of representative directions, prompt artifacts and complete remaining coverage. Each
-        draw binds its image artifact, prompt artifact, screen/state/viewport and
-        `provenance.tool: image_gen.imagegen`. The UI node owns the image and prompt bytes; this file indexes
-        them, and scripts/kernel/serve-ask.mjs reads it when it serves the owner's pick.
+      en: "The readable mapping of representative directions, prompt artifacts and complete remaining
+        coverage. Each draw binds its image artifact, prompt artifact, screen/state/viewport and
+        `provenance.tool: image_gen.imagegen`. The UI node owns the image and prompt bytes; this
+        file indexes them, and scripts/kernel/serve-ask.mjs reads it when it serves the owner's
+        pick."
 steps:
-  - reads: [target,business,architecture,brand,knowledge,grammar,repo,profile]
+  - reads:
+      - target
+      - business
+      - architecture
+      - brand
+      - knowledge
+      - grammar
+      - repo
+      - profile
     writes: [node]
     action:
-      en: >-
-        Freeze complete coverage before generation. Enumerate every required screen, reachable state and
-        responsive band from accepted journeys/SDS; map each combination to actual inspected Grammar components
-        and state contracts. Enumerate the interaction flow with the same rigor: every transition's trigger and
-        landing state, and every reachable edge case. Write that flow map into the ui record. Classify the scope
-        as bounded or large; for a large task choose the representative set of critical screens covering the
-        highest-risk layouts, interactions, brand moments and component anatomy, never exceeding
-        `params.representativeScreensMax`, and derive every remaining screen in the coverage map rather than
-        generating an image for it. Generate `params.candidatesPerScreen` directions per screen; when that is
-        more than one, park an owner ask so the owner picks, keep every candidate as direction and retain the
-        unchosen ones as evidence. Before generation, classify every visible region by realization: use
-        `raster-asset` for authored imagery whose identity depends on rich texture, illustration, photography or
-        a declared mascot/media master; use `code-native` for layout, spacing, responsive structure, panels,
-        cards, controls, text, system icons, borders, shadows, glows and simple geometric decoration
-        representable by semantic DOM plus installed Grammar/CSS/SVG. A raster screenshot of code-native UI is
-        direction only and never authorizes shipping that UI as a flattened image. A missing product decision,
-        SDS behavior, Grammar capability or flow edge is a typed blocker, never filled with visual invention.
-  - reads: [business,architecture,brand,knowledge,grammar,target,profile]
-    writes: [node,designSource,evidence]
+      en: "Freeze complete coverage before generation. Enumerate every required screen, reachable state
+        and responsive band from accepted journeys/SDS; map each combination to actual inspected
+        Grammar components and state contracts. Enumerate the interaction flow with the same rigor:
+        every transition's trigger and landing state, and every reachable edge case. Write that flow
+        map into the ui record. Classify the scope as bounded or large; for a large task choose the
+        representative set of critical screens covering the highest-risk layouts, interactions,
+        brand moments and component anatomy, never exceeding `params.representativeScreensMax`, and
+        derive every remaining screen in the coverage map rather than generating an image for it.
+        Generate `params.candidatesPerScreen` directions per screen; when that is more than one,
+        park an owner ask so the owner picks, keep every candidate as direction and retain the
+        unchosen ones as evidence. Before generation, classify every visible region by realization:
+        use `raster-asset` for authored imagery whose identity depends on rich texture,
+        illustration, photography or a declared mascot/media master; use `code-native` for layout,
+        spacing, responsive structure, panels, cards, controls, text, system icons, borders,
+        shadows, glows and simple geometric decoration representable by semantic DOM plus installed
+        Grammar/CSS/SVG. A raster screenshot of code-native UI is direction only and never
+        authorizes shipping that UI as a flattened image. A missing product decision, SDS behavior,
+        Grammar capability or flow edge is a typed blocker, never filled with visual invention."
+  - reads:
+      - business
+      - architecture
+      - brand
+      - knowledge
+      - grammar
+      - target
+      - profile
+    writes: [node, designSource, evidence]
     action:
-      en: >-
-        Build one exact prompt per representative direction from accepted business/SDS, brand rules/masters,
-        relevant UI knowledge and actual Grammar anatomy/reference inputs. Include screen purpose, component
-        regions, state, viewport, accessibility and forbidden treatments. Every visible datum is concrete
-        plausible data derived from the accepted business record — numbers, currency amounts, dates, names,
-        statuses and copy — never lorem text or blurred stand-ins. Skeleton or shimmer appears only when the
-        directed state IS the loading state. Each direction renders the complete page in situ: the consuming
-        app's real persistent chrome — sidebar, navbar, subnav, page container, rail layout per its actual layout
-        components — surrounds the content region being directed, so the owner reviews the page as it will exist
-        rather than a fragment on a blank canvas. A pre-auth or chromeless route says so explicitly rather than
-        inventing chrome. Invoke built-in `image_gen.imagegen`; a browser capture, hand-painted boxes, mockup
-        export or prose-only substitute does not satisfy this operation. Save the returned image and exact
-        prompt, open the image, review it, and record the actual tool provenance, naming an image model only
-        when the tool itself exposed one.
-  - reads: [target,generatedDirection,brand,knowledge,grammar]
-    writes: [node,evidence]
+      en: "Build one exact prompt per representative direction from accepted business/SDS, brand
+        rules/masters, relevant UI knowledge and actual Grammar anatomy/reference inputs. Include
+        screen purpose, component regions, state, viewport, accessibility and forbidden treatments.
+        Every visible datum is concrete plausible data derived from the accepted business record —
+        numbers, currency amounts, dates, names, statuses and copy — never lorem text or blurred
+        stand-ins. Skeleton or shimmer appears only when the directed state IS the loading state.
+        Each direction renders the complete page in situ: the consuming app's real persistent chrome
+        — sidebar, navbar, subnav, page container, rail layout per its actual layout components —
+        surrounds the content region being directed, so the owner reviews the page as it will exist
+        rather than a fragment on a blank canvas. A pre-auth or chromeless route says so explicitly
+        rather than inventing chrome. Invoke built-in `image_gen.imagegen`; a browser capture,
+        hand-painted boxes, mockup export or prose-only substitute does not satisfy this operation.
+        Save the returned image and exact prompt, open the image, review it, and record the actual
+        tool provenance, naming an image model only when the tool itself exposed one."
+  - reads:
+      - target
+      - generatedDirection
+      - brand
+      - knowledge
+      - grammar
+    writes: [node, evidence]
     action:
-      en: >-
-        Review each direction against business truth, brand, relevant UI rules and the inspected Grammar anatomy.
-        Before accepting any prominent icon, illustration or symbolic family, self-question it explicitly: what
-        exact product concept does it encode; what would a viewer infer if the label disappeared; is the metaphor
-        generic or brand-specific; does its maturity fit the audience/category; is it distinct from siblings; do
-        camera, base, material, light, scale and density form one family; does it remain legible at the smallest
-        required viewport; and could installed Grammar or repository-native SVG communicate it more truthfully
-        than raster artwork. Reject childlike clip-art, generic stock metaphor, semantic ambiguity and mixed
-        visual families unless accepted intent explicitly requires them. Reject any direction that breaks a rule
-        of the prompt step — including a direction that draws titled cards inside cards, per-band cards, gapped
-        bands or floating actions where the resolved Grammar concepts call for one joined surface with an
-        external label row and hairline-separated bands — and correct the prompt and regenerate within the
-        bounded representative set. Declare every embedded illustration/mascot/decorative/media region classified
-        `raster-asset` as an artworkSlots entry for `interface.asset`. Record every `code-native` region with its
-        semantic structure, Grammar primitive or family anatomy, responsive/state behavior and allowed CSS/SVG
-        decoration; never send cards, panels, controls, typography or page composition to ImageGen as production
-        assets. Update the coverage map so every non-generated screen/state says which representative direction
-        it derives from, which actual Grammar components implement it and how its state differs.
-  - reads: [target,generatedDirection,workflow]
-    writes: [node,evidence,draws]
+      en: "Review each direction against business truth, brand, relevant UI rules and the inspected
+        Grammar anatomy. Before accepting any prominent icon, illustration or symbolic family,
+        self-question it explicitly: what exact product concept does it encode; what would a viewer
+        infer if the label disappeared; is the metaphor generic or brand-specific; does its maturity
+        fit the audience/category; is it distinct from siblings; do camera, base, material, light,
+        scale and density form one family; does it remain legible at the smallest required viewport;
+        and could installed Grammar or repository-native SVG communicate it more truthfully than
+        raster artwork. Reject childlike clip-art, generic stock metaphor, semantic ambiguity and
+        mixed visual families unless accepted intent explicitly requires them. Reject any direction
+        that breaks a rule of the prompt step — including a direction that draws titled cards inside
+        cards, per-band cards, gapped bands or floating actions where the resolved Grammar concepts
+        call for one joined surface with an external label row and hairline-separated bands — and
+        correct the prompt and regenerate within the bounded representative set. Declare every
+        embedded illustration/mascot/decorative/media region classified `raster-asset` as an
+        artworkSlots entry for `interface.asset`. Record every `code-native` region with its
+        semantic structure, Grammar primitive or family anatomy, responsive/state behavior and
+        allowed CSS/SVG decoration; never send cards, panels, controls, typography or page
+        composition to ImageGen as production assets. Update the coverage map so every non-generated
+        screen/state says which representative direction it derives from, which actual Grammar
+        components implement it and how its state differs."
+  - reads:
+      - target
+      - generatedDirection
+      - workflow
+    writes: [node, evidence, draws]
     action:
-      en: >-
-        Validate Work and every artifact hash, then report the representative images, prompt artifacts, actual
-        tool provenance and complete coverage map. State the truth boundary: the generated direction is a design
-        input, not exact component/render/API evidence. `interface.implement` produces the actual Grammar
-        implementation captures and code checks, and `uat.verify` independently exercises the running product in
-        a browser. Stop without frontend code and never self-advance.
+      en: "Validate Work and every artifact hash, then report the representative images, prompt artifacts,
+        actual tool provenance and complete coverage map. State the truth boundary: the generated
+        direction is a design input, not exact component/render/API evidence. `interface.implement`
+        produces the actual Grammar implementation captures and code checks, and `uat.verify`
+        independently exercises the running product in a browser. Stop without frontend code and
+        never self-advance."
 proofs:
   - id: imagegen-provenance
     requirement:
-      en: >-
-        Every representative image has an exact retained prompt and records an actual `image_gen.imagegen`
-        invocation plus accepted business/SDS, brand, UI knowledge and Grammar inputs. A claimed or guessed model
-        name is not proof.
+      en: Every representative image has an exact retained prompt and records an actual
+        `image_gen.imagegen` invocation plus accepted business/SDS, brand, UI knowledge and Grammar
+        inputs. A claimed or guessed model name is not proof.
   - id: coverage
     requirement:
-      en: >-
-        The representative set stays within its ceiling and the explicit coverage/component/state map accounts
-        for every remaining required screen, state and responsive band using actual inspected Grammar anatomy.
-        The `ui.flow` map accounts for every accepted transition and reachable edge case; an unaccounted flow
-        edge is reported as a typed blocker, not silently resolved.
+      en: The representative set stays within its ceiling and the explicit coverage/component/state map
+        accounts for every remaining required screen, state and responsive band using actual
+        inspected Grammar anatomy. The `ui.flow` map accounts for every accepted transition and
+        reachable edge case; an unaccounted flow edge is reported as a typed blocker, not silently
+        resolved.
   - id: content-truth
     requirement:
-      en: >-
-        Every accepted-content screen renders concrete values from the business record. Skeleton bars or gray
-        placeholder blocks pass only on a deliberately directed loading state.
+      en: Every accepted-content screen renders concrete values from the business record. Skeleton bars or
+        gray placeholder blocks pass only on a deliberately directed loading state.
   - id: truth-boundary
     requirement:
-      en: >-
-        The result is labelled proposed visual direction, never a working-product screenshot or exact component,
-        render or API proof. Later implementation captures and browser UAT remain required and distinct.
+      en: The result is labelled proposed visual direction, never a working-product screenshot or exact
+        component, render or API proof. Later implementation captures and browser UAT remain
+        required and distinct.
   - id: realization-map
     requirement:
-      en: >-
-        Every visible direction region has exactly one justified realization mode. Rich authored imagery binds to
-        a retained raster asset/artwork slot; layout, content, controls, system icons and representable visual
-        effects bind to semantic DOM plus installed Grammar/CSS/SVG. Flattened UI screenshots cannot satisfy
-        code-native regions, and a CSS approximation cannot silently replace a required brand/media asset.
+      en: Every visible direction region has exactly one justified realization mode. Rich authored imagery
+        binds to a retained raster asset/artwork slot; layout, content, controls, system icons and
+        representable visual effects bind to semantic DOM plus installed Grammar/CSS/SVG. Flattened
+        UI screenshots cannot satisfy code-native regions, and a CSS approximation cannot silently
+        replace a required brand/media asset.
   - id: symbolic-integrity
     requirement:
-      en: >-
-        Every prominent symbol has an explicit concept-to-form argument, alternate-reading check,
-        audience-maturity check, non-generic rationale, sibling distinction, coherent family grammar,
-        reduced-scale legibility proof and justified raster-asset or code-native realization. A readable but
-        childish, clichéd or semantically interchangeable symbol does not pass merely because its label explains
-        it.
+      en: Every prominent symbol has an explicit concept-to-form argument, alternate-reading check,
+        audience-maturity check, non-generic rationale, sibling distinction, coherent family
+        grammar, reduced-scale legibility proof and justified raster-asset or code-native
+        realization. A readable but childish, clichéd or semantically interchangeable symbol does
+        not pass merely because its label explains it.
   - id: binding
     requirement:
-      en: >-
-        `starci validate` passes; every cited ID/path and asset byte exists, required assertions are covered,
-        input bindings are current, and an honest not-run/fail cannot earn done.
+      en: "`starci validate` passes; every cited ID/path and asset byte exists, required assertions are
+        covered, input bindings are current, and an honest not-run/fail cannot earn done."
     check: bin/starci.mjs
 blockers:
   - code: IMAGEGEN_TOOL_UNAVAILABLE
     condition:
-      en: Built-in `image_gen.imagegen` is not exposed on this host. Report host-unsupported; do not substitute another renderer.
+      en: Built-in `image_gen.imagegen` is not exposed on this host. Report host-unsupported; do not
+        substitute another renderer.
   - code: DESIGN_INPUT_UNKNOWN
     condition:
       en: Required business content, SDS behavior, brand rights or a material owner direction is missing.
   - code: GRAMMAR_ANATOMY_UNPROVEN
     condition:
-      en: The actual consuming Grammar package/export/anatomy cannot be resolved. Name the missing source; do not invent a component.
+      en: The actual consuming Grammar package/export/anatomy cannot be resolved. Name the missing source;
+        do not invent a component.
   - code: SYMBOL_INTENT_UNRESOLVED
     condition:
-      en: A prominent symbol has ambiguous product meaning, mismatched audience maturity, generic stock metaphor or an incoherent family and accepted intent cannot resolve it.
+      en: A prominent symbol has ambiguous product meaning, mismatched audience maturity, generic stock
+        metaphor or an incoherent family and accepted intent cannot resolve it.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
-      en: A declared prerequisite or required scope is missing or not effectively done; do not weaken the graph.
+      en: A declared prerequisite or required scope is missing or not effectively done; do not weaken the
+        graph.
 placeholders:
   feature: Selected feature slug
   repo-id: Resolved direct repository name or path
@@ -299,15 +326,15 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 route:
   nodeKinds: [ui]
   phase: [direct, pre-implementation]
   intent: [direction, draw, imagegen, ui-design]
   prerequisites:
-    - "business.decide settled pass (reviewed SRS seed; Work leaves remain todo)"
-    - "architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)"
+    - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
+    - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
     - brand.decide done
-  riskHints: [host-tool-required:image_gen.imagegen]
+  riskHints:
+    - host-tool-required:image_gen.imagegen

@@ -1,16 +1,11 @@
-# modules/ops/ops/scope.finish.yaml — scope end-of-life operator.
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: scope.finish
 goal:
   en: Finish exactly the selected business/resource scope - end-of-life - while preserving required
     evidence and live consumers.
-nodeKinds:
-  - operations
+nodeKinds: [operations]
 completionProfile: operations
-sideEffects:
-  - explicit end-of-life metadata and separately authorized exact destructive actions only
+sideEffects: [explicit end-of-life metadata and separately authorized exact destructive actions only]
 graphPolicy:
   mode: selected-scope-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -20,10 +15,8 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
-        For an explicitly new target, absence is expected: inspect the nearest existing
-        ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
-        content."
+      en: Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
+        Preserve unaffected accepted content.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -43,19 +36,13 @@ reads:
     purpose:
       en: Read exact selected removals and recovery constraints; default finish is a scoped metadata
         decision, not recursive deletion.
-  - id: matrix
-    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
-    purpose:
-      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
-        input bindings, requested output JSON shapes and required criteria. Standalone execution
-        needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority.
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof. Capabilities are the intersection of actual tools, selected profile
+        policy, op permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
@@ -70,47 +57,28 @@ writes:
       - assertions
       - required
     content:
-      en: "Write only the explicitly authorized end-of-life decision/scope on the work/node@1 record before review; preserve stable
-        IDs and obligations. Actual removal/retention observations belong in evidence. Graph edits
-        apply only to the explicitly selected approved scope: declare real prerequisite node IDs in
-        dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new
-        unrelated scope; finish all graph/spec changes before review proof."
+      en: "Write only the explicitly authorized end-of-life decision/scope on the work/node@1 record
+        before review; preserve stable IDs and obligations. Actual removal/retention observations
+        belong in evidence. Graph edits apply only to the explicitly selected approved scope:
+        declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in
+        refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before
+        review proof."
   - id: evidence
-    path: E/manifest.yaml + E/finish-inventory.json + E/retention-check.json + E/removal.json only
-      when selected + E/result.md
-    fields:
-      - id
-      - nodeId
-      - inputDigest
-      - outcome
-      - assertions
-      - assets
-      - provenance
-      - codeRefs
-      - extensions
+    path: E/**
+    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    artifacts:
+      - manifest.yaml
+      - finish-inventory.json
+      - retention-check.json
+      - removal.json only when selected
+      - result.md
     content:
       en: "Record exact artifacts, ownership, safe destinations, verified hashes/readability and selected
         removal outcomes/recovery limitations; never copy secret plaintext. Operator-specific
-        observed result in E/result.md: Record finished scope, actual decision authority, replacement
-        IDs where applicable, consumer dispositions and retention/access policy. Preserve stable
-        identities and do not relabel unfinished required work na without a real scope decision."
-  - id: matrixHandoff
-    path: E/job-result.json
-    fields:
-      - requestId
-      - requestDigest
-      - op
-      - operation when selected
-      - status
-      - criteria
-      - outputs
-      - artifacts
-    content:
-      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
-        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
-        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
-        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
-        The selected request freezes output field schemas before execution.
+        observed result in E/result.md: Record finished scope, actual decision authority,
+        replacement IDs where applicable, consumer dispositions and retention/access policy.
+        Preserve stable identities and do not relabel unfinished required work na without a real
+        scope decision."
 steps:
   - reads:
       - inventory
@@ -118,18 +86,18 @@ steps:
       - repo
       - target
       - profile
-    writes:
-      - evidence
+    writes: [evidence]
     action:
-      en: Inventory exact selected nodes/resources, Git state, image/evidence/account custody references
+      en: "Inventory exact selected nodes/resources, Git state, image/evidence/account custody references
         and all live consumers. Distinguish custom durable .worktrees artifacts from Git-managed
         checkouts. Resolve the execution profile and actual tool availability before selecting
-        instruments; this does not switch the model/runtime or spawn workers.
+        instruments; this does not switch the model/runtime or spawn workers. For an explicitly new
+        target, absence is expected: inspect the nearest existing ancestor/workspace, then create
+        only that selected scope."
   - reads:
       - inventory
       - authority
-    writes:
-      - node
+    writes: [node]
     action:
       en: Resolve consumer preserve/replace/defer/finish dispositions and retention/recovery obligations.
         Missing decision or custody blocks deletion, not the read-only inventory.
@@ -137,8 +105,7 @@ steps:
       - inventory
       - authority
       - repo
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Verify required durable artifacts are retained and retrievable at approved destinations before
         any explicitly selected deletion. Resolve absolute targets, symlink/junction boundaries and
@@ -147,8 +114,7 @@ steps:
       - inventory
       - authority
       - repo
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Execute only separately authorized exact end-of-life effects, preferring reversible operations
         and appropriate Git worktree lifecycle. Preserve uncommitted/untracked user work; uncertain
@@ -157,23 +123,17 @@ steps:
       - target
       - inventory
       - authority
-      - matrix
-    writes:
-      - node
-      - evidence
-      - matrixHandoff
+    writes: [node, evidence]
     action:
       en: Validate surviving references/readability and report what was finished, actually removed,
-        retained and recoverable. Stop; no opportunistic cleanup of adjacent work. When selected in
-        a job matrix, produce E/job-result.json bound to the exact request, its output schema and
-        every required criterion. This handoff is conditional and does not change standalone or
-        named frontend response contracts.
+        retained and recoverable. Stop; no opportunistic cleanup of adjacent work. This handoff is
+        conditional and does not change standalone or named frontend response contracts.
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
-        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done.
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly
+        proposed, required assertions are covered, input bindings are current, and an honest
+        not-run/fail cannot earn done.
   - id: retention
     requirement:
       en: No required live consumer or sole evidence/custody copy is lost; exact selected effects and
@@ -203,36 +163,11 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "Can exactly the selected scope be finished while every live consumer and
-    every required piece of evidence or custody survives?"
-  whenNeeded:
-    - End-of-life handling for a selected business/resource scope; also explicitly authorized exact removals (registered worktrees, artifact directories).
-    - When consumers must be proven unaffected before a record leaves service.
-  whenNot:
-    - Default finish is metadata, not recursive deletion - removal is a separately authorized exact-target act.
-    - Never deletes where ownership, consumer disposition or retention is unresolved; no opportunistic adjacent cleanup.
-  consumes:
-    - Target; inventory (nodes, refs, git worktrees, dirty state); authority (selected removals + retention policy); repo.
-  produces:
-    - End-of-life metadata on the node; evidence: finish-inventory, retention-check, removal (when selected).
-  failureModes:
-    - FINISH_UNSAFE, DECLARED_DEPENDENCY_UNMET (declared blockers).
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [operations]
   phase: [operate, post-implementation]
   intent: [finish, remove, scope, end-of-life]
-  prerequisites: ["the scope exists"]
+  prerequisites: [the scope exists]
   riskHints: [destructive-gate]
