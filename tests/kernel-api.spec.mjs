@@ -403,14 +403,86 @@ test('estimate sizes same-op slices from measured counts, never a guess',t=>{
   assert.equal(big.status,0,big.stderr);
   const b=out(big);
   assert.equal(b.minutes,328,'40*4 + 20*3 + 9*12 = 328 agent-minutes');
-  assert.equal(b.slices,11,'ceil(328/30) = 11 slices inside the 15-30min target');
-  assert.ok(b.perSliceMinutes<=30&&b.perSliceMinutes>=15,`per-slice ${b.perSliceMinutes}min outside target`);
+  assert.equal(b.size,'xl','40 files reaches allocation.slicing.size.xl.from.files');
+  assert.equal(b.slices,b.agentsAchievable,'slices is retained as the agent count, never a second number');
+  assert.equal(b.slices,6,'xl at gear 1 asks for 6 agents (runtimes.yaml allocation.slicing.size.xl.agents)');
+  assert.equal(b.overTarget,true,'328 agent-min over 6 agents still exceeds targetMinutes[1]');
   const small=runApi('estimate','--repo',repo,'--files','3','--json');
   assert.equal(small.status,0,small.stderr);
   assert.equal(out(small).slices,1,'a 12-minute measure never cuts');
   const empty=runApi('estimate','--repo',repo,'--json');
   assert.notEqual(empty.status,0,'estimate with no measured count must refuse');
   assert.match(`${empty.stdout}${empty.stderr}`,/estimate-no-measure/);
+});
+
+// The owner's one knob, end to end: the measured closure lands in a size class,
+// the class plus the gear names agentsRequested, and the closure's own disjoint
+// path partition is what it can actually achieve.
+// runtimes.yaml allocation.slicing {size, gears}; config.yaml parallel.gear.
+test('estimate classifies s/m/l/xl and scales only l/xl by gear',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  seed(repo,ledger=>ledger.ensureWorkflow({workflowId:'wf-k7-size',title:'size classes'}));
+  const estimate=(...args)=>{
+    const r=runApi('estimate','--repo',repo,...args,'--json');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    return out(r);
+  };
+  // s: the whole closure fits inside targetMinutes[0] (3 files * 4 = 12 <= 15).
+  // m: past that window but short of every l bound (8 files * 4 = 32).
+  // l: 12 files reaches size.l.from.files. xl: 40 reaches size.xl.from.files.
+  const fixtures={s:['--files','3'],m:['--files','8'],l:['--files','12'],xl:['--files','40']};
+  const expected={
+    1:{s:[1,1],m:[1,1],l:[3,3],xl:[6,6]},
+    2:{s:[1,1],m:[1,1],l:[5,5],xl:[10,10]},
+  };
+  for(const gear of [1,2]) for(const [size,args] of Object.entries(fixtures)){
+    const e=estimate(...args,'--gear',String(gear));
+    const [requested,achievable]=expected[gear][size];
+    assert.equal(e.size,size,`${args.join(' ')} must classify ${size}, got ${e.size}`);
+    assert.equal(e.gear,gear);
+    assert.equal(e.gearSource,'flag','--gear is the dry-run override; it never writes');
+    assert.equal(e.agentsRequested,requested,`${size} at gear ${gear} asks for ${requested} agents`);
+    assert.equal(e.agentsAchievable,achievable);
+    assert.equal(e.slices,e.agentsAchievable,'slices must stay equal to agentsAchievable');
+    assert.equal(e.reason,null,'nothing bounded the request below it');
+  }
+  // s/m never fan out, whatever the gear.
+  assert.deepEqual([estimate('--files','3','--gear','2').agentsRequested,estimate('--files','8','--gear','2').agentsRequested],[1,1]);
+  // Without --gear the standing answer is the owner config, not a literal.
+  const standing=estimate('--files','12');
+  assert.equal(standing.gearSource,'config');
+  assert.ok(standing.gears.includes(standing.gear),'the gear must come from the declared gears list');
+  // An undeclared gear fails closed exactly like an undeclared config key.
+  const bad=runApi('estimate','--repo',repo,'--files','12','--gear','7','--json');
+  assert.notEqual(bad.status,0);
+  assert.match(`${bad.stdout}${bad.stderr}`,/gear-undeclared/);
+});
+
+test('estimate bounds agentsAchievable by the disjoint path partition the closure actually holds',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  seed(repo,ledger=>ledger.ensureWorkflow({workflowId:'wf-k7-achievable',title:'achievable'}));
+  // Two top-level groups, one of them spelled twice: an xl closure at gear 2
+  // asks for ten agents and can be cut into exactly two disjoint slices.
+  const r=runApi('estimate','--repo',repo,'--files','40','--gear','2',
+    '--paths','src/feature-a,src/feature-a/nested,lib/shared','--json');
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const e=out(r);
+  assert.equal(e.size,'xl');
+  assert.equal(e.agentsRequested,10,'xl at gear 2 requests 10');
+  assert.equal(e.agentsAchievable,2,'a two-group closure cuts into two disjoint slices, however high the gear');
+  assert.deepEqual(e.pathGroups,['lib/shared','src/feature-a'],'a descendant collapses into its owned ancestor');
+  assert.equal(e.achievableBasis,'disjoint-owned-path-prefixes');
+  assert.match(e.reason??'',/partitions into 2 pairwise-disjoint path prefix/);
+  assert.equal(e.slices,2,'the N the --cut-total flags carry is the achievable count, not the requested one');
+  // No closure supplied: the request stands, and the field says on what basis.
+  const unbounded=out(runApi('estimate','--repo',repo,'--files','40','--gear','2','--json'));
+  assert.equal(unbounded.agentsAchievable,10);
+  assert.equal(unbounded.achievableBasis,'unbounded-no-path-closure');
+  assert.equal(unbounded.reason,null);
+  // A glob is not a concrete ownership boundary and never becomes a slice.
+  const glob=runApi('estimate','--repo',repo,'--files','40','--paths','src/**/*.ts','--json');
+  assert.notEqual(glob.status,0);
+  assert.match(`${glob.stdout}${glob.stderr}`,/estimate-paths-invalid/);
 });
 
 test('a re-enqueued op carries its retry lineage: a business failure spends a business attempt, a no-effect rejection does not',t=>{

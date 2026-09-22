@@ -181,21 +181,47 @@ commands:
   # --------------------------------------------------------------------------
 
   estimate:
-    args: '--files <n> [--assertions <n>] [--components <n>] [--records <n>]'
+    args: '--files <n> [--assertions <n>] [--components <n>] [--records <n>] [--paths <csv>] [--gear <n>]'
     reads: >-
       modules/models/runtimes.yaml allocation.slicing only — {weights:{file,
-      assertion, component, record}, targetMinutes:[lo,hi], maxSlices}. The
-      kernel measures the write scope and passes the counts; the weights and
-      bounds are declared data, never a model's guess. No ledger row is read
+      assertion, component, record}, targetMinutes:[lo,hi], maxSlices, gears,
+      size:{<class>:{from, agents}}} — plus the owner's parallel.gear through
+      the one reader engine/config.mjs (`parallelGear()` in engine/config.mjs;
+      STARCI_OWNER_ROOT repoints it). The kernel measures the write scope and
+      passes the counts; the weights, class bounds, gear vocabulary and
+      agents-per-gear table are declared data, never a model's guess. No ledger
+      row is read
     writes: 'nothing — a pure computation, no row and no event'
     computes: >-
       W = sum(weight * count) agent-minutes;
-      slices = clamp(ceil(W / targetMinutes[1]), 1, maxSlices);
-      perSliceMinutes = W / slices
-    returns: '{ok:true, minutes, slices, perSliceMinutes, counts, weights, targetMinutes, maxSlices, overTarget} — overTarget means the maxSlices cap was reached and each slice still exceeds targetMinutes[1]'
+      size = the largest allocation.slicing.size class any one count reaches its `from` bound of,
+      else `s` when W is inside targetMinutes[0] and `m` above it;
+      agentsRequested = 1 for `s`/`m`, else size.<class>.agents[gear];
+      agentsAchievable = clamp(min(agentsRequested, maxSlices, <disjoint path prefixes of --paths>), 1, ...);
+      perSliceMinutes = W / agentsAchievable
+    gear: >-
+      the owner's parallel.gear is the standing answer; `--gear <n>` overrides it for a dry run and
+      writes nothing. A gear outside allocation.slicing.gears refuses either way. The gear raises
+      only agentsRequested — never a pool's maxParallel, maxParallelOps or budgets.maxOps
+    achievable: >-
+      the seam-first partition itself is derived by the Kernel agent from repository evidence
+      (driver-loop.yaml cutExecution), not by this code, so agentsAchievable is an UPPER BOUND and
+      `achievableBasis` names which one: `disjoint-owned-path-prefixes` when --paths supplied a
+      closure (the pairwise-disjoint concrete prefixes engine/admission.mjs normalizeOwnedPaths
+      collapses it to), `unbounded-no-path-closure` when it did not
+    returns: >-
+      {ok:true, minutes, size:s|m|l|xl, gear, gearSource:config|flag, agentsRequested,
+      agentsAchievable, achievableBasis, reason, pathGroups?, slices, perSliceMinutes, counts,
+      weights, targetMinutes, maxSlices, gears, overTarget}. `reason` names why achievable fell
+      below requested and is null when it did not. `slices` equals agentsAchievable — it is the N
+      the --cut-total flags carry. `overTarget` means each slice still exceeds targetMinutes[1]:
+      gear up or decompose the closure finer
     refuses:
       - estimate-no-measure: 'every count is absent or zero — there is nothing to size'
-    usedBy: 'the cut-bound evaluation before enqueue — the slice count the --cut-total flags carry (kernel-prompt.md)'
+      - estimate-paths-invalid: '--paths holds a glob, an absolute path, a parent traversal or nothing concrete (engine/admission.mjs normalizeOwnedPath)'
+      - gear-undeclared: '--gear names an integer allocation.slicing.gears does not declare'
+      - slicing-undeclared: 'allocation.slicing omits weights/targetMinutes/maxSlices/gears/size, a weight for a supplied count, or an agent count for this size at this gear'
+    usedBy: 'the cut-bound evaluation before enqueue — the agent count the --cut-total flags carry (kernel-prompt.md)'
 
   # --------------------------------------------------------------------------
   # PLAN — persist the derived plan + structural diff vs the approved shape.
