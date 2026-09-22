@@ -176,3 +176,11 @@ test('check-orca-tree is deliberately not part of npm run check — it needs a l
   const contract=fs.readFileSync(path.join(ROOT,'modules','kernel','start-workflow.yaml'),'utf8');
   assert.match(contract,/scripts\/checks\/check-orca-tree\.mjs/,'the rule cites the check that enforces it');
 });
+
+test('a [Kernel] terminal naming a workflow from another ledger is not an orphan here',t=>{
+  withLedger(t,({ledger})=>{
+    healthy(ledger);
+    const findings=orcaTreeFindings(ledger.db,seen(...healthyTerminals(),term('term-foreign','[Kernel] wf-elsewhere-bbbb2222')));
+    assert.equal(findings.some(f=>f.terminal==='term-foreign'),false,'another project kernel sharing the Orca host is not this ledger orphan');
+  });
+});
