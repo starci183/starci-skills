@@ -174,47 +174,61 @@ runtimes:
     models:
       medium: swe-2-max
       hard: swe-2-max
+# The allocator's reading of each kind, from what its op manifest's goal and steps do. `role` is the
+# kinds.yaml role. `work` is `think` when the output is a canonical record (SRS, SDS, scope, goal, decision,
+# brand, ui, Work, workspace, rule) or a verdict about quality, and `hands-on` when the op builds, runs or
+# measures under a record someone else settled. `floor` is the least difficulty the kind routes at:
+# scripts/agent/models.mjs selectPool raises a measured difficulty to it and never lowers one. Every think
+# kind's floor is hard, the tier where every think pool pins a frontier model. The kernel's own model
+# calls (selection.yaml kernelFunctionKinds) are think work at the same floor.
 roleOfKind:
-  request.analyze: plan
-  task.execute: plan
-  backend.implement: implement
-  backend.scaffold: implement
-  interface.implement: implement
-  interface.audit: verify
-  interface.scaffold: implement
-  package.scaffold: implement
-  scope.define: decide
-  code.refactor: implement
-  test.author: implement
-  grammar.update: implement
-  architecture.revise: decide
-  business.revise: decide
-  content.generate: write
-  docs.author: write
-  knowledge.repair: write
-  release.deliver: implement
-  scope.finish: implement
-  runtime.operate: implement
-  review.verify: verify
-  e2e.verify: verify
-  integration.verify: verify
-  security.verify: verify
-  perf.verify: verify
-  uat.verify: verify
-  uat.assisted.prepare: write
-  uat.assisted.verify: verify
-  goal.validate: verify
-  architecture.decide: decide
-  business.decide: decide
-  goal.revise: decide
-  decision.prepare: decide
-  provision.ask: decide
-  brand.decide: write
-  interface.draw: write
-  interface.asset: write
-  work.author: plan
-  implementation.plan: plan
-  workspace.manage: plan
+  request.analyze: {role: plan, work: think, floor: hard}
+  task.execute: {role: plan, work: think, floor: hard}
+  backend.implement: {role: implement, work: hands-on, floor: medium}
+  backend.scaffold: {role: implement, work: hands-on, floor: easy}
+  interface.implement: {role: implement, work: hands-on, floor: medium}
+  interface.audit: {role: verify, work: think, floor: hard}
+  interface.scaffold: {role: implement, work: hands-on, floor: easy}
+  package.scaffold: {role: implement, work: hands-on, floor: easy}
+  scope.define: {role: decide, work: think, floor: hard}
+  code.refactor: {role: implement, work: hands-on, floor: easy}
+  test.author: {role: implement, work: hands-on, floor: easy}
+  grammar.update: {role: implement, work: hands-on, floor: hard}
+  architecture.revise: {role: decide, work: think, floor: hard}
+  business.revise: {role: decide, work: think, floor: hard}
+  content.generate: {role: write, work: hands-on, floor: easy}
+  docs.author: {role: write, work: hands-on, floor: easy}
+  knowledge.repair: {role: write, work: think, floor: hard}
+  release.deliver: {role: implement, work: hands-on, floor: hard}
+  scope.finish: {role: implement, work: hands-on, floor: hard}
+  runtime.operate: {role: implement, work: hands-on, floor: medium}
+  review.verify: {role: verify, work: think, floor: hard}
+  e2e.verify: {role: verify, work: hands-on, floor: medium}
+  integration.verify: {role: verify, work: hands-on, floor: hard}
+  security.verify: {role: verify, work: think, floor: hard}
+  perf.verify: {role: verify, work: hands-on, floor: medium}
+  uat.verify: {role: verify, work: hands-on, floor: medium}
+  uat.assisted.prepare: {role: write, work: hands-on, floor: medium}
+  uat.assisted.verify: {role: verify, work: think, floor: hard}
+  goal.validate: {role: verify, work: think, floor: hard}
+  architecture.decide: {role: decide, work: think, floor: hard}
+  business.decide: {role: decide, work: think, floor: hard}
+  goal.revise: {role: decide, work: think, floor: hard}
+  decision.prepare: {role: decide, work: think, floor: hard}
+  provision.ask: {role: decide, work: think, floor: hard}
+  brand.decide: {role: write, work: think, floor: hard}
+  interface.draw: {role: write, work: think, floor: hard}
+  interface.asset: {role: write, work: hands-on, floor: medium}
+  work.author: {role: plan, work: think, floor: hard}
+  implementation.plan: {role: plan, work: think, floor: hard}
+  workspace.manage: {role: plan, work: think, floor: hard}
+  model.assessGoal: {role: plan, work: think, floor: hard}
+  model.planOp: {role: plan, work: think, floor: hard}
+  model.decide: {role: decide, work: think, floor: hard}
+  model.manageWorkflow: {role: decide, work: think, floor: hard}
+  model.validateOp: {role: verify, work: think, floor: hard}
+  model.critiqueGoal: {role: verify, work: think, floor: hard}
+  judge: {role: verify, work: think, floor: hard}
 # Hard capability gates per kind, checked inside poolRejectionReasons before a
 # pool can be selected — a declared `provides` entry on the pool is the only
 # proof; tier chain membership and owner prefer-bias can never hoist a pool

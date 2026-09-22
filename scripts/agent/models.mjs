@@ -2,6 +2,8 @@
 // modules/models/runtimes.yaml (schema starci/runtimes@1).
 //
 // Routing model (selection.yaml allocationFacts.poolSelection):
+//   0. runtimes.yaml roleOfKind names the kind's role, work and floor; the
+//      measured difficulty is raised to the floor, never lowered.
 //   1. chain(role, difficulty) = pools present in BOTH the difficulty tier
 //      (allocation.tiers[difficulty], role key first then the tier default)
 //      AND the per-role order (allocation.preference[role]). Tier position is
@@ -34,9 +36,29 @@ const DIFFICULTY_ALIASES = {
   insane: 'insane', xl: 'insane',
 };
 
+const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'insane'];
+
 // 'easy' | 'medium' | 'hard' | 'insane', or null when the spelling is unknown.
 export function normalizeDifficulty(difficulty) {
   return DIFFICULTY_ALIASES[String(difficulty ?? '').trim().toLowerCase()] ?? null;
+}
+
+// The higher of a measured difficulty and a kind's floor. An unknown or absent
+// floor leaves the measured difficulty as it is.
+export function raiseToFloor(difficulty, floor) {
+  const d = normalizeDifficulty(difficulty);
+  const f = normalizeDifficulty(floor);
+  if (!d || !f) return d;
+  return DIFFICULTY_ORDER.indexOf(f) > DIFFICULTY_ORDER.indexOf(d) ? f : d;
+}
+
+// runtimes.yaml roleOfKind entry for one kind as {role, work, floor}. A bare
+// string entry is the role alone.
+export function kindRoute(kind, runtimes) {
+  const entry = runtimes?.roleOfKind?.[kind];
+  if (typeof entry === 'string') return { role: entry, work: null, floor: null };
+  if (!entry || typeof entry !== 'object') return { role: null, work: null, floor: null };
+  return { role: entry.role ?? null, work: entry.work ?? null, floor: normalizeDifficulty(entry.floor) };
 }
 
 function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
@@ -134,14 +156,17 @@ function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, 
   return reasons;
 }
 
-// Full pool selection: kind → role (roleOfKind, overridable), chain =
-// tier∩role, bias, then eligibility per candidate. Returns the first eligible
-// pool with its launch model, or {error} with the full rejected list.
+// Full pool selection: kind → role and floor (roleOfKind, role overridable),
+// difficulty raised to the floor, chain = tier∩role, bias, then eligibility
+// per candidate. Returns the first eligible pool with its launch model, or
+// {error} with the full rejected list.
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir } = {}) {
   const rt = runtimes ?? loadRuntimes(modelsDir);
-  const d = normalizeDifficulty(difficulty);
-  if (!d) return { error: `unknown difficulty '${difficulty}'` };
-  const resolvedRole = role ?? rt?.roleOfKind?.[kind] ?? null;
+  const measured = normalizeDifficulty(difficulty);
+  if (!measured) return { error: `unknown difficulty '${difficulty}'` };
+  const route = kindRoute(kind, rt);
+  const d = raiseToFloor(measured, route.floor);
+  const resolvedRole = role ?? route.role;
   if (!resolvedRole) return { error: `no role resolves for kind '${kind}'` };
   const { chain: unbiased, tierSource } = chainFor({ role: resolvedRole, difficulty: d, runtimes: rt });
   const chain = applyBias(unbiased, bias);
@@ -151,7 +176,9 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, runtimes: rt });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
-    return { target: pool.target ?? target, modelId, effort, role: resolvedRole, difficulty: d, chain, tierSource, rejected };
+    return { target: pool.target ?? target, modelId, effort, role: resolvedRole, work: route.work, difficulty: d,
+      measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected };
   }
-  return { error: `no eligible pool for role '${resolvedRole}' at ${d} difficulty`, role: resolvedRole, difficulty: d, chain, tierSource, rejected };
+  return { error: `no eligible pool for role '${resolvedRole}' at ${d} difficulty`, role: resolvedRole, work: route.work, difficulty: d,
+    measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected };
 }

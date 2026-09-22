@@ -261,8 +261,9 @@ allocationFacts:
     # The (role, difficulty) candidate chain — scripts/agent/models.mjs selectPool executes this.
     chainRule: >-
       chain(role, difficulty) = pools present in BOTH tiers[difficulty] (role key first, then the
-      tier's default) AND preference[role]. Tier position is the outer sort; the per-role preference
-      order breaks ties. A pool missing from either list is not on the chain at all.
+      tier's default) AND preference[role], where difficulty is the measured one raised to the kind's
+      runtimes.yaml roleOfKind floor (a floor never lowers it). Tier position is the outer sort; the
+      per-role preference order breaks ties. A pool missing from either list is not on the chain at all.
     bias: >-
       {prefer: [pools], avoid: [pools]} — prefer hoists the named pools to the front preserving their
       relative chain order; avoid removes them. Bias is applied AFTER the chain is built and NEVER
