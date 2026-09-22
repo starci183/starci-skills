@@ -21,9 +21,12 @@ purpose: |-
 # CONCURRENCY LIVES HERE AND NOWHERE ELSE. `runtimes.<pool>.maxParallel` below is the enforced slot
 # count: scripts/kernel/api.mjs (route capacity), scripts/agent/models.mjs (selectPool) and
 # scripts/route/route-model.mjs read it, and route-model reports any model profile whose cached
-# `capacity.maxParallel` has drifted from it. `maxParallelOps` is the fleet-wide ceiling the kernel
-# reasons against (modules/kernel/driver-loop.yaml); no code enforces it. Every other contract cites
-# this file instead of restating a number.
+# `capacity.maxParallel` has drifted from it. Every other contract cites this file instead of
+# restating a number.
+# `maxParallelOps` is the fleet-wide ceiling across every workflow; `budgets.maxOps` in the owner's
+# config.yaml is the per-workflow one. The lower of the two admits: engine/admission.mjs
+# opSlotCeiling takes min(budgets.maxOps, maxParallelOps) and scripts/kernel/api.mjs refuses
+# route/dispatch with `max-ops` at it.
 maxParallelOps: 20
 allocation:
   # The workflow-bound profile applies adaptive capacity from validated config.yaml; this is the default it overrides.
@@ -72,16 +75,32 @@ allocation:
   # every slot of the pool and leaves the rest of the tree waiting behind it.
   fanOut: {seamFirst: true, maxPerGroup: 10}
   # Deterministic same-op slicing — the kernel measures the write scope and calls `api estimate`;
-  # it never guesses a slice count. W = sum(weight * count) in agent-minutes; the returned slice
-  # count is clamp(ceil(W / targetMinutes[1]), 1, maxSlices) so each slice lands inside
-  # targetMinutes. The static bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a
-  # coarse screen over the same measure — the estimate is the authority. When N > 1 slices are
-  # admitted together the kernel rotates --prefer across the difficulty tier's pool order so the
-  # fleet spreads over devin/codex/claude/qwen lanes instead of piling onto the first pool.
+  # it never guesses an agent count. W = sum(weight * count) in agent-minutes places the closure in
+  # a `size` class, and the class plus the owner's `parallel.gear` (config.yaml) names how many
+  # agents the op asks for. `s` and `m` are always one agent; only `l` and `xl` fan out. The static
+  # bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a coarse screen over the same
+  # measure — the estimate is the authority. When N > 1 slices are admitted together the kernel
+  # rotates --prefer across the difficulty tier's pool order so the fleet spreads over
+  # devin/codex/claude/qwen lanes instead of piling onto the first pool.
+  # A gear never raises a pool's maxParallel, maxParallelOps or budgets.maxOps: it raises only what
+  # `api estimate` requests, and admission still clamps it.
   slicing:
     weights: {file: 4, assertion: 3, component: 12, record: 2}
     targetMinutes: [15, 30]
     maxSlices: 15
+    gears: [1, 2]
+    # Size classes over the same measure. A closure is `xl` when any of its counts reaches an `xl`
+    # bound, `l` when any reaches an `l` bound, `s` when W is inside targetMinutes[0], else `m`.
+    # `l.from.files: 12` is ledger-derived: of 52 settled implement/refactor/author jobs in the
+    # nivo ledger, closures at or above 12 authored files ran a median 46 min against 12 min below
+    # it, the first cutoff where the majority exceeds one targetMinutes[1] window
+    # (.experiments/practices/2026-09-23-parallel-gear.md). Every other `from` bound is the
+    # fable.md sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
+    # windows and no assertion or component measurement at all, so `xl.from` and both `assertions`
+    # bounds have no observation behind them and are re-derived when estimate inputs are recorded.
+    size:
+      l:  {from: {files: 12, assertions: 40},  agents: {1: 3, 2: 5}}
+      xl: {from: {files: 40, assertions: 150}, agents: {1: 6, 2: 10}}
   # The fleet's operating windows, in milliseconds. engine/config.mjs allocationMs() is how code reads
   # them and kernel contracts cite the key rather than restating the number, so each one is changed here
   # and nowhere else. stallAfterMs is the single "this op is no longer working" threshold — the kernel's
