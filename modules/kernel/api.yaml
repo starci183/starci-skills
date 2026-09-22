@@ -620,9 +620,13 @@ commands:
       `api consume-report` is enforced by settle itself, so a report is
       never settled unconsumed; lease and budget_reservation rows released —
       a
-      settle frees the slot; the worker terminal is closed via
-      scripts/agent/lib.mjs — a settled op leaves no live terminal for
-      anyone to reuse; events 'op-settled' {verdict}
+      settle frees the slot; the worker terminal is closed (terminal-close for
+      a command terminal, worker-stop + worker-release for a managed worker)
+      and the op's Orca Task is closed with `task-update --status done`,
+      recorded as taskClosed on the receipt and the job payload — a settled op
+      leaves no live terminal, worker or open Task
+      (modules/kernel/start-workflow.yaml orcaTree is the rule);
+      events 'op-settled' {verdict}
     validates: >-
       The reports ROW is the durable verdict — filed by `api report`,
       integrated by `api consume-report`; the done-marker/message is only
@@ -690,11 +694,14 @@ commands:
       goal row closed (status 'done'); the kernel singleton signal deleted;
       the Kernel job settled with worker_id and terminalHandle cleared; the
       exact Kernel terminal receives a best-effort close request after the
-      durable receipt is emitted; events 'workflow-finished'.
+      durable receipt is emitted; every Task the Run still holds open is closed
+      with `task-update --status done`, so a finished workflow leaves nothing
+      in the Orca tree (modules/kernel/start-workflow.yaml orcaTree);
+      events 'workflow-finished'.
       goals/jobs/reports/events all stay — a
       finished goal is history, not deletion
       (start-workflow.yaml: finished goals never re-enter the queue).
-    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested}'
+    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}]}'
     refuses:
       - workflow-unknown
       - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'
