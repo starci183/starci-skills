@@ -53,10 +53,22 @@ export function validateConfig(config){
       throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>}.');
     if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
   }
-  if(config?.kernel!==undefined){
+  if(plain(config?.kernel)&&Object.hasOwn(config.kernel,'group')){
+    const kernel=config.kernel,group=kernel.group;
+    if(Object.keys(kernel).some(key=>!['group','effort'].includes(key))||!Array.isArray(group)||!group.length||group.some(member=>!plain(member)||Object.keys(member).some(key=>!['agent','model'].includes(key))||typeof member.agent!=='string'||!member.agent.trim()||!(member.model===undefined||member.model===null||typeof member.model==='string'&&member.model.trim())))
+      throw Error('Invalid config.yaml: kernel group must be {group: [{agent, model?}, ...], effort?} with at least one member.');
+    if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error('Invalid config.yaml: kernel.group names each agent once — availability is per provider.');
+    for(const {agent,model} of group){
+      if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: kernel.group agent ${agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+      if(typeof model==='string'&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
+        throw Error(`Invalid config.yaml: kernel.group model ${model} is not declared by a ${agent} runtime.`);
+    }
+    if(kernel.effort!==undefined&&kernel.effort!==null&&!EFFORT_LEVELS.includes(kernel.effort))
+      throw Error('Invalid config.yaml: kernel.effort must use the effort vocabulary.');
+  }else if(config?.kernel!==undefined){
     const kernel=config.kernel;
     if(!plain(kernel)||Object.keys(kernel).some(key=>!['agent','model','effort'].includes(key))||Object.values(kernel).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
-      throw Error('Invalid config.yaml: kernel must be {agent?, model?, effort?} with string-or-null values.');
+      throw Error('Invalid config.yaml: kernel must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.');
     if(typeof kernel.agent==='string'&&!knownProviders.has(kernel.agent))
       throw Error(`Invalid config.yaml: kernel.agent ${kernel.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     if(typeof kernel.effort==='string'&&!EFFORT_LEVELS.includes(kernel.effort))

@@ -160,6 +160,8 @@ function ownerConfigSummary() {
         agent: c?.kernel?.agent ?? null,
         model: c?.kernel?.model ?? null,
         effort: c?.kernel?.effort ?? c?.effort ?? null,
+        ...(Array.isArray(c?.kernel?.group)
+          ? { group: c.kernel.group.map(m => ({ agent: m?.agent ?? null, model: m?.model ?? null })) } : {}),
       },
       budgets: c?.budgets ?? null,
     };
@@ -336,7 +338,7 @@ if (planOnly) {
     assessNote: assess.available ? undefined : assess.note,
     willWrite,
     config: ownerConfigSummary(),
-    kernelRoute: 'precedence: --agent flag > config.yaml kernel pin > route-model',
+    kernelRoute: 'precedence: --agent flag > config.yaml kernel pin or group > route-model',
     ledger: ledgerFileFor(repo),
     revisionPreview: preview ?? undefined,
   };
@@ -361,7 +363,9 @@ if (planOnly) {
   }
   const cfg = out.config;
   lines.push(cfg.file
-    ? `CONFIG: ${cfg.file} — kernel pin agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'} effort=${cfg.kernel?.effort ?? '(default)'}`
+    ? `CONFIG: ${cfg.file} — ${cfg.kernel?.group
+      ? `kernel group ${cfg.kernel.group.map(m => `${m.agent}/${m.model ?? '(pool model)'}`).join(' → ')}`
+      : `kernel pin agent=${cfg.kernel?.agent ?? '(none)'} model=${cfg.kernel?.model ?? '(none)'}`} effort=${cfg.kernel?.effort ?? '(default)'}`
       + (cfg.budgets && Object.values(cfg.budgets).some(v => v != null) ? ` budgets=${JSON.stringify(cfg.budgets)}` : '')
       + (cfg.error ? ` (${cfg.error})` : '')
     : 'CONFIG: no config.yaml — kernel route falls to --agent flag or route-model');

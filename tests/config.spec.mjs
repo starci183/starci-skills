@@ -8,7 +8,7 @@ import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 // config.example.yaml is the shipped default — the installer seeds config.yaml from it verbatim, so it
 // is what loadConfig({initialize:true}) must produce. The spec reads it rather than keeping a copy.
 const EXAMPLE_NON_OPERATION={...parseYaml(fs.readFileSync(new URL('../config.example.yaml',import.meta.url),'utf8')).models.nonOperation};
-const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{agent:'claude',model:'claude-opus-5-5',effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null},delegation:null,budgets:{maxOps:null,perOpMs:null,dailyTokens:null},allocation:{mode:'adaptive',preferredProvider:null},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}}});
+const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{group:[{agent:'claude',model:'claude-opus-5-5'},{agent:'codex',model:'gpt-6-sol'}],effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null},delegation:null,budgets:{maxOps:null,perOpMs:null,dailyTokens:null},allocation:{mode:'adaptive',preferredProvider:null},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}}});
 test('local config initializes the three canonical quota-aware non-operation roles and rejects unknown roles, models and shapes',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));try{fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));assert.deepEqual(loadConfig(root,{initialize:true}),expected());assert.deepEqual(effectiveNonOperationModels(loadConfig(root)).kernelManager,{pool:'sol-opus',runtimes:['claude-agent','codex-agent'],selection:'quota-aware'});const badRole=expected();badRole.models.nonOperation.rescuer='sol-opus';assert.throws(()=>validateConfig(badRole),/closed quota-aware/);fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(badRole));assert.throws(()=>loadConfig(root),/closed quota-aware/,'loadConfig must not reinterpret an unknown non-operation role');const badModel=expected();badModel.models.pools['sol-opus']=['unknown-model','codex-agent'];assert.throws(()=>validateConfig(badModel),/sol-opus/);const reordered=expected();reordered.models.pools['sol-opus']=['codex-agent','claude-agent'];assert.deepEqual(effectiveNonOperationModels(reordered).validator.runtimes,['codex-agent','claude-agent'],'member order is the owner route order');const duplicate=expected();duplicate.models.pools['sol-opus']=['claude-agent','claude-agent'];assert.throws(()=>validateConfig(duplicate),/canonical pair/);assert.throws(()=>nonOperationModels('ownerAuthority',expected()),/Unknown non-operation/);const custom={...expected(),language:'en',model:'test-host-model'};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(custom));assert.deepEqual(loadConfig(root),custom);fs.writeFileSync(path.join(root,'config.yaml'),'null\n');assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('top-level supervisor/validator/critique sections are refused as unknown keys',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-old-'));try{const old=expected();old.supervisor={runtimes:['codex-agent','claude-agent']};old.critique={runtimes:['claude-agent','codex-agent']};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(old));assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('six-role nonOperation drafts are refused by the closed schema',()=>{const draft=expected();draft.models.nonOperation={goalAssessment:['claude-agent','codex-agent'],operationPlanner:['claude-agent','codex-agent'],kernelManager:['claude-agent','codex-agent'],technicalDecision:['claude-agent','codex-agent'],goalCritic:['claude-agent','codex-agent'],validator:['claude-agent','codex-agent']};assert.throws(()=>validateConfig(draft),/Invalid config/);});
@@ -75,7 +75,7 @@ test('supervisor.pollIntervalMs is an owner key: an integer of at least a minute
 test('the shipped example validates on the current catalog and a config naming a removed pool is refused',()=>{
   const example=parseYaml(fs.readFileSync(new URL('../config.example.yaml',import.meta.url),'utf8'));
   assert.equal(validateConfig(example),example);
-  assert.deepEqual(example.kernel,{agent:'claude',model:'claude-opus-5-5',effort:'high'});
+  assert.deepEqual(example.kernel,{group:[{agent:'claude',model:'claude-opus-5-5'},{agent:'codex',model:'gpt-6-sol'}],effort:'high'},'the shipped kernel is the Claude-then-Sol group');
   assert.deepEqual(Object.keys(example.models.pools),['sol-opus']);
   const removed=expected();
   removed.models.pools={'fable-astra':['claude-fable','codex-agent']};
@@ -87,6 +87,29 @@ test('the shipped example validates on the current catalog and a config naming a
   const dangling=expected();
   dangling.models.nonOperation.planner='fable-astra';
   assert.throws(()=>validateConfig(dangling),/models\.nonOperation\.planner/,'a role naming a removed pool is refused');
+});
+
+test('kernel takes a single authoritative pin or an ordered group, never a mix',()=>{
+  const base=expected();
+  const withKernel=kernel=>({...base,kernel});
+  for(const pin of [{agent:'codex',model:'gpt-6-sol',effort:'high'},{model:'claude-opus-5-5'},{agent:'claude'},{agent:null,model:null,effort:null}])
+    assert.doesNotThrow(()=>validateConfig(withKernel(pin)),JSON.stringify(pin));
+  for(const group of [
+    {group:[{agent:'claude',model:'claude-opus-5-5'},{agent:'codex',model:'gpt-6-sol'}],effort:'high'},
+    {group:[{agent:'codex',model:'gpt-6-sol'},{agent:'claude'}]},
+    {group:[{agent:'claude',model:'claude-opus-5-5'}],effort:null},
+  ])assert.doesNotThrow(()=>validateConfig(withKernel(group)),JSON.stringify(group));
+  const refused=[
+    [{group:[]},/at least one member/],
+    [{group:[{agent:'claude'}],agent:'codex'},/kernel group must be/],
+    [{group:[{agent:'claude',model:'claude-opus-5-5',effort:'high'}]},/kernel group must be/],
+    [{group:[{agent:'claude'},{agent:'claude'}]},/each agent once/],
+    [{group:[{agent:'gemini'}]},/kernel\.group agent gemini/],
+    [{group:[{agent:'claude',model:'gpt-6-sol'}]},/model gpt-6-sol is not declared by a claude runtime/],
+    [{group:[{agent:'codex',model:'gpt-6-sol'}],effort:'warp'},/effort vocabulary/],
+    [{agent:'codex',pool:'think'},/kernel must be/],
+  ];
+  for(const [kernel,pattern] of refused)assert.throws(()=>validateConfig(withKernel(kernel)),pattern,JSON.stringify(kernel));
 });
 
 test('delegation is an owner key: a named delegate answers asks until a time, and expires', async () => {
