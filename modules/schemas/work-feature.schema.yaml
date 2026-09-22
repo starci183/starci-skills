@@ -30,7 +30,57 @@ properties:
     $ref: "#/$defs/prose"
     description: What the feature covers and, where it helps, what it deliberately does not. It is the
       orientation a reader needs before opening any leaf.
+  extensions:
+    type: object
+    additionalProperties: false
+    description: Declarations that belong to a numbered extension of the Work model rather than to this
+      family's own vocabulary.
+    properties:
+      work3:
+        type: object
+        additionalProperties: false
+        properties:
+          scope:
+            $ref: "#/$defs/scope"
 $defs:
+  scope:
+    type: object
+    additionalProperties: false
+    required: [nodes, deps, exclusions]
+    description: The bounded scope scope.define writes for one workflow - the proposed nodes it may touch,
+      their declared dependencies and the exclusions it must not touch. It is typed data a planning
+      operation consumes without re-reading the request, kept on the record of the feature that owns the
+      request.
+    properties:
+      request:
+        type: object
+        description: The workflow and approved goal identity and revision this scope bounds, with its
+          outcome and effect ceiling.
+      nodes:
+        type: array
+        items:
+          type: object
+          required: [id]
+          properties:
+            id: {type: string, minLength: 1}
+            dependsOn: {type: array, items: {type: string}}
+      deps:
+        type: array
+        items:
+          type: object
+          required: [from, to]
+          properties:
+            from: {type: string, minLength: 1}
+            to: {type: string, minLength: 1}
+      exclusions:
+        type: array
+        items:
+          type: object
+          required: [reason]
+          properties:
+            reason: {$ref: "#/$defs/prose"}
+      openQuestions:
+        type: array
   prose:
     type: string
     minLength: 1

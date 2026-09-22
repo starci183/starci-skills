@@ -140,7 +140,7 @@ sections:
       - Work metadata uses YAML 1.2 in workspace.yaml, index.yaml, resource.yaml and
         evidence/manifest.yaml. Canonical index.yaml carries the schema const of its own family
         (`work/<family>@1` under `features/`, `work/catalog@1`/`work/feature@1`/`work/brand@1` at
-        their declared positions, `work/node@1` for root-level operations/scope records) and a
+        their declared positions, `work/node@1` for root-level operations records) and a
         readable description field. Domain JSON required by operator contracts remains in
         extensions. YAML schema consts are defined by the catalog under modules/schemas/ — nothing
         is exported into the work tree.
@@ -188,8 +188,9 @@ sections:
       - The flat families `br`, `ac`, `fr`, `nfr`, `data`, `journey`, `decision`, `sds`, `ui`,
         `impl`, `uat`, `contract`, `integration`, `gap` and `event` are the closed set of record
         folders under a feature - no `business/`/`architecture/` wrapper ever appears inside
-        `features/`. Root-level operations and scope records live at `.starciwork/<scope>/`
-        outside `features/` and carry `work/node@1`. Add a new domain as a new family or resource
+        `features/`. Root-level operations records live at `.starciwork/<scope>/` outside
+        `features/` and carry `work/node@1`; a workflow's bounded scope lives on its owning
+        feature record under `extensions.work3.scope`. Add a new domain as a new family or resource
         kind plus its explicit contract, never as an invented folder.
       - 'Accepted art direction/design assets are source inputs: store them in the selected design
         resource directory and declare `files:[{"path":"assets/direction.png"}]` using the real
@@ -217,7 +218,7 @@ sections:
         adapted to fit an observed file."
       - "Every structured artifact an op writes carries its declared `schema:` const as a record
         key: family records `work/<family>@1`, the catalog `work/catalog@1`, the feature overview
-        `work/feature@1`, the brand `work/brand@1`, root-level operations/scope records
+        `work/feature@1`, the brand `work/brand@1`, root-level operations records
         `work/node@1`, the workspace `work/workspace@1`, resources
         `work/resource@1`, evidence manifests `work/evidence@1` (emitted by the kernel from the
         op's manifest fields), the workflow goal `starci/goal@1`, intake records

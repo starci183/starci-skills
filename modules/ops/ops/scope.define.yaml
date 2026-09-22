@@ -1,9 +1,9 @@
 schema: starci/op@1
 id: scope.define
 goal:
-  en: Turn one request into a bounded scope record - the nodes, dependencies and exclusions the
-    selected workflow may touch - by read-only analysis that writes the scope record and nothing
-    else.
+  en: Turn one request into a bounded scope on the owning feature's record - the nodes, dependencies
+    and exclusions the selected workflow may touch - by read-only analysis that performs no effect it
+    scopes.
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects: []
@@ -49,15 +49,21 @@ writes:
         the scope record and actual observations to the evidence result, never to semantic node
         prose.
   - id: scope
-    path: .starciwork/<scope>/index.yaml
-    fields: [schema, id, kind, required, state, description, dependsOn, refs, assertions, extensions.work3.scope]
+    path: .starciwork/features/<feature>/index.yaml
+    fields: [schema, id, title, description, extensions.work3.scope]
     content:
-      en: One scope record (work/node@1, state todo) carrying the bounded scope as typed data under
-        extensions.work3.scope - nodes[] with stable proposed ids, deps[] as real declared node ids
-        and exclusions[] naming what the workflow must not touch. Every named node traces to the
-        request or to an inspected path; a scope item that cannot be grounded is an open question in
-        the record, not an invented entry. Existing decided records are referenced by id, never
-        restated.
+      en: The scope record is the owning feature's own record (work/feature@1, no state) carrying the
+        bounded scope as typed data under extensions.work3.scope - request (workflow, goal identity
+        and revision, outcome, effect ceiling), nodes[] with stable proposed ids, deps[] as real
+        declared node ids, exclusions[] each with its reason, and openQuestions[]. Every named node
+        traces to the request or to an inspected path; a scope item that cannot be grounded is an
+        open question in the record, not an invented entry. Existing decided records are referenced
+        by id, never restated.
+  - id: catalog
+    path: .starciwork/index.yaml
+    fields: [features]
+    content:
+      en: The work/catalog@1 entry of a feature the request introduces.
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
@@ -95,12 +101,16 @@ steps:
       - request
       - records
       - repo
-    writes: [scope, evidence]
+    writes: [scope, catalog, evidence]
     action:
       en: Write the one scope record with the bounded scope as typed data - the proposed nodes, the
-        declared dependencies between them and onto existing records, and the explicit exclusions.
-        Scope the smallest set that completes the request; a material ambiguity about what is wanted
-        is an open question or a blocker, never a guessed node.
+        declared dependencies between them and onto existing records, and the explicit exclusions -
+        on the feature that owns the request; a scope spanning several features is written there
+        once and names the other features' records by id. An existing feature record keeps its
+        schema, id, title and description; a feature the request introduces is created with those
+        four fields plus its catalog entry. Scope the smallest set that completes the request; a
+        material ambiguity about what is wanted is an open question or a blocker, never a guessed
+        node.
   - reads:
       - request
       - records
@@ -124,7 +134,8 @@ proofs:
   - id: no-effects
     requirement:
       en: The analysis performed no source, runtime, publication, deployment or data effect; the only
-        writes are the scope record, this node's kernel fields and the evidence bundle.
+        writes are the scope record, a new feature's catalog entry, this node's kernel fields and the
+        evidence bundle.
   - id: binding
     requirement:
       en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly
@@ -151,7 +162,7 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  scope: Selected scope node directory the record is authored under
+  feature: The feature that owns the request, whose record carries the scope
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
 layoutPolicy:

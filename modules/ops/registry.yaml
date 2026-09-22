@@ -1055,9 +1055,9 @@ ops:
     kindInferred: operate
   - id: scope.define
     family: scope
-    goal: Turn one request into a bounded scope record - the nodes, dependencies and exclusions the
-      selected workflow may touch - by read-only analysis that writes the scope record and nothing
-      else.
+    goal: Turn one request into a bounded scope on the owning feature's record - the nodes, dependencies
+      and exclusions the selected workflow may touch - by read-only analysis that performs no effect
+      it scopes.
     nodeKinds:
       - operations
     completionProfile: operations
@@ -1070,6 +1070,7 @@ ops:
     writes:
       - node
       - scope
+      - catalog
       - evidence
     route:
       nodeKinds:

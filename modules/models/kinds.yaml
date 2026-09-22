@@ -645,8 +645,8 @@ kinds:
     writes: [record]
     knowledge: [architecture-rules, design-patterns, application-stacks]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@1]
+    stacks: [modules/schemas/work-feature.schema.yaml, modules/schemas/work-layout.yaml]
+    carries: [work/feature@1, work/catalog@1]
     purpose: Bound the request into a scope - the nodes the workflow walks, their dependencies, and the exclusions the owner approved.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
