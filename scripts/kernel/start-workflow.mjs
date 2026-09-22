@@ -442,7 +442,7 @@ try {
     // A stale managed kernel may still hold a live Orca worker — settle the
     // exact old dispatch (stop + release) before the seat is cleared so the
     // replacement never runs beside a zombie.
-    if (priorHealth.value?.dispatch) await releaseManagedWorker(priorHealth.value.dispatch);
+    if (priorHealth.value?.dispatch) releaseManagedWorker(priorHealth.value.dispatch);
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(target);
     const at = Date.now();
     ledger.transaction(() => {
