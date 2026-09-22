@@ -522,7 +522,9 @@ commands:
       rolls back or weakens the authoritative report row. The watchdog
       (modules/models/runtimes.yaml allocation.watchdogCadenceMs) is only the fallback for a missed/racing event wake. The file stays the artifact the row binds —
       the ROW is the record, and `api status` projects it so the kernel
-      knows exactly when an op answered and with what outcome.
+      knows exactly when an op answered and with what outcome. A row filed
+      with outcome 'ask' then follows askLifecycle below until it is answered
+      or superseded.
     returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}}'
     refuses:
       - report-missing: 'report file unreadable'
@@ -667,6 +669,21 @@ commands:
       - workflow-unknown
       - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'
     usedBy: 'tick.finish — called only once every job is settled AND the final verify leg passed (driver-loop.yaml)'
+
+# ============================================================================
+# ASK LIFECYCLE — the events an `outcome: ask` report passes through after it
+# is filed. The report row stays OPEN until a terminal kind lands; every reader
+# of open asks honours all of them.
+# ============================================================================
+askLifecycle:
+  servedBy: scripts/kernel/serve-ask.mjs
+  ordering: events are ordered by events.seq — event_id is a random token and orders nothing
+  events:
+    - ask-serving: 'the localhost form is bound and answering. payload {dispatchId, url, fields, ttlMs}; the newest ask-serving for a dispatch is the URL that counts'
+    - ask-serving-expired: 'the --ttl window closed with no submission. payload {dispatchId}; the URL is dead until a re-serve appends a newer ask-serving'
+    - ask-superseded: 'a later ask report for the same (workflow, op) was served and retires this one. payload {dispatchId: <retired ask>, by: <the ask now serving>, opId}; terminal — a retired ask is closed without an answer and is never relayed to the owner'
+    - ask-answered: 'the owner submitted the form. payload {dispatchId, receiptPath, custodyWritten, envWritten, pointersWritten, errors} — names and custody paths only, never values; terminal'
+  open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id; modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead or unserved before it reaches the owner'
 
 # ============================================================================
 # TABLE MAP — which command touches which ledger table (ledger-db.mjs DDL).

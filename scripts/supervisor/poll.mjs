@@ -64,9 +64,10 @@ const probe = async (url, timeoutMs) => {
 };
 
 // An open ask's URL is worth relaying only when it still answers. The ledger
-// already knows when a form server gave up (serve-ask.mjs appends
-// 'ask-serving-expired'), so a dead ask costs no network at all; everything
-// else is probed once per cycle.
+// already knows when a form server gave up (scripts/kernel/serve-ask.mjs
+// appends 'ask-serving-expired'), so a dead ask costs no network at all;
+// everything else is probed once per cycle. An ask that a replacement
+// retired ('ask-superseded') is not open and never reaches here.
 export const askLiveness = async (db, dispatchId, { timeoutMs = PROBE_TIMEOUT_MS } = {}) => {
   const serving = lastEvent(db, 'ask-serving', dispatchId);
   if (!serving) return { url: null, liveness: 'unserved' };
@@ -81,7 +82,8 @@ export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEO
   const asks = db.prepare(
     `SELECT r.workflow_id, r.dispatch_id, r.report_id, r.created_at FROM reports r
       WHERE r.outcome='ask' AND NOT EXISTS (
-        SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id AND e.kind='ask-answered'
+        SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
+          AND e.kind IN ('ask-answered','ask-superseded')
           AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
       ORDER BY r.report_id DESC`).all();
   const seen = new Set(); const out = [];
