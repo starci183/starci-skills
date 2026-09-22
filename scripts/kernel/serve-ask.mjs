@@ -170,22 +170,13 @@ const assetsOf = (assets, repo) => {
 // Candidate draws are always recorded in a draws.yaml next to their assets —
 // when an ask names no paths at all, render the newest draw set rather than
 // leaving the owner to pick blind.
-const drawsImages = (repo) => {
+// The images a draws.yaml names. Only a draws.yaml the ask's own report lists
+// is read: picking "the newest draws.yaml in the tree" once served another
+// workflow's candidates under an unrelated question.
+export const drawsImages = (repo, drawsFile) => {
   const root = path.join(repo, '.starciwork');
-  const candidates = [];
-  const queue = [root]; let head = 0, visited = 0;
-  while (head < queue.length && visited++ < 20000) {
-    const dir = queue[head++];
-    let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
-    for (const e of ents) {
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!e.name.startsWith('.')) queue.push(p); continue; }
-      if (e.name === 'draws.yaml') candidates.push(p);
-    }
-  }
-  candidates.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-  const newest = candidates[0];
-  if (!newest) return [];
+  const newest = drawsFile;
+  if (!newest || !fs.existsSync(newest)) return [];
   const out = [];
   let id = null;
   for (const line of fs.readFileSync(newest, 'utf8').split('\n')) {
@@ -207,11 +198,15 @@ const drawsImages = (repo) => {
   return out;
 };
 
-const reportImages = (files, repo) => {
+export const reportImages = (files, repo) => {
   const out = [], seen = new Set();
   for (const spec of files ?? []) {
     const rel = String(spec).replace(/\\/g, '/');
     const abs = path.join(repo, rel);
+    if (/(^|\/)draws\.yaml$/.test(rel)) {
+      for (const img of drawsImages(repo, abs)) if (!seen.has(img.abs)) { seen.add(img.abs); out.push(img); }
+      continue;
+    }
     if (!/[*{[]/.test(rel)) {
       if (fs.existsSync(abs) && MIME[path.extname(abs).slice(1).toLowerCase()] && !seen.has(abs)) { seen.add(abs); out.push({ label: rel, abs, mtime: fs.statSync(abs).mtimeMs }); }
       continue;
@@ -306,8 +301,11 @@ const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'i
 // <screen>-<choice>[-round-N] / -candidate-<choice>. Returns [] when the
 // images do not partition cleanly into >=2-choice groups — the flat artifact
 // list renders instead. Each choice may carry {idx,label} of its image.
-const pickGroupsOf = (question, images) => {
+export const pickGroupsOf = (question, images) => {
   const imgs = images ?? [];
+  // A question that lists its options already has its answer schema; image
+  // names never add required pick groups to it.
+  if (!question?.picks?.length && (question?.options ?? []).length) return [];
   if (question?.picks?.length) {
     return question.picks.map((p) => ({
       id: String(p.id), label: p.label ?? String(p.id),
@@ -486,7 +484,6 @@ const main = async () => {
   let images = assetsOf(question.assets, repo);
   if (!images.length) images = imagesOf(qText, repo);
   if (!images.length) images = reportImages(rj.files, repo);
-  if (!images.length) images = drawsImages(repo);
   const nonce = `a-${crypto.randomBytes(9).toString('hex')}`;
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 
@@ -640,4 +637,4 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   }, ttl).unref();
 };
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
