@@ -1,0 +1,37 @@
+name: ci
+
+# The repository's own gate: `npm run check` (node --check over every runtime .mjs, the ops-registry
+# freshness check, the provider validator) then the full `npm test` suite, on the Node 22 line the
+# engines field requires. Runs on every push and pull request so a red tree shows up before review.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-and-test:
+    name: check + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static checks
+        run: npm run check
+
+      - name: Test suite
+        run: npm test

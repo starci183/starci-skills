@@ -28,6 +28,10 @@ node_modules/
 __pycache__/
 /scheduled_tasks.lock
 
+# Generated build output under the examples and the packages tree: re-run, never committed.
+examples/**/coverage/
+packages/**/storybook-static/
+
 # ex-testing/ is deleted in the cut; keep the ignore so resurrected scratch
 # never gets committed.
 /ex-testing/

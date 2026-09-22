@@ -1,3 +1,4 @@
+# TODO(owner): the architecture-check steps call node cli/main.mjs which no longer exists; decide fix vs delete (fable.md P0.1).
 name: todo-app-example
 
 # Proves the todo-app example (examples/todo-app-backend + examples/todo-app-frontend) end to end, on a
@@ -9,13 +10,13 @@ on:
   push:
     paths:
       - 'examples/**'
-      - 'schemas/**'
+      - 'modules/schemas/**'
       - 'scripts/checks/check-example-*.mjs'
       - 'scripts/checks/**'
   pull_request:
     paths:
       - 'examples/**'
-      - 'schemas/**'
+      - 'modules/schemas/**'
       - 'scripts/checks/check-example-*.mjs'
       - 'scripts/checks/**'
 
