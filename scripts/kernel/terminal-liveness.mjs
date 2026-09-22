@@ -3,6 +3,16 @@
 // not prove that an LLM turn is still running.  Provider TUIs also keep their
 // input row visible while active, so current activity wins over readyPrompt.
 
+// Screens that wait for a human answer before any turn can run. The runtime
+// names the gate and stops; answering it (directory trust, first-run setup,
+// a tool approval) is the owner's decision.
+const INTERACTIVE_GATES = [
+  { gate: 'codex-directory-trust', pattern: /do you trust the contents of this directory/i },
+  { gate: 'claude-first-run-onboarding', pattern: /let's get started|choose the text style/i },
+  { gate: 'workspace-trust', pattern: /trust the authors/i },
+  { gate: 'tool-approval', pattern: /approve once|permission (?:required|request)|allow `[^`]+` commands|confirm\s*[·•]/i },
+];
+
 export function classifyAgentScreen(screen) {
   const lines = String(screen ?? '').split(/\r?\n/).filter(Boolean);
   const recentLines = lines.slice(-14);
@@ -16,7 +26,6 @@ export function classifyAgentScreen(screen) {
   const topLevelRecent = recentLines
     .filter(line => !/^\s*[│┃┆┊]/u.test(line))
     .join('\n');
-  const interactiveGate = /approve once|permission (?:required|request)|trust the authors|allow `[^`]+` commands|confirm\s*[·•]/i;
   const failure = /not logged in|authentication (?:failed|required)|session expired|fatal error|agent child exited|process exited/i;
   const active = /(?:^|\n)\s*[•*]?\s*(?:Working|Thinking|Running)\b|esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
   // The prompt row may contain a provider message (for example Orca's
@@ -24,7 +33,8 @@ export function classifyAgentScreen(screen) {
   // prompt row is turn-idle unless a current activity marker above wins.
   const readyPrompt = /(?:^|\n)\s*[>›❯❭]\s*(?:\S|$)|(?:^|\n)\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\b/im;
 
-  if (interactiveGate.test(topLevelRecent)) return { state: 'interactive-gate', recent };
+  const gate = INTERACTIVE_GATES.find(({ pattern }) => pattern.test(topLevelRecent));
+  if (gate) return { state: 'interactive-gate', gate: gate.gate, recent };
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
   if (active.test(topLevelRecent)) return { state: 'active', recent };
   if (readyPrompt.test(topLevelRecent)) return { state: 'turn-idle', recent };
