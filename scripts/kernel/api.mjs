@@ -601,14 +601,17 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
 
   const index = opId ? legOps.indexOf(opId) : -1;
   if (index > 0) {
+    // An earlier leg holds this job only while it has a job still in flight or
+    // queued. A leg with no job, or whose jobs all settled, is not a wait: the
+    // plan either never enqueued it (intake legs) or already moved past it.
     const blocking = legOps.slice(0, index)
-      .find((earlier) => !(jobsByOp.get(earlier) ?? []).some((row) => row.status === 'succeeded'));
+      .map((earlier) => ({ earlier, pending: (jobsByOp.get(earlier) ?? []).filter((row) => row.job_id !== job.job_id && !FINAL_SETTLED.includes(row.status)) }))
+      .find(({ pending }) => pending.length > 0);
     if (blocking) {
-      const pending = (jobsByOp.get(blocking) ?? []).filter((row) => !FINAL_SETTLED.includes(row.status));
       return {
         queuedBecause: 'dependency',
-        blockedBy: { op: blocking, job: pending[pending.length - 1]?.job_id ?? null },
-        detail: `approved leg ${blocking} has no job settled succeeded; it precedes ${opId} in the approved order`,
+        blockedBy: { op: blocking.earlier, job: blocking.pending[blocking.pending.length - 1].job_id },
+        detail: `approved leg ${blocking.earlier} still has job ${blocking.pending[blocking.pending.length - 1].job_id} ${blocking.pending[blocking.pending.length - 1].status}; it precedes ${opId} in the approved order`,
       };
     }
   }
@@ -701,8 +704,8 @@ function cmdStatus(ledger, args) {
   // Operations the Kernel can move right now with no wait at all: a queued job
   // to route/dispatch, a fenced launch to reconcile. An 'engaged' frontier that
   // holds one of these is not a reason to yield.
-  const readyOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
-      AND status IN ('queued','effect_unknown')`).get(workflowId).n;
+  const fencedOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
+      AND status='effect_unknown'`).get(workflowId).n;
   // Why each queued job is not running. A queued row is the dispatch candidate;
   // without this the Kernel can only see that it did not move, not what to
   // clear. The causes and their order are QUEUED_BECAUSE above.
@@ -727,6 +730,10 @@ function cmdStatus(ledger, args) {
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
     ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel }),
   }));
+  // Ready means the Kernel can move it now: a queued job nothing holds, or a
+  // fenced launch to reconcile. A queued job waiting on a leg, a slot or a
+  // circuit is not work the Kernel can do this turn.
+  const readyOperations = fencedOperations + queued.filter((item) => item.queuedBecause === 'ready').length;
   const queuedCauses = Object.fromEntries(QUEUED_BECAUSE
     .map((cause) => [cause, queued.filter((item) => item.queuedBecause === cause).length])
     .filter(([, n]) => n > 0));

@@ -232,13 +232,22 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   assert.equal(open.queuedBecause,'circuit-open');
   assert.deepEqual(open.blockedBy,{provider:'claude',pool},'the provider credential that is parked, and the pool that shares it');
 
-  // dependency outranks everything: an approved leg that precedes this op has
-  // no succeeded job, so no admission check can make it dispatchable.
+  // An earlier approved leg that was never enqueued is not a wait: intake legs
+  // often have no job, and a plan that moved past a leg does not re-block on it.
   seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=? AND revision=0')
     .run(json({opChain:{legs:[{op:'scope.define'},{op:'docs.author'}]}}),wf));
+  assert.notEqual(because(second,statusOf()).queuedBecause,'dependency','a leg with no job holds nothing');
+
+  // dependency outranks everything once the earlier leg has a job still queued
+  // or in flight: no admission check can make this op dispatchable before it settles.
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+      VALUES(?,?,?,?,0,'op','op',?,'queued',?,?)`).run('earlier-leg-job',wf,'scope.define',1,json({opId:'scope.define'}),at,at);
+  });
   const dep=because(second,statusOf());
   assert.equal(dep.queuedBecause,'dependency');
-  assert.deepEqual(dep.blockedBy,{op:'scope.define',job:null},'no job of the earlier leg exists at all');
+  assert.deepEqual(dep.blockedBy,{op:'scope.define',job:'earlier-leg-job'},'the earlier leg and its pending job');
   assert.match(dep.detail,/precedes docs\.author in the approved order/);
 });
 
@@ -249,8 +258,8 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>
     const at=Date.now();
     ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,1,0,'kernel','kernel',?,'running',?,?,?)")
       .run(`kernel-${wf}`,wf,json({
-        route:{host:'orca',agent:'codex',model:'gpt-5.6-sol',runtimePool:'codex-agent'},
-        hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-5.6-sol',terminalHandle:'term-kernel'}},
+        route:{host:'orca',agent:'codex',model:'gpt-6-sol',runtimePool:'codex-agent'},
+        hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-kernel'}},
       }),'term-kernel',at,at);
   });
   const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
@@ -265,7 +274,7 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>
   assert.equal(kernel?.nodeId,`agent:kernel:${wf}`);
   assert.equal(kernel?.parentNodeId,`workflow:${wf}`);
   assert.equal(kernel?.runtime?.agent,'codex');
-  assert.equal(kernel?.runtime?.model,'gpt-5.6-sol');
+  assert.equal(kernel?.runtime?.model,'gpt-6-sol');
   assert.equal(op?.parentNodeId,kernel?.nodeId);
   assert.equal(op?.opId,'docs.author');
   assert.ok(body?.edges?.some(e=>e.parentNodeId===kernel.nodeId&&e.childNodeId===op.nodeId));
@@ -516,7 +525,7 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',t
     const at=Date.now(),jobId=`kernel-${wf}`;
     ledger.enqueueJob({jobId,workflowId:wf,kind:'kernel',role:'kernel',payload:{
       hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,
-        role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-5.6-sol',terminalHandle:'term-k7-kernel'}},
+        role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-k7-kernel'}},
     }});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='term-k7-kernel' WHERE job_id=?").run(jobId);
     ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
