@@ -1008,6 +1008,13 @@ function cmdEnqueue(ledger, args) {
   if (ownedPaths.length === 0) {
     throw Object.assign(new Error(`--paths resolved to no path for ${args.op} — an op without owned_paths is an unbounded grant`), { code: 'empty-paths' });
   }
+  // The kernel custody roots (modules/schemas/work-layout.yaml kernelCustody)
+  // belong to the kernel. An op that owns one also takes a path lease every
+  // sibling op in the workflow collides with, which serializes parallel cells.
+  const custody = ownedPaths.filter((p) => /(^|\/)\.starciwork\/(kernel-evidence|kernel-strays|kernel-approvals)(\/|$)/.test(p.replace(/\\/g, '/')));
+  if (custody.length) {
+    throw Object.assign(new Error(`--paths names kernel custody ${custody.join(', ')} for ${args.op}; kernel-evidence, kernel-strays and kernel-approvals are the kernel's, never an op's write set`), { code: 'path-kernel-custody' });
+  }
   const records = [...new Set(String(args.records ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
   const cutValues = [args['cut-id'], args['cut-ordinal'], args['cut-total']];
   const hasCut = cutValues.some((value) => value != null);

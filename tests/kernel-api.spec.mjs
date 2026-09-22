@@ -682,6 +682,11 @@ test('enqueue refuses an unbounded grant, an op with no brief, and a finished wo
   assert.deepEqual([refusal(noPaths).ok,refusal(noPaths).code],[false,'empty-paths']);
   assert.equal(rows(),0,'a refused enqueue writes no jobs row');
 
+  const custody=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/,.starciwork/kernel-evidence/'+wf+'/round2','--json');
+  assert.equal(custody.status,1,'an op never owns kernel custody');
+  assert.deepEqual([refusal(custody).ok,refusal(custody).code],[false,'path-kernel-custody']);
+  assert.equal(rows(),0);
+
   const unknown=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
   assert.equal(unknown.status,1,'an op with no brief must not enqueue');
   assert.deepEqual([refusal(unknown).ok,refusal(unknown).code],[false,'unknown-op']);

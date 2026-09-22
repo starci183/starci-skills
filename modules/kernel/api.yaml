@@ -332,6 +332,7 @@ commands:
       - workflow-finished: 'a finished phase takes no new work (finish below)'
       - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
       - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
+      - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
       - params-invalid: '--params is not a JSON object, names a param the brief does not declare, carries a value of the wrong type or outside its min/max/enum, sets a `setBy: owner` param the approved goal leg does not carry, or a goal leg carries a `setBy: kernel` param (scripts/route/dispatch-op.mjs resolveOpParams)'
     duplicates: >-
