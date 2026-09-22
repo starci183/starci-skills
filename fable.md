@@ -455,3 +455,70 @@ P2 vệ sinh.
 5. **De-sediment CONTEXT.md**: P1.21–23 cộng mục feedback-sediment ở trên.
 6. **Số vào data**: P1.24. Mỗi số một chỗ trong `runtimes.yaml` hoặc `driver-loop.yaml`, code đọc.
 7. P1.25–29 và P2 theo sức.
+
+## alpha.2 lanes (2026-09-22, base `f87a8f34b`)
+
+Nguyên tắc sửa nằm ở `CONTRIBUTING.md` mục "Editing contracts and prose". Mỗi lane một
+worktree, một allowlist, commit trên nhánh riêng, không push. Fable merge theo thứ tự
+A, D, B, C rồi mới cắm E. Devin làm trên `main` trực tiếp theo allowlist riêng.
+
+| Lane | Ai | Allowlist | Việc |
+|---|---|---|---|
+| A | Opus | `.github/**`, `package.json` scripts, `.gitignore`, `packages/package.json` engines | `ci.yml`, script `check`, trigger `modules/schemas/**`, ignore coverage |
+| B | Opus | `modules/kernel/**`, `engine/**`, `scripts/kernel/{api,start-workflow,report-envelope,watchdog}.mjs` trừ vùng Devin, `route-model.mjs`, `runtimes.yaml allocation:`, `kinds.yaml blockers` | verb surface + check, refusal thật, observe, cites check, một authority cho list/hàm, số vào data, ghost engine |
+| C | Opus | `modules/models/**` trừ 2 vùng của B, `modules/host/**`, `_common.yaml`, `modules/goal/**`, `modules/schemas/**`, `modules/quality/**`, `providers.mjs` | xoá coordinator/matrix/solo, concurrency một số, dead cites, `.json` ghost, catalog schema + check, host claims |
+| D | Opus | `scripts/api/orca/**` xoá, `scripts/agent/**`, 3 check mồ côi, `tests/**`, `reference-renders`, `examples/**/coverage` | wrapper chết, scaffold test, stub Orca chung, `npm-package.spec` < 60s, untrack coverage |
+| E | Opus, sau B+C | `CONTEXT.md`, `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `docs/**`, `skills/**`, `.experiments/**`, `knowledge/` rename | de-sediment chat/kernel/watchdog, ghost `distless`, verb list cite, docs vs code, tiếng Việt |
+| Devin | Devin | `modules/supervisor/**`, `scripts/kernel/serve-ask.mjs`, `scripts/kernel/api.mjs` chỉ `rejectDispatch`, `reportDispatchIdOf`, `explicitReportDispatchIdOf`, `requireDispatchedReportBinding`, `writeProviderCircuit` và nhánh readiness/auth; `scripts/kernel/terminal-liveness.mjs`; `modules/ops/ops/interface.{implement,audit}.yaml` | A3–A8 trong `DEVIN_POLL_BUG.md`, theo nhận định ở mục supervisor-poll |
+
+**Nhắn Devin (thầy chuyển giúp):**
+
+1. Đọc `CONTRIBUTING.md` mục "Editing contracts and prose" trước khi sửa tiếp.
+2. Commit `1cc1f19ed` thêm câu "stale form URLs ... relayed only after re-verifying they answer
+   200" vào `supervise.yaml` nhưng `poll.mjs` không probe. Hoặc probe, hoặc bỏ câu. Cùng commit
+   câu "only the watchdog wakes them" sai: `api report` wake kernel sau khi commit row
+   (`op-ipc.spec`). Sửa câu.
+3. Commit `e881f0159` nhét luật vào `writes[].content` và ghép ba path bằng `+` trong một
+   trường `path`. Luật vào `steps[].action`, mỗi path một entry hoặc một glob.
+4. A7: không xoá `managed.dispatchId` khi reject. Report binding lấy từ bảng `contracts`;
+   dispatch bị reject vào `payload.rejectedDispatches[]`.
+5. A6: không cho `poll.mjs` wake kernel. Sửa ở kernel: yield chỉ sau `api status` mới nhất
+   không có frontier actionable.
+6. `DEVIN_POLL_BUG.md` chuyển vào `.claude/.experiments/practices/2026-09-22-supervisor-round1.md`
+   theo format Practiced/Observed/Derived/Open; mục B đưa vào `.starciwork` của dự án.
+7. `poll.mjs`: `reportsSince` phải `WHERE report_id > ?`, không `LIMIT 30` rồi lọc.
+
+**Gate chờ thầy:** `demo.agekey` demo hay rotate; `todo-app-example.yml` sửa hay xoá; agent
+được sửa record `examples/` không; A1 audit tự đo hay tin producer.
+
+## Quyết định của Fable (2026-09-22, thầy uỷ quyền toàn bộ cho tới khi ra `1.0.0-alpha.2`)
+
+1. **`demo.agekey`: giữ, là demo cố ý.** Key chỉ mở env demo của example `todo-app-backend`
+   và CI `live` job cần nó để chạy không secret. Điều kiện: mọi thứ mã hoá bằng key này là
+   giá trị demo, không có credential thật; `examples/todo-app-backend/README.md` và header
+   workflow ghi một câu "demo key, committed on purpose, encrypts demo values only". Nếu sau
+   này example cần secret thật thì key đi vào GitHub secret và rotate, không phải bây giờ.
+2. **`todo-app-example.yml`: sửa cho chạy được bằng script hiện có, bước nào không có script
+   thì xoá.** `node cli/main.mjs architecture check` thay bằng
+   `node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root examples/<app> --all`
+   và check architecture tương đương trong `scripts/checks/` nếu example có config; không có
+   thì bước đó bị xoá. Không giữ `if: false`: bước hoặc chạy, hoặc không tồn tại. Workflow
+   phải xanh trên tree hiện tại trước khi merge.
+3. **Agent được sửa `examples/`.** Checker và schema dưới `modules/schemas/` là authority;
+   record trong example phải khớp schema, không phải ngược lại. Evidence sinh lại bằng script
+   sở hữu (`scripts/example/*`), không sửa tay. `tests/work-change.spec.mjs` và
+   `tests/work-record-schemas.spec.mjs` bỏ skip: viết 8 schema còn thiếu từ record thật, sửa
+   record cho khớp, hoặc sửa checker nếu checker mới là cái lệch so với `work-layout.yaml`.
+4. **A1: audit tự đo.** `interface.audit` đo DOM/computed-style bằng Playwright runner đã lock
+   (cơ chế của `uat.assisted.prepare`), qua `E/screens` + origin đang serve ghi trong
+   `E/runtime.json` của producer. `E/measurements.json` của producer là self-report, audit có
+   thể so chiếu nhưng không bao giờ là proof. Áp trước audit round 2. Vùng này thuộc allowlist
+   Devin; nếu Devin chưa làm khi lane B, C, D merge xong thì lane G làm.
+
+**Phạm vi `1.0.0-alpha.2`:** toàn bộ inventory P0–P2, bảy điểm của Devin, bốn quyết định trên,
+lane E prose, lane F examples (workflow + record + 8 schema). Sang `alpha.3`: op-shape và
+`params`, `lib.mjs` đọc `calls.yaml` + live agent-context, QUALITY-BAR thành check.
+
+**Điều kiện ra alpha.2:** `npm run check` xanh, `npm test` không skip nào ngoài PowerShell
+7, CI `ci.yml` và `todo-app-example.yml` xanh trên `main`, CHANGELOG mục alpha.2 liệt kê
+đúng những gì đã landed, tag `v1.0.0-alpha.2` sau khi thầy xem diff.
