@@ -231,8 +231,8 @@ rules:
            */ — opens with a capitalised claim, then the evidence, then the corrected history
       - id: case-2
         when: Config
-        write: the eslint.config.mjs blocks that record why a rule is at error, with the measured debt (nợ=0 (296/296)
-          in source)
+        write: the eslint.config.mjs blocks that record why a rule is at error, with the measured debt
+          (debt=0 (296/296) in source)
     verification:
       automated:
         - NEST_COMMENT_FORM

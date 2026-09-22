@@ -32,6 +32,5 @@ __pycache__/
 examples/**/coverage/
 packages/**/storybook-static/
 
-# ex-testing/ is deleted in the cut; keep the ignore so resurrected scratch
-# never gets committed.
+# Scratch space for throwaway experiments: use it freely, it is never committed.
 /ex-testing/

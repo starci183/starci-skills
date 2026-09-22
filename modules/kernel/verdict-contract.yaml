@@ -112,7 +112,7 @@ returns:
 
   suspicion:
     meaning: >-
-      Optional free-text: the 'cấn cấn' signal — the agent's statement that
+      Optional free-text: the mid-flight wrongness signal — the agent's statement that
       something upstream is wrong (a spec contradicts the work, the scope
       doesn't cover reality, the goal looks wrong). Free text because doubt
       is not enumerable; routing it is the driver's job.
