@@ -834,7 +834,6 @@ const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split
 const PROVIDER_HEALTH_SCOPE = 'provider-health';
 const normalizeProviderId = (provider) => {
   const id = String(provider ?? '').trim().toLowerCase();
-  if (id === 'fable' || id === 'claude-fable') return 'claude';
   return id.replace(/-agent$/, '');
 };
 const failureText = (...parts) => parts.map((part) => {

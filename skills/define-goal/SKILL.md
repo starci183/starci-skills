@@ -33,8 +33,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 2. **Extract routing bias** — read the owner prompt yourself and write
    `{prefer:[], avoid:[]}` from its intent (e.g. "prefer codex", "use claude",
    "don't use qwen" → prefer/avoid those pools, in whatever language the owner
-   wrote it; aliases: codex/claude/fable/qwen/devin → `<name>-agent`, `fable` →
-   `claude-fable`).
+   wrote it; aliases: codex/claude/qwen/devin → `<name>-agent`).
    You understand the phrasing — a regex would not. Then normalize it through
    the canonicalizer so casing/aliases are cleaned and `avoid` wins conflicts:
 
