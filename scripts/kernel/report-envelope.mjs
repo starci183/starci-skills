@@ -32,6 +32,25 @@ const underOwned = (file, ownedPaths) => {
   });
 };
 
+// A report file written in a legacy code page (Windows PowerShell 5.1
+// Set-Content, a native-exe argument) reaches the ledger with every
+// non-ASCII letter replaced by '?' ("Ch?n tuy?n c?ng khai"), and an owner ask
+// is then served unreadable. Text that lost its characters is refused, never
+// stored: the words cannot be recovered from the ledger afterwards.
+const LOSSY_MARK = /\p{L}\?\p{L}|\?\?\p{L}|\uFFFD/gu;
+export function lossyTextFields(value) {
+  const fields = [];
+  const scan = (label, v) => { if (typeof v === 'string') fields.push([label, v]); };
+  scan('summary', value?.summary);
+  scan('question.text', value?.question?.text);
+  (Array.isArray(value?.question?.options) ? value.question.options : []).forEach((o, i) => scan(`question.options[${i}]`, typeof o === 'string' ? o : o?.label));
+  scan('blocker.detail', value?.blocker?.detail);
+  (Array.isArray(value?.open) ? value.open : []).forEach((o, i) => scan(`open[${i}]`, o));
+  const marks = fields.map(([label, text]) => [label, (text.match(LOSSY_MARK) ?? []).length]).filter(([, n]) => n > 0);
+  const total = marks.reduce((sum, [, n]) => sum + n, 0);
+  return total >= 3 || fields.some(([, text]) => text.includes("\uFFFD")) ? marks.map(([label]) => label) : [];
+}
+
 // validateOpReport(value, {ownedPaths, identity}) — identity fields present in
 // the file must match the job's truth (identity = {run, task, dispatch, from});
 // absent ones are stamped by the caller. Returns {ok:true, report} or
@@ -62,6 +81,9 @@ export function validateOpReport(value, { ownedPaths = [], identity = {} } = {})
   if (value.outcome === 'partial' && (!Array.isArray(value.open) || !value.open.length || value.open.some((o) => !text(o)))) fail("outcome 'partial' requires a nonempty open[] of unfinished items");
   if (value.outcome === 'ask' && (!value.question || !text(value.question.text))) fail("outcome 'ask' requires question.text");
   if (value.outcome === 'blocked' && (!value.blocker || !BLOCKER_KINDS.includes(value.blocker.kind) || !text(value.blocker.detail))) fail(`outcome 'blocked' requires blocker {kind <- ${BLOCKER_KINDS.join('|')}, detail}`);
+
+  const lossy = lossyTextFields(value);
+  if (lossy.length) fail(`text in ${lossy.join(', ')} lost its non-ASCII characters ('?' inside words): write the report file as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8 / [IO.File]::WriteAllText) and file it again`);
 
   for (const k of ['run', 'task', 'dispatch', 'from']) {
     if (value[k] !== undefined && identity[k] != null && value[k] !== identity[k]) fail(`identity '${k}' is '${value[k]}' but the job binds '${identity[k]}'`);
