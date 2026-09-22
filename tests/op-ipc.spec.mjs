@@ -6,6 +6,10 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+// Lease resource_keys are 'path:' + this normalization — the one the api takes
+// its requests from and the ledger's conflict finder resolves with, never a
+// mirror of it ('docs/' fences 'path:docs').
+import {normalizeOwnedPath} from '../engine/admission.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -38,7 +42,7 @@ const LANDED={
   // marker is absent from api.mjs today — 'contract'/'lease_token' alone would
   // false-positive on the existing prompt-builder and rejectDispatch code.
   dispatchIpc:has(/\bINTO\s+contracts\b/i,/\b(writeContract|upsertContract|putContract|fileContract)\b/)
-    &&has(/phase-transition/)
+    &&has(/phase-transition/,/\btransitionWorkflowToRunning\b/)
     &&has(/\bINTO\s+leases\b/i,/\breserveTwoPhase\b/,/\bacquireLease\b/),
   report:has(/\breport-filed\b/,/\bcmdReport\b/,/\bcase 'report'/,/\breport:\s*\[/),
   opContract:has(/\bop-contract\b/,/\bcmdOpContract\b/),
@@ -60,10 +64,6 @@ const WORKFLOW='wf-op-ipc';
 const OP='code.refactor';
 const OWNED=['docs/','src/op-ipc.txt'];
 const checkEnvelope=(...checks)=>({checks});
-// api.mjs's normalizeOwnedPath, mirrored: lease resource_keys are
-// 'path:' + the owned path with separators canonicalised and trailing
-// slashes stripped ('docs/' fences 'path:docs').
-const normalizeOwnedPath=p=>String(p).replace(/\\/g,'/').replace(/\/{2,}/g,'/').replace(/^\.\//,'').replace(/\/+$/,'');
 
 const fixture=(t,{mode='healthy'}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-op-ipc-'));

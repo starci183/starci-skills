@@ -29,6 +29,20 @@ export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
  * live leases and unsettled jobs are never touched. See compactSnapshots below.
  */
 export const RETENTION={snapshotBodiesKept:1,droppedGenerationRows:0};
+/**
+ * The workflows.phase queued → running write, in one place: kernel boot (scripts/kernel/start-workflow.mjs)
+ * and the first `api dispatch` of a workflow both take it. Guarded on phase='queued' so a kernel restart is
+ * idempotent and a finished workflow is never regressed; the 'phase-transition' event is appended only when
+ * the row actually moved, and an already-running workflow only gets a fresh updated_at. Call inside the
+ * caller's transaction. Returns true when this call moved the row.
+ */
+export function transitionWorkflowToRunning(ledger,{workflowId,now=Date.now(),generation=null}){
+  const moved=ledger.db.prepare("UPDATE workflows SET phase='running',updated_at=? WHERE workflow_id=? AND phase='queued'").run(now,workflowId).changes>0;
+  if(moved)ledger.appendEvent({workflowId,entityType:'workflow',entityId:workflowId,...(generation==null?{}:{generation}),
+    kind:'phase-transition',payload:{from:'queued',to:'running'},createdAt:now});
+  else ledger.db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(now,workflowId);
+  return moved;
+}
 /** Give freed pages back to the filesystem where the file was created to allow it; a no-op on an older file. */
 export function reclaimSpace(db){try{db.exec('PRAGMA incremental_vacuum');}catch{}}
 

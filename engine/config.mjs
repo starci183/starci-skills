@@ -66,6 +66,22 @@ export function readOwnerConfig(root=configRoot){
   return null;
 }
 export const loadOwnerConfig=readOwnerConfig;
+/**
+ * The tolerant read the kernel boot and the router share: an owner file that is absent, unparsable or
+ * short of the closed schema must never stop a workflow from routing. Returns
+ * {file, config, error, invalid} — `config` is the validated config, or the raw parse when it fails the
+ * schema (with `invalid` naming the reason), or null when the file is absent or `error` says why it
+ * could not be read at all.
+ */
+export function inspectOwnerConfig(root=configRoot){
+  const file=path.join(root,'config.yaml');
+  if(!fs.existsSync(file))return {file,config:null,error:null,invalid:null};
+  let parsed;
+  try{parsed=parseYaml(fs.readFileSync(file,'utf8'))??null;}
+  catch(error){return {file,config:null,error:`config.yaml unparsable: ${error.message}`,invalid:null};}
+  try{return {file,config:validateConfig(parsed),error:null,invalid:null};}
+  catch(error){return {file,config:parsed,error:null,invalid:error.message};}
+}
 export function loadConfig(root=configRoot,{initialize=false}={}){
   const yaml=path.join(root,'config.yaml');
   if(initialize&&!fs.existsSync(yaml)){

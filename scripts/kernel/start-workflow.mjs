@@ -30,7 +30,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { openLedger, ledgerFileFor, transitionWorkflowToRunning } from '../../engine/ledger-db.mjs';
+import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
@@ -48,32 +49,13 @@ const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
 const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
 
 // Owner config: <skillRoot>/config.yaml — the per-project config seeded from
-// config.example.yaml by the installer (gitignored). engine/config.mjs is
-// tried first for an owner-config reader; when it exports none the yaml is
-// parsed directly with the same parser the rest of this file uses.
-// A missing or unparsable file is never fatal — routing falls through to
-// route-model. STARCI_OWNER_ROOT points the reader at a
-// different directory holding a config.yaml (test and tooling seam).
+// config.example.yaml by the installer (gitignored), read through the one
+// reader in engine/config.mjs. A missing, unparsable or schema-short file is
+// never fatal — routing falls through to route-model and says why.
+// STARCI_OWNER_ROOT points the reader at a different directory holding a
+// config.yaml (test and tooling seam).
 const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
 const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRoot, file) : file;
-async function readOwnerConfig() {
-  const file = path.join(ownerRoot, 'config.yaml');
-  if (!fs.existsSync(file)) return { file, config: null, error: null };
-  const engineLoader = path.join(skillRoot, 'engine', 'config.mjs');
-  let engineError = null;
-  if (fs.existsSync(engineLoader)) {
-    try {
-      const mod = await import(pathToFileURL(engineLoader).href);
-      for (const name of ['loadOwnerConfig', 'readOwnerConfig'])
-        if (typeof mod[name] === 'function')
-          return { file, config: mod[name](ownerRoot) ?? null, error: null };
-    } catch (e) { engineError = `engine/config.mjs: ${e.message}`; }
-  }
-  try {
-    const config = parseYaml(fs.readFileSync(file, 'utf8')) ?? null;
-    return { file, config, error: null, ...(engineError ? { engineError } : {}) };
-  } catch (e) { return { file, config: null, error: `config.yaml unparsable: ${e.message}`, ...(engineError ? { engineError } : {}) }; }
-}
 
 // Provider liveness probe: scripts/api/quota/index.mjs exports
 // probeQuota(provider) → {state, usedPercent, detail}; 'dead' means the
@@ -221,7 +203,7 @@ async function resolveKernelRoute() {
         error: `explicit kernel agent '${agentOverride}' probe is dead (${probe.detail ?? 'not authenticated'})` };
     return completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] });
   }
-  const owner = await readOwnerConfig();
+  const owner = inspectOwnerConfig(ownerRoot);
   const kc = owner.config?.kernel;
   const cfgAgent = typeof kc?.agent === 'string' && kc.agent.trim() ? kc.agent.trim() : null;
   const cfgModel = typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
@@ -232,7 +214,7 @@ async function resolveKernelRoute() {
     agent: cfgAgent, model: cfgModel, effort: cfgEffort,
     budgets: owner.config?.budgets ?? null,
     ...(owner.error ? { error: owner.error } : {}),
-    ...(owner.engineError ? { engineLoader: owner.engineError } : {}),
+    ...(owner.invalid ? { configInvalid: owner.invalid } : {}),
   } : null;
   const warnings = [];
   if (cfgAgent) {
@@ -612,18 +594,7 @@ try {
       ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,?,'kernel','kernel',?,'running',?,?,?)")
         .run(`kernel-${workflowId}`, workflowId, null, generation, payload, workerId, now, now);
     }
-    // Phase transition — the canonical write (api.mjs dispatch carries the
-    // same update as a safety net). Guarded on phase='queued' so a kernel
-    // restart is idempotent and a finished/archived workflow is never
-    // regressed; the event is appended only when the row actually moved.
-    const transitioned = ledger.db.prepare("UPDATE workflows SET phase='running',updated_at=? WHERE workflow_id=? AND phase='queued'")
-      .run(now, workflowId);
-    if (transitioned.changes > 0) {
-      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation,
-        kind: 'phase-transition', payload: { from: 'queued', to: 'running' }, createdAt: now });
-    } else {
-      ledger.db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(now, workflowId);
-    }
+    transitionWorkflowToRunning(ledger, { workflowId, now, generation });
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: replaced ? 'kernel-restarted' : 'kernel-booted',
       payload: { terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,

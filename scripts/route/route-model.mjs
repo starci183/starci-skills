@@ -41,39 +41,20 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel } from '../agent/models.mjs';
+import { inspectOwnerConfig } from '../../engine/config.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
 
 // --- owner config (config.yaml) --------------------------------------------------
-// engine/config.mjs's owner-config reader (readOwnerConfig/loadOwnerConfig) is
-// preferred when present; otherwise the yaml is parsed directly. A missing or
-// unparsable file is never fatal — callers degrade to "no config" and route
-// exactly as before.
+// engine/config.mjs inspectOwnerConfig is the one reader. STARCI_OWNER_ROOT
+// points it at a different directory holding a config.yaml (test and tooling
+// seam). A missing, unparsable or schema-short file is never fatal — routing
+// degrades to "no config" and reports why.
 const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
-async function readOwnerConfig() {
-  const file = path.join(ownerRoot, 'config.yaml');
-  if (!fs.existsSync(file)) return { file, config: null, error: null };
-  const engineLoader = path.join(skillRoot, 'engine', 'config.mjs');
-  let engineError = null;
-  if (fs.existsSync(engineLoader)) {
-    try {
-      const mod = await import(pathToFileURL(engineLoader).href);
-      for (const name of ['loadOwnerConfig', 'readOwnerConfig'])
-        if (typeof mod[name] === 'function')
-          return { file, config: mod[name](ownerRoot) ?? null, error: null };
-    } catch (e) { engineError = `engine/config.mjs: ${e.message}`; }
-    // No usable export (or the import failed) — the direct yaml read below is
-    // the fallback; an engine error is annotated, never fatal.
-  }
-  try {
-    const config = parseYaml(fs.readFileSync(file, 'utf8')) ?? null;
-    return { file, config, error: null, ...(engineError ? { engineError } : {}) };
-  } catch (e) { return { file, config: null, error: `config.yaml unparsable: ${e.message}`, ...(engineError ? { engineError } : {}) }; }
-}
 
 // Which config.yaml models.nonOperation role serves each kernel-function kind —
 // the same map engine/config.mjs resolves through nonOperationModels().
@@ -394,7 +375,7 @@ function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profil
   const configLine = {
     file: owner.config ? path.relative(skillRoot, owner.file) : null,
     ...(owner.error ? { error: owner.error } : {}),
-    ...(owner.engineError ? { engineLoader: owner.engineError } : {}),
+    ...(owner.configInvalid ? { configInvalid: owner.configInvalid } : {}),
     effort: owner.effort ?? null,
     preferredProvider: owner.preferredProvider ?? null,
     ...(w.modelFunction ? { kernelRole: owner.cfgRole ?? null, pool: owner.cfgPoolName ?? null, members: owner.cfgMembers ?? null } : {}),
@@ -484,7 +465,7 @@ async function main() {
   // kinds to a configured pool, allocation.preferredProvider is a bounded owner
   // bias over order (never a fallback chain — it permutes, it does not shrink
   // eligibility), effort is surfaced for the caller. Absent file → no effect.
-  const ownerFile = await readOwnerConfig();
+  const ownerFile = inspectOwnerConfig(ownerRoot);
   const ownerCfg = ownerFile.config;
   const cfgRole = KERNEL_FUNCTION_ROLE[args.kind] ?? null;
   const cfgPoolName = cfgRole ? ownerCfg?.models?.nonOperation?.[cfgRole] : null;
@@ -494,7 +475,7 @@ async function main() {
     && ownerCfg.allocation.preferredProvider.trim() ? ownerCfg.allocation.preferredProvider.trim() : null;
   const effort = (w.modelFunction ? ownerCfg?.kernel?.effort ?? ownerCfg?.effort : ownerCfg?.effort) ?? null;
   const owner = { file: ownerFile.file, config: ownerCfg, error: ownerFile.error,
-    engineError: ownerFile.engineError ?? null,
+    configInvalid: ownerFile.invalid ?? null,
     cfgRole, cfgPoolName, cfgMembers, preferredProvider, effort };
 
   const candidates = loadCandidates(modelsDir);
@@ -564,7 +545,7 @@ async function main() {
     config: {
       file: ownerCfg ? path.relative(skillRoot, owner.file) : null,
       ...(owner.error ? { error: owner.error } : {}),
-      ...(owner.engineError ? { engineLoader: owner.engineError } : {}),
+      ...(owner.configInvalid ? { configInvalid: owner.configInvalid } : {}),
       effort: effort ?? null,
       preferredProvider,
       ...(w.modelFunction ? { kernelRole: cfgRole, pool: cfgPoolName ?? null, members: cfgMembers ?? null } : {}),

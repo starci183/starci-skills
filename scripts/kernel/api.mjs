@@ -34,9 +34,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   openLedger, ledgerFileFor, machineFileFor, openMachine,
-  newToken, JOB_STATUSES, reserveTwoPhase,
+  newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { ownedPathLeaseRequests } from '../../engine/admission.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
@@ -1106,12 +1107,10 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
 // settle already uses. An open failure returns !ok: a dispatch that cannot
 // fence must not launch.
 const DISPATCH_LEASE_TTL_MS = 30 * 60 * 1000; // bounds a crashed worker's fence; settle releases early
-const normalizeOwnedPath = (p) => String(p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
-const opLeaseRequests = (payload) => [...new Set((payload.owned_paths ?? [])
-  .map((p) => (typeof p === 'string' ? p : p?.path))
-  .filter(Boolean)
-  .map((p) => `path:${normalizeOwnedPath(p)}`))]
-  .map((resourceKey) => ({ resourceKey, units: 1 }));
+// engine/admission.mjs owns owned-path normalization and the capacity-1 lease
+// request per minimal prefix — the same function the ledger's conflict finder
+// resolves paths with, so a request and a held lease can never disagree.
+const opLeaseRequests = (payload) => ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean));
 
 const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS } = {}) => {
   const db = ledger.db, leases = opLeaseRequests(payload);
@@ -1132,16 +1131,6 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS }
       leases, ttlMs,
     });
   } finally { machine.close(); }
-};
-
-// The canonical workflows.phase write (mirrors start-workflow.mjs): guarded
-// on phase='queued' so a finished/archived workflow is never regressed, and
-// the phase-transition event is appended only when the row actually moved.
-const transitionQueuedToRunning = (ledger, workflowId, now) => {
-  const moved = ledger.db.prepare("UPDATE workflows SET phase='running',updated_at=? WHERE workflow_id=? AND phase='queued'").run(now, workflowId);
-  if (moved.changes > 0) {
-    ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'phase-transition', payload: { from: 'queued', to: 'running' }, createdAt: now });
-  }
 };
 
 // The kernel → worker half of the op IPC: one contracts row per
@@ -1387,7 +1376,7 @@ function cmdDispatch(ledger, args, repo) {
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(handle, JSON.stringify(payload), now, jobId);
-    transitionQueuedToRunning(ledger, job.workflow_id, now);
+    transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, generation: job.generation });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
@@ -1653,7 +1642,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(dispatchId, JSON.stringify(payload), now, jobId);
-    transitionQueuedToRunning(ledger, job.workflow_id, now);
+    transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, generation: job.generation });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
