@@ -1,17 +1,13 @@
-# modules/ops/ops/decision.prepare.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: decision.prepare
 goal:
-  en: >-
-    Prepare one decision the runtime takes provisionally - the question, why it matters, the options analysed
-    per side, one recommendation - or answer the question from the records the product already decided. The
-    runtime never decides for the owner: it carries the recommendation into the work and the owner overturns it
-    later with workflow-answer. A provision (a credential, an account, a dataset, an authority) is not prepared
-    here; that is provision.ask, the one operation that waits for the owner.
-nodeKinds:
-  - business
+  en: "Prepare one decision the runtime takes provisionally - the question, why it matters, the
+    options analysed per side, one recommendation - or answer the question from the records the
+    product already decided. The runtime never decides for the owner: it carries the recommendation
+    into the work and the owner overturns it later with workflow-answer. A provision (a credential,
+    an account, a dataset, an authority) is not prepared here; that is provision.ask, the one
+    operation that waits for the owner."
+nodeKinds: [business]
 completionProfile: business
 sideEffects: []
 graphPolicy:
@@ -21,23 +17,22 @@ graphPolicy:
   dispatch: never
 reads:
   - id: question
-    path: "the operation goal (section 'Question for the owner') and the operation that asked it"
+    path: the operation goal (section 'Question for the owner') and the operation that asked it
     purpose:
-      en: Read the question exactly as it was raised - by which operation, of which kind (business, design,
-        authority, credential), what it blocks - before anything is written. A question of business, design,
-        authority, security, money or customer data is the owner's to answer; only a mechanical one is not.
+      en: Read the question exactly as it was raised - by which operation, of which kind (business,
+        design, authority, credential), what it blocks - before anything is written.
   - id: decided
-    path: ".starciwork/features/<feature>/**/index.yaml (done)"
+    path: .starciwork/features/<feature>/**/index.yaml (done)
     purpose:
       en: Read every decided flat Work record the question touches - rules, requirements, data, decisions,
-        design, contracts, integrations. A decided record that already settles the question is the answer,
-        named by id; the owner is not asked twice.
+        design, contracts, integrations. A decided record that already settles the question is the
+        answer, named by id; the owner is not asked twice.
   - id: environment
     path: repository:<repo-id>/<bound-paths>
     purpose:
       en: For a credential or configuration question, read where the code reads the value - the exact
         variable name - and which identity custody of this tree
-        (.starciwork/_resources/identity/<slug>/) holds it. Never the value itself.
+        (.starciwork/_resources/identity/<slug>/) holds it.
 writes:
   - id: decision
     path: .starciwork/features/<feature>/decision/<slug>/index.yaml
@@ -55,69 +50,69 @@ writes:
       - change
     content:
       en: One work/policy-decision@1 record draft (id decision.<feature>.<slug>, state todo, outcome open,
-        the shape of the existing policy decisions of the tree), carrying in order the question; tension,
-        naming by id the decided records the question strains between and the statement of that strain;
-        the options, each with an id, a summary and its consequence for the design, the rules, the
-        security and authority, and what it costs; and exactly one recommendation with its reason. Real
-        product-shaped content, no placeholder, no secret value. The options array contains at least two
-        distinct concrete mutually exclusive policy outcomes in the exact presentation order before
-        owner presentation. Questions beginning with Whether are agenda topics, not yes/no decisions.
-        Repair an unprepared options array in this operation before requesting an answer.
+        the shape of the existing policy decisions of the tree), carrying in order the question;
+        tension, naming by id the decided records the question strains between and the statement of
+        that strain; the options, each with an id, a summary and its consequence for the design, the
+        rules, the security and authority, and what it costs; and exactly one recommendation with
+        its reason. Real product-shaped content, no placeholder, no secret value. The options array
+        contains at least two distinct concrete mutually exclusive policy outcomes in the exact
+        presentation order before owner presentation. Questions beginning with Whether are agenda
+        topics, not yes/no decisions. Repair an unprepared options array in this operation before
+        requesting an answer.
 steps:
   - reads:
       - question
       - decided
     writes: []
     action:
-      en: >-
-        Try the decided records first. When one settles the question, report done with the first line of
-        the summary exactly "answered-from: <record id>" followed by the answer in one paragraph, and write
-        nothing.
+      en: "Try the decided records first. When one settles the question, report done with the first line
+        of the summary exactly \"answered-from: <record id>\" followed by the answer in one
+        paragraph, and write nothing. A question of business, design, authority, security, money or
+        customer data is the owner's to answer; only a mechanical one is not."
   - reads:
       - question
       - decided
       - environment
-    writes:
-      - decision
+    writes: [decision]
     action:
       en: Otherwise write the one policy-decision record draft with the question, the decided records it
         strains between named in tension.records, the numbered options analysed per side and one
-        recommendation. A provision is not prepared here; that is provision.ask.
+        recommendation. A provision is not prepared here; that is provision.ask. Never the value
+        itself.
   - reads:
       - question
     writes: []
     action:
-      en: >-
-        Print the question and its numbered options in this terminal and say that the owner may answer here
-        with the number, or later with workflow-answer; do not wait - a decision is taken provisionally on the
-        recommendation and the owner overturns it later.
+      en: Print the question and its numbered options in this terminal and say that the owner may answer
+        here with the number, or later with workflow-answer; do not wait - a decision is taken
+        provisionally on the recommendation and the owner overturns it later.
   - reads:
       - question
     writes: []
     action:
-      en: >-
-        Run `starci validate` and report done exactly once: first line "decision: <record id>", then
-        "recommended: <n>", then the options numbered as the owner will answer them. If the owner happened to
-        answer here already, the first line is "answered-by-owner: <n>" instead.
-
+      en: 'Run `starci validate` and report done exactly once: first line "decision: <record id>", then
+        "recommended: <n>", then the options numbered as the owner will answer them. If the owner
+        happened to answer here already, the first line is "answered-by-owner: <n>" instead.'
 proofs:
   - id: decided-first
     requirement:
-      en: A question a decided record settles is answered from that record, by id, and no record is written.
+      en: A question a decided record settles is answered from that record, by id, and no record is
+        written.
   - id: one-record
     requirement:
       en: Otherwise exactly one policy-decision record draft exists with the question, the tension records
-        by id, the numbered options analysed per side and one recommendation, and the workspace validates.
-        The explicit options array contains concrete selectable outcomes, not an agenda of topics.
+        by id, the numbered options analysed per side and one recommendation, and the workspace
+        validates. The explicit options array contains concrete selectable outcomes, not an agenda
+        of topics.
   - id: asked-in-the-terminal
     requirement:
-      en: The question and its numbered options were printed in this operation's own terminal, with both ways
-        to answer them, before any report was sent.
+      en: The question and its numbered options were printed in this operation's own terminal, with both
+        ways to answer them, before any report was sent.
   - id: no-secret
     requirement:
       en: No value of any credential or secret appears in the record, the report, the terminal or anywhere
-        else; a credential is put into the tree's encrypted identity custody by the owner's own command and
-        this operation verifies only that it is present.
+        else; a credential is put into the tree's encrypted identity custody by the owner's own
+        command and this operation verifies only that it is present.
 blockers:
   - code: QUESTION_UNCLEAR
     condition:
@@ -134,38 +129,10 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "What is the decidable question, its options analysed per side, and the one
-    recommendation the runtime carries provisionally until the owner overturns
-    it?"
-  whenNeeded:
-    - When another operation raises an owner question (business/design/authority) that needs a decidable record.
-    - When the question is already settled by a decided record - then answered-from: <id> is returned and nothing is written.
-  whenNot:
-    - Not for provisions - a credential/account/dataset is provision.ask, which actually waits for the owner.
-    - Not for mechanical questions the runtime can answer itself; never decides money/authority/customer-data silently.
-  consumes:
-    - The question as raised; decided flat Work records; environment facts (a credential question cites the variable name + custody, never the value).
-  produces:
-    - One work/policy-decision@1 record draft (outcome open, state todo) with numbered options and exactly one recommendation.
-    - Terminal print of the question for the owner; provisional recommendation the runtime may carry until overturned.
-  failureModes:
-    - QUESTION_UNCLEAR, DECLARED_DEPENDENCY_UNMET (declared blockers).
-    - Missing options is repaired in-op before requesting an answer - the record must be decidable, not just stored.
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [business]
   phase: [decide, cross-cutting]
   intent: [decision, prepare, owner-question]
-  prerequisites: ["a decidable question raised by another op"]
+  prerequisites: [a decidable question raised by another op]

@@ -1,14 +1,18 @@
-# modules/ops/ops/business.decide.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: business.decide
 goal:
   en: Specify the selected business slice with the minimum complete observable behavior needed to
     implement and independently accept it, then refine that contract from authoritative feedback.
-nodeKinds:
-  - business
-  - business-overview
+params:
+  readingsStated:
+    type: integer
+    default: 3
+    min: 2
+    max: 5
+    setBy: kernel
+    doc:
+      en: How many candidate readings a repair enumerates before choosing one.
+nodeKinds: [business, business-overview]
 completionProfile: business
 sideEffects: []
 graphPolicy:
@@ -20,12 +24,8 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read the current feature record and its flat spec records, refs, dependencies, proof demands
-        and validator freshness. Pre-existing work/node@N records under business/ or architecture/ are
-        read-only legacy inputs: they carry the accepted requirement content this op refines into flat
-        records, they never satisfy the flat writes below, and they are never edited or extended. For an
-        explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace,
-        then create only that selected scope. Preserve unaffected accepted content."
+      en: Read the current feature record and its flat spec records, refs, dependencies, proof demands and
+        validator freshness. Preserve unaffected accepted content.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -40,23 +40,18 @@ reads:
       en: Classify each statement as intent, observed fact, example, proposal, unknown or contradiction,
         with source citation/revision. Existing behavior does not authorize a new rule.
   - id: specification
-    path: modules/ops/ops/business.decide.yaml + modules/schemas/work-layout.yaml + modules/schemas/work-*.schema.yaml
+    path: modules/ops/ops/business.decide.yaml + modules/schemas/work-layout.yaml +
+      modules/schemas/work-*.schema.yaml
     purpose:
       en: Read the record family contracts and this operator procedure before authoring the .starciwork
         payload.
-  - id: matrix
-    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
-    purpose:
-      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
-        input bindings, requested output JSON shapes and required criteria. Standalone execution
-        needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority.
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof. Capabilities are the intersection of actual tools, selected profile
+        policy, op permissions and existing task authority.
 writes:
   - id: node
     path: .starciwork/features/<feature>/{index.yaml,fr/**/index.yaml,nfr/**/index.yaml,br/**/index.yaml,decision/**/index.yaml,data/**/index.yaml,journey/**/index.yaml}
@@ -74,48 +69,30 @@ writes:
       - family payload
     content:
       en: Every authored index.yaml is a flat work/*@1 record at its family path under
-        features/<feature>/, where <family> is one of fr, nfr, br, decision, data or journey.
-        The feature's readable overview is features/<feature>/index.yaml (work/feature@1) carrying
+        features/<feature>/, where <family> is one of fr, nfr, br, decision, data or journey. The
+        feature's readable overview is features/<feature>/index.yaml (work/feature@1) carrying
         purpose, customer understanding, outcome, scope and open questions in title/description.
         Author each requirement as work/functional-requirement@1 under fr/<name>/ (actors, trigger,
         mainFlow, exceptionFlows, postconditions, composes, requiresProof), each quality as
-        work/non-functional-requirement@1 under nfr/<name>/, each rule as work/business-rule@1
-        under br/<name>/ with its acceptance criteria inline or under br/<rule>/ac/<name>/, each
-        policy question as work/policy-decision@1 under decision/<name>/, each data definition as
+        work/non-functional-requirement@1 under nfr/<name>/, each rule as work/business-rule@1 under
+        br/<name>/ with its acceptance criteria inline or under br/<rule>/ac/<name>/, each policy
+        question as work/policy-decision@1 under decision/<name>/, each data definition as
         work/data@1 under data/<name>/ and each customer journey as work/customer-journey@1 under
         journey/<name>/. Keep each FR's main, alternative and exception flows, branch review,
-        postconditions and acceptance together in its own record. When a legacy work/node@N tree under
-        business/ already states the requirement, restate it faithfully in the flat records - the job is
-        not done until the selected slice exists as flat records; the legacy tree stays untouched for the
-        canonicalization sweep to retire.
-        For a not-yet-implemented slice, author the smallest decision-complete contract covering actor goal,
-        observable outcome, material invariants and permissions, relevant branches, acceptance and
-        consequential open decisions. Do not pre-author hypothetical future capabilities or source-local
-        mechanics merely to make the document look comprehensive. Keep the selected spec records at
-        state todo while implementation, test/E2E or UAT evidence is still open; never invent another
-        lifecycle state. A passing business.decide job means the current requirement seed is reviewed
-        and usable downstream, not that the record or feature is done.
-        Write all canonical spec content in English, including natural-language prose, YAML/schema
-        keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables, types,
-        operation names and source symbols. Stable semantic refs resolve
-        through exact owning Work refs without copying.
-  - id: matrixHandoff
-    path: E/job-result.yaml
-    fields:
-      - requestId
-      - requestDigest
-      - op
-      - operation when selected
-      - status
-      - criteria
-      - outputs
-      - artifacts
-    content:
-      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
-        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
-        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
-        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
-        The selected request freezes output field schemas before execution.
+        postconditions and acceptance together in its own record. When a legacy work/node@N tree
+        under business/ already states the requirement, restate it faithfully in the flat records -
+        the job is not done until the selected slice exists as flat records; the legacy tree stays
+        untouched for the canonicalization sweep to retire. For a not-yet-implemented slice, author
+        the smallest decision-complete contract covering actor goal, observable outcome, material
+        invariants and permissions, relevant branches, acceptance and consequential open decisions.
+        Do not pre-author hypothetical future capabilities or source-local mechanics merely to make
+        the document look comprehensive. Keep the selected spec records at state todo while
+        implementation, test/E2E or UAT evidence is still open; never invent another lifecycle
+        state. A passing business.decide job means the current requirement seed is reviewed and
+        usable downstream, not that the record or feature is done. Write all canonical spec content
+        in English, including natural-language prose, YAML/schema keys, stable IDs/refs, enum
+        literals, protocol identifiers, API fields, variables, types, operation names and source
+        symbols. Stable semantic refs resolve through exact owning Work refs without copying.
 steps:
   - reads:
       - target
@@ -123,22 +100,25 @@ steps:
       - repo
       - specification
       - profile
-    writes:
-      - node
+    writes: [node]
     action:
-      en: Resolve the canonical .starciwork workspace and selected business leaf. Research accepted
+      en: "Resolve the canonical .starciwork workspace and selected business leaf. Research accepted
         intent and supplied domain documents. Classify every citation as accepted intent, observed
-        source, proposal or unknown; source behavior never
-        approves policy. Bound authoring to the next selected implementation slice. Separate what must
-        be decided now from later product possibilities and source-local implementation choices; record
-        only consequential unknowns. Resolve the execution profile and actual tool availability before selecting
-        instruments; this does not switch the model/runtime or spawn workers.
+        source, proposal or unknown; source behavior never approves policy. Bound authoring to the
+        next selected implementation slice. Separate what must be decided now from later product
+        possibilities and source-local implementation choices; record only consequential unknowns.
+        Resolve the execution profile and actual tool availability before selecting instruments;
+        this does not switch the model/runtime or spawn workers. Pre-existing work/node@N records
+        under business/ or architecture/ are read-only legacy inputs: they carry the accepted
+        requirement content this op refines into flat records, they never satisfy the flat writes
+        below, and they are never edited or extended. For an explicitly new target, absence is
+        expected: inspect the nearest existing ancestor/workspace, then create only that selected
+        scope."
   - reads:
       - intent
       - target
       - repo
-    writes:
-      - node
+    writes: [node]
     action:
       en: Write purpose, scope/exclusions, glossary, assumptions, actors with
         responsibilities/rights/restrictions, FR/BR and observable NFRs. Specify business data
@@ -149,23 +129,22 @@ steps:
   - reads:
       - intent
       - repo
-    writes:
-      - node
+    writes: [node]
     action:
-      en: "Every selected FR resolves to an implementation-ready flow, not a title alone: trigger, primary/supporting actors,
-        inputs, preconditions, numbered actor/request/system-response steps, guards, effects,
-        failures, repeat behavior and success/failure postconditions. Alternative and exception
-        branches identify their starting step, condition, ordered steps, resume/end and acceptance.
-        Review denied/invalid input, cancellation, duplicate/retry, concurrency and recovery where
-        they can materially change the observable result of this slice; explain absent branch classes
-        without fabricating cases. Do not expand generic edge-case inventories that have no plausible
-        actor, state or acceptance consequence in the selected slice."
+      en: "Every selected FR resolves to an implementation-ready flow, not a title alone: trigger,
+        primary/supporting actors, inputs, preconditions, numbered actor/request/system-response
+        steps, guards, effects, failures, repeat behavior and success/failure postconditions.
+        Alternative and exception branches identify their starting step, condition, ordered steps,
+        resume/end and acceptance. Review denied/invalid input, cancellation, duplicate/retry,
+        concurrency and recovery where they can materially change the observable result of this
+        slice; explain absent branch classes without fabricating cases. Do not expand generic
+        edge-case inventories that have no plausible actor, state or acceptance consequence in the
+        selected slice."
   - reads:
       - target
       - intent
       - repo
-    writes:
-      - node
+    writes: [node]
     action:
       en: Review observable outcomes against accepted intent and observed behavior. Business states what
         users and the system must do, not class inheritance, repositories, service placement,
@@ -175,8 +154,7 @@ steps:
   - reads:
       - intent
       - repo
-    writes:
-      - node
+    writes: [node]
     action:
       en: Specify actor-action-resource permissions, tenant/owner boundaries, sensitive-data handling and
         abuse cases. Give each security requirement an observable denial/no-side-effect acceptance
@@ -184,52 +162,47 @@ steps:
   - reads:
       - intent
       - target
-    writes:
-      - node
+    writes: [node]
     action:
-      en: Author the feature's readable overview at features/<feature>/index.yaml and typed flat
-        work/*@1 records under fr/, nfr/, br/, decision/, data/ and journey/ as the selected slice
-        requires. Every item owns a folder/index.yaml carrying its own family schema const; deeper
-        name segments may group related records but every index.yaml is a complete record. Keep each
-        FR's flows, branch review, postconditions and acceptance cohesive. Write all canonical spec
-        content in English, including natural-language prose, YAML/schema keys, stable IDs/refs,
-        enum literals, protocol identifiers, API fields, variables, types, operation names and
-        source symbols. Connect semantic IDs to exact owning Work refs.
+      en: Author the feature's readable overview at features/<feature>/index.yaml and typed flat work/*@1
+        records under fr/, nfr/, br/, decision/, data/ and journey/ as the selected slice requires.
+        Every item owns a folder/index.yaml carrying its own family schema const; deeper name
+        segments may group related records but every index.yaml is a complete record. Keep each FR's
+        flows, branch review, postconditions and acceptance cohesive. Connect semantic IDs to exact
+        owning Work refs.
   - reads:
       - target
       - intent
       - repo
-    writes:
-      - node
+    writes: [node]
     action:
       en: "Repair mode (the `business.revise` kind this operator also carries) is not a second decision: a
-        requirement that is silent, ambiguous or settled twice in two ways is revised here, never escalated
-        and never left for a builder to read a meaning into. Read the reported gap, state the two or three
-        readings the recorded requirement actually admits, and choose the most reasonable one from the
-        accepted records of this feature, the decided records of the other features and the product's own
-        conventions. Write that reading into the requirement, rule or journey with the acceptance an
-        implementer derives code from, bump the record's change.rev, and append EXACTLY ONE
-        extensions.work3.decisionLog entry {rev, at, gap, chosen, why, alternatives}, never rewriting or
-        deleting an earlier one. One exception: when the readings differ in an observable outcome about
-        money, authority or customer data, do not choose silently - report ask with question.kind decision,
-        one numbered option per reading with what each costs and who it affects, and one recommendation; the
-        kernel writes that decision record for the owner and carries the work on the recommendation until
-        they answer. Never ask for anything else. Treat implementation feedback as evidence about feasibility
-        or a missing observable case, not as business authority: revise only when it exposes an actual
-        requirement gap or accepted owner feedback. File names, private helper choices and other reversible
-        source-local details remain in Implementation and do not trigger a spec revision. Preserve valid
-        unrelated content and invalidate only downstream proof affected by the accepted delta."
+        requirement that is silent, ambiguous or settled twice in two ways is revised here, never
+        escalated and never left for a builder to read a meaning into. Read the reported gap, state
+        every reading the recorded requirement actually admits, up to `params.readingsStated`, and
+        choose the most reasonable one from the accepted records of this feature, the decided
+        records of the other features and the product's own conventions. Write that reading into the
+        requirement, rule or journey with the acceptance an implementer derives code from, bump the
+        record's change.rev, and append EXACTLY ONE extensions.work3.decisionLog entry {rev, at,
+        gap, chosen, why, alternatives}, never rewriting or deleting an earlier one. One exception:
+        when the readings differ in an observable outcome about money, authority or customer data,
+        do not choose silently - report ask with question.kind decision, one numbered option per
+        reading with what each costs and who it affects, and one recommendation; the kernel writes
+        that decision record for the owner and carries the work on the recommendation until they
+        answer. Never ask for anything else. Treat implementation feedback as evidence about
+        feasibility or a missing observable case, not as business authority: revise only when it
+        exposes an actual requirement gap or accepted owner feedback. File names, private helper
+        choices and other reversible source-local details remain in Implementation and do not
+        trigger a spec revision. Preserve valid unrelated content and invalidate only downstream
+        proof affected by the accepted delta."
   - reads:
       - target
       - repo
       - intent
-      - matrix
-    writes:
-      - node
-      - matrixHandoff
+    writes: [node]
     action:
-      en: Validate detailed requirement/flow/branch/acceptance coverage and the Work tree.
-        Review contradictions, scope and unresolved decisions with the user. Leave the selected spec
+      en: Validate detailed requirement/flow/branch/acceptance coverage and the Work tree. Review
+        contradictions, scope and unresolved decisions with the user. Leave the selected spec
         records state todo after the review. Open material issues stay in blockedBy and produce
         partial or blocked; they are never hidden by schema validity. Output reviewed business
         outcomes and observable security/quality acceptance for Architecture; no implementation or
@@ -240,9 +213,9 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
-        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done.
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly
+        proposed, required assertions are covered, input bindings are current, and an honest
+        not-run/fail cannot earn done.
   - id: coverage
     requirement:
       en: Each item needed by the selected implementation slice has acceptance IDs and source intent;
@@ -253,18 +226,18 @@ proofs:
     requirement:
       en: Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps
         and postconditions, and security has observable negative acceptance. Validate flat family
-        placement and every authored work/*@1 record's own schema contract; no code/service inventory
-        is required in Business. Existing specification@1 and srs@1 records are readable inputs, never
-        new output.
+        placement and every authored work/*@1 record's own schema contract; no code/service
+        inventory is required in Business. Existing specification@1 and srs@1 records are readable
+        inputs, never new output.
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
-        record changed, its change.rev higher than it was, and exactly one new extensions.work3.decisionLog
-        entry naming the gap, the chosen reading, why it is the most reasonable one by the records it was
-        read from, and the alternatives that were not taken. A changed record with no entry is a defect. A
-        reading that changes an observable outcome about money, authority or customer data and was taken
-        without a decision record with numbered options and one recommendation is a defect, whatever else
-        the revision gets right."
+        record changed, its change.rev higher than it was, and exactly one new
+        extensions.work3.decisionLog entry naming the gap, the chosen reading, why it is the most
+        reasonable one by the records it was read from, and the alternatives that were not taken. A
+        changed record with no entry is a defect. A reading that changes an observable outcome about
+        money, authority or customer data and was taken without a decision record with numbered
+        options and one recommendation is a defect, whatever else the revision gets right."
 blockers:
   - code: BUSINESS_UNKNOWN
     condition:
@@ -273,9 +246,9 @@ blockers:
   - code: BUSINESS_CONTRADICTION
     condition:
       en: Accepted sources conflict on an observable outcome about money, authority or customer data;
-        preserve both citations and put the numbered options with one recommendation to the actual owner,
-        never average them. A conflict that changes no such outcome is not this blocker - it is revised to
-        the most reasonable reading with the reason in the decision log.
+        preserve both citations and put the numbered options with one recommendation to the actual
+        owner, never average them. A conflict that changes no such outcome is not this blocker - it
+        is revised to the most reasonable reading with the reason in the decision log.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
@@ -297,43 +270,10 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "What must the product observably do - actors, flows, rules, policy
-    decisions, data, customer journeys, acceptance - stated so an implementer
-    and an acceptor need no guesses?"
-  whenNeeded:
-    - When a selected scope needs a minimum decision-complete requirement seed: only the flat work/*@1 records required by the next implementation slice, plus the feature's readable overview.
-    - Repair mode (business.revise secondary request): when implementation evidence or accepted feedback proves an observable requirement silent, ambiguous or contradictory.
-  whenNot:
-    - Not for technical design - that is architecture.decide; this op does not design components or pick frameworks.
-    - Not for code/service inventories - repo reads ground the requirements, they are not the deliverable.
-    - Not for speculative completeness across unselected future capabilities or reversible source-local choices; those do not block the selected slice.
-    - Never turns observed source behavior into approved policy; money/authority/customer-data conflicts go to the owner via ask, never averaged silently.
-  consumes:
-    - Target feature record and its flat spec records; accepted user intent, domain documents and prior decided records.
-    - Repo observation for grounding (existing behavior is a candidate fact, not authority).
-    - modules/schemas/work-layout.yaml and the work-*.schema.yaml family contracts.
-  produces:
-    - features/<feature>/index.yaml overview + flat work/*@1 records (fr, nfr, br, decision, data, journey) at their family paths.
-    - change.rev bumps and decisionLog entries on every revision; E/ matrix job-result when selected.
-    - Downstream: the reviewed requirement seed + journeys that architecture.decide, scope.define and verification ops consume; later evidence may refine them through a new reviewed revision. This op does not author record state done.
-  failureModes:
-    - BUSINESS_UNKNOWN, BUSINESS_CONTRADICTION, DECLARED_DEPENDENCY_UNMET (declared blockers).
-    - A changed record without a decisionLog entry is a defect; unreviewed contradiction cannot be hidden in prose.
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [business, business-overview]
   phase: [decide, pre-implementation]
   intent: [business, srs, requirements, decide]
-  prerequisites: ["scope defined"]
+  prerequisites: [scope defined]

@@ -1,13 +1,18 @@
-# modules/ops/ops/architecture.decide.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: architecture.decide
 goal:
   en: Design the selected implementation slice with the minimum complete flow-led, source-independent
     architecture needed to build safely, then refine it from concrete implementation evidence.
-nodeKinds:
-  - architecture
+params:
+  readingsStated:
+    type: integer
+    default: 3
+    min: 2
+    max: 5
+    setBy: kernel
+    doc:
+      en: How many candidate readings a repair enumerates before choosing one.
+nodeKinds: [architecture]
 completionProfile: architecture
 sideEffects: []
 graphPolicy:
@@ -17,30 +22,27 @@ graphPolicy:
   dispatch: never
 reads:
   - id: design-patterns
-    path: knowledge/architecture-rules.yaml + knowledge/design-patterns.yaml + docs/design-pattern-catalog.md
+    path: knowledge/architecture-rules.yaml + knowledge/design-patterns.yaml +
+      docs/design-pattern-catalog.md
     purpose:
-      en: Apply the fixed NestJS/Next.js ownership standard and select only patterns triggered by the
-        actual scenario. Review transaction/effect boundaries, state authority, concurrency, failure
-        and recovery using primary sources where needed. Record decisions in the existing design;
-        pattern names and source observations are not behavioral proof or authority for code edits.
+      en: Review transaction/effect boundaries, state authority, concurrency, failure and recovery using
+        primary sources where needed. Record decisions in the existing design; pattern names and
+        source observations are not behavioral proof or authority for code edits.
   - id: application-stacks
-    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md +
+      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
-        credential custody, lifecycle commands and existing consumers. Run the static stacks
-        check when validating a materialized stack; bind its exact inputs and limitations.
-        Acceptance additionally requires the selected real startup, persistence, recovery and
-        application checks. This conditional read grants no extra deployment or source scope.
+        credential custody, lifecycle commands and existing consumers. Run the static stacks check
+        when validating a materialized stack; bind its exact inputs and limitations. Acceptance
+        additionally requires the selected real startup, persistence, recovery and application
+        checks. This conditional read grants no extra deployment or source scope.
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read current target, ancestor scope, refs, dependencies, proof demands and validator freshness.
-        Pre-existing work/node@N records under business/ or architecture/ are read-only legacy inputs:
-        they carry accepted content this op refines into flat records, they never satisfy the flat
-        writes below, and they are never edited or extended. For an explicitly new target, absence is
-        expected: inspect the nearest existing ancestor/workspace, then create only that selected
-        scope. Preserve unaffected accepted content."
+      en: Read current target, ancestor scope, refs, dependencies, proof demands and validator freshness.
+        Preserve unaffected accepted content.
   - id: business
     path: .starciwork/features/<feature>/{index.yaml,fr/**/index.yaml,nfr/**/index.yaml,br/**/index.yaml,decision/**/index.yaml,data/**/index.yaml,journey/**/index.yaml}
     purpose:
@@ -56,28 +58,23 @@ reads:
         using primary documentation where necessary; do not present a design as deployed-source
         observation.
   - id: specification
-    path: modules/ops/ops/architecture.decide.yaml + modules/schemas/work-layout.yaml + modules/schemas/work-*.schema.yaml
+    path: modules/ops/ops/architecture.decide.yaml + modules/schemas/work-layout.yaml +
+      modules/schemas/work-*.schema.yaml
     purpose:
       en: Read the record family contracts and this operator procedure before authoring the .starciwork
         payload.
   - id: feasibility
     path: Selected repositories, relevant configuration and installed API declarations
     purpose:
-      en: Inspect only surfaces material to the selected design so targets and migration are feasible.
-        The survey informs but never overrides accepted SRS or supplies completion proof.
-  - id: matrix
-    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
-    purpose:
-      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
-        input bindings, requested output JSON shapes and required criteria. Standalone execution
-        needs no fabricated matrix request. A template is not authority for extra effects.
+      en: The selected repositories, their relevant configuration and the installed API declarations the
+        design targets.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority.
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof. Capabilities are the intersection of actual tools, selected profile
+        policy, op permissions and existing task authority.
 writes:
   - id: node
     path: .starciwork/features/<feature>/{sds/**/index.yaml,contract/**/index.yaml,integration/**/index.yaml}
@@ -102,48 +99,29 @@ writes:
         features/<feature>/, where <family> is sds, contract or integration. Author logical
         components as work/sds-component@1 under sds/<name>/ (responsibility, interfaces, owners,
         refs, dependsOn, stateMachine, sequence, requiresProof), synchronous surfaces between a
-        provider feature and a consumer feature as work/contract@1 under contract/<name>/
-        (between, owner, surface, guarantees, consumerObligations), and each external system as
+        provider feature and a consumer feature as work/contract@1 under contract/<name>/ (between,
+        owner, surface, guarantees, consumerObligations), and each external system as
         work/integration@1 under integration/<name>/ (provider, boundary, endpoints, credential
         {name, providedBy: owner, where}, sandbox, requiresProof.live) with the declaring side
-        naming it in extensions.work3.integrations and dependsOn/refs. When a legacy work/node@N tree
-        under architecture/ already states the design, restate it faithfully in the flat records - the
-        job is not done until the selected slice exists as flat records; the legacy tree stays
-        untouched for the canonicalization sweep to retire. Components prescribe
-        logical responsibilities and interfaces without repository roles, paths, symbols,
-        signatures, source status or revision evidence. For a not-yet-implemented slice, author
-        the smallest design-complete map that settles
-        logical ownership, contracts, authority, durable state/effects, material failure/recovery and
-        planned verification. Do not invent endpoints, tables, event topics, retry counts, file layouts
-        or private helpers unless an accepted constraint makes that logical contract necessary. Keep the
-        selected design records at state todo while implementation, test/E2E or UAT evidence is still
-        open; never invent another lifecycle state.
-        A passing architecture.decide job means the current design seed is reviewed and usable
-        downstream, not that the record or feature is done. Link reviewed todo requirement inputs
-        through refs; do not place them
-        in dependsOn, because the durable business.decide-to-architecture.decide job edge owns
-        execution order.
-        Write all canonical design content in English, including natural-language prose,
-        YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
-        types, operation names and source symbols. Preserve business and shared
-        design through stable IDs and exact owning Work refs."
-  - id: matrixHandoff
-    path: E/job-result.json
-    fields:
-      - requestId
-      - requestDigest
-      - op
-      - operation when selected
-      - status
-      - criteria
-      - outputs
-      - artifacts
-    content:
-      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
-        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
-        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
-        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
-        The selected request freezes output field schemas before execution.
+        naming it in extensions.work3.integrations and dependsOn/refs. When a legacy work/node@N
+        tree under architecture/ already states the design, restate it faithfully in the flat
+        records - the job is not done until the selected slice exists as flat records; the legacy
+        tree stays untouched for the canonicalization sweep to retire. Components prescribe logical
+        responsibilities and interfaces without repository roles, paths, symbols, signatures, source
+        status or revision evidence. For a not-yet-implemented slice, author the smallest
+        design-complete map that settles logical ownership, contracts, authority, durable
+        state/effects, material failure/recovery and planned verification. Do not invent endpoints,
+        tables, event topics, retry counts, file layouts or private helpers unless an accepted
+        constraint makes that logical contract necessary. Keep the selected design records at state
+        todo while implementation, test/E2E or UAT evidence is still open; never invent another
+        lifecycle state. A passing architecture.decide job means the current design seed is reviewed
+        and usable downstream, not that the record or feature is done. Link reviewed todo
+        requirement inputs through refs; do not place them in dependsOn, because the durable
+        business.decide-to-architecture.decide job edge owns execution order. Write all canonical
+        design content in English, including natural-language prose, YAML/schema keys, stable
+        IDs/refs, enum literals, protocol identifiers, API fields, variables, types, operation names
+        and source symbols. Preserve business and shared design through stable IDs and exact owning
+        Work refs."
 steps:
   - reads:
       - design-patterns
@@ -154,25 +132,30 @@ steps:
       - specification
       - feasibility
       - profile
-    writes:
-      - node
+    writes: [node]
     action:
       en: "Resolve accepted requirement scope, drivers, actors and platform constraints from canonical
         Work. Read modules/schemas/work-layout.yaml and the work-sds-component/work-contract/
-        work-integration schema contracts. Survey relevant source,
-        configuration and installed APIs; then independently record retain, extend, correct, replace
-        or add decisions with rationale, impact and migration. Bound the design to the next selected
-        implementation slice and separate material logical decisions from reversible source-local
-        mechanics. Prescribe logical responsibilities,
-        interfaces, state and failure behavior. Repository/file/symbol/call mappings and actual
-        revisions or proof belong to Implementation. Never write product
-        code or present a design constraint as deployed behavior."
+        work-integration schema contracts. Survey relevant source, configuration and installed APIs;
+        then independently record retain, extend, correct, replace or add decisions with rationale,
+        impact and migration. Bound the design to the next selected implementation slice and
+        separate material logical decisions from reversible source-local mechanics. Prescribe
+        logical responsibilities, interfaces, state and failure behavior.
+        Repository/file/symbol/call mappings and actual revisions or proof belong to Implementation.
+        Never write product code or present a design constraint as deployed behavior. Apply the
+        fixed NestJS/Next.js ownership standard and select only patterns triggered by the actual
+        scenario. Pre-existing work/node@N records under business/ or architecture/ are read-only
+        legacy inputs: they carry accepted content this op refines into flat records, they never
+        satisfy the flat writes below, and they are never edited or extended. For an explicitly new
+        target, absence is expected: inspect the nearest existing ancestor/workspace, then create
+        only that selected scope. Inspect only surfaces material to the selected design so targets
+        and migration are feasible. The survey informs but never overrides accepted SRS or supplies
+        completion proof."
   - reads:
       - target
       - business
       - constraints
-    writes:
-      - node
+    writes: [node]
     action:
       en: Write logical components with responsibilities, exclusions and dependency directions. Contracts
         have one owner, caller/receiver, sync/async/in-process mode, inputs, outcomes/errors,
@@ -186,48 +169,44 @@ steps:
       - target
       - business
       - constraints
-    writes:
-      - node
+    writes: [node]
     action:
       en: Design runtime scenarios referencing canonical fr record IDs. Every step names its component,
-        logical operation, callers/receivers, contracts, authorization, data,
-        transaction/state decision, return path, failure outcome, recovery and planned verification.
-        Repository roles, paths, symbols and signatures belong to the later Implementation mapping;
-        do not attach source status or revision evidence. Cover significant architectural
-        differences, including response loss, concurrency, duplicates, ordering, partial success and
-        cancellation only where they can materially change this slice's contract or recovery.
+        logical operation, callers/receivers, contracts, authorization, data, transaction/state
+        decision, return path, failure outcome, recovery and planned verification. Repository roles,
+        paths, symbols and signatures belong to the later Implementation mapping; do not attach
+        source status or revision evidence. Cover significant architectural differences, including
+        response loss, concurrency, duplicates, ordering, partial success and cancellation only
+        where they can materially change this slice's contract or recovery.
   - reads:
       - target
       - business
       - constraints
-    writes:
-      - node
+    writes: [node]
     action:
       en: Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle,
         placement, connections and credential custody. For durable customer state, examine database
-        consistency, complete backup set, authoritative/derived state, volumes, config, Secrets/keys,
-        custody outside the relevant failure domain, restore destination/order, reconciliation,
-        old-writer fencing and safe effect resumption. Volume bytes alone do not prove recovery.
-        Select failure domains and recovery depth from actual scope, not a mandatory checklist for
-        every project.
+        consistency, complete backup set, authoritative/derived state, volumes, config,
+        Secrets/keys, custody outside the relevant failure domain, restore destination/order,
+        reconciliation, old-writer fencing and safe effect resumption. Volume bytes alone do not
+        prove recovery. Select failure domains and recovery depth from actual scope, not a mandatory
+        checklist for every project.
   - reads:
       - target
       - business
       - constraints
-    writes:
-      - node
+    writes: [node]
     action:
       en: Challenge one coherent proposal with a materially simpler alternative, rationale, cost,
         downsides and revisit conditions. Patterns are optional; specify actual mechanisms rather
         than names. Use applicable StarCi knowledge, verified installed APIs and primary technical
-        references with an applicability argument. Do not invent business targets or product policy; make technical choices within
-        approved requirements.
+        references with an applicability argument. Do not invent business targets or product policy;
+        make technical choices within approved requirements.
   - reads:
       - target
       - business
       - constraints
-    writes:
-      - node
+    writes: [node]
     action:
       en: Write relevant quality/threat/failure scenarios with trigger, impact, response, owner and
         planned design checks linked to SRS acceptance. Keep residual risk and limitations explicit.
@@ -237,76 +216,75 @@ steps:
       - target
       - business
       - constraints
-      - matrix
-    writes:
-      - node
-      - matrixHandoff
+    writes: [node]
     action:
       en: Validate flat family layout and exact canonical requirement/shared-design references. Review
-        full requirement/flow/acceptance coverage across the owning architecture scope. Resolve material
-        design blockers before pass. Confirm that all canonical design content is English; schema
-        validity alone is not review. Leave the selected design records state todo after the review.
-        Open material issues stay in blockedBy and produce partial or blocked. Implementation owns source
-        mapping and test execution. The op job may settle done because this bounded design job completed,
-        but record state done is reserved for final reconciliation of current requirements, design,
-        code, test/E2E and UAT evidence at one revision.
+        full requirement/flow/acceptance coverage across the owning architecture scope. Resolve
+        material design blockers before pass. Confirm that all canonical design content is English;
+        schema validity alone is not review. Leave the selected design records state todo after the
+        review. Open material issues stay in blockedBy and produce partial or blocked.
+        Implementation owns source mapping and test execution. The op job may settle done because
+        this bounded design job completed, but record state done is reserved for final
+        reconciliation of current requirements, design, code, test/E2E and UAT evidence at one
+        revision.
   - reads:
       - target
       - business
       - constraints
-    writes:
-      - node
+    writes: [node]
     action:
-      en: "Repair mode (the `architecture.revise` kind this operator also carries) is not a second decision: a
-        design section a builder found silent, confusing or self-contradictory is revised here, never
-        escalated and never left for the build to invent a mechanism around. Read the reported gap, state the
-        two or three readings the recorded design actually admits, and choose the most reasonable one from the
-        accepted requirement it realises, the rest of the design it must stay consistent with, the decided
-        records of the other features and the product's own conventions. Write that reading into the section
-        with the contract and the acceptance an implementer derives code from, bump the record's
-        change.rev, and
-        append EXACTLY ONE extensions.work3.decisionLog entry {rev, at, gap, chosen, why, alternatives},
-        never rewriting or deleting an earlier one. One exception: when the readings differ in an observable
-        outcome about money, authority or customer data, do not choose silently - report ask with
-        question.kind decision, one numbered option per reading with what each costs and who it affects, and
-        one recommendation; the kernel writes that decision record for the owner and carries the work on the
-        recommendation until they answer. Never ask for anything else. A gap that is really a missing or
-        self-contradictory REQUIREMENT is blocked with srs-gap back to the business record that owns it.
-        Classify implementation feedback before revising: a source-local name, file layout, private helper,
-        library call or other reversible detail stays in Implementation; a proven gap in logical ownership,
-        contract, authority, durable state/effect, compatibility, material failure/recovery or quality
-        mechanism belongs here. Revise only that bounded design delta, preserve valid unrelated design and
-        invalidate only affected downstream proof."
+      en: "Repair mode (the `architecture.revise` kind this operator also carries) is not a second
+        decision: a design section a builder found silent, confusing or self-contradictory is
+        revised here, never escalated and never left for the build to invent a mechanism around.
+        Read the reported gap, state every reading the recorded design actually admits, up to
+        `params.readingsStated`, and choose the most reasonable one from the accepted requirement it
+        realises, the rest of the design it must stay consistent with, the decided records of the
+        other features and the product's own conventions. Write that reading into the section with
+        the contract and the acceptance an implementer derives code from, bump the record's
+        change.rev, and append EXACTLY ONE extensions.work3.decisionLog entry {rev, at, gap, chosen,
+        why, alternatives}, never rewriting or deleting an earlier one. One exception: when the
+        readings differ in an observable outcome about money, authority or customer data, do not
+        choose silently - report ask with question.kind decision, one numbered option per reading
+        with what each costs and who it affects, and one recommendation; the kernel writes that
+        decision record for the owner and carries the work on the recommendation until they answer.
+        Never ask for anything else. A gap that is really a missing or self-contradictory
+        REQUIREMENT is blocked with srs-gap back to the business record that owns it. Classify
+        implementation feedback before revising: a source-local name, file layout, private helper,
+        library call or other reversible detail stays in Implementation; a proven gap in logical
+        ownership, contract, authority, durable state/effect, compatibility, material
+        failure/recovery or quality mechanism belongs here. Revise only that bounded design delta,
+        preserve valid unrelated design and invalidate only affected downstream proof."
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, declared
-        proof demands are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done. The starci/sds@1 record remains a readable input for existing trees, never new
-        authoring output.
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly
+        proposed, declared proof demands are covered, input bindings are current, and an honest
+        not-run/fail cannot earn done. The starci/sds@1 record remains a readable input for existing
+        trees, never new authoring output.
   - id: implementability
     requirement:
       en: Each significant operation resolves logical owner, contract, data/commit boundary,
         authorization, state/transaction, return/recovery and planned verification for the selected
         implementation slice. The Implementation handoff names the required source-mapping scope
-        without putting repository paths or symbols into SDS. Proactively walk realistic
-        main, alternative, failure and edge cases and relevant constraints; foreseeable material cases
-        and core choices must not be left for implementers to invent. Reversible source-local mechanics
-        and unrelated future capabilities are not SDS gaps. Explicit consequential unknowns and subsequent
-        empirical refinement do not require theoretical perfection before coding.
+        without putting repository paths or symbols into SDS. Proactively walk realistic main,
+        alternative, failure and edge cases and relevant constraints; foreseeable material cases and
+        core choices must not be left for implementers to invent. Reversible source-local mechanics
+        and unrelated future capabilities are not SDS gaps. Explicit consequential unknowns and
+        subsequent empirical refinement do not require theoretical perfection before coding.
   - id: impact-security-coverage
     requirement:
-      en: Requirement outcomes map to owned contracts, runtime scenarios and design checks. Assess relevant
-        threats/failures and limitations. Structural validation does not establish semantic approval
-        or executed behavior.
+      en: Requirement outcomes map to owned contracts, runtime scenarios and design checks. Assess
+        relevant threats/failures and limitations. Structural validation does not establish semantic
+        approval or executed behavior.
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
-        record changed, its change.rev higher than it was, and exactly one new extensions.work3.decisionLog entry
-        naming the gap, the chosen reading, why it is the most reasonable one by the records it was read from,
-        and the alternatives that were not taken. A changed record with no entry is a defect. A reading that
-        changes an observable outcome about money, authority or customer data and was taken without a decision
-        record with numbered options and one recommendation is a defect, whatever else the revision gets right."
+        record changed, its change.rev higher than it was, and exactly one new
+        extensions.work3.decisionLog entry naming the gap, the chosen reading, why it is the most
+        reasonable one by the records it was read from, and the alternatives that were not taken. A
+        changed record with no entry is a defect. A reading that changes an observable outcome about
+        money, authority or customer data and was taken without a decision record with numbered
+        options and one recommendation is a defect, whatever else the revision gets right."
 blockers:
   - code: OWNERSHIP_UNKNOWN
     condition:
@@ -336,52 +314,11 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "What is the source-independent technical design (SDS) that realizes the
-    accepted SRS - flows, components, contracts, data, quality, deployment,
-    decisions, verification - precise enough that a builder needs no invention?"
-  whenNeeded:
-    - >-
-      After an accepted SRS slice exists, author the minimum design-complete SDS needed before
-      backend/frontend implementation of that selected slice.
-    - >-
-      Mid-implementation when an implement op proves an SDS gap - repair mode via
-      the declared implementation.architecture secondary calls of
-      backend.implement/interface.implement, or the
-      architecture.revise secondary request contract.
-  whenNot:
-    - Not to write product code or map repository paths/symbols - Implementation resolves source and freezes write ceilings (architecture-to-implement handoff invariant).
-    - Not to re-decide business intent - an srs-gap blocks back to business.decide, never gets resolved silently.
-    - Not for speculative completeness, unrelated future capabilities or reversible source-local mechanics that Implementation can choose without changing a logical contract.
-    - Not proof a deployment/recovery ran - design records plan verification; drills are a separate operation's proof.
-    - INFERRED: not for invented design - every change must trace to a requested SDS change or reported gap (revision-block protocol).
-  consumes:
-    - Accepted SRS/business node and accepted owner decisions (business:).
-    - Design-pattern catalog (knowledge/patterns INDEX topics), Academy architecture rules (rules:).
-    - Constraints + feasibility survey of relevant source inventory; repair mode consumes the reported gap (repo:).
-    - Optionally: matrix cell request, runtime execution profile.
-  produces:
-    - Design records (sds/contract/integration/data/decision) under the feature's flat families - written only by this op's architecture mode.
-    - Current investigation.contextDigest on reviewed todo leaves; decisionLog entries on every revision; E/ matrix job-result when selected.
-    - Downstream: current reviewed design authority consumed by interface.implement/backend.implement write ceilings and secondary responses; concrete evidence may open a bounded revised version.
-  failureModes:
-    - OWNERSHIP_UNKNOWN / COMPATIBILITY_UNKNOWN / DECLARED_DEPENDENCY_UNMET (declared blockers).
-    - Revision without decisionLog + revision block is a defect; money/authority/customer-data reading changes without an owner decision record is a defect (output checks).
-    - Reported stale-record findings are conflicts to resolve, not authority to remove records unilaterally.
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [architecture]
   phase: [decide, pre-implementation]
   intent: [architecture, sds, design, contracts, decide]
-  prerequisites: ["business.decide settled pass (reviewed SRS seed; Work leaves remain todo)"]
+  prerequisites:
+    - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)

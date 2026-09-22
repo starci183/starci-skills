@@ -1,17 +1,11 @@
-# modules/ops/ops/knowledge.repair.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: knowledge.repair
 goal:
   en: Repair one challenged canonical instruction/rule and affected references from concrete
     applicability evidence.
-nodeKinds:
-  - implementation
+nodeKinds: [implementation]
 completionProfile: implementation
-sideEffects:
-  - exact authorized knowledge source/reference edits
-  - scoped local commits when authorized
+sideEffects: [exact authorized knowledge source/reference edits, scoped local commits when authorized]
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -39,28 +33,17 @@ reads:
     purpose:
       en: Read the actual rule identifier/case and its owner/callers, observed counterexamples and
         existing enforcement. Read relevant skill instructions fully if editing a skill.
-  - id: matrix
-    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
-    purpose:
-      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
-        input bindings, requested output JSON shapes and required criteria. Standalone execution
-        needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority.
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof. Capabilities are the intersection of actual tools, selected profile
+        policy, op permissions and existing task authority.
 writes:
   - id: node
     path: N/index.yaml
-    fields:
-      - state
-      - blocker
-      - completion.inputDigest
-      - completion.evidence
-      - completion.codeRefs
+    fields: [state, blocker, completion.inputDigest, completion.evidence, completion.codeRefs]
     content:
       en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
         only state/blocker/completion here; actual observations, findings, commit mappings and
@@ -69,48 +52,20 @@ writes:
         never add/remove them to obtain pass.
   - id: source
     path: repository:<repo-id>/<write-ceiling>
-    fields:
-      - source files
-      - tests
-      - migration/assets/config only when selected
+    fields: [source files, tests, migration/assets/config only when selected]
     content:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
         changes; record actual diff and commit mapping, not proposed changes as delivered.
   - id: evidence
-    path: E/manifest.yaml + E/rule-review.md + E/validation.json + E/lineage.json + E/result.md
-    fields:
-      - id
-      - nodeId
-      - inputDigest
-      - outcome
-      - assertions
-      - assets
-      - provenance
-      - codeRefs
-      - extensions
+    path: E/**
+    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    artifacts: [manifest.yaml, rule-review.md, validation.json, lineage.json, result.md]
     content:
       en: "Keep applicability findings, exact before/after authority paths, actual
         validator/citation/reference checks and origin-context retest when included.
         Operator-specific observed result in E/result.md: Record evidence-backed reason and
         canonical owner, preserving stable rule IDs and existing valid scope. A one-off preference
         is not universal law."
-  - id: matrixHandoff
-    path: E/job-result.json
-    fields:
-      - requestId
-      - requestDigest
-      - op
-      - operation when selected
-      - status
-      - criteria
-      - outputs
-      - artifacts
-    content:
-      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
-        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
-        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
-        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
-        The selected request freezes output field schemas before execution.
 steps:
   - reads:
       - target
@@ -126,8 +81,7 @@ steps:
   - reads:
       - rule
       - repo
-    writes:
-      - source
+    writes: [source]
     action:
       en: Make smallest scoped rule/gate/step repair with stable IDs, same-commit affected reference
         updates and no product-specific law. Update genuine callers/contracts together; do not patch
@@ -135,8 +89,7 @@ steps:
   - reads:
       - rule
       - repo
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Run actual relevant validation/citation/parity and behavioral regression checks. Generated
         documents use their owned generators; inspect changes rather than claiming textual shape
@@ -145,23 +98,17 @@ steps:
       - target
       - rule
       - repo
-      - matrix
-    writes:
-      - node
-      - evidence
-      - matrixHandoff
+    writes: [node, evidence]
     action:
       en: Commit owned change when authorized and report exact originating context needing re-evaluation.
-        Do not automatically rerun its operation or claim visual correctness. When selected in a job
-        matrix, produce E/job-result.json bound to the exact request, its output schema and every
-        required criterion. This handoff is conditional and does not change standalone or named
-        frontend response contracts.
+        Do not automatically rerun its operation or claim visual correctness. This handoff is
+        conditional and does not change standalone or named frontend response contracts.
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
-        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done.
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly
+        proposed, required assertions are covered, input bindings are current, and an honest
+        not-run/fail cannot earn done.
   - id: commit
     requirement:
       en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository, and
@@ -195,36 +142,11 @@ placeholders:
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "What is the smallest canonical repair to a challenged instruction or rule -
-    and its affected references - grounded in applicability evidence?"
-  whenNeeded:
-    - When concrete evidence challenges a canonical knowledge file/rule or a skill instruction.
-    - When a rule's references (indexes, dependents) must be kept consistent with the repaired text.
-  whenNot:
-    - Not for product behavior fixes - product defects route to their owning workflow.
-    - A one-off preference is not universal law; a challenge without a canonical owner or applicable case is RULE_OWNER_UNKNOWN, not a rewrite.
-  consumes:
-    - Target; the challenged rule + its references + owner maintenance policy + original evidence; repo observations.
-  produces:
-    - Smallest scoped rule/reference edits; validation/citation/regression evidence; scoped commit when authorized.
-  failureModes:
-    - RULE_OWNER_UNKNOWN, DECLARED_DEPENDENCY_UNMET (declared blockers).
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
 route:
   nodeKinds: [implementation]
   phase: [implement, cross-cutting]
   intent: [knowledge, repair, rules, maintenance]
-  prerequisites: ["evidence challenging a rule"]
+  prerequisites: [evidence challenging a rule]
   riskHints: [runtime-self-edit]

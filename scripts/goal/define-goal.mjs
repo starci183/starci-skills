@@ -7,6 +7,13 @@
 //   node scripts/goal/define-goal.mjs --repo <path> --text "<owner prompt>" [--title <t>] [--json] [--plan]
 //   node scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" [--title <t>] [--json] [--plan]
 //
+// --params '{"<op>": {"<name>": <value>}}' attaches the owner's tunables to the
+// matching legs of the derived chain, so a choice like "three candidates per
+// screen" is a value on the leg rather than a sentence the op has to read out of
+// the goal prose. Each name must be one the op brief declares with setBy owner
+// (modules/schemas/op.schema.yaml); `api enqueue` validates the value and
+// refuses params-invalid. A leg the chain does not hold is an error here.
+//
 // --project resolves <source>/.workspaces/projects/<name>/work.json
 // (starci/workspace-binding@1), where <source> is the repository that owns this
 // .claude runtime. Every repositories.<role>.pathFromSource resolves to a
@@ -36,9 +43,24 @@ const reviseWorkflowId = arg('revise');
 const revisionReason = arg('reason', 'owner-approved plan-divergence correction');
 const approveRevision = arg('approve-revision');
 const routingBias = (() => { try { return JSON.parse(arg('routing-bias', 'null')); } catch { return null; } })();
+// Owner tunables per leg: {"<op>": {"<name>": <value>}}. Legality is the op
+// brief's business (api enqueue validates it); here the only rules are that the
+// flag parses as a map of maps and that every named op is in the derived chain.
+const legParams = (() => {
+  const raw = arg('params');
+  if (raw == null) return null;
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (e) { console.error(`--params is not JSON: ${e.message}`); process.exit(2); }
+  const isMap = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (!isMap(parsed)) { console.error('--params must be a JSON object keyed by op id: {"<op>": {"<name>": <value>}}'); process.exit(2); }
+  for (const [op, values] of Object.entries(parsed)) {
+    if (!isMap(values)) { console.error(`--params ${op} must be a JSON object of {name: value}`); process.exit(2); }
+  }
+  return parsed;
+})();
 const asJson = process.argv.includes('--json');
 const planOnly = process.argv.includes('--plan');
-const usage = 'usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]]';
+const usage = `usage: define-goal.mjs (--repo <path> | --project <name>) --text "<owner prompt>" [--title] [--params '{"<op>":{"<name>":<value>}}'] [--json] [--plan] [--revise <workflow-id> [--reason <text>] [--approve-revision <preview-token>]]`;
 if (projectName && repoArg) { console.error(`--project and --repo are mutually exclusive\n${usage}`); process.exit(2); }
 if (!text) { console.error(usage); process.exit(2); }
 if (approveRevision && !reviseWorkflowId) { console.error('--approve-revision requires --revise <workflow-id>'); process.exit(2); }
@@ -144,6 +166,15 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 const workflowId = `wf-${slug(title || text)}-${Date.now().toString(36)}`;
 const goalIdentity = crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
 const chain = deriveOpChain(text);
+if (legParams) {
+  const ops = new Set((chain?.legs ?? []).map(l => l.op));
+  const unknown = Object.keys(legParams).filter(op => !ops.has(op));
+  if (unknown.length) {
+    console.error(`--params names op(s) the derived chain does not hold: ${unknown.join(', ')}${ops.size ? ` (chain: ${[...ops].join(', ')})` : ' (chain: underivable)'}`);
+    process.exit(2);
+  }
+  for (const leg of chain.legs) if (legParams[leg.op]) leg.params = legParams[leg.op];
+}
 const now = Date.now();
 const legLabel = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;
 const chainOps = c => c?.legs?.map(legLabel) ?? [];
@@ -274,7 +305,7 @@ if (planOnly) {
   const assess = assessRepos(scanRepos);
   const legs = (chain?.legs ?? []).map(l => {
     const tier = tierOf(l.op);
-    return { seq: l.seq, op: legLabel(l), tier, estimateMinutes: COLD_MINUTES[tier] };
+    return { seq: l.seq, op: legLabel(l), tier, estimateMinutes: COLD_MINUTES[tier], ...(l.params ? { params: l.params } : {}) };
   });
   const totalMinutes = legs.length ? legs.reduce((n, l) => n + l.estimateMinutes, 0) : null;
   const out = {
@@ -309,7 +340,7 @@ if (planOnly) {
   lines.push('GOAL:', `  ${text}`);
   lines.push(`OP CHAIN (estimate is cold: easy=${COLD_MINUTES.easy}m medium=${COLD_MINUTES.medium}m hard=${COLD_MINUTES.hard}m):`);
   if (legs.length) {
-    for (const l of legs) lines.push(`  ${l.seq}. ${l.op}  ~${l.estimateMinutes}m ${l.tier}`);
+    for (const l of legs) lines.push(`  ${l.seq}. ${l.op}  ~${l.estimateMinutes}m ${l.tier}${l.params ? `  params ${Object.entries(l.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''}`);
     lines.push(`  total ~${totalMinutes}m — estimate is cold`);
   } else {
     lines.push('  underivable (kernel will derive at boot)');

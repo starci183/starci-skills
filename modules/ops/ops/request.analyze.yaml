@@ -1,13 +1,9 @@
-# modules/ops/ops/request.analyze.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: request.analyze
 goal:
-  en: Analyze one request into a typed intake record - the selected workflow and the scope
-    statement it hands to scope.define - without performing effects.
-nodeKinds:
-  - operations
+  en: Analyze one request into a typed intake record - the selected workflow and the scope statement
+    it hands to scope.define - without performing effects.
+nodeKinds: [operations]
 completionProfile: operations
 sideEffects: []
 graphPolicy:
@@ -20,16 +16,13 @@ reads:
   - id: request
     path: current user request, supplied files/references and existing task authorization
     purpose:
-      en: Start without presumed business, architecture or product context. Identify the intended
-        result, concrete inputs, permitted effects and observable completion criteria from the
-        request. Ask only material missing choices while continuing independent inspection; vague
-        scope is not permission for arbitrary deployment/data mutation.
+      en: Start without presumed business, architecture or product context. Identify the intended result,
+        concrete inputs, permitted effects and observable completion criteria from the request.
   - id: catalog
-    path: modules/goal/archetypes.yaml + modules/ops/registry.yaml canonical op list + modules/models/kinds.yaml
+    path: modules/goal/archetypes.yaml + modules/ops/registry.yaml canonical op list +
+      modules/models/kinds.yaml
     purpose:
-      en: Read the closed list of workflows, canonical op kinds and operation kinds the selection
-        must come from. The selected workflow names real catalog ids and the staged plan names real
-        kinds; an unmatched job is an explicit unknown, never a silently substituted near-match.
+      en: The closed list of workflows, canonical op kinds and operation kinds a selection comes from.
   - id: repo
     path: repository:<repo-id>/<bound-paths> when source is relevant
     purpose:
@@ -39,38 +32,24 @@ reads:
   - id: profile
     path: modules/models/registry.yaml + actual host tools/model
     purpose:
-      en: Resolve the working profile against actual available tools. Do not switch providers,
-        invent tools or dispatch agents solely from a profile.
+      en: Resolve the working profile against actual available tools. Do not switch providers, invent
+        tools or dispatch agents solely from a profile.
 writes:
   - id: intake
     path: intake.json under the op's declared write ceiling, listed in the report's files[]
-    fields:
-      - schema
-      - request
-      - workflow
-      - scope
-      - criteria
-      - exclusions
-      - open
+    fields: [schema, request, workflow, scope, criteria, exclusions, open]
     content:
-      en: The typed handoff (schema starci/workflow-intake@1) the calling chat hands to the Orca host - the request digest, exactly one
-        selected workflow id from the catalog, the scope statement (proposed nodes, dependencies and
-        exclusions for scope.define to bound), the acceptance criteria and the unresolved questions.
-        No guessed defaults; an unanswerable question is carried in open, not answered. The intake
-        file is the only runtime artifact this op writes — delivered as report evidence; the kernel's
-        run state (runtime.sqlite goals/jobs/inbox/reports/events rows) is never op output.
+      en: The typed handoff (schema starci/workflow-intake@1) the calling chat hands to the Orca host -
+        the request digest, exactly one selected workflow id from the catalog, the scope statement
+        (proposed nodes, dependencies and exclusions for scope.define to bound), the acceptance
+        criteria and the unresolved questions. No guessed defaults; an unanswerable question is
+        carried in open, not answered. The intake file is the only runtime artifact this op writes —
+        delivered as report evidence; the kernel's run state (runtime.sqlite
+        goals/jobs/inbox/reports/events rows) is never op output.
   - id: evidence
-    path: E/intake.json + E/result.json + E/artifacts
-    fields:
-      - request
-      - scope
-      - criteria
-      - status
-      - outputs
-      - observations
-      - effects
-      - evidenceRefs
-      - remaining
+    path: E/**
+    fields: [request, scope, criteria, status, outputs, observations, effects, evidenceRefs, remaining]
+    artifacts: [intake.json, result.json, artifacts]
     content:
       en: E is an explicit request-owned durable output directory for this intake, outside unrelated
         user-owned docs/sites and unrelated source. Record the analysis - inspected context, the
@@ -80,138 +59,109 @@ steps:
   - reads:
       - request
       - profile
-    writes:
-      - evidence
+    writes: [evidence]
     action:
       en: Distinguish the whole requested outcome from the segment being classified. Identify desired
         outcome, known inputs, effect ceiling, criteria and unknowns. For unclear details, inspect
         first and ask only decisions that materially change the intended result or mutation target.
         Resolve the actual tools the calling chat provides; this op runs there, not in the kernel,
-        and it dispatches nothing.
+        and it dispatches nothing. Ask only material missing choices while continuing independent
+        inspection; vague scope is not permission for arbitrary deployment/data mutation.
   - reads:
       - request
       - repo
       - catalog
-    writes:
-      - evidence
+    writes: [evidence]
     action:
-      en: "Research just enough actual context to classify correctly: source ownership and shape when
-        code is involved, existing records when a tree is present, and the candidate workflows the
-        catalog offers. Do not require business/architecture/Work setup ops as prerequisites."
+      en: "Research just enough actual context to classify correctly: source ownership and shape when code
+        is involved, existing records when a tree is present, and the candidate workflows the
+        catalog offers. Do not require business/architecture/Work setup ops as prerequisites. Read
+        the closed list of workflows, canonical op kinds and operation kinds the selection must come
+        from. The selected workflow names real catalog ids and the staged plan names real kinds; an
+        unmatched job is an explicit unknown, never a silently substituted near-match."
   - reads:
       - request
       - catalog
       - repo
-    writes:
-      - intake
+    writes: [intake]
     action:
       en: Select exactly one matching workflow from the catalog and write the intake record carrying
-        schema starci/workflow-intake@1 - the
-        selection, the scope statement with proposed nodes/dependencies/exclusions, the criteria and
-        the open questions. One request can need several workflows; this op selects the one that
-        owns the first segment and names the rest as open items, never collapsing a multi-stage
-        mission into one workflow.
+        schema starci/workflow-intake@1 - the selection, the scope statement with proposed
+        nodes/dependencies/exclusions, the criteria and the open questions. One request can need
+        several workflows; this op selects the one that owns the first segment and names the rest as
+        open items, never collapsing a multi-stage mission into one workflow.
   - reads:
       - request
       - catalog
-    writes:
-      - intake
-      - evidence
+    writes: [intake, evidence]
     action:
-      en: Verify the selected workflow can produce every criterion assigned to this segment and that
-        the scope statement bounds it - other requested outcomes remain covered as named open items.
+      en: Verify the selected workflow can produce every criterion assigned to this segment and that the
+        scope statement bounds it - other requested outcomes remain covered as named open items.
         Verify the written intake record carries schema starci/workflow-intake@1 at its declared
-        path inside the write ceiling; a wrong path, name or schema fails the run.
-        If no catalog workflow safely matches, return blocked with the exact missing decision or
-        contract gap; never use analysis as a broad fallback executor.
+        path inside the write ceiling; a wrong path, name or schema fails the run. If no catalog
+        workflow safely matches, return blocked with the exact missing decision or contract gap;
+        never use analysis as a broad fallback executor.
   - reads:
       - request
-    writes:
-      - evidence
+    writes: [evidence]
     action:
-      en: Return the intake record id, the selected workflow, the scope statement and the unresolved
-        items to the calling chat, which hands them to the Orca host. Pass means the selection is
+      en: Return the intake record id, the selected workflow, the scope statement and the unresolved items
+        to the calling chat, which hands them to the Orca host. Pass means the selection is
         evidence-grounded; it does not mean the selected workflow ran or that scope.define accepted
         the statement.
 proofs:
   - id: selection
     requirement:
-      en: The request, observed context and effect ceiling map to exactly one catalog workflow id,
-        and the intake record carries it with the scope statement, criteria and open questions -
-        typed fields a host can consume without re-reading the request.
+      en: The request, observed context and effect ceiling map to exactly one catalog workflow id, and the
+        intake record carries it with the scope statement, criteria and open questions - typed
+        fields a host can consume without re-reading the request.
   - id: coverage
     requirement:
-      en: Every criterion assigned to this segment is producible by the selected workflow, and every
-        other requested outcome is named as an open item for later workflows - nothing requested is
+      en: Every criterion assigned to this segment is producible by the selected workflow, and every other
+        requested outcome is named as an open item for later workflows - nothing requested is
         dropped silently and nothing extra is invented.
   - id: no-effects
     requirement:
-      en: The analysis recorded that no source, runtime, publication, deployment or data effect
-        occurred; the only writes are the intake record and the evidence bundle.
+      en: The analysis recorded that no source, runtime, publication, deployment or data effect occurred;
+        the only writes are the intake record and the evidence bundle.
   - id: chat-side
     requirement:
-      en: The op ran in the calling chat application and dispatched nothing in the kernel - the
-        intake record is the handoff, and workflow execution begins only after the host accepts it.
+      en: The op ran in the calling chat application and dispatched nothing in the kernel - the intake
+        record is the handoff, and workflow execution begins only after the host accepts it.
 blockers:
   - code: INTENT_UNRESOLVED
     condition:
-      en: An essential outcome, target or permitted effect cannot be resolved from the request and
-        safe inspection; the open question is carried, or blocked with blocker kind authority when
-        only the owner can answer.
+      en: An essential outcome, target or permitted effect cannot be resolved from the request and safe
+        inspection; the open question is carried, or blocked with blocker kind authority when only
+        the owner can answer.
   - code: NO_MATCHING_WORKFLOW
     condition:
-      en: No catalog workflow covers this segment's effects safely; report the exact contract gap
-        instead of substituting a near-match.
+      en: No catalog workflow covers this segment's effects safely; report the exact contract gap instead
+        of substituting a near-match.
   - code: OUTSIDE_SCOPE
     condition:
-      en: A necessary effect exceeds current authorization or conflicts with retained user work;
-        report blocked with blocker kind authority naming the missing grant.
+      en: A necessary effect exceeds current authorization or conflicts with retained user work; report
+        blocked with blocker kind authority naming the missing grant.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
-      en: A declared prerequisite is not effectively done, or a required declared input is missing.
-        Report node/resource IDs; never run predecessors or invent the input.
+      en: A declared prerequisite is not effectively done, or a required declared input is missing. Report
+        node/resource IDs; never run predecessors or invent the input.
 placeholders:
   workflow: Selected workflow id the intake record is staged under
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
-intakePolicy:
-  selection: one-catalog-workflow
-  successors: named-open-items-never-hidden
-  execution: none
-  host: calling-chat-app-not-kernel
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "Which one catalog workflow owns this request's first segment - and what
-    scope statement does scope.define receive?"
-  whenNeeded:
-    - Entry point of every incoming request: classify into exactly one catalog workflow and write the intake record before any effect.
-    - When supplied files/briefs must be folded into the request before routing.
-  whenNot:
-    - Never performs effects - the op is read-only by contract.
-    - Runs in the calling chat, not inside the kernel; does not collapse a multi-stage mission into one workflow (the rest stays named open items).
-    - No near-match substitution when no workflow fits - that is blocked, not best-effort routing.
-  consumes:
-    - The user request + supplied files; the workflow catalog + op registry + kinds; repo context when relevant.
-  produces:
-    - intake.json (starci/workflow-intake@1) under the declared write ceiling, delivered as report evidence, plus the request-owned evidence dir.
-  failureModes:
-    - INTENT_UNRESOLVED, NO_MATCHING_WORKFLOW, OUTSIDE_SCOPE, DECLARED_DEPENDENCY_UNMET (declared blockers).
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
+policy:
+  intakePolicy:
+    selection: one-catalog-workflow
+    successors: named-open-items-never-hidden
+    execution: none
+    host: calling-chat-app-not-kernel
 route:
   nodeKinds: [operations]
   phase: [intake, pre-implementation]
   intent: [analyze, intake, classify, read-only]
-  prerequisites: []

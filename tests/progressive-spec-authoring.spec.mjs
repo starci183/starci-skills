@@ -2,124 +2,125 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {parseYaml} from '../engine/yaml.mjs';
+import { parseYaml } from '../engine/yaml.mjs';
+import { loadOp, root, blocker, readOf, writeOf, states, statesOnce } from './helpers/op-contract.mjs';
 
-const root=path.resolve(import.meta.dirname,'..');
-const load=id=>parseYaml(fs.readFileSync(path.join(root,'modules/ops/ops',`${id}.yaml`),'utf8'));
-const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
-const prose=value=>JSON.stringify(value);
+// Specs are authored progressively: an op seeds the smallest decision-complete
+// slice and refines it from evidence, rather than writing a whole speculative
+// tree up front. Asserted through the enums, ids and policy keys that carry the
+// rule, not through the sentences that explain it.
+const readFile = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('SRS and SDS ops seed only the selected decision-complete slice and refine from evidence',()=>{
-  const business=prose(load('business.decide'));
-  assert.match(business,/minimum complete observable behavior/);
-  assert.match(business,/smallest decision-complete contract/);
-  assert.match(business,/state todo while implementation, test\/E2E or UAT evidence is still open/);
-  assert.match(business,/passing business\.decide job means the current requirement seed is reviewed/);
-  assert.match(business,/record state done is reserved for final reconciliation/);
-  assert.match(business,/implementation feedback as evidence/);
-  assert.match(business,/speculative completeness/);
-  assert.doesNotMatch(business,/reviewed SRS leaf may be done/);
-
-  const architecture=prose(load('architecture.decide'));
-  assert.match(architecture,/minimum complete flow-led/);
-  assert.match(architecture,/smallest design-complete map/);
-  assert.match(architecture,/selected design records at state todo while implementation, test\/E2E or UAT evidence is still open/);
-  assert.match(architecture,/passing architecture\.decide job means the current design seed is reviewed/);
-  assert.match(architecture,/record state done is reserved for final reconciliation/);
-  assert.match(architecture,/Classify implementation feedback before revising/);
-  assert.match(architecture,/Reversible source-local mechanics/);
-  assert.doesNotMatch(architecture,/target repo\/path\/symbol\/signature/);
-  assert.doesNotMatch(architecture,/reviewed SDS leaf may be done/);
-});
-
-test('Work lifecycle keeps the closed state enum and represents progress through activity',()=>{
-  const schema=parseYaml(read('modules/schemas/work.schema.yaml'));
-  const v2State=schema.$defs.node.allOf.find(rule=>rule?.if?.properties?.schema?.const==='work/node@1')
-    .then.properties.state.enum;
-  assert.deepEqual(v2State,['uninvestigate','todo','done']);
-  assert.deepEqual(schema.$defs.node.properties.activity.enum,['idle','investigating','implementing','verifying']);
-
-  const doctrine=read('modules/schemas/work-layout.yaml');
-  assert.match(doctrine,/todo \+ activity: idle/);
-  assert.match(doctrine,/Never add an inprogress state/);
-  assert.match(doctrine,/final reconciliation/);
-});
-
-test('final delivery verification requires one current full-chain revision',()=>{
-  const review=prose(load('review.verify'));
-  assert.match(review,/SRS\/SDS\/implementation\/test\/E2E\/UAT/);
-  assert.match(review,/same delivery revision/);
-  assert.match(review,/DELIVERY_CHAIN_INCOMPLETE/);
-
-  const driver=read('modules/kernel/driver-loop.yaml');
-  assert.match(driver,/current reconciliation\s+proving SRS, SDS/);
-  const verdict=read('modules/kernel/verdict-contract.yaml');
-  assert.match(verdict,/delivery-done-with-incomplete-chain/);
-});
-
-test('implementation and verification ops distinguish material spec gaps from local choices',()=>{
-  for(const id of ['backend.implement','interface.implement']){
-    const contract=prose(load(id));
-    assert.match(contract,/Classify implementation feedback before stopping/,id);
-    assert.match(contract,/Reversible source-local choices are implementation work/,id);
-    assert.match(contract,/smallest proposed delta/,id);
+test('the SRS and SDS ops seed the smallest slice and leave it todo until evidence closes it', () => {
+  for (const [id, noun] of [['business.decide', 'decision-complete'], ['architecture.decide', 'design-complete']]) {
+    const op = loadOp(id);
+    statesOnce(assert, op, ['smallest', noun], { label: `${id} seeds the smallest ${noun} slice` });
+    states(assert, op, ['todo', 'evidence']);
+    states(assert, op, ['final reconciliation'], { label: `${id} reserves done for final reconciliation` });
+    // The revision path is a repair, not a second decision, and it appends one
+    // decision-log entry per revision.
+    states(assert, op, ['decisionLog']);
+    statesOnce(assert, op, ['params.readingsStated'], { section: '$.steps', label: 'how many readings a repair enumerates' });
+    assert.equal(op.params.readingsStated.setBy, 'kernel');
+    assert.equal(JSON.stringify(op.steps).match(/\btwo or three readings\b/i), null,
+      `${id} restates the reading count instead of citing the param`);
   }
-
-  const refactor=prose(load('code.refactor'));
-  assert.match(refactor,/A source-local refactoring choice is not an SRS gap/);
-  assert.match(refactor,/private helper choices are owned by this refactor/);
-
-  const tests=prose(load('test.author'));
-  assert.match(tests,/REQUIREMENT_UNSETTLED/);
-  assert.match(tests,/suite-local mechanics are not spec gaps/);
 });
 
-test('workspace canonicalization test author accepts only its explicitly bound direct-predecessor proposal',()=>{
-  const contract=load('test.author');
-  assert.equal(contract.graphPolicy.prerequisiteState,'done-or-exact-direct-predecessor-proposal');
-  assert.equal(contract.proposalAuthority.scope,'workspace-canonicalization-only');
-  const authority=prose(contract.proposalAuthority);
-  assert.match(authority,/one scope record explicitly bound in packet context\.records/);
-  assert.match(authority,/passed scope\.define output immediately preceding this test\.author leg/);
-  assert.match(authority,/proposed id must equal the selected target id/);
-  assert.match(authority,/repository-wide discovery/);
-  assert.match(authority,/workspace\.manage owns later reconstruction/);
+test('implementation feedback is classified before it is allowed to move a spec', () => {
+  for (const id of ['business.decide', 'architecture.decide', 'backend.implement', 'interface.implement']) {
+    const op = loadOp(id);
+    states(assert, op, ['implementation feedback'], { label: `${id} classifies implementation feedback` });
+  }
+  for (const id of ['backend.implement', 'interface.implement'])
+    states(assert, loadOp(id), ['smallest', 'delta']);
 
-  const target=contract.reads.find(read=>read.id==='target');
-  assert.match(target.path,/packet context\.records -> exact bound scope\.define record/);
-  assert.match(prose(target),/do not scan \.starciwork for alternatives/);
-  assert.match(prose(target),/packet context\.workflow binds the approved goal identity\/revision/);
-
-  const nodeWrite=contract.writes.find(write=>write.id==='node');
-  assert.match(prose(nodeWrite),/When proposalAuthority is in use because the target does not exist, omit this write entirely/);
-  assert.match(prose(nodeWrite),/workspace\.manage to materialize later/);
+  const refactor = loadOp('code.refactor');
+  states(assert, refactor, ['source-local']);
+  const tests = loadOp('test.author');
+  assert.ok(blocker(tests, 'REQUIREMENT_UNSETTLED'), 'test.author has no REQUIREMENT_UNSETTLED blocker');
+  states(assert, tests, ['suite-local']);
 });
 
-test('workspace canonicalization refactor consumes the same bound proposal only after regression proof',()=>{
-  const contract=load('code.refactor');
-  assert.equal(contract.graphPolicy.prerequisiteState,'done-or-exact-workspace-canonicalization-proposal-with-regression');
-  assert.equal(contract.proposalAuthority.scope,'workspace-canonicalization-only');
-  const authority=prose(contract.proposalAuthority);
-  assert.match(authority,/one scope\.define record explicitly bound in packet context\.records/);
-  assert.match(authority,/after a passed test\.author leg/);
-  assert.match(authority,/same covering regression command must run under the applicable refactor or migration proof/);
-  assert.match(authority,/repository-wide discovery/);
-  assert.match(authority,/workspace\.manage owns later reconstruction/);
+test('the Work lifecycle keeps its closed state enum and shows progress through activity', () => {
+  const schema = parseYaml(readFile('modules/schemas/work.schema.yaml'));
+  const nodeState = schema.$defs.node.allOf.find((rule) => rule?.if?.properties?.schema?.const === 'work/node@1')
+    .then.properties.state.enum;
+  assert.deepEqual(nodeState, ['uninvestigate', 'todo', 'done']);
+  assert.deepEqual(schema.$defs.node.properties.activity.enum, ['idle', 'investigating', 'implementing', 'verifying']);
 
-  assert.equal(contract.migrationAuthority.scope,'workspace-canonicalization-only');
-  const migration=prose(contract.migrationAuthority);
-  assert.match(migration,/red before source edits/);
-  assert.match(migration,/green after/);
-  assert.match(migration,/any unrelated failure blocks before edits/);
-  assert.match(migration,/collection-only check/);
-  assert.match(contract.refactorPolicy.workspaceCanonicalizationMigration,/red-before-green-after/);
+  const layout = readFile('modules/schemas/work-layout.yaml');
+  assert.match(layout, /todo \+ activity: idle/);
+  assert.match(layout, /Never add an inprogress state/);
+  assert.match(layout, /final reconciliation/);
+});
 
-  const target=contract.reads.find(read=>read.id==='target');
-  assert.match(target.path,/packet context\.records -> exact bound scope\.define record/);
-  assert.match(prose(target),/Do not scan \.starciwork for alternatives/);
-  assert.match(prose(target),/packet context\.workflow binds the approved goal identity\/revision/);
+test('final delivery verification requires one current full-chain revision', () => {
+  const review = loadOp('review.verify');
+  // review.verify runs one selected mode; the delivery chain belongs to the
+  // modes that reconcile it, so the blocker lives with them.
+  const modes = Object.entries(review.policy.executionModes)
+    .filter(([, mode]) => (mode.blockers ?? []).some((b) => b.code === 'DELIVERY_CHAIN_INCOMPLETE'))
+    .map(([name]) => name);
+  assert.ok(modes.length >= 1, 'no review.verify mode blocks on DELIVERY_CHAIN_INCOMPLETE');
+  assert.equal(review.policy.modePolicy.selection, 'required-exactly-one');
+  states(assert, review, ['delivery revision']);
+  assert.match(readFile('modules/kernel/driver-loop.yaml'), /current reconciliation\s+proving SRS, SDS/);
+  assert.match(readFile('modules/kernel/verdict-contract.yaml'), /delivery-done-with-incomplete-chain/);
+});
 
-  const nodeWrite=contract.writes.find(write=>write.id==='node');
-  assert.match(prose(nodeWrite),/omit this write entirely/);
-  assert.match(prose(nodeWrite),/workspace\.manage to materialize later/);
+test('test.author accepts only the proposal its packet explicitly bound', () => {
+  const op = loadOp('test.author');
+  assert.equal(op.graphPolicy.prerequisiteState, 'done-or-exact-direct-predecessor-proposal');
+  const authority = op.policy.proposalAuthority;
+  assert.ok(authority, 'proposalAuthority belongs under policy:');
+  assert.equal(authority.scope, 'workspace-canonicalization-only');
+  const text = JSON.stringify(authority).toLowerCase();
+  for (const term of ['packet context.records', 'scope.define', 'repository-wide discovery', 'workspace.manage'])
+    assert.ok(text.includes(term), `proposalAuthority should bound ${term}`);
+
+  const target = readOf(op, 'target');
+  assert.match(target.path, /packet context\.records/);
+  states(assert, op, ['do not scan'], { label: 'the target is the bound record, not a search' });
+  states(assert, op, ['goal identity'], { label: 'the packet binds the approved goal' });
+  assert.ok(blocker(op, 'DECLARED_DEPENDENCY_UNMET'));
+  assert.match(JSON.stringify(writeOf(op, 'node')), /workspace\.manage/,
+    'the node write must say who materializes the proposed record later');
+});
+
+test('code.refactor consumes the same bound proposal, and only after regression proof', () => {
+  const op = loadOp('code.refactor');
+  assert.equal(op.graphPolicy.prerequisiteState, 'done-or-exact-workspace-canonicalization-proposal-with-regression');
+  const authority = op.policy.proposalAuthority;
+  assert.equal(authority.scope, 'workspace-canonicalization-only');
+  const text = JSON.stringify(authority).toLowerCase();
+  for (const term of ['packet context.records', 'test.author', 'regression', 'repository-wide discovery', 'workspace.manage'])
+    assert.ok(text.includes(term), `proposalAuthority should bound ${term}`);
+
+  const migration = op.policy.migrationAuthority;
+  assert.equal(migration.scope, 'workspace-canonicalization-only');
+  const migrationText = JSON.stringify(migration).toLowerCase();
+  for (const term of ['red before source edits', 'green after', 'unrelated failure', 'collection-only'])
+    assert.ok(migrationText.includes(term), `migrationAuthority should bound ${term}`);
+  assert.match(op.policy.refactorPolicy.workspaceCanonicalizationMigration, /red-before-green-after/);
+
+  const target = readOf(op, 'target');
+  assert.match(target.path, /packet context\.records/);
+  states(assert, op, ['do not scan'], { label: 'the target is the bound record, not a search' });
+  assert.match(JSON.stringify(writeOf(op, 'node')), /workspace\.manage/);
+
+  // The cut-set authority is what lets one semantic op run as several slices.
+  assert.equal(op.policy.cutSetAuthority.scope, 'workspace-canonicalization-only');
+});
+
+test('every op in the catalog holds the one shape, with no authored summary block', () => {
+  const dir = path.join(root, 'modules', 'ops', 'ops');
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.yaml'))) {
+    const op = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8'));
+    assert.equal(op.schema, 'starci/op@1', `${file} does not stamp starci/op@1`);
+    assert.ok(!Object.hasOwn(op, 'business'), `${file} still authors a business: summary`);
+    for (const key of Object.keys(op))
+      assert.ok(!/Policy$|Authority$|^executionModes$|^findingSchema$/.test(key) || key === 'graphPolicy' || key === 'layoutPolicy',
+        `${file} declares ${key} at the top level instead of under policy:`);
+  }
 });

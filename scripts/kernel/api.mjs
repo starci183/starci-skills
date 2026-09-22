@@ -55,6 +55,7 @@ import { classifyAgentScreen } from './terminal-liveness.mjs';
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
 import { selectPool, resolveLaunchModel } from '../agent/models.mjs';
+import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
@@ -140,7 +141,7 @@ const usage = (code) => {
   hierarchy --workflow <id>
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>]
-           [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+           [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            deterministic slice sizing from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
@@ -192,6 +193,17 @@ const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
 
 const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+
+/** What the approved goal leg for this op carries as `params` — the owner's
+ *  side of the tunables (scripts/goal/define-goal.mjs --params writes it into
+ *  goals.json.opChain.legs[]). An absent chain or leg means the owner set none. */
+const goalLegParams = (goal, opId) => {
+  try {
+    const legs = JSON.parse(goal?.json ?? '{}')?.opChain?.legs;
+    const leg = Array.isArray(legs) ? legs.find((l) => l?.op === opId) : null;
+    return leg?.params && typeof leg.params === 'object' ? leg.params : null;
+  } catch { return null; }
+};
 const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
 const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?.managed?.agentTerminalHandle
@@ -702,6 +714,21 @@ function cmdEnqueue(ledger, args) {
     throw Object.assign(new Error(`unknown op ${args.op} — no brief at modules/ops/ops/${args.op}.yaml`), { code: 'unknown-op' });
   }
   const goal = latestGoal(db, workflowId);
+  // Tunables are data. The brief declares each param's type, default and setter;
+  // the approved goal leg carries what the owner chose, --params carries what the
+  // kernel chose, and a value that fails either authority is refused here rather
+  // than reaching an agent as an unbound number.
+  const brief = parseYaml(fs.readFileSync(briefFile, 'utf8'));
+  let flagParams = null;
+  if (args.params !== undefined) {
+    try { flagParams = JSON.parse(args.params); }
+    catch (e) { throw Object.assign(new Error(`--params is not JSON: ${e.message}`), { code: 'params-invalid' }); }
+    if (flagParams === null || typeof flagParams !== 'object' || Array.isArray(flagParams)) {
+      throw Object.assign(new Error('--params must be a JSON object of {name: value}'), { code: 'params-invalid' });
+    }
+  }
+  const resolvedParams = resolveOpParams(brief, { leg: goalLegParams(goal, args.op), flag: flagParams });
+  if (!resolvedParams.ok) throw Object.assign(new Error(resolvedParams.detail), { code: resolvedParams.reason });
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
   // An op with no owned_paths is an unbounded write grant: the packet would
   // tell the worker "(per brief write-ceiling)" and nothing would fence it.
@@ -736,6 +763,7 @@ function cmdEnqueue(ledger, args) {
     const retry = priorJob ? deriveRetryLineage(priorJob) : null;
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
+      ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
       ...(cut ? { cut } : {}),
       ...(retry ? { retry } : {}),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
@@ -762,8 +790,8 @@ function cmdEnqueue(ledger, args) {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   });
 
-  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut };
-  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''})`, args.json);
+  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null };
+  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})`, args.json);
 }
 
 /* ----------------------------------------------------------------- route */
@@ -974,9 +1002,10 @@ const resolveModel = (target) => {
 
 // dispatch-op.mjs's packet builder is not exported (it runs main() on import),
 // so the packet shape is replicated here: same fields, same returns contract.
-const buildPacket = ({ job, payload, model, goal }) => ({
+const buildPacket = ({ job, payload, model, goal, params }) => ({
   op: job.op_id ?? payload.opId,
   brief: `modules/ops/ops/${job.op_id ?? payload.opId}.yaml`,
+  ...(params && Object.keys(params).length ? { params } : {}),
   context: {
     workflow: {
       id: job.workflow_id,
@@ -1014,6 +1043,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
   `source_runtime: ${skillRoot}`,
   `target_repository: ${repo}`,
   `brief: ${brief}  (your contract — never renegotiate it)`,
+  ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow.id} goal_revision=${packet.context.workflow.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow.goal_identity ?? '(unbound)'}`,
   `records: ${packet.context.records.join(', ') || '(none bound)'}`,
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
@@ -1190,7 +1220,12 @@ function cmdDispatch(ledger, args, repo) {
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   const briefExists = fs.existsSync(briefAbs);
 
-  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id) });
+  // The packet's params are the brief's defaults with the overrides enqueue
+  // already validated on top — dispatch resolves, it never re-decides.
+  const briefDoc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
+  const dispatchParams = resolveOpParams(briefDoc, {}).params;
+  for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(dispatchParams, name)) dispatchParams[name] = value;
+  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams });
   const priorFailures = job.attempt > 1 ? (() => {
     const row = db.prepare('SELECT attempt, checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC LIMIT 1')
       .get(job.workflow_id, op, job.attempt);

@@ -1,12 +1,8 @@
-# modules/ops/ops/backend.implement.yaml
-# The operator contract is the authority; the trailing 'business:' block is analysis,
-# inference marked where the contract does not state it literally.
-
+schema: starci/op@1
 id: backend.implement
 goal:
   en: Implement one selected backend outcome and prove its declared contract on actual code.
-nodeKinds:
-  - implementation
+nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
   - owned source edits
@@ -21,14 +17,15 @@ graphPolicy:
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.yaml + docs/application-stacks.md + docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: knowledge/application-stacks.yaml + docs/application-stacks.md +
+      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
-        credential custody, lifecycle commands and existing consumers. Run the static stacks
-        check when validating a materialized stack; bind its exact inputs and limitations.
-        Acceptance additionally requires the selected real startup, persistence, recovery and
-        application checks. This conditional read grants no extra deployment or source scope.
+        credential custody, lifecycle commands and existing consumers. Run the static stacks check
+        when validating a materialized stack; bind its exact inputs and limitations. Acceptance
+        additionally requires the selected real startup, persistence, recovery and application
+        checks. This conditional read grants no extra deployment or source scope.
   - id: target
     path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
@@ -52,8 +49,7 @@ reads:
     purpose:
       en: Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the
         selected flat Work graph; distinguish proposed paths from observed files. No universal
-        design-first op chain is implied; report genuinely missing required scope before
-        proceeding.
+        design-first op chain is implied; report genuinely missing required scope before proceeding.
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -62,53 +58,33 @@ reads:
         Greenfield/spec-only work records source not-yet-created and grounds intent in the user
         request; no invented repository or fact citation. Source implementation still needs an
         actual selected writable repository.
-  - id: matrix
-    path: selected complete-job matrix request + .starciwork/runtime.sqlite jobs rows
-    purpose:
-      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
-        input bindings, requested output JSON shapes and required criteria. Standalone execution
-        needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority.
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof. Capabilities are the intersection of actual tools, selected profile
+        policy, op permissions and existing task authority.
 writes:
   - id: node
     path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
-    fields:
-      - state
-      - evidence
-      - blockedBy
+    fields: [state, evidence, blockedBy]
     content:
       en: Read the existing selected scope, expected proof demands and flat Work graph unchanged. Write
         only state/evidence/blockedBy here; actual observations, findings, commit mappings and
         remaining cleanup belong to the evidence result, not semantic record prose. Missing
-        refs/dependsOn/acceptance require a reported gap or separately selected scope update;
-        never add/remove them to obtain pass.
+        refs/dependsOn/acceptance require a reported gap or separately selected scope update; never
+        add/remove them to obtain pass.
   - id: source
     path: repository:<repo-id>/<write-ceiling>
-    fields:
-      - source files
-      - tests
-      - migration/assets/config only when selected
+    fields: [source files, tests, migration/assets/config only when selected]
     content:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
         changes; record actual diff and commit mapping, not proposed changes as delivered.
   - id: evidence
-    path: E/manifest.yaml + E/tests.json + E/test-output.txt + E/lineage.json + E/result.md
-    fields:
-      - id
-      - nodeId
-      - inputDigest
-      - outcome
-      - assertions
-      - assets
-      - provenance
-      - codeRefs
-      - extensions
+    path: E/**
+    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    artifacts: [manifest.yaml, tests.json, test-output.txt, lineage.json, result.md]
     content:
       en: "Store actual command, cwd/repo, source commit/tree, environment, exit code, counts and
         expected/actual per required proof, with sanitized original output. Operator-specific
@@ -122,35 +98,10 @@ writes:
         reference, coverage target or unavailable required Sonar gate is blocked/not-run, never
         pass; do not move this responsibility to architecture, business or UAT. Reuse existing
         authorization and keep secrets outside evidence."
-  - id: matrixHandoff
-    path: E/job-result.json
-    fields:
-      - requestId
-      - requestDigest
-      - op
-      - operation when selected
-      - status
-      - criteria
-      - outputs
-      - artifacts
-    content:
-      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
-        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
-        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
-        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
-        The selected request freezes output field schemas before execution.
   - id: apiDelivery
-    path: E/api-contract.json + E/runtime.json
-    fields:
-      - operations
-      - request
-      - response
-      - errors
-      - authorization
-      - codeRefs
-      - servedVersions
-      - endpoint
-      - probeEvidence
+    path: E/**
+    fields: [operations, request, response, errors, authorization, codeRefs, servedVersions, endpoint, probeEvidence]
+    artifacts: [api-contract.json, runtime.json]
     content:
       en: When the selected consumer needs a runnable backend, deliver the implemented API
         request/response/error/authorization contract and actual served build references. Reuse or
@@ -178,25 +129,25 @@ steps:
         and report a missing required external authority rather than inventing a helper. Resolve the
         execution profile and actual tool availability before selecting instruments; this does not
         switch the model/runtime or spawn workers. Classify implementation feedback before stopping:
-        repository paths, private helper names, library calls and other reversible source-local choices
-        are owned here and do not require spec expansion. A changed observable outcome, actor permission,
-        money or customer-data rule is an srs-gap; a missing logical owner, contract, authority boundary,
-        durable state/effect, compatibility, material failure/recovery or quality mechanism is an sds-gap.
-        Report a spec-affecting finding with the exact observed fact, affected semantic ids and smallest
-        proposed delta; never edit requirement or design records in this op. CALL POINT (discovery,
-        implementation or verification): when an observed source/test fact proves the accepted design
-        technically missing or contradictory while requirements stay unchanged, read
-        backend.implement/secondary.json and request its implementation.architecture role. The
-        backend worker waits and never edits design records. Orca runs architecture.decide in a separate
-        child worktree; after coordinator review/integration, start a fresh backend attempt from that
-        design revision and rerun every affected check. If requirements, owner or accepted scope must
-        change, return blocked for a user decision instead of invoking the sidearm."
+        repository paths, private helper names, library calls and other reversible source-local
+        choices are owned here and do not require spec expansion. A changed observable outcome,
+        actor permission, money or customer-data rule is an srs-gap; a missing logical owner,
+        contract, authority boundary, durable state/effect, compatibility, material failure/recovery
+        or quality mechanism is an sds-gap. Report a spec-affecting finding with the exact observed
+        fact, affected semantic ids and smallest proposed delta; never edit requirement or design
+        records in this op. CALL POINT (discovery, implementation or verification): when an observed
+        source/test fact proves the accepted design technically missing or contradictory while
+        requirements stay unchanged, read backend.implement/secondary.json and request its
+        implementation.architecture role. The backend worker waits and never edits design records.
+        Orca runs architecture.decide in a separate child worktree; after kernel review and
+        integration, start a fresh backend attempt from that design revision and rerun every
+        affected check. If requirements, owner or accepted scope must change, return blocked for a
+        user decision instead of invoking the sidearm."
   - reads:
       - business
       - architecture
       - repo
-    writes:
-      - source
+    writes: [source]
     action:
       en: Implement transport, validation, permission checks, use-case logic and persistence inside the
         declared ownership. Enforce denials before unauthorized side effects; do not invent fallback
@@ -205,17 +156,14 @@ steps:
       - business
       - architecture
       - repo
-    writes:
-      - source
+    writes: [source]
     action:
       en: Implement declared transaction, retry/idempotency, concurrency, error identity and read-time
         revalidation. Migrations are source only; applying them remotely is not included.
   - reads:
       - repo
       - target
-    writes:
-      - source
-      - evidence
+    writes: [source, evidence]
     action:
       en: Add or repair scoped unit tests, then execute the repository's backend unit gate and retain
         command, exit code, counts and sanitized output. Next execute the relevant backend E2E gate
@@ -230,12 +178,7 @@ steps:
   - reads:
       - repo
       - target
-      - matrix
-    writes:
-      - node
-      - evidence
-      - matrixHandoff
-      - apiDelivery
+    writes: [node, evidence, apiDelivery]
     action:
       en: Review the diff and verify no unrelated changes. A passing backend delivery requires scoped unit
         and backend E2E evidence, every applicable quality gate, the exact tested source tree, API
@@ -250,9 +193,9 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
-        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done.
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly
+        proposed, required assertions are covered, input bindings are current, and an honest
+        not-run/fail cannot earn done.
   - id: commit
     requirement:
       en: Inspect exact staged diff and actual tests; bind full real source commit(s), per repository, and
@@ -300,72 +243,34 @@ placeholders:
   piece: Stable selected piece slug
   flow: Selected UAT journey slug
   screen: Selected surface/state slug
-commitPolicy:
-  mode: scoped-local-commit
-  ownership: exact-selected-paths
-  verify: git-readback-full-sha-and-diff
-  push: false
-  reuseAuthorization: true
-  noChange: return-existing-verified-commit-no-empty-commit
-qualityPolicy:
-  owner: backend.implement
-  checks:
-    - lint
-    - typecheck
-    - unit
-    - backend-e2e
-    - coverage
-    - build
-    - sonar
-  requiredResult: pass
-  unitGate: scoped-unit-pass-for-tested-revision
-  backendE2EGate: scoped-backend-e2e-pass-for-tested-revision
-  handoffBinding: api-contract-runtime-quality-evidence-and-tested-commit
-  sonarGate: server-quality-gate-pass-for-tested-revision
-  missingRunner: blocked
-  canDelegateResponsibility: false
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen
   artifacts: every-structured-write-carries-its-declared-schema-const
-  checks:
-    - starci-validate
+  checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
-
-# ---------------------------------------------------------------------------
-# Business analysis (not part of the source contract; inference marked).
-business:
-  question: >-
-    "Does the actual backend code implement the selected accepted operations and
-    ACs - and prove it with unit + backend E2E + quality gates (incl. sonar when
-    declared) against the tested commit?"
-  whenNeeded:
-    - When an accepted requirement/design slice needs backend code created, refined or defect-repaired (primary mode).
-    - As the declared interface.backend secondary of interface.implement for a bounded, contract-compatible backend repair.
-  whenNot:
-    - Not for frontend code, browser UAT, remote migrations, package publishing or production deploys (declared not-this-scope).
-    - Not when the design is merely silent - a proven design gap delegates to the architecture.decide secondary; a requirement contradiction is blocked, never guessed.
-    - Reversible source-local choices are implementation work, not automatic spec gaps; do not stop merely because the upstream records omit a private mechanism.
-    - INFERRED: not a substitute for verification ops - its own gates prove the implementation only within its declared suite; independent proof belongs to e2e/integration/uat/review.
-  consumes:
-    - Accepted requirement + design records and the target implementation record (request-bound scope).
-    - Bound repo paths, write ceiling, existing code + suite; backend pattern INDEX topics; sonar policy.
-    - apiDelivery bindings for consumers needing a runnable API; secondary request contract when acting as interface.backend.
-  produces:
-    - Source edits inside the declared write ceiling; scoped commits when authorized.
-    - Record state + evidence; apiDelivery assertions for consumers.
-    - Evidence bundle: checks, backend tests, sonar report, lineage, api-contract; E/response.json workflow handoff.
-  failureModes:
-    - BUSINESS_UNKNOWN, SCOPE_WIDENING, PROOF_UNAVAILABLE, DECLARED_DEPENDENCY_UNMET (declared blockers).
-    - Uncommitted or unproven delivery is reported honestly - absent runner/sonar is blocked, not pass.
-    - A failed secondary response is returned to the caller; it never becomes this op's own product scope.
-# ---------------------------------------------------------------------------
-# route: resolver index.
-# Keys derive from this op's nodeKinds + modules/ops/registry.yaml
-# lifecyclePosition/kindInferred. scripts/route/route-op.mjs matches on this
-# block alone — an agent never reads the whole contract to route.
+policy:
+  commitPolicy:
+    mode: scoped-local-commit
+    ownership: exact-selected-paths
+    verify: git-readback-full-sha-and-diff
+    push: false
+    reuseAuthorization: true
+    noChange: return-existing-verified-commit-no-empty-commit
+  qualityPolicy:
+    owner: backend.implement
+    checks: [lint, typecheck, unit, backend-e2e, coverage, build, sonar]
+    requiredResult: pass
+    unitGate: scoped-unit-pass-for-tested-revision
+    backendE2EGate: scoped-backend-e2e-pass-for-tested-revision
+    handoffBinding: api-contract-runtime-quality-evidence-and-tested-commit
+    sonarGate: server-quality-gate-pass-for-tested-revision
+    missingRunner: blocked
+    canDelegateResponsibility: false
 route:
   nodeKinds: [implementation]
   phase: [implement, implementation]
   intent: [implement, backend, code, api, build]
-  prerequisites: ["business.decide settled pass (reviewed requirement seed; Work leaves remain todo)", "architecture.decide settled pass (reviewed design seed; Work leaves remain todo)"]
+  prerequisites:
+    - business.decide settled pass (reviewed requirement seed; Work leaves remain todo)
+    - architecture.decide settled pass (reviewed design seed; Work leaves remain todo)
   riskHints: [source-edits]

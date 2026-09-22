@@ -64,7 +64,7 @@ test('only explicit no-effect infrastructure failures resume without consuming b
 
 test('workspace.manage derives explicit migration slices instead of claiming broad workspace roots',()=>{
   const file=path.resolve(import.meta.dirname,'../modules/ops/ops/workspace.manage.yaml');
-  const policy=parseYaml(fs.readFileSync(file,'utf8')).modePolicy.ownershipDerivation;
+  const policy=parseYaml(fs.readFileSync(file,'utf8')).policy.modePolicy.ownershipDerivation;
   assert.equal(policy.rule,'narrowest-concrete-selected-prefixes');
   assert.deepEqual(policy.broadRootsForbiddenWhenDerivable,['repository root','.starciwork','.starcistacks']);
   assert.ok(policy.importSlices.some(slice=>slice.includes('.starciwork/<scope>/')&&slice.includes('migration')));

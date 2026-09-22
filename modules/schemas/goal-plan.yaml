@@ -11,8 +11,9 @@ shape:
   file: 'one JSON document, UTF-8; parse must yield a plain object with a `legs` array'
   legs: |-
     ordered list of plan legs, earliest first. Each leg is an object:
-      {op: <opId>, paths?: [<repo-relative path prefix>...], notes?: <string>}
+      {op: <opId>, paths?: [<repo-relative path prefix>...], params?: {<name>: <value>}, notes?: <string>}
   legs[].op: 'non-empty string naming a catalog op - modules/ops/ops/<op>.yaml must exist (enqueue refuses unknown-op)'
+  legs[].params: 'optional map of the op tunables the OWNER chose - each name is declared in that op brief params block (modules/schemas/op.schema.yaml) with setBy owner; api enqueue validates type, min, max and enum and refuses params-invalid, then the dispatch packet carries the brief defaults with these on top'
   legs[].paths: 'optional list of repository-relative path prefixes the leg owns - the write ceiling enqueued onto the job row as owned_paths and the set dispatch disjointness is checked against'
   legs[].notes: 'optional free text - why the leg exists, what it must not touch, sequencing intent'
 rules:
@@ -21,6 +22,8 @@ rules:
   - An oversized approved leg is not duplicated in this semantic plan. The Kernel partitions its concrete closure into same-op execution jobs using api enqueue cut metadata; see modules/kernel/driver-loop.yaml enqueue.cutExecution.
   - "Independent legs (no dependency between them) must declare disjoint `paths` prefixes: the kernel runs several ops at once on one worktree, so an overlap is a re-plan, not a risk note (modules/goal/legality.yaml splitRules; api dispatch refuses path-collision)."
   - A leg with no `paths` is an unbounded grant: enqueue refuses empty-paths, so a leg meant to run must name its ceiling.
+  - "A tunable an owner chose is a value on the leg, never a sentence in the goal text: `params` carries it, `api enqueue --params` relays it and the packet delivers it, so no agent has to read prose to decide how many candidates, rounds or options the owner wanted."
+  - "A leg may carry only params the op declares with `setBy: owner`; a `setBy: kernel` param on a leg is params-invalid."
   - Op ids come only from the operator catalog; there is no dependsOn field - ordering is the legs array itself plus the approved opChain it is diffed against.
 validation: |-
   api.mjs cmdPlan reads the file as JSON and requires plan.legs to be an array whose every element

@@ -1,0 +1,59 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:asset-manifest:1
+type: object
+additionalProperties: false
+description: "The asset inventory interface.implement emits for one delivered interface scope
+  (E/assets.json). One entry per asset the accepted direction asked for, whether it was reused,
+  produced or deferred — so a reader counts what the scope owes and what it still lacks without
+  reading the op's prose. A deferred entry carries a brief and null bytes; it never carries a
+  fabricated file."
+required: [schema, reviewedDrawIds, items]
+properties:
+  schema:
+    const: starci/asset-manifest@1
+  reviewedDrawIds:
+    type: array
+    items: {type: string, minLength: 1}
+    description: The accepted interface.draw ids this inventory was derived from, in the order they were reviewed.
+  items:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, drawIds, usage, requiredForFlow, status]
+      properties:
+        id: {type: string, minLength: 1}
+        drawIds:
+          type: array
+          items: {type: string, minLength: 1}
+          description: The accepted directions that asked for this asset.
+        usage:
+          type: string
+          minLength: 1
+          description: Where the asset appears — surface, region and state.
+        requiredForFlow:
+          type: boolean
+          description: True when a business or UX acceptance criterion cannot be met without it.
+        status:
+          enum: [reused, produced, deferred]
+        sourcePath:
+          type: [string, "null"]
+          description: The repository path the delivered source imports, or null while the asset is deferred.
+        artifact:
+          type: [string, "null"]
+          description: The retained image artifact's path, or null while the asset is deferred.
+        provenance:
+          type: object
+          description: The instrument that produced the bytes and the inputs it was given.
+        brief:
+          type: object
+          additionalProperties: false
+          description: What a later operation needs to produce a deferred asset.
+          required: [prompt, width, height, format, placement, placeholder]
+          properties:
+            prompt: {type: string, minLength: 1}
+            width: {type: integer, minimum: 1}
+            height: {type: integer, minimum: 1}
+            format: {type: string, minLength: 1}
+            placement: {type: string, minLength: 1}
+            placeholder: {const: blank-reserved-slot}

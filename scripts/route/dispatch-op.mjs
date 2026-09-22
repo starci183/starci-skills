@@ -8,9 +8,15 @@
 //   packet:
 //     op: <id>
 //     brief: modules/ops/ops/<id>.yaml
+//     params: {<name>: <value>}   resolved tunables — the brief's defaults with
+//                                 the goal leg's and the kernel's overrides on top
 //     context: {records: [...], owned_paths: [...]}
 //     constraints: {model, budget, lease}
 //     returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string}
+//
+// resolveOpParams is exported: scripts/kernel/api.mjs enqueue validates the
+// owner's and the kernel's overrides against the brief with the same function
+// that resolves them here, so a value refused at enqueue cannot appear in a packet.
 //
 // Spawn path reconciled with the real orca CLI:
 //   orca terminal create --worktree <selector> --title "[Op] <id>" --command "<text>" --json
@@ -22,8 +28,8 @@
 //
 // CLI:
 //   node scripts/route/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
-//       [--model <target>] [--budget <n>] [--lease <token>] [--worktree <sel>]
-//       [--dry-run | --spawn] [--json]
+//       [--params '<json>'] [--model <target>] [--budget <n>] [--lease <token>]
+//       [--worktree <sel>] [--dry-run | --spawn] [--json]
 //   --spawn requires --lease (the lease binds the agent's writes to the job).
 
 import fs from 'node:fs';
@@ -37,10 +43,68 @@ import { buildContext, renderPromptReads } from '../context/pack.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
+// --------------------------------------------------------------------- params
+// An op's tunables are data (modules/schemas/op.schema.yaml `params`): the brief
+// holds the type, the default and who may set it, and the packet carries the
+// resolved value. Prose never restates a number, so nothing has to be inferred
+// from the goal text at run time.
+
+/** One value against one declared param. Returns null when it holds. */
+function paramValueError(name, def, value) {
+  const type = def?.type;
+  if (type === 'enum') {
+    const allowed = Array.isArray(def.enum) ? def.enum : [];
+    return allowed.includes(value) ? null : `${name} must be one of ${allowed.join(', ')} (got ${JSON.stringify(value)})`;
+  }
+  if (type === 'integer' && !Number.isInteger(value)) return `${name} must be an integer (got ${JSON.stringify(value)})`;
+  if (type === 'number' && !(typeof value === 'number' && Number.isFinite(value))) return `${name} must be a number (got ${JSON.stringify(value)})`;
+  if (type === 'string' && typeof value !== 'string') return `${name} must be a string (got ${JSON.stringify(value)})`;
+  if (type === 'boolean' && typeof value !== 'boolean') return `${name} must be true or false (got ${JSON.stringify(value)})`;
+  if (typeof value === 'number') {
+    if (def.min !== undefined && value < def.min) return `${name} is ${value}, below its minimum ${def.min}`;
+    if (def.max !== undefined && value > def.max) return `${name} is ${value}, above its maximum ${def.max}`;
+  }
+  return null;
+}
+
+/** The op's declared defaults with validated overrides on top.
+ *  `leg` is what the approved goal leg carries — the only source for a param
+ *  the brief marks `setBy: owner`. `flag` is what the kernel passes at enqueue;
+ *  it may set a `setBy: kernel` param outright and may relay an owner param only
+ *  when the leg already names it. An undeclared name, a wrong type, a value
+ *  outside its bounds or a setter that has no authority is a refusal — the
+ *  kernel never guesses a tunable it was not given. */
+export function resolveOpParams(opDoc, { leg = null, flag = null } = {}) {
+  const declared = opDoc?.params && typeof opDoc.params === 'object' ? opDoc.params : {};
+  const legValues = leg && typeof leg === 'object' ? leg : {};
+  const flagValues = flag && typeof flag === 'object' ? flag : {};
+  const overrides = {};
+
+  for (const [source, values] of [['goal leg', legValues], ['--params', flagValues]]) {
+    for (const [name, value] of Object.entries(values)) {
+      const def = declared[name];
+      if (!def) return { ok: false, reason: 'params-invalid', detail: `${source} sets ${name}, which ${opDoc?.id ?? 'this op'} does not declare` };
+      if (def.setBy === 'owner' && source === '--params' && !Object.hasOwn(legValues, name)) {
+        return { ok: false, reason: 'params-invalid', detail: `${name} is set by the owner; the approved goal leg does not carry it` };
+      }
+      if (def.setBy === 'kernel' && source === 'goal leg') {
+        return { ok: false, reason: 'params-invalid', detail: `${name} is set by the kernel; a goal leg cannot carry it` };
+      }
+      const error = paramValueError(name, def, value);
+      if (error) return { ok: false, reason: 'params-invalid', detail: error };
+      overrides[name] = value;
+    }
+  }
+
+  const params = {};
+  for (const [name, def] of Object.entries(declared)) params[name] = Object.hasOwn(overrides, name) ? overrides[name] : def.default;
+  return { ok: true, params, overrides };
+}
+
 function usage(code) {
   console.error(`use: node scripts/route/dispatch-op.mjs --op <id>
-    [--records a,b] [--state <.starciwork dir>] [--model <target>] [--budget <n>]
-    [--lease <token>] [--worktree <selector>] [--dry-run | --spawn] [--json]`);
+    [--records a,b] [--state <.starciwork dir>] [--params '<json>'] [--model <target>]
+    [--budget <n>] [--lease <token>] [--worktree <selector>] [--dry-run | --spawn] [--json]`);
   process.exit(code);
 }
 
@@ -56,6 +120,7 @@ function parseArgs(argv) {
     if (k === '--op') a.op = take();
     else if (k === '--records') a.records.push(...take().split(','));
     else if (k === '--state') a.state = take();
+    else if (k === '--params') a.params = take();
     else if (k === '--model') a.model = take();
     else if (k === '--budget') a.budget = take();
     else if (k === '--lease') a.lease = take();
@@ -121,6 +186,7 @@ function buildPrompt(packet, context) {
     `[Op] ${packet.op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel.`,
     ...renderPromptReads(context),
     `brief: ${packet.brief}  (your contract — never renegotiate it)`,
+    ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}  (resolved tunables — use these values, never a number from prose)`] : []),
     `records: ${packet.context.records.join(', ') || '(none bound)'}`,
     `owned_paths: ${[...new Set(packet.context.owned_paths.map(p => p.path))].join(', ') || '(per brief write-ceiling)'}`,
     `   only owned_paths may be modified; anything else is out of scope.`,
@@ -161,9 +227,18 @@ function main() {
     skillRoot, briefDoc: opDoc, ownedPaths: owned.ownedPaths,
   });
 
+  let flagParams = null;
+  if (args.params !== undefined) {
+    try { flagParams = JSON.parse(args.params); }
+    catch (e) { console.error(`--params is not JSON: ${e.message}`); process.exit(2); }
+  }
+  const resolved = resolveOpParams(opDoc, { flag: flagParams });
+  if (!resolved.ok) { console.error(`${resolved.reason}: ${resolved.detail}`); process.exit(1); }
+
   const packet = {
     op: args.op,
     brief: briefRel,
+    ...(Object.keys(resolved.params).length ? { params: resolved.params } : {}),
     context: {
       records: args.records,
       owned_paths: owned.ownedPaths,
@@ -249,6 +324,7 @@ function main() {
   if (args.json) { console.log(JSON.stringify(result, null, 2)); return; }
   console.log(`PACKET op=${packet.op}`);
   console.log(`  brief: ${packet.brief}`);
+  if (packet.params) console.log(`  params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}`);
   console.log(`  records: ${packet.context.records.join(', ') || '(none)'}`);
   for (const p of packet.context.owned_paths) console.log(`  owned_path: ${p.path}  (record ${p.record}, via ${p.via}${p.exists ? '' : ', MISSING-ON-DISK'})`);
   if (packet.context.recordsNotFound) console.log(`  records not in tree: ${packet.context.recordsNotFound.join(', ')}`);
@@ -264,4 +340,4 @@ function main() {
   for (const line of prompt.split('\n')) console.log(`  | ${line}`);
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

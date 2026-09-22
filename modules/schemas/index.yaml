@@ -309,6 +309,52 @@ schemas:
       whenNot: Not the goal record itself — the goal lives in the goals table; this is only the derived-plan file contract.
       selectedBy: The kernel agent's plan step — driver-loop.yaml tick.plan.
 
+  - id: starci/op@1
+    file: modules/schemas/op.schema.yaml
+    dialect: json-schema
+    subsystem: kernel
+    governs: "The shape of every operator manifest under modules/ops/ops/: typed `params` for tunables, `reads`/`writes` as data, one rule per `steps[].action`, `proofs` as what settle verifies, and one `policy` map for op-specific policy."
+    binds: modules/ops/ops/*.yaml
+    usedBy:
+      - scripts/checks/check-op-manifest.mjs (validates the shape plus PARAM_RESTATED, RULE_DUPLICATED, RULE_IN_DATA, PATH_JOINED, CHECK_MISSING)
+      - scripts/route/build-ops-registry.mjs (indexes id/goal/params/route into modules/ops/registry.yaml)
+      - scripts/kernel/api.mjs (enqueue validates --params against the op's params block; dispatch merges defaults into the packet)
+    business:
+      question: "What is an operation, exactly — and where does each of its rules and numbers live?"
+      whenNeeded: Every op manifest edit; the check refuses a stray key, a restated number or a rule written twice.
+      whenNot: Not the op's return envelope — that is starci/op-report@1 in modules/kernel/verdict-contract.yaml.
+      selectedBy: "The manifest's own `schema: starci/op@1` stamp."
+
+  - id: starci/asset-manifest@1
+    file: modules/schemas/asset-manifest.schema.yaml
+    dialect: json-schema
+    subsystem: kernel
+    governs: "interface.implement's asset inventory for one delivered interface scope: one entry per asset the accepted direction asked for, reused, produced or deferred, with the brief a deferred entry owes."
+    binds: E/assets.json under an impl node's evidence bundle
+    usedBy:
+      - modules/ops/ops/interface.implement.yaml (the assetManifest write names this const; its asset-coverage proof is measured against this shape)
+      - modules/ops/ops/interface.asset.yaml (reads the deferred briefs it has to satisfy)
+    business:
+      question: "Which assets does this interface owe, and which of them exist?"
+      whenNeeded: Every interface.implement that consumes an accepted direction with artwork slots.
+      whenNot: Not the bytes themselves — the images live under the node's assets, and this file indexes them.
+      selectedBy: "The file's own `schema: starci/asset-manifest@1` stamp."
+
+  - id: starci/realization-check@1
+    file: modules/schemas/realization-check.schema.yaml
+    dialect: json-schema
+    subsystem: kernel
+    governs: "How each region of an accepted direction was realized — raster-asset or code-native — and the evidence for the choice."
+    binds: E/realization-check.json under an impl node's evidence bundle
+    usedBy:
+      - modules/ops/ops/interface.implement.yaml (the realizationCheck write names this const)
+      - modules/ops/ops/interface.audit.yaml (reads it as the realization map a hard realization.mode finding is measured against)
+    business:
+      question: "Was each region built the way the accepted direction said it would be?"
+      whenNeeded: Every interface.implement delivering a draw-backed surface, and every audit of one.
+      whenNot: Not a verdict — the audit decides; this file is what it reads.
+      selectedBy: "The file's own `schema: starci/realization-check@1` stamp."
+
   - id: starci/agent-hierarchy@1
     file: modules/schemas/agent-hierarchy.yaml
     dialect: prose-contract
