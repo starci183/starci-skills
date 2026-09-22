@@ -18,11 +18,11 @@ export function classifyAgentScreen(screen) {
     .join('\n');
   const interactiveGate = /approve once|permission (?:required|request)|trust the authors|allow `[^`]+` commands|confirm\s*[·•]/i;
   const failure = /not logged in|authentication (?:failed|required)|session expired|fatal error|agent child exited|process exited/i;
-  const active = /(?:^|\n)\s*[•*]?\s*(?:Working|Thinking|Running)\s*(?:\(|·|\.\.\.|$)|esc to (?:interrupt|cancel)|background terminal running/i;
+  const active = /(?:^|\n)\s*[•*]?\s*(?:Working|Thinking|Running)\b|esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
   // prompt row is turn-idle unless a current activity marker above wins.
-  const readyPrompt = /(?:^|\n)\s*[>›❯❭]\s*\S|(?:^|\n)\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\b/im;
+  const readyPrompt = /(?:^|\n)\s*[>›❯❭]\s*(?:\S|$)|(?:^|\n)\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\b/im;
 
   if (interactiveGate.test(topLevelRecent)) return { state: 'interactive-gate', recent };
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
