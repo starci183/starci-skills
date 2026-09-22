@@ -170,8 +170,8 @@ skills:
       working:
         - qwen-agent
         - devin-agent
-        - claude-agent
         - codex-agent
+        - claude-agent
       reasoning:
         - claude-agent
         - codex-agent
@@ -187,12 +187,12 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   backend.implement:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   brand.decide:
     skill: starci
     # A decide operation that also produces bytes: when the product has no mascot, the Codex runtime, the only
@@ -211,12 +211,12 @@ operators:
   docs.author:
     skill: starci
     # Authoring reference docs is write-role work over the record tree: the full writing chain.
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   provision.ask:
     skill: starci
     # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order,
@@ -233,48 +233,47 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   content.generate:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   code.refactor:
     skill: starci
     # Restructuring code under a behaviour invariant is implementation work: the full coding chain.
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   e2e.verify:
     skill: starci
-    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   integration.verify:
     skill: starci
     # A live call to a real provider is the same kind of work as the API proof: run code, read the response
-    # back, keep the output. So it carries the same verify-role chain e2e.verify does.
-    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    # back, keep the output. Its hard floor starts the chain at Devin.
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
-      - {environment: devin, profiles: [devin-agent]}
   grammar.update:
     skill: starci
-    # Growing the installed grammar is code, stories, tests, a published version and a canon entry, so it runs on
-    # the strongest coding runtimes first and never on the image model: nothing here is drawn.
-    chain: [claude-agent, codex-agent, devin-agent]
+    # Growing the installed grammar is code, stories, tests, a published version and a canon entry: hands-on
+    # work at a hard floor, so the chain starts at Devin.
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: claude, profiles: [claude-agent]}
-      - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   goal.revise:
     skill: starci
     # Revising a live goal is a decision about the work, not work on it: the reasoning chain.
@@ -298,12 +297,12 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   interface.implement:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   interface.audit:
     skill: starci
     # Visual/Grammar conformance is an independent verdict about quality: think work.
@@ -319,21 +318,20 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   perf.verify:
     skill: starci
-    # Measuring a performance budget is the same proof shape as the security audit: the verify chain.
-    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    # Measuring a performance budget runs the product and reads numbers back: the hands-on verify chain.
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   release.deliver:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   request.analyze:
     skill: starci
     # Turning a raw request into a scoped, checkable goal is planning work: the reasoning chain, the cheap pool never.
@@ -349,20 +347,19 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   runtime.operate:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   scope.finish:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   scope.define:
     skill: starci
     # Cutting a goal into bounded nodes is a decision about the work: the reasoning chain.
@@ -387,29 +384,29 @@ operators:
     skill: starci
     # Authoring the regression check a behaviour-invariant change is measured against is implementation work:
     # the full coding chain.
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   uat.verify:
     skill: starci
-    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   uat.assisted.prepare:
     skill: starci
     # Preparation authors deterministic scripts/evidence but performs no product journey.
-    chain: [codex-agent, devin-agent, claude-agent, qwen-agent]
+    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: codex, profiles: [codex-agent]}
-      - {environment: devin, profiles: [devin-agent]}
-      - {environment: claude, profiles: [claude-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
   uat.assisted.verify:
     skill: starci
     # Receipt acceptance is an elevated verdict over evidence: think work.
@@ -460,25 +457,21 @@ selection: |-
 costPolicy: |-
   Runtime pools are provider quota windows: the Codex pool carries gpt-6-luna for easy and medium work and
   gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role, the Qwen pool
-  carries qwen3.8-flash, and Devin stays closed until an owner grants slots. General bounded implementation,
-  verification, content and maintenance operations run the established Qwen/Devin/Claude/Codex pool order.
-  Deep reasoning (business.decide, architecture.decide) runs the Codex pool first and the Claude pool second.
-  Independent review runs the Qwen pool's reviewer first, Devin second, the Codex pool third and the Claude
-  pool last. work.author reads a Work record, its neighbours and the code an implementation would touch, so
-  it carries the `plan` role and leads with the Codex pool, then the Claude pool.
-  brand.decide is the mirror of that case: it carries the `write` role, and the op also generates a placeholder
-  mascot when the product has none; only the Codex pool carries an image generator, so that target leads its
-  chain as the launchable candidate and the Claude pool follows and defers the artwork with a concrete brief.
+  carries qwen3.8-flash, and Devin stays closed until an owner grants slots. modules/models/runtimes.yaml
+  roleOfKind splits the kinds: think work (canonical records and quality verdicts) runs the Claude pool, then
+  the Codex pool on Sol; hands-on work runs the Qwen and Devin pools first and the Codex and Claude pools as
+  overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
+  the Claude pool decides the identity and defers that artwork with a concrete brief, and the Codex pool, the
+  only one with an image generator, generates it when it takes the launch.
   interface.draw invokes built-in ImageGen for a small representative set and therefore carries the single
   Codex route whose host contract exposes that tool. This route names the operation agent, not an
   image-model version: tool model selection is not exposed. interface.asset re-renders the artwork that drawing
   approved and therefore carries the same single image-capable route, with no deferral fallback - a deferred
   slot is exactly what this operation exists to close. grammar.update is the opposite case: it grows the
   installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
-  entry - so it carries the execution `implement` role but drops the image model entirely and leads with
-  the Claude pool, then the Codex pool; nothing in it is drawn, and a publish is irreversible, so the chain is
-  limited to declared coding runtimes. knowledge.repair edits
-  this runtime and therefore leads with the Claude pool. Every automatic chain contains only managed-agent or return-preamble
+  entry - so it carries the execution `implement` role at a hard floor; nothing in it is drawn, and a publish
+  is irreversible, so the chain is limited to declared coding runtimes. knowledge.repair rewrites a canonical
+  rule of this runtime and is think work. Every automatic chain contains only managed-agent or return-preamble
   command-terminal candidates and
   advances only after a verified no-effect failure. DeepSeek V4 Pro and Qwen 3.8 Max remain installed
   explicit or user-approved exception targets but are excluded from automatic chains; Orca

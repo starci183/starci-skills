@@ -93,6 +93,40 @@ test('every declared operator chain of a think kind names only frontier pools, C
   }
 });
 
+// Owner rule: hands-on work goes to Qwen and Devin first, the frontier pools only as overflow; insane is
+// frontier-only.
+const handsOnKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='hands-on').map(([kind])=>kind);
+
+test('hands-on orders lead with Qwen and Devin, overflow to Codex then Claude, and insane stays frontier-only',()=>{
+  const {tiers,preference}=runtimes.allocation;
+  for(const role of ['implement','write','verify']){
+    assert.deepEqual(preference[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],role);
+    assert.deepEqual(tiers.easy[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],`easy ${role}`);
+    assert.deepEqual(tiers.medium[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],`medium ${role}`);
+    assert.deepEqual(tiers.hard[role],['devin-agent','codex-agent','claude-agent'],`hard ${role}`);
+    assert.deepEqual(tiers.insane[role],['claude-agent','codex-agent'],`insane ${role}`);
+  }
+  const registry=read('modules/models/registry.yaml');
+  for(const kind of handsOnKinds){
+    const chain=registry.operators[kind]?.chain;
+    if(!chain||(runtimes.kindRequires?.[kind]??[]).length)continue;
+    assert.ok(['qwen-agent','devin-agent'].includes(chain[0]),`${kind} chain ${chain} must lead with Qwen or Devin`);
+    assert.deepEqual(chain.slice(-2),['codex-agent','claude-agent'],`${kind} overflows to Codex then Claude`);
+  }
+});
+
+test('hands-on kinds land on Qwen or Devin below insane when those pools have room',()=>{
+  for(const kind of handsOnKinds){
+    if((runtimes.kindRequires?.[kind]??[]).length)continue;
+    for(const difficulty of ['easy','medium','hard']){
+      const r=selectPool({kind,difficulty,runtimes});
+      assert.ok(['qwen-agent','devin-agent'].includes(r.target),`${kind}@${difficulty} -> ${r.target}`);
+    }
+    const busy=selectPool({kind,difficulty:'medium',runtimes,capacity:{'qwen-agent':{running:10},'devin-agent':{running:10}}});
+    assert.equal(busy.target,'codex-agent',`${kind} overflows to Codex when Qwen and Devin are full`);
+  }
+});
+
 test('a prefer bias cannot hoist a non-frontier pool into think work',()=>{
   const r=selectPool({kind:'review.verify',difficulty:'medium',runtimes,bias:{prefer:['devin-agent','qwen-agent']}});
   assert.deepEqual(r.chain,['claude-agent','codex-agent']);

@@ -35,26 +35,31 @@ allocation:
   # whatever its role, and decide and plan are think roles: Claude Opus 5.5 first, GPT-6 Sol when Claude is
   # unavailable, and never a pool without a frontier model. Think kinds route at a hard floor, where
   # codex-agent pins Sol; the keys below hard exist for direct role consumers that bring no kind.
+  # Hands-on work (implement, write, and verify kinds roleOfKind marks hands-on) goes to Qwen and Devin first,
+  # then Sol/Luna, then Opus as overflow. Qwen pins no hard model, so the hard tier starts at Devin; insane is
+  # frontier-only.
   tiers:
     hard:
-      # Heavy implementation and refactor work (the scope measure names it hard even when the record does not):
-      # Opus first, the SWE agent when its slots were explicitly assigned, Sol only as the last heavy fallback -
-      # never the first answer for a six-file rewrite. Hard verification goes to Opus and Sol before it
-      # reaches the SWE agent.
-      default: [claude-agent, devin-agent, codex-agent]
-      implement: [claude-agent, devin-agent, codex-agent]
-      write: [claude-agent, devin-agent, codex-agent]
-      verify: [claude-agent, codex-agent, devin-agent]
+      default: [devin-agent, codex-agent, claude-agent]
+      implement: [devin-agent, codex-agent, claude-agent]
+      write: [devin-agent, codex-agent, claude-agent]
+      verify: [devin-agent, codex-agent, claude-agent]
       think: [claude-agent, codex-agent]
       decide: [claude-agent, codex-agent]
       plan: [claude-agent, codex-agent]
     medium:
-      default: [codex-agent, claude-agent, qwen-agent, devin-agent]
+      default: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
       think: [claude-agent]
       decide: [claude-agent]
       plan: [claude-agent]
     easy:
       default: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
       think: [claude-agent]
       decide: [claude-agent]
       plan: [claude-agent]
@@ -68,13 +73,15 @@ allocation:
       think: [claude-agent, codex-agent]
       decide: [claude-agent, codex-agent]
       plan: [claude-agent, codex-agent]
+  # config.yaml allocation.preferredProvider is a bias within the tier's eligible pools and never moves think
+  # work to a pool outside `think` (scripts/route/route-model.mjs).
   preference:
-    implement: [codex-agent, claude-agent, qwen-agent, devin-agent]
-    verify: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
     think: [claude-agent, codex-agent]
     decide: [claude-agent, codex-agent]
     plan: [claude-agent, codex-agent]
-    write: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    write: [qwen-agent, devin-agent, codex-agent, claude-agent]
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
