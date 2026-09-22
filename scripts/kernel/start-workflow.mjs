@@ -527,7 +527,8 @@ try {
   const now = Date.now();
   const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
   const generation = workflow?.generation ?? 0;
-  const previousJob = ledger.db.prepare('SELECT attempt FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+  const previousJob = ledger.db.prepare('SELECT attempt,payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+  const previousPayload = (() => { try { return JSON.parse(previousJob?.payload_json || '{}') ?? {}; } catch { return {}; } })();
   const attempt = previousJob ? previousJob.attempt + 1 : 1;
   const routeInfo = { host: 'orca', agent: route.agent, routedBy: route.routedBy, model: kernelModel,
     effort: kernelEffort, profile: route.route?.profile ?? null, runtimePool: route.runtimePool ?? null, launch: 'terminal' };
@@ -536,7 +537,13 @@ try {
     ledger.db.prepare("UPDATE signals SET holder_pid=?,value_json=?,at=?,expires_at=NULL WHERE scope='kernel' AND key=? AND token=?")
       .run(process.pid, JSON.stringify({ terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,
         model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true }), now, workflowId, token);
-    const payload = JSON.stringify({
+    // A restart replaces the SEAT, not the workflow's Orca identity. Writing a
+    // fresh object over payload_json dropped orca.runId, so the next dispatch's
+    // ensureWorkflowRun saw no Run and created a second one — the two-tree
+    // sidebar. The new payload is merged OVER the previous one so durable
+    // Orca facts (orca.*, hierarchy.runtime.runId) survive agent churn while
+    // every seat fact (route, terminalHandle, attempt) is replaced.
+    const nextPayload = {
       inbox_id: claim.inbox_id,
       goal_revision: goal?.revision ?? 0,
       route: routeInfo,
@@ -558,6 +565,16 @@ try {
           runtimePool: route.runtimePool ?? null,
           terminalHandle: handle,
         },
+      },
+    };
+    const payload = JSON.stringify({
+      ...previousPayload,
+      ...nextPayload,
+      ...(previousPayload.orca ? { orca: { ...previousPayload.orca } } : {}),
+      hierarchy: {
+        ...(previousPayload.hierarchy ?? {}),
+        ...nextPayload.hierarchy,
+        runtime: { ...(previousPayload.hierarchy?.runtime ?? {}), ...nextPayload.hierarchy.runtime },
       },
     });
     if (previousJob) {
