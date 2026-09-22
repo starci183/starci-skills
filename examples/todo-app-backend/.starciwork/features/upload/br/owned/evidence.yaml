@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: br.upload.owned
-recordDigest: 999ffc35e2392e778fbc4aad9dbb9368b2a52c6e57c4c2980a3e235c8830e334
+recordDigest: 8d5ab5347db28314be25221f4532ef19d333aeb866f98c7b03a921244da476ae
 codeDigest:
   algorithm: sha256
   files:
@@ -39,6 +39,6 @@ assertions:
     observation: npx jest src/modules/integrations/upload/upload.service.spec.ts exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T20:59:14.997Z
+  capturedAt: 2026-09-22T18:40:25.391Z

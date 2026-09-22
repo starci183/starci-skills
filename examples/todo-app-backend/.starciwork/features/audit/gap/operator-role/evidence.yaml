@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: gap.audit.operator-role
-recordDigest: d2847109d7294f3d9065172fc2e040daf6c4445f16a31cd36f06a18876234b9f
+recordDigest: 75fc431cfbe79005a2192fa4defeea16dd12531bc9f84a759febb08ae54095e0
 outcome: pass
 assertions:
   - id: gap.audit.operator-role
@@ -18,6 +18,6 @@ assertions:
     observation: npx jest src/modules/bussiness/audit/audit-operator.service.spec.ts --runInBand exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T18:29:22.595Z
+  capturedAt: 2026-09-22T18:16:10.894Z

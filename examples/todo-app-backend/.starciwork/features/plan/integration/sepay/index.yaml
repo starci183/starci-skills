@@ -1,7 +1,8 @@
 schema: work/integration@1
 id: integration.plan.sepay
 title: SePay processes the checkout and confirms payment
-state: inprogress
+state: todo
+activity: verifying
 provider: sepay
 boundary: The product never stores a card or bank credential; SePay owns the transfer, and this product owns
   the subscription row that follows a confirmed payment, keyed by SePay's payment intent id.

@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: sds.audit.erasure-request
-recordDigest: ade73cc12ecbd2a8f19f0a24d97229178507b46bde2c5976df6d9e74de9fe75c
+recordDigest: 7517ed942c887d7e5ed728b0722d5f6c8bed5394b2d7029d15c7d1c034584561
 codeDigest:
   algorithm: sha256
   files:
@@ -14,7 +14,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/append-log-line.handler.ts
       sha256: 091c9a70a8a90fe6ec9ed030d5ac3b3dd41b5befbb2d5270b802d180f327a0bf
     - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      sha256: eced8460bc4ab6e074babb2da465cd6dd6c7a682bacdba0b99f2b49e17015aeb
+      sha256: 78b5ab923a61972d6a27872f94dac199cdaa3cc484b7aa07bbdf982e25746214
     - path: src/modules/bussiness/audit/audit-erasure.service.ts
       sha256: a4b36693f4a2189c731eb60ecacff92b91fb39f443d1403d945536b6dbde62c4
     - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
@@ -75,7 +75,7 @@ codeDigest:
       sha256: 56bdf0a467ab20094eaa91fec2a4052081b2f1a27fe39846b8f956e67786b762
     - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
       sha256: a69b044f18ff64b6c457cf4c3ffa0e3b0c3af57a58f0d0d2ca98228dc4fcc1eb
-  digest: 6a113e3c9cb426f017a49571496a5dde67dd67b975663b103213ef57f63d26ec
+  digest: 1db3ae5287be0e531a9593389a36572b84c7a35ac6cefe7fdc53c6fa9f6b88c3
 outcome: pass
 assertions:
   - id: t-request
@@ -107,6 +107,6 @@ assertions:
     observation: npx jest src/modules/bussiness/audit --runInBand -t "personId is dropped" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:13:00.092Z
+  capturedAt: 2026-09-22T18:19:50.171Z

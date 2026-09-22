@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: impl.task.todo-app-backend.complete-task
-recordDigest: b29e4fb571719455517d0008cb0c72e8bd28364d48e285eb917adbb408dfa8f5
+recordDigest: 478b0804fa2b087df5ca6dad7b24c0cc86a4a6b9db02b8ba1ed0c7ab83e3f683
 codeDigest:
   algorithm: sha256
   files:
@@ -54,7 +54,7 @@ codeDigest:
     - path: src/modules/bussiness/task/list-tasks.query.ts
       sha256: d2255a9c907778ed9431dbcd1f2abf1784ab9ededdeec629fa967e735a47fc94
     - path: src/modules/bussiness/task/ownership.guard.spec.ts
-      sha256: b623e488a0db1df4b268fdc59679d592469ee525284b0eb5fdea4c999de5e7b7
+      sha256: 99835e620b6797801921c67e3ac65c7c00e8d1c3ca19e52257f8bf9e763142e1
     - path: src/modules/bussiness/task/ownership.guard.ts
       sha256: 1bc3ae50c35934f06b7b2096b0872480078b86f9f7ba4a4c27e9a0f445e53d31
     - path: src/modules/bussiness/task/reopen-task.command.ts
@@ -79,7 +79,7 @@ codeDigest:
       sha256: d983a4a891dfec3d295eb66db354e7ef75ab0514aad4d325a03dab91dfc013d4
     - path: src/modules/bussiness/task/types/task-record.ts
       sha256: e7a7719a464f7be1ab8faa18a97991d5c3d7f37bf8cbfac80c0d66eab0a5941c
-  digest: 696c8afc144583b9ad2335158724030cb120af8077bb2a8bbea71f37983e23e7
+  digest: fff01ddd1d71cb6d9289a88fcafbf455572f37b38da1e30bcd6354318c7a68cc
 outcome: pass
 assertions:
   - id: br.task.complete.once
@@ -105,6 +105,6 @@ assertions:
     observation: npx jest src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:22:03.934Z
+  capturedAt: 2026-09-22T18:37:04.292Z

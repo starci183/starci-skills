@@ -13,8 +13,11 @@
 // modules/supervisor/supervise.yaml cites this file instead of restating it.
 //
 // Each cycle prints: new op reports since the last cycle, open asks with
-// their serving URLs, direction artifacts newer than the last cycle, and
-// kernel terminal liveness. First cycle prints the current state as baseline.
+// their serving URLs, direction artifacts newer than the last cycle, kernel
+// terminal liveness, and the Orca tree findings
+// scripts/checks/check-orca-tree.mjs projects from the same ledger plus a
+// terminal listing (ORCA-TREE lines). First cycle prints the current state as
+// baseline.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +25,9 @@ import { pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
 import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
+import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
 
 export const DEFAULT_INTERVAL_MS = 180000;
 // The digest's first cycle has no previous cycle to diff against: it prints
@@ -107,6 +112,25 @@ export const kernelState = (db, wf) => {
   } catch { return { terminal, state: 'unreachable' }; }
 };
 
+// The Orca tree against the ledger, once per cycle:
+// scripts/checks/check-orca-tree.mjs owns the codes and the projection, this
+// only supplies the listing. A digest that reads kernel liveness is already
+// talking to the host, so the listing costs one more read — but a ledger with
+// no kernel signal at all still makes no host call, because there is nothing
+// of ours for Orca to be holding.
+export const orcaTree = (db, { terminals = undefined } = {}) => {
+  const anyKernel = db.prepare(
+    "SELECT COUNT(*) n FROM signals s JOIN workflows w ON w.workflow_id=s.key WHERE s.scope='kernel' AND w.phase!='finished'").get().n;
+  if (terminals === undefined && !anyKernel) return { listed: false, reason: 'no kernel signal', findings: [] };
+  let listing = terminals;
+  if (listing === undefined) {
+    try { listing = terminalList({}); } catch (e) { return { listed: false, reason: String(e?.message ?? e), findings: [] }; }
+  }
+  const rows = readTerminals(listing);
+  if (!rows) return { listed: false, reason: listing?.error ?? 'terminal-list returned no listing', findings: [] };
+  return { listed: true, count: rows.length, findings: orcaTreeFindings(db, rows) };
+};
+
 // Newest direction/artifact images under .starciwork, bounded walk.
 export const newArtifacts = (repo, sinceMs) => {
   const root = path.join(repo, '.starciwork');
@@ -133,6 +157,12 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
     const k = kernelState(db, w.workflow_id);
     lines.push(`${short(w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
   }
+  const tree = orcaTree(db);
+  for (const f of tree.findings) {
+    if (f.workflowId && !mine(wanted, f.workflowId)) continue;
+    lines.push(`  ORCA-TREE ${formatFinding(f)}`);
+  }
+  if (!tree.listed && wfs.length) lines.push(`  orca tree unchecked (${tree.reason})`);
   const reps = reportsSince(db, state.first ? state.lastReportId - BASELINE_REPORTS : state.lastReportId, wanted);
   for (const r of reps) lines.push(`  report ${short(r.workflow_id)} ${r.op_id} a${r.attempt} -> ${r.outcome} @${ts(r.created_at)}`);
   if (reps.length) state.lastReportId = Math.max(state.lastReportId, ...reps.map((r) => r.report_id));
@@ -142,7 +172,7 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   for (const a of arts) lines.push(`  artifact+ ${path.relative(repo, a.path)}`);
   if (arts.length) state.lastArtifacts = Date.now();
   state.first = false;
-  return { text: lines.join('\n'), workflows: wfs, asks, reports: reps };
+  return { text: lines.join('\n'), workflows: wfs, asks, reports: reps, tree };
 };
 
 const main = () => {
@@ -166,7 +196,7 @@ const main = () => {
   };
   const run = async () => {
     const out = await cycle(db, { repo, wanted, state });
-    if (asJson) console.log(JSON.stringify({ at: Date.now(), workflows: out.workflows.map((w) => w.workflow_id), asks: out.asks }, null, 0));
+    if (asJson) console.log(JSON.stringify({ at: Date.now(), workflows: out.workflows.map((w) => w.workflow_id), asks: out.asks, orcaTree: out.tree }, null, 0));
     console.log(out.text);
   };
   return run().then(() => {

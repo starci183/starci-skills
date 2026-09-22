@@ -20,7 +20,7 @@ seedFiles:
 preconditions:
   - all 14 migration-owned tables exist (schema mirrors migrations, all statements idempotent)
   - task/invitation/rule/session/subscription/notify/audit rows only under the uat-* namespace
-  - free-cap boundary owners present: uat-cap-below (19 open), uat-cap-at (20 open), uat-paid (25 open)
+  - "free-cap boundary owners present: uat-cap-below (19 open), uat-cap-at (20 open), uat-paid (25 open)"
   - audit_log_lines carries a valid GENESIS-rooted hash chain when seeded onto an empty table
 namespace: owner LIKE 'uat-%'
 details:

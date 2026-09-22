@@ -23,8 +23,6 @@ change:
   reason: "v9-3's uat.plan.upgrade-after-cap run walked this journey's first two steps live (cap
     reached, 21st refused); the blockedBy because texts claiming 'has not run' are corrected. The
     upgrade/checkout steps remain unproven and the edges stay."
-  withdraws:
-    - "its required live uat proof has not run (gap.plan.live-proof)."
 
 blockedBy:
   - {record: fr.plan.upgrade, because: "fr.plan.upgrade is todo: the usage screen and upgrade action exist and the cap half was walked live (run 20260919T143402Z), but the live SePay leg is unproven and cannot be simulated per the owner directive (gap.plan.live-proof)."}

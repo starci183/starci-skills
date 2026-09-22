@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: sds.login.session-store
-recordDigest: e642df2d20d179a85c792ddf25a2ed19485543b0f7f3df883a26879dd0f5b921
+recordDigest: 1cf03d620fd9b0995edefda3e45c56ac5e7b406c58b138dd017204c9ee151601
 codeDigest:
   algorithm: sha256
   files:
@@ -62,6 +62,6 @@ assertions:
     observation: npx jest src/modules/bussiness/session -t "t-begin" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T13:05:57.773Z
+  capturedAt: 2026-09-22T18:22:14.515Z

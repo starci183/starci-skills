@@ -96,6 +96,52 @@ spawn:
     absence fails with step=model-attestation, closes the terminal, clears the
     startup reservation and never records the Kernel job as running.
 
+# ============================================================================
+# The Orca tree (Run -> Task -> terminal) beside the ledger hierarchy. The
+# ledger is the relationship source; this is the rule that keeps what Orca
+# renders equal to it, continuously and not only at creation. Cited by
+# modules/kernel/dispatch.yaml and modules/kernel/api.yaml; stated here once.
+# ============================================================================
+orcaTree:
+  rule: >-
+    A workflow has exactly one live kernel terminal; its Orca Run is created
+    once and survives kernel restarts; every operation Task is created in that
+    Run with the CURRENT kernel terminal as `from` and as `parent`; a job that
+    ends (settle, reject, finish) leaves no live terminal, worker or open Task;
+    a kernel restart closes the previous kernel terminal before the new one is
+    recorded.
+  enforcedBy:
+    - scripts/kernel/start-workflow.mjs — the restart merges the new seat over the previous kernel payload, so orca.runId and hierarchy.runtime.runId survive, and terminal-closes the previous kernel terminal before the replacement is recorded; a refused close is a kernel-stale-terminal-unclosed event plus an open incident.
+    - scripts/kernel/api.mjs — ensureWorkflowRun creates the Run once per workflow; createOperationTask passes the current kernel terminal as parent and from; rejectDispatch closes the terminal or worker the refused attempt created and records terminalClosed; settle closes the worker and the Task; finish closes the kernel terminal and every Task the Run still holds open.
+    - modules/host/orca/calls.yaml — the typed calls those steps issue (terminal-create --title, terminal-close, task-create --parent, task-update).
+  titles:
+    kernelTerminal: '[Kernel] <workflow_id>'
+    operationTerminal: '[Op] <op> a<attempt> · <workflow_id>'
+    operationTask: '{displayName: [Op] <op>, taskTitle: <op> #<attempt>}'
+    note: >-
+      A Task hangs under its parent, which says the rest; a terminal is a flat
+      sidebar row with no parent to read, so it carries the attempt and the
+      workflow too. Titles are written at creation (terminal-create --title),
+      not left to the provider's own summary; the managed path renames the
+      exact attested assignee afterwards because worker-start creation labels
+      do not reach a fresh terminal in an existing worktree.
+  check:
+    executable: scripts/checks/check-orca-tree.mjs
+    usage: check-orca-tree.mjs --repo <ledger owner> (--terminals <terminal-list --json receipt> | --live) [--json]
+    findings:
+      DUPLICATE_KERNEL: a workflow with more than one live kernel terminal, or a kernel signal terminal that is not the kernel job's worker_id
+      ORPHAN_TERMINAL: a live StarCi terminal bound to no running/answering job and not the kernel signal of a non-finished workflow
+      DEAD_KERNEL: a non-finished workflow whose signal terminal is not in the listing
+      TASK_OUTSIDE_RUN: a job holding an open Task in a Run that is not the workflow's current Run
+    exit: 0 clean, 1 findings, 2 usage
+    scope: >-
+      Only StarCi's own terminals — a handle the ledger names, or a title the
+      kernel wrote. An owner's own terminals are never findings.
+    notInNpmCheck: >-
+      It reads a ledger, which `npm run check` does not have. It runs against a
+      project's .starciwork, and scripts/supervisor/poll.mjs prints the same
+      findings every cycle.
+
 records:
   jobs_row: {kind: 'kernel', workflow_id, status: 'running', worker_id: <terminal handle>, payload: {route: {host: orca, agent, model}, hierarchy: {schema: starci/agent-hierarchy@1, nodeId: 'agent:kernel:<workflow_id>', parentNodeId: 'workflow:<workflow_id>', role: kernel, runtime: {host: orca, agent, provider, model, profile, runtimePool, terminalHandle}}}}
   signals_row: {scope: 'kernel', key: workflow_id, token, value: {terminal: <terminal handle>, modelAttested: true}}

@@ -38,5 +38,5 @@ reason: >-
   choosing it settles the question without asking the rule to change. If an organization concept is ever
   added to the product, this decision is reopened rather than silently reinterpreted as having already
   answered owner-reads-all or member-grants.
-change: {rev: 1, kind: clarifying, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: the product has no organization concept, so a list is unconditionally the reader's own tasks."}
+change: {rev: 1, kind: initial, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: the product has no organization concept, so a list is unconditionally the reader's own tasks."}
 

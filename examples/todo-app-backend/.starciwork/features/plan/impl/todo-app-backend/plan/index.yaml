@@ -12,8 +12,6 @@ owners:
 proves: [br.plan.caps.limit, br.plan.active-scope, br.plan.downgrade.freeze, br.plan.payment.idempotent,
   br.plan.lapse.reverts-on-read, sds.plan.subscription-lifecycle, sds.plan.cap-guard,
   contract.plan.create-precondition]
-verification: []
-verificationSource: authored-claim
 change:
   rev: 3
   kind: clarifying

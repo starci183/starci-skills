@@ -1,7 +1,0 @@
-schema: work/workspace@1
-id: lease-app
-project: lease-app
-description: Minimal workspace for the lease-drift negative case.
-repositories:
-  - role: be
-    name: lease-be

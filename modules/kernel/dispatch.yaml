@@ -317,16 +317,24 @@ spawnMechanics:
     terminal-send of the returned preamble -> submission/death attestation.
     Either path persists starci/agent-hierarchy@1 plus Run/Task/Dispatch and
     terminal metadata before job -> running. Failure = dispatch-rejected, job
-    not running, terminal closed/released as applicable, slot released.
+    not running, slot released, and the terminal or worker the attempt created
+    closed inside the same rejection, which records terminalClosed
+    (modules/kernel/start-workflow.yaml orcaTree).
     Command flags and readiness patterns come from the agent card
     modules/models/agents/<agent>.yaml.
     The kernel's own launch shows the same primitive sequence
     (scripts/kernel/start-workflow.mjs: terminal-create -> terminal-read ->
     terminal-send -> bind the startup terminal).
   naming: >-
-    `[Kernel] <project>` for the coordinator terminal, `[Op] <op-or-task>`
-    for workers — Orca titles are the fleet's address book; a terminal
-    nobody reads is closed (scripts/agent/lib.mjs terminal close).
+    Orca titles are the fleet's address book and are written at creation, not
+    left to the provider's own summary; a terminal nobody reads is closed
+    (scripts/agent/lib.mjs terminal close). The exact titles and the tree they
+    render are one rule, stated once in modules/kernel/start-workflow.yaml
+    orcaTree: one live kernel terminal per workflow, one Run that survives
+    kernel restarts, every operation Task created in it with the CURRENT
+    kernel terminal as `from` and as `parent`, and nothing live left behind by
+    a settle, a reject or a finish. scripts/checks/check-orca-tree.mjs is the
+    executable half.
   launchWindow: >-
     A launch that never acquires is bounded, not awaited forever — the agent
     card's readiness.timeoutMs caps the readiness/attestation read

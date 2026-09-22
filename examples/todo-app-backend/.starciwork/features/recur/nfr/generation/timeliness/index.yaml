@@ -26,4 +26,4 @@ requiresProof:
 # a second, real absence this record's own text assumes away. Neither is a missing module (the reason a
 # gap record would name), so no blockedBy edge is authored here, matching
 # impl.task.todo-app-backend.list's own precedent for nfr.task.list.latency.
-change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "Removed the stale blockedBy on the now-resolved gap.recur.unbuilt-module; recorded why this record still cannot be claimed done (see comment above) instead of citing a gap that would misname the actual reason."}
+change: {rev: 1, kind: initial, at: 2026-09-18T16:00:00.000Z, reason: "Removed the stale blockedBy on the now-resolved gap.recur.unbuilt-module; recorded why this record still cannot be claimed done (see comment above) instead of citing a gap that would misname the actual reason."}

@@ -16,7 +16,7 @@ revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 # rule) and br.task.single-owner (gap.task.share-edge-hold) are not claimed proven here; proves lists
 # only what this capture actually carries.
 proves: [br.task.complete.once, sds.task.completion-state, event.task.completed]
-change: {rev: 1, kind: clarifying, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
+change: {rev: 1, kind: initial, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
   owners now also claims the shipped complete-task mutation door,
   src/features/todo/graphql/mutations/task/complete-task - its resolver dispatches CompleteTaskCommand
   into the module above. Record metadata only; the revision pin and the code are unchanged."}

@@ -5,7 +5,7 @@ state: done
 fields:
   - {name: id, type: text, required: true, note: "Opaque, one of a fixed catalog, not owned by a person."}
   - {name: tier, type: text, required: true, note: "'free' or 'paid'; no third tier exists yet."}
-  - {name: taskCap, type: integer, required: false, note: 20 for free, absent (unlimited) for paid.}
+  - {name: taskCap, type: integer, required: false, note: "20 for free, absent (unlimited) for paid."}
 invariants:
   - taskCap is present and equal to 20 if and only if tier is free.
   - The catalog holds exactly two rows; a plan is a fixed offering, not a per-person configuration.

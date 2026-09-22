@@ -75,6 +75,16 @@ calls:
     required: [spec, run]
     receipt: [result.task.id, result.task.display_name]
     creates: task
+  task-update:
+    command: orchestration task-update
+    kind: mutation
+    flags: [id, status, result, run, from]
+    required: [id, status]
+    receipt: [result.task.id]
+    note: >-
+      How an operation Task is closed. scripts/kernel/api.mjs settles a job by writing the verdict, closing the
+      worker and then marking its Task done; api finish marks whatever Task the Run still holds open. A Task
+      left open is what kept settled operations visible at the Orca sidebar root.
   worker-start:
     command: orchestration worker-start
     kind: mutation

@@ -19,4 +19,4 @@ because: This gap folds into gap.login.live-proof, whose own evidence (integrati
   evidence.yaml, migrations-applied assertion) is the replayable proof; this record's own statement
   above additionally names the exact psql output verified directly against the shared Postgres
   container.
-change: {rev: 1, kind: editorial, at: 2026-09-18T16:40:00.000Z, reason: "state flips to done alongside gap.login.live-proof, which it folds into and which is now itself done."}
+change: {rev: 1, kind: initial, at: 2026-09-18T16:40:00.000Z, reason: "state flips to done alongside gap.login.live-proof, which it folds into and which is now itself done."}

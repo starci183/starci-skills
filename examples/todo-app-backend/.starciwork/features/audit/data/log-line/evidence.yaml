@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: data.audit.log-line
-recordDigest: fc7fe8df0d0d1ae77866b5c6eb0fa003a1b70f1d272ecc0fc63dea84bcea467b
+recordDigest: c4549911c1a34518f67312e92a829505cf0c486bb0e0b9f317d4aa2febb09b47
 outcome: pass
 assertions:
   - id: data.audit.log-line
@@ -15,6 +15,6 @@ assertions:
       src/modules/bussiness/audit/audit-keystore.service.spec.ts exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T13:00:11.733Z
+  capturedAt: 2026-09-22T18:12:49.418Z

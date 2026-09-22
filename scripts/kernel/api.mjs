@@ -71,6 +71,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
+import { taskUpdate } from '../api/orca/task-update.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -1374,11 +1375,49 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
 // post-launch attestation failures) a typed infra-provider incident so survey
 // sees it without parsing events. `terminal` is the launch's handle: a
 // terminal handle for command-terminal jobs, a Dispatch id for managed ones.
+const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+
+// A refusal must leave no live terminal, worker or open Task behind. Whatever
+// this attempt created before the host said no is closed exactly once here:
+// a command terminal with terminal-close, a managed worker with worker-stop +
+// worker-release. It runs before the rejection is written so the answer —
+// terminalClosed: true | false | null when the attempt created nothing to
+// close — is part of the dispatch-rejected record rather than a second
+// unrecorded effect. `settled` is a cleanup the caller already performed
+// (cmdDispatchManaged reconciles partial effects before rejecting); it is
+// reported, never repeated.
+// An unknown effect is the one case a refusal may NOT force closed: calls.yaml
+// reconcile-then-stop says the job is fenced at effect_unknown until `api
+// reconcile` proves the state. terminalClosed is false there — outstanding,
+// not silent.
+const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, settled, effectState }) => {
+  if (closeTerminal) {
+    if (alreadyClosed)
+      return { terminalClosed: true, closed: { kind: 'terminal', handle: closeTerminal, ok: true, by: 'launcher' } };
+    const r = bestEffort(() => terminalClose({ terminal: closeTerminal }));
+    return { terminalClosed: r?.ok === true,
+      closed: { kind: 'terminal', handle: closeTerminal, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) } };
+  }
+  if (!terminal || !MANAGED_KINDS.includes(model?.kind)) return { terminalClosed: null, closed: null };
+  if (!settled && effectState === 'unknown')
+    return { terminalClosed: false, closed: { kind: 'managed', dispatchId: terminal, deferred: 'reconcile-then-stop' } };
+  const stop = settled ? settled.stop : bestEffort(() => workerStop({ dispatch: terminal }));
+  const release = settled ? settled.release : bestEffort(() => workerRelease({ dispatch: terminal }));
+  const provenNoEffect = settled?.provenNoEffect === true;
+  return {
+    terminalClosed: provenNoEffect || (stop?.ok === true && release?.ok === true),
+    closed: { kind: 'managed', dispatchId: terminal, stop: { ok: stop?.ok === true },
+      release: { ok: release?.ok === true }, ...(provenNoEffect ? { provenNoEffect: true } : {}) },
+  };
+};
+
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false,
   effectState = 'none', details = null, providerHealthEvidence = null,
+  closeTerminal = null, alreadyClosed = false, settled = null,
 }) => {
   const authFailure = Boolean(providerHealthEvidence) || confirmedAuthFailure({ step, signal, error, details });
+  const { terminalClosed, closed } = closeRejectedLaunch({ model, terminal, closeTerminal, alreadyClosed, settled, effectState });
   // rejectDispatch is reached only before an accepted operation contract or
   // business verdict. Once the host proves effectState:none, the same durable
   // candidate is safe to reroute regardless of whether the infrastructure
@@ -1432,6 +1471,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
       effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth, at: now,
+      terminalClosed, ...(closed ? { closed } : {}),
     };
     if (effectState === 'none') {
       ledger.db.prepare('UPDATE jobs SET status=?, payload_json=?, result_json=?, worker_id=NULL, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?')
@@ -1444,7 +1484,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
-        effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth },
+        effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth,
+        terminalClosed, ...(closed ? { closed } : {}) },
     });
     if (providerHealth) {
       ledger.appendEvent({
@@ -1462,7 +1503,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
           `[infra-provider] ${JSON.stringify({ provider: model.provider, signal: signal ?? error ?? null, jobId })}`, now);
     }
   });
-  return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth };
+  return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth,
+    terminalClosed, ...(closed ? { closed } : {}) };
 };
 
 /* ------------------------------------------------------ op IPC helpers */
@@ -1566,6 +1608,12 @@ function cmdDispatch(ledger, args, repo) {
   const prompt = buildPrompt(packet, jobId, repo, priorFailures);
   const worktree = args.worktree ?? repo;
   const title = `[Op] ${op}`;
+  // The Task display name is `[Op] <op>` — it hangs under its parent, which
+  // says the rest. A command terminal is a flat sidebar row with no parent to
+  // read, and left untitled it shows the provider's own auto-summary
+  // ("devin.exe: Kernel orchestration for…"), so its title carries the
+  // attempt and the workflow as well.
+  const terminalTitle = `[Op] ${op} a${job.attempt} · ${job.workflow_id}`;
   // The composed command is what a spawn would actually run — card env prefix
   // + credential strip + requirements (the --yolo/dangerous flags). Dry-run
   // prints it so reviewers see the injected flags, not just the profile body.
@@ -1576,14 +1624,14 @@ function cmdDispatch(ledger, args, repo) {
   const orcaCommands = model.kind === 'command-terminal'
     ? [
       { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow; later operations reuse it' },
-      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
-      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', composedCommand ?? '<command>', '--json'] },
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
+      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', terminalTitle, '--command', composedCommand ?? '<command>', '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle>', '--screen', '--json'], note: 'readiness — verify the prompt landed before sending' },
       { step: 'dispatch', argv: ['orchestration', 'dispatch', '--task', '<operation-task-id>', '--to', '<handle>', '--from', '<kernel-terminal>', '--run', '<workflow-run-id>', '--return-preamble', '--json'] },
       { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle>', '--text', '<dispatch-preamble>', '--enter', '--json'] },
     ]
     : [
-      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
+      { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
       { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--model', '<resolved-model-id>', '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'], note: `${model.target} is a managed agent; worker-start owns dispatch/injection and must not be followed by orchestration dispatch` },
     ];
 
@@ -1594,7 +1642,7 @@ function cmdDispatch(ledger, args, repo) {
       spawnCommand: spawnCmd
         ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null, ...(spawnCmd.error ? { error: spawnCmd.error } : {}) }
         : { command: null, error: `${model.target} is launch kind '${model.kind}' — composed by 'orca orchestration worker-start', not terminal create` },
-      orca: { worktree, title, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
+      orca: { worktree, title, terminalTitle, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
     };
     emit(out, [
@@ -1684,7 +1732,7 @@ function cmdDispatch(ledger, args, repo) {
   // spawnAgent assembles the command and attests readiness/model, but prompt
   // delivery is delayed until Orca returns this Task's authoritative preamble.
   const spawned = spawnAgent({
-    provider: model.provider, worktree, title, prompt: null,
+    provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
   });
   const handle = spawned.terminal ?? null;
@@ -1698,7 +1746,8 @@ function cmdDispatch(ledger, args, repo) {
     const reason = spawned.signal ?? spawned.error ?? `spawn failed at ${spawned.step}`;
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step: spawned.step, signal: spawned.signal ?? null, error: spawned.error ?? null,
-      terminal: handle, incident: spawned.step === 'attestation', details: spawned,
+      terminal: handle, closeTerminal: handle, alreadyClosed: true,
+      incident: spawned.step === 'attestation', details: spawned,
     });
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, spawn: { ...spawn, reason } };
     emit(out, `dispatch REJECTED for ${jobId} (${spawned.step}): ${reason} — job status=${rejection.status}, terminal closed`, args.json);
@@ -1708,13 +1757,16 @@ function cmdDispatch(ledger, args, repo) {
   let artifact = null;
   const rejectCommand = ({ step, error = null, signal = null, dispatchId = null, incident = false, details = null }) => {
     cleanupDeliveryArtifact(artifact);
-    if (handle) terminalClose({ terminal: handle });
+    // The terminal this attempt created is closed by rejectDispatch, in the
+    // same step that records the refusal — a refused op never keeps a row in
+    // the sidebar (fable.md orca-hierarchy: [Op] interface.audit "Idle").
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
-      step, signal, error, terminal: dispatchId ?? handle, incident, effectState: 'none', details,
+      step, signal, error, terminal: dispatchId ?? handle, closeTerminal: handle,
+      incident, effectState: 'none', details,
     });
     const reason = signal ?? error ?? `command-terminal dispatch failed at ${step}`;
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, step, dispatchId, terminal: handle, error: reason },
-      `dispatch REJECTED for ${jobId} (${step}): ${reason}`, args.json);
+      `dispatch REJECTED for ${jobId} (${step}): ${reason} — terminal closed=${rejection.terminalClosed}`, args.json);
     process.exit(1);
   };
 
@@ -1832,12 +1884,18 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }) {
   return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };
 }
 
+// Every operation Task is created in the workflow's Run with the CURRENT
+// kernel terminal as both `from` (who issues it) and `parent` (whose child it
+// is). `from` alone left the Orca tree to be inferred from the Run, so a Task
+// whose Run was bound to a replaced kernel terminal fell out to the sidebar
+// root (fable.md orca-hierarchy, root cause 3).
 const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle }) =>
   taskCreate({
     run: runId,
     spec: prompt,
     taskTitle: `${op} #${attempt}`,
     displayName: title,
+    parent: kernelHandle,
     from: kernelHandle,
   });
 
@@ -1914,7 +1972,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     const reconciliation = reconcileFailure(effectState, dispatchId);
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId, incident,
-      effectState: reconciliation.effectState, details,
+      effectState: reconciliation.effectState, details, settled: reconciliation.cleanup,
     });
     const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
@@ -2281,7 +2339,8 @@ function cmdSettle(ledger, args, repo) {
   // never un-settles.
   // Managed jobs hold a Dispatch id in worker_id, not a terminal handle — they
   // take the worker-stop/-release path below, never terminal close.
-  const managed = jobPayloadOf(job)?.managed ?? null;
+  const settledPayload = jobPayloadOf(job);
+  const managed = settledPayload?.managed ?? null;
   let terminalClosed = null;
   if (job.worker_id && !managed) {
     const closed = terminalClose({ terminal: job.worker_id });
@@ -2315,9 +2374,44 @@ function cmdSettle(ledger, args, repo) {
     };
   }
 
+  // The op's Orca Task is closed with its worker. Settling only the worker
+  // left every finished operation as an open Task in the workflow Run, which
+  // is what the owner saw as ticked [Op] rows sitting at the sidebar root
+  // (fable.md orca-hierarchy, row 3). A close failure never un-settles the
+  // job; the ledger row is already the record.
+  const taskClosed = closeOperationTask(db, job, settledPayload);
+  if (taskClosed) {
+    const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
+    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
+      .run(JSON.stringify({ ...stored, taskClosed }), Date.now(), jobId);
+  }
+
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, ...(managedWorker ? { managedWorker } : {}) };
-  emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
+  const out = { ok: true, jobId, verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}) };
+  emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
+}
+
+// The operation Task an op holds, whichever launch kind opened it, and the
+// Run/kernel-terminal identity task-update needs to address it. Returns null
+// when the attempt never got a Task — there is then nothing to close.
+const operationTaskOf = (payload) => {
+  const taskId = payload?.orca?.taskId ?? payload?.managed?.taskId ?? payload?.hierarchy?.runtime?.taskId ?? null;
+  if (!taskId) return null;
+  return { taskId, runId: payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null };
+};
+
+// 'done' is Task closure, not a verdict: the verdict lives in the ledger. An
+// op that fails still leaves no open Task.
+const TASK_CLOSED_STATUS = 'done';
+
+function closeOperationTask(db, job, payload, kernelHandle) {
+  const task = operationTaskOf(payload);
+  if (!task) return null;
+  if (payload?.taskClosed?.ok === true) return payload.taskClosed;
+  const from = kernelHandle !== undefined ? kernelHandle
+    : db.prepare("SELECT worker_id FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(job.workflow_id)?.worker_id ?? null;
+  const r = bestEffort(() => taskUpdate({ id: task.taskId, status: TASK_CLOSED_STATUS, run: task.runId, from }));
+  return { taskId: task.taskId, status: TASK_CLOSED_STATUS, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) };
 }
 
 /* -------------------------------------------------------------- incident */
@@ -2387,9 +2481,25 @@ function cmdFinish(ledger, args) {
       kind: 'workflow-finished', payload: { inboxClosed: closed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal },
     });
   });
+  // A finish leaves no open Task in the workflow Run. Settle closes an op's
+  // Task as it settles; this catches the ones no settle ever reached — a
+  // cancelled attempt, a job settled before task closure existed, an op whose
+  // task-update was refused (taskClosed.ok false).
+  const tasksClosed = [];
+  for (const row of db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId)) {
+    const payload = jobPayloadOf(row);
+    if (!operationTaskOf(payload) || payload?.taskClosed?.ok === true) continue;
+    const result = closeOperationTask(db, row, payload, kernelTerminal);
+    if (!result) continue;
+    tasksClosed.push({ jobId: row.job_id, ...result });
+    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
+      .run(JSON.stringify({ ...payload, taskClosed: result }), now, row.job_id);
+  }
+
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, alreadyFinished: already,
-    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal) };
-  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
+    tasksClosed };
+  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   // Emit the durable receipt first because a Kernel normally closes its own
   // terminal here. The ledger is already authoritative if the host closes the
   // PTY before the terminal-close client can print its own receipt.

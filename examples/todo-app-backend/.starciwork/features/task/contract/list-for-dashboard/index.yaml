@@ -12,7 +12,7 @@ surface:
     guarantee: Two integers for one person. Never the tasks themselves, never another person's.
     stability: Adding a counter is additive; changing what open means is breaking.
 guarantees:
-  - The counts obey br.task.list.owned: they cover exactly the person's own tasks.
+  - "The counts obey br.task.list.owned: they cover exactly the person's own tasks."
 consumerObligations:
   - The dashboard renders counts and never derives a task list from them.
 refs: [br.task.list.owned]

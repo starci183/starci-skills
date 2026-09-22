@@ -2,14 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {parseYaml} from '../../../core/yaml.mjs';
+import {parseYaml} from '../../../engine/yaml.mjs';
 import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from '../../../scripts/checks/render.mjs';
 import {defaultGrammarRoot} from '../../../scripts/checks/brand.mjs';
 
 /**
  * Running-page render proof for the ecommerce-app-fe pair, per ui-screen record.
  *
- * `scripts/example-render-proof.mjs` is the gate's own composition of the canon checks, but it is defined
+ * `scripts/example/example-render-proof.mjs` is the gate's own composition of the canon checks, but it is defined
  * only for `work/implementation@1` records: it returns no problems for any other schema, and this product's
  * Work tree authors no frontend implementation node at all (its two `impl/*` records are both
  * `repository: ecommerce-app-be`, role `be`, and neither names a ui-screen in `proves`). So the ecommerce
@@ -125,7 +125,7 @@ if (args.mode === 'custody') {
   const brandDoc = parseYaml(fs.readFileSync(brandFile, 'utf8'));
   if (!brandDoc?.brand || typeof brandDoc.brand !== 'object' || Array.isArray(brandDoc.brand)) {
     say('fail', 'RENDER_BRAND_MISSING: the Work tree\'s brand/index.yaml carries no `brand:` specification block '
-      + `(its top-level keys are ${Object.keys(brandDoc).join(', ')}), so scripts/example-render-proof.mjs's `
+      + `(its top-level keys are ${Object.keys(brandDoc).join(', ')}), so scripts/example/example-render-proof.mjs's `
       + 'readExampleBrand refuses before any check runs and brandColours() reads no colour at all — the record '
       + 'authors a human-readable `colour:` map instead of the `color.tokens`/`color.scales` shape scripts/checks/render.mjs parses.');
   }

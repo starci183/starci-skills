@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: nfr.audit.tamper-evidence
-recordDigest: 3fff2f359ac3d2732b85648e880eb56db067926f365645c9acae0c1c0fb42bea
+recordDigest: 99ec359976bb5167c30de67a279857fb1023da988bdbf9ebfc78229eebe70fa2
 outcome: pass
 assertions:
   - id: measurement
@@ -13,6 +13,6 @@ assertions:
     observation: npx jest -t "ac.audit.append-only.chain-detects-tamper" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T11:56:22.530Z
+  capturedAt: 2026-09-22T18:19:04.597Z

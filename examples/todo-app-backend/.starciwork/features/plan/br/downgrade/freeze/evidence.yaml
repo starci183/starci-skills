@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: br.plan.downgrade.freeze
-recordDigest: 36c1257e0df8399dfed3995550f8c500cc813537b01970466c5893098b3a8956
+recordDigest: 5a04bea4ea93634b7200983b9c3febb264c326d8b46b23d7f1906d83d8888976
 codeDigest:
   algorithm: sha256
   files:
@@ -50,7 +50,7 @@ codeDigest:
     - path: src/modules/bussiness/plan/subscription.service.ts
       sha256: 7ab734025bddfa00b0e7c1fe3b8d13bf2389d38d6ccb0f223c056424366b7482
     - path: src/modules/bussiness/plan/testing/fake-plan-entity-manager.ts
-      sha256: 33070d735db1a28917970853b6947db10dac3aded0bf0cdebffac9da73391a3d
+      sha256: 682f0c28b0cf005a2c14288afb1bf7600d2fb719af76ca6a0395631d3f066dbd
     - path: src/modules/bussiness/plan/types/payment-intent-record.ts
       sha256: 30b8379ae917d39336f496892f6d2194b541386515bfca4b0aca7e07e9801d33
     - path: src/modules/bussiness/plan/types/plan-catalog.ts
@@ -63,7 +63,7 @@ codeDigest:
       sha256: 6fed8eae728294b40608722e17a4d18cdf3c89582b219cea2baed8179f406c3b
     - path: src/modules/bussiness/plan/upgrade-plan.handler.ts
       sha256: 5c7e4a70f64ad509d48792eeb8df4655b89daa9b04829fb4575058a9d02ebc4c
-  digest: 777d9bcdffeac5cd0b7f0eae1a6007a78b6931f1ca3f2f64ba377133e53f8cae
+  digest: 30bf3bb86c7e5862be48b63201c9e0d70a97f017d84d601bb5699bcb4f6f0310
 outcome: pass
 assertions:
   - id: br.plan.downgrade.freeze#ac.plan.downgrade.freeze.over-cap-blocks-create
@@ -78,6 +78,6 @@ assertions:
     observation: npx jest -t "ac.plan.downgrade.freeze.existing-tasks-untouched" exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T13:08:08.147Z
+  capturedAt: 2026-09-22T18:25:47.209Z

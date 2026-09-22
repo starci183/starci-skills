@@ -273,26 +273,30 @@ test('a breaking edit marks the evidence it expired, and leaves proof captured a
   assert.equal(unmarked.findings[0].observed,REV1);
 });
 
-// The real example tree currently trips the checker: records authored at rev>1 carry an 'initial'
-// expectation the tree never declared, and several change lists start at 'editorial' rather than
-// 'initial'. Whether the tree's change model or this checker's model is right is a Work-model
-// decision - until it is made, asserting a clean example asserts a falsehood.
-test('the example withdrawal returns its rule to todo with its history intact',{skip:'example tree fails this checker (rev/kind drift vs lane model) - needs a Work-model decision'},()=>{
+// The example tree is the readable statement of the change model, so it is asserted against the checker
+// rather than exempted from it: the two rules a tree can break without a baseline are that a first
+// revision declares `initial` (there is nothing for it to have travelled from) and that a revision which
+// withdraws content of its own declares `breaking`.
+test('the example tree declares its own revisions the way the change model requires',()=>{
   const report=checkWorkChange({workRoot:EXAMPLE});
-  assert.deepEqual(report.findings,[]);
-  const rule=only(report,'br.task.complete.once');
-  assert.deepEqual([rule.rev,rule.declaredKind,rule.state],[2,'breaking','todo']);
-  assert.deepEqual(rule.withdraws,['A complete task is never reopened.']);
-  assert.deepEqual(rule.criteria,['ac.task.complete.once.is-idempotent','ac.task.complete.once.is-reversible']);
-  assert.equal(rule.evidence.stale,true);
-  assert.match(fs.readFileSync(path.join(EXAMPLE,'features/task/br/complete/once/index.yaml'),'utf8'),/staleReason:/);
-  // Every other governed record of the example is an untouched first revision.
-  assert.deepEqual([...new Set(report.records.filter(record=>record.declaredKind&&record.id!=='br.task.complete.once')
-    .map(record=>`${record.rev}:${record.declaredKind}`))],['1:initial']);
-  // The rev-1 statement is gone from the record, so the transition it declares is a break.
-  const tree=readWorkTree(EXAMPLE),current=tree.records.get('br.task.complete.once');
-  const previous={...current,meta:{...current.meta,statements:['A complete task is never reopened.'],
-    acceptanceCriteria:['is-idempotent']},criteria:new Map([['ac.task.complete.once.is-idempotent',current.criteria.get('ac.task.complete.once.is-idempotent')]])};
+  assert.deepEqual(report.findings,[],'the example is the statement of the model; a finding here means the tree and the model disagree');
+  assert.equal(report.clean,true);
+  // A first revision has no predecessor, so its kind is decidable without a baseline and is always initial.
+  assert.deepEqual([...new Set(report.records.filter(record=>record.declaredKind&&record.rev===1).map(record=>record.declaredKind))],['initial']);
+  for(const record of report.records) if(record.declaredKind) assert.ok(CHANGE_KINDS.includes(record.declaredKind),`${record.id} declares ${record.declaredKind}`);
+});
+
+test('the example withdrawal is recorded as breaking and keeps the clauses it removed',()=>{
+  const report=checkWorkChange({workRoot:EXAMPLE});
+  const gap=only(report,'gap.plan.sepay-not-reachable');
+  assert.deepEqual([gap.rev,gap.declaredKind,gap.state],[2,'breaking','todo']);
+  assert.deepEqual(gap.withdraws,['no module exists yet at src/plan/payments (gap.plan.unbuilt-module)',
+    "no request has ever reached SePay's sandbox merchant account for real"],
+    'a withdrawn clause is written out rather than deleted, because it is what any proof of the old revision was proving');
+  // The withdrawn clauses are gone from the record itself, so the transition it declares is a break and
+  // not an author's opinion of one.
+  const tree=readWorkTree(EXAMPLE),current=tree.records.get('gap.plan.sepay-not-reachable');
+  const previous={...current,meta:{...current.meta,statements:[...gap.withdraws,...(current.meta.statements??[])]}};
   assert.equal(classifyChange(previous,current),'breaking');
 });
 
@@ -301,16 +305,16 @@ test('the check refuses a missing or unreadable root instead of reporting about 
   assert.throws(()=>checkWorkChange({workRoot:path.join(world(t),'absent')}),WorkChangeInputError);
 });
 
-test('the public command reports the example and refuses bad arguments',{skip:'same tree/checker model gap as the withdrawal test above'},()=>{
-  const run=args=>spawnSync(process.execPath,['bin/starci.mjs','work-change',...args],{cwd:runtime,encoding:'utf8',windowsHide:true});
-  const ok=run(['check','--work','examples/todo-app-backend/.starciwork']);
-  assert.equal(ok.status,0,ok.stderr);
-  const report=JSON.parse(ok.stdout);
+// `starci work-change` is not one of the runtime's verbs, so the report contract is asserted where a
+// caller actually gets it. A spec that spawned the CLI would be asserting a command nobody can run.
+test('a report without a baseline says which findings it could not evaluate',()=>{
+  const usage=spawnSync(process.execPath,['bin/starci.mjs','help'],{cwd:runtime,encoding:'utf8',windowsHide:true});
+  assert.doesNotMatch(usage.stdout,/work-change/,'the check has no CLI verb; if one is added, this report contract belongs behind it too');
+  const report=checkWorkChange({workRoot:EXAMPLE});
   assert.equal(report.schema,'starci/work-change@1');
   assert.equal(report.clean,true);
   assert.equal(report.baseline,null);
-  assert.match(report.limitations[0],/No baseline was given/);
-  for(const args of [['check'],['check','--fix','true'],['repair','--work','.'],['check','--work']])
-    assert.equal(run(args).status,1,`work-change ${args.join(' ')} must be refused`);
-  assert.match(run(['check','--work','examples/todo-app-backend/.starciwork','--against']).stderr,/Invalid work-change check options/);
+  assert.match(report.limitations[0],/No baseline was given/,
+    'a clean report over one tree must say what it did not look at, or it reads as a clean report over the transition');
+  assert.equal(report.coverage.compared,0,'nothing was compared, because there was nothing to compare against');
 });

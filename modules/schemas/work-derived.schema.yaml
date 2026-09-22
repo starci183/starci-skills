@@ -1,0 +1,330 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:work:derived:1
+type: object
+additionalProperties: false
+description: "The reverse-edge index, effective state, tally and frontier the Work layout promises a reader
+  can read instead of grepping for - written to _derived/index.yaml by
+  scripts/example/example-derive.mjs and never authored by hand. Every field here is computed from the
+  records on disk, which is exactly why no real record is allowed to author `usedBy`, `effectiveState` or
+  `frontier` of its own: two copies of a derivation are two things that can disagree, and the authored one
+  always wins an argument it should lose. The projection carries no id and no state and is excluded from
+  the record walk; scripts/checks/check-example-derived.mjs refuses it the moment it goes stale against the
+  tree it claims to describe."
+required:
+  - schema
+  - records
+  - tally
+  - frontier
+  - unclassifiedEdges
+properties:
+  schema:
+    const: work/derived@1
+    description: Document kind discriminator. It names the generated projection rather than a record family
+      so that the record walk can exclude it by schema instead of by the directory it happens to sit in.
+  records:
+    type: object
+    propertyNames:
+      $ref: "#/$defs/recordId"
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required:
+        - schema
+        - feature
+        - state
+        - effectiveState
+      properties:
+        schema:
+          type: string
+          pattern: ^(?:work|starci)/[a-z-]+@\d+$
+          description: "The kind of the entry this describes, copied so a reader can filter the projection
+            without opening the tree again. It is not always a `work/` family: a settled UAT run is
+            addressable by id and is indexed here under its own artifact kind."
+        feature:
+          oneOf:
+            - $ref: "#/$defs/featureId"
+            - type: "null"
+          description: The feature that owns the record, or null for the tree-level records - the
+            workspace, the catalog, the brand - that sit outside any feature and are therefore outside the
+            per-feature tally.
+        state:
+          oneOf:
+            - $ref: "#/$defs/state"
+            - type: "null"
+          description: The state the record itself authors, copied verbatim. It is null for the branches
+            the layout gives no lifecycle to, so that a reader can tell a parent from a leaf that has not
+            started.
+        effectiveState:
+          oneOf:
+            - enum:
+                - uninvestigate
+                - todo
+                - done
+                - suspended
+                - blocked
+            - type: "null"
+          description: "What the record's state actually amounts to right now, which is deliberately not
+            the same field as `state`. A record whose bound input moved keeps its authored done, its
+            completion and its history intact and reads as `suspended` here; one whose blockers are unmet
+            reads as `blocked`. Historical proof is never rewritten to say the work was not done - it was;
+            what changed is the input it was proved against."
+        suspensionReason:
+          $ref: "#/$defs/slug"
+          description: Why the derivation suspended this record - the code under its owners moved, or its
+            own evidence is marked stale. It appears only when `effectiveState` is suspended, because a
+            reason for a state the record is not in is a sentence nobody can check.
+        usedBy:
+          type: object
+          additionalProperties: false
+          minProperties: 1
+          description: Who points at this record, grouped by the edge kind that points. It is the reverse
+            of the authored edges and exists only here - a record that carried its own inbound list would
+            go false whenever somebody else edited theirs, with nothing in its own file changing.
+          properties:
+            refs:
+              $ref: "#/$defs/recordIdList"
+            composes:
+              $ref: "#/$defs/recordIdList"
+            dependsOn:
+              $ref: "#/$defs/recordIdList"
+            subscribes:
+              $ref: "#/$defs/recordIdList"
+            extends:
+              $ref: "#/$defs/recordIdList"
+            appliesTo:
+              $ref: "#/$defs/recordIdList"
+            conflictsWith:
+              $ref: "#/$defs/recordIdList"
+            blockedBy:
+              $ref: "#/$defs/recordIdList"
+            tension:
+              $ref: "#/$defs/recordIdList"
+            contractProvider:
+              $ref: "#/$defs/recordIdList"
+            contractConsumer:
+              $ref: "#/$defs/recordIdList"
+            provenBy:
+              $ref: "#/$defs/recordIdList"
+        blockers:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: The roots this record's `blockedBy` chain actually reaches, walked rather than
+            copied. A record usually cites the thing immediately above it, and the question a reader has is
+            what is at the bottom.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - rootKind
+              - cyclic
+              - because
+            properties:
+              id:
+                $ref: "#/$defs/recordId"
+                description: The record the chain ends at.
+              rootKind:
+                enum:
+                  - gap
+                  - decision
+                  - record
+                  - missing
+                description: "What kind of thing the chain bottoms out in: a named absence, an open
+                  decision, an ordinary record with no blocker of its own, or an id nothing owns. The
+                  layout's honest roots are the first two; the third is reported as it is rather than
+                  forced into a shape it is not, because a cluster of records blocking each other is itself
+                  a fact worth seeing."
+              cyclic:
+                type: boolean
+                description: Whether the walk reached this id by coming back round to something already on
+                  its own path. A cycle is reported rather than recursed into, and the flag is what tells a
+                  reader the root is structural rather than real.
+              because:
+                oneOf:
+                  - type: string
+                    minLength: 1
+                  - type: "null"
+                description: The reason carried down the chain from the edge that started it, or null when
+                  no edge on the path gave one.
+    description: Every record in the tree, keyed by its own id. The keys are open because the set is the
+      tree's, not this schema's, and constraining them to a shape is the only thing a projection of the
+      whole tree can honestly say about them.
+  tally:
+    type: object
+    additionalProperties: false
+    required:
+      - overall
+      - byFeature
+      - gaps
+      - unbuiltModuleGaps
+    description: "The counted state of the tree. It is here because `proven` is counted rather than merely
+      stored: the gap between a specification corpus and its demonstration is a number an owner reads, and
+      an unmeasured gap becomes the comfortable default."
+    properties:
+      overall:
+        $ref: "#/$defs/counts"
+        description: The whole tree, over the records the layout gives a lifecycle state to.
+      byFeature:
+        type: object
+        propertyNames:
+          $ref: "#/$defs/featureId"
+        additionalProperties:
+          $ref: "#/$defs/counts"
+        description: The same counts per feature, so that one feature carrying the whole backlog is visible
+          rather than averaged away.
+      gaps:
+        type: array
+        uniqueItems: true
+        description: Every `work/gap@1` in the tree with what would close it, listed so that the named
+          absences can be read in one place instead of per feature.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - feature
+            - state
+            - closedBy
+          properties:
+            id:
+              $ref: "#/$defs/recordId"
+            feature:
+              oneOf:
+                - $ref: "#/$defs/featureId"
+                - type: "null"
+            state:
+              $ref: "#/$defs/state"
+            closedBy:
+              oneOf:
+                - type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    $ref: "#/$defs/recordId"
+                - type: "null"
+              description: The gap's closers, normalised to a list even where the record authored a bare
+                string, or null where the gap names none. Null is information - it says nothing is yet
+                scheduled to close this absence.
+      unbuiltModuleGaps:
+        type: integer
+        minimum: 0
+        description: How many unbuilt-module gaps are still open. It is singled out because it is the one
+          count that says how much of the tree describes code that does not exist yet.
+  frontier:
+    type: array
+    uniqueItems: true
+    description: The todo records whose blockers are all met - the work that could start now. It is the
+      answer to the only scheduling question the tree is asked, computed rather than maintained, so nothing
+      sits on a list because somebody forgot to take it off.
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - feature
+        - title
+      properties:
+        id:
+          $ref: "#/$defs/recordId"
+        feature:
+          oneOf:
+            - $ref: "#/$defs/featureId"
+            - type: "null"
+        title:
+          oneOf:
+            - type: string
+              minLength: 1
+            - type: "null"
+          description: The record's own title, copied so the frontier reads as work rather than as ids, and
+            null where the record carries none.
+  unclassifiedEdges:
+    type: array
+    description: "References the derivation found in fields that are not one of the layout's declared edge
+      kinds. They are reported rather than filed under an invented kind, because a projection that guesses
+      what an edge means is a projection that quietly answers questions nobody asked it. Entries are not
+      deduplicated: one field naming the same record twice is two occurrences, and collapsing them would
+      under-report how much a field leans on one record."
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - from
+        - field
+        - target
+      properties:
+        from:
+          $ref: "#/$defs/recordId"
+          description: The record the reference was found in.
+        field:
+          type: string
+          minLength: 1
+          description: The dotted path inside that record where it sits, so the fact can be checked against
+            the file rather than searched for.
+        target:
+          $ref: "#/$defs/recordId"
+          description: The record it points at.
+$defs:
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
+      written twice by two authors is the same string.
+  featureId:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A feature's own id - the directory name under features/ and the id its
+      features/<feature>/index.yaml carries. It has no family prefix because a feature is the owner of
+      families rather than a member of one.
+  recordId:
+    type: string
+    pattern: ^[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9][A-Za-z0-9-]*)*(?:#[A-Za-z0-9][A-Za-z0-9.-]*)?$
+    description: "The id of anything the tree addresses. The projection indexes every record, including the
+      tree-level ones whose ids carry no family prefix at all - `brand`, the workspace, each feature - and
+      every settled UAT run, whose id carries its run directory's uppercase timestamp. This pattern is
+      therefore deliberately wider than the family-prefixed recordId the record schemas use: a derivation
+      that could not name something would be a derivation that silently dropped it."
+  recordIdList:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: The records pointing at this one through one edge kind, in sorted order so two runs over
+      the same tree produce byte-identical output.
+  state:
+    enum:
+      - uninvestigate
+      - todo
+      - done
+    description: The state a leaf authors - not looked at, outstanding, or finished. The derived values
+      suspended and blocked are not in this set, because they are what the projection computes rather than
+      what a record may claim.
+  counts:
+    type: object
+    additionalProperties: false
+    required:
+      - done
+      - todo
+      - stale
+      - blocked
+      - total
+    description: One bucketing of records by effective state. `stale` is the tally's name for suspended -
+      the bucket a reader wants is "proof that no longer speaks for the current record", which is what the
+      word says at a glance.
+    properties:
+      done:
+        type: integer
+        minimum: 0
+      todo:
+        type: integer
+        minimum: 0
+      stale:
+        type: integer
+        minimum: 0
+      blocked:
+        type: integer
+        minimum: 0
+      total:
+        type: integer
+        minimum: 0

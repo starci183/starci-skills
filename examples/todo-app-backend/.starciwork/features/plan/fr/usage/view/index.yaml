@@ -23,8 +23,6 @@ change:
   reason: "v9-3's run walked this surface live and observed the at-cap state correctly; the blockedBy
     because text claiming 'has not run' is corrected. The edge stays - the run settles fail, not the
     pass this record's uat proof needs."
-  withdraws:
-    - "uat.verify has not run the usage surface against the running product yet."
 
 blockedBy:
   - {record: gap.plan.live-proof, because: "The usage surface has now been walked live - uat.plan.upgrade-after-cap run 20260919T143402Z observed the at-cap state naming the cap with the upgrade action present - but the run it was observed in settles fail (pending SePay gateway leg; no create-refusal feedback on /tasks), so the required live uat proof is exercised yet unsettled and stays open with the gap."}

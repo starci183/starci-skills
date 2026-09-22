@@ -1,9 +1,9 @@
-# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence@1 section for what that distinction means).
 schema: work/evidence@1
 record: impl.plan.todo-app-backend.plan
-recordDigest: 55629d4f87cdf677007048ffad6359864c85a758c8c6bc2ad66bfe7a1180181c
+recordDigest: 9e3b1ab38b8b45c29343d732aad3310d7065b7613c20b92898db01c9a32d6b7e
 codeDigest:
   algorithm: sha256
   files:
@@ -12,7 +12,7 @@ codeDigest:
     - path: src/features/todo/graphql/mutations/plan/downgrade-plan/downgrade-plan.module.ts
       sha256: 835f213a4a9bc5f1e5158edae20309363a0374b340096168efd10d12ad4e2029
     - path: src/features/todo/graphql/mutations/plan/downgrade-plan/downgrade-plan.resolver.spec.ts
-      sha256: 4ed530793e99cb5b3cd5504ee8ffcdcc26e410ad3e8dc3064c96984acd36dac9
+      sha256: e19f685728817b5a00ba9e92c557ecdb1bbe2b4d7a5993dcbd8b5da069997fd1
     - path: src/features/todo/graphql/mutations/plan/downgrade-plan/downgrade-plan.resolver.ts
       sha256: e8a3978e391628d1cabf6cc286f5a1be64989e12f0c93e36c283e594e3e71edd
     - path: src/features/todo/graphql/mutations/plan/downgrade-plan/graphql-types/response.ts
@@ -26,7 +26,7 @@ codeDigest:
     - path: src/features/todo/graphql/mutations/plan/reconcile-payment/reconcile-payment.module.ts
       sha256: d6db0ea6518f04b8be4b6e2b3dfc75c049900ecee88d7da373b17b537b06878c
     - path: src/features/todo/graphql/mutations/plan/reconcile-payment/reconcile-payment.resolver.spec.ts
-      sha256: e3add2795dd8b0fba5260679682d0c0996a5c273145fc6219ff50e02f6df07e0
+      sha256: f14b54ffd09da193dcd034eb4db6a57c8f2690ac7c5c6f71bc1cbea49d89f750
     - path: src/features/todo/graphql/mutations/plan/reconcile-payment/reconcile-payment.resolver.ts
       sha256: 6b9247571a5648e90397d0acdbb419ca45896af5c9a84dfa7a5cc42db0786ea0
     - path: src/features/todo/graphql/mutations/plan/upgrade-plan/graphql-types/response.ts
@@ -36,7 +36,7 @@ codeDigest:
     - path: src/features/todo/graphql/mutations/plan/upgrade-plan/upgrade-plan.module.ts
       sha256: 8469ce037b27cd4a2dfd00825ba14452c044217aa2a6f8fc9b8033fb1ecdbf50
     - path: src/features/todo/graphql/mutations/plan/upgrade-plan/upgrade-plan.resolver.spec.ts
-      sha256: 39747166403347b0201e8f90ed7636b622187b1244f628012bffbe4b5763b8a0
+      sha256: 79b17f76b3667e4d05c400606f26cb7972c724e9ae263b797ca297b633c979c3
     - path: src/features/todo/graphql/mutations/plan/upgrade-plan/upgrade-plan.resolver.ts
       sha256: dc7a681356dcb6ff9fce265ab4cccb5427fc912736028bd572c297362d7e2606
     - path: src/features/todo/graphql/queries/plan/plan-usage/graphql-types/response.ts
@@ -100,7 +100,7 @@ codeDigest:
     - path: src/modules/bussiness/plan/subscription.service.ts
       sha256: 7ab734025bddfa00b0e7c1fe3b8d13bf2389d38d6ccb0f223c056424366b7482
     - path: src/modules/bussiness/plan/testing/fake-plan-entity-manager.ts
-      sha256: 33070d735db1a28917970853b6947db10dac3aded0bf0cdebffac9da73391a3d
+      sha256: 682f0c28b0cf005a2c14288afb1bf7600d2fb719af76ca6a0395631d3f066dbd
     - path: src/modules/bussiness/plan/types/payment-intent-record.ts
       sha256: 30b8379ae917d39336f496892f6d2194b541386515bfca4b0aca7e07e9801d33
     - path: src/modules/bussiness/plan/types/plan-catalog.ts
@@ -114,7 +114,7 @@ codeDigest:
     - path: src/modules/bussiness/plan/upgrade-plan.handler.ts
       sha256: 5c7e4a70f64ad509d48792eeb8df4655b89daa9b04829fb4575058a9d02ebc4c
     - path: src/modules/integrations/sepay/sepay.client-edge.spec.ts
-      sha256: f5c86c63c767b05f0a98059515d26ff1c3a183acb5878f01e935253fe6895f13
+      sha256: 9675163565da1be9eed6949dbda67886dce2e17babf64c3392283917ccd01084
     - path: src/modules/integrations/sepay/sepay.client.spec.ts
       sha256: 0dff8d5936e9604ca9c0125261d7aaab785b18d91b28beabe9d701b4c7228bcc
     - path: src/modules/integrations/sepay/sepay.client.ts
@@ -123,7 +123,7 @@ codeDigest:
       sha256: f8ae2f04c79286f90f231254e556e7c088bdd586a239757bb6601023aee97dc9
     - path: src/modules/integrations/sepay/sepay.module.ts
       sha256: eb83145789af2b7be599c214ce68d842aa3f5fa76401d9e534bb0e2c48d83217
-  digest: 21bce1a55126e47077803edd308bfca52356f7d774ab1f64a16ccb3c30464f8d
+  digest: 22d657952d678fb53bafd19b4448a25dfdc5ca9cc33cb30ba5b1cc28c9eb53f5
 outcome: pass
 assertions:
   - id: br.plan.caps.limit
@@ -170,6 +170,6 @@ assertions:
     observation: npx jest src/modules/bussiness/plan/create-precondition.contract.spec.ts exited 0
 provenance:
   actor: example-evidence
-  tool: scripts/example-evidence.mjs
+  tool: scripts/example/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-19T23:15:50.999Z
+  capturedAt: 2026-09-22T18:27:35.058Z

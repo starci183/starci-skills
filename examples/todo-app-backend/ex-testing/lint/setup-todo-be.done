@@ -1,8 +1,0 @@
-v3-0-todo-be-setup-modules DONE 2026-09-19
-app: examples/todo-app-backend
-config: eslint.config.mjs mirrors examples/ecommerce-app-be (stylistic + no-restricted-syntax w/ spec+src/tests carve-outs + canon/local merge + module-boundary globs + spec throw-abstract off + lang exemption); env readers limited to app-config.service.ts + audit-operator.service.ts
-canon: @starci/eslint-canon-be@^1.2.1 (npm) + vendored plugins/eslint/index.mjs (7 local rules)
-deps added: eslint@^9.39.5 typescript-eslint@^8.70.0 globals@^17.12.0 tsconfig-paths@^4.2.0 (@nestjs/testing already present)
-aliases: tsconfig paths + jest moduleNameMapper (root + e2e) + tsconfig-paths/register in start script and e2e api spawn
-verify: npx eslint src/modules/**/*.ts -> 16 remaining (12 no-folder-reexport, 4 no-non-global-module-import - all blocked on out-of-scope composition-root/importer files) | npx tsc --noEmit -> clean | npx jest src/modules -> 89 suites, 560/560 passed
-debt: ex-testing/lint/debt-todo-be.json (whole-app 606: modules 16, features 2, tests 0, src-root 588 out-of-lane)
