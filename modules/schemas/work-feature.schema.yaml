@@ -54,33 +54,67 @@ $defs:
     properties:
       request:
         type: object
+        additionalProperties: false
+        required: [workflow, goalIdentity, goalRevision, outcome]
         description: The workflow and approved goal identity and revision this scope bounds, with its
           outcome and effect ceiling.
+        properties:
+          workflow: {type: string, minLength: 1}
+          goalIdentity: {type: string, minLength: 1}
+          goalRevision: {type: integer, minimum: 0}
+          source: {type: string, minLength: 1}
+          outcome: {$ref: "#/$defs/prose"}
+          effectCeiling:
+            anyOf:
+              - {$ref: "#/$defs/prose"}
+              - {type: array, minItems: 1, items: {$ref: "#/$defs/prose"}}
+          completionCriteria: {type: array, items: {$ref: "#/$defs/prose"}}
       nodes:
         type: array
         items:
           type: object
+          additionalProperties: false
           required: [id]
           properties:
             id: {type: string, minLength: 1}
+            kind: {type: string, minLength: 1}
+            path: {type: string, minLength: 1}
+            purpose: {$ref: "#/$defs/prose"}
+            grounding: {type: array, items: {type: string, minLength: 1}}
             dependsOn: {type: array, items: {type: string}}
       deps:
         type: array
         items:
           type: object
+          additionalProperties: false
           required: [from, to]
           properties:
             from: {type: string, minLength: 1}
             to: {type: string, minLength: 1}
+            reason: {$ref: "#/$defs/prose"}
       exclusions:
         type: array
         items:
           type: object
+          additionalProperties: false
           required: [reason]
           properties:
+            subject: {type: string, minLength: 1}
+            path: {type: string, minLength: 1}
             reason: {$ref: "#/$defs/prose"}
       openQuestions:
         type: array
+        items:
+          anyOf:
+            - {$ref: "#/$defs/prose"}
+            - type: object
+              additionalProperties: false
+              required: [question]
+              properties:
+                id: {type: string, minLength: 1}
+                question: {$ref: "#/$defs/prose"}
+                status: {type: string, minLength: 1}
+                resolution: {$ref: "#/$defs/prose"}
   prose:
     type: string
     minLength: 1

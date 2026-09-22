@@ -58,7 +58,11 @@ writes:
         declared node ids, exclusions[] each with its reason, and openQuestions[]. Every named node
         traces to the request or to an inspected path; a scope item that cannot be grounded is an
         open question in the record, not an invented entry. Existing decided records are referenced
-        by id, never restated.
+        by id, never restated. The field names are exactly those of
+        modules/schemas/work-feature.schema.yaml $defs.scope (request.workflow, goalIdentity,
+        goalRevision, source, outcome, effectCeiling, completionCriteria; node id, kind, path,
+        purpose, grounding[], dependsOn[]; dep from, to, reason; exclusion subject, path, reason); the
+        schema closes every object, so an invented key makes the record invalid.
   - id: catalog
     path: .starciwork/index.yaml
     fields: [features]
