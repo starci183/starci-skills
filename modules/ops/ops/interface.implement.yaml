@@ -169,7 +169,9 @@ writes:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
         changes; record actual diff and commit mapping, not proposed changes as delivered.
   - id: evidence
-    path: .starciwork/features/<feature>/impl/<repository>/<name>/assets/running-page.png
+    path: >-
+      .starciwork/features/<feature>/impl/<repository>/<name>/assets/running-page.png +
+      E/screens/**/*.png + E/runtime.json + E/measurements.json
     fields:
       - id
       - nodeId
@@ -200,7 +202,15 @@ writes:
         submission alone is not pass. Fix scoped failures and rerun affected checks. A missing
         runner, token reference, coverage target or unavailable required Sonar gate is
         blocked/not-run, never pass; do not move this responsibility to architecture, business or
-        UAT. Reuse existing authorization and keep secrets outside evidence."
+        UAT. Reuse existing authorization and keep secrets outside evidence. Every delivered
+        surface must additionally emit the runtime evidence bundle interface.audit reads:
+        E/screens/**/*.png captures one real served render per delivered route x state x viewport x
+        theme cell; E/runtime.json records per capture the served origin/environment revision,
+        driver, route/state actually opened, viewport/theme, probe result and limitations (HEAD is
+        not served proof); E/measurements.json records per capture the DOM/accessibility and
+        computed-style measurements used to prove rendered geometry, breakpoints, tokens and
+        interactive affordances. PNG-only handoff is incomplete evidence: cells without runtime and
+        measurement entries keep this op's outcome partial/blocked, never done."
   - id: handoff
     path: E/response.yaml
     fields:
