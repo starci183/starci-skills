@@ -166,10 +166,19 @@ tick:
     cutExecution: >-
       A preflight-proven write closure beyond the canonical cut bounds is
       execution decomposition INSIDE the already approved semantic op, not a
-      new semantic plan leg and not an owner gate. The slice count is
+      new semantic plan leg and not an owner gate. The agent count is
       computed, not guessed: measure the closure's files/assertions/
-      components/records and call `api estimate`; its `slices` (weights and
-      bounds: modules/models/runtimes.yaml allocation.slicing) is N.
+      components/records, pass its paths, and call `api estimate`; its
+      `agentsAchievable` is N and its `slices` is the same number. That number
+      is the closure's size class and the owner's parallelism gear read
+      through the declared tables (modules/models/runtimes.yaml
+      allocation.slicing `weights`, `targetMinutes`, `size.<class>.from`,
+      `size.<class>.agents`, `gears`), then bounded by the disjoint partition
+      the closure actually holds — `agentsRequested` is what the gear asks
+      for and `reason` names what capped it. A gear raises the request only:
+      the pool's maxParallel, the fleet's maxParallelOps and the workflow's
+      budgets.maxOps still admit, and a slice refused `max-ops` stays queued
+      until one of them frees.
       A cut is not fan-out within an operation: the slices are DISJOINT jobs
       of the same approved op, each still one job with one agent and one
       verdict (dispatch.yaml oneOpOneAgent), never several agents sharing one

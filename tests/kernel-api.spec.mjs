@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
@@ -16,6 +17,19 @@ const API=path.join(ROOT,'scripts','kernel','api.mjs');
 // wrapping kernel/ledger-db.mjs tables (workflows, goals, inbox, jobs,
 // signals, incidents, events).
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+/** The same call with an owner-config root: STARCI_OWNER_ROOT is the one seam engine/config.mjs reads config.yaml through. */
+const runApiAsOwner=(ownerRoot,...args)=>spawnSync(process.execPath,[API,...args],
+  {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:ownerRoot}});
+/** A temp owner root holding a valid config.yaml — the shipped example with `patch` merged over it. */
+const ownerConfig=(t,patch)=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const example=path.join(ROOT,'config.example.yaml');
+  fs.copyFileSync(example,path.join(dir,'config.example.yaml'));
+  const config=parseYaml(fs.readFileSync(example,'utf8'));
+  fs.writeFileSync(path.join(dir,'config.yaml'),stringifyYaml({...config,...patch}));
+  return dir;
+};
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
 /** One temp Work root per test: a plain directory; openLedger creates .starciwork/runtime.sqlite on demand. */
@@ -81,6 +95,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
     state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,unconsumedReports:0,nudgeReadyJobs:[],
+    queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish',
   });
 });
@@ -135,6 +150,96 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
   seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf));
   assert.deepEqual([frontier().state,frontier().actionable],['finished',false],
     'a finished workflow is the other state with nothing to act on');
+});
+
+// A queued row is the dispatch candidate; frontier.queued says why each one has
+// not moved, so the Kernel clears the named blocker instead of re-dispatching
+// into the same refusal. Causes and their order: api.mjs QUEUED_BECAUSE.
+test('status explains every queued job: ready, dependency, path-lease, pool-full, circuit-open, max-ops',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-queued-because';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const statusOf=(root=owner)=>{
+    const r=runApiAsOwner(root,'status','--repo',repo,'--workflow',wf,'--json');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    return out(r).frontier;
+  };
+  const because=(jobId,frontier)=>frontier.queued.find(item=>item.jobId===jobId);
+
+  const enq=(op,paths)=>{
+    const r=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op',op,'--paths',paths,'--json');
+    assert.equal(r.status,0,r.stderr);
+    return out(r).job_id;
+  };
+  const first=enq('docs.author','docs/first');
+
+  // Nothing blocks it: queued and dispatchable now.
+  let frontier=statusOf();
+  assert.deepEqual(because(first,frontier),{jobId:first,opId:'docs.author',attempt:1,queuedBecause:'ready',blockedBy:null,detail:null});
+  assert.deepEqual(frontier.queuedCauses,{ready:1});
+  assert.equal(frontier.readyOperations,1,'the existing frontier counters are untouched');
+
+  // path-lease: a live capacity-1 path lease an overlapping sibling holds.
+  const second=enq('docs.author','docs/first/nested');
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,1)').run('path:docs/first');
+    ledger.db.prepare("UPDATE jobs SET status='leased', lease_token='tok-k7-first' WHERE job_id=?").run(first);
+    const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(first);
+    ledger.db.prepare(`INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref)
+      VALUES(?,?,?,?,?,?,?,1,?,?,NULL)`).run('path:docs/first',first,wf,job.op_id,job.attempt,job.generation,job.lease_token,at,at+600000);
+  });
+  frontier=statusOf();
+  assert.equal(because(second,frontier).queuedBecause,'path-lease');
+  assert.deepEqual(because(second,frontier).blockedBy,{path:'path:docs/first',job:first},'the blocking path AND the job that holds it');
+
+  // max-ops outranks the path fence: the workflow ceiling refuses before leases
+  // are ever consulted, so that is the cause the Kernel is told to clear.
+  const capped=ownerConfig(t,{budgets:{maxOps:1,perOpMs:null,dailyTokens:null}});
+  const atCeiling=because(second,statusOf(capped));
+  assert.equal(atCeiling.queuedBecause,'max-ops');
+  assert.deepEqual(atCeiling.blockedBy,{ceiling:1,ceilingSource:'budgets.maxOps',running:1});
+
+  // Release the fence, then saturate the routed pool instead.
+  seed(repo,ledger=>{
+    ledger.db.prepare('DELETE FROM leases WHERE job_id=?').run(first);
+    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(first);
+  });
+  assert.equal(because(second,statusOf()).queuedBecause,'ready','a released fence and a settled sibling clear it');
+
+  // pool-full: the persisted route decision names a pool whose declared
+  // maxParallel is already committed fleet-wide, across every workflow.
+  const pool='claude-fable',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8')).runtimes[pool].maxParallel;
+  seed(repo,ledger=>{
+    const payload=JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(second).payload_json);
+    ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(json({...payload,model:pool}),second);
+    const at=Date.now();
+    ledger.ensureWorkflow({workflowId:'wf-other',title:'another workflow on the same fleet'});
+    for(let n=1;n<=maxParallel;n++) ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+      VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`).run(`occupant-${n}`,'wf-other','docs.author',n,json({opId:'docs.author',model:pool}),at,at);
+  });
+  const full=because(second,statusOf());
+  assert.equal(full.queuedBecause,'pool-full');
+  assert.deepEqual(full.blockedBy,{pool,running:maxParallel,maxParallel},'the blocking pool and its declared slot count, read from runtimes.yaml');
+
+  // circuit-open outranks pool-full: a dead provider credential is not a wait.
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare(`INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health',?,NULL,NULL,?,?,?)`)
+      .run('claude',json({schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth',failures:1,strikeLimit:1}),at,at+600000);
+  });
+  const open=because(second,statusOf());
+  assert.equal(open.queuedBecause,'circuit-open');
+  assert.deepEqual(open.blockedBy,{provider:'claude',pool},'the provider credential that is parked, and the pool that shares it');
+
+  // dependency outranks everything: an approved leg that precedes this op has
+  // no succeeded job, so no admission check can make it dispatchable.
+  seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=? AND revision=0')
+    .run(json({opChain:{legs:[{op:'scope.define'},{op:'docs.author'}]}}),wf));
+  const dep=because(second,statusOf());
+  assert.equal(dep.queuedBecause,'dependency');
+  assert.deepEqual(dep.blockedBy,{op:'scope.define',job:null},'no job of the earlier leg exists at all');
+  assert.match(dep.detail,/precedes docs\.author in the approved order/);
 });
 
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
@@ -293,6 +398,51 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
   assert.notEqual(job?.status,'running','a packet print must not mark the job running — nothing was spawned');
 });
 
+// budgets.maxOps is the owner's per-workflow concurrency ceiling and it is
+// ENFORCED: min(budgets.maxOps, runtimes.yaml maxParallelOps) is the line, and a
+// job that meets it stays queued instead of launching.
+test('budgets.maxOps refuses the second concurrent operation with max-ops and leaves it queued',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-max-ops';
+  const owner=ownerConfig(t,{budgets:{maxOps:1,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const first=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/a','--json');
+  assert.equal(first.status,0,first.stderr);
+  const second=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/b','--json');
+  assert.equal(second.status,0,second.stderr);
+  const [jobA,jobB]=read(repo,l=>l.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=? ORDER BY attempt').all(wf)).map(r=>r.job_id);
+
+  // Nothing is dispatched yet: two queued jobs hold no slot, so the first one is admitted.
+  const admitted=runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobA,'--json');
+  assert.equal(admitted.status,0,admitted.stderr||admitted.stdout);
+
+  // The first operation now holds the workflow's one slot.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobA));
+  const refused=runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json');
+  assert.notEqual(refused.status,0,'a second dispatch at budgets.maxOps:1 must refuse');
+  const body=out(refused);
+  assert.equal(body?.ok,false);
+  assert.equal(body?.reason,'max-ops');
+  assert.equal(body?.slots?.ceiling,1);
+  assert.equal(body?.slots?.ceilingSource,'budgets.maxOps','the owner budget is the lower of the two ceilings');
+  assert.equal(body?.slots?.running,1);
+  assert.equal(read(repo,l=>l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobB)).status,'queued',
+    'a refused dispatch reserves nothing — the job stays queued for the next slot');
+  // route spends a model decision on a slot that does not exist; it refuses first.
+  const routed=runApiAsOwner(owner,'route','--repo',repo,'--job',jobB,'--json');
+  assert.notEqual(routed.status,0);
+  assert.equal(out(routed)?.reason,'max-ops');
+
+  // Free the slot and the same job is admitted with nothing else changed.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(jobA));
+  assert.equal(runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
+    'a settled sibling releases the slot');
+  // With no owner budget the fleet ceiling (runtimes.yaml maxParallelOps) admits alone.
+  const unbounded=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobA));
+  assert.equal(runApiAsOwner(unbounded,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
+    'one running operation is nowhere near maxParallelOps');
+});
+
 test('settle --verdict fail --report marks the job settled and appends an event',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-settle';
   seedGoal(repo,wf);
@@ -403,14 +553,86 @@ test('estimate sizes same-op slices from measured counts, never a guess',t=>{
   assert.equal(big.status,0,big.stderr);
   const b=out(big);
   assert.equal(b.minutes,328,'40*4 + 20*3 + 9*12 = 328 agent-minutes');
-  assert.equal(b.slices,11,'ceil(328/30) = 11 slices inside the 15-30min target');
-  assert.ok(b.perSliceMinutes<=30&&b.perSliceMinutes>=15,`per-slice ${b.perSliceMinutes}min outside target`);
+  assert.equal(b.size,'xl','40 files reaches allocation.slicing.size.xl.from.files');
+  assert.equal(b.slices,b.agentsAchievable,'slices is retained as the agent count, never a second number');
+  assert.equal(b.slices,6,'xl at gear 1 asks for 6 agents (runtimes.yaml allocation.slicing.size.xl.agents)');
+  assert.equal(b.overTarget,true,'328 agent-min over 6 agents still exceeds targetMinutes[1]');
   const small=runApi('estimate','--repo',repo,'--files','3','--json');
   assert.equal(small.status,0,small.stderr);
   assert.equal(out(small).slices,1,'a 12-minute measure never cuts');
   const empty=runApi('estimate','--repo',repo,'--json');
   assert.notEqual(empty.status,0,'estimate with no measured count must refuse');
   assert.match(`${empty.stdout}${empty.stderr}`,/estimate-no-measure/);
+});
+
+// The owner's one knob, end to end: the measured closure lands in a size class,
+// the class plus the gear names agentsRequested, and the closure's own disjoint
+// path partition is what it can actually achieve.
+// runtimes.yaml allocation.slicing {size, gears}; config.yaml parallel.gear.
+test('estimate classifies s/m/l/xl and scales only l/xl by gear',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  seed(repo,ledger=>ledger.ensureWorkflow({workflowId:'wf-k7-size',title:'size classes'}));
+  const estimate=(...args)=>{
+    const r=runApi('estimate','--repo',repo,...args,'--json');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    return out(r);
+  };
+  // s: the whole closure fits inside targetMinutes[0] (3 files * 4 = 12 <= 15).
+  // m: past that window but short of every l bound (8 files * 4 = 32).
+  // l: 12 files reaches size.l.from.files. xl: 40 reaches size.xl.from.files.
+  const fixtures={s:['--files','3'],m:['--files','8'],l:['--files','12'],xl:['--files','40']};
+  const expected={
+    1:{s:[1,1],m:[1,1],l:[3,3],xl:[6,6]},
+    2:{s:[1,1],m:[1,1],l:[5,5],xl:[10,10]},
+  };
+  for(const gear of [1,2]) for(const [size,args] of Object.entries(fixtures)){
+    const e=estimate(...args,'--gear',String(gear));
+    const [requested,achievable]=expected[gear][size];
+    assert.equal(e.size,size,`${args.join(' ')} must classify ${size}, got ${e.size}`);
+    assert.equal(e.gear,gear);
+    assert.equal(e.gearSource,'flag','--gear is the dry-run override; it never writes');
+    assert.equal(e.agentsRequested,requested,`${size} at gear ${gear} asks for ${requested} agents`);
+    assert.equal(e.agentsAchievable,achievable);
+    assert.equal(e.slices,e.agentsAchievable,'slices must stay equal to agentsAchievable');
+    assert.equal(e.reason,null,'nothing bounded the request below it');
+  }
+  // s/m never fan out, whatever the gear.
+  assert.deepEqual([estimate('--files','3','--gear','2').agentsRequested,estimate('--files','8','--gear','2').agentsRequested],[1,1]);
+  // Without --gear the standing answer is the owner config, not a literal.
+  const standing=estimate('--files','12');
+  assert.equal(standing.gearSource,'config');
+  assert.ok(standing.gears.includes(standing.gear),'the gear must come from the declared gears list');
+  // An undeclared gear fails closed exactly like an undeclared config key.
+  const bad=runApi('estimate','--repo',repo,'--files','12','--gear','7','--json');
+  assert.notEqual(bad.status,0);
+  assert.match(`${bad.stdout}${bad.stderr}`,/gear-undeclared/);
+});
+
+test('estimate bounds agentsAchievable by the disjoint path partition the closure actually holds',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  seed(repo,ledger=>ledger.ensureWorkflow({workflowId:'wf-k7-achievable',title:'achievable'}));
+  // Two top-level groups, one of them spelled twice: an xl closure at gear 2
+  // asks for ten agents and can be cut into exactly two disjoint slices.
+  const r=runApi('estimate','--repo',repo,'--files','40','--gear','2',
+    '--paths','src/feature-a,src/feature-a/nested,lib/shared','--json');
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const e=out(r);
+  assert.equal(e.size,'xl');
+  assert.equal(e.agentsRequested,10,'xl at gear 2 requests 10');
+  assert.equal(e.agentsAchievable,2,'a two-group closure cuts into two disjoint slices, however high the gear');
+  assert.deepEqual(e.pathGroups,['lib/shared','src/feature-a'],'a descendant collapses into its owned ancestor');
+  assert.equal(e.achievableBasis,'disjoint-owned-path-prefixes');
+  assert.match(e.reason??'',/partitions into 2 pairwise-disjoint path prefix/);
+  assert.equal(e.slices,2,'the N the --cut-total flags carry is the achievable count, not the requested one');
+  // No closure supplied: the request stands, and the field says on what basis.
+  const unbounded=out(runApi('estimate','--repo',repo,'--files','40','--gear','2','--json'));
+  assert.equal(unbounded.agentsAchievable,10);
+  assert.equal(unbounded.achievableBasis,'unbounded-no-path-closure');
+  assert.equal(unbounded.reason,null);
+  // A glob is not a concrete ownership boundary and never becomes a slice.
+  const glob=runApi('estimate','--repo',repo,'--files','40','--paths','src/**/*.ts','--json');
+  assert.notEqual(glob.status,0);
+  assert.match(`${glob.stdout}${glob.stderr}`,/estimate-paths-invalid/);
 });
 
 test('a re-enqueued op carries its retry lineage: a business failure spends a business attempt, a no-effect rejection does not',t=>{

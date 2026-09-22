@@ -73,7 +73,8 @@ conventions:
   stdout: >-
     one JSON object — {ok:true, ...} on success. A refusal prints ok:false and
     names itself in one of four fields: `code` (the thrown refusals, the
-    common case), `reason` (nudge, observe, reconcile), `rejected` (every
+    common case), `reason` (nudge, observe, reconcile, and the `max-ops`
+    concurrency refusal route and dispatch share), `rejected` (every
     dispatch launch failure) or `refused` (dispatch admission drift). The
     kebab string is the contract callers match on; each command's `refuses:`
     below names the string it prints and every untyped refusal says so
@@ -144,12 +145,37 @@ commands:
 
   status:
     args: '--workflow <id>'
-    reads: 'workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact running-operation terminal show receipts'
+    reads: >-
+      workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact
+      running-operation terminal show receipts; and, for each queued job, what blocks it — the
+      approved leg order on the latest goals row, the workflow's slot-holding operation count
+      against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
+      pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel
     writes: 'nothing'
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,unconsumedReports,nudgeReadyJobs[],reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile)'
+      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,unconsumedReports,nudgeReadyJobs[],queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile)'
+      'frontier.queued': >-
+        [{jobId, opId, attempt, queuedBecause, blockedBy, detail}] — one row per queued job, in
+        created order, naming why it is not running. `queuedBecause` is
+        dependency|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries the id
+        that holds it: {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
+        {provider, pool} for an open circuit, {path, job} for a path lease, {pool, running,
+        maxParallel} for a full pool, and null for `ready`. `ready` means nothing blocks it and the
+        Kernel is the only thing left to move it
+      'frontier.queuedBecause precedence': >-
+        first cause that bites, in this order. `dependency` — an approved leg that precedes this
+        op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
+        ordering IS the legs array, so the earlier leg is the dependency). Then the four admission
+        checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
+        before anything else), `circuit-open` (the routed pool's provider credential is parked),
+        `path-lease` (a live capacity-1 `path:<owned_path>` lease overlaps this job's closure —
+        row existence is the fence, expiry only a recovery signal), `pool-full` (other holders of
+        the routed pool already fill its maxParallel; this job's own routed-but-queued row does not
+        count against itself). An unrouted job is never pool-full or circuit-open — there is no
+        pool to be full of
+      'frontier.queuedCauses': '{<cause>: <count>} — the same rows tallied by cause, omitting causes with no rows'
       jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
@@ -181,21 +207,48 @@ commands:
   # --------------------------------------------------------------------------
 
   estimate:
-    args: '--files <n> [--assertions <n>] [--components <n>] [--records <n>]'
+    args: '--files <n> [--assertions <n>] [--components <n>] [--records <n>] [--paths <csv>] [--gear <n>]'
     reads: >-
       modules/models/runtimes.yaml allocation.slicing only — {weights:{file,
-      assertion, component, record}, targetMinutes:[lo,hi], maxSlices}. The
-      kernel measures the write scope and passes the counts; the weights and
-      bounds are declared data, never a model's guess. No ledger row is read
+      assertion, component, record}, targetMinutes:[lo,hi], maxSlices, gears,
+      size:{<class>:{from, agents}}} — plus the owner's parallel.gear through
+      the one reader engine/config.mjs (`parallelGear()` in engine/config.mjs;
+      STARCI_OWNER_ROOT repoints it). The kernel measures the write scope and
+      passes the counts; the weights, class bounds, gear vocabulary and
+      agents-per-gear table are declared data, never a model's guess. No ledger
+      row is read
     writes: 'nothing — a pure computation, no row and no event'
     computes: >-
       W = sum(weight * count) agent-minutes;
-      slices = clamp(ceil(W / targetMinutes[1]), 1, maxSlices);
-      perSliceMinutes = W / slices
-    returns: '{ok:true, minutes, slices, perSliceMinutes, counts, weights, targetMinutes, maxSlices, overTarget} — overTarget means the maxSlices cap was reached and each slice still exceeds targetMinutes[1]'
+      size = the largest allocation.slicing.size class any one count reaches its `from` bound of,
+      else `s` when W is inside targetMinutes[0] and `m` above it;
+      agentsRequested = 1 for `s`/`m`, else size.<class>.agents[gear];
+      agentsAchievable = clamp(min(agentsRequested, maxSlices, <disjoint path prefixes of --paths>), 1, ...);
+      perSliceMinutes = W / agentsAchievable
+    gear: >-
+      the owner's parallel.gear is the standing answer; `--gear <n>` overrides it for a dry run and
+      writes nothing. A gear outside allocation.slicing.gears refuses either way. The gear raises
+      only agentsRequested — never a pool's maxParallel, maxParallelOps or budgets.maxOps
+    achievable: >-
+      the seam-first partition itself is derived by the Kernel agent from repository evidence
+      (driver-loop.yaml cutExecution), not by this code, so agentsAchievable is an UPPER BOUND and
+      `achievableBasis` names which one: `disjoint-owned-path-prefixes` when --paths supplied a
+      closure (the pairwise-disjoint concrete prefixes engine/admission.mjs normalizeOwnedPaths
+      collapses it to), `unbounded-no-path-closure` when it did not
+    returns: >-
+      {ok:true, minutes, size:s|m|l|xl, gear, gearSource:config|flag, agentsRequested,
+      agentsAchievable, achievableBasis, reason, pathGroups?, slices, perSliceMinutes, counts,
+      weights, targetMinutes, maxSlices, gears, overTarget}. `reason` names why achievable fell
+      below requested and is null when it did not. `slices` equals agentsAchievable — it is the N
+      the --cut-total flags carry. `overTarget` means each slice still exceeds targetMinutes[1]:
+      gear up or decompose the closure finer
     refuses:
       - estimate-no-measure: 'every count is absent or zero — there is nothing to size'
-    usedBy: 'the cut-bound evaluation before enqueue — the slice count the --cut-total flags carry (kernel-prompt.md)'
+      - estimate-paths-invalid: '--paths holds a glob, an absolute path, a parent traversal or nothing concrete (engine/admission.mjs normalizeOwnedPath)'
+      - gear-undeclared: '--gear names an integer allocation.slicing.gears does not declare'
+      - 'the owner config being unparsable or schema-short (UNTYPED): estimate reads parallel.gear strictly and refuses with the validation message rather than sizing a fan-out against a guessed gear. `--gear` does not consult the file and answers anyway. Admission (route/dispatch) keeps the opposite tolerance — see route.maxOps'
+      - slicing-undeclared: 'allocation.slicing omits weights/targetMinutes/maxSlices/gears/size, a weight for a supplied count, or an agent count for this size at this gear'
+    usedBy: 'the cut-bound evaluation before enqueue — the agent count the --cut-total flags carry (kernel-prompt.md)'
 
   # --------------------------------------------------------------------------
   # PLAN — persist the derived plan + structural diff vs the approved shape.
@@ -300,16 +353,27 @@ commands:
       the job row + its payload (payload.difficulty is the fallback when
       --difficulty is absent); the workflow goal's routing_bias {prefer[],
       avoid[]} — flag entries lead the merged list; modules/models/runtimes.yaml
-      pool cards (maxParallel, provider); live running counts; provider quota
-      probes; typed expiring provider-health signals. Free-form incident text
-      is evidence for the Kernel but never provider-health input
+      pool cards (maxParallel, provider) and maxParallelOps; the owner's
+      budgets.maxOps; the workflow's own slot-holding operation count; live
+      running counts; provider quota probes; typed expiring provider-health
+      signals. Free-form incident text is evidence for the Kernel but never
+      provider-health input
     writes: >-
       jobs.payload_json gains {model, modelId, effort, routeChain,
       routeRejected, difficulty} — the PERSISTED route dispatch then launches
       exactly (dispatch reads payload.model/modelId/effort, never re-decides);
       events 'route-decided' {kind, difficulty, bias, ...decided}
     returns: '{ok:true, jobId, kind, difficulty, bias, decision:{model, modelId, effort, routeChain, routeRejected}}'
+    maxOps: >-
+      the workflow's concurrent-operation ceiling is min(budgets.maxOps, maxParallelOps) —
+      the owner's per-workflow budget and the fleet-wide one, lower wins
+      (engine/admission.mjs opSlotCeiling). A slot is held from the lease forward: leased,
+      running, answering and the fenced effect_unknown. A queued job holds none. An unreadable
+      owner config leaves budgets.maxOps unbounded and the fleet ceiling admits alone; a
+      parallelism gear never raises either number. Pool maxParallel is a separate fence the
+      capacity block above applies
     refuses:
+      - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations, so there is no slot for this decision to be spent on. Prints {ok:false, jobId, kind, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued and `api status` reports it queuedBecause max-ops'
       - job-unknown: 'no jobs row for --job'
       - job-reconcile-required: 'effect_unknown remains fenced until api reconcile proves no effect'
       - job-settled: 'a settled job takes no route — the decision was already spent'
@@ -382,6 +446,7 @@ commands:
       routed refusal, never a running ghost.
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
+      - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'

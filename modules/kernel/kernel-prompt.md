@@ -87,13 +87,23 @@ BOUNDARY — hard rules, non-negotiable:
   - Evaluate the cut bound for EVERY op before enqueue — the check is
     mandatory and COMPUTED, never estimated by feel: measure the op's write
     scope (files, assertions, components, records) and call
-    `api estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]`.
-    The returned `slices` is the slice count (runtimes.yaml allocation.slicing
-    owns the weights and the 15-30min target); slices > 1 means the op is over
-    the bound. When exceeded, keep the approved plan unchanged and execute that
-    SAME op as a complete seam-first set of pairwise-disjoint jobs using api
-    enqueue `--cut-id/--cut-ordinal/--cut-total`, sized so each slice holds
-    roughly minutes/slices of the measured work. Never inject another op such
+    `api estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
+    [--paths <csv>]`. The returned `agentsAchievable` is N, the number of
+    agents to run this op with, and `slices` is the same number. It is the
+    op's size class and the owner's parallelism gear read through the declared
+    tables ({skillRoot}/modules/models/runtimes.yaml allocation.slicing
+    `weights`, `targetMinutes`, `size.<class>.from`, `size.<class>.agents`,
+    `gears`), bounded by the disjoint partition the supplied closure actually
+    holds — never a number you choose. N > 1 means the op is over the bound;
+    `reason` says what capped it below `agentsRequested` and `overTarget`
+    means each slice still exceeds the declared window, which is a call to
+    decompose the closure finer or for the owner to raise the gear, never a
+    reason to run a wider set than N. When exceeded, keep the approved plan
+    unchanged and execute that SAME op as a complete seam-first set of
+    pairwise-disjoint jobs using api enqueue
+    `--cut-id/--cut-ordinal/--cut-total` with N as the total, sized so each
+    slice holds roughly the returned `perSliceMinutes` of the measured work.
+    Never inject another op such
     as work.author, never launch a mega-op, and do not advance the semantic
     leg until every slice passes. This decomposition is Kernel/AI technical
     work, not an owner gate. A wide per-route or per-record implement/verify

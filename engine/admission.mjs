@@ -66,6 +66,36 @@ export function findOwnedPathLeaseConflicts(db,requests,{excludeJobId=null}={}){
   return conflicts;
 }
 
+/**
+ * The concurrent-operation ceiling one workflow is admitted at. Two declared numbers meet here and
+ * the LOWER of them admits: the owner's `budgets.maxOps` (per workflow) and `maxParallelOps` from
+ * modules/models/runtimes.yaml (fleet-wide). A null, absent or non-positive value is unbounded, so
+ * a workflow with no owner budget still meets the fleet ceiling. A parallelism gear raises what
+ * `api estimate` requests and never raises either of these.
+ */
+export function opSlotCeiling({maxOps=null,maxParallelOps=null}={}){
+  const positive=value=>{const n=Number(value);return Number.isInteger(n)&&n>0?n:null;};
+  const owner=positive(maxOps),fleet=positive(maxParallelOps);
+  if(owner===null&&fleet===null)return {ceiling:null,source:null};
+  if(owner===null)return {ceiling:fleet,source:'maxParallelOps'};
+  if(fleet===null)return {ceiling:owner,source:'budgets.maxOps'};
+  return owner<=fleet?{ceiling:owner,source:'budgets.maxOps'}:{ceiling:fleet,source:'maxParallelOps'};
+}
+
+/**
+ * Admission against that ceiling. `running` is how many operations of the one workflow already hold
+ * a slot; a job at or above the ceiling is refused `max-ops` rather than launched and left to
+ * discover the cap from a provider.
+ */
+export function admitOpSlot({running=0,maxOps=null,maxParallelOps=null}={}){
+  const {ceiling,source}=opSlotCeiling({maxOps,maxParallelOps});
+  const held=Math.max(0,Number(running)||0);
+  if(ceiling===null)return {ok:true,running:held,ceiling:null,ceilingSource:null,reason:null};
+  return held<ceiling
+    ?{ok:true,running:held,ceiling,ceilingSource:source,reason:null}
+    :{ok:false,running:held,ceiling,ceilingSource:source,reason:'max-ops'};
+}
+
 const object=value=>{
   if(value&&typeof value==='object')return value;
   if(typeof value!=='string'||!value.trim())return {};

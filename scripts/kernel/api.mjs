@@ -12,6 +12,7 @@
 //   enqueue  --repo <path> --workflow <id> --op <opId> --paths <csv> [--title <t>] [--risk <r>]
 //            [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
 //   estimate --repo <path> --files <n> [--assertions <n>] [--components <n>] [--records <n>]
+//            [--paths <csv>] [--gear <n>]
 //   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
 //   reconcile --repo <path> --job <job_id>
@@ -37,8 +38,12 @@ import {
   newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { deriveRetryLineage, ownedPathLeaseRequests } from '../../engine/admission.mjs';
-import { allocationMs, allocationSettings } from '../../engine/config.mjs';
+import {
+  admitOpSlot, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
+} from '../../engine/admission.mjs';
+import {
+  allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
+} from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
@@ -69,6 +74,10 @@ import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+// The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
+// reader in engine/config.mjs at a different directory holding one — the same test and tooling
+// seam scripts/kernel/start-workflow.mjs and scripts/route/route-model.mjs use.
+const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
 // The status vocabulary is engine/ledger-db.mjs JOB_STATUSES; these are the
@@ -144,7 +153,8 @@ const usage = (code) => {
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>]
            [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
-           deterministic slice sizing from runtimes.yaml allocation.slicing
+           [--paths <csv>] [--gear <n>]
+           deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
   reconcile --job <job_id>
@@ -191,6 +201,46 @@ const emit = (out, human, asJson) => {
 // still count as a live turn. One authority: modules/models/runtimes.yaml
 // allocation.liveness.activeUnclassifiedMs.
 const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
+
+// Operation statuses that hold one of the workflow's concurrent slots. A queued
+// job has not been dispatched and holds nothing; everything from the lease
+// forward does, including a fenced launch whose effect may exist.
+const SLOT_HOLDING_STATUSES = [...JOB_STATUSES.dispatchable.filter((status) => status !== 'queued'), ...JOB_STATUSES.fenced];
+// modules/models/runtimes.yaml — the pool cards and the fleet ceiling. Every
+// concurrency number this gate reasons with comes from here.
+const runtimesDoc = () => {
+  try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8')); }
+  catch { return null; }
+};
+const poolCardFor = (doc, target) => Object.entries(doc?.runtimes ?? {})
+  .find(([poolId, runtime]) => (runtime?.target ?? poolId) === target)?.[1] ?? null;
+const fleetMaxParallelOps = () => {
+  const value = Number(runtimesDoc()?.maxParallelOps);
+  return Number.isInteger(value) && value > 0 ? value : null;
+};
+/**
+ * The owner's concurrent-operation budget. A missing, unparsable or schema-short config.yaml must
+ * never stop a workflow from routing (the same tolerance start-workflow and route-model keep), so
+ * an unreadable owner file leaves `maxOps` unbounded and the fleet ceiling admits alone.
+ */
+const ownerMaxOps = () => {
+  const owner = inspectOwnerConfig(ownerRoot);
+  if (owner.error || owner.invalid) return null;
+  const value = Number(owner.config?.budgets?.maxOps);
+  return Number.isInteger(value) && value > 0 ? value : null;
+};
+/**
+ * Admission against min(budgets.maxOps, maxParallelOps) for one workflow: how many of its
+ * operations already hold a slot, against the lower of the two declared ceilings
+ * (engine/admission.mjs admitOpSlot). The refusal string is `max-ops`.
+ */
+const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
+  const running = db.prepare(
+    `SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND job_id<>?
+       AND status IN (${SLOT_HOLDING_STATUSES.map(() => '?').join(',')})`
+  ).get(workflowId, excludeJobId ?? '', ...SLOT_HOLDING_STATUSES).n;
+  return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: fleetMaxParallelOps() });
+};
 
 const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
@@ -527,6 +577,94 @@ function cmdSurvey(ledger, args) {
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
 const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'orphaned-frontier', 'idle'];
+/**
+ * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
+ * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
+ * `api route` and `api dispatch` run, in their own order (workflow ceiling, provider circuit, path
+ * fence, pool saturation); `ready` means nothing blocks it and the Kernel is the only thing left.
+ */
+const QUEUED_BECAUSE = ['dependency', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+/**
+ * The approved leg order for a workflow: the derived plan when one exists, else the approved
+ * opChain. modules/schemas/goal-plan.yaml carries no dependsOn field — ordering IS the legs array,
+ * so an op's dependency is every earlier leg, and an earlier leg with no succeeded job blocks it.
+ */
+const approvedLegOps = (goalJson) => {
+  const legs = goalJson?.derivedPlan?.legs ?? goalJson?.opChain?.legs ?? null;
+  if (!Array.isArray(legs)) return [];
+  return [...new Set(legs.map((leg) => (typeof leg === 'string' ? leg : leg?.op)).filter(Boolean))];
+};
+/** One queued job's blocking cause and the id that holds it. */
+function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel }) {
+  const payload = jobPayloadOf(job);
+  const opId = job.op_id ?? payload.opId ?? null;
+
+  const index = opId ? legOps.indexOf(opId) : -1;
+  if (index > 0) {
+    const blocking = legOps.slice(0, index)
+      .find((earlier) => !(jobsByOp.get(earlier) ?? []).some((row) => row.status === 'succeeded'));
+    if (blocking) {
+      const pending = (jobsByOp.get(blocking) ?? []).filter((row) => !FINAL_SETTLED.includes(row.status));
+      return {
+        queuedBecause: 'dependency',
+        blockedBy: { op: blocking, job: pending[pending.length - 1]?.job_id ?? null },
+        detail: `approved leg ${blocking} has no job settled succeeded; it precedes ${opId} in the approved order`,
+      };
+    }
+  }
+
+  if (!slots.ok) {
+    return {
+      queuedBecause: 'max-ops',
+      blockedBy: { ceiling: slots.ceiling, ceilingSource: slots.ceilingSource, running: slots.running },
+      detail: `the workflow holds ${slots.running} of ${slots.ceiling} operations (${slots.ceilingSource})`,
+    };
+  }
+
+  const target = payload.model ?? null;
+  const card = target ? poolCardFor(rtDoc, target) : null;
+  if (target) {
+    const health = providerHealthOf(db, card?.provider ?? target);
+    if (health) {
+      return {
+        queuedBecause: 'circuit-open',
+        blockedBy: { provider: health.provider, pool: target },
+        detail: `provider ${health.provider} circuit open (${health.failureKind ?? 'auth'}) until ${health.expiresAt ?? 'explicit recovery'}`,
+      };
+    }
+  }
+
+  // Lease-row existence is the fence, expiry only a recovery signal
+  // (engine/admission.mjs findOwnedPathLeaseConflicts) — an expired row still
+  // answers "why is this queued", because the prior attempt's effect may exist.
+  // A projection never throws on a malformed stored path: dispatch admission is
+  // where that row is refused, and status must still answer for its siblings.
+  let conflict = null;
+  try { conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload), { excludeJobId: job.job_id })[0] ?? null; }
+  catch { conflict = null; }
+  if (conflict) {
+    return {
+      queuedBecause: 'path-lease',
+      blockedBy: { path: conflict.held, job: conflict.job_id },
+      detail: `${conflict.held} is held by ${conflict.job_id} and overlaps ${conflict.requested}`,
+    };
+  }
+
+  // A routed-but-queued job already counts toward its pool (the same count
+  // `api route` reasons with), so this job is in that tally: what bounds it is
+  // the OTHER holders of the lane.
+  const maxParallel = Number(card?.maxParallel);
+  const otherHolders = Math.max(0, (runningByModel[target] ?? 0) - 1);
+  if (target && Number.isInteger(maxParallel) && maxParallel > 0 && otherHolders >= maxParallel) {
+    return {
+      queuedBecause: 'pool-full',
+      blockedBy: { pool: target, running: otherHolders, maxParallel },
+      detail: `pool ${target} holds ${otherHolders} of ${maxParallel} slots`,
+    };
+  }
+
+  return { queuedBecause: 'ready', blockedBy: null, detail: null };
+}
 function cmdStatus(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -565,6 +703,34 @@ function cmdStatus(ledger, args) {
   // holds one of these is not a reason to yield.
   const readyOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
       AND status IN ('queued','effect_unknown')`).get(workflowId).n;
+  // Why each queued job is not running. A queued row is the dispatch candidate;
+  // without this the Kernel can only see that it did not move, not what to
+  // clear. The causes and their order are QUEUED_BECAUSE above.
+  const workflowJobs = db.prepare("SELECT job_id,op_id,status,attempt,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId);
+  const jobsByOp = new Map();
+  for (const row of workflowJobs) {
+    if (!row.op_id) continue;
+    if (!jobsByOp.has(row.op_id)) jobsByOp.set(row.op_id, []);
+    jobsByOp.get(row.op_id).push(row);
+  }
+  const legOps = approvedLegOps(goalJsonOf(latestGoal(db, workflowId)));
+  const slots = opSlotAdmission(db, workflowId);
+  const rtDoc = runtimesDoc();
+  // A persisted payload.model marks a committed lane fleet-wide — the same
+  // count `api route` reasons with, so status and route agree on pool load.
+  const runningByModel = {};
+  for (const row of db.prepare(`SELECT payload_json FROM jobs WHERE status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).all(...FINAL_SETTLED)) {
+    const model = parseJson(row.payload_json, {})?.model;
+    if (model) runningByModel[model] = (runningByModel[model] ?? 0) + 1;
+  }
+  const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
+    jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
+    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel }),
+  }));
+  const queuedCauses = Object.fromEntries(QUEUED_BECAUSE
+    .map((cause) => [cause, queued.filter((item) => item.queuedBecause === cause).length])
+    .filter(([, n]) => n > 0));
+
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
@@ -582,6 +748,8 @@ function cmdStatus(ledger, args) {
     readyOperations,
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
+    queued,
+    queuedCauses,
     reason: frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
@@ -592,7 +760,11 @@ function cmdStatus(ledger, args) {
   };
   const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, activeLeases: leases, inboxPending, reports, workers };
   emit(out,
-    `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+    [
+      `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+      ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
+      ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
+    ].join('\n'),
     args.json);
 }
 
@@ -669,22 +841,33 @@ function cmdPlan(ledger, args) {
 }
 
 /* -------------------------------------------------------------- estimate */
-// Deterministic same-op slice sizing. The kernel measures the write scope and
-// passes the counts; weights and bounds live in runtimes.yaml
-// allocation.slicing so the estimate is a declared computation, never a
-// model's guess. W = sum(weight * count) agent-minutes; slices =
-// clamp(ceil(W / targetMinutes[1]), 1, maxSlices).
+// The plural `from:` keys of allocation.slicing.size.<class> against the
+// singular count names the weights use. One map, both directions.
+const SIZE_MEASURE_KEYS = { files: 'file', assertions: 'assertion', components: 'component', records: 'record' };
+// Size classes that never fan out, whatever the gear: the owner's table
+// applies to the declared classes only (runtimes.yaml allocation.slicing.size).
+const SINGLE_AGENT_SIZES = ['s', 'm'];
+// Deterministic same-op sizing. The kernel measures the write scope and passes
+// the counts; the weights, the class bounds, the gear vocabulary and the
+// agents-per-gear table all live in runtimes.yaml allocation.slicing, so the
+// estimate is a declared computation and never a model's guess.
+// W = sum(weight * count) agent-minutes places the closure in a size class; the
+// class plus the owner's config.yaml parallel.gear names agentsRequested, and
+// the closure's disjoint path partition bounds agentsAchievable.
 function cmdEstimate(ledger, args) {
   const slicing = allocationSettings().slicing ?? {};
   const weights = slicing.weights ?? {};
   const target = Array.isArray(slicing.targetMinutes) ? slicing.targetMinutes.map(Number) : [];
   const maxSlices = Number(slicing.maxSlices);
+  const sizes = slicing.size;
   if (target.length !== 2 || target.some((n) => !Number.isFinite(n) || n <= 0)
-    || !Number.isFinite(maxSlices) || maxSlices < 1) {
+    || !Number.isFinite(maxSlices) || maxSlices < 1
+    || !sizes || typeof sizes !== 'object' || Array.isArray(sizes) || !Object.keys(sizes).length) {
     throw Object.assign(
-      new Error('modules/models/runtimes.yaml allocation.slicing must declare {weights, targetMinutes:[lo,hi], maxSlices}'),
+      new Error('modules/models/runtimes.yaml allocation.slicing must declare {weights, targetMinutes:[lo,hi], maxSlices, gears, size}'),
       { code: 'slicing-undeclared' });
   }
+  const gears = slicingGears();
   const counts = {
     file: Math.max(0, Number(args.files) || 0),
     assertion: Math.max(0, Number(args.assertions) || 0),
@@ -703,16 +886,84 @@ function cmdEstimate(ledger, args) {
       { code: 'slicing-undeclared' });
   }
   const minutes = Object.entries(counts).reduce((sum, [k, n]) => sum + (Number(weights[k]) || 0) * n, 0);
-  const slices = Math.min(maxSlices, Math.max(1, Math.ceil(minutes / target[1])));
+
+  // The largest declared class any single count reaches; below them all, one
+  // targetMinutes[0] window of work is 's' and anything above it is 'm'.
+  let size = minutes <= target[0] ? 's' : 'm';
+  for (const [name, card] of Object.entries(sizes)) {
+    const bounds = Object.entries(card?.from ?? {});
+    if (bounds.length && bounds.some(([key, bound]) => {
+      const measure = SIZE_MEASURE_KEYS[key];
+      return measure && Number.isFinite(Number(bound)) && counts[measure] >= Number(bound);
+    })) size = name;
+  }
+
+  // --gear is a dry run: the owner's config.yaml parallel.gear is the standing
+  // answer and is never written by this command.
+  const gearSource = args.gear !== undefined ? 'flag' : 'config';
+  let gear;
+  if (gearSource === 'flag') {
+    gear = Number(args.gear);
+    if (!Number.isInteger(gear) || !gears.includes(gear)) {
+      throw Object.assign(
+        new Error(`--gear ${args.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')})`),
+        { code: 'gear-undeclared' });
+    }
+  } else {
+    gear = loadConfig(ownerRoot)?.parallel?.gear ?? defaultParallelGear();
+  }
+
+  const agentsRequested = (() => {
+    if (SINGLE_AGENT_SIZES.includes(size)) return 1;
+    const declared = Number(sizes[size]?.agents?.[gear]);
+    if (!Number.isInteger(declared) || declared < 1) {
+      throw Object.assign(
+        new Error(`modules/models/runtimes.yaml allocation.slicing.size.${size}.agents declares no agent count for gear ${gear}`),
+        { code: 'slicing-undeclared' });
+    }
+    return declared;
+  })();
+
+  // The seam-first partition itself is derived by the Kernel agent from
+  // repository evidence (driver-loop.yaml cutExecution), not by this code, so
+  // what is computable here is an UPPER BOUND: the pairwise-disjoint concrete
+  // prefixes the declared closure already holds. Without --paths there is no
+  // closure to bound it with and the request stands unbounded.
+  const pathArg = args.paths === undefined ? null : csvList(args.paths);
+  let pathGroups = null;
+  if (pathArg) {
+    try { pathGroups = normalizeOwnedPaths(pathArg); }
+    catch (e) { throw Object.assign(new Error(`--paths: ${e.message}`), { code: 'estimate-paths-invalid' }); }
+    if (!pathGroups.length) {
+      throw Object.assign(new Error('--paths resolved to no concrete prefix'), { code: 'estimate-paths-invalid' });
+    }
+  }
+  const achievableBasis = pathGroups ? 'disjoint-owned-path-prefixes' : 'unbounded-no-path-closure';
+  const bounds = [agentsRequested, maxSlices, ...(pathGroups ? [pathGroups.length] : [])];
+  const agentsAchievable = Math.max(1, Math.min(...bounds));
+  const reason = agentsAchievable < agentsRequested
+    ? (pathGroups && pathGroups.length < agentsRequested
+      ? `closure partitions into ${pathGroups.length} pairwise-disjoint path prefix(es); size ${size} at gear ${gear} requests ${agentsRequested}`
+      : `allocation.slicing.maxSlices ${maxSlices} caps the ${agentsRequested} agents size ${size} requests at gear ${gear}`)
+    : null;
+
+  const slices = agentsAchievable;
   const perSliceMinutes = Math.round((minutes / slices) * 10) / 10;
   const out = {
-    ok: true, minutes, slices, perSliceMinutes, counts, weights,
-    targetMinutes: target, maxSlices,
-    overTarget: slices >= maxSlices && perSliceMinutes > target[1],
+    ok: true, minutes, size, gear, gearSource,
+    agentsRequested, agentsAchievable, achievableBasis, reason,
+    ...(pathGroups ? { pathGroups } : {}),
+    slices, perSliceMinutes, counts, weights,
+    targetMinutes: target, maxSlices, gears,
+    overTarget: perSliceMinutes > target[1],
   };
   emit(out, [
-    `estimate: ${minutes} agent-min -> ${slices} slice(s) ~${perSliceMinutes}min each (target ${target[0]}-${target[1]}min, cap ${maxSlices})`,
-    ...(out.overTarget ? [`  slice cap ${maxSlices} reached at ${perSliceMinutes}min/slice — prefer finer path decomposition before enqueue`] : []),
+    `estimate: ${minutes} agent-min -> size ${size} at gear ${gear} (${gearSource})`,
+    `  agents: requested ${agentsRequested}, achievable ${agentsAchievable} (${achievableBasis})${reason ? ` — ${reason}` : ''}`,
+    `  ${slices} slice(s) ~${perSliceMinutes}min each (target ${target[0]}-${target[1]}min, cap ${maxSlices})`,
+    // What would actually move the number: a gear only helps while the gear is
+    // what bounds the set. Once the partition does, a wider closure decomposition is the only lever.
+    ...(out.overTarget ? [`  each slice still exceeds ${target[1]}min — ${reason ? 'decompose the closure into more disjoint prefixes' : 'raise the gear or decompose the closure finer'} before enqueue`] : []),
   ].join('\n'), args.json);
 }
 
@@ -932,6 +1183,16 @@ async function cmdRoute(ledger, args) {
   const payload = jobPayloadOf(job);
   const kind = job.op_id ?? payload.opId;
   if (!kind) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+
+  // Concurrency admission BEFORE the pool decision: a route that lands on a
+  // full workflow is a decision the kernel cannot spend. The ceiling is the
+  // lower of the owner's budgets.maxOps and the fleet's maxParallelOps.
+  const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
+  if (!slots.ok) {
+    const out = { ok: false, jobId, kind, reason: 'max-ops', slots };
+    emit(out, `route REFUSED for ${jobId} (${kind}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource})`, args.json);
+    process.exit(1);
+  }
 
   const gj = goalJsonOf(latestGoal(db, job.workflow_id));
   const goalBias = gj.routing_bias ?? {};
@@ -1312,6 +1573,18 @@ function cmdDispatch(ledger, args, repo) {
   const payload = jobPayloadOf(job);
   const op = job.op_id ?? payload.opId;
   if (!op) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+
+  // Concurrency admission, before the packet and before any Orca call: the
+  // workflow may hold min(budgets.maxOps, maxParallelOps) operations at once
+  // and a job above that line stays queued rather than launching
+  // (engine/admission.mjs admitOpSlot). Pool maxParallel is a separate fence
+  // route already applies; this one is the workflow's own ceiling.
+  const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
+  if (!slots.ok) {
+    const out = { ok: false, jobId, op, reason: 'max-ops', slots };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource}); job stays queued`, args.json);
+    process.exit(1);
+  }
 
   const model = resolveModel(args.model ?? payload.model ?? 'qwen-agent'); // orchestrationDefault: qwen-agent
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
