@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/profile-registry.schema.json
 title: StarCi profile registry
 type: object
-required: [schema, runtimes, aliases, executionModes, agentArchitecture, defaults, targets, skills, operators, fallback]
+required: [schema, runtimes, aliases, executionModel, defaults, targets, skills, operators, fallback]
 properties:
   schema: {const: starci/profile-registry@1}
   runtimes:
@@ -13,62 +13,28 @@ properties:
   aliases:
     type: object
     additionalProperties: {type: string, minLength: 1}
-  executionModes:
+  executionModel:
     type: object
     additionalProperties: false
-    required: [solo, orchestrated]
-    properties:
-      solo:
-        type: object
-        additionalProperties: false
-        required: [hosts, controlPlane, operationAgent, maxConcurrentOperationAgents, isolation, worktree, scheduling, fanOutWithinOperation]
-        properties:
-          hosts:
-            const: [codex, claude, orca]
-          controlPlane: {const: current-chat-session}
-          operationAgent: {const: isolated-background-agent}
-          maxConcurrentOperationAgents: {const: 3}
-          isolation: {const: isolated-per-operation}
-          worktree: {const: current-session-worktree}
-          scheduling: {const: dependency-dag}
-          fanOutWithinOperation: {const: forbidden}
-      orchestrated:
-        type: object
-        additionalProperties: false
-        required: [controlPlane, bootstrapHosts, bootstrapRole, coordinatorAgent, coordinatorAuthority, workers, workflowWrapperAgent, workflowManagerAuthority, workflowManagerReportsTo, workflowManagerExecutionPolicy, higherLayerSubstitution, operationAgent, maxConcurrentOperationAgents, isolation, worktree, scheduling, fanOutWithinOperation]
-        properties:
-          controlPlane: {const: orca}
-          bootstrapHosts: {const: [codex, claude, orca]}
-          bootstrapRole: {const: retain-user-designated-coordinator}
-          coordinatorAgent: {const: current-user-designated-session}
-          coordinatorAuthority: {const: owns-approved-boundaries-and-review}
-          workers:
-            const: [codex, claude, qwen, devin]
-          workflowWrapperAgent: {const: deterministic-workflow-kernel}
-          workflowManagerAuthority: {const: sole-state-writer-and-operation-dag}
-          workflowManagerReportsTo: {const: active-user-designated-coordinator}
-          workflowManagerExecutionPolicy: {const: typed-kernel-loop}
-          higherLayerSubstitution: {const: forbidden}
-          operationAgent: {const: supervised-native-agent-in-workflow-worktree}
-          maxConcurrentOperationAgents: {const: 3}
-          isolation: {const: isolated-per-operation}
-          worktree: {const: isolated-child-per-workflow-attempt}
-          scheduling: {const: dependency-dag}
-          fanOutWithinOperation: {const: forbidden}
-  agentArchitecture:
-    type: object
-    additionalProperties: false
-    required: [levels, flexibleLayers, isolationBoundary, wrapperResponsibilities, operationMapping, concreteAgentBinding]
+    required: [levels, host, chat, workflowKernel, kernelAuthority, operationAgent, operationMapping, isolationBoundary, worktree, scheduling, fanOutWithinOperation, concreteAgentBinding, concurrency]
     properties:
       levels:
-        const: [user-coordinator, workflow-kernel, operation-agent]
-      flexibleLayers:
-        const: [user-coordinator]
-      isolationBoundary: {const: operation}
-      wrapperResponsibilities:
-        const: [resolve-dependencies, normalize-input, resolve-agent-chain, validate-output, route-output, retry-no-effect]
+        const: [workflow-kernel, operation-agent]
+      host: {const: orca}
+      chat: {const: trigger-and-monitor-only}
+      workflowKernel: {const: one-long-lived-agent-per-workflow}
+      kernelAuthority: {const: sole-workflow-state-writer-through-scripts/kernel/api.mjs}
+      operationAgent: {const: one-ephemeral-agent-per-job}
       operationMapping: {const: one-operation-instance-one-agent}
+      isolationBoundary: {const: operation}
+      worktree: {const: isolated-child-per-job}
+      scheduling: {const: dependency-dag}
+      fanOutWithinOperation: {const: forbidden}
       concreteAgentBinding: {const: provider-profile-model}
+      # A pointer, never a number: the slot counts live in runtimes.yaml, which
+      # is the only file scripts/kernel/api.mjs and scripts/agent/models.mjs read
+      # for capacity.
+      concurrency: {type: string, minLength: 1}
   defaults: {type: object}
   targets:
     type: object

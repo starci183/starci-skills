@@ -1,38 +1,26 @@
 schema: starci/orca-capabilities@1
-hostModes:
-  solo:
-    supported: true
-    topology: one-current-worktree-one-workflow
-  orchestrated:
-    supported: true
-    exclusiveHost: true
-    topology: plan-coordinator-to-workflow-coordinators-to-operation-agents
+exclusiveHost: true
+topology: workflow-kernel-to-operation-agents
 roles:
-  planCoordinator:
-    nativeAgent: required
-    location: main-worktree
-    lifetime: parent-run
-  workflowMonitor:
-    nativeAgent: required
-    location: isolated-child-worktree
-    lifetime: workflow-attempt
+  workflowKernel:
+    attestedTerminal: required
+    location: workflow-worktree
+    lifetime: workflow
   operationAgent:
     nativeAgent: required
-    location: existing-workflow-child
+    location: own-job-worktree
     lifetime: operation-attempt
-    maximumConcurrentPerWorkflow: 3
+    concurrency: modules/models/runtimes.yaml runtimes.<pool>.maxParallel
 isolation:
-  worktreeBoundary: workflow-attempt
+  worktreeBoundary: job
   agentBoundary: operation-attempt
   nestedAgentInsideOperation: forbidden
 communication:
   allowed:
-    - operation-to-own-workflow-coordinator
-    - workflow-coordinator-to-parent-plan-coordinator
-    - parent-plan-coordinator-to-workflow-coordinator
+    - kernel-to-own-operation
+    - operation-to-own-kernel
   forbidden:
-    - operation-to-parent-plan-coordinator
-    - parent-plan-coordinator-to-operation
+    - operation-to-operation
 identity:
   role: immutable-task-display-name
   provider: native-agent-icon-or-command-terminal-rendered-identity-plus-supervised-dispatch-receipt

@@ -29,29 +29,25 @@ launch:
   imageGeneration: false        # claude.json: every profile imageGeneration:false
 
 position:
-  # Where this pool sits in declared order. Sources: runtimes.json allocation.tiers,
-  # registry.json operators.<op>.chain, registry.json supervisors, selection text.
+  # Where this pool sits in declared order. Sources: modules/models/runtimes.yaml
+  # allocation.tiers, modules/models/registry.yaml operators.<op>.chain.
   hardTier: first in default/implement/write; second in verify/decide/plan (after claude-fable)
   mediumTier: second in default; third in decide/plan
   easyTier: last
-  chainLeads: [grammar.update, knowledge.repair]   # registry.json operators — only these two lead with claude-agent
-  supervisors: [planCoordinator, workflowMonitor]  # registry.json supervisors — both lead claude-agent, effort high
+  chainLeads: [grammar.update, knowledge.repair]   # registry.yaml operators — only these two lead with claude-agent
   rationale: >-
-    registry.json supervisors.note: "Session stability outranks model depth here,
-    so the working Claude profile leads." grammar.update and knowledge.repair lead
-    with Claude because they mutate the installed grammar/this runtime — highest
-    blast radius per unit of work (costPolicy text, registry.json).
+    grammar.update and knowledge.repair lead with Claude because they mutate the
+    installed grammar/this runtime — highest blast radius per unit of work
+    (modules/models/registry.yaml costPolicy).
 
 business:
   question: >-
-    "Which pool do I trust with the heaviest bounded mutation and with the
-    always-on coordinator/monitor seats?" — claude-agent is the hard-tier default
-    and the supervisor seat.
+    "Which pool do I trust with the heaviest bounded mutation?" — claude-agent is
+    the hard-tier default.
   whenNeeded:
     - Hard-tier implement/write work where the cheaper Qwen/Devin order has already failed or is unsuitable (prefer-then-overflow, runtimes.json allocation.policy).
     - grammar.update / knowledge.repair — runtime self-editing ops whose chains lead here.
-    - decide/plan/verify work when claude-fable's weekly window is saturated or cooling — opus-reviewer exists precisely as the reasoning half of the pool (claude.json roleDescription).
-    - Supervisor roles (planCoordinator, workflowMonitor) — session stability first.
+    - decide/plan/verify work when claude-fable's weekly window is saturated or cooling — opus-reviewer exists precisely as the reasoning half of the pool (registry.yaml targets.claude-agent.profiles.reasoning).
   whenNot:
     - "Image-generation routes: no profile carries imageGeneration — interface.draw/interface.asset never route here (costPolicy: only the Codex pool carries an image generator)."
     - "Cost-sensitive easy work: easy tier orders it last; picking it first wastes the strongest pool on the weakest work (inference from tier order)."
@@ -61,4 +57,4 @@ business:
     humans only via the declared chains in registry.json operators.
   failureModes:
     - "Treating the alias `claude-opus` as proof of model: attestation must show claude-opus-5 (model-catalog.md)."
-    - Burning the supervisor-capable pool on easy fan-out — an availability/cost mistake, not an eligibility error.
+    - Burning the strongest pool on easy fan-out — an availability/cost mistake, not an eligibility error.

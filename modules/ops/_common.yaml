@@ -36,21 +36,16 @@ sections:
         unrelated user Work.
   - title: Mandatory lifecycle gates
     blocks:
-      - "Use the entry-skill owner-`ok` gates as the common decision boundary
-        (modules/models/registry.yaml approvalMode). Before the first workflow
-        effect, present one complete brief containing goal, scope, repositories, worktree topology,
-        operators, allowed action/effect ceilings, exclusions and completion criteria; bind the
-        actual subsequent user acceptance to its digest. After that acceptance, procedural actions
-        inside the unchanged envelope are automatic and must not create repetitive command,
-        worktree, secondary-op, retry, integration or technical-review questions. Ask the user
-        again only when the route returns needUser."
-      - "There is no separate approvals engine or policy file: the owner gates are the entry
-        skills' exact `ok` approvals and the settle-time evidence verdicts
-        (modules/models/registry.yaml approvalMode: entry-skill-owner-ok). Inside an accepted goal
-        envelope the kernel proceeds without procedural confirmations; a changed goal, widened
-        scope/authority, missing credential, unresolved business alternative, safety block,
-        reserved checkpoint or partial/unknown effect returns to the owner as an api incident or an
-        owner ask. Each cell's own matrix/ownership budget is unchanged."
+      - "The owner gates are the entry skills' exact `ok` approvals and the settle-time evidence
+        verdicts (modules/models/registry.yaml approvalMode: entry-skill-owner-ok); there is no
+        separate approvals engine or policy file. Before the first workflow effect the entry skill
+        presents one complete brief — goal, scope, repositories, worktree topology, operators,
+        allowed action/effect ceilings, exclusions and completion criteria — and binds the owner's
+        acceptance to its digest. Inside that accepted envelope the kernel proceeds without
+        procedural confirmations and raises no repetitive command, worktree, retry, integration or
+        technical-review questions; a changed goal, widened scope/authority, missing credential,
+        unresolved business alternative, safety block, reserved checkpoint or partial/unknown
+        effect returns to the owner as an api incident or an owner ask."
       - Every selected workflow finishes through the kernel's gate/finish contract
         (modules/kernel/api.yaml `finish`). Missing .starciwork routes to
         workspace-bootstrap; invalid .starciwork is not overwritten. Preserve the original request
@@ -60,22 +55,22 @@ sections:
         investigated.
       - Before effects, present a concrete goal with final business outcome, exact source/service
         impacts, real existing lines/anchors/hashes or explicit proposed new paths, resource
-        effects, cell purpose, input/output contracts and acceptance criteria. Wait for the actual
-        user to approve the goal digest.
+        effects, operation purpose, input/output contracts and acceptance criteria. Wait for the
+        actual user to approve the goal digest.
       - Typed request/response mapping can adapt field names and shape using exact accepted producer
         values, but cannot enlarge scope or change expected business behavior. Changed goal requires
         renewed user approval.
       - Technical pass is not done until every accepted completion criterion is verified. When the
-        accepted brief delegates technical acceptance, the
-        coordinator records that bounded technical acceptance, updates only selected Work nodes,
-        validates their completion proof and reports the result without another formal question.
-        A reserved exit checkpoint, changed envelope or undeclared external effect still requires
-        the user. Parent completion is derived.
+        accepted brief delegates technical acceptance, the kernel records that bounded technical
+        acceptance at `api settle`, updates only selected Work nodes, validates their completion
+        proof and reports the result without another formal question. A reserved exit checkpoint,
+        changed envelope or undeclared external effect still requires the user. Parent completion
+        is derived.
   - title: Read the source tree
     blocks:
-      - The runtime reads its source tree directly; there is no build step and no .dist to publish.
-        Contracts load from the authored YAML under modules/schemas/, modules/kernel/, modules/models/ and
-        modules/ops/. Read only selected artifacts.
+      - The runtime reads this tree directly. Contracts load from the authored YAML under
+        modules/schemas/, modules/kernel/, modules/models/ and modules/ops/. Read only selected
+        artifacts.
   - title: Workflow selection and authority
     blocks:
       - The single [StarCi skill](../CONTEXT.md) selects one workflow from the op catalog
@@ -83,32 +78,32 @@ sections:
         contract completely. No preset skill layer or automatic successor exists. A question may
         remain read-only. Unmatched/ad hoc jobs use direct-task → task.execute; unknown explicit
         workflow names are not silently substituted.
-      - In Orca, keep that workflow common to the resolved workspace and modules. Each emitted cell
-        binds one ordered external-agent chain from modules/models/registry.yaml. The operator chain is
-        explicit and overrides the owning skill default; otherwise it inherits that default. Select
-        the first observed ready candidate. Fall through only for an allowed failure after verified
-        no effects; never duplicate partial or unknown effects across providers.
-      - Each cell owns a complete request-bound job. Select exact scope, actual inputs, permitted
-        effects and required criteria; no catalog text grants new authority. Reuse existing
-        authorization. For missing material intent or uncertain remote effects inspect/reconcile
-        first and request only the essential missing decision.
-      - "The coordinator follows the selected matrix: at most 3 sequential rows × 3 parallel primary
-        cells. Parallel cells require disjoint mutable ownership and no same-row dependency. The
-        caller may define at most 3 secondary types; no secondary grandchildren or parent
-        completion. Agent/tool availability and higher-priority delegation rules still apply.
-        Ordinary tool steps and bounded repair stay inside the same cell, never hide unrelated
-        successor jobs."
-      - "backend.implement and interface.implement may call only their declared
-        implementation.architecture secondary when an observed implementation/test fact proves an
-        accepted SDS technically missing or contradictory. The code worker waits and never edits
-        SDS. Orca creates a separate architecture.decide worktree, the coordinator reviews and
-        integrates its bounded English/source-independent SDS correction, and a fresh
-        implementation attempt reruns affected checks. This is automatic procedure inside an
-        accepted brief; a business/SRS change or wider owner/scope returns needUser."
+      - In Orca, keep that workflow common to the resolved workspace and modules. Each enqueued
+        operation binds one ordered external-agent chain from modules/models/registry.yaml. The
+        operator chain is explicit and overrides the owning skill default; otherwise it inherits
+        that default. Select the first observed ready candidate. Fall through only for an allowed
+        failure after verified no effects; never duplicate partial or unknown effects across
+        providers.
+      - One operation is one complete request-bound job carried by one ephemeral op agent. Select
+        exact scope, actual inputs, permitted effects and required criteria; no catalog text grants
+        new authority. Reuse existing authorization. For missing material intent or uncertain
+        remote effects inspect/reconcile first and request only the essential missing decision.
+      - "The kernel launches only what its dispatch plan proves parallel-safe: parallel jobs
+        require disjoint mutable ownership and no unsatisfied dependency between them, and the
+        live slot count per runtime pool is modules/models/runtimes.yaml
+        runtimes.<pool>.maxParallel. An operation is never split among several agents and never
+        fanned out. Ordinary tool steps and bounded repair stay inside the same operation and never
+        hide unrelated successor jobs."
+      - "backend.implement and interface.implement report an accepted SDS as technically missing or
+        contradictory when an observed implementation/test fact proves it; the code worker waits
+        and never edits SDS. The kernel enqueues a separate architecture.decide operation in its own
+        worktree, and a fresh implementation attempt reruns affected checks. This is automatic
+        procedure inside an accepted brief; a business/SRS change or wider owner/scope returns
+        needUser."
       - Before transitions, preserve exact accepted output → input bindings and require every
         request/response criterion and real evidence to pass. The frontend has a local runtime gate;
-        other matrices require the current explicit coordinator and are not automatic executors.
-        Missing or failed proof does not advance.
+        every other transition advances only on the kernel's settled verdict. Missing or failed
+        proof does not advance.
   - title: Dependency graph and scope ownership
     blocks:
       - The actual dependency graph belongs in `.starciwork`, not in an operator's next-step list.
@@ -372,9 +367,8 @@ sections:
       - Record a blocker with the actual missing fact, affected node, last relevant observation and
         required owner decision/action. Continue other selected independent pieces only if safe and
         within remaining limits. Failure never authorizes an out-of-scope repair, deployment or new
-        chain. Each worker finishes with result, changed node IDs/files, real commits,
-        tested/untested extent, evidence and the precise remaining gap; return to the coordinator
-        without dispatching another op. The coordinator may advance already selected eligible waves,
-        then ends the prompt when the selected result is reached, a required decision blocks
-        progress or the three-wave budget is exhausted. Unselected next ops are suggestions for a
-        later prompt only.
+        chain. Each op agent finishes with result, changed node IDs/files, real commits,
+        tested/untested extent, evidence and the precise remaining gap, writes that one report and
+        dies; it never dispatches another op. The kernel settles that verdict and picks the next
+        leg, and finishes the workflow when the selected result is reached or a required decision
+        blocks progress. Unselected next ops are suggestions for a later plan only.

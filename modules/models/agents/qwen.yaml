@@ -9,7 +9,7 @@ commandRequirements:
 commandRequirementsReason: |-
   --yolo is mandatory for terminal-spawned qwen, not optional: without it the TUI asks command approval
   per tool kind (Read, grep, Bash...) and answering "allow always" only whitelists that one kind — the
-  next kind re-prompts and the lane stalls forever.
+  next kind re-prompts and the agent stalls forever.
 why: |-
   Orca 1.4.188's native qwen-code adapter cannot deliver a Task prompt to Qwen Code 0.23.3
   (agent_prompt_stalled, agent_readiness timeout). A terminal created with the declared qwen command

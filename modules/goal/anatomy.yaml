@@ -155,7 +155,9 @@ identity:
   files:
     goalRow: .starciwork/runtime.sqlite goals/inbox rows  # the durable record (engine/ledger-db.mjs)
     goalMd:  rendered for humans only — never a store     # runtime.sqlite is the store
-  requiredFields:  # modules/goal/define-goal.yaml `required`
+  # starci/goal@1 has no schema file: the goal is a sqlite row and this list is
+  # the contract the kernel agent authors against. This yaml owns it.
+  requiredFields:
     - schema          # const starci/goal@1
     - id
     - workflow
@@ -167,7 +169,7 @@ identity:
     - businessChanges
     - impacts
     - resourceEffects
-    - cells
+    - opChain         # the ordered op legs scripts/route/route-plan.mjs derives
     - workTargets
   rev: >-
     Integer revision counter. `goalRevOf(state)` = state.goalRev ?? goal.rev ??

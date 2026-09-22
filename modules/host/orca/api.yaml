@@ -252,23 +252,9 @@ starciOrchestrationAllowlist:
     - orchestration run-create
     - orchestration run-use
     - orchestration run-current
-  planCoordinator:
-    - orchestration task-create
-    - orchestration task-list
-    - orchestration task-update
-    - orchestration worker-start
-    - orchestration worker-show
-    - orchestration worker-list
-    - orchestration send
-    - orchestration check
-    - orchestration reply
-    - orchestration gate-create
-    - orchestration gate-resolve
-    - orchestration gate-list
-    - worktree set
-    - terminal rename
-    - terminal close
-  workflowMonitor:
+  workflowKernel:
+    # Issued on the kernel's behalf by scripts/kernel/api.mjs through
+    # scripts/api/orca/ — the kernel agent never runs orca itself.
     - orchestration task-create
     - orchestration task-list
     - orchestration task-update
@@ -284,13 +270,17 @@ starciOrchestrationAllowlist:
     - orchestration check
     - orchestration ask
     - orchestration reply
+    - orchestration gate-create
+    - orchestration gate-resolve
+    - orchestration gate-list
+    - orchestration dispatch
+    - orchestration dispatch-show
+    - worktree set
     - terminal rename
     - terminal close
     - terminal create
     - terminal read
     - terminal send
-    - orchestration dispatch
-    - orchestration dispatch-show
   operationAgent:
     - orchestration send
     - orchestration ask

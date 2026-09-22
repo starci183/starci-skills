@@ -642,7 +642,7 @@ schemas:
     file: modules/schemas/profile-registry.schema.yaml
     dialect: json-schema
     subsystem: model
-    governs: "The model/runtime registry contract — runtimes[], aliases, executionModes{solo,orchestrated}, agentArchitecture, defaults, targets, skills, operators, fallback."
+    governs: "The model/runtime registry contract — runtimes[], aliases, executionModel, defaults, targets, skills, operators, fallback."
     binds: "modules/models/registry.yaml (carries schema starci/profile-registry@1)"
     usedBy: [scripts/checks/providers.mjs (reads modules/models/registry.yaml targets; Orca admission must use profile resolver output)]
     business:

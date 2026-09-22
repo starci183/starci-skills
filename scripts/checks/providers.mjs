@@ -79,20 +79,39 @@ export function validateProviderContracts(){
     add(errors,card?.agent===agent,`Agent card ${rel} agent field must equal its file stem '${agent}'`);
   }
 
-  // 2. Every host contract document under modules/host/<provider>/ parses —
-  //    orca is required (the orchestrated host); claude/codex host docs validate
-  //    the same way when present.
+  // 2. Every host contract document under modules/host/<provider>/ parses, and
+  //    each host's index.yaml attests its own identity: a starci/ schema id, a
+  //    `provider` equal to its directory name, and every relative file path it
+  //    names (`agentCard`, `files.*`) resolving to a file that exists. orca is
+  //    required — it is the execution host.
   add(errors,fs.existsSync(HOSTS_DIR),'Host contract directory is missing: modules/host/');
   const hosts=fs.existsSync(HOSTS_DIR)
     ?fs.readdirSync(HOSTS_DIR,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort()
     :[];
   add(errors,hosts.includes('orca'),'Orca host contract directory is missing: modules/host/orca/');
   for(const host of hosts){
-    const docs=yamlFilesIn(path.join(HOSTS_DIR,host));
+    const hostDir=path.join(HOSTS_DIR,host);
+    const docs=yamlFilesIn(hostDir);
     add(errors,docs.length>0,`No host contract documents under modules/host/${host}/`);
+    let index=null;
     for(const name of docs){
-      try{readYamlFile(path.join(HOSTS_DIR,host,name));}
-      catch(error){errors.push(`Host document modules/host/${host}/${name} does not parse: ${error.message}`);}
+      let doc=null;
+      try{doc=readYamlFile(path.join(hostDir,name));}
+      catch(error){errors.push(`Host document modules/host/${host}/${name} does not parse: ${error.message}`);continue;}
+      if(path.basename(name).replace(/\.ya?ml$/i,'')==='index')index=doc;
+    }
+    add(errors,index!==null,`Host contract modules/host/${host}/ has no index.yaml`);
+    if(!index)continue;
+    add(errors,typeof index.schema==='string'&&index.schema.startsWith('starci/'),
+      `Host contract modules/host/${host}/index.yaml must declare a starci/ schema id`);
+    add(errors,index.provider===host,
+      `Host contract modules/host/${host}/index.yaml provider must equal its directory name '${host}'`);
+    const referenced=[index.agentCard,...(plain(index.files)?Object.values(index.files):[])]
+      .filter(value=>typeof value==='string'&&/\.ya?ml$/i.test(value));
+    for(const rel of referenced){
+      const resolved=path.resolve(hostDir,rel);
+      add(errors,fs.existsSync(resolved),
+        `Host contract modules/host/${host}/index.yaml names a missing file: ${rel}`);
     }
   }
 

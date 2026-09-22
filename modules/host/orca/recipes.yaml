@@ -1,34 +1,6 @@
 schema: starci/orca-recipes@1
 api: api.yaml
 recipes:
-  bootstrap-plan-coordinator:
-    mode: orchestrated
-    actor: external-bootstrap-chat
-    sequence:
-      - orchestration.run-create
-      - orchestration.task-create
-      - orchestration.worker-start
-      - worktree.set-display-name
-      - terminal.rename
-      - orchestration.run-use
-    worktreeName: "[Coordinator] <Plan>"
-    terminalName: "[Monitor] <Plan>"
-    environmentBinding: current-runtime-by-omitting---on
-    then: external-bootstrap-leaves-control-loop
-  start-workflow-coordinator:
-    mode: orchestrated
-    actor: plan-coordinator
-    sequence:
-      - orchestration.task-create
-      - orchestration.worker-start-new-child
-      - worktree.set-parent-to-exact-main-coordinator
-      - worktree.show-and-attest-parent-lineage
-      - worktree.set-display-name
-      - terminal.rename
-    worktreeName: "[Workflow] <Workflow>"
-    terminalName: "[Monitor] <Workflow>"
-    environmentBinding: current-runtime-by-omitting---on
-    beforeOperationTaskCreate: parent-lineage-attested
   start-qwen-operation:
     mode: orchestrated
     actor: canonical-launcher
@@ -70,7 +42,7 @@ recipes:
     quotaTelemetry: launch-status
   start-managed-operation:
     mode: orchestrated
-    actor: workflow-monitor
+    actor: canonical-launcher
     sequence:
       - assert-expected-active-dag-operation
       - resolve-operation-provider-chain
@@ -93,46 +65,21 @@ recipes:
       - start-next-candidate-only-when-effect-state-is-none
       - return-typed-exhausted-or-reconciliation-result
     forbiddenAfter: [partial-effects, unknown-effects]
-  replace-workflow-monitor:
-    mode: orchestrated
-    actor: plan-coordinator
-    sequence:
-      - orchestration.worker-show-and-require-not-ready-or-running
-      - orchestration.worker-stop
-      - orchestration.worker-release-and-require-released-or-already_released
-      - orchestration.worker-start-retry-of-with-supervisor-chain
-      - orchestration.worker-show-and-attest-provider-identity
-      - terminal.rename
-      - orchestration.worker-show-and-verify-canonical-title
-    terminalName: "[Monitor] <Workflow>"
-  coordinator-instruction:
-    actor: plan-coordinator
-    recipient: workflow-coordinator
-    sequence:
-      - orchestration.send-type-escalation
-      - workflow-coordinator-blocking-check-wakes
-      - workflow-coordinator-routes-to-operation-when-needed
-    forbiddenType: status
   operation-boundary:
     actor: operation-agent
     sequence:
       - orchestration.send-worker-result
       - idle
   accept-operation:
-    actor: workflow-monitor
+    actor: canonical-launcher
     sequence:
       - validate-normalized-operation-output
       - terminal.rename-canonical-before-release
       - orchestration.worker-release
       - orchestration.check-ack
       - schedule-ready-operation-or-report-workflow-boundary
-  wait-workflow:
-    actor: workflow-coordinator
-    sequence:
-      - orchestration.check-wait
-    timeoutAction: rearm-only
-  wait-plan:
-    actor: plan-coordinator
+  wait-operation-boundary:
+    actor: workflow-kernel
     sequence:
       - orchestration.check-wait
     timeoutAction: rearm-only
@@ -145,7 +92,7 @@ recipes:
       - terminal.read-screen-until-input-prompt
       - terminal.send-with-enter
     terminalName: "[<role>] <name>"
-    note: 'terminal.create accepts --command and optionally --worktree; omitting --worktree spawns in the runtime default cwd. Use for probes/diagnostics; operation lanes always bind a worktree.'
+    note: 'terminal.create accepts --command and optionally --worktree; omitting --worktree spawns in the runtime default cwd. Use for probes/diagnostics; operation agents always bind a worktree.'
   unstick-permission-prompt:
     mode: direct
     actor: launcher-or-kernel
@@ -160,18 +107,18 @@ recipes:
     sequence:
       - terminal.read-screen-detect-child-exit
       - terminal.close
-      - terminal.create-fresh-lane
+      - terminal.create-fresh-agent-terminal
       - redeliver-brief-via-file
     signal: 'Agent connection lost: agent child exited'
-    note: 'A dead child never drains queued sends. The fresh lane must survey the tree for partial work — markers, not memory, carry state.'
+    note: 'A dead child never drains queued sends. The fresh agent must survey the tree for partial work — markers, not memory, carry state.'
 cliGotchas:
   - 'orca terminal create flag is --title, not --name.'
   - 'orca worktree rm removes the worktree from Orca AND git — it deletes files on disk; never use it to "unregister" a path that must be kept.'
   - 'terminal read --screen shows tail only; idle detection uses lastOutputAt freshness, not scrollback.'
 forbiddenSequences:
-  - external-chat-runs-plan-loop
-  - plan-coordinator-calls-operation
-  - workflow-coordinator-implements-op
+  - chat-runs-the-kernel-loop
+  - kernel-implements-an-operation-itself
+  - operation-calls-another-operation
   - qwen-op-uses-agent-tool
   - devin-op-uses-provider-native-subagent-or-cloud-handoff
   - devin-op-launched-without-explicit-workflow-slot
