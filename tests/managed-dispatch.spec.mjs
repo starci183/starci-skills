@@ -625,6 +625,44 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
     'no third launch is burned on the circuited pool');
 });
 
+test('a circuit that reopens for the same failure waits longer each time (circuitBackoff)',t=>{
+  const fx=fixture(t);
+  fx.env.STARCI_FAKE_ORCA_MODE='worker-start-refused';
+  const workflowId='wf-worker-start-backoff';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
+      .run(`kernel-${workflowId}`);
+    for(const n of [1,2,3,4])
+      ledger.enqueueJob({jobId:`job-bo-${n}`,workflowId,opId:'architecture.decide',kind:'op',
+        payload:{opId:'architecture.decide',owned_paths:[`docs/bo-${n}/`],difficulty:'hard'}});
+  }finally{ledger.close();}
+  const refuse=jobId=>{
+    const routed=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--prefer','claude-agent','--json');
+    assert.equal(routed.status,0,routed.stderr||routed.stdout);
+    fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
+  };
+  const health=()=>ledgerRead(fx.repo,db=>{
+    const row=db.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key='claude'").get();
+    return row?{...json(row.value_json),expiresAt:row.expires_at}:null;
+  });
+  refuse('job-bo-1');refuse('job-bo-2');
+  const first=health();
+  assert.equal(first.status,'unavailable');
+  assert.equal(first.trips,1);
+  assert.ok(first.cooldownMs<=120000,'the first open circuit waits the base worker-start cooldown');
+  // the cooldown passes and the same failure comes back
+  const w=openLedger({file:ledgerFileFor(fx.repo)});
+  try{w.db.prepare("UPDATE signals SET expires_at=? WHERE scope='provider-health' AND key='claude'").run(Date.now()-1);}finally{w.close();}
+  refuse('job-bo-3');refuse('job-bo-4');
+  const second=health();
+  assert.equal(second.status,'unavailable');
+  assert.equal(second.trips,2,'the trip count survives the expired row');
+  assert.equal(second.cooldownMs,600000,'base 120000 x factor 5 from runtimes.yaml allocation.circuitBackoff');
+  assert.ok(second.expiresAt>Date.now()+500000);
+});
+
 test('A7: a rejected managed launch is recorded as evidence, never as the job binding',t=>{
   const fx=fixture(t,{stale:['claude']});
   const workflowId='wf-a7-rejected-evidence';

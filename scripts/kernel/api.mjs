@@ -1188,19 +1188,40 @@ const providerSignalOf = (db, provider, now = Date.now()) => {
 // durable 'striking' strike counter that routing ignores; on the limit it
 // becomes the 'unavailable' circuit route/dispatch skip. The return value is
 // the OPEN circuit or null — a strike is not yet provider health.
+// A circuit that keeps reopening for the same failure is a condition that does
+// not clear on its own (an un-onboarded CLI, a revoked credential): each reopen
+// inside allocation.circuitBackoff.windowMs multiplies the cooldown by
+// .factor, capped at .capMs. The trip count survives the row's expiry.
+const circuitBackoff = () => {
+  try {
+    const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
+    return doc?.allocation?.circuitBackoff ?? null;
+  } catch { return null; }
+};
 const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error, now, failureKind = 'auth' }) => {
   const key = normalizeProviderId(provider);
   if (!key) return null;
-  const expiresAt = now + providerCooldownMs(failureKind);
   const prior = providerSignalOf(db, key, now);
   const failures = (prior?.failureKind === failureKind ? Number(prior.failures ?? 0) : 0) + 1;
   const strikeLimit = providerStrikeLimit(failureKind);
+  const opens = failures >= strikeLimit;
+  const lastRow = db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
+  const last = parseJson(lastRow?.value_json, {});
+  const backoff = circuitBackoff();
+  const sameRecent = last?.failureKind === failureKind && Number.isFinite(Number(last?.observedAt))
+    && backoff && now - Number(last.observedAt) <= Number(backoff.windowMs);
+  const trips = opens ? (sameRecent ? Number(last.trips ?? 0) : 0) + 1 : Number(sameRecent ? (last.trips ?? 0) : 0);
+  const base = providerCooldownMs(failureKind);
+  const cooldown = opens && backoff && trips > 1
+    ? Math.min(Number(backoff.capMs), base * Math.pow(Number(backoff.factor), trips - 1))
+    : base;
+  const expiresAt = now + cooldown;
   const value = {
     schema: 'starci/provider-health@1', provider: key,
-    status: failures >= strikeLimit ? 'unavailable' : 'striking',
+    status: opens ? 'unavailable' : 'striking',
     failureKind, strikeLimit, model: model ?? null, jobId, step,
     signal: signal ?? null, detail: error ?? null, observedAt: now,
-    failures,
+    failures, trips, cooldownMs: cooldown,
   };
   db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at)
     VALUES(?,?,NULL,NULL,?,?,?)
