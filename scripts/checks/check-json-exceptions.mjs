@@ -18,8 +18,8 @@ const ignoreLockfiles = process.argv.includes('--ignore-lockfiles');
 /** Directories never treated as authored skill JSON. */
 const SKIP_DIR_NAMES = new Set([
   '.git',
-  '.dist',
   'dist',
+  'storybook-static',
   'node_modules',
   '.next',
   'out',
@@ -28,8 +28,6 @@ const SKIP_DIR_NAMES = new Set([
   'coverage',
   // Synthetic checker fixtures under tests/fixtures must not pollute the skill-root walk.
   'tests',
-  // ex-testing holds fleet-lane briefs, lint reports and scratch; it is not authored skill source.
-  'ex-testing',
 ]);
 
 /**
