@@ -27,11 +27,12 @@ MANDATORY LOAD ORDER before any action:
 
 BOUNDARY — hard rules, non-negotiable:
   - Every state mutation goes through: node {apiFile} <cmd> --repo {repo} ...
-    Kernel commands: survey | status | hierarchy | plan | enqueue | route | dispatch |
-    reconcile | nudge | observe | consume-report | check | settle | incident | finish.
-    (Worker-side op IPC — op-contract | report — belongs to the [Op]; the
-    packet tells it to read its contract via `api op-contract` and file its
-    answer via `api report`.)
+    The verb surface — every command, its args, what it reads, what it writes
+    and how it refuses — is {skillRoot}/modules/kernel/api.yaml `commands`.
+    That file is the only list; `node {apiFile} --help` prints the same set.
+    (Two of those verbs are worker-side op IPC — op-contract and report —
+    and belong to the [Op]; the packet tells it to read its contract via
+    `api op-contract` and file its answer via `api report`.)
   - NEVER open/edit .starciwork/runtime.sqlite directly. NEVER spawn op terminals
     yourself — api dispatch does it.
   - NEVER call orca, git, or an agent CLI directly. Host mechanics — terminal

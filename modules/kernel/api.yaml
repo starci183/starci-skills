@@ -38,11 +38,14 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    Seventeen verbs. Reads return projections (survey, status, hierarchy,
-    op-contract) plus `observe` — the kernel's read-only window onto its own
-    job's exact op terminal screen, reasoning context and never evidence;
-    the op IPC is durable rows (dispatch writes contracts, report files
-    reports, consume-report integrates, check records re-runs); the rest are
+    Eighteen verbs. Pure reads return projections and touch no row (survey,
+    status, hierarchy, op-contract) and `estimate` computes slice sizing from
+    modules/models/runtimes.yaml without reading the ledger at all; `observe`
+    is the kernel's window onto its own job's exact op terminal screen —
+    reasoning context and never evidence — and is the one screen read that
+    still appends its own receipt event; the op IPC is durable rows (dispatch
+    writes contracts, report files reports, consume-report integrates, check
+    records re-runs); the rest are
     single ledger transactions that each append one hash-chained event (plan,
     enqueue, route, dispatch, reconcile, nudge, observe, settle, incident, finish). Every command prints
     one JSON object to stdout; a refusal exits non-zero with {ok:false,
@@ -103,7 +106,10 @@ conventions:
 commands:
 
   # --------------------------------------------------------------------------
-  # READS — projections only; a read never mutates the ledger.
+  # PROJECTIONS — survey/status/hierarchy never mutate the ledger. They are
+  # not the only non-mutating verbs (op-contract and estimate write nothing
+  # either), and `observe` is a read of a terminal screen that still appends
+  # its own receipt event — it lives in its own section below.
   # --------------------------------------------------------------------------
 
   survey:
@@ -160,6 +166,27 @@ commands:
     refuses:
       - workflow-unknown
     usedBy: 'Orca/sidebar integrations and workflow monitors that need a semantic agent tree'
+
+  # --------------------------------------------------------------------------
+  # ESTIMATE — deterministic same-op slice sizing. No ledger row is touched.
+  # --------------------------------------------------------------------------
+
+  estimate:
+    args: '--files <n> [--assertions <n>] [--components <n>] [--records <n>]'
+    reads: >-
+      modules/models/runtimes.yaml allocation.slicing only — {weights:{file,
+      assertion, component, record}, targetMinutes:[lo,hi], maxSlices}. The
+      kernel measures the write scope and passes the counts; the weights and
+      bounds are declared data, never a model's guess. No ledger row is read
+    writes: 'nothing — a pure computation, no row and no event'
+    computes: >-
+      W = sum(weight * count) agent-minutes;
+      slices = clamp(ceil(W / targetMinutes[1]), 1, maxSlices);
+      perSliceMinutes = W / slices
+    returns: '{ok:true, minutes, slices, perSliceMinutes, counts, weights, targetMinutes, maxSlices, overTarget} — overTarget means the maxSlices cap was reached and each slice still exceeds targetMinutes[1]'
+    refuses:
+      - estimate-no-measure: 'every count is absent or zero — there is nothing to size'
+    usedBy: 'the cut-bound evaluation before enqueue — the slice count the --cut-total flags carry (kernel-prompt.md)'
 
   # --------------------------------------------------------------------------
   # PLAN — persist the derived plan + structural diff vs the approved shape.

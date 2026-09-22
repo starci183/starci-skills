@@ -11,6 +11,7 @@
 //   plan     --repo <path> --workflow <id> --file <plan.json>
 //   enqueue  --repo <path> --workflow <id> --op <opId> --paths <csv> [--title <t>] [--risk <r>]
 //            [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+//   estimate --repo <path> --files <n> [--assertions <n>] [--components <n>] [--records <n>]
 //   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
 //   reconcile --repo <path> --job <job_id>
