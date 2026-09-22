@@ -359,7 +359,7 @@ archetypes:
   # ==========================================================================
   - id: investigate-first
     signals: >-
-      "app hơi lag" (app is a bit laggy), "X is slow", "Y feels broken", "Z
+      "the app is a bit laggy", "X is slow", "Y feels broken", "Z
       takes forever" — a symptom report with no named fix. The build target is
       UNKNOWN until evidence says where the cost/defect lives.
     chain:
@@ -378,7 +378,7 @@ archetypes:
       - {op: interface.draw, why: "a perf defect is not drawn away — no ui design work until the finding names one"}
       - {op: provision.ask,  why: "no owner-only input in a symptom report — opened only if the investigation hits an authority wall"}
     workedExample:
-      prompt: "app hơi lag"   # "the app is a bit laggy"
+      prompt: "the app is a bit laggy"
       signalMatch: "symptom, no named target -> investigate-first"
       decision: >-
         perf.verify first to localise the cost (which surface, which budget

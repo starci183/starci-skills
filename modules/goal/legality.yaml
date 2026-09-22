@@ -2,8 +2,8 @@
 # modules/goal/legality.yaml
 #
 # The legality rules a proposed op chain must satisfy and the kernel enforces.
-# FIVE families: forward edges (ordering), backward edges (the cấn cấn
-# mid-flight-discovery mechanism), split rules (fan-out legality),
+# FIVE families: forward edges (ordering), backward edges (the mid-flight
+# discovery mechanism), split rules (fan-out legality),
 # existing-surface rules (the survey leg / extend-vs-add), and ambiguity rules
 # (the ORDER/SCOPE/INTENT ladder). Declarative only — these are the business
 # rules the analyzer checks a chain against and the kernel routes on; nothing
@@ -272,7 +272,7 @@ forwardEdges:
     illegal: "goal.revise on an unapproved goal is ILLEGAL"
 
 # ============================================================================
-# 2 — BACKWARD EDGES. The cấn cấn mechanism: mid-flight discovery that the
+# 2 — BACKWARD EDGES. The mid-flight discovery mechanism: discovery that the
 #    goal, a record, or the scope is wrong. The discovery NEVER gets fixed in
 #    place — it travels BACK to the owning boundary and re-runs forward.
 #    CONTEXT.md: "return to the owning workflow, re-run it from the affected

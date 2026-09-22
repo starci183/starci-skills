@@ -71,7 +71,7 @@ stateModel:
     (stale evidence = variable back to unsettled for chain purposes).
   goalAsState: >-
     A goal IS a target-state expression S* over those variables:
-    "thêm tính năng A" -> {feature.A: exists ∧ proven}. The done: metrics are
+    "add feature A" -> {feature.A: exists ∧ proven}. The done: metrics are
     the machine-checkable form of S* — evaluateGoalMetrics literally evaluates
     the ledger/operation/gate variables against it.
   currentState: >-
@@ -98,7 +98,7 @@ decomposition:
   steps:
     - id: PARSE
       does: "input -> S*: form the target-state expression"
-      example: "'thêm tính năng A' -> {feature.A: exists ∧ proven}; 'lint check repo' -> {repo.checks: reported}"
+      example: "'add feature A' -> {feature.A: exists ∧ proven}; 'lint check repo' -> {repo.checks: reported}"
       failsWhen: "INTENT ambiguous — S* cannot be formed -> provision.ask, never guess (legality.yaml ambiguity.intent)"
 
     - id: SURVEY
@@ -134,7 +134,7 @@ decomposition:
     - id: VALIDATE
       does: "legality: prerequisites satisfied? scopes disjoint? which ambiguity tier fires? (legality.yaml — all five families)"
   replanning: >-
-    "cấn cấn" (mid-flight wrongness) is RE-PLANNING, not an exception:
+    Mid-flight wrongness is RE-PLANNING, not an exception:
     discovering the SRS is wrong = discovering S₀ was measured wrong (the
     `sds: decided` variable is actually invalid) -> re-run from step 2 with
     corrected S₀ -> new chain. There is no separate rollback logic;
