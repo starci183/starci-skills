@@ -101,6 +101,13 @@ const writeEnvelope=(fx,{outcome='done',sentinel='SENTINEL-ALPHA',name='report-1
   }));
   return file;
 };
+// `api report --json` prints its emit() object and then the human rendering of
+// the filed row; the object is the leading JSON value.
+const emitted=stdout=>{
+  const open=stdout.indexOf('{');
+  const close=stdout.indexOf('\n}');
+  return open<0||close<0?null:JSON.parse(stdout.slice(open,close+2));
+};
 const fileReport=(fx,jobId,opts={})=>{
   const file=writeEnvelope(fx,opts);
   const r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',file,'--json');
@@ -416,4 +423,76 @@ test('a red Kernel check overrules an Op done claim, settles fail, and releases 
   assert.ok(body.checkEvidence.failed>0);
   assert.equal(jobRow(fx,jobId)?.status,'failed');
   assert.equal(leaseRows(fx,jobId).length,0,'failed settlement releases the operation lease');
+});
+
+/* ----------------------------- A7: a rejected dispatch never shadows a live one */
+
+// Patch the job payload the way rejectDispatch leaves it: the launch that was
+// refused goes on rejectedDispatches[], and whatever managed binding the row
+// already had is NOT written over.
+const patchPayload=(fx,jobId,patch)=>{
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    const row=ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId);
+    ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?')
+      .run(JSON.stringify({...JSON.parse(row.payload_json),...patch}),jobId);
+  }finally{ledger.close();}
+};
+
+test('A7: a report binds to the contracts row, never to a dispatch that was rejected',t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-a7');
+  dispatchRunning(fx,jobId);
+  const live=contractRows(fx)[0].dispatch_id;
+
+  // The incident: worker-start refused ctx_rejected_A before any contract, the
+  // retry ran under the live dispatch, and the job payload still named A.
+  patchPayload(fx,jobId,{
+    managed:{dispatchId:'ctx_rejected_A'},
+    rejectedDispatches:[{dispatchId:'ctx_rejected_A',step:'worker-start',at:Date.now(),effectState:'none'}],
+  });
+
+  const filed=fileReport(fx,jobId,{outcome:'done',sentinel:'A7-LIVE',name:'a7-live.json'});
+  assert.equal(emitted(filed.stdout)?.dispatchId,live,
+    'the contracts row for this attempt is the binding — a stale payload cannot strand a valid report');
+  assert.equal(reportRows(fx)[0].dispatch_id,live);
+
+  // A report that claims the rejected dispatch is refused under its own name.
+  const forged=path.join(fx.repo,'a7-forged.json');
+  fs.writeFileSync(forged,JSON.stringify({schema:'starci/op-report@1',outcome:'done',
+    summary:'claiming the dead dispatch',files:['src/op-ipc.txt'],
+    checks:[{name:'self-check',command:'true',exitCode:0}],dispatch:'ctx_rejected_A'}));
+  const refused=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',forged,'--json');
+  assert.notEqual(refused.status,0,'a rejected dispatch is evidence, never an identity to file under');
+  assert.match(`${refused.stderr}${refused.stdout}`,/report-invalid/);
+  assert.match(`${refused.stderr}${refused.stdout}`,/identity 'dispatch'/);
+  assert.equal(reportRows(fx).length,1,'the refused claim never reaches the row');
+
+  // check and settle resolve the same binding, so the attempt can finish.
+  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,
+    '--checks',JSON.stringify(checkEnvelope({name:'validator',exitCode:0})),'--json');
+  assert.equal(checked.status,0,`api check must bind to the live dispatch: ${checked.stderr||checked.stdout}`);
+  const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
+  assert.equal(settled.status,0,`api settle must bind to the live dispatch: ${settled.stderr||settled.stdout}`);
+  assert.equal(jobRow(fx,jobId)?.status,'succeeded');
+  assert.ok(reportRows(fx)[0]?.consumed_at,'settle consumed the report filed under the live dispatch');
+});
+
+test('A7: a job whose only dispatch was rejected binds nothing at all',t=>{
+  const fx=fixture(t);
+  const jobId=enqueue(fx,'job-op-ipc-a7-unbound');
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
+  }finally{ledger.close();}
+  patchPayload(fx,jobId,{
+    managed:{dispatchId:'ctx_rejected_only'},
+    rejectedDispatches:[{dispatchId:'ctx_rejected_only',step:'worker-start',at:Date.now(),effectState:'none'}],
+  });
+
+  const report=writeEnvelope(fx,{outcome:'done',name:'a7-unbound.json'});
+  const refused=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
+  assert.notEqual(refused.status,0,'a refused launch is not a binding to file against');
+  assert.match(`${refused.stderr}${refused.stdout}`,/report-dispatch-unbound/);
+  assert.equal(reportRows(fx).length,0);
 });

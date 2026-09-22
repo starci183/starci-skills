@@ -1112,11 +1112,17 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       });
     }
     const priorPayload = jobPayloadOf(job);
+    // A rejected dispatch is EVIDENCE, never a binding. Overwriting
+    // managed.dispatchId with it made one field mean two things, and the
+    // readers that resolve a report's dispatch could not tell them apart:
+    // a valid report from the live retry was refused because the payload
+    // still pointed at the dispatch that never got a contract. The rejected
+    // id goes on its own list; reconcile reads it there.
     if (terminal && MANAGED_KINDS.includes(model.kind)) {
-      priorPayload.managed = {
-        ...(priorPayload.managed ?? {}), dispatchId: terminal,
-        rejectedBeforeContract: true,
-      };
+      priorPayload.rejectedDispatches = [
+        ...(Array.isArray(priorPayload.rejectedDispatches) ? priorPayload.rejectedDispatches : []),
+        { dispatchId: terminal, step, at: now, effectState },
+      ];
     }
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
@@ -1765,7 +1771,14 @@ function cmdReconcile(ledger, args) {
   if (job.status !== 'effect_unknown') {
     throw Object.assign(new Error(`job ${jobId} is ${job.status}; reconcile requires effect_unknown`), { code: 'job-not-reconcilable' });
   }
-  const dispatchId = payload.managed?.dispatchId
+  // What reconcile must prove no-effect is the launch that left the job
+  // effect_unknown — the newest rejected dispatch that is not already settled
+  // (payload.rejectedDispatches, where rejectDispatch records the evidence it
+  // used to write over managed.dispatchId). Only when no rejection owns this
+  // state is the job's own managed binding the thing to reconcile.
+  const unsettledRejection = [...(payload.rejectedDispatches ?? [])].reverse()
+    .find((entry) => entry?.dispatchId && entry.effectState && entry.effectState !== 'none')?.dispatchId ?? null;
+  const dispatchId = unsettledRejection ?? payload.managed?.dispatchId
     ?? (String(job.worker_id ?? '').startsWith('ctx_') || String(job.worker_id ?? '').startsWith('dispatch-') ? job.worker_id : null);
   if (!dispatchId) throw Object.assign(new Error(`job ${jobId} has no managed dispatch identity`), { code: 'dispatch-identity-missing' });
 
@@ -1797,6 +1810,12 @@ function cmdReconcile(ledger, args) {
     leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
     const nextPayload = jobPayloadOf(job);
     delete nextPayload.managed;
+    // The rejection is settled now: keep it as evidence, but stop it naming
+    // the state a later reconcile would have to prove again.
+    if (Array.isArray(nextPayload.rejectedDispatches)) {
+      nextPayload.rejectedDispatches = nextPayload.rejectedDispatches.map((entry) =>
+        entry?.dispatchId === dispatchId ? { ...entry, effectState: 'none', reconciledAt: now } : entry);
+    }
     if (nextPayload.hierarchy?.runtime) {
       const { taskId, dispatchId: ignoredDispatch, terminalHandle, ...runtime } = nextPayload.hierarchy.runtime;
       nextPayload.hierarchy.runtime = runtime;
@@ -1865,13 +1884,13 @@ function cmdSettle(ledger, args, repo) {
     // a --report file that is itself a valid op-report@1 envelope is filed on
     // the job's behalf first; anything else (markdown, absent — a dead worker)
     // settles on the kernel's verdict alone.
-    const dispatchId = reportDispatchIdOf(job);
+    const dispatchId = reportDispatchIdOf(db, job);
     const row = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, dispatchId);
     let envelope = null;
     if (row) envelope = parseJson(row.report_json);
     if (!row && reportAbs) {
       const ownedPaths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths, identity: reportIdentityOf(job) });
+      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths, identity: reportIdentityOf(db, job) });
       if (valid.ok) {
         envelope = valid.report;
         db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
@@ -1917,7 +1936,7 @@ function cmdSettle(ledger, args, repo) {
     // worker→kernel signal is spent exactly once (dispatch_id is the worker's
     // handle, falling back to the job id when none was ever bound).
     reportsConsumed = db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL')
-      .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(job)).changes > 0;
+      .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(db, job)).changes > 0;
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefs, reportsConsumed },
@@ -2071,14 +2090,31 @@ const jobOpOf = (job) => job.op_id ?? jobPayloadOf(job).opId ?? null;
 // reports.dispatch_id is the orchestration Dispatch id whenever one exists.
 // command-terminal jobs retain their terminal handle in worker_id for exact
 // cleanup, so payload.orca.dispatchId is the durable report identity.
-const reportDispatchIdOf = (job) => {
+// The contracts row for (workflow, op, attempt) IS the dispatch authority —
+// `api dispatch` writes it before the job goes running, on both launch kinds.
+// The payload is a cache of the same fact and can lag it (a launch rejected
+// after an earlier one succeeded leaves a stale id behind), so the contract
+// answers first and the payload only fills in for an attempt that has none.
+const contractDispatchIdOf = (db, job) => db
+  .prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+  .get(job.workflow_id, jobOpOf(job), job.attempt)?.dispatch_id ?? null;
+const rejectedDispatchIdsOf = (job) => new Set(
+  (jobPayloadOf(job).rejectedDispatches ?? []).map((entry) => entry?.dispatchId).filter(Boolean));
+const reportDispatchIdOf = (db, job) => {
   const payload = jobPayloadOf(job);
-  return payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? job.worker_id ?? job.job_id;
+  return contractDispatchIdOf(db, job) ?? explicitReportDispatchIdOf(db, job)
+    ?? payload.orca?.dispatchId ?? job.worker_id ?? job.job_id;
 };
 const REPORTABLE_JOB_STATUSES = new Set(['running', 'answering', 'effect_unknown']);
-const explicitReportDispatchIdOf = (job) => {
+const explicitReportDispatchIdOf = (db, job) => {
+  const contract = contractDispatchIdOf(db, job);
+  if (contract) return contract;
+  // No contract for this attempt: the payload is the only binding there is,
+  // and a dispatch that was rejected is never one.
   const payload = jobPayloadOf(job);
-  return payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? null;
+  const rejected = rejectedDispatchIdsOf(job);
+  const bound = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? null;
+  return bound && !rejected.has(bound) ? bound : null;
 };
 const requireDispatchedReportBinding = (db, job) => {
   if (!REPORTABLE_JOB_STATUSES.has(job.status)) {
@@ -2086,13 +2122,12 @@ const requireDispatchedReportBinding = (db, job) => {
       code: 'report-job-not-active', status: job.status,
     });
   }
-  const dispatchId = explicitReportDispatchIdOf(job);
+  const dispatchId = explicitReportDispatchIdOf(db, job);
   if (!dispatchId) {
     throw Object.assign(new Error(`job ${job.job_id} has no bound operation dispatch`), { code: 'report-dispatch-unbound' });
   }
-  const contract = db.prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(job.workflow_id, jobOpOf(job), job.attempt);
-  if (!contract || contract.dispatch_id !== dispatchId) {
+  const contract = contractDispatchIdOf(db, job);
+  if (!contract || contract !== dispatchId) {
     throw Object.assign(new Error(`job ${job.job_id} has no contract bound to dispatch ${dispatchId}`), {
       code: 'report-contract-unbound', dispatchId,
     });
@@ -2113,11 +2148,11 @@ const parseAttempt = (v) => {
 // run/task/dispatch/from from the job row; a file that claims a different
 // identity is report-invalid. --outcome is optional consistency: when given it
 // must equal the envelope's outcome.
-const reportIdentityOf = (job) => {
+const reportIdentityOf = (db, job) => {
   const payload = jobPayloadOf(job);
   return { run: payload.managed?.runId ?? payload.orca?.runId ?? null,
            task: payload.managed?.taskId ?? payload.orca?.taskId ?? null,
-           dispatch: reportDispatchIdOf(job), from: job.job_id };
+           dispatch: reportDispatchIdOf(db, job), from: job.job_id };
 };
 function cmdReport(ledger, args, repo) {
   const db = ledger.db, job = resolveJob(db, args.job);
@@ -2127,7 +2162,7 @@ function cmdReport(ledger, args, repo) {
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
   const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
   const ownedPaths = (jobPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(job) });
+  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(db, job) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)
@@ -2230,7 +2265,7 @@ function cmdCheck(ledger, args, repo) {
 // as a live answer again.
 function cmdConsumeReport(ledger, args) {
   const db = ledger.db, job = resolveJob(db, args.job);
-  const dispatchId = reportDispatchIdOf(job);
+  const dispatchId = reportDispatchIdOf(db, job);
   let consumed = false;
   ledger.transaction(() => {
     const now = Date.now();

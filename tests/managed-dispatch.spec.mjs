@@ -525,3 +525,43 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   assert.equal(fx.calls().filter(call=>call==='orchestration worker-start').length,2,
     'no third launch is burned on the circuited pool');
 });
+
+test('A7: a rejected managed launch is recorded as evidence, never as the job binding',t=>{
+  const fx=fixture(t,{stale:['claude']});
+  const workflowId='wf-a7-rejected-evidence';
+  const jobId='job-a7-rejected-evidence';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
+      .run(`kernel-${workflowId}`);
+    ledger.enqueueJob({jobId,workflowId,opId:'architecture.decide',kind:'op',
+      payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
+  }finally{ledger.close();}
+
+  fx.env.STARCI_FAKE_ORCA_MODE='auth-unknown';
+  assert.equal(fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json').status,0);
+  assert.notEqual(fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json').status,0,
+    'an unproven launch rejects the dispatch');
+
+  const payload=json(jobRow(fx.repo,jobId)?.payload_json);
+  assert.equal(payload?.managed?.dispatchId,undefined,
+    'a refused launch never becomes the job’s managed binding — that field means "live", nothing else');
+  assert.deepEqual(payload?.rejectedDispatches?.map(entry=>[entry.dispatchId,entry.step,entry.effectState]),
+    [['dispatch-fake-1','worker-start','unknown']],
+    'the refused launch is kept as evidence with the step that refused it and the effect reconcile must prove away');
+  assert.ok(Number.isFinite(payload.rejectedDispatches[0].at));
+
+  // reconcile reads that array where it used to read the overwritten binding.
+  fx.env.STARCI_FAKE_ORCA_MODE='prompt-stalled';
+  const reconciled=fx.run(API,'reconcile','--repo',fx.repo,'--job',jobId,'--json');
+  assert.equal(reconciled.status,0,`reconcile failed: ${reconciled.stderr||reconciled.stdout}`);
+  assert.equal(json(reconciled.stdout)?.dispatchId,'dispatch-fake-1',
+    'reconcile resolves the launch it must prove from rejectedDispatches[]');
+  const after=jobRow(fx.repo,jobId);
+  assert.equal(after?.status,'queued');
+  const afterPayload=json(after.payload_json);
+  assert.equal(afterPayload.rejectedDispatches[0].effectState,'none',
+    'a reconciled rejection stays on the record, settled — evidence outlives the state it proved');
+  assert.ok(Number.isFinite(afterPayload.rejectedDispatches[0].reconciledAt));
+});

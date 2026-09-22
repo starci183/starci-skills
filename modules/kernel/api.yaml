@@ -387,7 +387,13 @@ commands:
           spawn, prompt send/submission, attestation against the adapter
           card's knownFailures, or a dispatch-show assignee mismatch. In every
           case the job is NOT running, the terminal is closed and the lease +
-          budget reservations are released
+          budget reservations are released. The refused launch is appended to
+          payload.rejectedDispatches[] {dispatchId, step, at, effectState} —
+          the evidence reconcile proves no-effect against, kept apart from
+          payload.managed so it can never be read as the job's live binding.
+          An unclassified worker-start refusal also records a provider strike
+          (modules/models/runtimes.yaml allocation.providerStrikes), and the
+          strike that reaches the limit opens the typed provider circuit
     layoutPreflight: >-
       the owned-path legality preflight dispatch.yaml describes is the
       KERNEL's step before enqueue, not an api refusal: api dispatch does not
@@ -526,9 +532,19 @@ commands:
       with outcome 'ask' then follows askLifecycle below until it is answered
       or superseded.
     returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}}'
+    binding: >-
+      The contracts row for the job''s {workflow_id, op_id, attempt} resolves
+      the dispatch a report binds to — it is the row `api dispatch` wrote
+      before the job went running, so it is the only authority. The job
+      payload answers only for an attempt that has no contracts row, and a
+      dispatch listed in payload.rejectedDispatches[] is evidence of a refused
+      launch, never a binding.
     refuses:
+      - report-job-not-active: 'the job is not running, answering or effect_unknown — a queued or settled job has no worker to file for it'
+      - report-dispatch-unbound: 'the job binds no operation dispatch at all: never dispatched, or every dispatch it carries was rejected'
+      - report-contract-unbound: 'the job binds a dispatch that no contracts row for this attempt was written for'
       - report-missing: 'report file unreadable'
-      - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch'
+      - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here)'
       - outcome-mismatch: '--outcome flag contradicts the envelope outcome'
       - job-unknown / job-settled
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
@@ -569,6 +585,7 @@ commands:
       - bad-attempt: '--attempt is not a positive integer'
       - checks-attempt-mismatch: '--attempt names an attempt other than the job row''s — one checks row per attempt, never written against a neighbour'
       - checks-report-missing: 'no worker report is filed for the job''s bound dispatch — the kernel re-runs checks against a filed answer, not against silence'
+      - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: the report binding refusals, resolved exactly as `report` binding declares'
     usedBy: 'drive.settle — after consume-report and before settle; the re-run record a `pass` verdict stands on'
 
   # --------------------------------------------------------------------------
@@ -622,6 +639,7 @@ commands:
       - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the final ordinal additionally lacks full-regression-final'
       - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
+      - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
       # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
     usedBy: 'drive.settle — last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 
