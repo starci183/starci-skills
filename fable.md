@@ -598,3 +598,23 @@ Việc rơi sang lane khác:
 
 Lưu ý cho mọi lane: worktree không có `config.yaml` (untracked) nên `goal-entry.spec` ×2
 và `json-exceptions.spec` fail trong worktree, không fail trên `main`. Đó không phải regression.
+
+### Lane C landed: mô hình cũ đã chôn, một số concurrency, catalog schema có check
+
+`registry.yaml` một `executionModel`; `host/claude|codex` còn một `index.yaml` thật mỗi host;
+`_common.yaml` hết matrix/cell; `runtimes.<pool>.maxParallel` là số duy nhất được code enforce;
+~25 cite hàm ma trong `modules/goal/` đã thành luật do yaml tự sở hữu; `.json` ghost hết;
+`check-schema-catalog.mjs` phủ 54 stamp; `json-exceptions.spec` xanh lại (đỏ từ trước vì 4
+path storybook không có trên đĩa).
+
+Việc rơi sang lane khác:
+
+- E: `knowledge/code-examples/index.yaml:1` phải đổi stamp thành `starci/code-example-catalog@1`
+  (alias đã bỏ); `CONTEXT.md:1` `distless`; `CONTEXT.md:31` live agent-context (lane I đang
+  làm cho nó thành thật, E viết lại câu); `supervise.yaml:8` "theo dõi" (Devin/G).
+- B: `driver-loop.yaml:289` cite `maxParallelOps` không ai enforce, hoặc enforce hoặc bỏ cite;
+  `driver-loop.yaml:484`, `verdict-contract.yaml:115` còn `cấn cấn`; `engine/config.mjs` 6
+  string `config.json` (đã trong brief B).
+- H: ~15 op còn `reads: matrix` / `writes: matrixHandoff`, giữ vocabulary matrix sống qua
+  registry sinh ra. Bỏ khi migrate op-shape.
+- `maxParallelOps: 20` giữ tạm vì B cite; sau khi B quyết, C hoặc H xoá.
