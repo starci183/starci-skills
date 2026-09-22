@@ -28,7 +28,7 @@ const SKIP_DIR_NAMES = new Set([
   'coverage',
   // Synthetic checker fixtures under tests/fixtures must not pollute the skill-root walk.
   'tests',
-  // Local scratch (gitignored) that may sit under examples/; not authored source.
+  // Fleet scratch (lint reports, perf baselines) under examples/; not authored source.
   'ex-testing',
 ]);
 
