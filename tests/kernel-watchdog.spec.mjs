@@ -32,6 +32,27 @@ test('permission and process failures are not treated as safe wake prompts',()=>
   assert.equal(classifyAgentScreen('ERROR: Not logged in\n› Ask Codex to do anything').state,'failed');
 });
 
+// A Collab Kernel opened Devin's own question dialog; its "❭" selection cursor
+// read as an input prompt and every watchdog wake was typed into "Other".
+test('an agent CLI question dialog is an interactive gate, never a turn-idle prompt',()=>{
+  const devin=`── Read scope ✓ · Safe mode ✓ · Quality targets ──
+  Decision 2 (decision.collab.safe-mode-defaults): Which actions does V1 safe mode hold?
+  · Mandatory gate (recommended)
+  · Owner-configurable
+  ❭ Other (type your own)
+↑↓ navigate · ↵ select · ←→ switch question · ? help me out · esc cancel
+? Not ready to answer, help me out!`;
+  const verdict=classifyAgentScreen(devin);
+  assert.equal(verdict.state,'interactive-gate');
+  assert.equal(verdict.gate,'agent-question-dialog');
+  const claude=`Which layout?
+❯ 1. Grid
+  2. List
+Enter to select · Tab/Arrow keys to navigate · Esc to cancel`;
+  assert.equal(classifyAgentScreen(claude).state,'interactive-gate');
+  assert.equal(classifyAgentScreen('● Canceled. What should Devin do?\n❭ Ask Devin to build features').state,'turn-idle','a cancelled dialog back at the prompt is idle again');
+});
+
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
   assert.match(prompt,/external watchdog owns the 5-minute cadence/i);

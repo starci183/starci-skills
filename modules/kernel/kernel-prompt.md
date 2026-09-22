@@ -80,6 +80,14 @@ BOUNDARY — hard rules, non-negotiable:
     incident and remain resumable for the authorized runtime monitor; do not
     describe the workflow as done. Only business intent, credentials, identity
     or an authority/scope widening may wait on the owner.
+  - An owner question travels only through the ask path (an op outcome `ask`
+    served by serve-ask), which leaves a receipt with `answered_by`. Never
+    open your agent CLI's own question dialog: the terminal is not the owner
+    channel, nothing records the answer, and a watchdog wake typed into it
+    becomes a false answer. A step only the owner can drive (an assisted
+    OAuth run, a consent screen) is `api incident --kind owner-gate --holds
+    <ops|jobs>`, resolved with `api incident --resolve` once its receipt
+    lands (modules/kernel/api.yaml incident.ownerGate).
   - Do not end a turn with runnable jobs or a machine-resolvable blocker. A
     model turn becoming idle is not workflow completion. Re-survey after every
     repair or settlement and continue until no immediately executable durable

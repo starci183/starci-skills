@@ -10,6 +10,10 @@ const INTERACTIVE_GATES = [
   { gate: 'codex-directory-trust', pattern: /do you trust the contents of this directory/i },
   { gate: 'claude-first-run-onboarding', pattern: /let's get started|choose the text style/i },
   { gate: 'workspace-trust', pattern: /trust the authors/i },
+  // An agent CLI's own multiple-choice question (Devin's ask dialog, Claude's
+  // AskUserQuestion). Its selection cursor looks like an input prompt, and a
+  // wake typed into it lands in the "Other" answer field.
+  { gate: 'agent-question-dialog', pattern: /(?:↑↓|arrow keys)(?: to)? navigate[^\n]*(?:↵|enter)(?: to)? select|(?:↵|enter) to select[^\n]*navigate|not ready to answer|type your own/i },
   { gate: 'tool-approval', pattern: /approve once|permission (?:required|request)|allow `[^`]+` commands|confirm\s*[·•]/i },
 ];
 

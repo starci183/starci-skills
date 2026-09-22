@@ -157,8 +157,8 @@ export async function watchdogTick() {
     reason: 'terminal shows an authentication/process failure; exact terminal must be reconciled before replacement',
   };
   if (classified.state === 'interactive-gate') return {
-    ok: false, workflowId, phase, terminal, action: 'interactive-gate', outputAgeMs,
-    reason: 'kernel terminal is waiting on an interactive permission/trust gate',
+    ok: false, workflowId, phase, terminal, action: 'interactive-gate', gate: classified.gate ?? null, outputAgeMs,
+    reason: `kernel terminal is waiting on an interactive gate (${classified.gate ?? 'unnamed'}); nothing is typed into it`,
   };
   return {
     ok: true, workflowId, phase, terminal,
