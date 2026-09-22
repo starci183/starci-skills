@@ -6,7 +6,8 @@ import net from 'node:net';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {reportsSince,openAsks,DEFAULT_INTERVAL_MS} from '../scripts/supervisor/poll.mjs';
+import {reportsSince,openAsks,orcaTree,DEFAULT_INTERVAL_MS} from '../scripts/supervisor/poll.mjs';
+import {orcaTreeFindings,readTerminals} from '../scripts/checks/check-orca-tree.mjs';
 
 // scripts/supervisor/poll.mjs is the supervisor's mechanism: a pure observer
 // over the durable ledger. modules/supervisor/supervise.yaml is its contract.
@@ -164,6 +165,34 @@ test('a re-served ask is probed again, not left dead by the earlier expiry',asyn
     const asks=await openAsks(ledger.db);
     assert.equal(asks[0].liveness,'live');
     assert.equal(asks[0].url,url,'the newest ask-serving wins — event order is seq, not the random event_id');
+  });
+});
+
+test('a ledger with no kernel signal makes no host call — the tree is simply unchecked',t=>{
+  withLedger(t,({ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    const tree=orcaTree(ledger.db);
+    assert.deepEqual(tree,{listed:false,reason:'no kernel signal',findings:[]},
+      'a pure observer with nothing of ours in Orca asks Orca nothing');
+  });
+});
+
+test('the digest prints one ORCA-TREE line per finding, from the same projection the check exports',t=>{
+  withLedger(t,({ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'},
+      signals:[{scope:'kernel',key:WORKFLOW,token:'k1',value:{terminal:'term-kernel-new'}}],
+      jobs:[{jobId:`kernel-${WORKFLOW}`,kind:'kernel',status:'running',worker_id:'term-kernel-new',payload:{}}]});
+    // Two live [Kernel] terminals for one workflow — exactly what the owner
+    // found in the sidebar.
+    const listing={ok:true,terminals:[
+      {handle:'term-kernel-new',title:`[Kernel] ${WORKFLOW}`,connected:true},
+      {handle:'term-kernel-old',title:`[Kernel] ${WORKFLOW}`,connected:true},
+    ]};
+    const tree=orcaTree(ledger.db,{terminals:listing});
+    assert.equal(tree.listed,true);
+    assert.deepEqual(tree.findings.map(f=>f.code),['DUPLICATE_KERNEL']);
+    assert.deepEqual(tree.findings,orcaTreeFindings(ledger.db,readTerminals(listing)),
+      'the digest and the check report the same thing, because they are the same projection');
   });
 });
 
