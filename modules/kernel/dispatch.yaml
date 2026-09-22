@@ -75,6 +75,7 @@ packet:
       id: <workflow-id>
       goal_revision: <revision>
       goal_identity: <identity>
+    owner_language: <lang>              # config.yaml language; every owner-facing string is written in it
     records: [...]                      # .starciwork records it touches (the read set)
     owned_paths: [...]                  # what it may modify — boundary enforcement
   constraints:

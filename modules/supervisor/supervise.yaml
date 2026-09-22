@@ -37,7 +37,8 @@ loop:
       if absent, its CLI answers but cannot spawn terminals while the app is down; (2) each
       running workflow's kernel signal is probed — a dead terminal is replaced via
       start-workflow --goal; (3) one watchdog per running workflow is re-spawned
-      (node scripts/kernel/watchdog.mjs --repo <repo> --workflow <id>) — a kernel that yields is
+      (node scripts/kernel/watchdog.mjs --repo <repo> --workflow <id> --repair; without --repair it
+      only reports wake-needed and never wakes) — a kernel that yields is
       woken by the transition that has work for it (api report, an answered ask) and the watchdog
       is the fallback for a missed or racing wake; (4) parked asks re-serve on kernel survey —
       the digest tags every open ask live, stale, dead or unserved, and only a `live` tag is

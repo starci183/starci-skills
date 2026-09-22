@@ -29,7 +29,21 @@ const TERMINAL_PHASES=new Set(['finished','stale','failed']);
 const STATUSES=new Set(['completed','failed','not-run','cancelled','inconclusive']);
 const SIGNALS=new Set(['ok','fail','cancel']);
 const SAFE_ENV=['PATH','Path','PATHEXT','SystemRoot','COMSPEC','TEMP','TMP','HOME','USERPROFILE','LOCALAPPDATA','APPDATA','NODE_PATH'];
-const executableFor=value=>process.platform!=='win32'?value:value==='node'?process.execPath:['npm','npx','pnpm','yarn'].includes(value)?`${value}.cmd`:value;
+// How a manifest command is spawned. On Windows, Node refuses to spawn .cmd/.bat
+// files without a shell (CVE-2024-27980, spawn EINVAL), so npm and npx run as
+// node <npm>/bin/<tool>-cli.js from the running Node install — no shell, the
+// arguments stay an argv array. pnpm and yarn keep their .cmd shims.
+export const launchFor=(command,{platform=process.platform,execPath=process.execPath}={})=>{
+  const [head,...rest]=command;
+  if(platform!=='win32')return {file:head,args:rest};
+  if(head==='node')return {file:execPath,args:rest};
+  if(head==='npm'||head==='npx'){
+    const cli=path.win32.join(path.win32.dirname(execPath),'node_modules','npm','bin',`${head}-cli.js`);
+    return {file:execPath,args:[cli,...rest]};
+  }
+  if(head==='pnpm'||head==='yarn')return {file:`${head}.cmd`,args:rest};
+  return {file:head,args:rest};
+};
 
 const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
 export const digestFile=file=>sha256(fs.readFileSync(file));
@@ -234,8 +248,8 @@ const runCommand=(prepared,item,defaultCwd)=>{
   const command=Array.isArray(item?.command)?item.command:[];need(command.length,`command ${item?.id??'(unnamed)'} is empty`);
   const cwd=resolveCwd(prepared.root,item.cwd??defaultCwd);
   const env=Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
-  const executable=executableFor(command[0]);
-  const result=spawnSync(executable,command.slice(1),{cwd,env,encoding:'utf8',timeout:prepared.request.limits.timeoutMs,windowsHide:true});
+  const launch=launchFor(command);
+  const result=spawnSync(launch.file,launch.args,{cwd,env,encoding:'utf8',timeout:prepared.request.limits.timeoutMs,windowsHide:true});
   return {id:item.id??'command',command:sanitizer(prepared)(commandLabel(command)),exitCode:Number.isInteger(result.status)?result.status:1,evidenceRefs:[]};
 };
 const policyCommands=(file,key)=>{const value=readYaml(file)??{};const list=value[key];return Array.isArray(list)?list:[];};
@@ -301,8 +315,8 @@ const workerMain=async prepared=>{
   let completionSignal=null,launchExit=1,protocolError=null;
   const env=Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
   Object.assign(env,{STARCI_ASSISTED_UAT_REQUEST:prepared.requestFile,STARCI_ASSISTED_UAT_RUN_DIR:prepared.runDir,STARCI_ASSISTED_UAT_PROTOCOL:PROTOCOL_PREFIX});
-  const command=prepared.session.launch.command,executable=executableFor(command[0]);
-  const child=spawn(executable,command.slice(1),{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:false});
+  const command=prepared.session.launch.command,launch=launchFor(command);
+  const child=spawn(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:false});
   const childExit=new Promise(resolve=>{
     child.once('exit',code=>resolve(Number.isInteger(code)?code:1));
     child.once('error',error=>{protocolError=error;resolve(1);});
