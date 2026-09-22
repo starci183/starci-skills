@@ -1,0 +1,466 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:work:integration:1
+type: object
+additionalProperties: false
+description: "One external system the product talks to, written as a record rather than as a remark inside
+  the requirement that mentions it. A declared `extensions.work3.integrations` edge owes exactly one of
+  these, and the reason it is a family of its own is the proof rule it carries: this record reaches done
+  only through a run against the real provider, whose evidence says `proof: {boundary: live, fakes: []}`.
+  An integration whose only evidence names it among another run's fakes is proven against a stand-in, which
+  is the one thing an external dependency cannot be proven against."
+required:
+  - schema
+  - id
+  - title
+  - state
+  - provider
+  - boundary
+  - endpoints
+properties:
+  schema:
+    const: work/integration@1
+    description: Record family discriminator. Every record names its own family so a file can be validated
+      without inferring its meaning from the directory it happens to sit in.
+  id:
+    type: string
+    pattern: ^integration(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: "The integration's stable id, a lowercase dot-path under the integration family:
+      integration.<feature>.<provider>; example integration.login.keycloak. It is the exact id a
+      requirement's `extensions.work3.integrations` entry declares, so the declaration and the record it
+      owes are matched by string equality rather than by a reader's judgement."
+  title:
+    $ref: "#/$defs/prose"
+    description: What the external system does for this product, in the product's terms. A reader learns
+      from this line why the dependency exists before learning which vendor supplies it.
+  state:
+    $ref: "#/$defs/state"
+  activity:
+    $ref: "#/$defs/activity"
+  provider:
+    $ref: "#/$defs/slug"
+    description: The external system by name - keycloak, postgresql, redis. It is the vendor or product
+      name rather than a role, because two features depending on "the database" and on "postgresql" are
+      making different claims about what can be swapped.
+  boundary:
+    $ref: "#/$defs/prose"
+    description: What stays on each side of the line - what this product owns and what the provider owns.
+      It is required because the failure mode of an external dependency is not usually an outage; it is
+      each side assuming the other holds something, and this sentence is where that is settled.
+  endpoints:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: The reachable points this product actually uses, one entry each. At least one is required
+      because an integration with no endpoint is a dependency nobody can probe, and the live proof this
+      family demands has nothing to aim at.
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - method
+        - path
+      properties:
+        name:
+          $ref: "#/$defs/slug"
+          description: A short name for the point, as this product refers to it - token, userinfo, primary.
+        method:
+          $ref: "#/$defs/prose"
+          description: How the point is reached - an HTTP verb, or the protocol itself where there is no
+            verb, as with a raw TCP connection.
+        path:
+          $ref: "#/$defs/prose"
+          description: The address, exactly as the client uses it - a URL path, a connection string with no
+            credential in it. It is the provider's address, never a secret, which is what `credential`
+            below is for.
+  credential:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - providedBy
+      - where
+    description: "How this product authenticates to the provider, named and never carried. The record says
+      which variable holds the secret and where its sealed custody is; the value is the owner's and does not
+      enter the tree, because the tree is tracked, readable, and outlives any one rotation."
+    properties:
+      name:
+        type: string
+        pattern: ^[A-Z][A-Z0-9_]*$
+        description: The exact environment variable the client reads. It is the precise name rather than a
+          description of one, because a credential that is nearly right fails at runtime with a message
+          about the provider rather than about the variable.
+      providedBy:
+        $ref: "#/$defs/slug"
+        description: Who supplies the value - the owner, never the agent and never the repository.
+      where:
+        $ref: "#/$defs/prose"
+        description: The sealed custody path the value is read from. It names an encrypted file so a reader
+          can find and rotate the secret without the record ever having held it.
+  sandbox:
+    $ref: "#/$defs/prose"
+    description: What can be run against without touching the provider's production - the dev instance, the
+      vendor's test mode, the port it listens on. It is where the live proof this family demands is actually
+      obtainable, which is the difference between a demand and an impossibility.
+  module:
+    oneOf:
+      - $ref: "#/$defs/prose"
+      - type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+    description: The module-root directory or directories holding this product's client for the provider.
+      It is a directory a reader would call the module's root, never an individual file, so a file moving
+      inside it during a refactor is not by itself a broken reference.
+  requiresProof:
+    $ref: "#/$defs/requiresProof"
+  provenBy:
+    $ref: "#/$defs/provenBy"
+  refs:
+    $ref: "#/$defs/refs"
+  dependsOn:
+    $ref: "#/$defs/dependsOn"
+  blockedBy:
+    $ref: "#/$defs/blockedBy"
+  conflictsWith:
+    $ref: "#/$defs/conflictsWith"
+  blockers:
+    $ref: "#/$defs/blockers"
+  verificationSource:
+    $ref: "#/$defs/verificationSource"
+  because:
+    $ref: "#/$defs/because"
+  change:
+    $ref: "#/$defs/change"
+dependentRequired:
+  because:
+    - verificationSource
+$defs:
+  prose:
+    type: string
+    minLength: 1
+    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
+      a written one, so it is refused at the type.
+  fieldName:
+    type: string
+    pattern: ^[A-Za-z][A-Za-z0-9_]*$
+    description: A field name as the wire carries it. Casing is not normalised, because an event's payload
+      names are the real names a consumer destructures and rewriting them here would describe a different
+      message.
+  recordId:
+    type: string
+    pattern: ^(?:br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event|environment|identity|fixture)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: "The id of any record in the tree, family prefix included, optionally addressing one
+      criterion the record carries inline as `<record id>#<criterion>`. Requiring a known prefix means an
+      unresolvable reference is caught as a malformed id rather than surviving as a plausible-looking
+      string."
+  eventId:
+    type: string
+    pattern: ^event(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: The id of a `work/event@1` record. It is its own type so that a subscription to something
+      that is not an event is a malformed id here rather than a resolution failure later.
+  state:
+    enum:
+      - uninvestigate
+      - todo
+      - done
+    description: "Whether this leaf has not been looked at, is outstanding, or is finished, and nothing
+      else. There is deliberately no in-progress value: `todo` plus `activity` says that, and
+      `effectiveState: suspended` is derived by the runtime when an input a done record was proved against
+      has moved. Authoring either would let a record claim a status something else is supposed to compute."
+  activity:
+    enum:
+      - idle
+      - investigating
+      - implementing
+      - verifying
+    description: What is happening to this record right now, beside its state rather than inside it. `todo`
+      with `idle` is defined work nobody is running; `todo` with any other value is work in flight. It is a
+      separate field because activity changes many times inside one state and a lifecycle that encoded both
+      would record a restart as a change of status.
+  verificationSource:
+    enum:
+      - kernel-observed
+      - example-toolkit
+      - authored-claim
+    description: "Where this record's verification came from: kernel-observed means the runtime ran it and
+      saw the result, example-toolkit means one of the scripts/example/ tools ran the commands outside any
+      kernel workflow, and authored-claim means a person or an agent wrote the sentence. The three read
+      identically as prose and mean completely different things, so the label is written rather than
+      inferred."
+  because:
+    type: string
+    minLength: 1
+    description: "Why no run proves this record, required whenever `verificationSource: authored-claim` is
+      what carries its done. Without it, an authored claim is indistinguishable from a proof nobody got
+      round to recording."
+  subscribes:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/eventId"
+    description: The events this record consumes, by id. It is the inbound half of the event coupling and
+      is authored on the consumer, because the producer must not have to know who listens.
+  refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: Semantic inputs this record read, by id, without implying any execution order. An edge
+      records what was bound so that a change invalidates exactly the dependents that read the part which
+      moved, and nothing else.
+  dependsOn:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: Prerequisites that must genuinely be effectively done before this record can be. It is
+      deliberately not where a reviewed-but-todo specification seed goes - that is `refs` - because using
+      it for an intentionally todo input would deadlock delivery.
+  blockedBy:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - because
+      properties:
+        record:
+          $ref: "#/$defs/recordId"
+          description: The record this one waits on, by id. It is an edge rather than a sentence so that the
+            gate can resolve it and refuse a wait on something that no longer exists.
+        rev:
+          type: integer
+          minimum: 1
+          description: The blocking record's `change.rev` at the moment this blocker was authored, omitted
+            only when the wait does not depend on a particular revision holding. A blocker whose target has
+            since reached done at or past this rev is stale, and the gate refuses it rather than letting it
+            go quietly out of date.
+        because:
+          $ref: "#/$defs/prose"
+          description: What the wait is actually about, in a sentence that a reader can check against the
+            target. It is required because an edge with no reason is a fact nobody can re-evaluate when the
+            target moves.
+    description: What this record waits on, as edges rather than prose. An absence with no owner is not
+      authored here as a sentence; it becomes a `work/gap@1` record and this list points at its id like any
+      other.
+  conflictsWith:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - because
+      properties:
+        record:
+          $ref: "#/$defs/recordId"
+          description: The record that currently cannot be true at the same time as this one.
+        rev:
+          type: integer
+          minimum: 1
+          description: The revision of the target the conflict was observed against. The gate refuses a
+            mismatch against the target's current rev, so a conflict already settled by an edit surfaces
+            instead of standing.
+        because:
+          $ref: "#/$defs/prose"
+          description: Why the two cannot both hold, stated so that settling the conflict is a decidable
+            question rather than a matter of taste.
+    description: "Pairwise conflicts only. Three or more records that are each individually true and jointly
+      unsatisfiable are a set only a decision can settle, and they are authored as `tension` on the
+      `work/policy-decision@1` that owns settling them."
+  blockers:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+    description: "Impediments that are facts about the world rather than edges into the tree - an
+      unavailable environment, a tool nobody has. They are kept out of lifecycle state deliberately: the
+      record is still todo, and the blocker explains why it has not moved."
+  requiresProof:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: What this record needs before anybody may call it proven, broken down by kind. The kinds
+      are a closed set so that a weaker bar cannot be invented by choosing a new word for it.
+    properties:
+      unit:
+        $ref: "#/$defs/proofDemand"
+      e2e:
+        $ref: "#/$defs/proofDemand"
+      uat:
+        $ref: "#/$defs/proofDemand"
+      perf:
+        $ref: "#/$defs/proofDemand"
+      live:
+        $ref: "#/$defs/proofDemand"
+      implementation:
+        $ref: "#/$defs/proofDemand"
+      measurement:
+        $ref: "#/$defs/proofDemand"
+      requirements:
+        $ref: "#/$defs/proofDemand"
+      transitions:
+        $ref: "#/$defs/proofDemand"
+      provider:
+        $ref: "#/$defs/proofDemand"
+      consumer:
+        $ref: "#/$defs/proofDemand"
+  proofDemand:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: What satisfying one kind means here, stated concretely enough that a checker can decide it
+      rather than a reader judging it. An empty demand would be a kind named and nothing asked of it.
+    not:
+      properties:
+        required:
+          const: true
+        optional:
+          const: true
+      required:
+        - required
+        - optional
+    properties:
+      required:
+        const: true
+        description: This kind must be satisfied. It is only ever true, because the absence of the key
+          already says the kind is not demanded.
+      optional:
+        const: true
+        description: This kind counts when it is present but does not hold the record back. It may not
+          appear beside `required` - a demand that is both is a demand that has not been decided.
+      command:
+        $ref: "#/$defs/prose"
+        description: The exact command that satisfies this kind, runnable as written. Naming it on the
+          record is what stops the demand being satisfiable by whatever run happens to be convenient later.
+      forEach:
+        type: string
+        pattern: ^[a-z][A-Za-z0-9.]*$
+        description: The name of a field on this same record whose every entry must be satisfied separately.
+          It turns a single tick into a count that grows with the record, instead of a proof recorded
+          against an older, shorter list continuing to read as complete.
+      note:
+        $ref: "#/$defs/prose"
+        description: What this kind is actually asking for on this record, where the kind's name alone would
+          leave two readers expecting different runs.
+  provenBy:
+    type: object
+    additionalProperties: false
+    description: What actually satisfied each demanded kind. It is written by the kernel from
+      `requiresProof` and the provers' own `proves` edges; an agent-authored one is a record speaking for
+      other records, and goes quietly false when one of them stops covering the path.
+    properties:
+      unit:
+        $ref: "#/$defs/proofRefs"
+      e2e:
+        $ref: "#/$defs/proofRefs"
+      uat:
+        $ref: "#/$defs/proofRefs"
+      perf:
+        $ref: "#/$defs/proofRefs"
+      live:
+        $ref: "#/$defs/proofRefs"
+      implementation:
+        $ref: "#/$defs/proofRefs"
+      measurement:
+        $ref: "#/$defs/proofRefs"
+      requirements:
+        $ref: "#/$defs/proofRefs"
+      transitions:
+        $ref: "#/$defs/proofRefs"
+      provider:
+        $ref: "#/$defs/proofRefs"
+      consumer:
+        $ref: "#/$defs/proofRefs"
+  proofRefs:
+    type: array
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/proofRef"
+    description: Everything that satisfied one kind. An empty list is information - it says the kind was
+      demanded and nothing has yet answered it, which is a different fact from the kind not being asked for.
+  proofRef:
+    type: string
+    pattern: ^[a-z0-9]+(?:[-.][a-z0-9]+)*(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: "One thing that satisfied a demand: the id of the record that proved it, the name of an
+      evidence directory, or an evidence directory and one assertion inside it written as name#assertion."
+  change:
+    type: object
+    additionalProperties: false
+    required:
+      - rev
+      - kind
+      - at
+    description: One authored edit to this record. Change is authored and staleness is derived, so this
+      block says what a person did and never what the runtime concluded from it.
+    properties:
+      rev:
+        type: integer
+        minimum: 1
+        description: The revision this edit produced, counting from 1. Other records cite it in `blockedBy`
+          and `conflictsWith`, which is what lets the gate tell a wait that is still true from one that has
+          already been answered.
+      kind:
+        enum:
+          - initial
+          - editorial
+          - clarifying
+          - breaking
+        description: "What the edit did to what the record promises: initial is the first write, editorial
+          changes wording without changing meaning, clarifying adds precision without withdrawing anything,
+          and breaking removes or replaces a statement. The set is closed so that a withdrawal cannot be
+          under-reported by inventing a gentler word for it."
+      at:
+        $ref: "#/$defs/timestamp"
+      withdraws:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: The statements this revision removes, quoted verbatim, so that a reader of the next
+          revision can see exactly what the product stopped promising rather than inferring it from a diff.
+      retains:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: The statements an editorial pass keeps verbatim. It exists so that an edit which
+          rewrites half a paragraph is not forced to withdraw the whole thing to be honest about what moved.
+      reason:
+        $ref: "#/$defs/prose"
+        description: Why the edit was made, naming what changed outside this record. It is the sentence that
+          makes a revision readable a year later, when the diff alone says only that words are different.
+  timestamp:
+    type: string
+    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
+    description: An ISO 8601 instant in UTC. The zone is pinned to Z so two records written on two machines
+      are ordered against each other without knowing where either was written.
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
+      written twice by two authors is the same string.
+  featureId:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A feature's own id - the directory name under features/ and the id its
+      features/<feature>/index.yaml carries. It has no family prefix because a feature is the owner of
+      families rather than a member of one.
+  sha256:
+    type: string
+    pattern: ^[a-f0-9]{64}$
+    description: A lowercase hex SHA-256. It is pinned to one case and one length so that two records
+      digesting the same bytes produce the same string.

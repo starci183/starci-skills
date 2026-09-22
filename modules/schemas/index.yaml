@@ -292,6 +292,110 @@ schemas:
       whenNot: Never edited after publish (bytes under a published manifest are frozen); corrected proof gets a NEW evidence id.
       selectedBy: Verification lanes publish; completion review reads.
 
+  - id: work/contract@1
+    file: modules/schemas/work-contract.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One synchronous request/response seam between a provider feature and a consumer feature — its surface points, what the provider guarantees, what the consumer owes back, and a proof demand on BOTH halves."
+    binds: .starciwork/features/<feature>/contract/<name>/index.yaml
+    usedBy: [scripts/checks/check-example-work.mjs (ref resolution on between/surface), scripts/example/example-derive.mjs (contractProvider/contractConsumer edge kinds)]
+    business:
+      question: "What have two features agreed at the seam, and has each side proved its own half?"
+      whenNeeded: Any cross-feature call — the seam is where each side's own records stop being enough.
+      whenNot: Never for a fire-and-forget signal (that is work/event@1) — a refusal the caller sees and one it never sees fail differently.
+      selectedBy: The provider feature owns it; `between` names both sides.
+
+  - id: work/event@1
+    file: modules/schemas/work-event.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One fire-and-forget signal, its payload fields, and the delivery guarantee plus ordering the transport promises — the two facts a consumer cannot read off the payload."
+    binds: .starciwork/features/<feature>/event/<name>/index.yaml
+    usedBy: [scripts/checks/check-example-work.mjs (producer resolves, payload non-empty, delivery vocabulary; `subscribes` must name a work/event@1)]
+    business:
+      question: "What did the product announce, to whom, and how many times may they hear it?"
+      whenNeeded: Any broadcast a consumer reacts to; the id is the whole of the coupling between the two sides.
+      whenNot: Never for a call whose answer the caller waits on — that is work/contract@1.
+      selectedBy: Producer feature authors it; consumers name it in their own `subscribes`.
+
+  - id: work/integration@1
+    file: modules/schemas/work-integration.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One external system, its endpoints, the boundary each side owns, and the credential NAMED not carried — done only through a run whose evidence carries proof {boundary: live, fakes: []}."
+    binds: .starciwork/features/<feature>/integration/<id>/index.yaml
+    usedBy: [scripts/checks/check-evidence-binding.mjs (live-boundary proof), work-layout rule — a declared extensions.work3.integrations edge owes exactly one record]
+    business:
+      question: "What outside this product does it depend on, and has anyone actually reached it?"
+      whenNeeded: Every declared external dependency; the id matches the declaration by string equality.
+      whenNot: Never proven against a fake — an integration named among another run's proof.fakes is not proven.
+      selectedBy: The feature that owns the client; `provider` names the vendor, not a role.
+
+  - id: work/gap@1
+    file: modules/schemas/work-gap.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "A known absence as a record — `statement` of what is missing and `closedBy` naming every record whose done actually closes it; done only once EVERY closer is done."
+    binds: .starciwork/features/<feature>/gap/<name>/index.yaml
+    usedBy: [scripts/checks/check-example-work.mjs (closedBy resolution + all-closers-done), scripts/example/example-derive.mjs (blocker roots, unbuiltModuleGaps tally)]
+    business:
+      question: "What is not there, and what would have to land for it to be?"
+      whenNeeded: Whenever a blocker's real root is an absence — `blockedBy` points at the gap's id instead of restating the sentence.
+      whenNot: Never prose inside another record's blockedBy; an absence with no owner still gets a record.
+      selectedBy: The feature that would close it; the frontier and the blocker walk both read it.
+
+  - id: work/resource@1
+    file: modules/schemas/work-resource.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "Typed UAT custody in three kinds — environment (origins + probes), identity (disposable, sealed custody path, never a password), fixture (schema/seed files, namespace, preconditions)."
+    binds: .starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml
+    usedBy: [scripts/checks/check-example-work.mjs (a uat-flow's environment/fixtures/accounts identity must resolve to a resource of the MATCHING kind)]
+    business:
+      question: "Where does a walk run, who does it sign in as, and what seeds its prerequisites?"
+      whenNeeded: Every UAT flow — the three edges out of a flow all land here.
+      whenNot: Never holds a secret value; custody names the sealed file and how to open it.
+      selectedBy: The flow's own environment/fixtures fields and its accounts.yaml identity refs.
+
+  - id: work/critique@1
+    file: modules/schemas/work-critique.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "The GENERATED reading of a tree's weak points — blast radius, fan-in hotspots, designed todos, unrooted blockers. No id, no state: recomputed, never authored."
+    binds: .starciwork/_derived/critique.yaml
+    usedBy: [scripts/example/example-critique.mjs (writes it), scripts/checks/check-example-derived.mjs (refuses it when stale against the tree)]
+    business:
+      question: "Where is this tree structurally weak, measured rather than felt?"
+      whenNeeded: Read before a breaking change — `because` carries the number it measured.
+      whenNot: Never hand-edited; a finding disappears because the tree changed, not because the line was deleted.
+      selectedBy: Regenerate with scripts/example/example-critique.mjs --work <tree> --write.
+
+  - id: work/derived@1
+    file: modules/schemas/work-derived.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "The GENERATED reverse-edge index, effectiveState, tally and frontier. It is why no real record may author usedBy/effectiveState/frontier of its own — two copies of a derivation disagree and the authored one wins an argument it should lose."
+    binds: .starciwork/_derived/index.yaml
+    usedBy: [scripts/example/example-derive.mjs (writes it), scripts/example/example-critique.mjs (reads computeDerived), scripts/checks/check-example-derived.mjs]
+    business:
+      question: "What points at this record, what does its state actually amount to, and what could start now?"
+      whenNeeded: Scheduling and impact reading — the frontier is the answer computed rather than maintained.
+      whenNot: Never authored; excluded from the record walk (no id, no state).
+      selectedBy: Regenerate with scripts/example/example-derive.mjs --work <tree> --write.
+
+  - id: starci/uat-run-manifest@1
+    file: modules/schemas/uat-run-manifest.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "One append-only UAT run — its assertions (expected/observed, with not-run as a real third value), every capture's exact bytes, and the two commits that were being served."
+    binds: .starciwork/features/<feature>/uat/<flow>/runs/<runId>/manifest.yaml
+    usedBy: [scripts/example/example-ownership.mjs (isWorkRecordSchema — a non-work/ stamp is artifact payload), scripts/checks/check-example-work.mjs (PAYLOAD_SKIPPED)]
+    business:
+      question: "What did a walk against the running product actually observe, and against which build?"
+      whenNeeded: Every uat.verify run; a done uat-flow's evidence.yaml settles on exactly one runId.
+      whenNot: Never edited once settled — a re-run adds a new runId; it records observations, never a verdict about the record.
+      selectedBy: The harness writes it; the flow's sibling evidence.yaml points at the run it settled on.
+
   # --------------------------------------------------------------------------
   # KERNEL — the plan-file contract
   # --------------------------------------------------------------------------
