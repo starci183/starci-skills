@@ -209,7 +209,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
 
   // pool-full: the persisted route decision names a pool whose declared
   // maxParallel is already committed fleet-wide, across every workflow.
-  const pool='claude-fable',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8')).runtimes[pool].maxParallel;
+  const pool='claude-agent',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8')).runtimes[pool].maxParallel;
   seed(repo,ledger=>{
     const payload=JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(second).payload_json);
     ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(json({...payload,model:pool}),second);
