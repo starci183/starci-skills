@@ -27,9 +27,22 @@ test('actual npm tarball installs a runnable source command without development 
   // declared source tree, exactly what `files` publishes.
   const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
   for(const name of ['package.json','.gitignore'])fs.copyFileSync(path.join(root,name),path.join(source,name));
+  // files[] ends with the `!` negations npm subtracts after the positive entries. Subtracting them
+  // while copying yields the same tarball without first duplicating the working tree's
+  // node_modules/dist/storybook-static/coverage bulk, which npm would then discard.
+  const excluded=pkg.files.filter(entry=>entry.startsWith('!')).map(entry=>{
+    const body=entry.slice(1).replace(/\/+$/,'').replace(/[.+^${}()|[\]\\]/g,'\\$&')
+      .replace(/\*\*\//g,'\u0000').replace(/\*/g,'[^/]*').replace(/\u0000/g,'(?:[^/]+/)*');
+    return new RegExp(`^${body}(?:/|$)`);
+  });
+  const negated=absolute=>{
+    const rel=path.relative(root,absolute).replaceAll('\\','/');
+    return excluded.some(pattern=>pattern.test(rel));
+  };
   for(const entry of pkg.files){
+    if(entry.startsWith('!'))continue;
     const from=path.join(root,entry);
-    if(fs.existsSync(from))fs.cpSync(from,path.join(source,entry),{recursive:true});
+    if(fs.existsSync(from))fs.cpSync(from,path.join(source,entry),{recursive:true,filter:src=>!negated(src)});
   }
   const packed=npm(['pack','--ignore-scripts','--json','--pack-destination',temporary],source);
   assert.equal(packed.status,0,packed.stderr??String(packed.error));
