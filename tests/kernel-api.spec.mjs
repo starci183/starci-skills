@@ -95,6 +95,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
     state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,unconsumedReports:0,nudgeReadyJobs:[],
+    queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish',
   });
 });
@@ -149,6 +150,96 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
   seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf));
   assert.deepEqual([frontier().state,frontier().actionable],['finished',false],
     'a finished workflow is the other state with nothing to act on');
+});
+
+// A queued row is the dispatch candidate; frontier.queued says why each one has
+// not moved, so the Kernel clears the named blocker instead of re-dispatching
+// into the same refusal. Causes and their order: api.mjs QUEUED_BECAUSE.
+test('status explains every queued job: ready, dependency, path-lease, pool-full, circuit-open, max-ops',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-queued-because';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const statusOf=(root=owner)=>{
+    const r=runApiAsOwner(root,'status','--repo',repo,'--workflow',wf,'--json');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    return out(r).frontier;
+  };
+  const because=(jobId,frontier)=>frontier.queued.find(item=>item.jobId===jobId);
+
+  const enq=(op,paths)=>{
+    const r=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op',op,'--paths',paths,'--json');
+    assert.equal(r.status,0,r.stderr);
+    return out(r).job_id;
+  };
+  const first=enq('docs.author','docs/first');
+
+  // Nothing blocks it: queued and dispatchable now.
+  let frontier=statusOf();
+  assert.deepEqual(because(first,frontier),{jobId:first,opId:'docs.author',attempt:1,queuedBecause:'ready',blockedBy:null,detail:null});
+  assert.deepEqual(frontier.queuedCauses,{ready:1});
+  assert.equal(frontier.readyOperations,1,'the existing frontier counters are untouched');
+
+  // path-lease: a live capacity-1 path lease an overlapping sibling holds.
+  const second=enq('docs.author','docs/first/nested');
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,1)').run('path:docs/first');
+    ledger.db.prepare("UPDATE jobs SET status='leased', lease_token='tok-k7-first' WHERE job_id=?").run(first);
+    const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(first);
+    ledger.db.prepare(`INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref)
+      VALUES(?,?,?,?,?,?,?,1,?,?,NULL)`).run('path:docs/first',first,wf,job.op_id,job.attempt,job.generation,job.lease_token,at,at+600000);
+  });
+  frontier=statusOf();
+  assert.equal(because(second,frontier).queuedBecause,'path-lease');
+  assert.deepEqual(because(second,frontier).blockedBy,{path:'path:docs/first',job:first},'the blocking path AND the job that holds it');
+
+  // max-ops outranks the path fence: the workflow ceiling refuses before leases
+  // are ever consulted, so that is the cause the Kernel is told to clear.
+  const capped=ownerConfig(t,{budgets:{maxOps:1,perOpMs:null,dailyTokens:null}});
+  const atCeiling=because(second,statusOf(capped));
+  assert.equal(atCeiling.queuedBecause,'max-ops');
+  assert.deepEqual(atCeiling.blockedBy,{ceiling:1,ceilingSource:'budgets.maxOps',running:1});
+
+  // Release the fence, then saturate the routed pool instead.
+  seed(repo,ledger=>{
+    ledger.db.prepare('DELETE FROM leases WHERE job_id=?').run(first);
+    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(first);
+  });
+  assert.equal(because(second,statusOf()).queuedBecause,'ready','a released fence and a settled sibling clear it');
+
+  // pool-full: the persisted route decision names a pool whose declared
+  // maxParallel is already committed fleet-wide, across every workflow.
+  const pool='claude-fable',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8')).runtimes[pool].maxParallel;
+  seed(repo,ledger=>{
+    const payload=JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(second).payload_json);
+    ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(json({...payload,model:pool}),second);
+    const at=Date.now();
+    ledger.ensureWorkflow({workflowId:'wf-other',title:'another workflow on the same fleet'});
+    for(let n=1;n<=maxParallel;n++) ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+      VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`).run(`occupant-${n}`,'wf-other','docs.author',n,json({opId:'docs.author',model:pool}),at,at);
+  });
+  const full=because(second,statusOf());
+  assert.equal(full.queuedBecause,'pool-full');
+  assert.deepEqual(full.blockedBy,{pool,running:maxParallel,maxParallel},'the blocking pool and its declared slot count, read from runtimes.yaml');
+
+  // circuit-open outranks pool-full: a dead provider credential is not a wait.
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare(`INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health',?,NULL,NULL,?,?,?)`)
+      .run('claude',json({schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth',failures:1,strikeLimit:1}),at,at+600000);
+  });
+  const open=because(second,statusOf());
+  assert.equal(open.queuedBecause,'circuit-open');
+  assert.deepEqual(open.blockedBy,{provider:'claude',pool},'the provider credential that is parked, and the pool that shares it');
+
+  // dependency outranks everything: an approved leg that precedes this op has
+  // no succeeded job, so no admission check can make it dispatchable.
+  seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=? AND revision=0')
+    .run(json({opChain:{legs:[{op:'scope.define'},{op:'docs.author'}]}}),wf));
+  const dep=because(second,statusOf());
+  assert.equal(dep.queuedBecause,'dependency');
+  assert.deepEqual(dep.blockedBy,{op:'scope.define',job:null},'no job of the earlier leg exists at all');
+  assert.match(dep.detail,/precedes docs\.author in the approved order/);
 });
 
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{

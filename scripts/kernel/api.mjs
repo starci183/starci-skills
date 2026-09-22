@@ -39,7 +39,7 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  admitOpSlot, deriveRetryLineage, normalizeOwnedPaths, ownedPathLeaseRequests,
+  admitOpSlot, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
 } from '../../engine/admission.mjs';
 import {
   allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
@@ -205,14 +205,17 @@ const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
 // job has not been dispatched and holds nothing; everything from the lease
 // forward does, including a fenced launch whose effect may exist.
 const SLOT_HOLDING_STATUSES = [...JOB_STATUSES.dispatchable.filter((status) => status !== 'queued'), ...JOB_STATUSES.fenced];
-// The fleet-wide concurrency ceiling. modules/models/runtimes.yaml
-// maxParallelOps; the number lives there and nowhere else.
+// modules/models/runtimes.yaml — the pool cards and the fleet ceiling. Every
+// concurrency number this gate reasons with comes from here.
+const runtimesDoc = () => {
+  try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8')); }
+  catch { return null; }
+};
+const poolCardFor = (doc, target) => Object.entries(doc?.runtimes ?? {})
+  .find(([poolId, runtime]) => (runtime?.target ?? poolId) === target)?.[1] ?? null;
 const fleetMaxParallelOps = () => {
-  try {
-    const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-    const value = Number(doc?.maxParallelOps);
-    return Number.isInteger(value) && value > 0 ? value : null;
-  } catch { return null; }
+  const value = Number(runtimesDoc()?.maxParallelOps);
+  return Number.isInteger(value) && value > 0 ? value : null;
 };
 /**
  * The owner's concurrent-operation budget. A missing, unparsable or schema-short config.yaml must
@@ -573,6 +576,90 @@ function cmdSurvey(ledger, args) {
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
 const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'orphaned-frontier', 'idle'];
+/**
+ * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
+ * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
+ * `api route` and `api dispatch` run, in their own order (workflow ceiling, provider circuit, path
+ * fence, pool saturation); `ready` means nothing blocks it and the Kernel is the only thing left.
+ */
+const QUEUED_BECAUSE = ['dependency', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+/**
+ * The approved leg order for a workflow: the derived plan when one exists, else the approved
+ * opChain. modules/schemas/goal-plan.yaml carries no dependsOn field — ordering IS the legs array,
+ * so an op's dependency is every earlier leg, and an earlier leg with no succeeded job blocks it.
+ */
+const approvedLegOps = (goalJson) => {
+  const legs = goalJson?.derivedPlan?.legs ?? goalJson?.opChain?.legs ?? null;
+  if (!Array.isArray(legs)) return [];
+  return [...new Set(legs.map((leg) => (typeof leg === 'string' ? leg : leg?.op)).filter(Boolean))];
+};
+/** One queued job's blocking cause and the id that holds it. */
+function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel }) {
+  const payload = jobPayloadOf(job);
+  const opId = job.op_id ?? payload.opId ?? null;
+
+  const index = opId ? legOps.indexOf(opId) : -1;
+  if (index > 0) {
+    const blocking = legOps.slice(0, index)
+      .find((earlier) => !(jobsByOp.get(earlier) ?? []).some((row) => row.status === 'succeeded'));
+    if (blocking) {
+      const pending = (jobsByOp.get(blocking) ?? []).filter((row) => !FINAL_SETTLED.includes(row.status));
+      return {
+        queuedBecause: 'dependency',
+        blockedBy: { op: blocking, job: pending[pending.length - 1]?.job_id ?? null },
+        detail: `approved leg ${blocking} has no job settled succeeded; it precedes ${opId} in the approved order`,
+      };
+    }
+  }
+
+  if (!slots.ok) {
+    return {
+      queuedBecause: 'max-ops',
+      blockedBy: { ceiling: slots.ceiling, ceilingSource: slots.ceilingSource, running: slots.running },
+      detail: `the workflow holds ${slots.running} of ${slots.ceiling} operations (${slots.ceilingSource})`,
+    };
+  }
+
+  const target = payload.model ?? null;
+  const card = target ? poolCardFor(rtDoc, target) : null;
+  if (target) {
+    const health = providerHealthOf(db, card?.provider ?? target);
+    if (health) {
+      return {
+        queuedBecause: 'circuit-open',
+        blockedBy: { provider: health.provider, pool: target },
+        detail: `provider ${health.provider} circuit open (${health.failureKind ?? 'auth'}) until ${health.expiresAt ?? 'explicit recovery'}`,
+      };
+    }
+  }
+
+  // Lease-row existence is the fence, expiry only a recovery signal
+  // (engine/admission.mjs findOwnedPathLeaseConflicts) — an expired row still
+  // answers "why is this queued", because the prior attempt's effect may exist.
+  const conflict = findOwnedPathLeaseConflicts(db, opLeaseRequests(payload), { excludeJobId: job.job_id })[0];
+  if (conflict) {
+    return {
+      queuedBecause: 'path-lease',
+      blockedBy: { path: conflict.held, job: conflict.job_id },
+      detail: `${conflict.held} is held by ${conflict.job_id} and overlaps ${conflict.requested}`,
+    };
+  }
+
+  // A routed-but-queued job already counts toward its pool (the same count
+  // `api route` reasons with), so this job is in that tally: what bounds it is
+  // the OTHER holders of the lane.
+  const maxParallel = Number(card?.maxParallel);
+  const otherHolders = Math.max(0, (runningByModel[target] ?? 0) - 1);
+  if (target && Number.isInteger(maxParallel) && maxParallel > 0 && otherHolders >= maxParallel) {
+    return {
+      queuedBecause: 'pool-full',
+      blockedBy: { pool: target, running: otherHolders, maxParallel },
+      detail: `pool ${target} holds ${otherHolders} of ${maxParallel} slots`,
+    };
+  }
+
+  return { queuedBecause: 'ready', blockedBy: null, detail: null };
+}
 function cmdStatus(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -611,6 +698,34 @@ function cmdStatus(ledger, args) {
   // holds one of these is not a reason to yield.
   const readyOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
       AND status IN ('queued','effect_unknown')`).get(workflowId).n;
+  // Why each queued job is not running. A queued row is the dispatch candidate;
+  // without this the Kernel can only see that it did not move, not what to
+  // clear. The causes and their order are QUEUED_BECAUSE above.
+  const workflowJobs = db.prepare("SELECT job_id,op_id,status,attempt,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId);
+  const jobsByOp = new Map();
+  for (const row of workflowJobs) {
+    if (!row.op_id) continue;
+    if (!jobsByOp.has(row.op_id)) jobsByOp.set(row.op_id, []);
+    jobsByOp.get(row.op_id).push(row);
+  }
+  const legOps = approvedLegOps(goalJsonOf(latestGoal(db, workflowId)));
+  const slots = opSlotAdmission(db, workflowId);
+  const rtDoc = runtimesDoc();
+  // A persisted payload.model marks a committed lane fleet-wide — the same
+  // count `api route` reasons with, so status and route agree on pool load.
+  const runningByModel = {};
+  for (const row of db.prepare(`SELECT payload_json FROM jobs WHERE status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).all(...FINAL_SETTLED)) {
+    const model = parseJson(row.payload_json, {})?.model;
+    if (model) runningByModel[model] = (runningByModel[model] ?? 0) + 1;
+  }
+  const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
+    jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
+    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel }),
+  }));
+  const queuedCauses = Object.fromEntries(QUEUED_BECAUSE
+    .map((cause) => [cause, queued.filter((item) => item.queuedBecause === cause).length])
+    .filter(([, n]) => n > 0));
+
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
@@ -628,6 +743,8 @@ function cmdStatus(ledger, args) {
     readyOperations,
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
+    queued,
+    queuedCauses,
     reason: frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
@@ -638,7 +755,11 @@ function cmdStatus(ledger, args) {
   };
   const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, activeLeases: leases, inboxPending, reports, workers };
   emit(out,
-    `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+    [
+      `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+      ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
+      ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
+    ].join('\n'),
     args.json);
 }
 

@@ -145,12 +145,37 @@ commands:
 
   status:
     args: '--workflow <id>'
-    reads: 'workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact running-operation terminal show receipts'
+    reads: >-
+      workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact
+      running-operation terminal show receipts; and, for each queued job, what blocks it — the
+      approved leg order on the latest goals row, the workflow's slot-holding operation count
+      against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
+      pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel
     writes: 'nothing'
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,unconsumedReports,nudgeReadyJobs[],reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile)'
+      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,unconsumedReports,nudgeReadyJobs[],queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile)'
+      'frontier.queued': >-
+        [{jobId, opId, attempt, queuedBecause, blockedBy, detail}] — one row per queued job, in
+        created order, naming why it is not running. `queuedBecause` is
+        dependency|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries the id
+        that holds it: {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
+        {provider, pool} for an open circuit, {path, job} for a path lease, {pool, running,
+        maxParallel} for a full pool, and null for `ready`. `ready` means nothing blocks it and the
+        Kernel is the only thing left to move it
+      'frontier.queuedBecause precedence': >-
+        first cause that bites, in this order. `dependency` — an approved leg that precedes this
+        op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
+        ordering IS the legs array, so the earlier leg is the dependency). Then the four admission
+        checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
+        before anything else), `circuit-open` (the routed pool's provider credential is parked),
+        `path-lease` (a live capacity-1 `path:<owned_path>` lease overlaps this job's closure —
+        row existence is the fence, expiry only a recovery signal), `pool-full` (other holders of
+        the routed pool already fill its maxParallel; this job's own routed-but-queued row does not
+        count against itself). An unrouted job is never pool-full or circuit-open — there is no
+        pool to be full of
+      'frontier.queuedCauses': '{<cause>: <count>} — the same rows tallied by cause, omitting causes with no rows'
       jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
