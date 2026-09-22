@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-// terminal-show.mjs — `orca terminal show` as a callable function.
+// terminal-show.mjs — the calls.yaml `terminal-show` call as a callable function.
 //   node scripts/api/orca/terminal-show.mjs --terminal <handle>
 // Returns {ok, terminal, connected, writable} — the health primitives callers test.
-import { orcaRun, terminalOf, arg } from './lib.mjs';
+import { orcaCall, terminalOf, arg } from './lib.mjs';
 
 export function terminalShow({ terminal }) {
-  const r = orcaRun(['terminal', 'show', '--terminal', terminal, '--json']);
+  const r = orcaCall('terminal-show', { terminal });
   const t = terminalOf(r);
   return {
-    ok: r.status === 0 && Boolean(t),
+    ok: r.exitCode === 0 && Boolean(t),
     terminal: t,
     connected: t?.connected === true,
     writable: t?.writable !== false,
     exitCause: t?.exitCause?.reason ?? null,
-    error: r.error ?? r.stderr,
+    error: r.error,
   };
 }
 

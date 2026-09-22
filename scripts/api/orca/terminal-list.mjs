@@ -1,14 +1,11 @@
 #!/usr/bin/env node
-// terminal-list.mjs — `orca terminal list` as a callable function.
+// terminal-list.mjs — the calls.yaml `terminal-list` call as a callable function.
 //   node scripts/api/orca/terminal-list.mjs [--worktree <sel>]
-import { orcaRun, jsonOf, arg } from './lib.mjs';
+import { orcaCall, arg } from './lib.mjs';
 
 export function terminalList({ worktree } = {}) {
-  const argv = ['terminal', 'list', '--json'];
-  if (worktree) argv.push('--worktree', worktree);
-  const r = orcaRun(argv);
-  const terminals = jsonOf(r.stdout)?.result?.terminals ?? [];
-  return { ok: r.status === 0, terminals, error: r.error ?? r.stderr };
+  const r = orcaCall('terminal-list', { worktree });
+  return { ok: r.exitCode === 0, terminals: r.result?.terminals ?? [], error: r.error };
 }
 
 if (process.argv[1]?.endsWith('terminal-list.mjs')) {

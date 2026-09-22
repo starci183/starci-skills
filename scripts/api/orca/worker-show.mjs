@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-// worker-show.mjs — `orca orchestration worker-show` as a callable function.
+// worker-show.mjs — the calls.yaml `worker-show` call as a callable function.
 //   node scripts/api/orca/worker-show.mjs --dispatch <dispatch_id>
 // Returns {ok, state, dispatch, effective} — state is result.worker.state.
-import { orcaRun, jsonOf, arg } from './lib.mjs';
+import { orcaCall, arg } from './lib.mjs';
 
 export function workerShow({ dispatch }) {
-  if (!dispatch) throw new Error('workerShow: missing required --dispatch');
-  const r = orcaRun(['orchestration', 'worker-show', '--dispatch', dispatch, '--json']);
-  const result = jsonOf(r.stdout)?.result ?? null;
+  const r = orcaCall('worker-show', { dispatch });
+  const result = r.result;
   let rawStartOptions = null;
   try { rawStartOptions = JSON.parse(result?.worker?.start_options ?? 'null'); } catch { /* malformed host detail is not attestation */ }
   // Current Orca receipts expose the requested/effective launch on the worker
@@ -19,12 +18,12 @@ export function workerShow({ dispatch }) {
     ?? result?.effective
     ?? null;
   return {
-    ok: r.status === 0 && Boolean(result),
+    ok: r.exitCode === 0 && Boolean(result),
     state: result?.worker?.state ?? null,
     dispatch: result?.dispatch ?? null,
     effective,
     result,
-    error: r.error ?? r.stderr,
+    error: r.error,
   };
 }
 

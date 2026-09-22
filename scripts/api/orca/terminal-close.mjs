@@ -1,13 +1,11 @@
 #!/usr/bin/env node
-// terminal-close.mjs — `orca terminal close` as a callable function.
+// terminal-close.mjs — the calls.yaml `terminal-close` call as a callable function.
 //   node scripts/api/orca/terminal-close.mjs --terminal <handle> [--tab]
-import { orcaRun, arg, flag } from './lib.mjs';
+import { orcaCall, arg, flag } from './lib.mjs';
 
 export function terminalClose({ terminal, tab = false }) {
-  const argv = ['terminal', 'close', '--terminal', terminal, '--json'];
-  if (tab) argv.push('--tab');
-  const r = orcaRun(argv);
-  return { ok: r.status === 0, error: r.error ?? r.stderr };
+  const r = orcaCall('terminal-close', { terminal, tab });
+  return { ok: r.exitCode === 0, error: r.error };
 }
 
 if (process.argv[1]?.endsWith('terminal-close.mjs')) {

@@ -1,15 +1,16 @@
 schema: starci/orca-calls@1
 provider: orca
 api: api.yaml
+runner: scripts/api/orca/lib.mjs
 purpose: |-
-  The documented call surface: one typed entry per Orca call StarCi may issue, naming the command,
+  The executable call surface: one typed entry per Orca call StarCi may issue, naming the command,
   its flags, the receipt paths that prove it, and the outcome/effectState classification its caller
-  must apply. The wrappers in scripts/api/orca/ — one .mjs file per verb over the shared lib.mjs —
-  each hold that verb's argv as a literal and implement its classify rules inline, so an Orca
-  failure comes back as a classified envelope rather than an untyped exception. This file is not
-  read at runtime; the binding between it and the wrappers is enforced by
-  tests/provider-orca.spec.mjs, which refuses a wrapper whose verb or --flag this file does not
-  declare.
+  must apply. scripts/api/orca/lib.mjs loads this file once per process and orcaCall(verb, params)
+  builds argv from command + flags, refuses a param this file does not declare, requires every
+  `required` flag, applies `timeoutMs` and classifies the receipt, so an Orca failure comes back as
+  a typed envelope rather than an untyped exception. The wrappers in scripts/api/orca/ — one .mjs
+  file per verb — only name a verb and shape its receipt; tests/provider-orca.spec.mjs refuses a
+  wrapper whose verb this file does not declare.
 envelope:
   schema: starci/orca-call-result@1
   outcomes: [ok, failed, unknown]
@@ -19,17 +20,29 @@ envelope:
     - outcome failed with effectState none means the caller may retry the same candidate or fall through to the next candidate without reconciliation.
     - effectState partial names live residual resources; the caller must settle them (worker-stop, worker-release) and prove none before fallback.
     - outcome unknown or effectState unknown blocks fallback until a read-only reconciliation proves the actual state.
+    - A call without a classify block is classified by exit code alone - 0 is ok/committed, non-zero is failed/none.
+    - classify rules are evaluated in the order written and the first match wins, so each block ends with an unconditional rule.
 defaults:
   timeoutMs: 30000
   spawnGraceMs: 15000
   jsonFlag: json
+liveSchema:
+  source: agent-context
+  compare: [command, flags]
+  before: first-call-of-kind-mutation
+  cache: once-per-process
+  onMismatch: refuse-before-effects
+  refusal: 'outcome failed, effectState none, reason host-contract-drift, naming the verb and the missing command or flags'
+  unreadableListing: refuse-before-effects
+  envOverride: STARCI_ORCA_SKIP_LIVE_CHECK=1 skips the comparison; it exists for specs and stubbed binaries only.
+  enforcedBy: scripts/api/orca/lib.mjs orcaCall; scripts/checks/providers.mjs --live compares every entry at once.
 idempotency:
   flag: retry-request
   rule: |-
     A mutation whose process timed out or returned non-JSON is re-issued once with the same
     arguments plus --retry-request <deterministic id>; Orca returns the original result when it
     exists. If the replay is still unknown, the runner returns outcome unknown and the caller
-    reconciles by reading task-list, worker-list or worker-show for the deterministic display name.
+    reconciles by reading worker-show for the deterministic display name.
 calls:
   account-list:
     command: account list
@@ -55,18 +68,6 @@ calls:
     required: [objective]
     receipt: [result.run.id]
     creates: run
-  run-use:
-    command: orchestration run-use
-    kind: mutation
-    flags: [id, from]
-    required: [id]
-    receipt: [result.run.id]
-  run-show:
-    command: orchestration run-show
-    kind: read
-    flags: [id]
-    required: [id]
-    receipt: [result.run.id, result.run.coordinator_handle]
   task-create:
     command: orchestration task-create
     kind: mutation
@@ -74,17 +75,6 @@ calls:
     required: [spec, run]
     receipt: [result.task.id, result.task.display_name]
     creates: task
-  task-update:
-    command: orchestration task-update
-    kind: mutation
-    flags: [id, status, result, run, from]
-    required: [id, status]
-    receipt: [result.task.id]
-  task-list:
-    command: orchestration task-list
-    kind: read
-    flags: [run, status, ready, brief]
-    receipt: [result.tasks]
   worker-start:
     command: orchestration worker-start
     kind: mutation
@@ -129,27 +119,20 @@ calls:
       - when: {path: error.code, exists: true}
         outcome: failed
         effectState: none
+      - when: {}
+        outcome: unknown
+        effectState: unknown
+        reason: worker-start exited non-zero without a classifiable receipt
     recovery:
       failed: worker-start-retry-of
       partial: settle-dispatch
-      unknown: reconcile-then-stop-or-abandon
+      unknown: reconcile-then-stop
   worker-show:
     command: orchestration worker-show
     kind: read
     flags: [dispatch]
     required: [dispatch]
     receipt: [result.dispatch.id, result.worker.state]
-  worker-read:
-    command: orchestration worker-read
-    kind: read
-    flags: [dispatch, limit, cursor, source]
-    required: [dispatch]
-    receipt: [result]
-  worker-list:
-    command: orchestration worker-list
-    kind: read
-    flags: [run]
-    receipt: [result.workers]
   worker-stop:
     command: orchestration worker-stop
     kind: mutation
@@ -165,17 +148,17 @@ calls:
       - when: {path: error.code, in: [dispatch_inactive]}
         outcome: unknown
         effectState: unknown
-        reason: Orca refuses to stop a Dispatch that is already stop_unknown; reconcile, then abandon after the own terminal is closed
+        reason: Orca refuses to stop a Dispatch that is already stop_unknown; reconcile with worker-show and close the attempt's own terminal
       - when: {exitCode: 0, path: result.state, exists: true}
         outcome: ok
         effectState: committed
-  worker-abandon:
-    command: orchestration worker-abandon
-    kind: mutation
-    flags: [dispatch]
-    required: [dispatch]
-    receipt: [result]
-    note: Fences a stop_unknown Dispatch without any process action. The launcher uses it only after the attempt's own terminal is proven closed, so no live effect can remain.
+      - when: {exitCode: 0}
+        outcome: unknown
+        effectState: unknown
+        reason: worker-stop exited 0 without a state receipt
+      - when: {}
+        outcome: failed
+        effectState: none
   worker-release:
     command: orchestration worker-release
     kind: mutation
@@ -194,25 +177,27 @@ calls:
       - when: {path: result.state, in: [release_unknown]}
         outcome: unknown
         effectState: unknown
+      - when: {exitCode: 0}
+        outcome: unknown
+        effectState: unknown
+        reason: worker-release exited 0 without a classifiable state
+      - when: {}
+        outcome: failed
+        effectState: none
   check:
     command: orchestration check
     kind: read
     timeoutMs: 960000
     flags: [terminal, run, ack, unread, peek, all, types, wait, timeout-ms]
     receipt: [result]
-    note: --ack acknowledges the prior Delivery; a wait timeout is outcome ok with an empty batch.
+    note: --ack acknowledges the prior Delivery; a wait timeout is outcome ok with an empty batch. recipes.yaml accept-operation and wait-operation-boundary name this call; scripts/api/orca/ has no wrapper for it, so StarCi does not issue it yet.
   send:
     command: orchestration send
     kind: mutation
     flags: [subject, to, run, from, body, type, priority, thread-id, payload, task-id, dispatch-id, outcome, files-modified, report-path, phase, dispatch-capability]
     required: [subject]
     receipt: [result]
-  reply:
-    command: orchestration reply
-    kind: mutation
-    flags: [id, body, run, from]
-    required: [id, body]
-    receipt: [result]
+    note: recipes.yaml operation-boundary names this call; scripts/api/orca/ has no wrapper for it, so StarCi does not issue it yet.
   worktree-create:
     command: worktree create
     kind: mutation
@@ -287,7 +272,7 @@ calls:
     kind: mutation
     replay: none
     flags: [worktree, title, command]
-    required: [worktree, title, command]
+    required: [title, command]
     receipt: [result.terminal.handle]
     note: Command-terminal launch only; the command is the declared target command prefixed with the credential refresh. Never used to attach a shell to a managed agent.
   terminal-list:
@@ -357,5 +342,5 @@ forbiddenCalls:
   - terminal stop
 recoveries:
   worker-start-retry-of: Start a replacement attempt with --retry-of <dispatch> after the failed Dispatch is proven settled; placement and agent are repeated explicitly.
-  settle-dispatch: worker-stop then worker-release the exact Dispatch; effectState becomes none only when release reports released or already_released, or when the worker process is proven gone and only an identity_unproven terminal remains. When stop stays unknown after bounded reconciliation, the exact residual agent terminal created by the fenced attempt is closed with terminal close, then stop and release are repeated.
-  reconcile-then-stop-or-abandon: Read worker-show; ready keeps the attempt, failed or stopped allows retry-of, outcome_unknown requires worker-stop and a second read or an explicit worker-abandon that keeps resources live.
+  settle-dispatch: worker-stop then worker-release the exact Dispatch; effectState becomes none only when release reports released or already_released, or when the worker process is proven gone and only an identity_unproven terminal remains. When stop stays unknown after bounded reconciliation, the exact residual agent terminal created by the fenced attempt is closed with terminal-close, then worker-stop and worker-release are repeated.
+  reconcile-then-stop: Read worker-show; ready keeps the attempt, failed or stopped allows retry-of, outcome_unknown requires worker-stop and a second read before the attempt may be called settled.

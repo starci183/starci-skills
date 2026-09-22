@@ -142,37 +142,55 @@ test('the Orca host contract tree is complete and internally consistent',()=>{
 });
 
 test('every scripts/api/orca wrapper is backed by a calls.yaml entry',()=>{
-  // calls.yaml is the typed contract the thin wrappers implement — this parity
-  // check keeps it enforced, not documentary. A wrapper verb or --flag missing
-  // from calls.yaml means argv is built outside the contract. It covers every
-  // wrapper in the directory — terminal-* and orchestration/account verbs
-  // alike; lib.mjs and index.mjs are shared mechanics, not verbs.
+  // calls.yaml is the argv source: scripts/api/orca/lib.mjs loads it and
+  // orcaCall(verb, params) builds the command line. A wrapper therefore names
+  // a verb and never a command word or a --flag; this check keeps the file the
+  // single construction path. lib.mjs is the shared mechanics, not a verb.
   const calls=hostDoc('calls');
-  const entries=Object.values(calls.calls??{});
-  // defaults.jsonFlag ('json') is a contract-level default every wrapper sends;
-  // it is covered without appearing in each call's flags list.
-  const covered=call=>new Set([...(call?.flags??[]),calls.defaults?.jsonFlag].filter(Boolean));
+  const declared=new Set(Object.keys(calls.calls??{}));
   const wrappers=fs.readdirSync(WRAPPERS_DIR).filter(f=>f.endsWith('.mjs')&&!['lib.mjs','index.mjs'].includes(f)).sort();
   assert.ok(wrappers.length>0,'scripts/api/orca holds no verb wrappers');
   for(const file of wrappers){
     const source=fs.readFileSync(path.join(WRAPPERS_DIR,file),'utf8');
-    // The wrapper's argv literal leads with the orca verb words, anchored at
-    // the orcaRun( call or the argv assignment — other array literals in the
-    // file (validation loops, flag lists) must not be mistaken for it:
-    //   orcaRun(['terminal','show',…]) / const argv = ['orchestration','worker-start',…]
-    // Flags ('--x') and interpolated values are not verb words, so the leading
-    // run of bare word literals IS the command — one or two words.
-    const lead=source.match(/(?:orcaRun\(|argv\s*=)\s*\[\s*((?:'[a-z][a-z-]*'\s*,?\s*)+)/);
-    assert.ok(lead,`${file}: could not extract the orca verb from its argv literal`);
-    const words=[...lead[1].matchAll(/'([a-z][a-z-]*)'/g)].map(m=>m[1]);
-    const verb=words.join(' ');
-    const entry=entries.find(c=>c?.command===verb);
-    assert.ok(entry,`${file}: calls.yaml has no calls: entry with command '${verb}'`);
-    // Every '--flag' literal the wrapper builds into argv must be declared.
-    const built=new Set([...source.matchAll(/'--([a-z][a-z-]*)'/g)].map(m=>m[1]));
-    const declared=covered(entry);
-    for(const flag of built){
-      assert.ok(declared.has(flag),`${file}: builds --${flag} but calls.yaml '${verb}' flags lack it`);
+    const verbs=[...source.matchAll(/orcaCall\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1]);
+    assert.ok(verbs.length>0,`${file}: builds no orcaCall(<verb>) — argv must come from calls.yaml`);
+    for(const verb of verbs)assert.ok(declared.has(verb),`${file}: calls.yaml has no calls.${verb} entry`);
+    assert.doesNotMatch(source,/orcaRun\(/,`${file}: calls orcaRun directly — argv belongs to calls.yaml via orcaCall`);
+    assert.doesNotMatch(source,/spawnSync/,`${file}: spawns Orca itself — lib.mjs owns the process boundary`);
+  }
+  // Every param key a wrapper hands orcaCall is a declared flag of that verb —
+  // orcaCall refuses an undeclared one at runtime, this catches it at rest.
+  for(const file of wrappers){
+    const source=fs.readFileSync(path.join(WRAPPERS_DIR,file),'utf8');
+    for(const m of source.matchAll(/orcaCall\(\s*'([a-z][a-z-]*)'\s*,\s*\{([^}]*)\}/g)){
+      const entry=calls.calls[m[1]];
+      const flags=new Set([...(entry.flags??[]),calls.defaults?.jsonFlag].filter(Boolean));
+      for(const key of [...m[2].matchAll(/(?:^|,)\s*'?([a-zA-Z][a-zA-Z-]*)'?\s*(?=[:,\n]|$)/g)].map(k=>k[1])){
+        assert.ok(flags.has(key),`${file}: hands orcaCall('${m[1]}') a --${key} that calls.yaml does not declare`);
+      }
     }
+  }
+});
+
+test('calls.yaml declares the live agent-context guard the runner executes',()=>{
+  const calls=hostDoc('calls');
+  assert.equal(calls.runner,'scripts/api/orca/lib.mjs');
+  assert.deepEqual(calls.liveSchema?.compare,['command','flags']);
+  assert.equal(calls.liveSchema?.source,'agent-context');
+  assert.equal(calls.liveSchema?.onMismatch,'refuse-before-effects');
+  assert.equal(calls.liveSchema?.before,'first-call-of-kind-mutation');
+  assert.match(calls.liveSchema?.envOverride??'',/STARCI_ORCA_SKIP_LIVE_CHECK=1/);
+  assert.ok(calls.calls['agent-context'],'the guard needs an agent-context entry to issue');
+  const lib=fs.readFileSync(path.join(WRAPPERS_DIR,'lib.mjs'),'utf8');
+  assert.match(lib,/STARCI_ORCA_SKIP_LIVE_CHECK/,'the documented override must exist in the runner');
+  assert.match(lib,/host-contract-drift/,'the documented refusal must exist in the runner');
+  // A classify block is evaluated in order and the first match wins, so the
+  // last rule must be unconditional — otherwise the contract has a hole the
+  // runner fills with a default nobody declared.
+  for(const [name,call] of Object.entries(calls.calls)){
+    if(!call.classify)continue;
+    const last=call.classify.at(-1);
+    assert.deepEqual(last.when??{},{},`calls.${name} classify must end with an unconditional rule`);
+    assert.ok(['ok','failed','unknown'].includes(last.outcome),`calls.${name} classify tail outcome`);
   }
 });
