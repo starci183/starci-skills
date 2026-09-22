@@ -20,9 +20,9 @@ reads:
   - id: target
     path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
-      en: "Read the selected implementation record this scaffold realises: declared owners paths, refs
-        into the settled design, proof demands and validator freshness. A scaffold with no selected
-        record is a scope/graph gap: report it; do not invent the record or its path."
+      en: "The selected implementation record this scaffold realises: declared owners paths, refs into
+        the settled design, proof demands and validator freshness. On a greenfield scaffold the
+        record is absent — no workflow authors it before the first source tree exists."
   - id: baseline
     path: CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and nest)
     purpose:
@@ -64,7 +64,9 @@ writes:
     path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     fields: [state, owners, evidence, blockedBy]
     content:
-      en: Record the realised source root, exact scaffolded paths and the evidence the checks produced.
+      en: The selected implementation scope record — created with its schema const when absent on a
+        greenfield scaffold — carrying the realised source root, exact scaffolded paths and the
+        evidence the checks produced.
   - id: source
     path: repository:<repo-id>/<declared-source-root>/**
     fields: [manifest, toolchainConfig, layout, skeleton, harness]
@@ -139,7 +141,9 @@ steps:
     writes: [node, evidence]
     action:
       en: Record the realised source root and owned paths on the record, then return the evidence bundle —
-        exact files created, commands run, observed outputs, remaining gaps.
+        exact files created, commands run, observed outputs, remaining gaps. For a greenfield target,
+        absence of the record is expected; inspect the nearest existing ancestor/workspace, then
+        create only that selected implementation scope record and nothing beyond it.
 proofs:
   - id: scaffold-runs
     requirement:

@@ -20,8 +20,9 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read the selected implementation node this scaffold realises: declared source path,
-        framework/design refs, assertions. No selected node is a scope/graph gap — report it."
+      en: "The selected implementation node this scaffold realises: declared source path,
+        framework/design refs, assertions. On a greenfield scaffold the node is absent — no workflow
+        authors it before the first source tree exists."
   - id: baseline
     path: CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and next)
     purpose:
@@ -64,7 +65,9 @@ writes:
     path: N/index.yaml
     fields: [state, activity, codeRefs, evidence]
     content:
-      en: Record the realised source root, scaffolded paths and evidence the checks produced.
+      en: The selected implementation scope node — created with its schema const when absent on a
+        greenfield scaffold — carrying the realised source root, scaffolded paths and evidence the
+        checks produced.
   - id: source
     path: repository:<repo-id>/<declared-source-root>/**
     fields: [manifest, toolchainConfig, layout, themeWiring, firstShell, harness]
@@ -139,7 +142,9 @@ steps:
     writes: [node, evidence, firstRender]
     action:
       en: Record the realised source root and codeRefs on the node; return the evidence bundle with the
-        capture.
+        capture. For a greenfield target, absence of the node is expected; inspect the nearest
+        existing ancestor/workspace, then create only that selected implementation scope node and
+        nothing beyond it.
 proofs:
   - id: scaffold-runs
     requirement:
