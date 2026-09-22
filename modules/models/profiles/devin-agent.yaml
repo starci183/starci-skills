@@ -2,18 +2,18 @@
 # Business frame: the owner-gated executor. Owner-assigned capacity: 10 parallel
 # lanes under explicit-workflow-quota authority.
 
-target: devin-agent           # registry.json + runtimes.json
-provider: devin               # runtimes.json — provider cognition-devin (devin.json)
-runtime: devin                # registry.json
+target: devin-agent           # registry.yaml + runtimes.yaml
+provider: devin               # runtimes.yaml — provider cognition-devin (registry.yaml targets)
+runtime: devin                # registry.yaml
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: swe-2-max   # registry.json
+  requestedModel: swe-2-max   # registry.yaml
   profiles:
-    working: devin-worker     # devin.json — one bounded task in the workflow worktree via Devin CLI
-    reasoning: devin-reviewer # devin.json — verify one bounded change, never expand scope
+    working: devin-worker     # registry.yaml targets — one bounded task in the workflow worktree via Devin CLI
+    reasoning: devin-reviewer # registry.yaml targets — verify one bounded change, never expand scope
   logicalIdentity: >-
-    docs/model-catalog.md: the logical model identity is `devin-agent`; the local
+    modules/models/registry.yaml: the logical model identity is `devin-agent`; the local
     CLI may use an account-selected underlying model and StarCi does not rename or
     infer it. modelPolicy: "pin-swe-2-max-and-attest-the-devin-cli-runtime-before-dispatch".
 
@@ -30,10 +30,10 @@ launch:
     reasoningCommand: same command shape
     dispatch: return-preamble-and-send
     adapter: devin
-    nestedAgents: forbidden   # forbids Devin subagents / cloud handoff (model-catalog.md)
+    nestedAgents: forbidden   # forbids Devin subagents / cloud handoff (modules/models/registry.yaml)
     capacityGate: explicit-workflow-quota
   adapterPreflight: >-
-    model-catalog.md: the adapter runs read-only `devin models list --format json`
+    modules/models/registry.yaml: the adapter runs read-only `devin models list --format json`
     BEFORE the interactive CLI, because `auth status` exits zero even while logged
     out. dangerous is the unattended operation mode: authority remains bounded
     by the approved operation contract, owned-path leases and Kernel settlement;
@@ -59,7 +59,7 @@ business:
     - Hard-tier execution behind claude-agent when a quota is open.
   whenNot:
     - Anywhere outside Orca — the pool launches only as an Orca command-terminal inside the workflow worktree.
-    - decide/plan/manager/planner/validator/ImageGen roles — none exist (model-catalog.md lists these exclusions verbatim).
+    - decide/plan/manager/planner/validator/ImageGen roles — none exist (modules/models/registry.yaml lists these exclusions verbatim).
     - Beyond its owner-assigned cap: absence of granted quota, not the pool itself, is the gate.
   pickedBy: >-
     Allocator by role + tier + quota; the explicit-workflow-quota gate sits before

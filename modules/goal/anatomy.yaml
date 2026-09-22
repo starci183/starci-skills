@@ -9,16 +9,11 @@
 # will dispatch to get there; the goal is what makes "there" checkable.
 #
 # Sources (all under .claude/, relative to the skill root):
-#   modules/kernel/driver-loop.yaml — the kernel agent's loop contract; the goal
-#                                  lifecycle duties below (goalPhase, approve,
-#                                  reviseGoal, validateGoalRevision,
-#                                  diffGoalSections, propagateInvalidation,
-#                                  adoptReportRev, noteGoalMetrics,
-#                                  GOAL_SPIN_LIMIT, applyWorkflowAmendment,
-#                                  designGate, cutOpFor, goalRevOf) are
-#                                  kernel-agent reasoning over these contracts
-#   modules/kernel/api.yaml         — the api.mjs command surface the kernel
-#                                  reasons through
+#   modules/kernel/driver-loop.yaml — the kernel's tick contract; it owns
+#                                  validateGoalRevision, propagateInvalidation
+#                                  and AUTHORITY_WIDENING, which this file cites
+#   modules/kernel/api.yaml         — the scripts/kernel/api.mjs command surface
+#                                  the kernel reasons through
 #   modules/goal/define-goal.yaml — the goal contract (starci/goal@1 record shape)
 #   modules/schemas/goal-plan.yaml — the api plan --file shape {legs:[{op,paths?,notes?}]}
 #   engine/ledger-db.mjs           — the .starciwork/runtime.sqlite goal/job rows
@@ -28,7 +23,12 @@
 #   modules/ops/registry.yaml      — generated stage/coarsePhase index (read-only)
 #
 # Convention: claims marked (inferred) are analysis, not literal source text.
-# Everything else cites the file that states it.
+#
+# Convention: the camelCase and CAPITALISED names in this file (goalPhase,
+# reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
+# module owns and the kernel agent reasons with; they are not code symbols.
+# The executable surface is scripts/kernel/api.mjs and the contracts under
+# modules/kernel/. Where a rule is also transacted there, the entry says so.
 # ============================================================================
 
 schema: starci/module-goal-anatomy@1
@@ -46,7 +46,7 @@ about:
     report is bound to by rev, and against which the kernel evaluates done.
   sources:
     - modules/goal/define-goal.yaml
-    - the kernel agent
+    - modules/kernel/driver-loop.yaml
 
 # ----------------------------------------------------------------------------
 # STATE MODEL — the frame the whole module reads the world through.
@@ -73,7 +73,7 @@ stateModel:
     A goal IS a target-state expression S* over those variables:
     "thêm tính năng A" -> {feature.A: exists ∧ proven}. The done: metrics are
     the machine-checkable form of S* — evaluateGoalMetrics literally evaluates
-    the ledger/operation/gate variables against it (the kernel agent).
+    the ledger/operation/gate variables against it.
   currentState: >-
     S₀ is what SURVEY measures — which .starciwork records already own the
     touched paths and what state they are in (see existing.yaml). Decomposition
@@ -84,7 +84,7 @@ stateModel:
     already-done surface shortens the chain automatically (existing.yaml
     extend-vs-add).
   sources:
-    - the kernel agent (evaluateGoalMetrics, deriveGoalMetrics)
+    - this file (evaluateGoalMetrics, deriveGoalMetrics are its rules)
     - engine/ledger-db.mjs (record states) + the api's path:* lease admission (scripts/kernel/api.mjs)
     - scripts/checks/check-work-deep.mjs (normDigest/DEP_STALE — staleness of a done variable)
     - modules/goal/existing.yaml
@@ -139,9 +139,9 @@ decomposition:
     `sds: decided` variable is actually invalid) -> re-run from step 2 with
     corrected S₀ -> new chain. There is no separate rollback logic;
     propagateInvalidation is the kernel's mark of which variables went stale
-    (the kernel agent; legality.yaml backwardEdges).
+    (legality.yaml backwardEdges).
   sources:
-    - the kernel agent
+    - modules/kernel/driver-loop.yaml
     - engine/ledger-db.mjs
     - modules/models/kinds.yaml work.author intake cases (reference/conflict/new)
     - scripts/checks/check-work-deep.mjs (DEP_STALE)
@@ -173,26 +173,26 @@ identity:
     - workTargets
   rev: >-
     Integer revision counter. `goalRevOf(state)` = state.goalRev ?? goal.rev ??
-    goal.json rev ?? 1 (the kernel agent). Set at approval; every derivation
+    goal.json rev ?? 1. Set at approval; every derivation
     binds it. A revision is rev+1 exactly — never a skip, never a rewrite
-    (reviseGoal, the kernel agent).
+    (reviseGoal).
   digest: >-
     `state.goalDigest` = stateGoalIdentity(state), frozen before the first
-    revision (the kernel agent). The amendment's `baseGoalIdentity` must
+    revision. The amendment's `baseGoalIdentity` must
     match it — an amendment cannot redirect a workflow to a different goal.
   immutability: >-
     Goal/workflow identity cannot change during revision:
-    validateGoalRevision rejects a revision that changes the workflow identity
-    (the kernel agent). A wrong identity is therefore never an edit — see
+    (modules/kernel/driver-loop.yaml validateGoalRevision) rejects a revision that
+    changes the workflow identity. A wrong identity is never an edit — see
     legality.yaml ambiguity.intent (it is an owner question, always).
-  source: the kernel agent, the kernel agent, modules/goal/define-goal.yaml
+  source: modules/goal/define-goal.yaml
 
 # ----------------------------------------------------------------------------
 # DERIVATION — where a goal comes from. Two ledger modes, one phase.
 # ----------------------------------------------------------------------------
 derivation:
   phase: >-
-    `goalPhase(state)` runs BEFORE the human approval gate (the kernel agent).
+    `goalPhase(state)` runs BEFORE the human approval gate.
     It either derives the goal from the Work ledger or has the model assess one,
     then writes goal.json + goal.md, critique, prerequisites, questions, risks,
     planned operations and the definition-of-done data, and lands the workflow
@@ -216,7 +216,7 @@ derivation:
     runs it and hands the kernel a finished scope statement; no lane, route or
     scheduler may dispatch it inside the workflow.
   sources:
-    - the kernel agent (goalPhase, goalFromLedger)
+    - this file (goalPhase, goalFromLedger are its rules)
     - modules/models/kinds.yaml (PLAN_OP_KINDS, plan form)
     - modules/schemas/goal-plan.yaml
     - modules/models/kinds.yaml (request.analyze external)
@@ -229,17 +229,17 @@ definitionOfDone:
     `done:` block of checkable metrics: {id, kind: ledger|operation|gate, ref,
     expect[]}. deriveGoalMetrics supplies the defaults — every ledger item
     verified/preexisting/out-of-repository, every gate passed, every
-    kernel-derived op settled (the kernel agent).
+    kernel-derived op settled.
   evaluation: >-
     evaluateGoalMetrics -> {rev, ok, metrics, gaps, unevaluable}. Approval
     refuses when the metrics cannot be evaluated; validateGoalRevision requires
     the revised goal keep a nonempty, checkable done block whose metrics resolve
-    against the revised goal (the kernel agent).
+    against the revised goal.
   spinGuard: >-
     GOAL_SPIN_LIMIT = 5: settled dispatches that change no done metric raise a
     goal-stall needUser — motion without progress on the contract is a stop,
-    not more dispatching (noteGoalMetrics, the kernel agent).
-  source: the kernel agent
+    not more dispatching (noteGoalMetrics).
+  source: this file
 
 # ----------------------------------------------------------------------------
 # CRITIQUE — the model's challenge before anything is frozen.
@@ -257,9 +257,8 @@ critique:
   mechanics: >-
     planCritiquePrerequisites plans intake ops for missing features;
     planCritiqueDecisions plans decision asks for decisive hidden-decisions.
-    critique === 'not-attempted' blocks approval (goalApprovalBlocks,
-    the kernel agent).
-  source: the kernel agent (critiqueGoalPhase, planCritique*)
+    critique === 'not-attempted' blocks approval (goalApprovalBlocks).
+  source: this file (critiqueGoalPhase, planCritique* are its rules)
 
 # ----------------------------------------------------------------------------
 # APPROVAL — the freeze. Owner-only.
@@ -269,7 +268,7 @@ approval:
     `approve` is the owner-only gate (skills/define-goal/SKILL.md). It freezes
     the goal at `state.goalRev`, evaluates the done metrics, and refuses when
     they are unevaluable.
-  blocks:  # goalApprovalBlocks (the kernel agent)
+  blocks:  # goalApprovalBlocks 
     - no definitionOfDone
     - grounds assessment === 'none'
     - critique === 'not-attempted'
@@ -279,14 +278,14 @@ approval:
     apply to — a goal that was never approved cannot be revised, only replaced
     upstream.
   sources:
-    - the kernel agent (approve, goalApprovalBlocks)
+    - this file (approve, goalApprovalBlocks are its rules)
     - skills/define-goal/SKILL.md
 
 # ----------------------------------------------------------------------------
 # REVISION — goal.revise: the typed way a frozen goal changes.
 # ----------------------------------------------------------------------------
 revision:
-  rpc: goal_amend / reviseGoal        # the kernel agent exports
+  reviseGoal: this file's revision rule; the transaction is scripts/goal/define-goal.mjs --revise
   op: goal.revise                     # modules/ops/ops/goal.revise.yaml
   entry: scripts/goal/define-goal.mjs --revise <workflow_id>
   prerequisites: "an approved goal exists"   # route block
@@ -338,19 +337,19 @@ revision:
     A mid-flight discovery that the goal itself is wrong is NOT fixed in place.
     It becomes a revision (or an owner question), the affected derivations are
     marked stale, and the work re-runs from the affected boundary producing
-    fresh evidence (CLAUDE.md work-correction policy).
+    fresh evidence (CONTEXT.md work-correction policy).
   sources:
-    - the kernel agent (reviseGoal, validateGoalRevision, diffGoalSections,
-      propagateInvalidation, adoptReportRev, reopenStaleOp)
+    - this file; validateGoalRevision and propagateInvalidation are
+      modules/kernel/driver-loop.yaml
     - modules/ops/ops/goal.revise.yaml
-    - CLAUDE.md (work-correction policy)
+    - CONTEXT.md (work-correction policy)
     - docs/verify-proof.md
 
 # ----------------------------------------------------------------------------
 # AMENDMENT — owner-authored change bound to the frozen identity.
 # ----------------------------------------------------------------------------
 amendment:
-  record: starci/workflow-amendment@1   # applyWorkflowAmendment, the kernel agent
+  record: starci/workflow-amendment@1   # applyWorkflowAmendment (this file)
   binding: >-
     `baseGoalIdentity` must equal stateGoalIdentity(state) — the amendment
     applies to THIS goal's frozen digest or it is not this workflow's amendment.
@@ -375,13 +374,13 @@ amendment:
   idempotence: >-
     Keyed by digest; a replayed amendment is recognised, not re-applied. The
     original approval record is never rewritten.
-  source: the kernel agent (applyWorkflowAmendment, effectPathCovered)
+  source: this file (applyWorkflowAmendment, effectPathCovered are its rules)
 
 # ----------------------------------------------------------------------------
 # QUESTIONS — how the goal talks to the owner mid-flight.
 # ----------------------------------------------------------------------------
 questions:
-  askKinds: [decision.prepare, provision.ask]      # ASK_KINDS, the kernel agent
+  askKinds: [decision.prepare, provision.ask]      # ASK_KINDS (this file)
   rule: >-
     The runtime prepares a decision; the owner takes it. The kernel never
     answers for the owner — and it never invents an answer it was not offered
@@ -390,12 +389,12 @@ questions:
   stopBehaviour: >-
     A question whose stop reason is a provision or an irreversible effect opens
     a `provision.ask` and PAUSES the requester — there is nothing honest to do
-    until the owner acts (openOwnerAsk, the kernel agent).
+    until the owner acts (openOwnerAsk).
   provisionalBehaviour: >-
     Every other question opens `decision.prepare`; the requester waits only on
     the ask op (dependsOn) and resumes on the runtime's own recommendation as a
     PROVISIONAL answer. The owner overturns it later; a different answer
-    reopens what was built on it (the kernel agent header + openOwnerAsk).
+    reopens what was built on it.
   enrolledMode: >-
     When the workflow is enrolled — its engine record carries ENGINE_SCHEMA
     (engine/constants.mjs isEnrolled) — every non-mechanical
@@ -404,7 +403,7 @@ questions:
     openConflictDecision takes an intake-recorded conflict as a decision
     record with numbered options and one recommendation — provisionally, the
     same way; the workflow never finishes blocked over a conflict the runtime
-    can take a side on (the kernel agent).
+    can take a side on.
   projections: >-
     The kernel agent projects the canonical ask ops into owner-facing request
     kinds: information, credential, account, access, consent, authority,
@@ -413,7 +412,7 @@ questions:
     receipts — a credential is "verified" only after the integration.verify it
     feeds reports done+pass (verifyAcceptedIntegrationOwnerRequests).
   sources:
-    - the kernel agent
+    - modules/kernel/driver-loop.yaml
 
 # ----------------------------------------------------------------------------
 # DERIVATION CHAIN — how the goal becomes ops (the resolver's side).
@@ -424,11 +423,11 @@ opChain:
     lane's ordered `steps` are the node's op chain; `optionalWhen` predicates
     (node.hasNoArtworkSlots, goal.requiresSecurity, goal.requiresPerf) read the
     done metrics to skip steps. designGate holds a frontend build until the
-    feature's `ui` node is done (the kernel agent). A node too big for one
+    feature's `ui` node is done. A node too big for one
     op is cut by implementation.plan into disjoint-scope children — seam first,
-    then one observable behaviour each (cutOpFor — the kernel agent).
+    then one observable behaviour each (cutOpFor).
   planLedger: >-
-    The model proposes the ops array directly (goal-plan.json): unique ids,
+    The model proposes the ops array directly (the plan file (modules/schemas/goal-plan.yaml)): unique ids,
     same-plan dependsOn, acyclic, every ledger item referenced unless already
     done, independent ops disjoint-allowlisted, each op small enough for one
     session, and only PLAN_OP_KINDS. Process mechanics (ping/report/retry) are
@@ -439,7 +438,7 @@ opChain:
     and modules/goal/legality.yaml — closed, data-driven, first match wins.
   sources:
     - modules/models/kinds.yaml (lanes, routes, kinds)
-    - the kernel agent (designGate, cutOpFor)
+    - this file (designGate, cutOpFor are its rules)
     - modules/goal/legality.yaml
     - modules/schemas/goal-plan.yaml
     - modules/kernel/dispatch.yaml
@@ -453,4 +452,4 @@ not:
   - not-mutable-in-place: change is revision (typed) or amendment (owner), never an edit
   - not-the-repairer: verification reports findings; the graph routes the repair
   - not-the-answerer: questions go to the owner (stop) or a decision.prepare recommendation (provisional) — the goal never fills its own blanks
-  - not-a-debt-ledger: a wrong flow returns to its owning workflow and re-runs from the boundary (CLAUDE.md)
+  - not-a-debt-ledger: a wrong flow returns to its owning workflow and re-runs from the boundary (CONTEXT.md)

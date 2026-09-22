@@ -3,7 +3,7 @@
 # benchmark runs and user-approved exceptions only — a deliberate capacity the
 # routing policy refuses to spend by default.
 
-target: qwen3.8-max           # registry.json targets
+target: qwen3.8-max           # registry.yaml targets
 provider: qwen
 runtime: qwen                 # runs through the same Qwen command-terminal shape
 schema: starci/module-model-profile@1
@@ -11,10 +11,10 @@ schema: starci/module-model-profile@1
 identity:
   requestedModel: qwen3.8-max
   profiles:
-    working: qwen3.8-max-worker     # qwen.json — "complex bounded implementation
+    working: qwen3.8-max-worker     # registry.yaml targets — "complex bounded implementation
                                     # or repair ONLY when explicitly selected for
                                     # a benchmark or user-approved exception"
-    reasoning: qwen3.8-max-reviewer # qwen.json — analyze architecture/business/
+    reasoning: qwen3.8-max-reviewer # registry.yaml targets — analyze architecture/business/
                                   # verification evidence without repairing
   modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch
 
@@ -28,7 +28,7 @@ launch:
   imageGeneration: false
 
 position:
-  automaticChains: excluded   # registry.json selection + costPolicy: "Qwen 3.8 Max
+  automaticChains: excluded   # registry.yaml selection + costPolicy: "Qwen 3.8 Max
                             # and DeepSeek command terminals stay out of automatic
                             # chains"; "excluded from automatic chains"
   tiers: absent — appears in no allocation.tiers or preference list

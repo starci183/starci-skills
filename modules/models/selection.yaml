@@ -1,10 +1,12 @@
 # selection.yaml — how the runtime decides WHICH model may take WHICH workload.
 #
-# This file is the source of truth. `model-policy.mjs::<fn>` citations name the
-# implementation a rule was ported from; they are provenance, not a live import.
-# Allocation-order facts that live in
-# modules/models/runtimes.yaml and registry.yaml are in `allocationFacts` and cite
-# those files instead.
+# This file IS the rule: every gate, ladder and named step below is owned here,
+# and the names in them (workloadFor, evaluateModelEligibility, providerFilter,
+# selectEligibleCandidate, ...) name rules in this document. The executable part
+# of the path is scripts/agent/models.mjs (selectPool, poolRejectionReasons) and
+# scripts/route/route-model.mjs; the rest is what the kernel agent reasons with.
+# Allocation-order facts that live in modules/models/runtimes.yaml and
+# registry.yaml are in `allocationFacts` and cite those files instead.
 #
 # The one-sentence business rule (capabilities.yaml): a model NAME is an
 # availability fact, never proof of capability. A model job is eligible only
@@ -24,10 +26,10 @@ sources:
 # 1. Vocabularies and ladders
 # ---------------------------------------------------------------------------
 ladders:
-  risk:                      # riskRank — model-policy.mjs::top
+  risk:                      # ordinal; compared by rank, never clamped
     order: [low, medium, high, critical]
     default: medium          # when neither op nor context supplies one
-  qualityFloor:              # floorRank — model-policy.mjs::top
+  qualityFloor:              # ordinal; compared by rank, never clamped
     order: [probation, standard, high, critical]
     default: standard
   rule: >-
@@ -43,18 +45,18 @@ closedSets:
   kernelFunctionKinds:       # MODEL_KINDS + 'judge' — the kernel's own model calls,
     - model.assessGoal       # NOT operation work. They draw per-call scope but never
     - model.planOp           # consume the workflow's probation budget.
-    - model.decide           # (model-policy.mjs MODEL_KINDS: a workflow that spent
-    - model.validateOp       #  that budget on manager decisions would starve its
-    - model.manageWorkflow   #  own operation work)
+    - model.decide           #  a workflow that spent that budget on kernel
+    - model.validateOp       #  decisions would starve its own operation work
+    - model.manageWorkflow
     - model.critiqueGoal
     - model.classifyScreen
     - model.presentOwnerQuestion
     - judge                  # bare 'judge' kind also counts
-  roles: [decide, plan, implement, verify, write]   # kinds.json vocabularies.roles
+  roles: [decide, plan, implement, verify, write]   # kinds.yaml vocabularies.roles
 
 # ---------------------------------------------------------------------------
 # 2. Workload normalization — what a "workload" IS
-#    source: model-policy.mjs::normalizeWorkload
+#    Owned by this file.
 # ---------------------------------------------------------------------------
 workloadNormalization:
   description: >-
@@ -73,7 +75,7 @@ workloadNormalization:
 
 # ---------------------------------------------------------------------------
 # 3. Workload derivation for a real operation — the sharper normalization
-#    source: model-policy.mjs::workloadFor
+#    Owned by this file.
 # ---------------------------------------------------------------------------
 workloadDerivation:
   description: >-
@@ -111,13 +113,13 @@ workloadDerivation:
 
 # ---------------------------------------------------------------------------
 # 4. The qualification path — mode 'qualified'
-#    source: model-policy.mjs::qualification
+#    Owned by this file.
 # ---------------------------------------------------------------------------
 qualificationGates:
   description: >-
     evaluateModelEligibility tries the QUALIFIED path first. Every gate below
     that fails appends its reason; zero reasons = eligible. Evidence schema:
-    starci/model-qualification@1 (capabilities.json requiredEvidence).
+    starci/model-qualification@1 (capabilities.yaml requiredEvidence).
   preconditions:
     - evidence is a plain object with schema 'starci/model-qualification@1',
       else the single reason 'model eligibility unavailable'.
@@ -141,7 +143,7 @@ qualificationGates:
     - {id: risk-met, rule: "riskRank(evidence.maxRisk) ≥ riskRank(workload.risk)", reason: "risk <risk> is not qualified"}
     - {id: outcomes-pass, rule: "outcomes.status === 'pass' AND outcomes.cases ≥ 1 AND outcomes.passRate ≥ thresholds.minPassRate", reason: "qualification outcomes do not pass"}
   evidenceLoading:
-    # model-policy.mjs::loadModelEligibilityContext — where receipts come from
+    # where receipts come from
     - The policy file must be schema 'starci/model-capability-policy@1' or loading THROWS ('Model capability policy is unavailable').
     - Each qualification record's receipt.artifact.path must resolve INSIDE the declared qualification root (realpath check, prefix-bound); outside paths are silently skipped.
     - The artifact bytes are re-hashed; sha256 must equal receipt.artifact.sha256. Records passing both are stored as evidenceByRuntime[runtimeId] with verified:true. Anything else never reaches the gate.
@@ -149,14 +151,13 @@ qualificationGates:
 
 # ---------------------------------------------------------------------------
 # 5. The probation path — mode 'probation', scoped never manufactured
-#    source: model-policy.mjs::probationReasons + localProbationAllowed +
-#            probationUnavailableReasons + createWorkflowModelEligibility
+#    Owned by this file.
 # ---------------------------------------------------------------------------
 probation:
   principle: >-
     "Bootstrap is scoped probation, never manufactured qualification. Strict
-    oracle and independent review remain mandatory." (mjs comment).
-    Probation is only ever CONSULTED after the qualified path fails.
+    oracle and independent review remain mandatory." Probation is only ever
+    CONSULTED after the qualified path fails.
   recordGates:
     # probationReasons — what a probation record must satisfy
     - schema 'starci/model-probation@1' AND status 'active', else 'model eligibility unavailable'
@@ -216,11 +217,11 @@ decisionFlow:
   - "providerFilter(job): if ANY runtime is qualified → return exactly those targets. Else walk candidates via callback; collect eligible — but STOP after the first for non-kernel work ('probation admits exactly one target for one durable job so an internal fallback can never execute an unconsumed probation candidate'). Kernel functions keep all eligible members (per-call selection)."
   # selectEligibleCandidate — ordering among the eligible:
   - "filter eligibleCandidates → sort by budget[runtime].remaining DESC, then runtime.id ASC → take first. 'Quota can order eligible candidates; it can never make an ineligible model eligible or lower the floor.'"
-  - "No eligible model → {ok:false, reason:'no eligible model'} — a typed exclusion, never a silent model swap (model-catalog.md)."
+  - "No eligible model → {ok:false, reason:'no eligible model'} — a typed exclusion, never a silent model swap."
 
 # ---------------------------------------------------------------------------
 # 7. Independent review — who may judge
-#    source: model-policy.mjs::reviewerPolicy + capabilities.json review
+#    Owned by this file; the evidence shape is capabilities.yaml review.
 # ---------------------------------------------------------------------------
 reviewerPolicy:
   rules:
@@ -232,13 +233,13 @@ reviewerPolicy:
     - "candidate.contextDigest ≠ authorAttempt.hiddenContextDigest — 'review context includes author hidden history'."
   notes: >-
     providerDifferent and modelDifferent are REPORTED, not required —
-    capabilities.json: "differentProviderAloneIsInsufficient". runtimes.json adds
+    capabilities.yaml: "differentProviderAloneIsInsufficient". runtimes.yaml adds
     verifyAvoidsImplementRuntime: true — the allocator keeps the verifier off the
     runtime that implemented the slice, but eligibility itself is the gates above.
 
 # ---------------------------------------------------------------------------
 # 8. Ordering, fallback and failure — the facts the algorithm consumes
-#    sources: runtimes.json allocation + registry.json fallback/selection
+#    sources: runtimes.yaml allocation + registry.yaml fallback/selection
 # ---------------------------------------------------------------------------
 allocationFacts:
   policy: prefer-then-overflow        # runtimes.yaml — try the preferred pool,
@@ -257,7 +258,7 @@ allocationFacts:
     easy: "qwen-agent → devin-agent → codex-agent → claude-agent"
   preference: "per-role order: implement/write = codex→claude→qwen→devin; verify = codex→fable→claude→qwen→devin; decide/plan = fable→codex→claude"
   poolSelection:
-    # The (role, difficulty) candidate chain — scripts/agent/models.mjs::selectPool executes this.
+    # The (role, difficulty) candidate chain — scripts/agent/models.mjs selectPool executes this.
     chainRule: >-
       chain(role, difficulty) = pools present in BOTH tiers[difficulty] (role key first, then the
       tier's default) AND preference[role]. Tier position is the outer sort; the per-role preference
@@ -278,7 +279,7 @@ allocationFacts:
       the POOL by role+tier+bias+capacity, then resolves the MODEL by difficulty inside that pool.
   note: >-
     Tier/preference lists are within-family suitability for direct consumers,
-    NOT a provider fallback chain in a workflow (runtimes.json purpose). In a
+    NOT a provider fallback chain in a workflow (runtimes.yaml purpose). In a
     workflow the kernel's providerFilter + declared operator chains decide.
   cooldowns:                          # a failed runtime is parked, doubling per repeat
     rate-limited: 600000
@@ -290,7 +291,7 @@ allocationFacts:
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
 fallback:
-  # registry.json fallback — when a chain MAY advance to the next target
+  # registry.yaml fallback — when a chain MAY advance to the next target
   advanceOnlyWhen:
     - "failure reason ∈ {unavailable, quota-exhausted, rate-limited, startup-failure, unsupported}"
     - "effectState === 'none' — typed, identity-bound proof nothing happened"
@@ -305,10 +306,10 @@ fallback:
 # 9. Misuse modes — what goes wrong when an agent routes by vibes
 # ---------------------------------------------------------------------------
 misuseModes:
-  - "name-as-proof: \"Shipping in the package ≠ qualified. qualifications.json is empty; every admission today is qualification-by-receipt or probation.\""
+  - "name-as-proof: \"Shipping in the package ≠ qualified. qualifications.yaml is empty; every admission today is qualification-by-receipt or probation.\""
   - "budget-as-eligibility: \"Ordering by remaining quota cannot rescue an ineligible candidate (selectEligibleCandidate).\""
   - "probation-as-qualification: \"Probation never covers high/critical floors or highKinds; elevation strips it before the gates run (workloadFor).\""
   - "fallback-as-retry: \"Advancing a chain on a partial-effect failure re-executes real effects — forbidden without effectState 'none'.\""
-  - "pool-name-as-model: \"A pool's models map pins the model per difficulty; attestation must match that pin, not the pool name (runtimes.json purpose).\""
+  - "pool-name-as-model: \"A pool's models map pins the model per difficulty; attestation must match that pin, not the pool name (runtimes.yaml purpose).\""
   - "bias-as-eligibility: \"prefer/avoid reorders or removes chain candidates; it cannot make a pool serve a role or difficulty it does not declare (poolSelection.bias).\""
   - "supervisor-budget-burn: \"Kernel function calls skip the workflow probation budget deliberately — do not route them through operation accounting (MODEL_KINDS comment).\""

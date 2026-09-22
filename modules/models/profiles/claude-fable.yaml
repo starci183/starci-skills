@@ -3,37 +3,37 @@
 # architecture, goal analysis) on its own weekly budget window. It reasons and
 # judges; it does not implement — the pool has no `implement` role at all.
 
-target: claude-fable          # registry.json + runtimes.json
-provider: claude              # runtimes.json runtimes.claude-fable.provider
-runtime: claude               # registry.json targets.claude-fable.runtime
+target: claude-fable          # registry.yaml + runtimes.yaml
+provider: claude              # runtimes.yaml runtimes.claude-fable.provider
+runtime: claude               # registry.yaml targets.claude-fable.runtime
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: null        # registry.json: deliberately null — native managed
+  requestedModel: null        # registry.yaml: deliberately null — native managed
                             # launch inherits the host's configured model
   profiles:
-    reasoning: fable-5.1      # claude.json profiles.fable-5.1 — model: null (inherits
+    reasoning: fable-5.1      # registry.yaml targets profiles.fable-5.1 — model: null (inherits
                             # host configuration), role reasoning; no working profile
   note: >-
-    runtimes.json pins models.verify/decide/plan/write = claude-fable-5-1, but the
+    runtimes.yaml pins models.verify/decide/plan/write = claude-fable-5-1, but the
     registry target requests no model — managed-agent launch inherits the host's
     configured model. Attestation still applies per CONTEXT.md (worker-show
     effective model before effects).
 
 capacity:
   maxParallel: 2              # cached from runtimes.yaml; the smallest pool in the fleet
-  budgetWindow: fableWeekly   # runtimes.json — its own weekly quota window;
+  budgetWindow: fableWeekly   # runtimes.yaml — its own weekly quota window;
                             # saturating it does NOT overflow into claude-agent automatically
-  roles: [verify, decide, plan, write]   # runtimes.json — implement is ABSENT
+  roles: [verify, decide, plan, write]   # runtimes.yaml — implement is ABSENT
 
 launch:
   orca: {kind: managed-agent, agent: claude}
   imageGeneration: false
 
 position:
-  hardTier: first in verify/decide/plan          # runtimes.json allocation.tiers.hard
+  hardTier: first in verify/decide/plan          # runtimes.yaml allocation.tiers.hard
   mediumTier: first in decide/plan
-  chainLeads: [architecture.decide, business.decide, request.analyze, work.author]  # registry.json operators
+  chainLeads: [architecture.decide, business.decide, request.analyze, work.author]  # registry.yaml operators
   chainSecond: [decision.prepare, provision.ask, goal.revise, scope.define, review.verify]
   nonOperation: >-
     model-functions.md: critiqueGoal's default pool is the host's
@@ -51,12 +51,12 @@ business:
     - verify work on hard tier where an independent strong reasoner is wanted first.
     - Non-operation model functions (goal critique/validation) whose configured pool is Fable/Astra.
   whenNot:
-    - ANY implement-role operation — structurally excluded; the pool declares no implement role (runtimes.json). Not a preference, a fact.
+    - ANY implement-role operation — structurally excluded; the pool declares no implement role (runtimes.yaml). Not a preference, a fact.
     - "High-volume or easy work: maxParallel 2 on a weekly window is the scarcest capacity in the fleet — a bulk queue here starves the decide/plan roles (inference from budgetWindow + maxParallel)."
     - "When its quota window is cooling: the chain already falls to codex-agent then claude-agent; do not force Fable past cooldown."
   pickedBy: >-
     Allocator by role (decide/plan/verify/write only) + tier + qualification;
-    chains in registry.json put it first for reasoning ops.
+    chains in registry.yaml put it first for reasoning ops.
   failureModes:
     - Routing implement work here is impossible by declaration, not just wasteful — candidateFor has no implement profile.
     - "INFERRED: exhausting fableWeekly mid-workflow silently downgrades later decide/plan quality to codex-agent/claude-agent — sequence expensive reasoning early where the Plan allows."

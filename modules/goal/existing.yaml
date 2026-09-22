@@ -22,6 +22,12 @@
 #                                    unavailable input; stale evidence re-proves,
 #                                    never asserts fresh
 #   modules/ops/ops/work.author.yaml, scope.define.yaml — the record-authoring ops
+#
+# Convention: the camelCase and CAPITALISED names in this file (goalPhase,
+# reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
+# module owns and the kernel agent reasons with; they are not code symbols.
+# The executable surface is scripts/kernel/api.mjs and the contracts under
+# modules/kernel/. Where a rule is also transacted there, the entry says so.
 # ============================================================================
 
 schema: starci/module-goal-existing@1
@@ -39,7 +45,7 @@ about:
     done, or misses the surface it is about to break.
   sources:
     - engine/ledger-db.mjs
-    - the kernel agent
+    - modules/kernel/driver-loop.yaml
     - scripts/checks/check-work-deep.mjs
 
 # ----------------------------------------------------------------------------
@@ -90,8 +96,8 @@ decision:
     chain: "new module beside X + integration.verify on the boundary between them"
     records: "a `reference` reconciliation row to X (read it, don't touch it); the boundary is the new work"
     why: >-
-      No record of another feature is edited and none is reported against
-      (the kernel agent). The seam between old and new is where the
+      No record of another feature is edited and none is reported against.
+      The seam between old and new is where the
       risk lives — that is what the integration leg proves.
 
   - when: "X missing — no record owns the paths and the source has nothing"
@@ -173,5 +179,5 @@ rules:
 never:
   - never-skip: "never propose a chain without the survey — S₀ unmeasured is Δ uncomputable"
   - never-edit-another-owner: "a record owned by another feature is read via a `reference` case or escalated via `conflict` — never edited in place (work.author intake discipline)"
-  - never-assert-fresh: "a stale done variable is re-PROVEN, never refreshed by assertion (CLAUDE.md work-correction policy; docs/verify-proof.md)"
+  - never-assert-fresh: "a stale done variable is re-PROVEN, never refreshed by assertion (CONTEXT.md work-correction policy; docs/verify-proof.md)"
   - never-treat-absent-as-clean: "no record owning a path does not mean free rein — it means `new` scope, which scope.define still bounds"

@@ -35,7 +35,7 @@ shape:
     is a module boundary, not a prose claim); a todo one without owners is warned, not refused, since the
     module a design targets may not exist yet."
   ui: "features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen@1. Per
-    docs/kinds.md's lane order, drawing precedes implementing: a done work/implementation@1 that names a
+    modules/models/kinds.yaml lanes order, drawing precedes implementing: a done work/implementation@1 that names a
     ui-screen in its own proves, or whose repository is the workspace's frontend repository, is refused
     (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen - the ones it proves, or, when it proves none
     by id, every ui-screen its own feature owns - is itself done."

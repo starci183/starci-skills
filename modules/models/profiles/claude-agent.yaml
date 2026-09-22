@@ -3,30 +3,30 @@
 # operations that edit this runtime itself; the persistent supervisors sit here.
 # Every claim below traces to a cited source; inferred analysis is marked.
 
-target: claude-agent            # registry.json: targets.claude-agent
-provider: claude                # runtimes.json: runtimes.claude-agent.provider
-runtime: claude                 # registry.json: targets.claude-agent.runtime
+target: claude-agent            # registry.yaml: targets.claude-agent
+provider: claude                # runtimes.yaml: runtimes.claude-agent.provider
+runtime: claude                 # registry.yaml: targets.claude-agent.runtime
 schema: starci/module-model-profile@1  # module-local document kind; no upstream schema
 
 identity:
-  requestedModel: claude-opus-5   # registry.json targets.claude-agent.requestedModel
-  profiles:                     # registry.json targets.claude-agent.profiles
-    working: opus               # → claude.json profiles.opus → model claude-opus-5
-    reasoning: opus-reviewer    # → claude.json profiles.opus-reviewer → model claude-opus-5
+  requestedModel: claude-opus-5   # registry.yaml targets.claude-agent.requestedModel
+  profiles:                     # registry.yaml targets.claude-agent.profiles
+    working: opus               # → registry.yaml targets profiles.opus → model claude-opus-5
+    reasoning: opus-reviewer    # → registry.yaml targets profiles.opus-reviewer → model claude-opus-5
   note: >-
     The stable `claude-opus` runtime ID names the exact `claude-opus-5` model for
     both operation profiles and non-operation calls; an unversioned host default
-    is not proof of Opus 5 (docs/model-catalog.md). modelPolicy in claude.json:
+    is not proof of Opus 5 (modules/models/registry.yaml). modelPolicy in registry.yaml targets:
     "use-declared-profile-model-and-attest-effective-runtime;
     undeclared-models-inherit-current-host-configuration".
 
 capacity:
   maxParallel: 6                # cached from runtimes.yaml; route-model.mjs reports drift
-  roles: [implement, verify, write, decide, plan]   # runtimes.json — all five
+  roles: [implement, verify, write, decide, plan]   # runtimes.yaml — all five
 
 launch:
-  orca: {kind: managed-agent, agent: claude}   # registry.json orcaLaunch — worker-start path
-  imageGeneration: false        # claude.json: every profile imageGeneration:false
+  orca: {kind: managed-agent, agent: claude}   # registry.yaml orcaLaunch — worker-start path
+  imageGeneration: false        # registry.yaml targets: every profile imageGeneration:false
 
 position:
   # Where this pool sits in declared order. Sources: modules/models/runtimes.yaml
@@ -45,7 +45,7 @@ business:
     "Which pool do I trust with the heaviest bounded mutation?" — claude-agent is
     the hard-tier default.
   whenNeeded:
-    - Hard-tier implement/write work where the cheaper Qwen/Devin order has already failed or is unsuitable (prefer-then-overflow, runtimes.json allocation.policy).
+    - Hard-tier implement/write work where the cheaper Qwen/Devin order has already failed or is unsuitable (prefer-then-overflow, runtimes.yaml allocation.policy).
     - grammar.update / knowledge.repair — runtime self-editing ops whose chains lead here.
     - decide/plan/verify work when claude-fable's weekly window is saturated or cooling — opus-reviewer exists precisely as the reasoning half of the pool (registry.yaml targets.claude-agent.profiles.reasoning).
   whenNot:
@@ -54,7 +54,7 @@ business:
     - "INFERRED: bulk medium-tier implementation — the medium default order puts codex-agent and qwen-agent ahead, so default routing keeps Opus for harder slices."
   pickedBy: >-
     The kernel allocator via role preference + tier + qualification (selection.yaml);
-    humans only via the declared chains in registry.json operators.
+    humans only via the declared chains in registry.yaml operators.
   failureModes:
-    - "Treating the alias `claude-opus` as proof of model: attestation must show claude-opus-5 (model-catalog.md)."
+    - "Treating the alias `claude-opus` as proof of model: attestation must show claude-opus-5 (modules/models/registry.yaml)."
     - Burning the strongest pool on easy fan-out — an availability/cost mistake, not an eligibility error.

@@ -11,13 +11,10 @@
 #
 # Sources:
 #   modules/models/kinds.yaml                — lanes (step order), routes (outcome/blocker routing), kind catalog
-#   the kernel agent           — designGate, cutOpFor, disjoint child ops,
-#                                reviseGoal, validateGoalRevision,
-#                                propagateInvalidation, applyWorkflowAmendment,
-#                                STOP_KINDS, PROVISION_KINDS, openOwnerAsk
-#                                (pause vs provisional); owner request kinds;
-#                                credential verified only after
-#                                integration.verify done+pass
+#   modules/kernel/driver-loop.yaml — owns validateGoalRevision,
+#                                propagateInvalidation and AUTHORITY_WIDENING,
+#                                and the rule that a credential counts as
+#                                verified only after integration.verify done+pass
 #   engine/ledger-db.mjs         — the .starciwork runtime.sqlite record rows —
 #                                path-prefix allowlist coverage + ownership
 #   modules/goal/legality.yaml         — the disjoint-allowlist split rule
@@ -30,7 +27,13 @@
 #   docs/verify-proof.md — verify is read-only; source drift vs evidence invalidation vs unavailable input
 #   scripts/checks/check-work-deep.mjs     — DEP_STALE / NORM_UNRECORDED baseline semantics
 #   modules/goal/existing.yaml      — the survey leg + extend-vs-add decision
-#   CLAUDE.md                       — work-correction policy
+#   CONTEXT.md                      — work-correction policy
+#
+# Convention: the camelCase and CAPITALISED names in this file (goalPhase,
+# reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
+# module owns and the kernel agent reasons with; they are not code symbols.
+# The executable surface is scripts/kernel/api.mjs and the contracts under
+# modules/kernel/. Where a rule is also transacted there, the entry says so.
 # ============================================================================
 
 schema: starci/module-goal-legality@1
@@ -45,8 +48,8 @@ about:
     The analyzer proposes; these rules are what the proposal is checked
     against. The kernel enforces them at three seams — lane derivation
     (modules/models/kinds.yaml lanes), outcome routing (modules/models/kinds.yaml
-    routes), and revision validation (the kernel agent's reviseGoal /
-    validateGoalRevision) — so a chain that violates them is refused or
+    routes), and revision validation (this file's reviseGoal rule and
+    modules/kernel/driver-loop.yaml validateGoalRevision) — so a chain that violates them is refused or
     rerouted, never silently run.
 
 # ============================================================================
@@ -147,7 +150,7 @@ forwardEdges:
   - id: draw-before-ui-build
     if: "any frontend/UI build leg is proposed (interface.implement)"
     thenRequired: "interface.draw done for that feature's ui node"
-    enforcement: designGate — the kernel holds a frontend build until the feature's ui node is done and asks the user when the feature has none (the kernel agent)
+    enforcement: designGate — the kernel holds a frontend build until the feature's ui node is done and asks the user when the feature has none 
     why: "interface code is built against the drawing of its feature (modules/models/kinds.yaml implementation/frontend lane purpose)"
     illegal: "UI work without interface.draw first is ILLEGAL"
 
@@ -201,8 +204,8 @@ forwardEdges:
       canonicalization, workspace.manage replaces work.author because the
       canonical root/layout itself is reconstructed after path consumers move
     why: >-
-      Evidence pins source identity (sourceIdentity / currentCodeMap,
-      docs/verify-proof.md). A refactor that moves code without
+      Evidence pins source identity (sourceIdentity,
+      scripts/checks/source-staleness.mjs). A refactor that moves code without
       remapping the record leaves evidence certifying a tree that no longer
       exists — the stale-evidence rule. The regression-coverage prerequisite
       is enforced by the test-gap route (blocker test-gap -> test.author).
@@ -247,8 +250,8 @@ forwardEdges:
     enforcement: >-
       A missing credential blocks the proof as environment -> needUser
       (modules/models/kinds.yaml environment-needs-the-user); the credential ask only
-      settles 'verified' after integration.verify reports done+pass
-      (the kernel agent). The chain therefore carries a
+      settles 'verified' after integration.verify reports done+pass.
+      The chain therefore carries a
       provision.ask leg for the custody BEFORE the verify leg needs it.
     illegal: "integration verification without custody/provision readiness is ILLEGAL"
 
@@ -272,7 +275,7 @@ forwardEdges:
 # 2 — BACKWARD EDGES. The cấn cấn mechanism: mid-flight discovery that the
 #    goal, a record, or the scope is wrong. The discovery NEVER gets fixed in
 #    place — it travels BACK to the owning boundary and re-runs forward.
-#    CLAUDE.md: "return to the owning workflow, re-run it from the affected
+#    CONTEXT.md: "return to the owning workflow, re-run it from the affected
 #    Business/SRS or Architecture/SDS boundary, and produce fresh evidence.
 #    Never relabel an incorrect flow as debt or refresh stale evidence by
 #    assertion."
@@ -287,7 +290,7 @@ backwardEdges:
     section stale; the work re-runs from the affected boundary and produces
     FRESH evidence; old reports stay bound to the rev that produced them —
     adoptReportRev adopts a report into the new rev only when the digests are
-    identical (the kernel agent).
+    identical.
   neverQuietly: >-
     The finding is never "fixed quietly" inside the op that found it. The op's
     allowlist does not cover the requirement/design record, so it could not —
@@ -307,7 +310,7 @@ backwardEdges:
         A goal-level conflict goes through goal.revise.
       staleness: "downstream evidence derived from the changed section is marked stale (propagateInvalidation) and re-proven — never asserted fresh"
       ownerAsk: "only if the conflict is AUTHORITY_WIDENING — a scope/authority widening is the owner's call, not a record edit"
-      citation: "modules/models/kinds.yaml routes (srs/sds/interface/brand/grammar/test-gap); the kernel agent propagateInvalidation; CLAUDE.md work-correction policy"
+      citation: "modules/models/kinds.yaml routes (srs/sds/interface/brand/grammar/test-gap); modules/kernel/driver-loop.yaml propagateInvalidation; CONTEXT.md work-correction policy"
 
     - level: scope-expansion
       when: "the work the goal actually needs reaches beyond the scope the owner approved — a path, a feature, an integration the scope did not declare"
@@ -320,19 +323,19 @@ backwardEdges:
         containment means a request can never outgrow its grant,
         applyWorkflowAmendment).
       staleness: "the goal's scope/criteria derivations stale until the re-scoped goal is approved"
-      citation: "modules/ops/ops/scope.define.yaml + goal.revise.yaml; the kernel agent applyWorkflowAmendment/effectPathCovered"
+      citation: "modules/ops/ops/scope.define.yaml + goal.revise.yaml; this file's applyWorkflowAmendment/effectPathCovered"
 
     - level: identity-wrong
       when: "the discovery is that the goal itself is the wrong goal — wrong workflow, wrong feature, wrong product boundary"
       mayResolve: "NEVER. An agent must never self-decide a goal-identity change."
       route: >-
         provision.ask — always. validateGoalRevision rejects any revision that
-        changes the workflow identity (the kernel agent), and an
+        changes the workflow identity, and an
         amendment binds baseGoalIdentity — so identity cannot move under the
         goal's feet. The only legal move is to put the question to the owner
         and let the workflow be stopped or re-aimed by them.
       staleness: "a wrong identity voids ALL downstream evidence — every report bound to the wrong rev certifies the wrong contract"
-      citation: "the kernel agent validateGoalRevision + stateGoalIdentity; owner-ask provision stops"
+      citation: "modules/kernel/driver-loop.yaml validateGoalRevision; this file's stateGoalIdentity; owner-ask provision stops"
 
   # The closed route table this mechanism resolves through — cited, not restated.
   routeTable: >-
@@ -346,7 +349,7 @@ backwardEdges:
     environment -> needUser (1); authority -> needUser (1); ask -> needUser
     (1); partial -> same (5, retry); failed -> same (3, retry). First match
     wins; a route with an explicit `from` stands before the `any` one.
-  citation: "modules/models/kinds.yaml routes:; CLAUDE.md work-correction policy; the kernel agent"
+  citation: "modules/models/kinds.yaml routes:; CONTEXT.md work-correction policy"
 
 # ============================================================================
 # 3 — SPLIT RULES. When may a goal fan out into sibling chains.
@@ -365,13 +368,13 @@ splitRules:
     dispatch-planning conflict check (scripts/kernel/api.mjs;
     modules/kernel/dispatch.yaml fields.owned_paths).
     On a plan ledger the same rule is a schema constraint:
-    independent ops must have disjoint path-prefix allowlists (goal-plan.json).
+    independent ops must have disjoint path-prefix allowlists (the plan file (modules/schemas/goal-plan.yaml)).
   noSharedPath: >-
     No two sibling nodes may own the same path. A path every sibling must
     touch — module wiring, DI registration, migrations, shared contracts and
     types — is the SEAM: it is cut as its own child, runs ALONE and FIRST,
     and every sibling is disjoint from it (cutOpFor seam instructions,
-    the kernel agent; allocation.fanOut seamFirst).
+    runtimes.yaml allocation.fanOut seamFirst).
   serialFallback: >-
     If the scope cannot be split cleanly — no disjoint cut exists, the seam is
     the whole job — the goal runs SERIAL, one op at a time in dependency
@@ -380,7 +383,7 @@ splitRules:
     (modules/kernel/dispatch.yaml).
   siblingAnatomy: >-
     Each sibling gets its own op chain, its own agent, and its own worktree —
-    two workflows never share a worktree (the kernel agent). The parent
+    two workflows never share a worktree. The parent
     retains the join operations — integration.verify and review.verify prove
     the group once, at the parent, after every sibling is done
     (modules/kernel/dispatch.yaml groupAssertions; modules/models/kinds.yaml
@@ -452,14 +455,14 @@ ambiguityRules:
         and the amendment binds baseGoalIdentity — so the only honest move is
         the owner question.
       cost: "wrong identity invalidates ALL downstream evidence; wrong order costs reruns only"
-      citation: "the kernel agent validateGoalRevision + applyWorkflowAmendment; the kernel agent provision stops"
+      citation: "modules/kernel/driver-loop.yaml validateGoalRevision; this file's applyWorkflowAmendment and provision stops"
 
     - kind: SCOPE
       whereMissing: "SURVEY/GAP — S* formed but Δ unmeasurable (what is IN scope is unknown)"
       when: "what is IN the goal is ambiguous — which feature, which boundary, whether an existing node is reused or re-authored"
       resolve: "scope.define proposes the scope — bounding is exactly its job (prerequisite 'request analyzed'); it is the leg that makes Δ measurable"
       then: "if the proposed scope needs owner consent — it widens authority, touches undeclared paths, adds an integration — provision.ask carries it to the owner"
-      citation: "modules/ops/ops/scope.define.yaml; the kernel agent AUTHORITY_WIDENING"
+      citation: "modules/ops/ops/scope.define.yaml; modules/kernel/driver-loop.yaml AUTHORITY_WIDENING"
 
     - kind: ORDER
       whereMissing: "CHAIN — S* and Δ both known, only the topological sort undetermined"
@@ -467,7 +470,7 @@ ambiguityRules:
       resolve: "the AGENT chooses, using route prerequisites (`needs`) and lane order as the oracle — a leg whose prerequisite names another's output goes after it"
       record: "the assumption is recorded on the goal (`assumed:` / a questions entry) so a later revision can see it was a guess"
       cost: "wrong order costs reruns — the chain re-sorts and the affected evidence re-runs; nothing is voided"
-      citation: "modules/ops/ops/*.yaml route prerequisites; modules/models/kinds.yaml lanes order; goal-plan.json dependsOn"
+      citation: "modules/ops/ops/*.yaml route prerequisites; modules/models/kinds.yaml lanes order; modules/schemas/goal-plan.yaml dependsOn"
 
   escalation: >-
     The ladder is ordered by WHERE the information is missing and by the cost

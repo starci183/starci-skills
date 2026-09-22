@@ -13,7 +13,6 @@
 #   modules/ops/ops/*.yaml        — route blocks (nodeKinds, phase, intent, prerequisites, riskHints)
 #   modules/ops/registry.yaml     — generated stage index: intake > scope > decide > direct > implement > verify > release > operate
 #   modules/models/kinds.yaml              — lanes (nodeKind -> ordered steps), routes, kind catalog
-#   the kernel agent         — designGate, cutOpFor (fan-out + seam-first)
 #   engine/ledger-db.mjs       — disjoint(allowlist) path-prefix coverage
 #   modules/goal/legality.yaml       — the disjoint-allowlist split rule
 #   modules/kernel/dispatch.yaml  — seam-first cut, one behaviour per child, serial fallback
@@ -24,6 +23,12 @@
 # Convention: "leg" = one operation in the proposed chain. For each leg the
 # entry says why it is there — or, in the exclusions list, why it is NOT.
 # (inferred) marks analysis the sources imply but do not state literally.
+#
+# Convention: the camelCase and CAPITALISED names in this file (goalPhase,
+# reviseGoal, designGate, cutOpFor, GOAL_SPIN_LIMIT, ...) name rules THIS
+# module owns and the kernel agent reasons with; they are not code symbols.
+# The executable surface is scripts/kernel/api.mjs and the contracts under
+# modules/kernel/. Where a rule is also transacted there, the entry says so.
 # ============================================================================
 
 schema: starci/module-goal-archetypes@1
@@ -83,7 +88,7 @@ legRationale:
     The decide jobs may complete while their Work leaves remain todo until final reconciliation.
   draw: >-
     interface.draw is the `direct`-phase leg that produces the ui design record
-    the frontend lane's designGate waits on (the kernel agent). Route
+    the frontend lane's designGate waits on. Route
     prerequisites: business + architecture + brand decisions.
   implement: >-
     interface.implement (operator and kind) and
@@ -93,7 +98,7 @@ legRationale:
     work.author authors or remaps Work records (prerequisite: "scope defined").
     On a refactor it re-anchors the record's source mapping to the moved code —
     without it the evidence pins the old identity (docs/verify-proof.md
-    currentCodeMap / sourceIdentity). Whole-root .starciwork/.starcistacks
+    sourceIdentity — scripts/checks/source-staleness.mjs). Whole-root .starciwork/.starcistacks
     canonicalization is the narrow exception: workspace.manage owns canonical
     reconstruction after code.refactor migrates path consumers, so adding
     work.author would duplicate ownership.
@@ -275,7 +280,7 @@ archetypes:
       decision: >-
         code.refactor runs only if regression coverage exists (prereq). The
         work.author remap leg is MANDATORY — the implementation record's
-        sourceIdentity/currentCodeMap must point at the moved code or the
+        sourceIdentity must point at the moved code or the
         evidence certifies a tree that no longer exists. review.verify reads
         the result.
       ownerMoments: "scope-expansion if 'split into a module' turns out to touch undeclared paths -> re-run scope.define"
@@ -303,8 +308,7 @@ archetypes:
       custody is still missing when integration.verify runs, its report is
       blocked/environment -> environment-needs-the-user (needUser), and the
       credential ask only settles 'verified' AFTER integration.verify reports
-      done+pass (verifyAcceptedIntegrationOwnerRequests,
-      the kernel agent). "Settles inprogress if custody missing"
+      done+pass (verifyAcceptedIntegrationOwnerRequests). "Settles inprogress if custody missing"
       = the op stays live, waiting on the owner; it never fakes the proof.
     exclusions:
       - {op: interface.draw, why: "unless the integration also ships UI — then this archetype COMPOSES with feature-build-with-ui (priors compose; the union is confirmed leg by leg)"}
@@ -396,7 +400,7 @@ archetypes:
       - {op: scope.define,    leg: scopeDefine, note: "bounds ALL siblings before any is built — the disjointness is checked against this scope"}
       - {op: business.decide / architecture.decide, leg: decide, note: "shared records settle ONCE before the split — the seam children read them"}
       - {op: implementation.plan, leg: decide, note: "the seam cut: one child owns what all others would touch, runs ALONE and first (allocation.fanOut seamFirst)"}
-      - {op: <sibling builds>, leg: implement, note: "each sibling gets its own op chain, own agent, own worktree — modules/kernel/dispatch.yaml + the kernel agent worktree isolation"}
+      - {op: <sibling builds>, leg: implement, note: "each sibling gets its own op chain, own agent, own worktree — modules/kernel/dispatch.yaml worktree isolation"}
       - {op: integration.verify, leg: verify, note: "the JOIN at the parent — one proof the siblings compose, run on the parent after all children done"}
       - {op: review.verify,      leg: verify, note: "parent-tier read of the assembled group"}
     joinRule: >-

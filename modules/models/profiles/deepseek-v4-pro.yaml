@@ -3,20 +3,20 @@
 # every automatic chain. Its profiles carry the "preferred cost-aware" labels,
 # yet the routing policy still requires explicit selection.
 
-target: deepseek-v4-pro       # registry.json targets
+target: deepseek-v4-pro       # registry.yaml targets
 provider: qwen                # QwenCloud-compatible route — runs through the qwen CLI
-runtime: qwen                 # registry.json targets.deepseek-v4-pro.runtime
+runtime: qwen                 # registry.yaml targets.deepseek-v4-pro.runtime
 schema: starci/module-model-profile@1
 
 identity:
   requestedModel: deepseek-v4-pro
   profiles:
-    working: deepseek-v4-pro-worker     # qwen.json — "the PREFERRED cost-aware
+    working: deepseek-v4-pro-worker     # registry.yaml targets — "the PREFERRED cost-aware
                                         # backend implementation and repair work"
-    reasoning: deepseek-v4-pro-reviewer # qwen.json — "the PREFERRED deep
+    reasoning: deepseek-v4-pro-reviewer # registry.yaml targets — "the PREFERRED deep
                                         # independent review"
   tension: >-
-    The profile descriptions say "preferred" while registry.json
+    The profile descriptions say "preferred" while registry.yaml
     costPolicy excludes the target from all automatic chains. Resolution: the
     profiles describe intent within the QwenCloud family; the registry's chain
     exclusion is the operative routing rule — preference is realized only through
@@ -29,7 +29,7 @@ launch:
     dispatch: return-preamble-and-send
     adapter: qwen
     nestedAgents: forbidden
-  imageGeneration: false      # both profiles false in qwen.json
+  imageGeneration: false      # both profiles false in registry.yaml targets
 
 position:
   automaticChains: excluded   # costPolicy, verbatim

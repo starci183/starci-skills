@@ -6,8 +6,9 @@
 # specification schema bodies live under `modules/schemas/spec/` with
 # normalized `*.schema.yaml` names.
 #
-# There is no compiled JSON projection — the authored YAML under
-# modules/schemas/ is the only authority; consumers read these files directly.
+# The authored YAML under modules/schemas/ is the authority: every consumer
+# reads these files directly. The same holds for knowledge/**/*.yaml, so the
+# per-entry usedBy lines below name their real reader and nothing else.
 
 about:
   kind: schema-catalog
@@ -19,8 +20,6 @@ about:
     A governed record names its schema in its own `schema:` field (e.g. schema: work/business-rule@1,
     schema: starci/orca-calls@1). The catalog `id` below is that const — the value a record would carry —
     not the file name.
-  sourceOnly:
-    excluded: deliberately source-only (json-exceptions.yaml)
 
 schemas:
 
@@ -404,7 +403,7 @@ schemas:
       selectedBy: stacks checker + deploy lanes; the unversioned id is required verbatim.
 
   # --------------------------------------------------------------------------
-  # KNOWLEDGE / EXAMPLES — compiled knowledge inputs
+  # KNOWLEDGE / EXAMPLES — the authored knowledge tree
   # --------------------------------------------------------------------------
 
   - id: starci/knowledge-source@1
@@ -412,8 +411,8 @@ schemas:
     dialect: json-schema
     subsystem: knowledge
     governs: "One authored knowledge topic — id, title, purpose, appliesTo, related/families/observations."
-    binds: knowledge/**/*.yaml topic files (read directly as authored sources)
-    usedBy: [agents and skills read authored knowledge/**/*.yaml directly — no compiled mirror]
+    binds: knowledge/**/*.yaml topic files
+    usedBy: [agents and skills, reading knowledge/**/*.yaml]
     business:
       question: "Is this authored guidance a well-formed knowledge topic?"
       whenNeeded: Authoring/updating knowledge yaml (update-knowledge scope).
@@ -426,9 +425,9 @@ schemas:
     subsystem: knowledge
     governs: "A knowledge rule record — id, title, kind (+ lenient additionalProperties)."
     binds: rule entries inside knowledge topics
-    usedBy: [agents and skills read authored knowledge/**/*.yaml directly]
+    usedBy: [agents and skills, reading knowledge/**/*.yaml]
     business:
-      question: "Is this rule entry identifiable and kinded for the compiled knowledge tree?"
+      question: "Is this rule entry identifiable and kinded inside its topic?"
       whenNeeded: Same lane as knowledge-source — rule granularity inside topics.
       whenNot: additionalProperties:true — it is deliberately permissive; do not treat as a strict contract.
       selectedBy: Knowledge authoring review.
@@ -439,7 +438,7 @@ schemas:
     subsystem: knowledge
     governs: "A code example manifest — id, title, purpose, appliesTo, relatedRules, files, entrypoint, adapt, dependencies, verification, provenance."
     binds: code-example manifests inside the authored knowledge tree
-    usedBy: [agents and skills read authored knowledge/**/*.yaml directly]
+    usedBy: [agents and skills, reading knowledge/**/*.yaml]
     business:
       question: "Is this example reusable — does it say what it adapts, needs and how to verify?"
       whenNeeded: Curating example code into the knowledge fleet.
@@ -452,7 +451,7 @@ schemas:
     subsystem: knowledge
     governs: "The catalog listing code examples — schema/title/purpose/examples[]."
     binds: the example catalog document
-    usedBy: [agents and skills read authored knowledge/**/*.yaml directly]
+    usedBy: [agents and skills, reading knowledge/**/*.yaml]
     business:
       question: "Which examples exist and what is each for?"
       whenNeeded: Browsing/picking an example before adapting it.
@@ -491,11 +490,11 @@ schemas:
 
   # --------------------------------------------------------------------------
   # SPECIFICATION — SRS/SDS payload contracts (bodies under
-  # modules/schemas/spec/; validators live in scripts/checks/spec/)
-  # DORMANT on flat trees: these govern the retired nested business/architecture
-  # layout via engine/index.mjs's legacy path. Canonical flat work/* records are
-  # enforced by the work-* family schemas and the check-work-* gate stack, never
-  # by this subsystem.
+  # modules/schemas/spec/; validators live in scripts/checks/spec/).
+  # CURRENT: CONTEXT.md sends all new authoring to business/srs/ and
+  # architecture/sds/, and these schemas are what those payloads validate
+  # against. The work-* family schemas and the check-work-* gate stack govern
+  # the .starciwork work/* record tree — a different axis, not a replacement.
   # --------------------------------------------------------------------------
 
   - id: starci/specification-contract@1
@@ -517,7 +516,7 @@ schemas:
     subsystem: spec
     governs: "The source-independent SDS record — purpose, businessRefs, designRefs, views, decisions, checks, references, limitations; op const architecture.decide."
     binds: SDS records authored under the sds@1 payload (extensions.work3.sds / architecture trees)
-    usedBy: [scripts/checks/spec/sds.mjs (SDS_SCHEMA), contract.schema.yaml architecture.schema, tests/sds-payload.spec.mjs]
+    usedBy: [scripts/checks/spec/sds.mjs (SDS_SCHEMA), contract.schema.yaml architecture.schema, tests/sds.spec.mjs]
     business:
       question: "Is this SDS structurally a source-independent design record?"
       whenNeeded: architecture.decide output validation; compatibility reads of existing SDS records.
@@ -542,7 +541,7 @@ schemas:
     dialect: prose-contract
     subsystem: spec
     governs: "The typed split-SRS section contracts — aggregate starci/srs-aggregate@1 with allowedSections, plus per-section records (functional-requirement, nfr, business-rule, policy-decision, data, customer-journey) with required fields."
-    binds: legacy business/srs/**/index.yaml payloads (extensions.work3.srs) - retired nested layout, dormant on flat work/* trees
+    binds: business/srs/**/index.yaml payloads (extensions.work3.srs) — the canonical split-SRS tree
     usedBy: [scripts/checks/spec/srs-sections.mjs (SRS_SECTION_CONTRACT), contract.schema.yaml semantics.layout]
     business:
       question: "Does each split SRS leaf carry exactly the fields its section type owns?"
@@ -555,7 +554,7 @@ schemas:
     dialect: json-schema
     subsystem: spec
     governs: "The compatibility SRS record — id, nodeType, name, summary, refs, content; op const business.decide."
-    binds: legacy business/srs leaves (compatibility/recovery only) - retired nested layout
+    binds: business/srs leaves authored against the cohesive record (compatibility/recovery reads)
     usedBy: [scripts/checks/spec/srs.mjs (SRS_SCHEMA compat reader), contract.schema.yaml compatibilityBusiness.schema, tests/srs.spec.mjs]
     business:
       question: "Is a pre-split SRS record still readable under its original checks?"
@@ -681,4 +680,4 @@ gaps:
 coverage:
   tree: "modules/schemas/ — 40 authored files + modules/schemas/spec/ 5 files + index.yaml + relationships.yaml"
   authoredFiles: 45            # 40 top-level + 5 under spec/
-  projection: none             # no compiled projection — consumers read the authored YAML directly
+  authority: the authored YAML in this tree, read directly by its consumers
