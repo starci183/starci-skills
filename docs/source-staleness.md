@@ -86,3 +86,18 @@ completed prerequisite merely to inspect it. Real upstream authorization and
 declared dependencies still apply. `baselineDigest` binds the canonical
 inputs and stored source identities scanned by this report. It is not an
 acceptance receipt and cannot bless current bytes automatically.
+
+## Settled jobs and changed runtime inputs
+
+The runtime's own law inputs go stale too. `api dispatch` records, on the
+contract row, the digest of every `knowledge/**` path (and
+`modules/models/code-patterns.yaml`) the op manifest reads or the packet
+cites — a directory or glob as the digest of its sorted file digests, a
+missing path as `absent` (`scripts/kernel/input-digests.mjs`). `api survey`
+and `api status` list each settled job (passed, or partial) whose recorded
+digest differs from the current bytes as `staleInput`, and
+`status.frontier.staleOperations` makes the frontier actionable. The Kernel
+redoes such a job as a new attempt of the same op and cut ordinal, a cut
+seam-first (`modules/kernel/driver-loop.yaml` `enqueue.cutExecution`); until
+then its result does not satisfy its leg. A contract recorded without digests
+never reports stale input.

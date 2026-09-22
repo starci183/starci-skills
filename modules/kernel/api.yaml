@@ -130,7 +130,9 @@ commands:
     reads: >-
       workflows row; latest goals row (revision, goal_identity, json.opChain —
       the approved shape plan diffs against); all jobs; inbox rows; live
-      signals; the tail of events; open incidents
+      signals; the tail of events; open incidents; the contracts rows of
+      settled jobs and the current bytes of the law inputs they recorded
+      (staleInput below)
     writes: 'nothing — pure projection'
     returns:
       ok: true
@@ -142,6 +144,16 @@ commands:
       events: '[{seq, kind, entity_id, created_at}] — newest last, bounded tail'
       eventsHead: 'the hash-chain head over the events tail'
       incidentsOpen: '[{incident_id, kind, status, attempts, last_progress}] — open only'
+      staleInput: >-
+        [{jobId, op, attempt, cut?:{id, ordinal, total}, path, recorded, current, heldBy?}] — one row
+        per changed law input of a settled job (status succeeded, or failed on a partial report)
+        that is the newest attempt of its op and cut ordinal, in a workflow that is not finished.
+        `recorded` is the digest `dispatch` stored on the contract (contracts.context_json.inputs),
+        `current` the digest of the same path now (sha256, or `absent`). A contract with no
+        recorded inputs never appears. `heldBy` names the open seam-ordinal job a higher stale
+        slice of the same cut waits on. Computed by `staleInputs()` in scripts/kernel/input-digests.mjs,
+        each distinct path digested once per call
+      staleInputError: 'present only when the projection itself failed; staleInput is then []'
     refuses:
       - workflow-unknown: 'no workflows row for --workflow'
     usedBy: 'the ticks deep read — first call of every iteration (driver-loop.yaml tick.survey)'
@@ -153,12 +165,20 @@ commands:
       running-operation terminal show receipts; and, for each queued job, what blocks it — the
       approved leg order on the latest goals row, the workflow's slot-holding operation count
       against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
-      pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel
+      pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel; the
+      stale-input projection survey.staleInput describes
     writes: 'nothing'
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,unconsumedReports,nudgeReadyJobs[],queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile)'
+      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      'frontier.staleOperations': >-
+        [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
+        whose law inputs changed since dispatch, which the Kernel re-dispatches as a new attempt
+        (driver-loop.yaml enqueue.cutExecution). A row with `heldBy` waits on its cut's open seam
+        ordinal and does not make the frontier actionable; `reason` names the rows without it when
+        no earlier cause claims it
+      staleInput: 'as survey.staleInput (and staleInputError when the projection failed)'
       'frontier.queued': >-
         [{jobId, opId, attempt, queuedBecause, blockedBy, detail}] — one row per queued job, in
         created order, naming why it is not running. `queuedBecause` is
@@ -424,7 +444,13 @@ commands:
       atomically; contracts row = the rendered packet markdown keyed
       (workflow_id,op_id,attempt) with the dispatch_id — the worker's
       dispatch authority, read back via `api op-contract`, written BEFORE the
-      job may stand running; workflows.phase queued->running with a
+      job may stand running — whose context_json.inputs
+      {schema:starci/input-digests@1, digests:[{path, digest}]} records the
+      sha256 of every law input the op binds: each `knowledge/**` path (and
+      modules/models/code-patterns.yaml) named by the manifest's reads,
+      context, knowledge or selected executionModes.<mode>.reads and by the
+      packet params, a directory or glob as the digest of its sorted file
+      digests, a missing path as `absent` (scripts/kernel/input-digests.mjs); workflows.phase queued->running with a
       'phase-transition' event; jobs.status ->running with lease_token +
       worker_id only after attestation below (intent -> attested -> running);
       managed workers in an existing worktree have their exact assignee
@@ -836,6 +862,6 @@ tableMap:
   leases:     {read: [status, dispatch, reconcile, settle], write: [dispatch, reconcile, settle]}
   incidents:  {read: [survey, route], write: [dispatch, incident]}
   events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, report, consume-report, check, settle, incident, finish]}
-  reports:    {read: [reconcile, consume-report, settle], write: [report, consume-report, settle]}
-  contracts:  {read: [reconcile, op-contract], write: [dispatch]}
+  reports:    {read: [survey, status, reconcile, consume-report, settle], write: [report, consume-report, settle]}
+  contracts:  {read: [survey, status, reconcile, op-contract], write: [dispatch]}
   checks:     {read: [settle], write: [check]}
