@@ -554,6 +554,15 @@ const agentHierarchyOf = (db, workflowId) => {
 };
 
 /* ---------------------------------------------------------------- survey */
+// Settled results whose law inputs changed since dispatch (input-digests.mjs).
+// A finished workflow reports none; a projection error is surfaced beside an
+// empty list rather than failing the poll.
+const staleInputProjection = (db, wf) => {
+  if (wf.phase === 'finished') return { staleInput: [] };
+  try { return { staleInput: staleInputs(db, wf.workflow_id, { root: skillRoot }) }; }
+  catch (e) { return { staleInput: [], staleInputError: String(e?.message ?? e) }; }
+};
+const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
 function cmdSurvey(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
@@ -572,6 +581,7 @@ function cmdSurvey(ledger, args) {
   const events = db.prepare('SELECT seq,event_id,generation,entity_type,entity_id,kind,payload_json,created_at FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 10')
     .all(workflowId).reverse().map((r) => ({ ...r, payload: parseJson(r.payload_json) }));
   const incidents = db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId);
+  const stale = staleInputProjection(db, wf);
   const out = {
     ok: true, workflowId,
     workflow: wf,
@@ -583,6 +593,7 @@ function cmdSurvey(ledger, args) {
     inbox, signals, events,
     incidentsOpen: incidents,
     eventsHead: ledger.eventsHead(workflowId),
+    ...stale,
   };
   emit(out, [
     `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${wf.title ?? '-'}`,
@@ -590,6 +601,7 @@ function cmdSurvey(ledger, args) {
     `open jobs: ${openJobs.length} (${openJobs.map((j) => `${j.job_id}:${j.status}`).join(', ') || 'none'})`,
     `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
     `last events: ${events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none'}`,
+    ...staleOperationsOf(stale.staleInput).map((item) => `stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}`),
   ].join('\n'), args.json);
 }
 
@@ -819,12 +831,18 @@ function cmdStatus(ledger, args) {
     : openOperations > 0 ? 'engaged'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
-  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0;
+  // A settled result whose law inputs changed is work the Kernel owes now: it
+  // is re-dispatched as a new attempt (driver-loop.yaml enqueue.cutExecution).
+  const stale = staleInputProjection(db, wf);
+  const staleOperations = staleOperationsOf(stale.staleInput);
+  const staleReady = staleOperations.filter((item) => !item.heldBy);
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0;
   const frontier = {
     state: frontierState,
     actionable,
     openOperations,
     readyOperations,
+    staleOperations,
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
     queued,
@@ -835,15 +853,18 @@ function cmdStatus(ledger, args) {
         ? 'one or more exact running workers are at an idle provider prompt without a report; Kernel must call api nudge for each listed job now'
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
+      : staleReady.length > 0
+        ? `settled ${staleReady.map(staleLabel).join(', ')} read inputs that changed since dispatch; re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding`
       : null,
   };
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, ...stale };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
+      ...staleOperations.map((item) => `  stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
     ].join('\n'),
     args.json);
 }
