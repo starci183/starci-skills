@@ -201,6 +201,49 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   const after=fx.calls();
   assert.ok(after.includes('orchestration worker-stop'),`settle must worker-stop the dispatch — log: ${after.join(', ')}`);
   assert.ok(after.includes('orchestration worker-release'),`settle must worker-release the dispatch — log: ${after.join(', ')}`);
+  // Stopping the worker is not closing the Task. A settled op that leaves its
+  // Task open is exactly the ticked [Op] row the owner found at the Orca
+  // sidebar root (fable.md orca-hierarchy, row 3).
+  assert.ok(after.includes('orchestration task-update'),`settle must close the operation Task — log: ${after.join(', ')}`);
+  const update=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration task-update');
+  assert.equal(update?.[update.indexOf('--id')+1],'task-fake-1');
+  assert.equal(update?.[update.indexOf('--status')+1],'done');
+  assert.equal(update?.[update.indexOf('--run')+1],'run-fake-1');
+  assert.equal(update?.[update.indexOf('--from')+1],'fake-kernel-terminal');
+  assert.equal(json(s.stdout)?.taskClosed?.ok,true,'the settle receipt records the Task it closed');
+  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.taskClosed?.ok,true,
+    'and the job payload keeps the proof, so finish does not close it twice');
+});
+
+test('finish closes the kernel terminal and every Task the Run still holds open',t=>{
+  const fx=fixture(t);
+  const workflowId='wf-finish-tree';
+  const jobId='job-finish-tree';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
+    // An op whose Task was opened and whose attempt never reached settle.
+    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
+      payload:{opId:'code.refactor',owned_paths:['docs/'],managed:{runId:'run-fake-1',taskId:'task-orphan-1',dispatchId:'dispatch-fake-1'}}});
+    ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE job_id=?").run(jobId);
+  }finally{ledger.close();}
+
+  const finished=fx.run(API,'finish','--repo',fx.repo,'--workflow',workflowId,'--json');
+  assert.equal(finished.status,0,finished.stderr||finished.stdout);
+  const out=json(finished.stdout);
+  assert.equal(out?.phase,'finished');
+  assert.deepEqual(out?.tasksClosed?.map(entry=>[entry.jobId,entry.taskId,entry.status,entry.ok]),
+    [[jobId,'task-orphan-1','done',true]],'a finish leaves no open Task in the Run');
+  assert.equal(out?.kernelTerminal,'fake-kernel-terminal');
+
+  const argv=fx.callArgv();
+  const update=argv.find(a=>a.slice(0,2).join(' ')==='orchestration task-update');
+  assert.equal(update?.[update.indexOf('--id')+1],'task-orphan-1');
+  assert.equal(update?.[update.indexOf('--from')+1],'fake-kernel-terminal','the Task is closed from the kernel that owned it');
+  const close=argv.find(a=>a.slice(0,2).join(' ')==='terminal close');
+  assert.equal(close?.[close.indexOf('--terminal')+1],'fake-kernel-terminal','the kernel terminal does not outlive the workflow');
+  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.taskClosed?.ok,true);
 });
 
 test('Claude auth rejection circuits every shared-auth pool and reuses the logical operation attempt',t=>{

@@ -66,6 +66,7 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
+import { taskUpdate } from '../api/orca/task-update.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -2065,7 +2066,8 @@ function cmdSettle(ledger, args, repo) {
   // never un-settles.
   // Managed jobs hold a Dispatch id in worker_id, not a terminal handle — they
   // take the worker-stop/-release path below, never terminal close.
-  const managed = jobPayloadOf(job)?.managed ?? null;
+  const settledPayload = jobPayloadOf(job);
+  const managed = settledPayload?.managed ?? null;
   let terminalClosed = null;
   if (job.worker_id && !managed) {
     const closed = terminalClose({ terminal: job.worker_id });
@@ -2099,9 +2101,44 @@ function cmdSettle(ledger, args, repo) {
     };
   }
 
+  // The op's Orca Task is closed with its worker. Settling only the worker
+  // left every finished operation as an open Task in the workflow Run, which
+  // is what the owner saw as ticked [Op] rows sitting at the sidebar root
+  // (fable.md orca-hierarchy, row 3). A close failure never un-settles the
+  // job; the ledger row is already the record.
+  const taskClosed = closeOperationTask(db, job, settledPayload);
+  if (taskClosed) {
+    const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
+    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
+      .run(JSON.stringify({ ...stored, taskClosed }), Date.now(), jobId);
+  }
+
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, ...(managedWorker ? { managedWorker } : {}) };
-  emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
+  const out = { ok: true, jobId, verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}) };
+  emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
+}
+
+// The operation Task an op holds, whichever launch kind opened it, and the
+// Run/kernel-terminal identity task-update needs to address it. Returns null
+// when the attempt never got a Task — there is then nothing to close.
+const operationTaskOf = (payload) => {
+  const taskId = payload?.orca?.taskId ?? payload?.managed?.taskId ?? payload?.hierarchy?.runtime?.taskId ?? null;
+  if (!taskId) return null;
+  return { taskId, runId: payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null };
+};
+
+// 'done' is Task closure, not a verdict: the verdict lives in the ledger. An
+// op that fails still leaves no open Task.
+const TASK_CLOSED_STATUS = 'done';
+
+function closeOperationTask(db, job, payload, kernelHandle) {
+  const task = operationTaskOf(payload);
+  if (!task) return null;
+  if (payload?.taskClosed?.ok === true) return payload.taskClosed;
+  const from = kernelHandle !== undefined ? kernelHandle
+    : db.prepare("SELECT worker_id FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1").get(job.workflow_id)?.worker_id ?? null;
+  const r = bestEffort(() => taskUpdate({ id: task.taskId, status: TASK_CLOSED_STATUS, run: task.runId, from }));
+  return { taskId: task.taskId, status: TASK_CLOSED_STATUS, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) };
 }
 
 /* -------------------------------------------------------------- incident */
@@ -2171,9 +2208,25 @@ function cmdFinish(ledger, args) {
       kind: 'workflow-finished', payload: { inboxClosed: closed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal },
     });
   });
+  // A finish leaves no open Task in the workflow Run. Settle closes an op's
+  // Task as it settles; this catches the ones no settle ever reached — a
+  // cancelled attempt, a job settled before task closure existed, an op whose
+  // task-update was refused (taskClosed.ok false).
+  const tasksClosed = [];
+  for (const row of db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id").all(workflowId)) {
+    const payload = jobPayloadOf(row);
+    if (!operationTaskOf(payload) || payload?.taskClosed?.ok === true) continue;
+    const result = closeOperationTask(db, row, payload, kernelTerminal);
+    if (!result) continue;
+    tasksClosed.push({ jobId: row.job_id, ...result });
+    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
+      .run(JSON.stringify({ ...payload, taskClosed: result }), now, row.job_id);
+  }
+
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, alreadyFinished: already,
-    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal) };
-  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
+    tasksClosed };
+  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   // Emit the durable receipt first because a Kernel normally closes its own
   // terminal here. The ledger is already authoritative if the host closes the
   // PTY before the terminal-close client can print its own receipt.
