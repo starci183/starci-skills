@@ -14,7 +14,7 @@
     "test:be": "npm test --workspace @starci/eslint-canon-be"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.13.0"
   },
   "devDependencies": {
     "eslint": "^9.18.0",
