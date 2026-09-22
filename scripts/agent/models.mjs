@@ -104,19 +104,56 @@ export function applyBias(chain, bias) {
   return [...kept.filter(p => prefer.has(p)), ...kept.filter(p => !prefer.has(p))];
 }
 
+// Host tools. An op that cannot run without a tool of the agent's host says so
+// as data: `route.riskHints: [host-tool-required:<tool>]` on its manifest. An
+// agent says which host tools it has as data: `capabilities.hostTools` on its
+// card (modules/models/agents/<provider>.yaml). A pool whose agent lacks a
+// required tool is ineligible — tier order and prefer-bias never hoist it.
+const HOST_TOOL_HINT = 'host-tool-required:';
+const DEFAULT_OPS_DIR = path.join(skillRoot, 'modules', 'ops', 'ops');
+const yamlCache = new Map();
+const readYamlCached = (file) => {
+  if (!yamlCache.has(file)) {
+    let doc = null;
+    try { doc = fs.existsSync(file) ? parseYaml(fs.readFileSync(file, 'utf8')) : null; } catch { doc = null; }
+    yamlCache.set(file, doc);
+  }
+  return yamlCache.get(file);
+};
+
+/** The host tools op `kind` declares it cannot run without, from its manifest's route.riskHints. */
+export function hostToolsRequired(kind, { opsDir = DEFAULT_OPS_DIR } = {}) {
+  if (!kind || /[\\/]|\.\./.test(String(kind))) return [];
+  const hints = readYamlCached(path.join(opsDir, `${kind}.yaml`))?.route?.riskHints;
+  return (Array.isArray(hints) ? hints : [])
+    .filter((hint) => typeof hint === 'string' && hint.startsWith(HOST_TOOL_HINT))
+    .map((hint) => hint.slice(HOST_TOOL_HINT.length).trim()).filter(Boolean);
+}
+
+/** The host tools the agent behind `provider` has, from its card's capabilities.hostTools. */
+export function hostToolsOf(provider, { modelsDir = DEFAULT_MODELS_DIR } = {}) {
+  if (!provider || /[\\/]|\.\./.test(String(provider))) return [];
+  const tools = readYamlCached(path.join(modelsDir, 'agents', `${provider}.yaml`))?.capabilities?.hostTools;
+  return Array.isArray(tools) ? tools.map(String) : [];
+}
+
+/** The required host tools a pool's agent lacks for op `kind`. */
+export function missingHostTools({ pool, kind, modelsDir, opsDir } = {}) {
+  const have = hostToolsOf(pool?.provider, { modelsDir });
+  return hostToolsRequired(kind, { opsDir }).filter((tool) => !have.includes(tool));
+}
+
 // Eligibility reasons for one pool at one difficulty. [] = eligible. The
 // capacity map is caller-supplied live state: capacity[target] =
 // {auth, quota:{state}, running, openIncident}; an absent entry means "no
 // live signal" and passes the capacity gates (unknown is OK — dead is not).
-function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, runtimes }) {
+function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, runtimes, modelsDir, opsDir }) {
   const reasons = [];
   if (!pool) return [`no runtimes.yaml entry for pool '${target}'`];
   if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role))
     reasons.push(`pool does not serve role '${role}'`);
-  for (const cap of runtimes?.kindRequires?.[kind] ?? []) {
-    if (!(pool.provides ?? []).includes(cap))
-      reasons.push(`pool lacks capability '${cap}' required by kind '${kind}'`);
-  }
+  for (const tool of missingHostTools({ pool, kind, modelsDir, opsDir }))
+    reasons.push(`pool agent '${pool.provider}' lacks host tool '${tool}' required by kind '${kind}' (route.riskHints host-tool-required:${tool})`);
   const lm = resolveLaunchModel(target, difficulty, { runtimes });
   if (lm.error) reasons.push(lm.error);
   const cap = capacity?.[target];
@@ -137,7 +174,7 @@ function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, 
 // Full pool selection: kind → role (roleOfKind, overridable), chain =
 // tier∩role, bias, then eligibility per candidate. Returns the first eligible
 // pool with its launch model, or {error} with the full rejected list.
-export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir } = {}) {
+export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir } = {}) {
   const rt = runtimes ?? loadRuntimes(modelsDir);
   const d = normalizeDifficulty(difficulty);
   if (!d) return { error: `unknown difficulty '${difficulty}'` };
@@ -148,10 +185,28 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const rejected = [];
   for (const target of chain) {
     const pool = rt?.runtimes?.[target] ?? null;
-    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, runtimes: rt });
+    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, runtimes: rt, modelsDir, opsDir });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
     return { target: pool.target ?? target, modelId, effort, role: resolvedRole, difficulty: d, chain, tierSource, rejected };
+  }
+  // No capacity or health state can fix a missing host tool, so when no pool in
+  // the chain could ever take the job for want of one, the refusal says which.
+  const tools = hostToolsRequired(kind, { opsDir });
+  const structural = chain.filter((target) => {
+    const pool = rt?.runtimes?.[target];
+    return pool && !(Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(resolvedRole))
+      && !resolveLaunchModel(target, d, { runtimes: rt }).error;
+  });
+  const toolRefusal = tools.length > 0 && structural.length > 0
+    && structural.every((target) => missingHostTools({ pool: rt.runtimes[target], kind, modelsDir, opsDir }).length > 0);
+  if (toolRefusal) {
+    const holders = Object.entries(rt?.runtimes ?? {})
+      .filter(([, pool]) => !missingHostTools({ pool, kind, modelsDir, opsDir }).length)
+      .map(([target, pool]) => ({ target: pool.target ?? target, difficulties: Object.keys(difficultyKeyed(pool.models)), roles: pool.roles ?? [] }));
+    const missing = [...new Set(structural.flatMap((target) => missingHostTools({ pool: rt.runtimes[target], kind, modelsDir, opsDir })))];
+    return { error: `no ${resolvedRole} pool at ${d} difficulty has host tool ${(missing.length ? missing : tools).join(', ')}`,
+      toolUnavailable: { tools: missing.length ? missing : tools, holders }, role: resolvedRole, difficulty: d, chain, tierSource, rejected };
   }
   return { error: `no eligible pool for role '${resolvedRole}' at ${d} difficulty`, role: resolvedRole, difficulty: d, chain, tierSource, rejected };
 }

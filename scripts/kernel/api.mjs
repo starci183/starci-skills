@@ -59,7 +59,7 @@ import { classifyAgentScreen } from './terminal-liveness.mjs';
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
-import { selectPool, resolveLaunchModel } from '../agent/models.mjs';
+import { selectPool, resolveLaunchModel, missingHostTools } from '../agent/models.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
@@ -1302,6 +1302,18 @@ async function cmdRoute(ledger, args) {
   }
 
   const decision = selectPool({ kind, difficulty, bias, capacity });
+  if (decision?.toolUnavailable) {
+    const { tools, holders } = decision.toolUnavailable;
+    const serving = holders.filter((h) => h.roles.includes(decision.role));
+    const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no ${decision.role} agent in the ${decision.difficulty} chain [${decision.chain.join(', ')}] has it`
+      + (serving.length
+        ? `; agents that have it: ${serving.map((h) => `${h.target} (difficulty ${h.difficulties.join('|')})`).join(', ')}. Re-run api route --job ${jobId} with --difficulty one of those serves${bias.avoid.some((p) => serving.some((h) => h.target === p)) ? ` and without --avoid ${bias.avoid.filter((p) => serving.some((h) => h.target === p)).join(',')}` : ''}.`
+        : `; no agent card lists it under capabilities.hostTools. Raise api incident --kind tool-unavailable for the owner.`)
+      + ' The job stays queued; never dispatch it on an agent without the tool.';
+    const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, reason: 'tool-unavailable', tools, holders: serving, detail };
+    emit(out, `route REFUSED for ${jobId} (${kind}): tool-unavailable — ${detail}`, args.json);
+    process.exit(1);
+  }
   if (!decision || decision.error) {
     const out = { ok: false, jobId, kind, difficulty, bias, error: decision?.error ?? 'selectPool returned no decision' };
     emit(out, `route REFUSED for ${jobId} (${kind}, ${difficulty}): ${out.error}`, args.json);
@@ -1654,6 +1666,7 @@ function cmdDispatch(ledger, args, repo) {
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   const briefExists = fs.existsSync(briefAbs);
+  const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });
 
   // The packet's params are the brief's defaults with the overrides enqueue
   // already validated on top — dispatch resolves, it never re-decides.
@@ -1708,6 +1721,7 @@ function cmdDispatch(ledger, args, repo) {
         : { command: null, error: `${model.target} is launch kind '${model.kind}' — composed by 'orca orchestration worker-start', not terminal create` },
       orca: { worktree, title, terminalTitle, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
+      ...(lackingTools.length ? { toolUnavailable: `${model.target} lacks host tool ${lackingTools.join(', ')} — spawn will refuse tool-unavailable` } : {}),
     };
     emit(out, [
       `PACKET job=${jobId} op=${op} model=${model.target} (${model.kind})`,
@@ -1724,6 +1738,15 @@ function cmdDispatch(ledger, args, repo) {
   }
 
   if (!briefExists) throw Object.assign(new Error(`spawn refused — no brief at modules/ops/ops/${op}.yaml`), { code: 'brief-missing' });
+  // A route persisted before host tools gated routing, an unrouted job's
+  // default pool or a --model override can name an agent without a tool the op
+  // cannot run without. That launch is a wasted dispatch; nothing is reserved.
+  if (lackingTools.length) {
+    const detail = `${model.target} (agent ${model.provider}) lacks host tool ${lackingTools.join(', ')} that ${op} requires (route.riskHints host-tool-required on modules/ops/ops/${op}.yaml). Re-run api route --job ${jobId} — it now selects only agents whose card lists the tool — then dispatch again${args.model ? ' without --model' : ''}. The job stays queued.`;
+    emit({ ok: false, jobId, op, reason: 'tool-unavailable', tools: lackingTools, model: model.target, detail },
+      `dispatch REFUSED for ${jobId} (${op}): tool-unavailable — ${detail}`, args.json);
+    process.exit(1);
+  }
   // A route decision may have been persisted before another job proves the
   // shared provider credential is dead. Re-check the durable provider circuit
   // before taking leases or creating an Orca Task so an already-routed sibling

@@ -317,8 +317,8 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   interface.audit:
     skill: starci
-    # Visual/Grammar conformance is independent verification. Codex leads for native image inspection,
-    # then the remaining hard-capable pools.
+    # Visual/Grammar conformance is independent verification. The chain is order only: the browser-dom
+    # host-tool gate (route.riskHints, agent card capabilities.hostTools) admits just the agents that measure.
     chain: [codex-agent, claude-agent, devin-agent]
     environments:
       - {environment: codex, profiles: [codex-agent]}

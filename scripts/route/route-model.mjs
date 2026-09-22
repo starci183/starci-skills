@@ -44,7 +44,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel } from '../agent/models.mjs';
+import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel, missingHostTools } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -343,10 +343,9 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
       base.capacityDrift = `profile pins maxParallel ${pc}; runtimes.yaml declares ${rt.maxParallel} (runtimes.yaml wins)`;
     if (w.role && rt.roles?.length && !rt.roles.includes(w.role))
       return { ...base, status: 'rejected', structural: true, reasons: [`pool does not serve role '${w.role}'`] };
-    const caps = runtimes?.kindRequires?.[w.kind] ?? [];
-    const missingCaps = caps.filter(c => !(rt.provides ?? []).includes(c));
-    if (missingCaps.length)
-      return { ...base, status: 'rejected', structural: true, reasons: missingCaps.map(c => `pool lacks capability '${c}' required by kind '${w.kind}'`) };
+    const missingTools = missingHostTools({ pool: rt, kind: w.kind });
+    if (missingTools.length)
+      return { ...base, status: 'rejected', structural: true, reasons: missingTools.map(tool => `pool agent '${rt.provider}' lacks host tool '${tool}' required by kind '${w.kind}' (route.riskHints host-tool-required:${tool})`) };
     if (lm.error)
       return { ...base, status: 'rejected', structural: true, reasons: [lm.error] };
     const evidence = evidenceByRuntime[id];
@@ -526,6 +525,9 @@ async function main() {
           : `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
     if (w.role && c.roles.length && !c.roles.includes(w.role))
       return { c, eligible: false, mode: null, reasons: [`pool does not serve role '${w.role}'`] };
+    const missingTools = missingHostTools({ pool: runtimes?.runtimes?.[c.id] ?? { provider: c.provider }, kind: args.kind });
+    if (missingTools.length)
+      return { c, eligible: false, mode: null, reasons: missingTools.map(tool => `pool agent '${c.provider}' lacks host tool '${tool}' required by kind '${args.kind}' (route.riskHints host-tool-required:${tool})`) };
     const lm = resolveLaunchModel(c.id, args.difficulty ?? 'medium', { runtimes });
     const qr = qualificationReasons({ provider: c.provider, model: lm.modelId ?? c.target, target: c.target, version: null }, evidenceByRuntime[c.id], w, rules);
     if (!qr.length) return { c, eligible: true, mode: 'qualified', reasons: [] };

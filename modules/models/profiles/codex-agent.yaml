@@ -26,8 +26,8 @@ capacity:
 launch:
   orca: {kind: managed-agent, agent: codex}
   imageGeneration: >-
-    The pool provides imagegen (runtimes.yaml provides, kindRequires) — the ONLY
-    image-capable pool in the fleet. interface.draw and interface.asset carry
+    The codex agent card lists image_gen.imagegen under capabilities.hostTools
+    (modules/models/agents/codex.yaml) — the ONLY image-capable pool in the fleet. interface.draw and interface.asset carry
     single-target chains that are exactly this route; asset generation has NO
     deferral fallback. profiles/gpt-6-sol.yaml carries the model-level flag.
 
@@ -52,7 +52,7 @@ business:
     codex-agent is the primary verifier and reasoning seat and the sole
     visual-design route.
   whenNeeded:
-    - verify-role operations — first in every verify chain (e2e, integration, security, perf, interface.audit, uat.assisted.verify).
+    - verify-role operations — first in every verify chain (e2e, integration, security, perf, uat.assisted.verify); interface.audit needs browser-dom, which the codex card does not list.
     - decide/plan operations — first in every reasoning chain; hard and insane work runs on gpt-6-sol.
     - interface.draw / interface.asset — the ONLY route; no other pool can produce the representative ImageGen candidates.
     - Medium-tier general work as first default.
