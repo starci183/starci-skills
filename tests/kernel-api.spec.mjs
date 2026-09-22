@@ -251,6 +251,63 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   assert.match(dep.detail,/precedes docs\.author in the approved order/);
 });
 
+// A live AUTH workflow parked its OAuth legs on a step only the owner can drive
+// and wrote that in free prose; status still called the jobs ready, so the
+// watchdog woke an idle Kernel that had nothing it could do.
+test('an owner-gate incident holds the jobs it names until the Kernel resolves it',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-owner-gate';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
+  const enq=(op,paths)=>{const r=api('enqueue','--workflow',wf,'--op',op,'--paths',paths);assert.equal(r.status,0,r.stderr);return out(r).job_id;};
+  const held=enq('integration.verify','docs/oauth-google');
+  const free=enq('docs.author','docs/readme');
+  const frontier=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).frontier;};
+  const because=(jobId,fr)=>fr.queued.find(item=>item.jobId===jobId);
+
+  const raised=api('incident','--workflow',wf,'--kind','owner-gate','--op','uat.assisted.verify',
+    '--holds','uat.assisted.verify,integration.verify','--detail','the owner drives the assisted OAuth run');
+  assert.equal(raised.status,0,raised.stderr||raised.stdout);
+  const incidentId=out(raised).incidentId;
+  assert.deepEqual(out(raised).holds,['uat.assisted.verify','integration.verify']);
+
+  let fr=frontier();
+  assert.equal(because(held,fr).queuedBecause,'owner-gate');
+  assert.deepEqual(because(held,fr).blockedBy,{incident:incidentId});
+  assert.equal(because(free,fr).queuedBecause,'ready','a job the gate does not name stays ready');
+  assert.equal(fr.readyOperations,1);
+
+  for(const verb of ['route','dispatch']){
+    const refused=api(verb,'--job',held);
+    assert.notEqual(refused.status,0,`${verb} refuses a held job before any pool or Orca call`);
+    assert.equal(out(refused).reason,'owner-gate');
+  }
+
+  // with only held jobs queued, nothing is actionable and the watchdog stays quiet
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(free));
+  fr=frontier();
+  assert.equal(fr.actionable,false);
+  assert.deepEqual(fr.queuedCauses,{'owner-gate':1});
+
+  const resolved=api('incident','--workflow',wf,'--resolve',incidentId,'--detail','assisted run receipt landed');
+  assert.equal(resolved.status,0,resolved.stderr||resolved.stdout);
+  assert.equal(out(resolved).changed,true);
+  fr=frontier();
+  assert.equal(because(held,fr).queuedBecause,'ready');
+  assert.equal(fr.actionable,true);
+  assert.equal(out(api('incident','--workflow',wf,'--resolve',incidentId)).changed,false,'resolving twice is a no-op');
+  const kinds=read(repo,ledger=>ledger.db.prepare("SELECT kind FROM events WHERE entity_type='incident' AND entity_id=? ORDER BY seq").all(incidentId).map(r=>r.kind));
+  assert.deepEqual(kinds,['incident-raised','incident-resolved']);
+
+  // without --holds the incident's own --op is held; any other kind holds nothing
+  const plain=out(api('incident','--workflow',wf,'--kind','owner-gate','--op','integration.verify','--detail','consent'));
+  assert.equal(because(held,frontier()).queuedBecause,'owner-gate');
+  api('incident','--workflow',wf,'--resolve',plain.incidentId);
+  api('incident','--workflow',wf,'--kind','infra-provider','--op','integration.verify','--detail','not a gate');
+  assert.equal(because(held,frontier()).queuedBecause,'ready');
+  assert.notEqual(api('incident','--workflow',wf,'--resolve','inc-nope').status,0,'an unknown incident is refused');
+});
+
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);

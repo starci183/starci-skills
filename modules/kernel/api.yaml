@@ -162,13 +162,15 @@ commands:
       'frontier.queued': >-
         [{jobId, opId, attempt, queuedBecause, blockedBy, detail}] — one row per queued job, in
         created order, naming why it is not running. `queuedBecause` is
-        dependency|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries the id
-        that holds it: {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
+        owner-gate|dependency|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries
+        the id that holds it: {incident} for an owner gate, {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
         {provider, pool} for an open circuit, {path, job} for a path lease, {pool, running,
         maxParallel} for a full pool, and null for `ready`. `ready` means nothing blocks it and the
         Kernel is the only thing left to move it
       'frontier.queuedBecause precedence': >-
-        first cause that bites, in this order. `dependency` — an approved leg that precedes this
+        first cause that bites, in this order. `owner-gate` — an open incident of kind
+        owner-gate names this job or its op in --holds (or, without --holds, as its --op): a step
+        only the owner drives holds it, and no admission check can clear that. Then `dependency` — an approved leg that precedes this
         op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
         ordering IS the legs array, so the earlier leg is the dependency). Then the four admission
         checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
@@ -747,8 +749,24 @@ commands:
   # --------------------------------------------------------------------------
 
   incident:
-    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>]'
+    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]  |  --workflow <id> --resolve <incidentId> [--detail <s>]'
     reads: 'the workflows row for --workflow'
+    ownerGate: >-
+      --kind owner-gate parks work on a step only the owner can drive (an
+      assisted OAuth run, a consent screen, a merchant choice). --holds lists
+      the ops or job ids it holds; without it, --op is held. While the
+      incident is open, status reports each held queued job
+      queuedBecause owner-gate (so the frontier is not actionable on them and
+      the watchdog does not wake the Kernel), and route and dispatch refuse
+      it with reason owner-gate. When the owner's step lands (the receipt
+      exists, the ask is answered), the Kernel runs --resolve and the jobs
+      are ready again. Free prose such as "[owner-gate-pending]" in --detail
+      holds only the incident's --op; name the rest in --holds
+    resolve: >-
+      --resolve <incidentId> sets that open incident's status to resolved and
+      appends events 'incident-resolved' {detail}; resolving a resolved
+      incident changes nothing and returns changed:false. It is also how a
+      superseded incident leaves survey.incidentsOpen
     writes: >-
       one incidents row per call {incident_id, workflow_id, op_id,
       attempts:0, status:'open', last_progress:'[<kind>] <detail>'} + events
@@ -756,9 +774,10 @@ commands:
       recognising that two escalations carry identical evidence, and
       therefore that the retry budget is spent, is the kernel's reading of
       `survey.incidentsOpen` (driver-loop.yaml retry-budget-exhausted)
-    returns: '{ok:true, incidentId, workflowId, kind, status:open}'
+    returns: '{ok:true, incidentId, workflowId, kind, status:open, holds?}  |  resolve: {ok:true, incidentId, workflowId, status:resolved, changed}'
     refuses:
       - workflow-unknown: 'no workflows row'
+      - incident-unknown: '--resolve names no incident on this workflow'
       # an empty --kind or --detail is a usage error (exit 2), not a typed refusal
     usedBy: >-
       plan divergence, retry budgets past their limit, unreconciled op

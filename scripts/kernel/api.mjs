@@ -23,7 +23,8 @@
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
 //   check    --repo <path> --job <job_id> (--checks '<json>' | --checks-file <path>)
 //   consume-report --repo <path> --job <job_id>
-//   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>]
+//   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
+//   incident --repo <path> --workflow <id> --resolve <incidentId> [--detail <s>]
 //   finish   --repo <path> --workflow <id>
 //
 // Every read prints a JSON-safe result; every write runs inside one
@@ -166,7 +167,8 @@ const usage = (code) => {
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
-  incident --workflow <id> --kind <k> --detail <s> [--op <opId>]
+  incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
+  incident --workflow <id> --resolve <incidentId> [--detail <s>]
   finish   --workflow <id>`);
   process.exit(code);
 };
@@ -601,7 +603,29 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'o
  * `api route` and `api dispatch` run, in their own order (workflow ceiling, provider circuit, path
  * fence, pool saturation); `ready` means nothing blocks it and the Kernel is the only thing left.
  */
-const QUEUED_BECAUSE = ['dependency', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+const QUEUED_BECAUSE = ['owner-gate', 'dependency', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+/**
+ * Open owner-gate incidents of a workflow: a step only the owner can drive
+ * (an assisted OAuth run, a consent screen) holds the jobs it names until the
+ * Kernel resolves the incident. `api incident --kind owner-gate --holds` names
+ * the held ops or jobs; without --holds the incident's --op is held. A job the
+ * owner holds is not work the Kernel can do, so status never calls it ready
+ * and the watchdog never wakes a Kernel for it.
+ */
+const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending'];
+const openOwnerGates = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
+  .map((row) => {
+    const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
+    if (!OWNER_GATE_KINDS.includes(kind)) return null;
+    const raised = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
+    const holds = parseJson(raised?.payload_json, {})?.holds;
+    return { incidentId: row.incident_id, holds: Array.isArray(holds) && holds.length ? holds : [row.op_id].filter(Boolean) };
+  })
+  .filter(Boolean);
+const ownerGateOf = (gates, job) => {
+  const opId = job.op_id ?? jobPayloadOf(job).opId ?? null;
+  return gates.find((gate) => gate.holds.includes(job.job_id) || (opId && gate.holds.includes(opId))) ?? null;
+};
 /**
  * The approved leg order for a workflow: the derived plan when one exists, else the approved
  * opChain. modules/schemas/goal-plan.yaml carries no dependsOn field — ordering IS the legs array,
@@ -613,9 +637,18 @@ const approvedLegOps = (goalJson) => {
   return [...new Set(legs.map((leg) => (typeof leg === 'string' ? leg : leg?.op)).filter(Boolean))];
 };
 /** One queued job's blocking cause and the id that holds it. */
-function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel }) {
+function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [] }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
+
+  const gate = ownerGateOf(ownerGates, job);
+  if (gate) {
+    return {
+      queuedBecause: 'owner-gate',
+      blockedBy: { incident: gate.incidentId },
+      detail: `owner-gate incident ${gate.incidentId} holds it; the Kernel resolves it (api incident --resolve) once the owner's step lands`,
+    };
+  }
 
   const index = opId ? legOps.indexOf(opId) : -1;
   if (index > 0) {
@@ -744,9 +777,10 @@ function cmdStatus(ledger, args) {
     const model = parseJson(row.payload_json, {})?.model;
     if (model) runningByModel[model] = (runningByModel[model] ?? 0) + 1;
   }
+  const ownerGates = openOwnerGates(db, workflowId);
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel }),
+    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates }),
   }));
   // Ready means the Kernel can move it now: a queued job nothing holds, or a
   // fenced launch to reconcile. A queued job waiting on a leg, a slot or a
@@ -1255,6 +1289,14 @@ async function cmdRoute(ledger, args) {
   // Concurrency admission BEFORE the pool decision: a route that lands on a
   // full workflow is a decision the kernel cannot spend. The ceiling is the
   // lower of the owner's budgets.maxOps and the fleet's maxParallelOps.
+  // An owner-gate incident naming this job refuses first: no pool can run a
+  // step only the owner drives.
+  const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
+  if (heldBy) {
+    const out = { ok: false, jobId, kind, reason: 'owner-gate', incident: heldBy.incidentId };
+    emit(out, `route REFUSED for ${jobId} (${kind}): owner-gate — incident ${heldBy.incidentId} holds it until the Kernel resolves it`, args.json);
+    process.exit(1);
+  }
   const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
   if (!slots.ok) {
     const out = { ok: false, jobId, kind, reason: 'max-ops', slots };
@@ -1669,6 +1711,12 @@ function cmdDispatch(ledger, args, repo) {
   // and a job above that line stays queued rather than launching
   // (engine/admission.mjs admitOpSlot). Pool maxParallel is a separate fence
   // route already applies; this one is the workflow's own ceiling.
+  const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
+  if (heldBy) {
+    const out = { ok: false, jobId, op, reason: 'owner-gate', incident: heldBy.incidentId };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): owner-gate — incident ${heldBy.incidentId} holds it until the Kernel resolves it; job stays queued`, args.json);
+    process.exit(1);
+  }
   const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
   if (!slots.ok) {
     const out = { ok: false, jobId, op, reason: 'max-ops', slots };
@@ -2542,6 +2590,24 @@ function closeOperationTask(db, job, payload, kernelHandle) {
 function cmdIncident(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (args.resolve) {
+    const row = db.prepare('SELECT incident_id,status FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
+    if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
+    const changed = row.status === 'open';
+    if (changed) {
+      ledger.transaction(() => {
+        db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(now, row.incident_id);
+        ledger.appendEvent({
+          workflowId, entityType: 'incident', entityId: row.incident_id,
+          kind: 'incident-resolved', payload: { detail: args.detail ?? null },
+        });
+      });
+    }
+    const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed };
+    emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
+    return;
+  }
+  const holds = String(args.holds ?? '').split(',').map((item) => item.trim()).filter(Boolean);
   const incidentId = `inc-${newToken().slice(0, 12)}`;
   ledger.transaction(() => {
     db.prepare(
@@ -2549,10 +2615,10 @@ function cmdIncident(ledger, args) {
     ).run(incidentId, workflowId, args.op ?? null, `[${args.kind}] ${args.detail}`, now);
     ledger.appendEvent({
       workflowId, entityType: 'incident', entityId: incidentId,
-      kind: 'incident-raised', payload: { kind: args.kind, detail: args.detail, opId: args.op ?? null },
+      kind: 'incident-raised', payload: { kind: args.kind, detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}) },
     });
   });
-  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: 'open' };
+  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: 'open', ...(holds.length ? { holds } : {}) };
   emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}: ${args.detail}`, args.json);
 }
 
@@ -2853,7 +2919,7 @@ async function main() {
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
     'consume-report': ['job'],
-    incident: ['workflow', 'kind', 'detail'],
+    incident: [],
     finish: ['workflow'],
   };
   if (!required[cmd]) usage(2);
@@ -2862,6 +2928,10 @@ async function main() {
   if (cmd === 'report' && args.outcome) need(REPORT_OUTCOMES.includes(args.outcome), `report --outcome must be ${REPORT_OUTCOMES.join('|')}, got '${args.outcome}'`);
   if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
+  if (cmd === 'incident') {
+    need(args.workflow, 'incident needs --workflow');
+    if (!args.resolve) { need(args.kind, 'incident needs --kind (or --resolve <incidentId>)'); need(args.detail, 'incident needs --detail'); }
+  }
 
   let ledger;
   try {
