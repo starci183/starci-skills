@@ -1113,11 +1113,49 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
 // post-launch attestation failures) a typed infra-provider incident so survey
 // sees it without parsing events. `terminal` is the launch's handle: a
 // terminal handle for command-terminal jobs, a Dispatch id for managed ones.
+const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+
+// A refusal must leave no live terminal, worker or open Task behind. Whatever
+// this attempt created before the host said no is closed exactly once here:
+// a command terminal with terminal-close, a managed worker with worker-stop +
+// worker-release. It runs before the rejection is written so the answer —
+// terminalClosed: true | false | null when the attempt created nothing to
+// close — is part of the dispatch-rejected record rather than a second
+// unrecorded effect. `settled` is a cleanup the caller already performed
+// (cmdDispatchManaged reconciles partial effects before rejecting); it is
+// reported, never repeated.
+// An unknown effect is the one case a refusal may NOT force closed: calls.yaml
+// reconcile-then-stop says the job is fenced at effect_unknown until `api
+// reconcile` proves the state. terminalClosed is false there — outstanding,
+// not silent.
+const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, settled, effectState }) => {
+  if (closeTerminal) {
+    if (alreadyClosed)
+      return { terminalClosed: true, closed: { kind: 'terminal', handle: closeTerminal, ok: true, by: 'launcher' } };
+    const r = bestEffort(() => terminalClose({ terminal: closeTerminal }));
+    return { terminalClosed: r?.ok === true,
+      closed: { kind: 'terminal', handle: closeTerminal, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) } };
+  }
+  if (!terminal || !MANAGED_KINDS.includes(model?.kind)) return { terminalClosed: null, closed: null };
+  if (!settled && effectState === 'unknown')
+    return { terminalClosed: false, closed: { kind: 'managed', dispatchId: terminal, deferred: 'reconcile-then-stop' } };
+  const stop = settled ? settled.stop : bestEffort(() => workerStop({ dispatch: terminal }));
+  const release = settled ? settled.release : bestEffort(() => workerRelease({ dispatch: terminal }));
+  const provenNoEffect = settled?.provenNoEffect === true;
+  return {
+    terminalClosed: provenNoEffect || (stop?.ok === true && release?.ok === true),
+    closed: { kind: 'managed', dispatchId: terminal, stop: { ok: stop?.ok === true },
+      release: { ok: release?.ok === true }, ...(provenNoEffect ? { provenNoEffect: true } : {}) },
+  };
+};
+
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false,
   effectState = 'none', details = null, providerHealthEvidence = null,
+  closeTerminal = null, alreadyClosed = false, settled = null,
 }) => {
   const authFailure = Boolean(providerHealthEvidence) || confirmedAuthFailure({ step, signal, error, details });
+  const { terminalClosed, closed } = closeRejectedLaunch({ model, terminal, closeTerminal, alreadyClosed, settled, effectState });
   // rejectDispatch is reached only before an accepted operation contract or
   // business verdict. Once the host proves effectState:none, the same durable
   // candidate is safe to reroute regardless of whether the infrastructure
@@ -1171,6 +1209,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
       effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth, at: now,
+      terminalClosed, ...(closed ? { closed } : {}),
     };
     if (effectState === 'none') {
       ledger.db.prepare('UPDATE jobs SET status=?, payload_json=?, result_json=?, worker_id=NULL, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?')
@@ -1183,7 +1222,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
-        effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth },
+        effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth,
+        terminalClosed, ...(closed ? { closed } : {}) },
     });
     if (providerHealth) {
       ledger.appendEvent({
@@ -1201,7 +1241,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
           `[infra-provider] ${JSON.stringify({ provider: model.provider, signal: signal ?? error ?? null, jobId })}`, now);
     }
   });
-  return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth };
+  return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth,
+    terminalClosed, ...(closed ? { closed } : {}) };
 };
 
 /* ------------------------------------------------------ op IPC helpers */
@@ -1431,7 +1472,8 @@ function cmdDispatch(ledger, args, repo) {
     const reason = spawned.signal ?? spawned.error ?? `spawn failed at ${spawned.step}`;
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step: spawned.step, signal: spawned.signal ?? null, error: spawned.error ?? null,
-      terminal: handle, incident: spawned.step === 'attestation', details: spawned,
+      terminal: handle, closeTerminal: handle, alreadyClosed: true,
+      incident: spawned.step === 'attestation', details: spawned,
     });
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, spawn: { ...spawn, reason } };
     emit(out, `dispatch REJECTED for ${jobId} (${spawned.step}): ${reason} — job status=${rejection.status}, terminal closed`, args.json);
@@ -1441,13 +1483,16 @@ function cmdDispatch(ledger, args, repo) {
   let artifact = null;
   const rejectCommand = ({ step, error = null, signal = null, dispatchId = null, incident = false, details = null }) => {
     cleanupDeliveryArtifact(artifact);
-    if (handle) terminalClose({ terminal: handle });
+    // The terminal this attempt created is closed by rejectDispatch, in the
+    // same step that records the refusal — a refused op never keeps a row in
+    // the sidebar (fable.md orca-hierarchy: [Op] interface.audit "Idle").
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
-      step, signal, error, terminal: dispatchId ?? handle, incident, effectState: 'none', details,
+      step, signal, error, terminal: dispatchId ?? handle, closeTerminal: handle,
+      incident, effectState: 'none', details,
     });
     const reason = signal ?? error ?? `command-terminal dispatch failed at ${step}`;
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, step, dispatchId, terminal: handle, error: reason },
-      `dispatch REJECTED for ${jobId} (${step}): ${reason}`, args.json);
+      `dispatch REJECTED for ${jobId} (${step}): ${reason} — terminal closed=${rejection.terminalClosed}`, args.json);
     process.exit(1);
   };
 
@@ -1653,7 +1698,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     const reconciliation = reconcileFailure(effectState, dispatchId);
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId, incident,
-      effectState: reconciliation.effectState, details,
+      effectState: reconciliation.effectState, details, settled: reconciliation.cleanup,
     });
     const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,

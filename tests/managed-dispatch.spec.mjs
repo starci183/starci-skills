@@ -319,6 +319,9 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
   assert.equal(partial.result.leases,0);
   assert.ok(partial.fx.calls().includes('orchestration worker-stop'));
   assert.ok(partial.fx.calls().includes('orchestration worker-release'));
+  // A refusal leaves nothing running, and says so on the record.
+  assert.equal(json(partial.result.job.result_json)?.terminalClosed,true);
+  assert.equal(json(partial.result.job.result_json)?.closed?.dispatchId,'dispatch-fake-1');
 
   const unknown=exercise('auth-unknown','unknown');
   assert.equal(unknown.result.job.status,'effect_unknown','a ready worker observation blocks provider fallback');
@@ -326,6 +329,52 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
   assert.equal(unknown.result.leases,1,'unknown effects keep the operation fence in place');
   assert.equal(unknown.fx.calls().includes('orchestration worker-stop'),false,'unknown readiness is not killed from a guess');
   assert.equal(unknown.fx.calls().includes('orchestration worker-release'),false);
+  assert.equal(json(unknown.result.job.result_json)?.terminalClosed,false,
+    'an unreconciled worker is outstanding, not quietly assumed gone');
+  assert.equal(json(unknown.result.job.result_json)?.closed?.deferred,'reconcile-then-stop');
+});
+
+test('a dispatch refused after the worker exists closes that worker in the same rejection',t=>{
+  // fable.md orca-hierarchy row 2: interface.audit a4 was rejected at
+  // worker-start and its terminal stayed open, so the sidebar kept an "Idle"
+  // [Op] row under the kernel for a job the ledger had already failed.
+  const fx=fixture(t);
+  fx.env.STARCI_FAKE_ORCA_MODE='auth-partial';
+  const workflowId='wf-reject-closes';
+  const jobId='job-reject-closes';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
+    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
+      payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent'}});
+  }finally{ledger.close();}
+
+  const rejected=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','codex-agent','--spawn','--json');
+  assert.notEqual(rejected.status,0,'a worker-start refusal is a rejected dispatch');
+  const out=json(rejected.stdout);
+  assert.equal(out?.rejected,'dispatch-rejected');
+  assert.equal(out?.rejection?.terminalClosed,true,'the refusal reports what it closed');
+
+  const argv=fx.callArgv();
+  const stopped=argv.filter(a=>a.slice(0,2).join(' ')==='orchestration worker-stop');
+  const released=argv.filter(a=>a.slice(0,2).join(' ')==='orchestration worker-release');
+  assert.equal(stopped.length,1,'the residual worker is stopped exactly once');
+  assert.equal(released.length,1,'and released exactly once — the rejection does not repeat the caller cleanup');
+  assert.equal(stopped[0][stopped[0].indexOf('--dispatch')+1],'dispatch-fake-1');
+  assert.equal(released[0][released[0].indexOf('--dispatch')+1],'dispatch-fake-1');
+
+  const event=ledgerRead(fx.repo,db=>db.prepare(
+    "SELECT payload_json FROM events WHERE workflow_id=? AND kind='dispatch-rejected'").get(workflowId));
+  const payload=json(event?.payload_json);
+  assert.equal(payload?.terminalClosed,true,'dispatch-rejected carries the proof');
+  assert.equal(payload?.closed?.kind,'managed');
+  assert.equal(payload?.closed?.dispatchId,'dispatch-fake-1');
+  // Lane G's evidence list is untouched by the containment.
+  const job=jobRow(fx.repo,jobId);
+  const rejectedDispatches=json(job?.payload_json)?.rejectedDispatches??[];
+  assert.equal(rejectedDispatches.length,1);
+  assert.equal(rejectedDispatches[0].dispatchId,'dispatch-fake-1');
 });
 
 test('managed prompt stall with exact exited worker is retried as the same logical attempt',t=>{

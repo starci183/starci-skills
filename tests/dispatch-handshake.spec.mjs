@@ -64,6 +64,9 @@ const callArgv=fx=>fs.existsSync(path.join(fx.root,'calls.jsonl'))
   :[];
 const calls=fx=>callArgv(fx).map(argv=>argv.slice(0,2).join(' '));
 
+const orcaState=fx=>JSON.parse(fs.readFileSync(path.join(fx.root,'state.json'),'utf8'));
+const liveTerminals=fx=>Object.values(orcaState(fx).terminals??{}).filter(term=>!term.closed).map(term=>term.handle);
+
 const jobRow=(fx,jobId)=>{
   const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
   try{return ledger.db.prepare('SELECT status,worker_id,result_json FROM jobs WHERE job_id=?').get(jobId);}
@@ -99,6 +102,21 @@ test('auth-dead stub: dispatch never leaves the job running and leaks no termina
   const job=jobRow(fx,fx.jobId);
   assert.notEqual(job?.status,'running','job must NOT be running after a rejected dispatch — this was the observed defect');
   assert.ok(calls(fx).includes('terminal close'),'the dead terminal must be closed — log shows no close call');
+  // fable.md orca-hierarchy: a refused op left its [Op] terminal open and the
+  // Orca sidebar kept showing it "Idle" under the kernel. A rejection leaves
+  // no live terminal for that dispatch, and says so on the record.
+  assert.deepEqual(liveTerminals(fx),[],'a rejected dispatch leaves no live terminal behind');
+  assert.deepEqual(orcaState(fx).closed,['fake-terminal-1']);
+  assert.equal(callArgv(fx).filter(argv=>argv.slice(0,2).join(' ')==='terminal close').length,1,
+    'the terminal is closed once, in the step that records the refusal');
+  const rejection=JSON.parse(r.stdout||'{}')?.rejection;
+  assert.equal(rejection?.terminalClosed,true);
+  assert.equal(rejection?.closed?.handle,'fake-terminal-1');
+  const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    const event=ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id='wf-dispatch' AND kind='dispatch-rejected'").get();
+    assert.equal(JSON.parse(event?.payload_json??'{}')?.terminalClosed,true,'dispatch-rejected carries the containment proof');
+  }finally{ledger.close();}
 });
 
 // Contract for m4's attestation work: the rejection is typed, not just a crash.
