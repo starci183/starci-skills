@@ -93,7 +93,8 @@ operationAgent:
       The runtime allocator names one runtime per operation and startOperation({candidates}) hands the
       launcher exactly that resolved selection; a chain is walked only when no candidate is given.
     guarantees:
-      - issues only the verbs and flags calls.yaml declares (tests/provider-orca.spec.mjs parity)
+      - issues only the verbs and flags calls.yaml declares (scripts/api/orca/lib.mjs builds every argv from that file)
+      - refuses before effects when the live agent-context signature does not carry the command or flags calls.yaml declares
       - attests-from-is-the-workflow-run-owner-handle
       - creates-canonical-operation-task-once-per-invocation
       - tries-only-the-allocated-candidate-or-walks-the-whole-resolved-chain-in-order

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// account-list.mjs — `orca account list` as a callable function.
+// account-list.mjs — the calls.yaml `account-list` call as a callable function.
 //   node scripts/api/orca/account-list.mjs
 // Returns {ok, accounts, rateLimits} — accounts is result minus rateLimits.
-import { orcaRun, jsonOf } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
 
 export function accountList() {
-  const r = orcaRun(['account', 'list', '--json']);
-  const { rateLimits = null, ...accounts } = jsonOf(r.stdout)?.result ?? {};
-  return { ok: r.status === 0, accounts, rateLimits, error: r.error ?? r.stderr };
+  const r = orcaCall('account-list');
+  const { rateLimits = null, ...accounts } = r.result ?? {};
+  return { ok: r.exitCode === 0, accounts, rateLimits, error: r.error };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('account-list.mjs')) {

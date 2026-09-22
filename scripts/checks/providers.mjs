@@ -1,5 +1,7 @@
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {agentContext} from '../api/orca/agent-context.mjs';
+import {missingFrom} from '../api/orca/lib.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -14,10 +16,11 @@ const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
 //     calls, capabilities, recipes, validation, envelopes)
 //   modules/models/profiles/<target>.yaml — profiles whose launch.orca.adapter
 //     names an agent card
-const AGENTS_DIR=path.join(skillRoot,'modules','models','agents');
-const HOSTS_DIR=path.join(skillRoot,'modules','host');
-const PROFILES_DIR=path.join(skillRoot,'modules','models','profiles');
-const REGISTRY_FILE=path.join(skillRoot,'modules','models','registry.yaml');
+const agentsDir=root=>path.join(root,'modules','models','agents');
+const hostsDir=root=>path.join(root,'modules','host');
+const profilesDir=root=>path.join(root,'modules','models','profiles');
+const registryFile=root=>path.join(root,'modules','models','registry.yaml');
+const AGENTS_DIR=agentsDir(skillRoot);
 const AGENT_CARD_SCHEMA='starci/agent-card@1';
 
 const yamlFilesIn=dir=>fs.existsSync(dir)
@@ -60,8 +63,9 @@ export function loadProviderContract(provider){
 }
 
 /** Validate the provider contract tree before an operation launch is planned. */
-export function validateProviderContracts(){
+export function validateProviderContracts({root=skillRoot}={}){
   const errors=[];
+  const AGENTS_DIR=agentsDir(root),HOSTS_DIR=hostsDir(root),PROFILES_DIR=profilesDir(root),REGISTRY_FILE=registryFile(root);
 
   // 1. Every agent card parses, carries the agent-card schema id and attests an
   //    `agent` identity equal to its file stem.
@@ -138,7 +142,84 @@ export function validateProviderContracts(){
       add(errors,typeof adapter==='string'&&Object.hasOwn(cards,adapter),`Registry target ${name} names unknown agent card: ${adapter}`);
   }
 
+  // 4. The Orca call contract is the argv source scripts/api/orca/lib.mjs
+  //    reads, so every flag it names must be one of the call's own declared
+  //    flags: a `required` or `forbidden` flag the entry does not declare can
+  //    never be built, and a classify block that can fall off its end leaves
+  //    the outcome to a default no document states.
+  errors.push(...validateCallContract(readCallContract(root)));
+
   return {ok:errors.length===0,errors};
+}
+
+const readCallContract=(root=skillRoot)=>{
+  const calls=path.join(hostsDir(root),'orca','calls.yaml');
+  const api=path.join(hostsDir(root),'orca','api.yaml');
+  if(!fs.existsSync(calls))return null;
+  try{return {calls:readYamlFile(calls),api:fs.existsSync(api)?readYamlFile(api):null};}
+  catch{return null;}
+};
+
+/** Static checks on modules/host/orca/calls.yaml — no Orca process is run. */
+export function validateCallContract(docs){
+  const errors=[];
+  if(!docs?.calls)return errors;
+  const {calls,api}=docs;
+  const jsonFlag=calls.defaults?.jsonFlag;
+  const publicCommands=Array.isArray(api?.publicCommands)?new Set(api.publicCommands):null;
+  const forbidden=new Set(calls.forbiddenCalls??[]);
+  const recoveries=new Set(Object.keys(calls.recoveries??{}));
+  for(const [name,call] of Object.entries(calls.calls??{})){
+    const declared=new Set([...(call?.flags??[]),jsonFlag].filter(Boolean));
+    for(const flag of call?.required??[])
+      add(errors,declared.has(flag),`calls.${name} requires --${flag} but does not declare it in flags`);
+    for(const flag of call?.forbidden??[])
+      add(errors,!declared.has(flag),`calls.${name} forbids --${flag} and also declares it in flags`);
+    for(const flag of Object.keys(call?.forbiddenValues??{}))
+      add(errors,(call?.forbidden??[]).includes(flag),
+        `calls.${name} constrains --${flag} values but does not forbid it`);
+    if(publicCommands){
+      add(errors,publicCommands.has(call?.command),`calls.${name} names an unknown Orca command: ${call?.command}`);
+      add(errors,!forbidden.has(call?.command),`calls.${name} names a forbidden command: ${call?.command}`);
+    }
+    add(errors,['read','mutation'].includes(call?.kind),`calls.${name} must declare kind read or mutation`);
+    if(Array.isArray(call?.classify)){
+      const last=call.classify.at(-1);
+      add(errors,last&&Object.keys(last.when??{}).length===0,
+        `calls.${name} classify must end with an unconditional rule — otherwise the outcome falls to an undeclared default`);
+      for(const rule of call.classify){
+        add(errors,(calls.envelope?.outcomes??[]).includes(rule?.outcome),`calls.${name} classify outcome ${rule?.outcome} is not in envelope.outcomes`);
+        add(errors,(calls.envelope?.effectStates??[]).includes(rule?.effectState),`calls.${name} classify effectState ${rule?.effectState} is not in envelope.effectStates`);
+      }
+    }
+    for(const target of Object.values(call?.recovery??{}))
+      add(errors,recoveries.has(target),`calls.${name} names an undefined recovery: ${target}`);
+  }
+  add(errors,calls.liveSchema?.onMismatch==='refuse-before-effects',
+    'calls.yaml liveSchema must state onMismatch: refuse-before-effects — scripts/api/orca/lib.mjs enforces it');
+  if(calls.liveSchema)
+    add(errors,Boolean(calls.calls?.['agent-context']),'calls.yaml liveSchema needs an agent-context entry to issue');
+  return errors;
+}
+
+/**
+ * Compare every calls.yaml entry against the live `orca agent-context --json`
+ * signature. Returns one drift row per entry the binary cannot satisfy.
+ */
+export function compareCallsToLiveSchema({root=skillRoot,listing}={}){
+  const docs=readCallContract(root);
+  if(!docs?.calls)return {ok:false,drift:[{call:null,reason:'no modules/host/orca/calls.yaml to compare'}]};
+  const live=listing===undefined?agentContext().listing:listing;
+  if(!live)return {ok:false,drift:[{call:null,reason:'orca agent-context returned no command listing'}]};
+  const jsonFlag=docs.calls.defaults?.jsonFlag;
+  const drift=[];
+  for(const [name,call] of Object.entries(docs.calls.calls??{})){
+    const missing=missingFrom(live,call,jsonFlag);
+    if(!missing)continue;
+    drift.push({call:name,command:call?.command??null,
+      missingCommand:missing.flags?false:true,missingFlags:missing.flags??[]});
+  }
+  return {ok:drift.length===0,drift};
 }
 
 export function requireProviderContracts(){
@@ -149,9 +230,15 @@ export function requireProviderContracts(){
 
 /** Checks entry: `node scripts/checks/providers.mjs` prints the validation report as JSON. */
 export function providersMain(argv=[]){
-  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/providers-check-help@1',help:'Usage: node scripts/checks/providers.mjs\n\nValidates the provider contract tree (modules/models/agents/*.yaml agent cards, modules/host/<provider>/*.yaml host documents, and the adapter references in modules/models/profiles/*.yaml and registry.yaml). Prints deterministic JSON. Exit 0 is valid, 1 reports contract errors.'}};
-  const result=validateProviderContracts();
-  return {exitCode:result.ok?0:1,report:{schema:'starci/providers-check-report@1',...result}};
+  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/providers-check-help@1',help:'Usage: node scripts/checks/providers.mjs [--live] [--root <dir>]\n\nValidates the provider contract tree (modules/models/agents/*.yaml agent cards, modules/host/<provider>/*.yaml host documents, the Orca call contract in modules/host/orca/calls.yaml, and the adapter references in modules/models/profiles/*.yaml and registry.yaml). Static by default - no process is run. --live additionally compares every calls.yaml command and flag against the live `orca agent-context --json` signature and exits 1 with the diff. --root checks another StarCi tree. Prints deterministic JSON. Exit 0 is valid, 1 reports contract errors.'}};
+  const rootIndex=argv.indexOf('--root');
+  const root=rootIndex>=0?argv[rootIndex+1]:skillRoot;
+  const result=validateProviderContracts({root});
+  if(!argv.includes('--live'))
+    return {exitCode:result.ok?0:1,report:{schema:'starci/providers-check-report@1',...result}};
+  const live=compareCallsToLiveSchema({root});
+  return {exitCode:result.ok&&live.ok?0:1,
+    report:{schema:'starci/providers-check-report@1',ok:result.ok&&live.ok,errors:result.errors,live}};
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

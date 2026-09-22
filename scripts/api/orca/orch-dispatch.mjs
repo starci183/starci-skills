@@ -1,25 +1,19 @@
 #!/usr/bin/env node
-// orch-dispatch.mjs — `orca orchestration dispatch` as a callable function.
+// orch-dispatch.mjs — the calls.yaml `dispatch` call as a callable function.
 //   node scripts/api/orca/orch-dispatch.mjs --task <task_id> --to <handle> [--from <handle>] [--run <run_id>]
-// Always appends --return-preamble (contract-required). Returns {ok, dispatchId, preamble}.
-import { orcaRun, jsonOf, arg } from './lib.mjs';
+// return-preamble is required by the contract, so it is always sent. Returns {ok, dispatchId, preamble}.
+import { orcaCall, arg } from './lib.mjs';
 
 export function orchDispatch({ task, to, from, run }) {
-  if (!task) throw new Error('orchDispatch: missing required --task');
-  if (!to) throw new Error('orchDispatch: missing required --to');
-  const argv = ['orchestration', 'dispatch', '--task', task, '--to', to, '--return-preamble'];
-  if (from) argv.push('--from', from);
-  if (run) argv.push('--run', run);
-  argv.push('--json');
-  const r = orcaRun(argv);
-  const result = jsonOf(r.stdout)?.result ?? null;
+  const r = orcaCall('dispatch', { task, to, from, run, 'return-preamble': true });
+  const result = r.result;
   const dispatchId = result?.dispatch?.id ?? null;
   return {
-    ok: r.status === 0 && Boolean(dispatchId),
+    ok: r.exitCode === 0 && Boolean(dispatchId),
     dispatchId,
     preamble: result?.preamble ?? null,
     result,
-    error: r.error ?? r.stderr,
+    error: r.error,
   };
 }
 

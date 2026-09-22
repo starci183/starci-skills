@@ -38,13 +38,28 @@
 //                          fake-terminal-1 — the kernel-restart spec proves the
 //                          replacement terminal is a different one.
 //
+//   STARCI_FAKE_ORCA_OMIT_COMMAND comma-separated Orca commands ('terminal
+//                          send') the agent-context listing leaves out — drives
+//                          the host-contract-drift refusal spec.
+//   STARCI_FAKE_ORCA_OMIT_FLAG comma-separated '<command>:<flag>' pairs
+//                          ('orchestration worker-start:model') the
+//                          agent-context listing leaves out of that command.
+//
+// `agent-context` answers from this repo's modules/host/orca/calls.yaml, so the
+// live-schema comparison in scripts/api/orca/lib.mjs runs in every spec instead
+// of being skipped; the two omit knobs above are the only way it drifts.
+//
 // State the specs read back: `commands` (every --command in creation order),
 // `counter` (terminals created) and `terminals[handle]` = {handle, connected,
 // writable, sent, prompt, command, model}. A spec may write connected:false
 // onto one terminal record between runs; `terminal show`/`read` then report
 // that exact terminal dead while the others stay live.
-export const FAKE_ORCA = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
+import path from 'node:path';
+
+const FAKE_ORCA_SOURCE = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const ROOT = __STARCI_ROOT__;
 const argv = process.argv.slice(2);
 const log = process.env.STARCI_FAKE_ORCA_LOG;
 const stateFile = process.env.STARCI_FAKE_ORCA_STATE;
@@ -73,6 +88,25 @@ const LIVE = h => (isQwen(h) ? 'Qwen' : 'Codex') + '\nmodel: ' + renderedModel(h
 const isDead = handle => mode === 'dead-terminal' || record(handle)?.connected === false;
 const hasSent = handle => { const r = record(handle); return r ? !!r.sent : state.sends > 0; };
 const verb = argv.slice(0, 2).join(' ');
+// The live-schema listing scripts/api/orca/lib.mjs compares against, derived
+// from calls.yaml so the stub can never disagree with the contract by accident.
+if (argv[0] === 'agent-context') {
+  const { parseYaml } = await import(pathToFileURL(ROOT + '/engine/yaml.mjs').href);
+  const contract = parseYaml(fs.readFileSync(ROOT + '/modules/host/orca/calls.yaml', 'utf8'));
+  const omitCommands = new Set((process.env.STARCI_FAKE_ORCA_OMIT_COMMAND || '').split(',').map(s => s.trim()).filter(Boolean));
+  const omitFlags = new Set((process.env.STARCI_FAKE_ORCA_OMIT_FLAG || '').split(',').map(s => s.trim()).filter(Boolean));
+  const commands = [];
+  const seen = new Set();
+  for (const call of Object.values(contract.calls || {})) {
+    if (!call || seen.has(call.command) || omitCommands.has(call.command)) continue;
+    seen.add(call.command);
+    const flags = (call.flags || []).filter(f => !omitFlags.has(call.command + ':' + f));
+    if (!flags.includes('json')) flags.push('json');
+    commands.push({ command: call.command, flags: flags.map(f => '--' + f) });
+  }
+  out({ ok: true, schemaVersion: 1, commandCount: commands.length, commands });
+  process.exit(0);
+}
 if (verb === 'terminal create') {
   state.terminalCommand = arg('command');
   state.terminalModel = commandModel(state.terminalCommand);
@@ -196,3 +230,8 @@ else if (verb === 'account list') {
 else { out({ ok: false, error: 'fake-orca: unhandled ' + argv.join(' ') }); process.exit(1); }
 process.exit(0);
 `;
+
+// The stub reads calls.yaml from this checkout, so it carries the repo root it
+// was written from — the spec's tmp dir is not a StarCi tree.
+const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..').replaceAll('\\', '/');
+export const FAKE_ORCA = FAKE_ORCA_SOURCE.replace('__STARCI_ROOT__', JSON.stringify(REPO_ROOT));

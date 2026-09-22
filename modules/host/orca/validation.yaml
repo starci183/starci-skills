@@ -1,16 +1,15 @@
 schema: starci/orca-provider-validation@1
 preflight:
-  - orca status --json
-  - orca agent-context --json
   - node scripts/checks/providers.mjs
-  - orca skills get orca-cli --json
-  - orca skills get orchestration --json
+  - node scripts/checks/providers.mjs --live
+  - node scripts/checks/check-host-boundary.mjs
 callContract:
   file: calls.yaml
-  runner: scripts/api/orca/*.mjs (one wrapper per verb over shared lib.mjs)
+  runner: scripts/api/orca/lib.mjs orcaCall (one wrapper per verb over it)
   envelope: starci/orca-call-result@1
   rules:
-    - Each wrapper holds its verb's argv as a literal and calls.yaml declares that verb and its flags; tests/provider-orca.spec.mjs refuses a wrapper the file does not declare. Prose templates in index.yaml document the same calls and are never a second construction path.
+    - lib.mjs loads calls.yaml once per process and builds every argv from it; a wrapper names a verb and shapes its receipt, and a param calls.yaml does not declare throws before the process runs. tests/orca-call-contract.spec.mjs drives that runner and tests/provider-orca.spec.mjs refuses a wrapper whose verb the file does not declare. Prose templates in index.yaml document the same calls and are never a second construction path.
+    - Before the first call of kind mutation, lib.mjs reads the live agent-context listing once and compares calls.yaml command and flags against it; a mismatch is outcome failed, effectState none, reason host-contract-drift and no process runs (calls.yaml liveSchema).
     - An Orca exit code 1 is a classified result with outcome and effectState; only a contract violation throws.
     - A mutation whose result is unknown is replayed once with --retry-request; a still-unknown result blocks fallback until a read-only reconciliation proves state.
     - Fallback to the next candidate requires effectState none, proven by settlement (worker-stop, worker-release released or already_released) when the failed attempt created a Dispatch.

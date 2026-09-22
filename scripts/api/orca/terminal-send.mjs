@@ -1,15 +1,13 @@
 #!/usr/bin/env node
-// terminal-send.mjs — `orca terminal send` as a callable function.
+// terminal-send.mjs — the calls.yaml `terminal-send` call as a callable function.
 //   node scripts/api/orca/terminal-send.mjs --terminal <handle> (--text <t> | --text-file <f>) [--enter] [--json]
 import fs from 'node:fs';
-import { orcaRun, jsonOf, arg, flag } from './lib.mjs';
+import { orcaCall, arg, flag } from './lib.mjs';
 
 export function terminalSend({ terminal, text, textFile, enter = true }) {
   const body = textFile ? fs.readFileSync(textFile, 'utf8') : (text ?? '');
-  const argv = ['terminal', 'send', '--terminal', terminal, '--text', body, '--json'];
-  if (enter) argv.push('--enter');
-  const r = orcaRun(argv);
-  return { ok: r.status === 0, receipt: jsonOf(r.stdout), error: r.error ?? r.stderr };
+  const r = orcaCall('terminal-send', { terminal, text: body, enter: Boolean(enter) });
+  return { ok: r.exitCode === 0, receipt: r.receipt, error: r.error };
 }
 
 if (process.argv[1]?.endsWith('terminal-send.mjs')) {

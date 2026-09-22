@@ -17,6 +17,8 @@ description: >-
 
 # Orca Orchestration
 
+For the owner's chat only. The `[Kernel]` and `[Op]` agents never run these commands; they call `scripts/kernel/api.mjs` or `scripts/api/orca/*.mjs`.
+
 This file is a discovery stub, not the usage guide. The full, version-matched Orca
 orchestration reference is served by the `orca` binary itself — kept out of this file on
 purpose so it can never drift from the binary that will actually run your commands.

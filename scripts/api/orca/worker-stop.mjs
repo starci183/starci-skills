@@ -1,35 +1,21 @@
 #!/usr/bin/env node
-// worker-stop.mjs — `orca orchestration worker-stop` as a callable function.
+// worker-stop.mjs — the calls.yaml `worker-stop` call as a callable function.
 //   node scripts/api/orca/worker-stop.mjs --dispatch <dispatch_id>
-// Applies the calls.yaml classify rules; returns {ok, outcome, effectState, dispatchId, state, result}.
-import { orcaRun, jsonOf, arg } from './lib.mjs';
+// Outcome and effectState come from the calls.yaml classify block; returns
+// {ok, outcome, effectState, dispatchId, state, result}.
+import { orcaCall, arg } from './lib.mjs';
 
 export function workerStop({ dispatch }) {
-  if (!dispatch) throw new Error('workerStop: missing required --dispatch');
-  const r = orcaRun(['orchestration', 'worker-stop', '--dispatch', dispatch, '--json'], { timeout: 60000 });
-  const j = jsonOf(r.stdout);
-  const result = j?.result ?? null;
-  const state = result?.state ?? null;
-  const errCode = j?.error?.code;
-  // calls.yaml worker-stop classify, evaluated in contract order — first match wins.
-  let outcome, effectState;
-  if (['stop_unknown', 'unverifiable', 'outcome_unknown'].includes(state) || errCode === 'dispatch_inactive') {
-    outcome = 'unknown'; effectState = 'unknown'; // reconcile, then abandon after the own terminal is closed
-  } else if (r.status === 0 && state !== null && state !== undefined) {
-    outcome = 'ok'; effectState = 'committed';
-  } else if (r.status === 0) {
-    outcome = 'unknown'; effectState = 'unknown'; // exited 0 without a state receipt
-  } else {
-    outcome = 'failed'; effectState = 'none';
-  }
+  const r = orcaCall('worker-stop', { dispatch });
+  const result = r.result;
   return {
-    ok: outcome === 'ok',
-    outcome,
-    effectState,
+    ok: r.outcome === 'ok',
+    outcome: r.outcome,
+    effectState: r.effectState,
     dispatchId: result?.dispatchId ?? null,
-    state,
+    state: result?.state ?? null,
     result,
-    error: r.error ?? r.stderr,
+    error: r.error,
   };
 }
 

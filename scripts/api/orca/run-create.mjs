@@ -1,22 +1,18 @@
 #!/usr/bin/env node
-// run-create.mjs — `orca orchestration run-create` as a callable function.
+// run-create.mjs — the calls.yaml `run-create` call as a callable function.
 //   node scripts/api/orca/run-create.mjs --objective <text> [--from <handle>]
 // Returns {ok, runId, result} — runId is result.run.id.
-import { orcaRun, jsonOf, arg } from './lib.mjs';
+import { orcaCall, arg } from './lib.mjs';
 
 export function runCreate({ objective, from }) {
-  if (!objective) throw new Error('runCreate: missing required --objective');
-  const argv = ['orchestration', 'run-create', '--objective', objective, '--json'];
-  if (from) argv.push('--from', from);
-  const r = orcaRun(argv);
-  const envelope = jsonOf(r.stdout);
-  const result = envelope?.result ?? null;
+  const r = orcaCall('run-create', { objective, from });
+  const result = r.result;
   const runId = result?.run?.id ?? null;
-  const receiptError = typeof envelope?.error === 'string'
-    ? envelope.error
-    : (envelope?.error ? JSON.stringify(envelope.error) : null);
-  const error = r.error || r.stderr || receiptError || (!runId ? r.stdout : null);
-  return { ok: r.status === 0 && Boolean(runId), runId, result, error };
+  const receiptError = typeof r.receipt?.error === 'string'
+    ? r.receipt.error
+    : (r.receipt?.error ? JSON.stringify(r.receipt.error) : null);
+  const error = r.error || receiptError || (!runId ? r.stdout : null);
+  return { ok: r.exitCode === 0 && Boolean(runId), runId, result, error };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('run-create.mjs')) {

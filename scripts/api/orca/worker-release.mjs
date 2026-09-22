@@ -1,36 +1,21 @@
 #!/usr/bin/env node
-// worker-release.mjs — `orca orchestration worker-release` as a callable function.
+// worker-release.mjs — the calls.yaml `worker-release` call as a callable function.
 //   node scripts/api/orca/worker-release.mjs --dispatch <dispatch_id>
-// Applies the calls.yaml classify rules; returns {ok, outcome, effectState, dispatchId, state, result}.
-import { orcaRun, jsonOf, arg } from './lib.mjs';
+// Outcome and effectState come from the calls.yaml classify block; returns
+// {ok, outcome, effectState, dispatchId, state, result}.
+import { orcaCall, arg } from './lib.mjs';
 
 export function workerRelease({ dispatch }) {
-  if (!dispatch) throw new Error('workerRelease: missing required --dispatch');
-  const r = orcaRun(['orchestration', 'worker-release', '--dispatch', dispatch, '--json'], { timeout: 60000 });
-  const j = jsonOf(r.stdout);
-  const result = j?.result ?? null;
-  const state = result?.state ?? null;
-  // calls.yaml worker-release classify, evaluated in contract order — first match wins.
-  let outcome, effectState;
-  if (r.status === 0 && ['released', 'already_released'].includes(state)) {
-    outcome = 'ok'; effectState = 'committed';
-  } else if (['retained', 'release_pending'].includes(state)) {
-    outcome = 'failed'; effectState = 'partial';
-  } else if (state === 'release_unknown') {
-    outcome = 'unknown'; effectState = 'unknown';
-  } else if (r.status === 0) {
-    outcome = 'unknown'; effectState = 'unknown'; // exited 0 without a classifiable state
-  } else {
-    outcome = 'failed'; effectState = 'none';
-  }
+  const r = orcaCall('worker-release', { dispatch });
+  const result = r.result;
   return {
-    ok: outcome === 'ok',
-    outcome,
-    effectState,
+    ok: r.outcome === 'ok',
+    outcome: r.outcome,
+    effectState: r.effectState,
     dispatchId: result?.dispatchId ?? null,
-    state,
+    state: result?.state ?? null,
     result,
-    error: r.error ?? r.stderr,
+    error: r.error,
   };
 }
 

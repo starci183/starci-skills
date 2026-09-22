@@ -1,21 +1,15 @@
 #!/usr/bin/env node
-// task-create.mjs — `orca orchestration task-create` as a callable function.
+// task-create.mjs — the calls.yaml `task-create` call as a callable function.
 //   node scripts/api/orca/task-create.mjs --run <run_id> --spec <text|path> [--task-title <t>] [--display-name <n>] [--deps <json_array>] [--parent <task_id>] [--from <handle>]
 // Returns {ok, taskId, task} — taskId is result.task.id. --spec is passed through verbatim.
-import { orcaRun, jsonOf, arg } from './lib.mjs';
+import { orcaCall, arg } from './lib.mjs';
 
 export function taskCreate({ run, spec, taskTitle, displayName, deps, parent, from }) {
-  if (!spec) throw new Error('taskCreate: missing required --spec');
-  if (!run) throw new Error('taskCreate: missing required --run');
-  const argv = ['orchestration', 'task-create', '--spec', spec, '--run', run, '--json'];
-  if (taskTitle) argv.push('--task-title', taskTitle);
-  if (displayName) argv.push('--display-name', displayName);
-  if (deps) argv.push('--deps', Array.isArray(deps) ? JSON.stringify(deps) : String(deps));
-  if (parent) argv.push('--parent', parent);
-  if (from) argv.push('--from', from);
-  const r = orcaRun(argv);
-  const task = jsonOf(r.stdout)?.result?.task ?? null;
-  return { ok: r.status === 0 && Boolean(task?.id), taskId: task?.id ?? null, task, error: r.error ?? r.stderr };
+  const r = orcaCall('task-create', {
+    spec, run, 'task-title': taskTitle, 'display-name': displayName, deps, parent, from,
+  });
+  const task = r.result?.task ?? null;
+  return { ok: r.exitCode === 0 && Boolean(task?.id), taskId: task?.id ?? null, task, error: r.error };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('task-create.mjs')) {
