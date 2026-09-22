@@ -137,6 +137,7 @@ signalMatching:
     - workspace-canonicalization
     - greenfield-scaffold
     - spec-foundation
+    - feature-build-fullstack
     - investigate-first
     - refactor
     - external-integration
@@ -206,7 +207,7 @@ archetypes:
       requires:
         - [author*, write, writing, complete, extend, rebuild, reconstruct, declare, define, viết, soạn, bổ sung, hoàn thiện, tái lập, khai báo, xây dựng đặc tả]
       excludes: [implement*, scaffold*, base repo]
-    supersedes: [feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
+    supersedes: [feature-build-fullstack, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
     chain:
       - {op: workspace.manage,    leg: workAuthor, note: "import mode: reconstruct the canonical .starciwork in the owner repository from the existing Work source with provenance, source untouched; its setup scope record is the bounded scope, so scope.define is not a leg"}
       - {op: business.decide,     leg: decide,     note: "review and extend the SRS against the vision; imported leaves confirmed to todo"}
@@ -246,7 +247,7 @@ archetypes:
         business. The stack is fixed by CONTEXT.md and the toolchain by
         knowledge/repository-baseline.yaml, so no decide leg precedes it.
       phrases: [scaffold*, base repo, base repository, repository baseline, repo baseline, greenfield, khởi tạo repo, dựng repo, dựng base repo, tạo repo mới, bootstrap the repo*]
-    supersedes: [spec-foundation, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
+    supersedes: [spec-foundation, feature-build-fullstack, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
     surfaces:
       backend: [backend, back-end, nestjs, nest, code be, api, máy chủ]
       frontend: [frontend, front-end, next.js, nextjs, fe, giao diện, ui]
@@ -271,6 +272,41 @@ archetypes:
       signalMatch: "'base repo' -> greenfield-scaffold; backend + frontend surfaces; SDS mention superseded"
       decision: "backend.scaffold and interface.scaffold run with disjoint source roots; review.verify reads their evidence. It runs in parallel with the spec-foundation workflow."
       ownerMoments: "none unless the grammar package or repository binding is missing (GRAMMAR_UNBOUND / REPO_UNBOUND)"
+
+  # ==========================================================================
+  # FEATURE-BUILD-FULLSTACK
+  # ==========================================================================
+  - id: feature-build-fullstack
+    signals:
+      note: >-
+        "build X end to end", "X backend and frontend", "full-stack X" — one
+        feature delivered through both the API and the interface to a running
+        product. Naming repositories that happen to be a backend and a frontend
+        is not this signal; lifecycle scopes supersede it.
+      phrases: [end to end, end-to-end, full-stack, fullstack, full stack, backend and frontend, frontend and backend, back end and front end, backend và frontend, frontend và backend, be và fe, fe và be, tới sản phẩm chạy được, đến sản phẩm chạy được, làm trọn tính năng, trọn tính năng]
+    supersedes: [feature-build-with-ui, feature-build-backend]
+    chain:
+      - {op: request.analyze,     leg: intake,      note: "external; chat-side intake"}
+      - {op: scope.define,        leg: scopeDefine, note: "bounds both surfaces of the feature"}
+      - {op: business.decide,     leg: decide,      note: "SRS shared by both surfaces"}
+      - {op: architecture.decide, leg: decide,      note: "SDS/contracts the API implements and the interface consumes"}
+      - {op: brand.decide,        leg: decide,      note: "only if no settled brand record — interface.draw prerequisite"}
+      - {op: interface.draw,      leg: draw,        note: "designGate holds the frontend build until this ui node is done"}
+      - {op: work.author,         leg: workAuthor,  note: "authors the records both lanes read"}
+      - {op: backend.implement,   leg: implement,   note: "the API slice; the interface builds against it"}
+      - {op: interface.implement, leg: implement,   note: "frontend build against the drawing and the implemented contract"}
+      - {op: interface.audit,     leg: verify,      note: "read-only UI/UX/Grammar audit before business proofs"}
+      - {op: e2e.verify,          leg: verify,      note: "backend lane proof through the public API on the real stack"}
+      - {op: uat.verify,          leg: verify,      note: "frontend lane proof on the served build"}
+      - {op: review.verify,       leg: verify,      note: "module-tier read after both lanes"}
+    exclusions:
+      - {op: integration.verify, why: "no external system in the prompt — composes with external-integration when one is named"}
+      - {op: code.refactor / test.author, why: "a new feature is built, not a behaviour-invariant restructure"}
+    workedExample:
+      prompt: "build Collab group chat end to end"
+      signalMatch: "'end to end' -> feature-build-fullstack; the ui and backend priors are superseded"
+      decision: "Both lanes in one chain: the API lands before the interface that consumes it, audit precedes the proofs, e2e and UAT close each lane, review.verify reads both."
+      ownerMoments: "brand.decide only when no settled brand record exists"
 
   # ==========================================================================
   # 1 — FEATURE-BUILD-WITH-UI

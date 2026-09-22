@@ -179,6 +179,17 @@ const ARCHETYPE_STAR = {
     },
     hints: { scopeKind: 'greenfield-scaffold' },
   },
+  // One feature through both lanes: the backend slice is a delivery of its
+  // own (strict qualifier, so the frontend build cannot stand in for it) and
+  // lands before the interface that consumes it.
+  'feature-build-fullstack': {
+    vars: a => [
+      { family: 'impl', suffix: 'X', state: 'done', _qual: 'backend', strictQualifier: true },
+      { family: 'ui', suffix: a.surfaceName, state: 'verified' },
+      { family: 'api', suffix: a.surfaceName, state: 'verified' },
+    ],
+    hints: { fullstack: true, implQualifier: 'frontend', scopeKind: 'feature-build-fullstack' },
+  },
   'investigate-first': {
     vars: () => [{ family: 'perf', suffix: 'X', state: 'verified' }],
     hints: { diagnosticFirst: true },
@@ -677,6 +688,12 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
       stacks.needsSatisfiedBy.push(`${arch.legId} (settled component inventory)`);
     }
     ensureLeg('review.verify', { forVar: { family: 'slice', suffix: 'X', state: 'reviewed' } });
+  }
+  // feature-build-fullstack: the interface walk runs on an API already proven
+  // through its public surface, so e2e.verify precedes uat.verify.
+  if (hints.fullstack && legs.has('e2e.verify') && legs.has('uat.verify')) {
+    edges.push(['e2e.verify', 'uat.verify']);
+    legs.get('uat.verify').needsSatisfiedBy.push('e2e.verify (the API the interface consumes is proven first)');
   }
   // investigate-first: a baseline perf.verify BEFORE scoping, then the closing
   // one after the build (archetypes.yaml #6 orderingIsThePoint).

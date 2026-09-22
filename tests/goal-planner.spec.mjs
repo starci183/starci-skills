@@ -138,3 +138,35 @@ test('an SDS mentioned beside a build verb stays a build, not a specification', 
   assert.equal(plan.scopeKind, 'feature-build-backend');
   assert.ok(plan.legs.some(leg => leg.op === 'backend.implement'));
 });
+
+const FULLSTACK_LEGS = [
+  'request.analyze', 'scope.define', 'business.decide', 'architecture.decide', 'brand.decide', 'interface.draw',
+  'work.author', 'backend.implement', 'interface.implement', 'interface.audit', 'e2e.verify', 'uat.verify', 'review.verify',
+];
+
+test('a feature named through both surfaces derives feature-build-fullstack with its own backend build', () => {
+  for (const prompt of [
+    'finish Sales, Accounting, Chatbot and AgentOS instance management, backend and frontend',
+    'build Collab group chat end to end',
+    'làm trọn tính năng nhóm chat, backend và frontend',
+  ]) {
+    const result = run(prompt);
+    assert.equal(result.status, 0, result.stderr || result.error?.message);
+    const plan = body(result);
+    assert.equal(plan.status, 'ok');
+    assert.equal(plan.scopeKind, 'feature-build-fullstack', prompt);
+    assert.deepEqual(plan.parseNotes, ['intent->S* via archetypes [feature-build-fullstack]'], 'ui and backend priors are superseded');
+    assert.deepEqual(plan.legs.map(leg => leg.op), FULLSTACK_LEGS, prompt);
+  }
+});
+
+test('repository nouns do not trigger fullstack, and no lifecycle prompt opens with test.author or code.refactor', () => {
+  assert.equal(body(run(SPEC_PROMPT)).scopeKind, 'spec-foundation');
+  assert.equal(body(run(SCAFFOLD_PROMPT)).scopeKind, 'greenfield-scaffold');
+  for (const prompt of [SPEC_PROMPT, SCAFFOLD_PROMPT, 'finish Sales, Accounting, Chatbot and AgentOS instance management, backend and frontend']) {
+    const plan = body(run(prompt));
+    assert.ok(!plan.parseNotes.join().includes('workspace-canonicalization'));
+    assert.ok(!['test.author', 'code.refactor'].includes(plan.legs[0]?.op), `${plan.scopeKind} must not open with a migration leg`);
+    assert.ok(!plan.legs.some(leg => leg.op === 'code.refactor'));
+  }
+});
