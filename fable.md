@@ -961,6 +961,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   cho phép transports rỗng, và export default định danh được tính là subject. Sau merge: check xanh, spec 31/31.
   Yêu cầu fork đặt test e2e baseline (~4.5 phút, cài package) sau cờ env, chạy ở checklist release.
 
+- 08:00 Trả lời ask Modules (business.decide a8, tuyến công khai Sales) theo ủy quyền: phương án 1, đăng ký
+  thao tác Sales có phiên bản trong Shared, giữ ý nghĩa đã duyệt; kernel đã được đánh thức. Câu hỏi hiện "Ch?n
+  tuy?n": 7 report business.decide bị PowerShell ghi bằng code page cũ, còn bản ghi yaml thì nguyên vẹn. Vá
+  `d3932b804`: api report từ chối văn xuôi mất ký tự non-ASCII, packet dặn ghi report.json dạng UTF-8. Merge
+  `lane-p4/e2e-flag` (test e2e baseline chỉ chạy khi STARCI_E2E_BASELINE=1). Fork báo gap stale-input (job đã
+  settle không bị đánh dấu cũ khi file knowledge đầu vào đổi digest); giao fork làm lane P5.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
