@@ -530,3 +530,25 @@ A, D, B, C rồi mới cắm E. Devin làm trên `main` trực tiếp theo allow
 **Điều kiện ra alpha.2:** `npm run check` xanh, `npm test` không skip nào ngoài PowerShell
 7, CI `ci.yml` và `todo-app-example.yml` xanh trên `main`, CHANGELOG mục alpha.2 liệt kê
 đúng những gì đã landed, tag `v1.0.0-alpha.2` sau khi thầy xem diff.
+
+### Lane J landed: `check-evidence-binding.mjs` và ba lỗ schema cho F2/C
+
+Check chạy trên example thật: todo-app-backend 122 `EVIDENCE_DIGEST_MISMATCH` (61 record) +
+25 `ASSERTED_NOT_OBSERVED`; ecommerce-app-be 385 mismatch (10 record) + 2. Đây là drift thật,
+evidence cũ hơn source. F2 sinh lại bằng `scripts/example/example-evidence.mjs`, không sửa tay.
+
+Lỗ schema (C/F2 phải đóng trước khi F2 bỏ skip):
+
+1. `codeDigest` là field mà cả example tree và `scripts/example/example-ownership.mjs` dùng,
+   nhưng không schema nào dưới `modules/schemas/` khai. `work-evidence.schema.yaml` là
+   `additionalProperties: false` nên mọi `evidence.yaml` trong example fail chính schema của nó.
+2. `work-evidence.schema.yaml` require `provenance.servedVersions[].{repository,commit,artifact}`;
+   0 record nào có. Field require mà không ai dùng thì hoặc bỏ require, hoặc example sai.
+3. `work-implementation.schema.yaml` require `directory`, `files`, `revision`, `verification`;
+   `work-layout.yaml` nói gate từ chối `directory`/`files` và dùng `owners[]`. Schema và
+   layout phủ nhau; `work-layout.yaml` là authority, schema sửa theo.
+4. `work-ui-screen.schema.yaml` không có viewport/breakpoint/theme/assets; `work-uat-flow.schema.yaml`
+   không có video/recording/failure-path. Hai bullet QUALITY-BAR §5 chưa check được vì không
+   có field để đọc. F2 thêm field khi viết 8 schema thiếu.
+
+Check chưa vào `npm run check`: lane I hoặc lane cuối wire vào `package.json` `check`.
