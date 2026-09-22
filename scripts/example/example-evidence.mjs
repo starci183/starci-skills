@@ -137,14 +137,14 @@ export function generateEvidence({workRoot, recordId, cwd, assertions, now = () 
     assertions: results.map(({id, command, exit, outcome: assertionOutcome, observation}) => ({id, command, exit, outcome: assertionOutcome, observation})),
     provenance: {
       actor: 'example-evidence',
-      tool: 'scripts/example-evidence.mjs',
+      tool: 'scripts/example/example-evidence.mjs',
       environment: 'local',
       capturedAt: now().toISOString(),
     },
   };
 
   const evidenceFile = path.join(path.dirname(recordFile), 'evidence.yaml');
-  const header = '# Written by scripts/example-evidence.mjs by actually running the assertion commands below\n'
+  const header = '# Written by scripts/example/example-evidence.mjs by actually running the assertion commands below\n'
     + '# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header\n'
     + '# and schemas/work-layout.yaml\'s work/evidence@1 section for what that distinction means).\n';
   fs.writeFileSync(evidenceFile, header + stringifyYaml(evidence));
