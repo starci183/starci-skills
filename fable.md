@@ -877,6 +877,12 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   Lane P (4 vá lãng phí) đang chạy trong worktree vì sửa api.mjs kernel đang chạy. `check-orca-tree` bỏ
   qua terminal của ledger khác (`0c434ed88`).
 
+- 04:45 Thầy gõ `ok` cho hai goal mới (nivo-modules-agentos, nivo-collab-group-chat), có điều kiện: chỉ
+  persist + start-kernel khi plan lập lại in đúng chuỗi `request.analyze > scope.define > business.decide >
+  architecture.decide > interface.draw > work.author > backend.implement > interface.implement >
+  interface.audit > e2e.verify > uat.verify > review.verify` (brand.decide chỉ khi chưa có brand đã duyệt).
+  Lệch thì không persist, để sáng.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
