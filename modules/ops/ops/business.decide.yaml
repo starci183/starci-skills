@@ -72,6 +72,8 @@ writes:
         features/<feature>/, where <family> is one of fr, nfr, br, decision, data or journey. The
         feature's readable overview is features/<feature>/index.yaml (work/feature@1) carrying
         purpose, customer understanding, outcome, scope and open questions in title/description.
+        Rewriting that overview keeps extensions.work3.scope exactly as scope.define wrote it, since the
+        bounded scope belongs to scope.define, and this op reads it, never re-authors it.
         Author each requirement as work/functional-requirement@1 under fr/<name>/ (actors, trigger,
         mainFlow, exceptionFlows, postconditions, composes, requiresProof), each quality as
         work/non-functional-requirement@1 under nfr/<name>/, each rule as work/business-rule@1 under
@@ -164,7 +166,8 @@ steps:
       - target
     writes: [node]
     action:
-      en: Author the feature's readable overview at features/<feature>/index.yaml and typed flat work/*@1
+      en: Author the feature's readable overview at features/<feature>/index.yaml (keeping its
+        extensions.work3.scope unchanged) and typed flat work/*@1
         records under fr/, nfr/, br/, decision/, data/ and journey/ as the selected slice requires.
         Every item owns a folder/index.yaml carrying its own family schema const; deeper name
         segments may group related records but every index.yaml is a complete record. Keep each FR's
