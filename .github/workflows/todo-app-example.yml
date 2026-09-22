@@ -1,23 +1,25 @@
-# TODO(owner): the architecture-check steps call node cli/main.mjs which no longer exists; decide fix vs delete (fable.md P0.1).
 name: todo-app-example
 
 # Proves the todo-app example (examples/todo-app-backend + examples/todo-app-frontend) end to end, on a
 # declared GitHub-hosted runner, so UAT/demo evidence never has to come from a developer's laptop and the
-# runtime's own gates (record layout, architecture check, scoped lint) stay green for the example at all
-# times. See examples/todo-app-backend/README.md#continuous-verification for the job-by-job summary.
+# runtime's own gates (record layout, scoped lint) stay green for the example at all times. See
+# examples/todo-app-backend/README.md#continuous-verification for the job-by-job summary.
+#
+# Both example apps compile sources out of packages/ (`@fe-kit/*`, `@e2e-kit/*`), so a change there is a
+# change to what these jobs check.
 
 on:
   push:
     paths:
       - 'examples/**'
+      - 'packages/**'
       - 'modules/schemas/**'
-      - 'scripts/checks/check-example-*.mjs'
       - 'scripts/checks/**'
   pull_request:
     paths:
       - 'examples/**'
+      - 'packages/**'
       - 'modules/schemas/**'
-      - 'scripts/checks/check-example-*.mjs'
       - 'scripts/checks/**'
 
 # A second push to the same branch/PR makes the still-running attempt pointless; cancel it instead of
@@ -55,7 +57,7 @@ jobs:
       - name: Run the example Work-gate fixture suite
         run: node --test tests/example-work-gate.spec.mjs
 
-  # 2) todo-app-backend: unit tests plus the architecture check, both read-only and requiring nothing but
+  # 2) todo-app-backend: unit tests plus the scoped-lint gate, both read-only and requiring nothing but
   #    the backend's own installed dependencies (the checker loads TypeScript through the checked
   #    repository's own node_modules, never the runtime's).
   backend:
@@ -85,50 +87,15 @@ jobs:
       - name: Unit tests
         run: npx jest
 
-      - name: Architecture check
-        working-directory: .
-        run: node cli/main.mjs architecture check examples/todo-app-backend --config architecture.json | tee architecture-backend.json
-
-      - name: Architecture check must be ok and cover all six backend sections
-        working-directory: .
-        run: |
-          node -e '
-            const fs = require("node:fs");
-            const result = JSON.parse(fs.readFileSync("architecture-backend.json", "utf8"));
-            const coverage = result.coverage ?? {};
-            const sections = {
-              "ownerPublicApi": coverage.ownerPublicApi?.status,
-              "moduleRegistration": coverage.moduleRegistration?.status,
-              "backendSourceShape.layout": coverage.backendSourceShape?.layout?.status,
-              "backendSourceShape.naming": coverage.backendSourceShape?.naming?.status,
-              "backendContractTypeForm.publicContracts": coverage.backendContractTypeForm?.publicContracts?.status,
-              "backendContractTypeForm.readonlyBoundaries": coverage.backendContractTypeForm?.readonlyBoundaries?.status,
-            };
-            const notChecked = Object.entries(sections).filter(([, status]) => status !== "checked");
-            if (result.ok !== true) {
-              console.error("architecture check reported ok:", result.ok);
-              process.exit(1);
-            }
-            if (notChecked.length) {
-              console.error("coverage sections not checked (unavailable counts as a failure, not a pass):");
-              for (const [name, status] of notChecked) console.error(` - ${name}: ${status ?? "missing"}`);
-              process.exit(1);
-            }
-            console.log("architecture check ok:true, all six backend coverage sections checked.");
-          '
-
-      # KNOWN RED TODAY: examples/todo-app-backend does not yet pass the nest scoped-lint profile.
-      # Lane `ex-be-nest` (branch ex-be-nest) owns bringing this profile clean; this step is written and
-      # wired now, guarded off with `if: false`, so the workflow states honestly what it does not yet
-      # enforce instead of quietly omitting the command or normalizing a red status/exit code. Remove the
-      # `if: false` guard (not the step) once ex-be-nest lands and this reports `status: clean`.
-      - name: Scoped lint (nest profile) [guarded off - see ex-be-nest]
-        if: false
+      # The aggregate gate for this repository. The architecture check is one of its machine kinds, so it
+      # runs here and nowhere else (docs/architecture-check.md); `--architecture-config` is resolved inside
+      # `--root`. The process exit code is the verdict - 0 `clean`, 1 `findings`, 2 `unavailable` - and the
+      # `starci/code-pattern-check@1` report on stdout is the detail, so no second step re-reads it.
+      - name: Scoped lint (nest profile)
         working-directory: .
         run: node scripts/checks/check-scoped-lint.mjs --profile nest --root examples/todo-app-backend --architecture-config architecture.json --all
 
-  # 3) todo-app-frontend: type-check, unit tests, lint, production build, architecture check and the
-  #    scoped-lint profile, which must already be clean (unlike the backend's).
+  # 3) todo-app-frontend: type-check, unit tests, lint, production build and the scoped-lint gate.
   frontend:
     name: frontend
     runs-on: ubuntu-latest
@@ -150,6 +117,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # packages/fe-kit ships as source behind the `@fe-kit/*` alias, and nothing resolves its peers
+      # (react, next, next-intl, @starci/grammar and their types) from packages/fe-kit upward. This
+      # junctions them onto this app's installed copies, which is what tsc, eslint, vitest and next read.
+      - name: Link fe-kit peers to this app's install
+        working-directory: .
+        run: node packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
+
       - name: Type-check (no emit)
         run: npx tsc --noEmit
 
@@ -162,48 +136,12 @@ jobs:
       - name: Production build
         run: npx next build
 
-      - name: Architecture check
+      # Same gate as the backend's, on the `next` profile: the architecture check is one of its machine
+      # kinds, and the exit code is the verdict (0 `clean`, 1 `findings`, 2 `unavailable`). The command is
+      # run unpiped so the runner sees that exit code rather than `tee`'s.
+      - name: Scoped lint (next profile)
         working-directory: .
-        run: node cli/main.mjs architecture check examples/todo-app-frontend --config architecture.json | tee architecture-frontend.json
-
-      - name: Architecture check must be ok and cover all three frontend sections
-        working-directory: .
-        run: |
-          node -e '
-            const fs = require("node:fs");
-            const result = JSON.parse(fs.readFileSync("architecture-frontend.json", "utf8"));
-            const coverage = result.coverage ?? {};
-            const sections = {
-              "ownerPublicApi": coverage.ownerPublicApi?.status,
-              "grammarContract": coverage.grammarContract?.status,
-              "frontendDataLifecycle": coverage.frontendDataLifecycle?.status,
-            };
-            const notChecked = Object.entries(sections).filter(([, status]) => status !== "checked");
-            if (result.ok !== true) {
-              console.error("architecture check reported ok:", result.ok);
-              process.exit(1);
-            }
-            if (notChecked.length) {
-              console.error("coverage sections not checked (unavailable counts as a failure, not a pass):");
-              for (const [name, status] of notChecked) console.error(` - ${name}: ${status ?? "missing"}`);
-              process.exit(1);
-            }
-            console.log("architecture check ok:true, all three frontend coverage sections checked.");
-          '
-
-      - name: Scoped lint (next profile) must be clean
-        working-directory: .
-        run: |
-          node scripts/checks/check-scoped-lint.mjs --profile next --root examples/todo-app-frontend --architecture-config architecture.json --all | tee scoped-lint-frontend.json
-          node -e '
-            const fs = require("node:fs");
-            const result = JSON.parse(fs.readFileSync("scoped-lint-frontend.json", "utf8"));
-            if (result.status !== "clean" || result.ok !== true) {
-              console.error("scoped lint (next) status:", result.status, "ok:", result.ok);
-              process.exit(1);
-            }
-            console.log("scoped lint (next) is clean.");
-          '
+        run: node scripts/checks/check-scoped-lint.mjs --profile next --root examples/todo-app-frontend --architecture-config architecture.json --all
 
   # 4) Bring up the example's real dev stack (Postgres + Keycloak, realm `todo`, demo user) on the runner,
   #    build and run the real API and the real Next.js production server against it, and prove the product
@@ -247,6 +185,9 @@ jobs:
           sudo mv /tmp/age/age /tmp/age/age-keygen /usr/local/bin/
           age --version
 
+      # `.starcistacks/dev/runtime/env/demo.agekey` is a demo key committed on purpose: it encrypts demo
+      # values only, so this job needs no GitHub Actions secret. See that example's README and
+      # .starcistacks/dev/runtime/env/KEYS.md.
       - name: Decrypt DEMO-ONLY dev secrets and bring up Postgres + Keycloak (not the app profile)
         run: |
           ./scripts/with-dev-secrets.sh \
@@ -415,6 +356,7 @@ jobs:
         run: |
           set -eu
           npm ci
+          node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
           npx next build
           npx next start -p 3000 > web.log 2>&1 &
           echo $! > web.pid
@@ -433,6 +375,34 @@ jobs:
             [ "$status" = "200" ] || { echo "$path returned $status, expected 200" >&2; exit 1; }
             echo "$path -> 200"
           done
+
+      # The Playwright harness (examples/todo-app-frontend/uat, run by that app's own `uat` script) drives
+      # the served frontend at http://localhost:3000; its config declares no webServer, so it runs in this
+      # job, against the stack the steps above brought up.
+      - name: Playwright UAT flows against the live stack
+        working-directory: examples/todo-app-frontend
+        run: |
+          set -eu
+          npx playwright install --with-deps chromium
+          npm run uat
+
+      # ops/uat.verify's run-folder shape (operator.yaml `writes.evidence`): the harness writes each run
+      # into the backend's own Work tree, the one .starciwork this product owns, as
+      # `runs/<runId>/{manifest.yaml,result.md,screens/*.png,videos/*}`. Videos are uploaded here by run id
+      # and referenced from the run manifest by sha256 - they are never committed to the repository,
+      # matching layoutPolicy in ops/uat.verify/operator.yaml.
+      - name: Upload UAT run evidence (manifest, result, screens, videos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: todo-app-uat-runs-${{ github.run_id }}
+          path: |
+            examples/todo-app-backend/.starciwork/features/*/uat/*/runs/*/manifest.yaml
+            examples/todo-app-backend/.starciwork/features/*/uat/*/runs/*/result.md
+            examples/todo-app-backend/.starciwork/features/*/uat/*/runs/*/screens/*
+            examples/todo-app-backend/.starciwork/features/*/uat/*/runs/*/videos/*
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload API and compose logs
         if: failure()
@@ -465,59 +435,3 @@ jobs:
           kill "$(cat ../todo-app-frontend/web.pid 2>/dev/null)" 2>/dev/null || true
           kill "$(cat api.pid 2>/dev/null)" 2>/dev/null || true
           docker compose -f .starcistacks/dev/infra/compose/compose.yaml down -v || true
-
-  # 5) UAT: only a placeholder today. Lane `ex-uat-harness` is authoring the Playwright harness under
-  #    examples/todo-app-frontend/uat/; this job runs it the moment that directory exists and stays a no-op
-  #    until then, so the workflow neither blocks on missing work nor silently skips it once it lands.
-  uat:
-    name: uat
-    needs: live
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Check for the UAT harness
-        id: harness
-        run: |
-          if [ -d "examples/todo-app-frontend/uat" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "examples/todo-app-frontend/uat does not exist yet (lane ex-uat-harness); nothing to run."
-          fi
-
-      # The harness brings up its own copy of the `live` job's stack (Postgres + Keycloak + built API +
-      # built frontend) the same way: decrypt the committed DEMO-ONLY secrets, `docker compose up -d`,
-      # then run the API and the Next.js server on the host. That sequence is intentionally not duplicated
-      # here a second time; it belongs in the harness's own setup once ex-uat-harness defines it, reusing
-      # exactly the steps in the `live` job above.
-      - name: Run Playwright UAT flows
-        if: steps.harness.outputs.present == 'true'
-        working-directory: examples/todo-app-frontend/uat
-        run: |
-          npm ci
-          npx playwright install --with-deps
-          npx playwright test
-
-      # ops/uat.verify's run-folder shape (operator.yaml `writes.evidence`): each run directory carries
-      # E/screens/*.png, E/videos/*, E/result.md and E/run-ledger.json. Videos are uploaded here as CI
-      # artifacts by run id and referenced from the run manifest by sha256 - they are never committed to
-      # the repository, matching layoutPolicy in ops/uat.verify/operator.yaml.
-      - name: Upload UAT run evidence (screens, videos, result, ledger)
-        if: steps.harness.outputs.present == 'true' && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: todo-app-uat-runs-${{ github.run_id }}
-          path: |
-            examples/todo-app-frontend/uat/**/runs/**/screens/*.png
-            examples/todo-app-frontend/uat/**/runs/**/videos/*
-            examples/todo-app-frontend/uat/**/runs/**/result.md
-            examples/todo-app-frontend/uat/**/runs/**/run-ledger.json
-            examples/todo-app-frontend/uat/**/test-results/**/*.webm
-          if-no-files-found: ignore
-          retention-days: 14
