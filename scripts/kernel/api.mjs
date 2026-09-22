@@ -678,8 +678,20 @@ function cmdEnqueue(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (wf.phase === 'finished') {
+    throw Object.assign(new Error(`workflow ${workflowId} is finished; a finished phase takes no new work`), { code: 'workflow-finished' });
+  }
+  const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${args.op}.yaml`);
+  if (!fs.existsSync(briefFile)) {
+    throw Object.assign(new Error(`unknown op ${args.op} — no brief at modules/ops/ops/${args.op}.yaml`), { code: 'unknown-op' });
+  }
   const goal = latestGoal(db, workflowId);
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
+  // An op with no owned_paths is an unbounded write grant: the packet would
+  // tell the worker "(per brief write-ceiling)" and nothing would fence it.
+  if (ownedPaths.length === 0) {
+    throw Object.assign(new Error(`--paths resolved to no path for ${args.op} — an op without owned_paths is an unbounded grant`), { code: 'empty-paths' });
+  }
   const records = [...new Set(String(args.records ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
   const cutValues = [args['cut-id'], args['cut-ordinal'], args['cut-total']];
   const hasCut = cutValues.some((value) => value != null);

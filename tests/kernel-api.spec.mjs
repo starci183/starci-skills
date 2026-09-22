@@ -60,13 +60,13 @@ test('survey on an empty workflow exits 0 with a sane empty result',{skip},t=>{
 test('enqueue writes a queued job row the ledger can see',{skip},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-enqueue';
   seedGoal(repo,wf);
-  const r=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/',
+  const r=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/',
     '--records','scope.workspace-canonicalization,scope.workspace-canonicalization',
     '--cut-id','consumer-migration','--cut-ordinal','1','--cut-total','3','--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const jobs=read(repo,l=>l.db.prepare('SELECT * FROM jobs WHERE workflow_id=?').all(wf));
   assert.ok(jobs.length>=1,'enqueue produced no jobs row');
-  const job=jobs.find(j=>j.op_id==='ex-test.probe')??jobs[0];
+  const job=jobs.find(j=>j.op_id==='docs.author')??jobs[0];
   assert.equal(job.status,'queued',`fresh job must be queued, got ${job.status}`);
   const payload=JSON.parse(job.payload_json);
   assert.deepEqual(payload.records,['scope.workspace-canonicalization'],
@@ -100,7 +100,7 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',{sk
         hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-5.6-sol',terminalHandle:'term-kernel'}},
       }),'term-kernel',at,at);
   });
-  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
+  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
   assert.equal(enq.status,0,enq.stderr);
   const h=runApi('hierarchy','--repo',repo,'--workflow',wf,'--json');
   assert.equal(h.status,0,h.stderr);
@@ -114,7 +114,7 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',{sk
   assert.equal(kernel?.runtime?.agent,'codex');
   assert.equal(kernel?.runtime?.model,'gpt-5.6-sol');
   assert.equal(op?.parentNodeId,kernel?.nodeId);
-  assert.equal(op?.opId,'ex-test.probe');
+  assert.equal(op?.opId,'docs.author');
   assert.ok(body?.edges?.some(e=>e.parentNodeId===kernel.nodeId&&e.childNodeId===op.nodeId));
 });
 
@@ -124,9 +124,9 @@ test('status projects exact host liveness and live jobs cannot route or dispatch
   seed(repo,ledger=>{
     const at=Date.now();
     ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'running',?,?,?)")
-      .run(jobId,wf,'ex-test.probe',json({opId:'ex-test.probe',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-live',agentTerminalHandle:'term-k7-op'},hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-live',terminalHandle:'term-k7-op'}}}),'term-k7-op',at,at);
+      .run(jobId,wf,'docs.author',json({opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-live',agentTerminalHandle:'term-k7-op'},hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-live',terminalHandle:'term-k7-op'}}}),'term-k7-op',at,at);
     ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'ex-test.probe',1,'ctx-k7-live','# live contract',json({}),at);
+      .run(wf,'docs.author',1,'ctx-k7-live','# live contract',json({}),at);
   });
   const fakeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-live-'));
   t.after(()=>fs.rmSync(fakeRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
@@ -185,9 +185,9 @@ test('status distinguishes a turn-idle Op and nudge wakes the exact worker witho
   seed(repo,ledger=>{
     const at=Date.now();
     ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'running',?,?,?)")
-      .run(jobId,wf,'ex-test.probe',json({opId:'ex-test.probe',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-idle',agentTerminalHandle:'term-k7-idle'},hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-idle',terminalHandle:'term-k7-idle'}}}),'term-k7-idle',at,at);
+      .run(jobId,wf,'docs.author',json({opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-idle',agentTerminalHandle:'term-k7-idle'},hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-idle',terminalHandle:'term-k7-idle'}}}),'term-k7-idle',at,at);
     ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'ex-test.probe',1,'ctx-k7-idle','# idle contract',json({}),at);
+      .run(wf,'docs.author',1,'ctx-k7-idle','# idle contract',json({}),at);
   });
   const fakeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-nudge-'));
   t.after(()=>fs.rmSync(fakeRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
@@ -220,7 +220,7 @@ test('status distinguishes a turn-idle Op and nudge wakes the exact worker witho
 test('dispatch --job without --spawn prints the packet and leaves the job unclaimed',{skip},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-dispatch';
   seedGoal(repo,wf);
-  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/',
+  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/',
     '--records','scope.workspace-canonicalization','--json');
   assert.equal(enq.status,0,enq.stderr);
   const jobId=out(enq)?.jobId??out(enq)?.job_id??read(repo,l=>l.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=?').get(wf))?.job_id;
@@ -238,7 +238,7 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
   assert.match(preview?.prompt??'',new RegExp(`workflow: ${wf} goal_revision=0 goal_identity=k7goal`));
   assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'CONTEXT.md').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
     'an Op launched in a routed repo must receive the absolute canonical Source skill path');
-  assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'modules','ops','ops','ex-test.probe.yaml').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
+  assert.match(preview?.prompt??'',new RegExp(path.join(ROOT,'modules','ops','ops','docs.author.yaml').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),
     'an Op must receive the absolute operation-contract path, not a cwd-relative modules path');
   assert.doesNotMatch(preview?.prompt??'',/CONTEXT\.md \(repo root\)/);
   const job=read(repo,l=>l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId));
@@ -248,7 +248,7 @@ test('dispatch --job without --spawn prints the packet and leaves the job unclai
 test('settle --verdict fail --report marks the job settled and appends an event',{skip},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-settle';
   seedGoal(repo,wf);
-  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
+  const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
   assert.equal(enq.status,0,enq.stderr);
   const jobId=out(enq)?.jobId??out(enq)?.job_id??read(repo,l=>l.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=?').get(wf))?.job_id;
   assert.ok(jobId);
@@ -271,17 +271,17 @@ test('cut pass requires the cut-aware green check names before settlement',{skip
   seedGoal(repo,wf);
   seed(repo,ledger=>{
     const at=Date.now();
-    ledger.enqueueJob({jobId,workflowId:wf,opId:'ex-test.probe',kind:'op',payload:{
-      opId:'ex-test.probe',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
+    ledger.enqueueJob({jobId,workflowId:wf,opId:'docs.author',kind:'op',payload:{
+      opId:'docs.author',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
       orca:{dispatchId:'ctx-k7-cut',agentTerminalHandle:'term-k7-cut'},
     }});
     ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
     ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'ex-test.probe',1,'ctx-k7-cut','# cut contract',json({}),at);
+      .run(wf,'docs.author',1,'ctx-k7-cut','# cut contract',json({}),at);
     ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,'ctx-k7-cut','ex-test.probe',1,0,'done',json({outcome:'done'}),null,at);
+      .run(wf,'ctx-k7-cut','docs.author',1,0,'done',json({outcome:'done'}),null,at);
     ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(wf,'ex-test.probe',1,json({checks:[{name:'generic-green',exitCode:0}]}),at);
+      .run(wf,'docs.author',1,json({checks:[{name:'generic-green',exitCode:0}]}),at);
   });
   const refused=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
   assert.notEqual(refused.status,0,'generic green evidence must not settle a cut pass');
@@ -290,7 +290,7 @@ test('cut pass requires the cut-aware green check names before settlement',{skip
     .run(json({checks:[
       {name:'cut-slice-postcondition',exitCode:0},
       {name:'cut-regression-inventory',exitCode:0},
-    ]}),wf,'ex-test.probe'));
+    ]}),wf,'docs.author'));
   const accepted=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
   assert.equal(read(repo,ledger=>ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status),'succeeded');
@@ -299,7 +299,7 @@ test('cut pass requires the cut-aware green check names before settlement',{skip
 test('incident writes an incidents row for the workflow',{skip},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-incident';
   seedGoal(repo,wf);
-  const r=runApi('incident','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--kind','test','--detail','k7 incident smoke','--json');
+  const r=runApi('incident','--repo',repo,'--workflow',wf,'--op','docs.author','--kind','test','--detail','k7 incident smoke','--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const n=read(repo,l=>l.db.prepare('SELECT count(*) n FROM incidents WHERE workflow_id=?').get(wf).n);
   assert.ok(n>=1,'incident produced no incidents row');
@@ -363,4 +363,27 @@ test('estimate sizes same-op slices from measured counts, never a guess',{skip},
   const empty=runApi('estimate','--repo',repo,'--json');
   assert.notEqual(empty.status,0,'estimate with no measured count must refuse');
   assert.match(`${empty.stdout}${empty.stderr}`,/estimate-no-measure/);
+});
+
+test('enqueue refuses an unbounded grant, an op with no brief, and a finished workflow',{skip},t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-enqueue-refusals';
+  seedGoal(repo,wf);
+  const rows=()=>read(repo,l=>l.db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(wf).n);
+  const refusal=r=>JSON.parse(r.stderr.trim().split('\n').at(-1));
+
+  const noPaths=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths',' , ','--json');
+  assert.equal(noPaths.status,1,'an op with no owned_paths must not enqueue');
+  assert.deepEqual([refusal(noPaths).ok,refusal(noPaths).code],[false,'empty-paths']);
+  assert.equal(rows(),0,'a refused enqueue writes no jobs row');
+
+  const unknown=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','ex-test.probe','--paths','docs/','--json');
+  assert.equal(unknown.status,1,'an op with no brief must not enqueue');
+  assert.deepEqual([refusal(unknown).ok,refusal(unknown).code],[false,'unknown-op']);
+  assert.equal(rows(),0);
+
+  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf));
+  const finished=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
+  assert.equal(finished.status,1,'a finished phase takes no new work');
+  assert.deepEqual([refusal(finished).ok,refusal(finished).code],[false,'workflow-finished']);
+  assert.equal(rows(),0);
 });

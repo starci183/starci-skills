@@ -66,8 +66,17 @@ about:
 # ============================================================================
 conventions:
   invoke: 'node scripts/kernel/api.mjs <command> [--repo <path>] [--json]'
-  ledger: '.starciwork/runtime.sqlite under the bound repo (engine/ledger-db.mjs ledgerFileFor)'
-  stdout: 'one JSON object — {ok:true, ...} on success, {ok:false, error:<message>, code:<kebab-string>} on refusal; callers match on the code string, it is the contract'
+  ledger: >-
+    .starciwork/runtime.sqlite under the bound repo (engine/ledger-db.mjs
+    ledgerFileFor). Every command opens it first; no file there refuses
+    `ledger-missing` before the verb runs
+  stdout: >-
+    one JSON object — {ok:true, ...} on success. A refusal prints ok:false and
+    names itself in one of four fields: `code` (the thrown refusals, the
+    common case), `reason` (nudge, observe, reconcile), `rejected` (every
+    dispatch launch failure) or `refused` (dispatch admission drift). The
+    kebab string is the contract callers match on; each command's `refuses:`
+    below names the string it prints and every untyped refusal says so
   exitCode: '0 ok / 1 refusal / 2 usage error'
   writes: >-
     every mutation runs inside BEGIN IMMEDIATE and appends its event —
@@ -204,9 +213,10 @@ commands:
       and its diff, not a copy. `lineage` = {replannedFrom, blocker, pathDelta,
       routingReason}: which prior plan-derived event/digest this supersedes, the
       typed blocker or trigger that forced the re-plan, the owned_paths delta vs
-      the prior legs, and why the legs routed as they did. A first plan may omit
-      it; a RE-PLAN (a prior plan-derived event exists) may not — re-planning
-      without provenance is a quiet rewrite (driver-loop.yaml replanTriggers.lineage).
+      the prior legs, and why the legs routed as they did. It is recorded exactly
+      as given, including all-null. Supplying it on a RE-PLAN is a kernel
+      obligation the api does not enforce — re-planning without provenance is a
+      quiet rewrite, and the rule lives in driver-loop.yaml replanTriggers.lineage.
     diff: >-
       STRUCTURAL only — the derived op ids + dependsOn edges vs the approved
       opChain legs. Added/removed/re-rooted legs are divergence; leg order
@@ -221,7 +231,6 @@ commands:
     refuses:
       - plan-file-missing: 'the --file path does not exist'
       - plan-file-invalid: 'unparseable, or fails the goal-plan {legs:[{op,...}]} shape — the refusal names the rule'
-      - plan-lineage-missing: 'a prior plan-derived event exists but no lineage was given — a re-plan must say what it supersedes and why'
       - workflow-unknown
     usedBy: 'tick.plan — divergence -> api incident --kind plan-divergence, never a quiet re-plan (driver-loop.yaml)'
 
@@ -251,9 +260,14 @@ commands:
       - workflow-unknown: 'no workflows row'
       - workflow-finished: 'a finished phase takes no new work (finish below)'
       - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
-      - already-queued: 'a queued or in-flight job for this op exists — the row IS the queue entry, never doubled'
       - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
+    duplicates: >-
+      enqueue does not refuse a second live job for the same op: cutExecution
+      (driver-loop.yaml) enqueues N disjoint same-op slices at once, each its
+      own attempt. Duplicate suppression is the kernel's plan discipline, and
+      the durable fence is dispatch admission — two jobs claiming a path both
+      reach the capacity-1 `path:<owned_path>` lease and only one is admitted.
     usedBy: 'tick.enqueue — one row per planned op the queue lacks; retries enqueue attempt+1'
 
   # --------------------------------------------------------------------------
@@ -283,7 +297,7 @@ commands:
       - job-not-queued: 'a live/leased/answering job cannot be rerouted; inspect status.workers and settle or reconcile its exact attempt'
       - job-live-worker: 'ledger says queued but the prior exact terminal is still connected+writable; reconcile it, never route a duplicate'
       - job-no-op: 'the job carries no op identity to route for'
-      - route-refused: 'selectPool returned no decision — capacity, eligibility or quota; a wait reason, not a failure'
+      - 'no decision (UNTYPED): selectPool returned none — capacity, eligibility or quota; a wait reason, not a failure. This one refusal prints {ok:false, jobId, kind, difficulty, bias, error:<selectPool message>} and exits 1 with no code string for the caller to match on'
     usedBy: >-
       drive.dispatch — `api route` runs BEFORE every `api dispatch`: the model
       decision is a ledger fact (payload + route-decided event), never an ad
@@ -351,12 +365,25 @@ commands:
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
-      - contested-lease: 'an in-flight job holds a capacity-1 resource this op needs (path:* write fences, machine:* budgets)'
-      - path-collision: 'owned_paths overlap an in-flight jobs read/write set (the api''s dispatch-planning conflict check)'
-      - path-illegal: 'owned_paths contradict the target repo''s layout/lint contracts — preflight says incident, never dispatch (dispatch.yaml preflight)'
-      - managed-agent: '--spawn on a managed-agent profile — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
-      - spawn-failed: 'create/read/send sequence did not land — the reservation is settled, never left leasing a ghost'
-      - dispatch-rejected: 'post-spawn attestation failed — auth/known-failure signature or dead terminal; job NOT running, terminal closed, slot released'
+      - job-no-op: 'the job row carries no op identity to dispatch'
+      - model-unknown: 'no model profile at modules/models/profiles/<target>.yaml'
+      - brief-missing: '--spawn with no brief at modules/ops/ops/<op>.yaml — the packet would cite a contract that is not there'
+      - managed-agent: '--spawn on a launch kind that is neither command-terminal nor managed — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
+      - 'reserve-failed (UNTYPED, field `refused`): admission threw on job identity/status drift — the job row is left untouched, an operator error rather than a dispatch rejection'
+      - dispatch-rejected: >-
+          the one typed rejection for every launch failure, carried in the
+          `rejected` field: an open provider-health circuit, a refused
+          admission (a live capacity-1 `path:<owned_path>` lease or
+          `machine:*` budget another in-flight job already holds — the
+          reasons ride `reserve.reasons`), run-create, task-create, a dead
+          spawn, prompt send/submission, attestation against the adapter
+          card's knownFailures, or a dispatch-show assignee mismatch. In every
+          case the job is NOT running, the terminal is closed and the lease +
+          budget reservations are released
+    layoutPreflight: >-
+      the owned-path legality preflight dispatch.yaml describes is the
+      KERNEL's step before enqueue, not an api refusal: api dispatch does not
+      read the target repo's layout/lint contracts
     usedBy: 'drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free'
 
   # --------------------------------------------------------------------------
@@ -394,7 +421,7 @@ commands:
       - dispatch-identity-missing: 'no exact managed Dispatch id is bound'
       - accepted-contract-exists: 'operation authority may have landed; never infer no effect'
       - worker-report-exists: 'worker evidence exists; use ordinary consume/check/settle'
-      - effect-unknown: 'host proof remains incomplete; status and lease stay unchanged'
+      - 'incomplete proof (UNTYPED): cleanup reports effectState other than none — the refusal prints {ok:false, jobId, reconciled:false, dispatchId, effectState, cleanup} and exits 1; status and lease stay unchanged'
       - live-worker-lease-conflict: 'the exact live worker exists but its owned paths cannot be re-fenced; do not duplicate or continue unfenced'
     usedBy: 'drive.reconcile before route; infrastructure retry reuses the same logical attempt and does not consume business route budget'
 
@@ -405,16 +432,26 @@ commands:
       sends a fixed liveness wake to the same exact operation terminal and
       appends op-worker-nudged. It creates no job, contract, lease, retry,
       verdict or authority.
-    returns: '{ok:true,jobId,nudged:true|false,reason?,worker,receipt?}'
+    returns: >-
+      {ok:true,jobId,nudged:true|false,reason?,worker,receipt?} — nudged:false
+      with ok:true and exit 0 is a SKIP, not a refusal: reason 'report-filed'
+      (the durable answer already exists) or 'worker-active' (the turn is
+      running)
     refuses:
+      - job-unknown: 'no jobs row for --job'
+      - job-not-operation: 'only an operation job has a worker terminal to wake'
       - job-not-running: 'only the current running attempt may be nudged'
+      # the four below exit 1 carrying the string in `reason`, not in `code`
       - worker-unavailable: 'exact terminal is disconnected/unwritable'
-      - interactive-gate: 'permission/trust input is a typed environment problem, not a wake'
-      - worker-state-unknown: 'weak observation never authorizes input'
+      - interactive-gate: 'permission/trust input is a typed environment problem, not a wake (liveness `failed` refuses under its own name the same way)'
+      - worker-state-unknown: 'liveness is neither turn-idle nor live-idle — weak observation never authorizes input'
+      - terminal-send-failed: 'the wake did not land on the exact terminal; no op-worker-nudged event is appended'
     usedBy: 'drive.wait on the first turn-idle observation with no durable report'
 
   # --------------------------------------------------------------------------
-  # OBSERVE — read-only screen context on the job's own exact op terminal.
+  # OBSERVE — screen context on the job's own exact op terminal. It touches no
+  # jobs/contracts/reports/checks/leases row and sends nothing, but it is not a
+  # pure read: it appends its own 'op-observed' receipt event.
   # --------------------------------------------------------------------------
 
   observe:
@@ -456,6 +493,7 @@ commands:
     returns: 'the stored contract markdown on stdout (machine form {ok:true, contract:{workflow_id, op_id, attempt, dispatch_id, markdown, context}} with --json)'
     refuses:
       - contract-missing: 'no contracts row for the job''s attempt — the job was never dispatched'
+      - bad-attempt: '--attempt is not a positive integer'
       - job-unknown
     usedBy: 'the [Op] worker — it reads its contract from the ledger row, not from the terminal prompt text'
 
@@ -514,8 +552,12 @@ commands:
     returns: '{ok:true, jobId, workflowId, op, attempt, checks:<n>, checkEvidence:{observed,passed,failed,green}}'
     refuses:
       - job-unknown
+      - job-no-op: 'the job row carries no op identity — pass --op'
       - checks-invalid: 'the --checks payload is not valid JSON / not the check-result shape'
       - checks-file-missing: 'the --checks-file path does not exist'
+      - bad-attempt: '--attempt is not a positive integer'
+      - checks-attempt-mismatch: '--attempt names an attempt other than the job row''s — one checks row per attempt, never written against a neighbour'
+      - checks-report-missing: 'no worker report is filed for the job''s bound dispatch — the kernel re-runs checks against a filed answer, not against silence'
     usedBy: 'drive.settle — after consume-report and before settle; the re-run record a `pass` verdict stands on'
 
   # --------------------------------------------------------------------------
@@ -578,16 +620,18 @@ commands:
 
   incident:
     args: '--workflow <id> --kind <k> --detail <s> [--op <opId>]'
-    reads: 'existing incidents — same {kind, op} fingerprint is ONE incident, not a pile'
+    reads: 'the workflows row for --workflow'
     writes: >-
-      incidents row upserted {incident_id, workflow_id, op_id, attempts+1,
-      status:'open', last_progress:detail} + events 'incident-raised' {kind,
-      fingerprint} — identical evidence is not progress (the api's
-      fingerprint upsert is the exhaustion detector)
-    returns: '{ok:true, incident_id, attempts, exhausted:true|false}'
+      one incidents row per call {incident_id, workflow_id, op_id,
+      attempts:0, status:'open', last_progress:'[<kind>] <detail>'} + events
+      'incident-raised' {kind, detail, opId}. Each call opens its own row:
+      recognising that two escalations carry identical evidence, and
+      therefore that the retry budget is spent, is the kernel's reading of
+      `survey.incidentsOpen` (driver-loop.yaml retry-budget-exhausted)
+    returns: '{ok:true, incidentId, workflowId, kind, status:open}'
     refuses:
       - workflow-unknown: 'no workflows row'
-      - empty-field: 'kind or detail empty — an incident without a named cause is noise'
+      # an empty --kind or --detail is a usage error (exit 2), not a typed refusal
     usedBy: >-
       plan divergence, retry budgets past their limit, unreconciled op
       deaths — anything the driver may not decide alone (driver-loop.yaml
