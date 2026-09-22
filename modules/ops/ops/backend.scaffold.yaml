@@ -127,7 +127,9 @@ steps:
         common and nest carry them (package.json with engines and scripts, strict tsconfig, canon
         eslint config, jest with coverage thresholds, husky pre-commit with lint-staged and pre-push,
         .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore, .editorconfig,
-        .gitattributes), then the declared layout, then the minimal skeleton — entrypoint plus the
+        .gitattributes) - the manifest composed and every config and skeleton file copied byte for byte
+        from the profile shape, with only its declared parameters and common-key placeholders filled -
+        then the declared layout, then the minimal skeleton — entrypoint plus the
         baseline liveness surface and any health the settled records add. No business behaviour
         beyond what the skeleton proves.
   - reads:

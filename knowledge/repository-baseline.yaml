@@ -15,22 +15,34 @@ provenance:
   observedReference:
     - repository: nivo-backend
       commit: a44246f1c9b7dcbaa0f36432b38375159321cb43
-      files: [package.json, tsconfig.json, eslint.config.mjs, .husky/pre-commit, .husky/pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore, .gitattributes]
+      files: [package.json, tsconfig.json, apps/core/tsconfig.app.json, nest-cli.json, jest.config.js, eslint.config.mjs, .husky/pre-commit, .husky/pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore, .gitattributes, src/features/core/api/core/http/health/transport/http/health.controller.ts]
     - repository: nivo-fe
       commit: aae8d15c8097ec767227fcc14bfe231f07f0213b
-      files: [package.json, apps/*/tsconfig.json, eslint.config.mjs, vitest.config.ts, .husky/pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore]
+      files: [package.json, apps/app/package.json, apps/app/tsconfig.json, apps/app/next.config.ts, apps/app/postcss.config.mjs, apps/app/vitest.config.ts, apps/app/src/app/globals.css, eslint.config.mjs, vitest.config.ts, vitest.setup.ts, .husky/pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore]
+    - registry: npm
+      packages: ['@starci/eslint-canon-be@1.2.1', '@starci/eslint-canon-fe@3.0.2', '@starci/grammar@0.4.13', 'lint-staged@16.4.0']
   limitations: |
     The owner's current repositories are the observed reference, not certification; where they
     differ from each other or from this baseline, the observations below say so and the baseline
     value wins for a new repository. Package versions are the observed pins at readAt; recheck the
-    published kit versions when scaffolding.
+    published kit versions when scaffolding. The shapes were proven at readAt by materialising each
+    profile into an empty directory and running npm install, typecheck, lint and the test runner
+    with exit 0.
+parameters:
+  name: npm package name of the new repository - the bound repository name
+  app: Nest application folder under apps/ - the service name the record or design declares
+  grammarFamily: The bound @starci/grammar family whose stylesheet the app imports (core, heritage or offset-pop)
 guidance:
   - id: BASELINE-ONE-SOURCE
     requirement: |
-      Every value a scaffold writes into manifests, hooks, CI, coverage and quality configuration
-      comes from the shapes below for the repository's profile. A profile shape extends common;
-      angle-bracket key placeholders and common.* references resolve to the value they name. A value the
-      shapes do not carry is a named gap in the scaffold evidence, never an improvised choice.
+      Every value a scaffold writes into manifests, toolchain configuration, hooks, CI, coverage and
+      quality configuration comes from the shapes below for the repository's profile. A profile shape
+      extends common: maps merge with the profile's keys added, and a profile list is appended to the
+      common list. An angle-bracket placeholder resolves to the common key it names or to a declared
+      parameter; common.* references resolve to the value they name. The manifest is composed as
+      common.manifest orders it, and every entry under files is written byte for byte at its path with
+      only its placeholders filled. A value the shapes do not carry is a named gap in the scaffold
+      evidence, never an improvised choice.
   - id: BASELINE-CHECK-ONLY-GATES
     requirement: |
       CI and pre-push run check-only commands (lint:check, typecheck, test:ci, build). Only the
@@ -60,6 +72,13 @@ shapes:
     engines:
       node: '>=<nodeMajor>'
     nodeMajor: 22
+    manifest:
+      file: package.json
+      name: <name>
+      version: 0.1.0
+      private: true
+      order: [name, version, private, packageManager, engines, scripts, lint-staged, dependencies, devDependencies]
+      lint-staged: common.hooks.lintStaged
     typescript:
       strict: true
       noEmitCheck: tsc --noEmit --pretty false
@@ -71,6 +90,15 @@ shapes:
       lint:check: eslint . --max-warnings=<lint.maxWarnings>
       typecheck: tsc --noEmit --pretty false
       prepare: husky
+    devDependencies:
+      typescript: ^5.7.3
+      '@types/node': ^<nodeMajor>
+      eslint: ^9.18.0
+      '@eslint/js': ^9.18.0
+      typescript-eslint: ^8.67.0
+      globals: ^15.14.0
+      husky: ^9.1.7
+      lint-staged: ^16.4.0
     coverage:
       reportsDirectory: coverage
       lcov: coverage/lcov.info
@@ -80,9 +108,12 @@ shapes:
         functions: 80
         branches: 75
     hooks:
-      manager: husky@^9.1.7
+      manager: husky
       preCommit: npx lint-staged
       prePush: npm run typecheck && npm run test:affected
+      files:
+        .husky/pre-commit: common.hooks.preCommit
+        .husky/pre-push: common.hooks.prePush
       lintStaged:
         '*.{ts,tsx,mts,cts,js,mjs,cjs}': eslint --fix --max-warnings=<lint.maxWarnings>
     ci:
@@ -121,7 +152,7 @@ shapes:
       comment: false
     sonar:
       file: sonar-project.properties
-      projectKey: <repository name>
+      projectKey: <name>
       hostUrl: https://sonar.starci.org
       sourceEncoding: UTF-8
       lcovReportPaths: coverage/lcov.info
@@ -137,9 +168,12 @@ shapes:
       - .starciwork/_local/
       - config.yaml
     editorconfig:
+      render: 'root = true, then one [*] section carrying every other key below'
       root: true
       charset: utf-8
       end_of_line: lf
+      indent_style: space
+      indent_size: 4
       insert_final_newline: true
       trim_trailing_whitespace: true
     gitattributes:
@@ -153,66 +187,512 @@ shapes:
     extends: common
     eslintKit: '@starci/eslint-canon-be'
     testRunner: jest
-    testDependencies: [jest, ts-jest, '@types/jest', '@nestjs/testing', supertest]
+    testDependencies: [jest, ts-jest, '@types/jest', '@nestjs/testing', supertest, '@types/supertest']
+    dependencies:
+      '@nestjs/common': ^11.0.1
+      '@nestjs/core': ^11.0.1
+      '@nestjs/platform-express': ^11.0.1
+      '@nestjs/terminus': ^11.1.1
+      reflect-metadata: ^0.2.2
+      rxjs: ^7.8.1
+    devDependencies:
+      '@nestjs/cli': ^11.0.0
+      '@nestjs/schematics': ^11.0.0
+      '@nestjs/testing': ^11.0.1
+      '@starci/eslint-canon-be': ^1.2.1
+      '@types/express': ^5.0.0
+      '@types/jest': ^29.5.14
+      '@types/supertest': ^7.2.1
+      jest: ^29.7.0
+      supertest: ^7.2.2
+      ts-jest: ^29.4.12
     scripts:
       build: nest build
       start: nest start
       start:dev: nest start --watch
-      start:prod: node dist/main
+      start:prod: node dist/apps/<app>/src/main
       test: jest
+      test:unit: jest
       test:ci: jest --ci --coverage --coverageReporters=lcov --coverageReporters=text-summary
       test:affected: jest --changedSince=origin/main --passWithNoTests
-    jestCoverageThreshold: common.coverage.thresholds
     sonar:
-      sources: src
-      tests: src
+      sources: apps,src
+      tests: apps,src
       exclusions: '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**'
       testInclusions: '**/*.spec.ts'
-    health: liveness adapter at the path docs/application-runtime-config-and-health.md names for Nest
+    health: GET /health/live, the Terminus liveness check with no indicators, at the transport path docs/application-runtime-config-and-health.md names for Nest
+    files:
+      tsconfig.json: |
+        {
+          "compilerOptions": {
+            "module": "nodenext",
+            "moduleResolution": "nodenext",
+            "resolvePackageJsonExports": true,
+            "target": "ES2023",
+            "esModuleInterop": true,
+            "allowSyntheticDefaultImports": true,
+            "isolatedModules": true,
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": true,
+            "resolveJsonModule": true,
+            "removeComments": true,
+            "sourceMap": true,
+            "outDir": "./dist",
+            "rootDir": "./",
+            "baseUrl": "./",
+            "skipLibCheck": true,
+            "strict": true,
+            "noFallthroughCasesInSwitch": true,
+            "forceConsistentCasingInFileNames": true,
+            "paths": {
+              "@features/*": ["./src/features/*"],
+              "@modules/*": ["./src/modules/*"]
+            }
+          },
+          "include": ["apps/**/*", "src/**/*"]
+        }
+      tsconfig.build.json: |
+        {
+          "extends": "./tsconfig.json",
+          "exclude": ["node_modules", "dist", "coverage", "**/*.spec.ts"]
+        }
+      nest-cli.json: |
+        {
+          "$schema": "https://json.schemastore.org/nest-cli",
+          "collection": "@nestjs/schematics",
+          "monorepo": true,
+          "root": "apps/<app>",
+          "sourceRoot": "apps/<app>/src",
+          "compilerOptions": {
+            "deleteOutDir": true,
+            "webpack": false,
+            "tsConfigPath": "tsconfig.build.json"
+          },
+          "projects": {
+            "<app>": {
+              "type": "application",
+              "root": "apps/<app>",
+              "entryFile": "main",
+              "sourceRoot": "apps/<app>/src",
+              "compilerOptions": {
+                "tsConfigPath": "tsconfig.build.json",
+                "webpack": false
+              }
+            }
+          }
+        }
+      jest.config.js: |
+        const { pathsToModuleNameMapper } = require("ts-jest")
+        const { compilerOptions } = require("./tsconfig.json")
+
+        /** @type {import("jest").Config} */
+        module.exports = {
+            preset: "ts-jest",
+            testEnvironment: "node",
+            testMatch: ["**/*.spec.ts"],
+            moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, { prefix: `${__dirname}/` }),
+            transform: {
+                "^.+\\.ts$": ["ts-jest", { tsconfig: "tsconfig.json", diagnostics: true }],
+            },
+            clearMocks: true,
+            collectCoverageFrom: ["apps/**/*.ts", "src/**/*.ts", "!**/*.spec.ts", "!**/*.d.ts", "!**/main.ts"],
+            coverageDirectory: "<coverage.reportsDirectory>",
+            coverageThreshold: {
+                global: {
+                    statements: <coverage.thresholds.statements>,
+                    lines: <coverage.thresholds.lines>,
+                    functions: <coverage.thresholds.functions>,
+                    branches: <coverage.thresholds.branches>,
+                },
+            },
+        }
+      eslint.config.mjs: |
+        import js from "@eslint/js"
+        import globals from "globals"
+        import tseslint from "typescript-eslint"
+        import { defineConfig } from "eslint/config"
+        import starciBe, { recommended as starciRecommended } from "@starci/eslint-canon-be"
+
+        const sources = ["apps/**/*.ts", "src/**/*.ts"]
+
+        export default defineConfig([
+            { ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**"] },
+            {
+                plugins: { js },
+                extends: ["js/recommended"],
+                languageOptions: { globals: globals.node },
+            },
+            ...tseslint.configs.recommended.map((config) => ({ ...config, files: sources })),
+            {
+                files: sources,
+                rules: {
+                    "@typescript-eslint/no-explicit-any": "error",
+                    "no-console": "error",
+                    indent: ["error", 4],
+                    quotes: ["error", "double"],
+                    semi: ["error", "never"],
+                },
+            },
+            {
+                files: sources,
+                plugins: { "starci-be": starciBe },
+                rules: starciRecommended,
+            },
+        ])
+      apps/<app>/src/main.ts: |
+        import { NestFactory } from "@nestjs/core"
+        import { AppModule } from "./app.module"
+
+        async function bootstrap() {
+            const app = await NestFactory.create(AppModule)
+            app.enableShutdownHooks()
+            await app.listen(process.env.PORT ?? 3000)
+        }
+
+        void bootstrap()
+      apps/<app>/src/app.module.ts: |
+        import { Module } from "@nestjs/common"
+        import { SystemHealthModule } from "@features/system-health/system-health.module"
+
+        @Module({ imports: [SystemHealthModule] })
+        /** Composition root: the modules this service runs. */
+        export class AppModule {}
+      src/features/system-health/system-health.module.ts: |
+        import { Module } from "@nestjs/common"
+        import { TerminusModule } from "@nestjs/terminus"
+        import { LiveController } from "./transport/http/live.controller"
+
+        @Module({
+            imports: [TerminusModule],
+            controllers: [LiveController],
+        })
+        /** Process-local liveness; readiness arrives with the SDS that declares dependencies. */
+        export class SystemHealthModule {}
+      src/features/system-health/transport/http/live.controller.ts: |
+        import { Controller, Get } from "@nestjs/common"
+        import { HealthCheck, HealthCheckService } from "@nestjs/terminus"
+
+        @Controller("health")
+        /** Liveness probe: answers from process-local state and never touches a dependency. */
+        export class LiveController {
+            constructor(private readonly health: HealthCheckService) {}
+
+            /** A provider outage must not restart the process, so no indicator runs here. */
+            @Get("live")
+            @HealthCheck()
+            live() {
+                return this.health.check([])
+            }
+        }
+      apps/<app>/src/app.module.spec.ts: |
+        import type { INestApplication } from "@nestjs/common"
+        import { Test } from "@nestjs/testing"
+        import request from "supertest"
+        import { AppModule } from "./app.module"
+
+        describe("GET /health/live", () => {
+            let app: INestApplication
+
+            beforeAll(async () => {
+                const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
+                app = moduleRef.createNestApplication()
+                await app.init()
+            })
+
+            afterAll(async () => {
+                await app.close()
+            })
+
+            it("answers ok from process-local state", async () => {
+                const response = await request(app.getHttpServer()).get("/health/live")
+                expect(response.status).toBe(200)
+                expect(response.body).toMatchObject({ status: "ok" })
+            })
+        })
   - id: next
     appliesTo: frontend
     extends: common
     eslintKit: '@starci/eslint-canon-fe'
     testRunner: vitest
-    testDependencies: [vitest, '@vitest/coverage-v8', '@vitejs/plugin-react', jsdom, '@testing-library/react', '@testing-library/jest-dom']
+    testDependencies: [vitest, '@vitest/coverage-v8', '@vitejs/plugin-react', vite, jsdom, '@testing-library/react', '@testing-library/dom', '@testing-library/jest-dom']
+    dependencies:
+      next: 16.1.6
+      react: 19.2.3
+      react-dom: 19.2.3
+      '@starci/grammar': 0.4.13
+      '@heroui/react': ^3.2.1
+      '@heroui/styles': ^3.2.1
+    devDependencies:
+      '@starci/eslint-canon-fe': 3.0.2
+      '@types/react': ^19
+      '@types/react-dom': ^19
+      tailwindcss: ^4
+      '@tailwindcss/postcss': ^4
+      eslint-plugin-react: ^7.37.5
+      eslint-plugin-react-hooks: ^7.0.1
+      eslint-plugin-jsx-a11y: ^6.10.2
+      vitest: ^3.2.7
+      '@vitest/coverage-v8': ^3.2.7
+      '@vitejs/plugin-react': ^5.2.0
+      vite: ^7.3.6
+      jsdom: ^29.1.1
+      '@testing-library/react': ^16.3.2
+      '@testing-library/dom': ^10.4.1
+      '@testing-library/jest-dom': ^7.0.1
     scripts:
       build: next build
       dev: next dev
       start: next start
       test: vitest run
+      test:unit: vitest run
       test:ci: vitest run --coverage
       test:affected: vitest run --changed origin/main --passWithNoTests
-    vitestCoverage:
-      provider: v8
-      reporter: [text-summary, json-summary, lcov]
-      thresholds: common.coverage.thresholds
-    gitignore: [.next/]
+    gitignore: [.next/, next-env.d.ts, '*.tsbuildinfo']
     sonar:
       sources: src
       tests: src
       exclusions: '**/*.spec.ts,**/*.spec.tsx,**/.next/**,**/node_modules/**,**/coverage/**'
       testInclusions: '**/*.spec.ts,**/*.spec.tsx'
       typescriptTsconfigPaths: tsconfig.json
-    grammar: the bound grammar package interface.scaffold resolves; the baseline adds no UI library
-    health: liveness route at the path docs/application-runtime-config-and-health.md names for Next
+    grammar:
+      package: '@starci/grammar'
+      peers: ['@heroui/react', '@heroui/styles']
+      stylesheet: src/app/globals.css imports tailwind, HeroUI styles, the grammar common sheet and the bound family sheet, and lets Tailwind scan the grammar dist
+      components: import from '@starci/grammar/<grammarFamily>' or '@starci/grammar/common'; the baseline adds no other UI library
+    health: GET /health/live route at the path docs/application-runtime-config-and-health.md names for Next
+    files:
+      tsconfig.json: |
+        {
+          "compilerOptions": {
+            "target": "ES2017",
+            "lib": ["dom", "dom.iterable", "esnext"],
+            "allowJs": true,
+            "skipLibCheck": true,
+            "strict": true,
+            "noEmit": true,
+            "esModuleInterop": true,
+            "module": "esnext",
+            "moduleResolution": "bundler",
+            "resolveJsonModule": true,
+            "isolatedModules": true,
+            "jsx": "react-jsx",
+            "incremental": true,
+            "plugins": [{ "name": "next" }],
+            "paths": {
+              "@/*": ["./src/*"]
+            }
+          },
+          "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+          "exclude": ["node_modules"]
+        }
+      next.config.ts: |
+        import type { NextConfig } from "next"
+
+        const nextConfig: NextConfig = {
+            output: "standalone",
+            transpilePackages: ["@starci/grammar"],
+            experimental: {
+                optimizePackageImports: ["@heroui/react"],
+            },
+        }
+
+        export default nextConfig
+      postcss.config.mjs: |
+        const config = {
+            plugins: {
+                "@tailwindcss/postcss": {},
+            },
+        }
+
+        export default config
+      vitest.config.ts: |
+        import react from "@vitejs/plugin-react"
+        import { resolve } from "node:path"
+        import { defineConfig } from "vitest/config"
+
+        export default defineConfig({
+            plugins: [react()],
+            resolve: {
+                alias: { "@": resolve(import.meta.dirname, "src") },
+            },
+            test: {
+                environment: "jsdom",
+                globals: true,
+                setupFiles: ["./vitest.setup.ts"],
+                include: ["src/**/*.spec.{ts,tsx}"],
+                server: {
+                    deps: {
+                        inline: [/[\\/]node_modules[\\/]@starci[\\/]grammar[\\/]/],
+                    },
+                },
+                coverage: {
+                    provider: "v8",
+                    reporter: ["text-summary", "json-summary", "lcov"],
+                    reportsDirectory: "<coverage.reportsDirectory>",
+                    include: ["src/**/*.{ts,tsx}"],
+                    exclude: ["**/*.d.ts", "**/*.spec.{ts,tsx}"],
+                    thresholds: {
+                        statements: <coverage.thresholds.statements>,
+                        lines: <coverage.thresholds.lines>,
+                        functions: <coverage.thresholds.functions>,
+                        branches: <coverage.thresholds.branches>,
+                    },
+                },
+            },
+        })
+      vitest.setup.ts: |
+        import "@testing-library/jest-dom/vitest"
+        import { cleanup } from "@testing-library/react"
+        import { afterEach } from "vitest"
+
+        afterEach(() => {
+            cleanup()
+        })
+      eslint.config.mjs: |
+        import starciFe, {
+            recommended as starciRecommended,
+            linterOptions as starciLinterOptions,
+            starciFeConfig,
+        } from "@starci/eslint-canon-fe"
+        import js from "@eslint/js"
+        import globals from "globals"
+        import tseslint from "typescript-eslint"
+        import pluginReact from "eslint-plugin-react"
+        import pluginReactHooks from "eslint-plugin-react-hooks"
+        import jsxA11y from "eslint-plugin-jsx-a11y"
+        import { defineConfig } from "eslint/config"
+
+        export default defineConfig([
+            {
+                ignores: ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/out/**", "**/coverage/**", "**/next-env.d.ts"],
+            },
+            {
+                files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+                plugins: { js },
+                extends: ["js/recommended"],
+                languageOptions: { globals: globals.browser },
+            },
+            tseslint.configs.recommended,
+            pluginReact.configs.flat.recommended,
+            {
+                settings: { react: { version: "detect" } },
+                rules: {
+                    "react/prop-types": "off",
+                    "react/react-in-jsx-scope": "off",
+                },
+            },
+            {
+                files: ["**/*.{jsx,tsx}"],
+                plugins: {
+                    "react-hooks": pluginReactHooks,
+                    "jsx-a11y": jsxA11y,
+                },
+                rules: {
+                    ...pluginReactHooks.configs.flat["recommended-latest"].rules,
+                    ...jsxA11y.flatConfigs.recommended.rules,
+                },
+            },
+            {
+                files: ["src/**/*.{ts,tsx}"],
+                languageOptions: {
+                    parserOptions: {
+                        projectService: true,
+                        tsconfigRootDir: import.meta.dirname,
+                    },
+                },
+                rules: {
+                    "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports" }],
+                    "@typescript-eslint/no-floating-promises": "error",
+                    "@typescript-eslint/no-misused-promises": "error",
+                    "@typescript-eslint/switch-exhaustiveness-check": "error",
+                },
+            },
+            starciFeConfig({
+                layout: "single-app",
+                plugin: starciFe,
+                recommended: starciRecommended,
+                linterOptions: starciLinterOptions,
+            }),
+            {
+                files: ["*.{js,mjs,cjs,ts}"],
+                languageOptions: { globals: globals.node },
+            },
+        ])
+      src/app/globals.css: |
+        @import "tailwindcss";
+        @import "@heroui/styles/css";
+        @import "@starci/grammar/common.css";
+        @import "@starci/grammar/<grammarFamily>.css";
+
+        @source "../../node_modules/@starci/grammar/dist";
+      src/app/layout.tsx: |
+        import type { ReactNode } from "react"
+        import "./globals.css"
+
+        interface RootLayoutProps {
+            readonly children: ReactNode
+        }
+
+        /** Root layout: every route renders inside it, so the grammar stylesheet loads once. */
+        const RootLayout = ({ children }: RootLayoutProps) => (
+            <html lang="en">
+                <body className="min-h-dvh">{children}</body>
+            </html>
+        )
+
+        export default RootLayout
+      src/app/layout.spec.tsx: |
+        import { renderToStaticMarkup } from "react-dom/server"
+        import { describe, expect, it } from "vitest"
+        import RootLayout from "./layout"
+
+        describe("RootLayout", () => {
+            it("frames the routed page inside the document body", () => {
+                const markup = renderToStaticMarkup(RootLayout({ children: "shell" }))
+                expect(markup).toContain("<body class=\"min-h-dvh\">shell</body>")
+            })
+        })
+      src/app/health/live/route.ts: |
+        /** Liveness is answered per request, never prerendered at build time. */
+        export const dynamic = "force-dynamic"
+
+        /** Liveness probe: answers from process-local state and never touches a dependency. */
+        export const GET = (): Response => Response.json({ status: "ok" })
+      src/app/health/live/route.spec.ts: |
+        import { describe, expect, it } from "vitest"
+        import { GET } from "./route"
+
+        describe("GET /health/live", () => {
+            it("answers ok from process-local state", async () => {
+                const response = GET()
+                expect(response.status).toBe(200)
+                await expect(response.json()).resolves.toEqual({ status: "ok" })
+            })
+        })
 observations:
   - id: package-manager
     observed: Both repositories pin packageManager npm@11.6.2 and install with npm ci in CI. nivo-fe also
       carries a stray pnpm-lock.yaml beside package-lock.json; the baseline keeps one lockfile.
   - id: node
     observed: Both ci.yml files set up Node 22; neither package.json declares engines, so the baseline
-      adds the engines line.
+      adds the engines line. nivo-backend pins @types/node ^22 and nivo-fe ^20; the baseline ties it to nodeMajor.
   - id: strict
     observed: nivo-fe app tsconfigs set strict true. nivo-backend sets only strictNullChecks with
-      noImplicitAny false - the gap a new repository does not inherit.
+      noImplicitAny false and strictBindCallApply false - the gap a new repository does not inherit, so
+      the nest tsconfig keeps nivo-backend's module, target and decorator options under strict true.
+      nivo-backend's incremental flag is dropped because nest build deletes dist while the build info
+      survives and the next build emits nothing.
   - id: lint
     observed: Both use a flat eslint.config.mjs over the canon kit (@starci/eslint-canon-be ^1.2.1,
-      @starci/eslint-canon-fe 3.0.2). nivo-fe lint:check passes the zero-warning budget to eslint;
-      nivo-backend lint:check passes none. Both alias format:check to the lint check - formatting is the canon's
-      stylistic rules, not a separate formatter.
+      @starci/eslint-canon-fe 3.0.2, both the published versions at readAt). nivo-fe lint:check passes
+      the zero-warning budget to eslint; nivo-backend lint:check passes none. Both alias format:check to
+      the lint check - formatting is the canon's stylistic rules, not a separate formatter. nivo-backend
+      also forces one element or argument per line and three repository-local rules; the baseline keeps
+      only its indent, quote and semicolon rules. typescript-eslint is pinned once at nivo-fe's ^8.67.0.
   - id: tests
-    observed: nivo-backend runs jest with ts-jest and test:ci writes lcov plus text-summary. nivo-fe runs
-      one root vitest invocation with the v8 provider writing a single coverage/lcov.info.
+    observed: nivo-backend runs jest with ts-jest (diagnostics on) and test:ci writes lcov plus
+      text-summary. nivo-fe runs one root vitest invocation with the v8 provider writing a single
+      coverage/lcov.info, jsdom, and the jest-dom matchers registered in a setup file.
   - id: coverage-thresholds
     observed: nivo-fe package.json starci.deliveryAssurance.unitCoverage and its codecov.yml
       (informational false) carry the threshold values the shapes adopt; nivo-backend codecov.yml is
@@ -221,7 +701,16 @@ observations:
     observed: Both run husky through the prepare script. Both pre-push hooks run lint:check and
       test:unit; nivo-backend pre-commit runs a secrets guard, nivo-fe has no pre-commit, and neither
       uses lint-staged - the baseline adds staged lint on commit and moves typecheck plus affected
-      tests to push.
+      tests to push. lint-staged 16 is the pin because 17 requires Node 22.22.1, above the engines floor.
+  - id: nest-layout
+    observed: nivo-backend is a Nest monorepo with apps/<app>/src composition roots and @features/@modules
+      path aliases; the baseline keeps that shape for one app. Its liveness is a Terminus check with no
+      indicators at /health/live, which the baseline keeps; its readiness indicators are SDS-owned.
+  - id: grammar
+    observed: nivo-fe apps pin @starci/grammar 0.4.13 (the published version at readAt) beside @heroui/react
+      and @heroui/styles ^3.2.1, which the grammar declares as peers. globals.css imports tailwind, HeroUI
+      styles and the grammar common sheet, and adds the grammar dist as a Tailwind source; nivo-fe supplies
+      its own family sheet where a new app imports the bound grammar family sheet.
   - id: ci
     observed: Both ci.yml files trigger on push to main and pull requests, run npm ci, lint:check,
       typecheck, build and test:ci, then upload coverage/lcov.info with codecov-action v5 (OIDC,
@@ -233,7 +722,7 @@ observations:
     observed: Both .gitignore files exclude node_modules, coverage, .env and .env.* with .env.example
       re-included; nivo-backend also ignores .starciwork/_local/. nivo-backend .gitattributes keeps
       encrypted payloads out of text conversion and forces LF on scripts. Neither repository has an
-      .editorconfig.
+      .editorconfig; the baseline one follows their four-space indentation.
 related:
   - architecture-rules.yaml
   - application-stacks.yaml
