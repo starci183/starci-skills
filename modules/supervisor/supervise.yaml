@@ -29,6 +29,16 @@ lanes:
 loop:
   command: node <skillRoot>/modules/supervisor/poll.mjs --repo <ledger-owner> [--workflow <id>]... [--interval-ms 180000]
   cadence: one digest per interval; 180000 ms default — owner may override
+  recovery:
+    do: |
+      On session start after an outage (power loss, host reboot, Orca restart) the supervisor
+      re-arms the environment before polling: (1) Orca app process must be running — launch it
+      if absent, its CLI answers but cannot spawn terminals while the app is down; (2) each
+      running workflow's kernel signal is probed — a dead terminal is replaced via
+      start-workflow --goal; (3) one watchdog per running workflow is re-spawned
+      (node scripts/kernel/watchdog.mjs --repo <repo> --workflow <id>) — kernels yield between
+      transitions and only the watchdog wakes them; (4) parked asks re-serve on kernel survey —
+      stale form URLs in the ledger are relayed only after re-verifying they answer 200.
   perCycle:
     - step: observe
       do: read the printed digest — new op reports, open asks + serving URLs, fresh direction
