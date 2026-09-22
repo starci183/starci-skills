@@ -677,3 +677,46 @@ Còn lại cho lane chốt K (sau H, G, F2):
 - `check-contract-cites --scan modules --scan docs --scan CONTEXT.md --scan skills` phải sạch;
   wire scan rộng này vào `npm run check` thay vì chỉ `modules/kernel`.
 - `check-evidence-binding.mjs` và `check-op-manifest.mjs` (H) vào `npm run check`.
+
+### Lane H landed: `starci/op@1`, params typed, 36 op migrated
+
+619 finding → 0; catalog 13.522 → 10.829 dòng; `business`/`handoff`/`matrixHandoff` hết;
+params: `interface.draw.candidatesPerScreen=1` (owner, max 3), `interface.audit.maxRounds=5`,
+`provision.ask.minOptions=2`, `work.author.{maxFiles=12,maxProofDemands=8,componentsTriggeringCut=3}`,
+`*.decide.readingsStated=3`. A1 audit tự đo landed. Hai corruption ngầm được sửa: blocker
+`AUDIT_SCOPE_INCOMPLETE`/`AUDIT_INPUT_CHANGED` từng parse thành key `null`; `uat.verify` path `E/`.
+
+## orca-hierarchy: vì sao sidebar Orca lộn xộn (2026-09-23, ledger nivo-backend)
+
+Thầy thấy trong Orca: hai `[Kernel] wf-nivo-workspace-provision`, hai `[Op] interface.implement`
+gpt-5.6-luna 18h nằm ở gốc, op "Idle" dưới một kernel. Đối chiếu:
+
+| Sidebar | Ledger/Orca thật | Nguyên nhân |
+|---|---|---|
+| 2 kernel WSPV | signal `kernel` trỏ `term_d2f101cf`; terminal `term_aef50872` "Kernel orchestration…" vẫn sống, không có trong signal; kernel job đang ở attempt 4 | Restart kernel (watchdog/supervisor `start-workflow --goal`) tạo terminal mới nhưng không đóng terminal cũ |
+| `[Op] interface.audit - Idle` dưới kernel | job `interface.audit a4` **failed** 15:52, dispatch `ctx_23ab4762` bị reject ở worker-start (chính là A7 của Devin), terminal `term_b6fa4c43` vẫn mở | `rejectDispatch` giải phóng lease nhưng không đóng terminal đã tạo |
+| 2 `[Op] interface.implement` luna 18h ở gốc, có tick | `interface.implement a19` succeeded qua managed worker codex `ctx_427183f`; các Task managed cũ | Settle chỉ `worker-stop` + `worker-release`, không xoá Task; Task thuộc Run bind với terminal kernel **cũ**, kernel restart có terminal mới nên Task rơi ra gốc |
+| Tiêu đề "devin.exe: Kernel orchestration for…" | `[Kernel] <wf>` chỉ áp lên Task display name | Rename terminal chỉ có cho managed worker, không cho terminal Devin |
+
+`api hierarchy` của ledger thì đúng: mọi op đều `parent = agent:kernel:<wf>`. Cái sai là cây
+Orca (Run → Task → terminal) không được đồng bộ khi kernel restart và khi job kết thúc.
+
+**Luật:** một workflow có đúng một terminal kernel sống; job kết thúc (settle, reject, finish)
+không để lại terminal hay Task sống; Run của workflow luôn bind với terminal kernel hiện tại.
+
+**Lane L (sau G, vì cùng đụng `rejectDispatch` và settle):**
+
+- [ ] `start-workflow.mjs` restart: đóng terminal kernel cũ (`terminal-close`) trước khi ghi signal
+      mới; nếu đóng không được thì incident, không im lặng
+- [ ] `rejectDispatch`: terminal/worker đã tạo thì đóng (`terminal-close` hoặc `worker-stop` +
+      `worker-release`) trong cùng transaction reject
+- [ ] settle/finish: đóng terminal cho mọi adapter, và với managed worker thì Task về trạng thái
+      done/archived qua wrapper có contract (khôi phục `task-update.mjs` mà lane D xoá vì chưa ai
+      gọi; giờ có người gọi)
+- [ ] Kernel restart: Run của workflow re-bind với terminal kernel mới (khôi phục `run-use.mjs`
+      nếu Orca cần lệnh đó), để Task mới nằm dưới kernel mới
+- [ ] Terminal Devin/command-terminal: đặt title `[Kernel] <wf>` / `[Op] <op> a<n>` ngay khi tạo
+      (`terminal-create --title`) thay vì để provider tự đặt
+- [ ] `check`: một check đọc ledger + `terminal-list` và báo terminal sống không thuộc job
+      sống nào (`ORPHAN_TERMINAL`), workflow có >1 terminal kernel (`DUPLICATE_KERNEL`)
+- [ ] Practice entry cho vòng này
