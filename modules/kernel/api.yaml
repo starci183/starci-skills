@@ -240,14 +240,18 @@ commands:
 
   enqueue:
     args: >-
-      --workflow <id> --op <opId> --paths <csv> [--records <csv>]
+      --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
       [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>]
-    reads: 'workflows.phase; existing jobs for {workflow_id, op_id}; the brief modules/ops/ops/<opId>.yaml must exist'
+    reads: >-
+      workflows.phase; existing jobs for {workflow_id, op_id}; the brief
+      modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
+      override is checked against; the latest goals row's opChain leg for this op
+      supplies what the owner set (modules/schemas/goal-plan.yaml legs[].params).
     writes: >-
       jobs row {job_id, workflow_id, op_id, attempt=max(prior attempts)+1
       (1 on first enqueue), generation, kind:'op', status:'queued',
       payload_json:{goal_binding:{revision,identity},records:[--records],
-      owned_paths:[--paths],cut?:{id,ordinal,total}}} + events 'job-enqueued'.
+      owned_paths:[--paths],params?:{<name>:<value>},cut?:{id,ordinal,total}}} + events 'job-enqueued'.
       `cut` marks one bounded execution slice of the SAME approved semantic op;
       all three cut flags are atomic, ordinal is 1-based and total is at least
       two. The goal binding is
@@ -262,13 +266,21 @@ commands:
       `records` is the explicit closed read binding carried
       unchanged into the dispatch packet; omission means no Work record is
       bound and never licenses repository-wide discovery.
-    returns: '{ok:true, job_id, workflowId, op, status:queued, attempt}'
+      `params` is the op's tunables: the brief (modules/schemas/op.schema.yaml)
+      declares each name's type, default, bounds and setter, the approved goal leg
+      carries what the owner chose, and `--params` carries what the kernel chose.
+      Only the overrides are stored on the row; dispatch merges the brief's
+      defaults under them when it renders the packet. A `setBy: owner` name is
+      accepted from --params only when the goal leg already carries it, and a
+      `setBy: kernel` name is never accepted from a goal leg.
+    returns: '{ok:true, job_id, workflowId, op, status:queued, attempt, cut, params}'
     refuses:
       - workflow-unknown: 'no workflows row'
       - workflow-finished: 'a finished phase takes no new work (finish below)'
       - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
       - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
+      - params-invalid: '--params is not a JSON object, names a param the brief does not declare, carries a value of the wrong type or outside its min/max/enum, sets a `setBy: owner` param the approved goal leg does not carry, or a goal leg carries a `setBy: kernel` param (scripts/route/dispatch-op.mjs resolveOpParams)'
     duplicates: >-
       enqueue does not refuse a second live job for the same op: cutExecution
       (driver-loop.yaml) enqueues N disjoint same-op slices at once, each its

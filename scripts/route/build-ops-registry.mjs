@@ -7,9 +7,11 @@
 //   node scripts/route/build-ops-registry.mjs --check    # diff only, no write (CI)
 //   node scripts/route/build-ops-registry.mjs --opsDir <dir> [--out <file>]
 //
-// Entry shape: {id, family, goal one-liner,
+// Entry shape: {id, family, goal one-liner, params {default, setBy},
 // nodeKinds, completionProfile, sideEffects summary, reads/writes scope, route keys,
-// lifecycle position}. Fields absent from a per-op yaml are omitted, never invented.
+// lifecycle position}. Fields absent from a per-op yaml are omitted, never invented;
+// the shape a per-op yaml may carry is modules/schemas/op.schema.yaml, enforced by
+// scripts/checks/check-op-manifest.mjs.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -62,6 +64,16 @@ function entryFor(file, doc) {
   const entry = { id, family: id.split('.')[0] };
   const goal = typeof doc?.goal === 'string' ? doc.goal : doc?.goal?.en;
   if (goal) entry.goal = firstLine(goal);
+  // Tunables are the registry's one numeric column: a reader sees what an owner
+  // or the kernel may set without opening the manifest. The doc prose stays in
+  // the manifest — the registry is an index.
+  if (doc?.params && typeof doc.params === 'object') {
+    const params = {};
+    for (const [name, def] of Object.entries(doc.params)) {
+      params[name] = { default: def?.default ?? null, setBy: String(def?.setBy ?? '') };
+    }
+    if (Object.keys(params).length) entry.params = params;
+  }
   if (doc?.nodeKinds) entry.nodeKinds = asList(doc.nodeKinds);
   if (doc?.completionProfile) entry.completionProfile = String(doc.completionProfile);
   const side = asList(doc?.sideEffects);
@@ -80,10 +92,7 @@ function entryFor(file, doc) {
     // richer analysis stays in the per-op yaml — the registry stays an index.
     if (entry.route.phase?.length) entry.lifecyclePosition = entry.route.phase.join(' | ');
   }
-  entry.kindInferred = id.split('.')[1] ?? entry.family; // the verb: draw|implement|decide|verify|ask|...
-  if (doc?.business?.question) entry.businessQuestion = firstLine(doc.business.question);
-  const whenNeeded = asList(doc?.business?.whenNeeded);
-  if (whenNeeded.length) entry.whenNeeded = firstLine(whenNeeded[0]);
+  entry.kindInferred = id.split('.').at(-1) ?? entry.family; // the verb: draw|implement|decide|verify|ask|...
   return entry;
 }
 
@@ -120,8 +129,8 @@ function main() {
     origin: {
       canonicalRegistry: '.claude/modules/ops/registry.yaml (this generated file)',
       commonDocument: '.claude/modules/ops/_common.yaml',
-      perOpSources: 'modules/ops/ops/<id>.yaml (authored operator contract + business: block + route: block)',
-      note: 'modules/ops is the authored operator source; _common.yaml keeps the shared pre-module policy prose.',
+      perOpSources: 'modules/ops/ops/<id>.yaml (authored operator contract, starci/op@1 — modules/schemas/op.schema.yaml)',
+      note: 'modules/ops is the authored operator source; _common.yaml keeps the shared pre-module policy prose. An op summary is this index, generated — no manifest carries one.',
     },
     stages: STAGES,
     coarsePhases: COARSE,

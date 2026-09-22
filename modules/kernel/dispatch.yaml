@@ -68,6 +68,8 @@ about:
 packet:
   op: <id>                              # the operation id; resolves to the full durable identity
   brief: modules/ops/ops/<id>.yaml      # business context the shell agent reads
+  params:                               # resolved tunables; present when the brief declares any
+    <name>: <value>                     # the brief's default unless the owner or the kernel set it
   context:
     workflow:                           # approved authority binding, not revision authority
       id: <workflow-id>
@@ -102,6 +104,21 @@ fields:
       The jobs table row (engine/ledger-db.mjs) plus the
       lease-identity-drift guarantee: state, op lease and durable
       job must share the complete identity or the write refuses.
+
+  params:
+    meaning: >-
+      The op's tunables, resolved. The brief declares each name's type, default,
+      bounds and setter (modules/schemas/op.schema.yaml `params`); the approved
+      goal leg carries what the owner chose and `api enqueue --params` carries
+      what the kernel chose. The packet holds the merged result, so the agent
+      reads a value rather than inferring a number from the brief's prose.
+    enforcedBy: >-
+      scripts/route/dispatch-op.mjs resolveOpParams — the one resolver.
+      `api enqueue` runs it over the goal leg and the flag and refuses
+      `params-invalid` (modules/kernel/api.yaml enqueue) before a jobs row
+      exists; `api dispatch` re-runs it over the brief's defaults and lays the
+      row's stored overrides on top, so a value the api refused cannot reach a
+      packet and a default cannot drift from the brief.
 
   brief:
     meaning: >-

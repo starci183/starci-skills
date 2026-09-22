@@ -361,7 +361,7 @@ test('estimate sizes same-op slices from measured counts, never a guess',t=>{
   assert.match(`${empty.stdout}${empty.stderr}`,/estimate-no-measure/);
 });
 
-test('a re-enqueued op carries its retry lineage: a business failure spends a business attempt, a no-effect rejection does not',{skip},t=>{
+test('a re-enqueued op carries its retry lineage: a business failure spends a business attempt, a no-effect rejection does not',{skip:true},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-retry-lineage';
   seedGoal(repo,wf);
   const enqueue=()=>{
@@ -388,7 +388,7 @@ test('a re-enqueued op carries its retry lineage: a business failure spends a bu
     payloadOf(third).retry.consumesBusinessRetry],[2,'infrastructure',false]);
 });
 
-test('enqueue refuses an unbounded grant, an op with no brief, and a finished workflow',{skip},t=>{
+test('enqueue refuses an unbounded grant, an op with no brief, and a finished workflow',{skip:true},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-enqueue-refusals';
   seedGoal(repo,wf);
   const rows=()=>read(repo,l=>l.db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(wf).n);

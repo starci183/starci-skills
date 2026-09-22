@@ -9,8 +9,8 @@
 //   GAP     delta = S* - S0 (a stale/not-done variable counts as missing)
 //   CHAIN   each missing var -> op whose produces: covers it (vocabulary:
 //           modules/goal/legality.yaml producesVocabulary.opProduces — the ops'
-//           route: blocks carry prerequisites but no machine-readable produces;
-//           business.produces prose is the fallback citation, marked inferred)
+//           route: blocks carry prerequisites but no machine-readable produces,
+//           so an unlisted op is matched by route.intent/goal and marked inferred)
 //   VALIDATE topo-sort by needs/prerequisites; cycles -> infeasible; forward
 //           edges, split rules and the INTENT/SCOPE/ORDER ambiguity ladder from
 //           legality.yaml (INTENT -> a provision.ask leg, never a guess)
@@ -95,9 +95,6 @@ function loadOps(opsDir) {
         prerequisites: asList(route.prerequisites),
         riskHints: asList(route.riskHints),
       },
-      // business.produces is PROSE — cited when the
-      // producesVocabulary table has no entry for this op.
-      producesProse: asList(doc?.business?.produces),
     });
   }
   return ops;

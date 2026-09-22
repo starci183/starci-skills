@@ -6,9 +6,10 @@ generatedBy: scripts/route/build-ops-registry.mjs
 origin:
   canonicalRegistry: .claude/modules/ops/registry.yaml (this generated file)
   commonDocument: .claude/modules/ops/_common.yaml
-  perOpSources: "modules/ops/ops/<id>.yaml (authored operator contract + business: block + route: block)"
+  perOpSources: modules/ops/ops/<id>.yaml (authored operator contract, starci/op@1 —
+    modules/schemas/op.schema.yaml)
   note: modules/ops is the authored operator source; _common.yaml keeps the shared pre-module policy
-    prose.
+    prose. An op summary is this index, generated — no manifest carries one.
 stages:
   intake: classify the request into typed intake/scope facts; zero effects
   scope: bound the work — scope record, workspace bootstrap, launchable nodes
@@ -66,11 +67,6 @@ ops:
         - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     lifecyclePosition: decide | pre-implementation
     kindInferred: decide
-    businessQuestion: '"What is the source-independent technical design (SDS) that realizes the accepted
-      SRS - flows, components, contracts, data, quality, deployment, decisions, verification -
-      precise enough that a builder'
-    whenNeeded: After an accepted SRS slice exists, author the minimum design-complete SDS needed before
-      backend/frontend implementation of that selected slice.
   - id: backend.implement
     family: backend
     goal: Implement one selected backend outcome and prove its declared contract on actual code.
@@ -113,10 +109,6 @@ ops:
         - source-edits
     lifecyclePosition: implement | implementation
     kindInferred: implement
-    businessQuestion: '"Does the actual backend code implement the selected accepted operations and ACs
-      - and prove it with unit + backend E2E + quality gates (incl.'
-    whenNeeded: When an accepted requirement/design slice needs backend code created, refined or
-      defect-repaired (primary mode).
   - id: backend.scaffold
     family: backend
     goal: Create one new backend source tree in the bound repository and prove its declared toolchain
@@ -159,9 +151,6 @@ ops:
         - new-tree
     lifecyclePosition: implement
     kindInferred: scaffold
-    businessQuestion: '"For a greenfield backend: what exact source tree does the settled design
-      require, and does the scaffolded toolchain actually run green?"'
-    whenNeeded: A workflow needs a new backend service/app where no source tree exists yet.
   - id: brand.decide
     family: brand
     goal: Settle one product's visual identity in the single brand record - colour tokens traced to the
@@ -202,10 +191,6 @@ ops:
         - generates-assets
     lifecyclePosition: decide | pre-implementation
     kindInferred: decide
-    businessQuestion: "\"What is this product's single settled visual identity - colors traced to real
-      source files, typography, mascot, logo, iconography, imagery, voice, motion, forbidden shapes
-      - that every later draw/bui"
-    whenNeeded: Before interface.draw / interface.asset need an identity to draw against.
   - id: business.decide
     family: business
     goal: Specify the selected business slice with the minimum complete observable behavior needed to
@@ -240,10 +225,6 @@ ops:
         - scope defined
     lifecyclePosition: decide | pre-implementation
     kindInferred: decide
-    businessQuestion: '"What must the product observably do - actors, flows, rules, policy decisions,
-      data, customer journeys, acceptance - stated so an implementer and an acceptor need no
-      guesses?"'
-    whenNeeded: "[object Object]"
   - id: code.refactor
     family: code
     goal: Restructure one selected slice of code under a proven behavior invariant - the same regression
@@ -285,10 +266,6 @@ ops:
         - source-edits
     lifecyclePosition: implement | implementation
     kindInferred: refactor
-    businessQuestion: '"Can this code slice be restructured while the same regression check proves
-      identical observable behavior before and after?"'
-    whenNeeded: When a selected code slice needs restructuring - move/rename/extract/dead-code removal -
-      under a proven behavior invariant.
   - id: content.generate
     family: content
     goal: Create or revise one selected content unit with grounded claims and actual requested
@@ -325,10 +302,6 @@ ops:
         - decided records/behavior exist
     lifecyclePosition: implement | implementation
     kindInferred: generate
-    businessQuestion: '"Is the selected content unit authored with grounded claims - and are its
-      requested media/code assets actually checked, not just generated?"'
-    whenNeeded: When the deliverable is content/curriculum/media rather than product behavior -
-      authoring or revising one bounded content unit.
   - id: decision.prepare
     family: decision
     goal: Prepare one decision the runtime takes provisionally - the question, why it matters, the
@@ -357,10 +330,6 @@ ops:
         - a decidable question raised by another op
     lifecyclePosition: decide | cross-cutting
     kindInferred: prepare
-    businessQuestion: '"What is the decidable question, its options analysed per side, and the one
-      recommendation the runtime carries provisionally until the owner overturns it?"'
-    whenNeeded: When another operation raises an owner question (business/design/authority) that needs a
-      decidable record.
   - id: docs.author
     family: docs
     goal: Author or update the documentation one selected scope needs, derived from the decided records
@@ -394,10 +363,6 @@ ops:
         - decided records/behavior exist
     lifecyclePosition: implement | implementation
     kindInferred: author
-    businessQuestion: '"What does a reader need documented about this scope - restated from decided
-      records and observed code, never from a transcript?"'
-    whenNeeded: When a selected scope owns documents that must be authored or updated under .starciwork
-      documentation directories.
   - id: e2e.verify
     family: e2e
     goal: Prove one selected delivered slice through its public API on a real stack the suite starts
@@ -443,9 +408,6 @@ ops:
         - served-target
     lifecyclePosition: verify | post-implementation
     kindInferred: verify
-    businessQuestion: '"Does the delivered slice prove every assertion through its public API on a real
-      stack the suite starts itself - one scenario per assertion, declared checks run verbatim?"'
-    whenNeeded: Post-implementation API-level proof of a delivered backend slice.
   - id: goal.revise
     family: goal
     goal: Produce goal v(n+1) from the frozen goal v(n) and the requested change - explicit diff, rev
@@ -477,10 +439,6 @@ ops:
         - an approved goal exists
     lifecyclePosition: decide | cross-cutting
     kindInferred: revise
-    businessQuestion: '"What is goal v(n+1) - the explicit diff from frozen v(n), rev+1, with authority
-      never silently widened?"'
-    whenNeeded: When an approved workflow goal needs revision driven by a critique outcome, an owner
-      instruction or a typed revision request.
   - id: grammar.update
     family: grammar
     goal: Grow the installed design grammar by one semantic unit the product needs and no composition of
@@ -519,10 +477,6 @@ ops:
         - runtime-self-edit
     lifecyclePosition: implement | implementation
     kindInferred: update
-    businessQuestion: '"Is the installed design grammar genuinely short one semantic unit - proven by a
-      recorded failed composition attempt - and can it be published green and bound in the
-      consumer?"'
-    whenNeeded: "[object Object]"
   - id: integration.verify
     family: integration
     goal: Prove one declared external integration against the real provider, in its sandbox account,
@@ -568,11 +522,6 @@ ops:
         - high-kind
     lifecyclePosition: verify | post-implementation
     kindInferred: verify
-    businessQuestion: "\"Does the declared integration actually work against the real provider's sandbox
-      - through the product's own client, with the owner-supplied credential read from sealed
-      custody at use time?\""
-    whenNeeded: Post-implementation proof of a declared external integration; a live exchange is
-      required - no mock or cassette.
   - id: interface.asset
     family: interface
     goal: Generate every artwork the approved interface candidate embeds as a real repository asset at
@@ -611,11 +560,6 @@ ops:
         - host-tool-required:image_gen.imagegen
     lifecyclePosition: implement | implementation
     kindInferred: asset
-    businessQuestion: "\"Are all artwork slots the approved design record declares produced as real repo
-      assets - at declared size/format, faithful to the chosen candidate's crops, and inside brand
-      rules?\""
-    whenNeeded: After interface.draw declares artworkSlots; before or during interface.implement, which
-      needs the files bound.
   - id: interface.audit
     family: interface
     goal: "Audit selected real interface renders against the exact latest explicitly owner-accepted
@@ -675,13 +619,16 @@ ops:
         - bounded-five-round-loop
     lifecyclePosition: verify | post-implementation
     kindInferred: audit
-    businessQuestion: '"Does the selected real interface have actionable render, UX or UI drift, and
-      where must repair resume?"'
-    whenNeeded: After interface.implement and after each routed repair, on the same selected matrix and
-      fresh captures.
   - id: interface.draw
     family: interface
     goal: Establish an image-first interface direction before frontend implementation.
+    params:
+      candidatesPerScreen:
+        default: 1
+        setBy: owner
+      representativeScreensMax:
+        default: 5
+        setBy: kernel
     nodeKinds:
       - ui
     completionProfile: ui
@@ -700,14 +647,11 @@ ops:
       - profile
       - generatedDirection
       - workflow
-      - matrix
     writes:
       - node
       - designSource
       - evidence
-      - handoff
       - draws
-      - matrixHandoff
     route:
       nodeKinds:
         - ui
@@ -727,10 +671,6 @@ ops:
         - host-tool-required:image_gen.imagegen
     lifecyclePosition: direct | pre-implementation
     kindInferred: draw
-    businessQuestion: '"What is the image-first interface direction - the smallest representative set of
-      critical screens generated with ImageGen plus an explicit coverage map for everything else?"'
-    whenNeeded: Before frontend implementation, when a new visual direction is required - after accepted
-      business/SDS and brand exist.
   - id: interface.implement
     family: interface
     goal: Implement one selected frontend creation, refinement or defect repair by reconciling the full
@@ -783,11 +723,6 @@ ops:
         - source-edits
     lifecyclePosition: implement | implementation
     kindInferred: implement
-    businessQuestion: '"Does the implemented frontend render the accepted draws + business and
-      architecture contracts - verified by real captures, quality gates green - and emit the UAT
-      handoff (flows.json)?"'
-    whenNeeded: For selected frontend creation, refinement or defect repair once draws/design exist (or
-      in a no-draw scope with source-derived mapping).
   - id: interface.scaffold
     family: interface
     goal: Create one new interface source tree in the bound repository and prove it renders — build
@@ -832,9 +767,6 @@ ops:
         - new-tree
     lifecyclePosition: implement
     kindInferred: scaffold
-    businessQuestion: '"For a greenfield frontend: what exact app tree do the settled design, grammar
-      and brand require, and does the scaffolded shell actually render?"'
-    whenNeeded: A workflow needs a new interface app where no source tree exists yet.
   - id: knowledge.repair
     family: knowledge
     goal: Repair one challenged canonical instruction/rule and affected references from concrete
@@ -873,9 +805,6 @@ ops:
         - runtime-self-edit
     lifecyclePosition: implement | cross-cutting
     kindInferred: repair
-    businessQuestion: '"What is the smallest canonical repair to a challenged instruction or rule - and
-      its affected references - grounded in applicability evidence?"'
-    whenNeeded: When concrete evidence challenges a canonical knowledge file/rule or a skill instruction.
   - id: package.scaffold
     family: package
     goal: Create one new package or library module at the declared path and prove its public contract
@@ -918,10 +847,6 @@ ops:
         - new-tree
     lifecyclePosition: implement
     kindInferred: scaffold
-    businessQuestion: '"For a new package/module: what exact boundary does the settled design declare,
-      and does a real consumer resolve its public surface?"'
-    whenNeeded: A workflow needs a new reusable package/module inside a bound repo (packages/* shape) or
-      a fresh bound repo.
   - id: perf.verify
     family: perf
     goal: Run or observe the declared performance measurements against the running product the
@@ -962,10 +887,6 @@ ops:
         - implementation done
     lifecyclePosition: verify | post-implementation
     kindInferred: verify
-    businessQuestion: '"What are the measured values of the declared metrics against the running product
-      - observed, never estimated?"'
-    whenNeeded: When a goal/request declares performance metrics with thresholds and the product runs in
-      an authorized environment.
   - id: provision.ask
     family: provision
     goal: Ask the owner for the one thing only they can give - a credential, an account on an outside
@@ -996,10 +917,6 @@ ops:
         - waits-on-owner
     lifecyclePosition: decide | cross-cutting
     kindInferred: ask
-    businessQuestion: '"What is the one thing only the owner can give - credential, account, dataset,
-      authority, irreversible go-ahead - and is it now present?"'
-    whenNeeded: When an operation needs an owner-only provision; this is the only op that actually waits
-      for the owner.
   - id: release.deliver
     family: release
     goal: Deliver one explicitly selected publication, deployment or database migration and verify its
@@ -1039,9 +956,6 @@ ops:
         - high-kind
     lifecyclePosition: release | post-implementation
     kindInferred: deliver
-    businessQuestion: '"Is the one explicitly selected publish/deploy/migrate effect delivered - and is
-      its remote outcome actually verified?"'
-    whenNeeded: "[object Object]"
   - id: request.analyze
     family: request
     goal: Analyze one request into a typed intake record - the selected workflow and the scope statement
@@ -1070,9 +984,6 @@ ops:
         - read-only
     lifecyclePosition: intake | pre-implementation
     kindInferred: analyze
-    businessQuestion: "\"Which one catalog workflow owns this request's first segment - and what scope
-      statement does scope.define receive?\""
-    whenNeeded: "[object Object]"
   - id: review.verify
     family: review
     goal: Independently verify a selected delivery, business, workflow, rendered visual or API result
@@ -1108,9 +1019,6 @@ ops:
         - a delivery to inspect
     lifecyclePosition: verify | post-implementation
     kindInferred: verify
-    businessQuestion: '"Does the selected delivered/business/workflow/visual/API/static-check result
-      independently hold up - reviewed against its own evidence, without repairing its producer?"'
-    whenNeeded: "[object Object]"
   - id: runtime.operate
     family: runtime
     goal: Deliver the requested runtime or service state with readiness, owned effects and real
@@ -1149,9 +1057,6 @@ ops:
         - runtime-effects
     lifecyclePosition: operate | cross-cutting
     kindInferred: operate
-    businessQuestion: '"Is the selected runtime or service in its authorized state - proven by declared
-      probes and the observed served identity?"'
-    whenNeeded: "[object Object]"
   - id: scope.define
     family: scope
     goal: Turn one request into a bounded scope record - the nodes, dependencies and exclusions the
@@ -1184,10 +1089,6 @@ ops:
         - request analyzed
     lifecyclePosition: scope | pre-implementation
     kindInferred: define
-    businessQuestion: '"What is the bounded scope - the nodes, dependencies and exclusions the selected
-      workflow may touch - grounded in the request and inspected records and source?"'
-    whenNeeded: After intake (or directly from a request) when a workflow needs a typed scope record
-      before any effects run.
   - id: scope.finish
     family: scope
     goal: Finish exactly the selected business/resource scope - end-of-life - while preserving required
@@ -1226,10 +1127,6 @@ ops:
         - destructive-gate
     lifecyclePosition: operate | post-implementation
     kindInferred: finish
-    businessQuestion: '"Can exactly the selected scope be finished while every live consumer and every
-      required piece of evidence or custody survives?"'
-    whenNeeded: End-of-life handling for a selected business/resource scope; also explicitly authorized
-      exact removals (registered worktrees, artifact directories).
   - id: security.verify
     family: security
     goal: Inspect one selected slice of code and configuration for vulnerabilities read-only and leave
@@ -1269,9 +1166,6 @@ ops:
         - a delivered slice
     lifecyclePosition: verify | post-implementation
     kindInferred: verify
-    businessQuestion: '"What typed vulnerabilities does the selected code/config slice contain -
-      measured against declared boundaries and rules, repaired by nobody here?"'
-    whenNeeded: "[object Object]"
   - id: task.execute
     family: task
     goal: Analyze one request into a bounded, evidence-grounded workflow selection without performing
@@ -1301,9 +1195,6 @@ ops:
         - no preset workflow matched
     lifecyclePosition: intake | pre-implementation
     kindInferred: execute
-    businessQuestion: '"For an unmatched or ad-hoc direct task: which single named workflow and
-      operator/mode contract should run this segment - analysed without performing any effect?"'
-    whenNeeded: Direct-task routing when no preset workflow matched the request.
   - id: test.author
     family: test
     goal: "Author the test files one bounded slice needs - inside a test-paths-only allowlist - and
@@ -1342,10 +1233,6 @@ ops:
         - test-gap blocker or code under test
     lifecyclePosition: implement | implementation
     kindInferred: author
-    businessQuestion: '"Are the tests this slice needs authored inside test-paths-only and proven
-      collected by the real runner - without claiming any product verdict?"'
-    whenNeeded: When a test-gap blocker routes here, or a slice needs authored tests before the verify
-      ops can run them.
   - id: uat.assisted.prepare
     family: uat
     goal: Prepare one accepted UAT flow set that contains genuine human-gated checkpoints as an
@@ -1398,12 +1285,7 @@ ops:
         - browser-required
         - human-checkpoint
     lifecyclePosition: verify | post-implementation
-    kindInferred: assisted
-    businessQuestion: '"Is this genuinely human-gated UAT scope frozen into a deterministic,
-      digest-bound and safely cleanable browser session without pretending that preparation or a
-      human ok accepted the product?"'
-    whenNeeded: An accepted browser flow has at least one unavoidable or explicitly reserved human
-      action/observation.
+    kindInferred: prepare
   - id: uat.assisted.verify
     family: uat
     goal: Independently verify one controlled human-assisted browser run from exact immutable receipts
@@ -1456,12 +1338,7 @@ ops:
         - human-checkpoint
         - evidence-sensitive
     lifecyclePosition: verify | post-implementation
-    kindInferred: assisted
-    businessQuestion: '"Does this exact human-assisted run still prove the frozen flow on the exact
-      current build/environment, with genuine sanitized evidence, independently reproduced
-      postconditions and verified cleanup?"'
-    whenNeeded: After the controlled runner wrote one immutable receipt for a request prepared by
-      uat.assisted.prepare.
+    kindInferred: verify
   - id: uat.verify
     family: uat
     goal: Execute the requested sequential UX flows with scoped account/seed setup, real
@@ -1511,9 +1388,6 @@ ops:
         - browser-required
     lifecyclePosition: verify | post-implementation
     kindInferred: verify
-    businessQuestion: '"Do the requested sequential UX flows pass in a real browser on the verified
-      served build - with real video/screenshots, scoped accounts and seed, and verified cleanup?"'
-    whenNeeded: "[object Object]"
   - id: work.author
     family: work
     goal: Author the canonical Work records one slice needs before it can be launched - in record mode
@@ -1557,9 +1431,6 @@ ops:
         - scope defined
     lifecyclePosition: scope | pre-implementation
     kindInferred: author
-    businessQuestion: '"Is this record launchable - record mode: real write scope + testable proof
-      demands + one runnable check each; cut mode: a seam-first split into disjoint children?"'
-    whenNeeded: "[object Object]"
   - id: workspace.manage
     family: workspace
     goal: Create or reconstruct one canonical .starciwork workspace from a new purpose or selected
@@ -1596,7 +1467,3 @@ ops:
         - work-tree-writes
     lifecyclePosition: scope | pre-implementation
     kindInferred: manage
-    businessQuestion: '"Does a canonical .starciwork workspace exist for this purpose - prepare: created
-      with verified repo bindings; import: reconstructed from inspected source with preserved
-      provenance?"'
-    whenNeeded: "[object Object]"
