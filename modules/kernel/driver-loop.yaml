@@ -92,11 +92,8 @@ boundary:
     until dispatch is a defect.
   terminalLifecycle: >-
     `api settle` closes the worker terminal — the kernel never reuses an op
-    terminal and never re-dispatches into a settled job's handle. A retry
-    is a NEW job row at attempt+1 with a fresh dispatch. A launch rejected
-    before any accepted contract/effect is the narrow exception: explicit
-    infrastructure + effectState:none returns that same job/attempt to queued
-    for rerouting, while businessAttempt and business route budget stay fixed.
+    terminal and never re-dispatches into a settled job's handle. What a retry
+    costs in rows and attempts is tick.drive.oneOpOneAgent below.
   opTerminalObservation: >-
     The one sanctioned look at an op's screen is `api observe --job <id>` —
     read-only reasoning context through the api on the job's own exact
@@ -157,9 +154,11 @@ tick:
       status='queued' with the op's explicit Work-record reads and write-set
       on the row. A downstream op that consumes a scope.define proposal binds
       that exact predecessor scope record here; it never discovers a
-      repository-wide substitute. A duplicate is a refusal, not a hazard — an
-      existing queued or in-flight row IS the queue entry and is never
-      re-enqueued (api.yaml already-queued). A settled dispatch-rejected job
+      repository-wide substitute. One row per planned op the queue lacks:
+      `api enqueue` does not refuse a second live row for the same op
+      (cutExecution needs N of them), so not doubling a leg is the kernel's
+      own discipline and the durable fence is the capacity-1 path lease
+      dispatch admission takes. A settled dispatch-rejected job
       is different: when its result explicitly proves infrastructure failure
       and effectState:none, it returns the same durable row/attempt to queued
       with the same businessAttempt. Repeating recovery creates no successor
@@ -169,8 +168,12 @@ tick:
       execution decomposition INSIDE the already approved semantic op, not a
       new semantic plan leg and not an owner gate. The slice count is
       computed, not guessed: measure the closure's files/assertions/
-      components/records and call `api estimate`; its `slices` (from
-      runtimes.yaml allocation.slicing, 15-30min per slice, cap 15) is N.
+      components/records and call `api estimate`; its `slices` (weights and
+      bounds: modules/models/runtimes.yaml allocation.slicing) is N.
+      A cut is not fan-out within an operation: the slices are DISJOINT jobs
+      of the same approved op, each still one job with one agent and one
+      verdict (dispatch.yaml oneOpOneAgent), never several agents sharing one
+      operation — which is what fanOutWithinOperation forbids.
       Derive a stable cut id and a complete seam-first partition of concrete,
       pairwise-disjoint path slices; enqueue one job per slice with the SAME
       approved op id using `--cut-id <id> --cut-ordinal <n> --cut-total <N>`.
@@ -284,9 +287,11 @@ tick:
         contract/effect and explicitly returned to queued by no-effect
         rejection or `api reconcile`; that row no longer holds a lease.
       starvation: >-
-        'contested-lease' / 'no free slot' is a wait reason, not a failure —
-        the loop records it and yields; it does not force
-        (runtimes.yaml maxParallelOps). A
+        A dispatch refused because another in-flight job already holds the
+        capacity-1 path lease or machine budget it needs comes back
+        `dispatch-rejected` with the reserve reasons attached — a wait reason,
+        not a failure. The loop records it and yields; it does not force
+        (modules/models/runtimes.yaml maxParallelOps). A
         path lease remains the durable fence until explicit settle/reconcile;
         expiry is a recovery signal, never proof that a prior worker cannot
         still write.
@@ -295,7 +300,8 @@ tick:
         Between dispatch and the next report the kernel WAITS durably, not
         inside one model turn. Once no immediately executable transition
         remains, it records/names the exact wait reason and yields immediately.
-        The external watchdog owns the five-minute cadence and wakes the same
+        The external watchdog owns the cadence
+        (modules/models/runtimes.yaml allocation.watchdogCadenceMs) and wakes the same
         Kernel identity; the resumed turn begins with `api status`. The Kernel
         never runs Start-Sleep, shell sleep, a timer, or an in-turn polling loop.
         It does not poll for work to invent. The report discipline is durable:
@@ -308,8 +314,9 @@ tick:
       observe: >-
         While a running op owes a report the kernel may keep reasoning
         context on it: `api observe --job <id> [--lines <n>]` reads the exact
-        worker terminal's liveness plus a bounded screen tail, on roughly a
-        three-minute cadence and especially before a nudge or settle-fail
+        worker terminal's liveness plus a bounded screen tail, on the cadence
+        modules/models/runtimes.yaml allocation.observeCadenceMs declares and
+        especially before a nudge or settle-fail
         decision — an op that dies without filing leaves `result.report:
         null`, so the screen is how the kernel learns what the op was doing.
         The screen is context, never evidence: only `api report` plus the
@@ -321,8 +328,9 @@ tick:
         call `api nudge --job <id>`; that wakes the exact worker with its existing
         contract and grants no new authority. If the bounded wake returns idle
         without a report, record worker-idle-without-report and settle fail from
-        the missing-report evidence before retrying at attempt+1. Never wait
-        indefinitely and never spawn a duplicate over the original lease.
+        the missing-report evidence before the retry (drive.oneOpOneAgent).
+        Never wait indefinitely and never spawn a duplicate over the original
+        lease.
       workerDonePing: >-
         An op's `worker_done` / terminal-done signal is a completion PING,
         never an outcome — the durable outcome is the reports row filed via
@@ -378,8 +386,9 @@ tick:
     repair:
       onFail: >-
         verdict fail -> retry inside the route's limit: `api enqueue` the
-        same op at attempt+1 with the failure named back (modules/models/
-        kinds.yaml routes — the full table is verdictTable below). A
+        same op with the failure named back (modules/models/
+        kinds.yaml routes — the full table is verdictTable below;
+        drive.oneOpOneAgent owns what the new row costs). A
         dispatch-rejected/no-effect infrastructure recovery reroutes the same
         queued durable attempt and does not consume this route limit.
       onBlocked: >-
@@ -495,7 +504,7 @@ verdictTable:
       business.revise etc., or goal.revise for a goal-level conflict);
       scope-expansion -> re-run scope.define, then provision.ask if authority
       widens; identity-wrong -> provision.ask ALWAYS.
-    citation: "modules/goal/legality.yaml backwardEdges; modules/ops/ops/goal.revise.yaml; init/CLAUDE.md work-correction policy"
+    citation: "modules/goal/legality.yaml backwardEdges; modules/ops/ops/goal.revise.yaml"
 
 interfaceAuditLoop:
   chain: >-
@@ -563,9 +572,9 @@ replanLineage: >-
   {replannedFrom, blocker, pathDelta, routingReason} on the plan-derived
   event: which plan it supersedes, the typed blocker or trigger that forced
   it, the owned_paths delta vs the prior legs, and why the legs routed as
-  they did (api.yaml plan; a re-plan with no lineage is refused
-  plan-lineage-missing — a new plan with no history is a quiet rewrite,
-  never allowed). The same fields ride a re-enqueue that exists because a
+  they did (modules/kernel/api.yaml plan records the fields verbatim and does
+  not refuse an omitted lineage — supplying it is the kernel's obligation, and
+  a new plan with no history is a quiet rewrite this loop never files). The same fields ride a re-enqueue that exists because a
   leg was re-planned.
 replanTriggers:
   - trigger: s0-measured-wrong
@@ -596,7 +605,7 @@ replanTriggers:
   - trigger: retry-budget-exhausted
     when: "a route's limit fired its last allowed time for a node group"
     driverDoes: "the route's own `then: needUser` fires — the workflow stops for the user with the failure history attached"
-    citation: "modules/models/kinds.yaml routes purpose lines; api.yaml incident (fingerprint/exhaustion)"
+    citation: "modules/models/kinds.yaml routes purpose lines; modules/kernel/api.yaml incident"
 
   - trigger: goal-completes
     when: "every leg settled and the gates ran"
@@ -615,7 +624,7 @@ escalation:
       record: "assumptions land on the goal (`assumed:`) so a later revision can see they were guesses"
     - kind: RETRY
       scope: "re-dispatch inside a route's limit, with the failure named back"
-      basis: "modules/models/kinds.yaml routes + engine/constants.mjs budgets"
+      basis: "modules/models/kinds.yaml routes — the route row carries the limit"
     - kind: REPAIR-ROUTE
       scope: "red proof / gap blocker -> the revise/build kind the route table names"
       basis: "the route table is closed — the driver matches, it does not improvise"
@@ -663,7 +672,8 @@ failureHandling:
       Terminal liveness is classified from the last screen lines:
       NEED-TRUST / NEED-PERM / CRASH / WORKING / DONE / IDLE? / EXITED /
       UNKNOWN. WORKING with an UNCHANGED context meter
-      ('Context: Nk / Mk tokens (P%)') for >=5-8 minutes is STALL? —
+      ('Context: Nk / Mk tokens (P%)') for longer than
+      modules/models/runtimes.yaml allocation.stallAfterMs is STALL? —
       output staleness is the child-exit detector: a live agent's context
       never stops moving. The api reads the terminal
       (scripts/agent/lib.mjs health/liveness) — the kernel never runs the
@@ -681,7 +691,7 @@ failureHandling:
   respawnPolicy:
     ownFault: >-
       A dead agent with no infrastructure cause and nothing to say: the op
-      attempt is settled and a retry re-enqueues at attempt+1 — past the
+      attempt is settled and the route's retry re-enqueues it — past the
       route's limit it is blocked and the owner is told
       (the api's reconciliation; kinds.yaml route limits). Re-brief with the
       failure named and relaunch — never
@@ -739,9 +749,9 @@ failureHandling:
       (scripts/kernel/watchdog.mjs; scripts/kernel/start-workflow.mjs;
       modules/kernel/start-workflow.yaml claim.onDeadKernel).
     respawn: >-
-      start-workflow re-opens the `[Kernel] <id>` coordinator terminal and
+      start-workflow re-opens the `[Kernel] <id>` terminal and
       re-sends the workflow-run command (kernel attempt+1, same workflow
-      generation); stale coordinator terminals of the dead kernel are
+      generation); stale Kernel terminals of the dead kernel are
       closed by handle first (scripts/agent/lib.mjs terminal close).
     singleton: >-
       One kernel per workflow, one supervisor per ledger — kernel-lock and
@@ -761,13 +771,14 @@ supervision:
   chain: >-
     owner chat (trigger only) -> [Kernel] agent (one per project, long-lived)
     -> [Op] agents (one per op, ephemeral). Above the kernel:
-    watchdog (scripts/kernel/watchdog.mjs) — a five-minute liveness loop over
+    watchdog (scripts/kernel/watchdog.mjs) — a liveness loop at
+    modules/models/runtimes.yaml allocation.watchdogCadenceMs over
     canonical status/survey and the attested Kernel terminal; start-workflow
     (scripts/kernel/start-workflow.mjs) — a one-shot
     claim -> spawn -> attest; re-running it on a dead kernel claims the stale
-    binding and spawns the replacement (kernel attempt+1). Beside the
-    kernel: nothing — there is no Coordinator and
-    no per-module Monitor.
+    binding and spawns the replacement (kernel attempt+1). The chain ends
+    there: one kernel orchestrates its whole workflow, and every other agent
+    inside it is an ephemeral Op that kernel dispatched.
   auditTrail: >-
     Every transition is an event in the ledger (engine/ledger-db.mjs events
     table, hash-chained — verifyChain; engine/schema.sql); persist-as-you-

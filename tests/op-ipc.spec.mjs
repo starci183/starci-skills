@@ -32,10 +32,7 @@ const WORKFLOW='wf-op-ipc';
 const OP='code.refactor';
 const OWNED=['docs/','src/op-ipc.txt'];
 const checkEnvelope=(...checks)=>({checks});
-// api.mjs's normalizeOwnedPath, mirrored: lease resource_keys are
-// 'path:' + the owned path with separators canonicalised and trailing
-// slashes stripped ('docs/' fences 'path:docs').
-const normalizeOwnedPath=p=>String(p).replace(/\\/g,'/').replace(/\/{2,}/g,'/').replace(/^\.\//,'').replace(/\/+$/,'');
+import {normalizeOwnedPath} from '../engine/admission.mjs';
 
 const fixture=(t,{mode='healthy'}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-op-ipc-'));

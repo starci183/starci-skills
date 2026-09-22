@@ -128,8 +128,7 @@ CREATE TRIGGER IF NOT EXISTS events_digest_chain AFTER INSERT ON events BEGIN
 
 -- ----------------------------------------------------------------------------
 -- jobs — the durable job queue; one row per admitted unit of model/operation/
--- judge/check work. Statuses: 'queued','leased','running','effect_unknown',
--- 'succeeded','failed','cancelled' (settled = the last three).
+-- judge/check work. The status vocabulary is engine/ledger-db.mjs JOB_STATUSES.
 -- What a row lets the kernel decide: may this worker claim (status+lease_token
 -- fence), is a settled result a duplicate (event_id dedupe in jobs.complete),
 -- and what must be reconciled after a crash (leased/running/effect_unknown with

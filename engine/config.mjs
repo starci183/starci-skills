@@ -7,19 +7,33 @@ import {parseYaml} from './yaml.mjs';
 export const configRoot=skillRoot;
 export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
 export const DEFAULT_MODEL_POOLS={'fable-astra':['claude-fable','codex-agent'],'opus-sol':['claude-agent','codex-agent']};
-export const DEFAULT_NON_OPERATION_MODELS={planner:'fable-astra',kernelManager:'opus-sol',validator:'fable-astra'};
 export const ADAPTIVE_ALLOCATION_MODE='adaptive';
+/** The effort vocabulary, ordered weakest to strongest — the only list of it. */
+export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 function runtimeProfile(){const source=fileURLToPath(new URL('../modules/models/runtimes.yaml',import.meta.url));if(!fs.existsSync(source))throw Error('Missing modules/models/runtimes.yaml');return parseYaml(fs.readFileSync(source,'utf8'));}
+/**
+ * modules/models/runtimes.yaml `allocation` — where the fleet's operating numbers live: the dispatch lease
+ * TTL, the liveness and cadence windows, the slicing weights, the failure cooldowns. Code reads them from
+ * here; a literal copy of any of them in a source file would be a second authority.
+ */
+export function allocationSettings(){return runtimeProfile()?.allocation??{};}
+/** One positive millisecond value out of `allocation`, by dotted key. Refuses when the contract omits it. */
+export function allocationMs(dotted){
+  const raw=dotted.split('.').reduce((node,key)=>(node==null?node:node[key]),allocationSettings());
+  const value=Number(raw);
+  if(!Number.isFinite(value)||value<=0)throw Error(`modules/models/runtimes.yaml allocation.${dotted} must declare a positive number of milliseconds`);
+  return value;
+}
 export function validateConfig(config){
   const allowed=['language','model','effort','models','debug','allocation','kernel','budgets'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
-  if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.json: debug must be true or false.');
+  if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){
     const allocation=config.allocation,preferred=allocation?.preferredProvider;
     if(!plain(allocation)||Object.keys(allocation).some(key=>!['mode','preferredProvider'].includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
-      throw Error('Invalid config.json: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>}.');
-    if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.json: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+      throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>}.');
+    if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
   }
   if(config?.kernel!==undefined){
     const kernel=config.kernel;
@@ -27,7 +41,7 @@ export function validateConfig(config){
       throw Error('Invalid config.yaml: kernel must be {agent?, model?, effort?} with string-or-null values.');
     if(typeof kernel.agent==='string'&&!knownProviders.has(kernel.agent))
       throw Error(`Invalid config.yaml: kernel.agent ${kernel.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
-    if(typeof kernel.effort==='string'&&!['none','minimal','low','medium','high','xhigh','max','ultra'].includes(kernel.effort))
+    if(typeof kernel.effort==='string'&&!EFFORT_LEVELS.includes(kernel.effort))
       throw Error('Invalid config.yaml: kernel.effort must use the effort vocabulary.');
   }
   if(config?.budgets!==undefined){
@@ -35,9 +49,9 @@ export function validateConfig(config){
     if(!plain(budgets)||Object.keys(budgets).some(key=>!['maxOps','perOpMs','dailyTokens'].includes(key))||Object.values(budgets).some(value=>value!==null&&!(Number.isInteger(value)&&value>0)))
       throw Error('Invalid config.yaml: budgets must be {maxOps?, perOpMs?, dailyTokens?} with positive-integer-or-null values.');
   }
-  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!['none','minimal','low','medium','high','xhigh','max','ultra'].includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==2||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==3||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.json: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
-  for(const [pool,members] of Object.entries(models.pools))if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw Error(`Invalid config.json: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);
-  for(const [role,required] of Object.entries(NON_OPERATION_ROLES)){const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw Error(`Invalid config.json: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);}
+  if(!plain(config)||Object.keys(config).some(key=>!allowed.includes(key))||typeof config.language!=='string'||!/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language)||!(config.model===null||typeof config.model==='string'&&config.model.trim())||!EFFORT_LEVELS.includes(config.effort)||!plain(models)||Object.keys(models).some(key=>!['pools','nonOperation','selection'].includes(key))||models.selection!=='quota-aware'||!plain(models.pools)||!plain(models.nonOperation)||Object.keys(models.pools).length!==2||Object.keys(models.pools).some(key=>!Object.hasOwn(DEFAULT_MODEL_POOLS,key))||Object.keys(models.nonOperation).length!==3||Object.keys(models.nonOperation).some(key=>!Object.hasOwn(NON_OPERATION_ROLES,key)))throw Error('Invalid config.yaml: expected language, model, effort and the closed quota-aware model pools/non-operation role map.');
+  for(const [pool,members] of Object.entries(models.pools))if(!Array.isArray(members)||members.length!==2||new Set(members).size!==2||members.some(id=>typeof id!=='string'||!plain(runtimes[id]))||!(members.length===DEFAULT_MODEL_POOLS[pool].length&&members.every(id=>DEFAULT_MODEL_POOLS[pool].includes(id))))throw Error(`Invalid config.yaml: models.pools.${pool} must contain its canonical pair of two unique known runtime ids.`);
+  for(const [role,required] of Object.entries(NON_OPERATION_ROLES)){const pool=models.nonOperation[role],members=models.pools[pool];if(typeof pool!=='string'||!members||members.some(id=>!runtimes[id].roles?.includes(required)))throw Error(`Invalid config.yaml: models.nonOperation.${role} must name a pool whose members carry the ${required} role.`);}
   return config;
 }
 export function effectiveNonOperationModels(config=loadConfig()){const models=validateConfig(config).models;return Object.fromEntries(Object.keys(NON_OPERATION_ROLES).map(role=>[role,{pool:models.nonOperation[role],runtimes:[...models.pools[models.nonOperation[role]]],selection:models.selection}]));}
@@ -55,8 +69,8 @@ function readExample(root=configRoot){const yaml=path.join(root,'config.example.
 /**
  * The owner config reader: `config.yaml` is the per-project file (gitignored,
  * seeded verbatim from `config.example.yaml` by the installer — comments and
- * all). Absent it → the example's defaults. Returns the validated config
- * or null when no owner file exists.
+ * all). Returns the validated owner config, or null when that file does not
+ * exist; falling back to the example's defaults is `loadConfig`.
  */
 export function readOwnerConfig(root=configRoot){
   const yaml=path.join(root,'config.yaml');
@@ -64,6 +78,22 @@ export function readOwnerConfig(root=configRoot){
   return null;
 }
 export const loadOwnerConfig=readOwnerConfig;
+/**
+ * The tolerant read the kernel boot and the router share: an owner file that is absent, unparsable or
+ * short of the closed schema must never stop a workflow from routing. Returns
+ * {file, config, error, invalid} — `config` is the validated config, or the raw parse when it fails the
+ * schema (with `invalid` naming the reason), or null when the file is absent or `error` says why it
+ * could not be read at all.
+ */
+export function inspectOwnerConfig(root=configRoot){
+  const file=path.join(root,'config.yaml');
+  if(!fs.existsSync(file))return {file,config:null,error:null,invalid:null};
+  let parsed;
+  try{parsed=parseYaml(fs.readFileSync(file,'utf8'))??null;}
+  catch(error){return {file,config:null,error:`config.yaml unparsable: ${error.message}`,invalid:null};}
+  try{return {file,config:validateConfig(parsed),error:null,invalid:null};}
+  catch(error){return {file,config:parsed,error:null,invalid:error.message};}
+}
 export function loadConfig(root=configRoot,{initialize=false}={}){
   const yaml=path.join(root,'config.yaml');
   if(initialize&&!fs.existsSync(yaml)){

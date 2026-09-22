@@ -8,7 +8,9 @@
 // plans, enqueues, routes, dispatches, reconciles, settles or finishes Ops.
 //
 //   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id>
-//       [--interval-ms 300000] [--once] [--repair] [--json]
+//       [--interval-ms <ms>] [--once] [--repair] [--json]
+//
+// The default cadence is modules/models/runtimes.yaml allocation.watchdogCadenceMs.
 
 // Without --repair this is a read-only health probe.  --repair is appropriate
 // only after the owner has authorized unattended continuation of the already
@@ -17,6 +19,7 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
@@ -38,7 +41,8 @@ const workflowId = valueOf('workflow') ?? valueOf('goal');
 const once = has('once');
 const repair = has('repair');
 const asJson = has('json');
-const intervalMs = Math.max(10_000, Number(valueOf('interval-ms', '300000')) || 300_000);
+const CADENCE_MS = allocationMs('watchdogCadenceMs');
+const intervalMs = Math.max(10_000, Number(valueOf('interval-ms')) || CADENCE_MS);
 
 const jsonFrom = stdout => {
   const text = String(stdout ?? '').trim();
@@ -165,7 +169,7 @@ const print = result => {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (!repo || !workflowId) {
-    console.error('use: watchdog.mjs --repo <ledger-owner> --workflow <id> [--interval-ms 300000] [--once] [--repair] [--json]');
+    console.error(`use: watchdog.mjs --repo <ledger-owner> --workflow <id> [--interval-ms ${CADENCE_MS}] [--once] [--repair] [--json]`);
     process.exit(2);
   }
   let exitCode = 0;

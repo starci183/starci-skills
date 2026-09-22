@@ -6,8 +6,9 @@ const plainPath=value=>typeof value==='string'?value:value?.path;
 /**
  * Canonical workspace-relative path prefix used by planning, leases and report boundaries. In a
  * multi-repository project the caller includes the repository binding prefix (for example `nivo-fe/`).
- * A legacy trailing `/**` is accepted as spelling for the directory prefix; every other glob,
- * absolute path and parent traversal is refused because it is not a concrete ownership boundary.
+ * A directory prefix is spelled either bare (`docs/`) or with a trailing `/**`, which normalizes to
+ * the same prefix; every other glob, absolute path and parent traversal is refused because it is not
+ * a concrete ownership boundary.
  */
 export function normalizeOwnedPath(value){
   let input=String(plainPath(value)??'').trim().replace(/\\/g,'/');

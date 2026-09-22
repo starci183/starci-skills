@@ -4,10 +4,20 @@
 // never claim another job's dispatch. Contract: modules/kernel/
 // verdict-contract.yaml §2.
 
+import { readDistJson } from '../../engine/runtime-root.mjs';
+
 export const OP_REPORT_SCHEMA = 'starci/op-report@1';
 export const OP_REPORT_OUTCOMES = ['done', 'partial', 'failed', 'ask', 'blocked'];
-// Mirrors modules/models/kinds.yaml blockers — keep in step.
-export const BLOCKER_KINDS = ['shared-change', 'srs-gap', 'sds-gap', 'interface-gap', 'brand-gap', 'grammar-gap', 'test-gap', 'environment', 'authority'];
+// modules/models/kinds.yaml `vocabularies.blockers` is the one authority: the route table
+// that dispatches on a blocker kind and the envelope that accepts one read the
+// same list. Missing or misshapen, the envelope refuses to load at all.
+export const BLOCKER_KINDS = (() => {
+  const blockers = readDistJson('modules', 'models', 'kinds.yaml')?.vocabularies?.blockers;
+  if (!Array.isArray(blockers) || !blockers.length || blockers.some((k) => typeof k !== 'string' || !k.trim())) {
+    throw new Error('modules/models/kinds.yaml vocabularies.blockers must be a non-empty list of kind names');
+  }
+  return blockers;
+})();
 
 const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head']);
 const text = (v) => typeof v === 'string' && v.trim().length > 0;

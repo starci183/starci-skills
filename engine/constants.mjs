@@ -1,6 +1,6 @@
 /**
  * `ENGINE_SCHEMA` is the durable engine's identity in workflow state: a schema, not a number, so a build
- * is named by what it is. The installer (`bin/starci-skills.mjs` → `scripts/install/`) consumes it.
+ * is named by what it is. `scripts/install/install.mjs` reads it and records it in the install manifest.
  *
  * The store schemas are deliberately NOT re-declared here: `LEDGER_SCHEMA`/`LEDGER_VERSION` and
  * `MACHINE_SCHEMA`/`MACHINE_VERSION` live in `engine/ledger-db.mjs`, beside the code that opens the files

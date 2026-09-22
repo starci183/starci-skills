@@ -76,10 +76,10 @@ returns:
         uat/e2e/perf red reports `failed` and routes to lane.build repair.
       blocked: >-
         Progress needs something outside the grant — maps to outcome
-        `blocked` (typed blocker required, kind one of BLOCKER_KINDS:
-        shared-change, srs-gap, sds-gap, interface-gap, brand-gap,
-        grammar-gap, test-gap, environment, authority) or `ask` (a question
-        the kernel
+        `blocked` (a typed blocker is required; the kinds are
+        modules/models/kinds.yaml blockers, which
+        scripts/kernel/report-envelope.mjs loads as BLOCKER_KINDS and the
+        envelope validates against) or `ask` (a question the kernel
         may answer only from offered options, else needUser).
     note: >-
       The packet's three-value enum is the agent-facing compression. On the
@@ -136,8 +136,8 @@ returns:
     neverQuietly: >-
       The suspicion is reported, not patched: the op's allowlist does not
       cover the record it doubts, so it cannot and may not edit it
-      (legality.yaml backwardEdges.neverQuietly; init/CLAUDE.md
-      work-correction policy — never relabel a wrong flow as debt).
+      (modules/goal/legality.yaml backwardEdges.neverQuietly — never relabel a
+      wrong flow as debt).
 
 # ============================================================================
 # 2 — THE REPORT ENVELOPE. starci/op-report@1 (validated when the worker
@@ -149,7 +149,7 @@ returns:
 #    kernel did not — a report is never settled unconsumed.
 # ============================================================================
 envelope:
-  schema: starci/op-report@1        # workflow-level: starci/workflow-report@1
+  schema: starci/op-report@1
   required: [outcome, run, task, dispatch, from, summary]
   fields:
     outcome: "done|partial|failed|ask|blocked"

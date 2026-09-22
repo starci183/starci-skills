@@ -11,6 +11,7 @@
 //   plan     --repo <path> --workflow <id> --file <plan.json>
 //   enqueue  --repo <path> --workflow <id> --op <opId> --paths <csv> [--title <t>] [--risk <r>]
 //            [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+//   estimate --repo <path> --files <n> [--assertions <n>] [--components <n>] [--records <n>]
 //   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
 //   reconcile --repo <path> --job <job_id>
@@ -33,9 +34,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   openLedger, ledgerFileFor, machineFileFor, openMachine,
-  newToken, SETTLED_JOB_STATUSES, reserveTwoPhase,
+  newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { deriveRetryLineage, ownedPathLeaseRequests } from '../../engine/admission.mjs';
+import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
@@ -47,10 +50,10 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
-// Pool selection + launch-model resolution (pinned lane: scripts/agent/models.mjs)
-// and the Orca orchestration wrappers the managed-agent dispatch path drives —
-// one thin wrapper per calls.yaml verb (run-create/task-create/worker-start/
-// dispatch/dispatch-show/worker-show/worker-stop/worker-release).
+// Pool selection and launch-model resolution, plus the Orca orchestration
+// wrappers the managed-agent dispatch path drives — one thin wrapper per
+// calls.yaml verb (run-create/task-create/worker-start/dispatch/
+// dispatch-show/worker-show/worker-stop/worker-release).
 import { selectPool, resolveLaunchModel } from '../agent/models.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
@@ -66,12 +69,12 @@ import { terminalRename } from '../api/orca/terminal-rename.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
-// The kernel-agent status vocabulary. enqueue writes 'queued' — the durable
-// engine's own word (ledger.enqueueJob). settle writes the engine's settled
-// vocabulary: 'succeeded'|'failed'.
-const FINAL_SETTLED = [...new Set(SETTLED_JOB_STATUSES)];
-const SETTLED = [...new Set([...FINAL_SETTLED, 'effect_unknown'])];
-const DISPATCHABLE = ['queued', 'leased', 'running', 'answering'];
+// The status vocabulary is engine/ledger-db.mjs JOB_STATUSES; these are the
+// three views this gate reasons in. enqueue writes 'queued' and settle writes
+// 'succeeded'|'failed' — the durable engine's own words.
+const FINAL_SETTLED = [...JOB_STATUSES.settled];
+const SETTLED = [...JOB_STATUSES.settled, ...JOB_STATUSES.fenced];
+const DISPATCHABLE = [...JOB_STATUSES.dispatchable];
 // The reports.outcome vocabulary — the worker-facing half of the op IPC.
 const REPORT_OUTCOMES = OP_REPORT_OUTCOMES;
 // Kernel verdict ↔ worker outcome consistency at settle: a pass settles a
@@ -146,7 +149,7 @@ const usage = (code) => {
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
-  report   --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
+  report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
@@ -182,6 +185,11 @@ const emit = (out, human, asJson) => {
   else console.log(human);
 };
 
+// How recently a terminal must have printed for an unclassifiable screen to
+// still count as a live turn. One authority: modules/models/runtimes.yaml
+// allocation.liveness.activeUnclassifiedMs.
+const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
+
 const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
 const latestGoal = (db, workflowId) => db.prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
 const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
@@ -212,7 +220,7 @@ const observeOperationWorker = (job, now = Date.now()) => {
       : screenState === 'turn-idle' ? 'turn-idle'
       : screenState === 'interactive-gate' ? 'interactive-gate'
       : screenState === 'failed' ? 'failed'
-      : outputAgeMs != null && outputAgeMs <= 120000 ? 'active-unclassified'
+      : outputAgeMs != null && outputAgeMs <= ACTIVE_UNCLASSIFIED_MS ? 'active-unclassified'
       : 'live-idle';
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness, connected, writable,
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
@@ -640,13 +648,16 @@ function cmdPlan(ledger, args) {
 // model's guess. W = sum(weight * count) agent-minutes; slices =
 // clamp(ceil(W / targetMinutes[1]), 1, maxSlices).
 function cmdEstimate(ledger, args) {
-  const rtFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
-  const slicing = (fs.existsSync(rtFile) ? parseYaml(fs.readFileSync(rtFile, 'utf8')) : null)
-    ?.allocation?.slicing ?? {};
-  const weights = { file: 4, assertion: 3, component: 12, record: 2, ...(slicing.weights ?? {}) };
-  const target = Array.isArray(slicing.targetMinutes) && slicing.targetMinutes.length === 2
-    ? slicing.targetMinutes.map(Number) : [15, 30];
-  const maxSlices = Math.max(1, Number(slicing.maxSlices) || 15);
+  const slicing = allocationSettings().slicing ?? {};
+  const weights = slicing.weights ?? {};
+  const target = Array.isArray(slicing.targetMinutes) ? slicing.targetMinutes.map(Number) : [];
+  const maxSlices = Number(slicing.maxSlices);
+  if (target.length !== 2 || target.some((n) => !Number.isFinite(n) || n <= 0)
+    || !Number.isFinite(maxSlices) || maxSlices < 1) {
+    throw Object.assign(
+      new Error('modules/models/runtimes.yaml allocation.slicing must declare {weights, targetMinutes:[lo,hi], maxSlices}'),
+      { code: 'slicing-undeclared' });
+  }
   const counts = {
     file: Math.max(0, Number(args.files) || 0),
     assertion: Math.max(0, Number(args.assertions) || 0),
@@ -658,7 +669,13 @@ function cmdEstimate(ledger, args) {
       new Error('estimate needs at least one of --files/--assertions/--components/--records'),
       { code: 'estimate-no-measure' });
   }
-  const minutes = Object.entries(counts).reduce((sum, [k, n]) => sum + (weights[k] ?? 0) * n, 0);
+  const unweighted = Object.entries(counts).filter(([k, n]) => n > 0 && !Number.isFinite(Number(weights[k])));
+  if (unweighted.length) {
+    throw Object.assign(
+      new Error(`modules/models/runtimes.yaml allocation.slicing.weights declares no weight for ${unweighted.map(([k]) => k).join(', ')}`),
+      { code: 'slicing-undeclared' });
+  }
+  const minutes = Object.entries(counts).reduce((sum, [k, n]) => sum + (Number(weights[k]) || 0) * n, 0);
   const slices = Math.min(maxSlices, Math.max(1, Math.ceil(minutes / target[1])));
   const perSliceMinutes = Math.round((minutes / slices) * 10) / 10;
   const out = {
@@ -677,8 +694,20 @@ function cmdEnqueue(ledger, args) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (wf.phase === 'finished') {
+    throw Object.assign(new Error(`workflow ${workflowId} is finished; a finished phase takes no new work`), { code: 'workflow-finished' });
+  }
+  const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${args.op}.yaml`);
+  if (!fs.existsSync(briefFile)) {
+    throw Object.assign(new Error(`unknown op ${args.op} — no brief at modules/ops/ops/${args.op}.yaml`), { code: 'unknown-op' });
+  }
   const goal = latestGoal(db, workflowId);
   const ownedPaths = [...new Set(String(args.paths).split(',').map((s) => s.trim()).filter(Boolean))];
+  // An op with no owned_paths is an unbounded write grant: the packet would
+  // tell the worker "(per brief write-ceiling)" and nothing would fence it.
+  if (ownedPaths.length === 0) {
+    throw Object.assign(new Error(`--paths resolved to no path for ${args.op} — an op without owned_paths is an unbounded grant`), { code: 'empty-paths' });
+  }
   const records = [...new Set(String(args.records ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
   const cutValues = [args['cut-id'], args['cut-ordinal'], args['cut-total']];
   const hasCut = cutValues.some((value) => value != null);
@@ -698,9 +727,17 @@ function cmdEnqueue(ledger, args) {
   let job;
   ledger.transaction(() => {
     const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, args.op).a;
+    // A retry's provenance. `attempt` is durable dispatch identity; the route's
+    // limit is budgeted against `businessAttempt`, which only advances when the
+    // prior attempt actually spent one — an infrastructure launch rejected
+    // before any effect does not (engine/admission.mjs deriveRetryLineage).
+    const priorJob = db.prepare('SELECT job_id,attempt,payload_json,result_json FROM jobs WHERE workflow_id=? AND op_id=? ORDER BY attempt DESC LIMIT 1')
+      .get(workflowId, args.op);
+    const retry = priorJob ? deriveRetryLineage(priorJob) : null;
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(cut ? { cut } : {}),
+      ...(retry ? { retry } : {}),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {
         schema: AGENT_HIERARCHY_SCHEMA,
@@ -730,10 +767,10 @@ function cmdEnqueue(ledger, args) {
 }
 
 /* ----------------------------------------------------------------- route */
-// scripts/api/quota is a pinned sibling lane: the module is imported lazily
-// and every probe degrades to {state:'unknown'} when it is absent or throws —
-// routing still decides on the capacity rows it can prove (running counts,
-// maxParallel, open incidents).
+// The quota probe shells out to a provider CLI, so it is imported lazily and
+// every probe degrades to {state:'unknown'} when it throws — routing still
+// decides on the capacity rows it can prove (running counts, maxParallel,
+// open incidents). A probe is evidence, never a verdict.
 const quotaModule = import('../api/quota/index.mjs').catch(() => null);
 const probeQuotaSafe = async (provider) => {
   try {
@@ -990,7 +1027,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
   `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory.`,
   `reporting: your answer is a starci/op-report@1 JSON envelope — report.json on disk (the artifact) filed into the ledger (the durable signal):`,
-  `  {"outcome":"done|partial|failed|ask|blocked","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
+  `  {"outcome":"${REPORT_OUTCOMES.join("|")}","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
   `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
@@ -1092,13 +1129,13 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
 // ledger and would hold any machineNeeds) — the same openMachine handle
 // settle already uses. An open failure returns !ok: a dispatch that cannot
 // fence must not launch.
-const DISPATCH_LEASE_TTL_MS = 30 * 60 * 1000; // bounds a crashed worker's fence; settle releases early
-const normalizeOwnedPath = (p) => String(p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
-const opLeaseRequests = (payload) => [...new Set((payload.owned_paths ?? [])
-  .map((p) => (typeof p === 'string' ? p : p?.path))
-  .filter(Boolean)
-  .map((p) => `path:${normalizeOwnedPath(p)}`))]
-  .map((resourceKey) => ({ resourceKey, units: 1 }));
+// Bounds a crashed worker's fence; settle releases early. One authority:
+// modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs.
+const DISPATCH_LEASE_TTL_MS = allocationMs('dispatchLeaseTtlMs');
+// engine/admission.mjs owns owned-path normalization and the capacity-1 lease
+// request per minimal prefix — the same function the ledger's conflict finder
+// resolves paths with, so a request and a held lease can never disagree.
+const opLeaseRequests = (payload) => ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean));
 
 const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS } = {}) => {
   const db = ledger.db, leases = opLeaseRequests(payload);
@@ -1119,16 +1156,6 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS }
       leases, ttlMs,
     });
   } finally { machine.close(); }
-};
-
-// The canonical workflows.phase write (mirrors start-workflow.mjs): guarded
-// on phase='queued' so a finished/archived workflow is never regressed, and
-// the phase-transition event is appended only when the row actually moved.
-const transitionQueuedToRunning = (ledger, workflowId, now) => {
-  const moved = ledger.db.prepare("UPDATE workflows SET phase='running',updated_at=? WHERE workflow_id=? AND phase='queued'").run(now, workflowId);
-  if (moved.changes > 0) {
-    ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'phase-transition', payload: { from: 'queued', to: 'running' }, createdAt: now });
-  }
 };
 
 // The kernel → worker half of the op IPC: one contracts row per
@@ -1374,7 +1401,7 @@ function cmdDispatch(ledger, args, repo) {
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(handle, JSON.stringify(payload), now, jobId);
-    transitionQueuedToRunning(ledger, job.workflow_id, now);
+    transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, generation: job.generation });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
@@ -1435,7 +1462,7 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }) {
     }
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'run-created', payload: { runId, coordinatorTerminal: kernelJob?.worker_id ?? null, storedOn: kernelJob ? kernelJob.job_id : jobId },
+      kind: 'run-created', payload: { runId, kernelTerminal: kernelJob?.worker_id ?? null, storedOn: kernelJob ? kernelJob.job_id : jobId },
     });
   });
   return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };
@@ -1640,7 +1667,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(dispatchId, JSON.stringify(payload), now, jobId);
-    transitionQueuedToRunning(ledger, job.workflow_id, now);
+    transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, generation: job.generation });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',

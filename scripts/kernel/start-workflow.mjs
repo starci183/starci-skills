@@ -30,10 +30,15 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { openLedger, ledgerFileFor, transitionWorkflowToRunning } from '../../engine/ledger-db.mjs';
+import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { workerShow } from '../api/orca/worker-show.mjs';
+import { workerStop } from '../api/orca/worker-stop.mjs';
+import { workerRelease } from '../api/orca/worker-release.mjs';
+import { resolveLaunchModel, selectPool } from '../agent/models.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -48,38 +53,20 @@ const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
 const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
 
 // Owner config: <skillRoot>/config.yaml — the per-project config seeded from
-// config.example.yaml by the installer (gitignored). engine/config.mjs is
-// tried first for an owner-config reader; when it exports none the yaml is
-// parsed directly with the same parser the rest of this file uses.
-// A missing or unparsable file is never fatal — routing falls through to
-// route-model. STARCI_OWNER_ROOT points the reader at a
-// different directory holding a config.yaml (test and tooling seam).
+// config.example.yaml by the installer (gitignored), read through the one
+// reader in engine/config.mjs. A missing, unparsable or schema-short file is
+// never fatal — routing falls through to route-model and says why.
+// STARCI_OWNER_ROOT points the reader at a different directory holding a
+// config.yaml (test and tooling seam).
 const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
 const ownerFileLabel = (file) => ownerRoot === skillRoot ? path.relative(skillRoot, file) : file;
-async function readOwnerConfig() {
-  const file = path.join(ownerRoot, 'config.yaml');
-  if (!fs.existsSync(file)) return { file, config: null, error: null };
-  const engineLoader = path.join(skillRoot, 'engine', 'config.mjs');
-  let engineError = null;
-  if (fs.existsSync(engineLoader)) {
-    try {
-      const mod = await import(pathToFileURL(engineLoader).href);
-      for (const name of ['loadOwnerConfig', 'readOwnerConfig'])
-        if (typeof mod[name] === 'function')
-          return { file, config: mod[name](ownerRoot) ?? null, error: null };
-    } catch (e) { engineError = `engine/config.mjs: ${e.message}`; }
-  }
-  try {
-    const config = parseYaml(fs.readFileSync(file, 'utf8')) ?? null;
-    return { file, config, error: null, ...(engineError ? { engineError } : {}) };
-  } catch (e) { return { file, config: null, error: `config.yaml unparsable: ${e.message}`, ...(engineError ? { engineError } : {}) }; }
-}
 
 // Provider liveness probe: scripts/api/quota/index.mjs exports
 // probeQuota(provider) → {state, usedPercent, detail}; 'dead' means the
-// provider is not authenticated. The module is a pinned sibling-lane dep —
-// absent or broken is 'unknown', never a crash and never a verdict. Probes
-// are memoized per process — one account-list read serves every candidate.
+// provider is not authenticated. It is imported lazily and every failure
+// degrades to 'unknown' — a probe is evidence, never a verdict, and a kernel
+// must still boot when the provider CLI cannot answer. Probes are memoized
+// per process — one account-list read serves every candidate.
 const probeCache = new Map();
 async function probeAgent(agent) {
   if (probeCache.has(agent)) return probeCache.get(agent);
@@ -95,29 +82,6 @@ async function probeAgent(agent) {
   }
   probeCache.set(agent, probe && typeof probe === 'object' ? probe : { state: 'unknown' });
   return probeCache.get(agent);
-}
-
-// The orchestration wrappers (run-create, task-create, worker-start,
-// dispatch, worker-show, worker-stop, worker-release, …) land in
-// scripts/api/orca/ as thin per-verb modules over lib.mjs — same pattern as
-// terminal-*.mjs. Merged lazily from every sibling file so a checkout where
-// they have not landed yet still runs the command-terminal kernel path.
-async function loadOrchestrationApi() {
-  const dir = path.join(skillRoot, 'scripts', 'api', 'orca');
-  const fns = {};
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort()) {
-    try { Object.assign(fns, await import(pathToFileURL(path.join(dir, file)).href)); } catch { /* half-landed lane — keep looking */ }
-  }
-  return fns;
-}
-
-// scripts/agent/models.mjs (pinned sibling lane) resolves the launch model a
-// pool target carries: resolveLaunchModel(target, difficulty) →
-// {modelId, effort}. Absent lane → null, the caller keeps its own value.
-async function loadModelSelection() {
-  const file = path.join(skillRoot, 'scripts', 'agent', 'models.mjs');
-  if (!fs.existsSync(file)) return null;
-  try { return await import(pathToFileURL(file).href); } catch { return null; }
 }
 
 // The pool target a provider pin launches on: the runtimes.yaml pool owned by
@@ -159,8 +123,6 @@ function agentForTarget(target) {
 // selection walks the tier∩role chain for the kernel-manager role (decide).
 // Explicit owner pins never enter this function: they fail closed.
 async function nextEligiblePool(excludeTarget, warnings) {
-  const sel = await loadModelSelection();
-  if (typeof sel?.selectPool !== 'function') return null;
   const runtimesFile = path.join(skillRoot, 'modules', 'models', 'runtimes.yaml');
   let runtimes = null;
   try { runtimes = parseYaml(fs.readFileSync(runtimesFile, 'utf8')); } catch { return null; }
@@ -178,7 +140,7 @@ async function nextEligiblePool(excludeTarget, warnings) {
   }
   let pool = null;
   try {
-    pool = sel.selectPool({
+    pool = selectPool({
       kind: KERNEL_ROUTE.kind, role: 'decide', difficulty: KERNEL_ROUTE.risk,
       bias: excludeTarget ? { avoid: [excludeTarget] } : null,
       capacity, runtimes,
@@ -194,15 +156,12 @@ async function completeKernelRoute(route) {
   let model = route.model ?? route.route?.model ?? null;
   let effort = route.effort ?? route.route?.effort ?? null;
   const runtimePool = route.route?.target ?? poolTargetForAgent(route.agent);
-  if (!model || !effort) {
-    const selection = await loadModelSelection();
-    if (typeof selection?.resolveLaunchModel === 'function' && runtimePool) {
-      try {
-        const resolved = selection.resolveLaunchModel(runtimePool, KERNEL_ROUTE.risk);
-        model = model ?? resolved?.modelId ?? null;
-        effort = effort ?? resolved?.effort ?? null;
-      } catch { /* converted to a typed route error below */ }
-    }
+  if ((!model || !effort) && runtimePool) {
+    try {
+      const resolved = resolveLaunchModel(runtimePool, KERNEL_ROUTE.risk);
+      model = model ?? resolved?.modelId ?? null;
+      effort = effort ?? resolved?.effort ?? null;
+    } catch { /* converted to a typed route error below */ }
   }
   if (!model)
     return { ...route, runtimePool, error: `kernel agent '${route.agent}' has no resolvable model for ${KERNEL_ROUTE.kind}/${KERNEL_ROUTE.risk}` };
@@ -221,7 +180,7 @@ async function resolveKernelRoute() {
         error: `explicit kernel agent '${agentOverride}' probe is dead (${probe.detail ?? 'not authenticated'})` };
     return completeKernelRoute({ agent: agentOverride, routedBy: 'override', warnings: [] });
   }
-  const owner = await readOwnerConfig();
+  const owner = inspectOwnerConfig(ownerRoot);
   const kc = owner.config?.kernel;
   const cfgAgent = typeof kc?.agent === 'string' && kc.agent.trim() ? kc.agent.trim() : null;
   const cfgModel = typeof kc?.model === 'string' && kc.model.trim() ? kc.model.trim() : null;
@@ -232,7 +191,7 @@ async function resolveKernelRoute() {
     agent: cfgAgent, model: cfgModel, effort: cfgEffort,
     budgets: owner.config?.budgets ?? null,
     ...(owner.error ? { error: owner.error } : {}),
-    ...(owner.engineError ? { engineLoader: owner.engineError } : {}),
+    ...(owner.invalid ? { configInvalid: owner.invalid } : {}),
   } : null;
   const warnings = [];
   if (cfgAgent) {
@@ -369,10 +328,7 @@ async function signalHealth(signal) {
     return { live: true, reason: 'startup reservation active', terminal: null, value };
   }
   if (value.dispatch) {
-    const orch = await loadOrchestrationApi();
-    if (typeof orch.workerShow !== 'function')
-      return { live: true, reason: 'managed kernel dispatch recorded; worker-show probe unavailable', terminal: null, value };
-    const shown = orch.workerShow({ dispatch: value.dispatch });
+    const shown = workerShow({ dispatch: value.dispatch });
     const state = shown?.state ?? null;
     const live = shown?.ok === true && !(state && MANAGED_DEAD_STATE.test(state));
     return {
@@ -389,11 +345,10 @@ async function signalHealth(signal) {
 // Best-effort settlement of a managed dispatch (stale kernel replacement or a
 // failed launch with residual effects): worker-stop then worker-release,
 // matching calls.yaml's settle-dispatch recovery. Never throws.
-async function releaseManagedWorker(dispatchId) {
+function releaseManagedWorker(dispatchId) {
   if (!dispatchId) return;
-  const orch = await loadOrchestrationApi();
-  try { orch.workerStop?.({ dispatch: dispatchId }); } catch { /* best-effort */ }
-  try { orch.workerRelease?.({ dispatch: dispatchId }); } catch { /* best-effort */ }
+  try { workerStop({ dispatch: dispatchId }); } catch { /* best-effort */ }
+  try { workerRelease({ dispatch: dispatchId }); } catch { /* best-effort */ }
 }
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
@@ -487,7 +442,7 @@ try {
     // A stale managed kernel may still hold a live Orca worker — settle the
     // exact old dispatch (stop + release) before the seat is cleared so the
     // replacement never runs beside a zombie.
-    if (priorHealth.value?.dispatch) await releaseManagedWorker(priorHealth.value.dispatch);
+    if (priorHealth.value?.dispatch) releaseManagedWorker(priorHealth.value.dispatch);
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(target);
     const at = Date.now();
     ledger.transaction(() => {
@@ -612,18 +567,7 @@ try {
       ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,?,'kernel','kernel',?,'running',?,?,?)")
         .run(`kernel-${workflowId}`, workflowId, null, generation, payload, workerId, now, now);
     }
-    // Phase transition — the canonical write (api.mjs dispatch carries the
-    // same update as a safety net). Guarded on phase='queued' so a kernel
-    // restart is idempotent and a finished/archived workflow is never
-    // regressed; the event is appended only when the row actually moved.
-    const transitioned = ledger.db.prepare("UPDATE workflows SET phase='running',updated_at=? WHERE workflow_id=? AND phase='queued'")
-      .run(now, workflowId);
-    if (transitioned.changes > 0) {
-      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, generation,
-        kind: 'phase-transition', payload: { from: 'queued', to: 'running' }, createdAt: now });
-    } else {
-      ledger.db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(now, workflowId);
-    }
+    transitionWorkflowToRunning(ledger, { workflowId, now, generation });
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: replaced ? 'kernel-restarted' : 'kernel-booted',
       payload: { terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,

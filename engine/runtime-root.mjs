@@ -5,12 +5,12 @@ import {parseYaml} from './yaml.mjs';
 
 /**
  * Runtime root helper. The runtime reads this source tree directly. `skillRoot` is the
- * directory containing `package.json` (this module's parent), whether that is the authored
- * checkout or a sealed runtime-pin payload.
+ * directory containing `package.json` (this module's parent) — the checkout, or the copy of it
+ * an install placed on the host.
  *
- * All workflows/ops/schemas/knowledge/specifications/model contracts consumed at
- * runtime are authored YAML (or authored JSON where a document is stored that way).
- * `readDistJson` resolves a path under `skillRoot` and parses the file by extension.
+ * Every workflow, op, schema, knowledge and model contract read at runtime is an authored YAML
+ * file (or an authored JSON one where a document is stored that way). `readDistJson` resolves a
+ * path under `skillRoot` and parses the file by its extension.
  */
 const moduleRoot = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
 

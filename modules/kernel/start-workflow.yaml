@@ -20,7 +20,7 @@ about:
 
 watchdog:
   executable: scripts/kernel/watchdog.mjs
-  cadenceMs: 300000
+  cadence: modules/models/runtimes.yaml allocation.watchdogCadenceMs
   boundary: >-
     Liveness only. It reads canonical status/survey and the attested Kernel
     terminal. A connected terminal at its provider input prompt is turn-idle
@@ -81,8 +81,8 @@ spawn:
     Source CONTEXT.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
     mutation goes through node scripts/kernel/api.mjs <cmd>
-    (survey/status/plan/enqueue/route/dispatch/nudge/observe/consume-report/
-    check/settle/incident/finish — plus the worker-side op IPC op-contract/report) — never
+    (the verb surface is modules/kernel/api.yaml `commands` — that file is the
+    only list, and two of its verbs are worker-side op IPC) — never
     direct sqlite writes, never self-spawned op terminals, never direct
     orca/git/agent-CLI calls (report/contract/check truth is the ledger
     rows via the api verbs); `api route` persists the model decision before
