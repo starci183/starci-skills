@@ -151,6 +151,34 @@ const ARCHETYPE_STAR = {
       scopeKind: 'workspace-canonicalization',
     },
   },
+  // Specification only: canonical Work from its source, SRS, SDS, stacks. The
+  // workspace.manage setup record is the scope and the reconstructed roots are
+  // the delivery review.verify reads.
+  'spec-foundation': {
+    vars: () => [
+      { family: 'workspace', suffix: '', state: 'managed' },
+      { family: 'business', suffix: 'X', state: 'decided' },
+      { family: 'sds', suffix: 'X', state: 'decided' },
+    ],
+    hints: {
+      specFoundation: true,
+      scopeProducer: 'workspace.manage',
+      deliveryOps: ['workspace.manage'],
+      scopeKind: 'spec-foundation',
+    },
+  },
+  // Source setup: one scaffold leg per named surface (archetypes.yaml
+  // greenfield-scaffold surfaces/surfaceRule); no decide leg precedes it.
+  'greenfield-scaffold': {
+    vars: (a, arch, text) => {
+      const surfaces = arch.extra?.surfaces ?? {};
+      const hit = key => asArray(surfaces[key]).some(p => phraseHits(text, p));
+      const named = ['backend', 'frontend', 'package'].filter(hit);
+      const picked = named.length ? named : ['backend', 'frontend'];
+      return picked.map(q => ({ family: 'impl', suffix: q, state: 'scaffolded', _qual: q, strictQualifier: true }));
+    },
+    hints: { scopeKind: 'greenfield-scaffold' },
+  },
   'investigate-first': {
     vars: () => [{ family: 'perf', suffix: 'X', state: 'verified' }],
     hints: { diagnosticFirst: true },
@@ -401,6 +429,9 @@ function parsePrerequisite(text, ops) {
     [/^an approved goal exists/i, { kind: 'condition', owner: true }],
     [/^the scope exists/i, { kind: 'condition' }],
     [/^a declared stack\/environment/i, { kind: 'condition' }],
+    [/^repository bound/i, { kind: 'condition' }],
+    [/^grammar bound/i, { kind: 'condition' }],
+    [/^a settled SDS only when/i, { kind: 'condition' }],
   ];
   for (const [re, req] of table) if (re.test(t)) return { ...req, note: req.note ?? t };
   return { kind: 'condition', note: `unparsed prerequisite treated as a condition: '${t}'` };
@@ -474,7 +505,8 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
         const sameFam = pv.family === v.family;
         const sameState = pv.state === v.state;
         const suffixOk = !v.suffix || v.suffix === 'X' || pv.suffix === 'X' || pv.suffix === '' || pv.suffix === v.suffix;
-        if (sameFam && sameState && suffixOk) {
+        const qualifierOk = !v.strictQualifier || pv.qualifier === v._qual;
+        if (sameFam && sameState && suffixOk && qualifierOk) {
           consumerLeg.needsSatisfiedBy.push(`${leg.legId} produces ${pv.raw}`);
           edges.push([leg.legId, consumerLeg.legId]);
           return true;
@@ -490,6 +522,12 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
     // 2b. soft needs are satisfiable out-of-band (e.g. "delivered code" for a
     // refactor is the pre-existing target, not a chain leg); a named-target
     // request IS its own scope (archetypes.yaml refactor excludes scope.define).
+    if (hints.scopeProducer && v.family === 'scope') {
+      const producer = ensureLeg(hints.scopeProducer);
+      edges.push([producer.legId, consumerLeg.legId]);
+      consumerLeg.needsSatisfiedBy.push(`${producer.legId} (its setup scope record bounds the goal)`);
+      return true;
+    }
     if (hints.scopeProvided && v.family === 'scope') {
       consumerLeg.needsSatisfiedBy.push('named target IS the scope — scope.define excluded per archetype');
       return true;
@@ -529,6 +567,14 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
     if (hit) {
       consumerLeg.needsSatisfiedBy.push(`${hit.legId} (${phase} leg)`);
       edges.push([hit.legId, consumerLeg.legId]);
+      return true;
+    }
+    const delivery = phase === 'implement' && hints.deliveryOps
+      ? [...legs.values()].filter(l => l !== consumerLeg && hints.deliveryOps.includes(l.op)).at(-1) : null;
+    if (delivery) {
+      consumerLeg.needsSatisfiedBy.push(`${delivery.legId} (delivery to inspect: the reconstructed Work and stack roots)`);
+      edges.push([delivery.legId, consumerLeg.legId]);
+      consumerLeg.deliveredBy = delivery.legId;
       return true;
     }
     if (phase === 'decide') return satisfyVar({ family: 'business', suffix: 'X', state: 'decided' }, consumerLeg);
@@ -614,6 +660,23 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
     edges.push([scope.legId, tests.legId], [tests.legId, refactor.legId], [refactor.legId, workspace.legId]);
     tests.needsSatisfiedBy.push(`${scope.legId} (bounded canonicalization scope)`);
     workspace.needsSatisfiedBy.push(`${refactor.legId} (path consumers migrated before canonical root reconstruction)`);
+  }
+  // spec-foundation: after the SDS settles, a second workspace.manage leg
+  // declares .starcistacks from its component inventory (the op whose
+  // import-slice ownership and starci-stacks-check cover that root), then
+  // review.verify checks the reconstructed Work and stack roots.
+  if (hints.specFoundation) {
+    const stacks = ensureLeg('workspace.manage', {
+      instance: 'stacks',
+      forVar: { family: 'workspace', suffix: 'stacks', state: 'managed' },
+      injected: 'declare .starcistacks dev/prod from the settled SDS component inventory (starci-stacks-check)',
+    });
+    const arch = legs.get('architecture.decide');
+    if (arch) {
+      edges.push([arch.legId, stacks.legId]);
+      stacks.needsSatisfiedBy.push(`${arch.legId} (settled component inventory)`);
+    }
+    ensureLeg('review.verify', { forVar: { family: 'slice', suffix: 'X', state: 'reviewed' } });
   }
   // investigate-first: a baseline perf.verify BEFORE scoping, then the closing
   // one after the build (archetypes.yaml #6 orderingIsThePoint).
@@ -738,7 +801,7 @@ function legalityCheck(order, legs, ops, s0) {
       .some(l => stageRankOf(ops.get(l.op)) === 4);
     const consumesPreExistingDelivery = ['uat.assisted.prepare', 'uat.assisted.verify'].includes(leg.op)
       && leg.conditions.some(c => /served build|controlled-run receipt/i.test(c));
-    const s0ok = leg.needsSatisfiedBy.some(n => n.startsWith('S0:')) || leg.assumed.length || consumesPreExistingDelivery;
+    const s0ok = leg.needsSatisfiedBy.some(n => n.startsWith('S0:')) || leg.assumed.length || consumesPreExistingDelivery || !!leg.deliveredBy;
     if (!hasImplBefore && !s0ok && !legs.get(leg.legId)?.instance) {
       findings.push({ rule: 'verify-after-implement', leg: leg.legId, note: 'proof leg with no delivered slice before it' });
     }

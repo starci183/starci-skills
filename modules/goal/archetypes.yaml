@@ -135,6 +135,8 @@ signalMatching:
     the scope kind and later matches' hints override earlier ones.
   sequence:
     - workspace-canonicalization
+    - greenfield-scaffold
+    - spec-foundation
     - investigate-first
     - refactor
     - external-integration
@@ -188,6 +190,87 @@ archetypes:
       A plan-divergence revision is previewed as rev+1 and requires exact owner
       ok before it is appended. The existing live Kernel remains parked until
       that transaction lands, then resurvey resumes the same workflow.
+
+  # ==========================================================================
+  # SPEC-FOUNDATION
+  # ==========================================================================
+  - id: spec-foundation
+    signals:
+      note: >-
+        Author or complete the specification of a product: rebuild a canonical
+        .starciwork from an existing Work source, review and extend the SRS,
+        write the SDS, declare the application stacks — no product code.
+        Repositories and surfaces appear as nouns, so the generic build priors
+        are superseded.
+      phrases: [srs, sds, đặc tả, specification*, software requirements, software design]
+      requires:
+        - [author*, write, writing, complete, extend, rebuild, reconstruct, declare, define, viết, soạn, bổ sung, hoàn thiện, tái lập, khai báo, xây dựng đặc tả]
+      excludes: [implement*, scaffold*, base repo]
+    supersedes: [feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
+    chain:
+      - {op: workspace.manage,    leg: workAuthor, note: "import mode: reconstruct the canonical .starciwork in the owner repository from the existing Work source with provenance, source untouched; its setup scope record is the bounded scope, so scope.define is not a leg"}
+      - {op: business.decide,     leg: decide,     note: "review and extend the SRS against the vision; imported leaves confirmed to todo"}
+      - {op: architecture.decide, leg: decide,     note: "SDS/contracts/integrations for every feature, including the component inventory the stacks declare"}
+      - {op: workspace.manage,    leg: workAuthor, note: "stacks instance: declare .starcistacks dev/prod from the settled component inventory and run starci-stacks-check — workspace.manage is the op whose import-slice ownership and layout checks cover .starcistacks"}
+      - {op: review.verify,       leg: verify,     note: "read-only Work and application-stack conformance checks over the reconstructed roots"}
+    exclusions:
+      - {op: request.analyze, why: "the approved goal entry is the analyzed intake; workspace.manage consumes it directly"}
+      - {op: scope.define, why: "workspace.manage's setup scope record bounds the reconstruction; a second scope record would duplicate it"}
+      - {op: work.author, why: "no implementation or UAT records are in scope — the goal stops at SRS, SDS and stacks"}
+      - {op: brand.decide / interface.draw / interface.asset, why: "no interface is designed in a specification goal"}
+      - {op: "*.implement / *.scaffold", why: "no product code — source trees are a separate greenfield-scaffold workflow"}
+      - {op: interface.audit / uat.verify / e2e.verify, why: "nothing is built, so there is no served build or API slice to prove"}
+    isolation: >-
+      A greenfield-scaffold workflow for the same project runs in parallel: its
+      baseline scaffold needs no SDS, and the two share the project ledger
+      without overlapping owned paths (.starciwork/.starcistacks versus source
+      trees).
+    workedExample:
+      prompt: "tái lập .starciwork chuẩn từ Work nguồn, rà và bổ sung SRS, viết SDS cho mọi feature, khai báo .starcistacks dev và prod"
+      signalMatch: "SRS/SDS nouns + authoring verbs (tái lập, bổ sung, viết, khai báo) -> spec-foundation; frontend/backend nouns superseded"
+      decision: >-
+        workspace.manage imports the source Work with provenance; business and
+        architecture decide in order; the stacks instance declares
+        .starcistacks from the settled components; review.verify runs the
+        Work and stacks checks. No implement, draw, UAT or E2E leg.
+      ownerMoments: "provision.ask only if the stacks need an owner credential the runtime cannot generate"
+
+  # ==========================================================================
+  # GREENFIELD-SCAFFOLD
+  # ==========================================================================
+  - id: greenfield-scaffold
+    signals:
+      note: >-
+        Create new base repositories: toolchain, baseline hooks and CI, empty
+        declared layout and one health endpoint — source setup with no
+        business. The stack is fixed by CONTEXT.md and the toolchain by
+        knowledge/repository-baseline.yaml, so no decide leg precedes it.
+      phrases: [scaffold*, base repo, base repository, repository baseline, repo baseline, greenfield, khởi tạo repo, dựng repo, dựng base repo, tạo repo mới, bootstrap the repo*]
+    supersedes: [spec-foundation, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]
+    surfaces:
+      backend: [backend, back-end, nestjs, nest, code be, api, máy chủ]
+      frontend: [frontend, front-end, next.js, nextjs, fe, giao diện, ui]
+      package: [shared package, new package, library package, thư viện dùng chung, gói dùng chung]
+    chain:
+      - {op: backend.scaffold,   leg: implement, note: "Nest base repository with the repository baseline and a liveness endpoint"}
+      - {op: interface.scaffold, leg: implement, note: "Next base repository with the baseline, grammar-bound first shell and liveness route"}
+      - {op: package.scaffold,   leg: implement, note: "only when the prompt declares a shared package; its public surface is settled architecture, so this leg carries architecture.decide with it"}
+      - {op: review.verify,      leg: verify,    note: "kernel-planned read of the baseline-runs and scaffold-runs evidence"}
+    exclusions:
+      - {op: business.decide / architecture.decide, why: "a baseline-only scaffold takes its stack from CONTEXT.md and its toolchain from the repository baseline; SDS-owned wiring is a later extend workflow"}
+      - {op: request.analyze / scope.define / work.author, why: "the approved goal entry names the repositories; no Work records are authored by a source-setup goal"}
+      - {op: brand.decide / interface.draw, why: "the first shell is not a designed screen"}
+      - {op: uat.verify / e2e.verify, why: "no business behaviour exists to walk or call; the scaffold proofs run the toolchain, hooks and first render"}
+    surfaceRule: >-
+      Each surface whose phrases hit adds its scaffold leg; when no surface is
+      named, backend and frontend are both scaffolded (every project pairs a
+      NestJS backend with a Next.js frontend). package.scaffold joins only on a
+      package phrase.
+    workedExample:
+      prompt: "Dựng base repo cho StarCi Next: NestJS backend và Next.js frontend, TypeScript strict, eslint canon, husky + lint-staged, CI, Codecov và Sonar"
+      signalMatch: "'base repo' -> greenfield-scaffold; backend + frontend surfaces; SDS mention superseded"
+      decision: "backend.scaffold and interface.scaffold run with disjoint source roots; review.verify reads their evidence. It runs in parallel with the spec-foundation workflow."
+      ownerMoments: "none unless the grammar package or repository binding is missing (GRAMMAR_UNBOUND / REPO_UNBOUND)"
 
   # ==========================================================================
   # 1 — FEATURE-BUILD-WITH-UI
