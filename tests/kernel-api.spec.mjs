@@ -365,6 +365,33 @@ test('estimate sizes same-op slices from measured counts, never a guess',{skip},
   assert.match(`${empty.stdout}${empty.stderr}`,/estimate-no-measure/);
 });
 
+test('a re-enqueued op carries its retry lineage: a business failure spends a business attempt, a no-effect rejection does not',{skip},t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-retry-lineage';
+  seedGoal(repo,wf);
+  const enqueue=()=>{
+    const r=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
+    assert.equal(r.status,0,r.stderr||r.error?.message);
+    return out(r).job_id;
+  };
+  const payloadOf=jobId=>JSON.parse(read(repo,l=>l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)).payload_json);
+  const settle=(jobId,result)=>seed(repo,l=>l.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id=?").run(JSON.stringify(result),jobId));
+
+  const first=enqueue();
+  assert.equal(payloadOf(first).retry,undefined,'a first attempt supersedes nothing');
+
+  // An ordinary failed attempt: the new row is a business retry.
+  settle(first,{verdict:'fail'});
+  const second=enqueue();
+  assert.deepEqual([payloadOf(second).retry.attempt,payloadOf(second).retry.businessAttempt,
+    payloadOf(second).retry.retryClass,payloadOf(second).retry.retryOf],[2,2,'business',first]);
+
+  // A launch rejected before any effect is infrastructure: it consumes no business retry.
+  settle(second,{reason:'dispatch-rejected',effectState:'none',retryable:true,attemptConsumed:false});
+  const third=enqueue();
+  assert.deepEqual([payloadOf(third).retry.businessAttempt,payloadOf(third).retry.retryClass,
+    payloadOf(third).retry.consumesBusinessRetry],[2,'infrastructure',false]);
+});
+
 test('enqueue refuses an unbounded grant, an op with no brief, and a finished workflow',{skip},t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-enqueue-refusals';
   seedGoal(repo,wf);

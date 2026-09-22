@@ -37,7 +37,7 @@ import {
   newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { ownedPathLeaseRequests } from '../../engine/admission.mjs';
+import { deriveRetryLineage, ownedPathLeaseRequests } from '../../engine/admission.mjs';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
@@ -727,9 +727,17 @@ function cmdEnqueue(ledger, args) {
   let job;
   ledger.transaction(() => {
     const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, args.op).a;
+    // A retry's provenance. `attempt` is durable dispatch identity; the route's
+    // limit is budgeted against `businessAttempt`, which only advances when the
+    // prior attempt actually spent one — an infrastructure launch rejected
+    // before any effect does not (engine/admission.mjs deriveRetryLineage).
+    const priorJob = db.prepare('SELECT job_id,attempt,payload_json,result_json FROM jobs WHERE workflow_id=? AND op_id=? ORDER BY attempt DESC LIMIT 1')
+      .get(workflowId, args.op);
+    const retry = priorJob ? deriveRetryLineage(priorJob) : null;
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(cut ? { cut } : {}),
+      ...(retry ? { retry } : {}),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {
         schema: AGENT_HIERARCHY_SCHEMA,

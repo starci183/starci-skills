@@ -252,7 +252,14 @@ commands:
       all three cut flags are atomic, ordinal is 1-based and total is at least
       two. The goal binding is
       frozen at enqueue so a later approved revision cannot silently retarget
-      an already queued job. `records` is the explicit closed read binding carried
+      an already queued job. When a prior attempt of the op exists the payload
+      also carries `retry` (engine/admission.mjs deriveRetryLineage):
+      {retryOf, resumeOf, attempt, businessAttempt, retryClass, effectState,
+      resumed, reusesDurableAttempt, consumesBusinessRetry}. `attempt` is
+      durable dispatch identity; `businessAttempt` is what a route's retry
+      limit is budgeted against, and it does not advance for a launch the
+      prior result proved rejected before any effect.
+      `records` is the explicit closed read binding carried
       unchanged into the dispatch packet; omission means no Work record is
       bound and never licenses repository-wide discovery.
     returns: '{ok:true, job_id, workflowId, op, status:queued, attempt}'
