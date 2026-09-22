@@ -40,6 +40,11 @@ branches:
     title: Complete application stacks
     path: application-stacks.yaml
     use: Whole-app dev and Ubuntu VPS Compose deployment, encrypted custody, lifecycle and verification.
+  - id: repository-baseline
+    title: Repository baseline
+    path: repository-baseline.yaml
+    use: Toolchain a new Nest or Next repository carries from its first commit - strict TypeScript, canon lint,
+      test runner and coverage, git hooks, CI gates, Codecov/Sonar, ignore rules and line endings.
   - id: code-examples
     title: Code examples
     path: code-examples/index.yaml

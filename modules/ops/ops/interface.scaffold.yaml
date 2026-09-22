@@ -20,12 +20,20 @@ reads:
   - id: target
     path: N/index.yaml
     purpose:
-      en: "Read the selected implementation node this scaffold realises: declared source path,
-        framework/design refs, assertions. No selected node is a scope/graph gap — report it."
+      en: "The selected implementation node this scaffold realises: declared source path,
+        framework/design refs, assertions. On a greenfield scaffold the node is absent — no workflow
+        authors it before the first source tree exists."
+  - id: baseline
+    path: CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and next)
+    purpose:
+      en: The Next.js stack every project uses and the toolchain a new frontend repository carries from
+        its first commit — manifest and engines, strict TypeScript, canon lint, vitest with coverage
+        thresholds, git hooks, CI gates, Codecov and Sonar configuration, ignore rules and line endings.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
-      en: REQUIRED for greenfield. Missing decisions report sds-gap.
+      en: The settled design for routing beyond the first shell, data boundaries and the dependencies it
+        owns beyond the baseline health surface. A baseline-only scaffold reads none.
   - id: grammar
     path: knowledge/grammars/* + grammar package (repository:<repo-id> binding)
     purpose:
@@ -57,7 +65,9 @@ writes:
     path: N/index.yaml
     fields: [state, activity, codeRefs, evidence]
     content:
-      en: Record the realised source root, scaffolded paths and evidence the checks produced.
+      en: The selected implementation scope node — created with its schema const when absent on a
+        greenfield scaffold — carrying the realised source root, scaffolded paths and evidence the
+        checks produced.
   - id: source
     path: repository:<repo-id>/<declared-source-root>/**
     fields: [manifest, toolchainConfig, layout, themeWiring, firstShell, harness]
@@ -89,14 +99,17 @@ writes:
 steps:
   - reads:
       - target
+      - baseline
       - architecture
       - grammar
       - brand
     writes: [evidence, firstRender]
     action:
-      en: Resolve what the new app must be — framework, shell shape, grammar version, token source.
-        Undecided inputs are named gaps, never improvised. Framework choice, app shell shape,
-        routing root and data boundaries come from the settled SDS — never guessed.
+      en: Resolve what the new app must be — shell shape, grammar version, token source. The framework
+        comes from CONTEXT.md and the toolchain from the repository baseline, so a baseline-only
+        scaffold needs no design record; routing beyond the root, data boundaries and SDS-owned
+        dependencies come from the settled SDS — never guessed. Undecided inputs are named gaps, never
+        improvised.
   - reads:
       - repo
       - conventions
@@ -105,13 +118,19 @@ steps:
       en: Resolve the real checkout, confirm the declared app path is empty-or-absent, read the house FE
         layout and lint contracts.
   - reads:
+      - baseline
       - architecture
       - grammar
       - brand
     writes: [source]
     action:
-      en: Write manifest + toolchain configs, then the declared layout, then grammar-based theme wiring,
-        then the minimal first shell. No screens or behaviour beyond what the shell proves.
+      en: Write the manifest and toolchain first, exactly as knowledge/repository-baseline.yaml shapes
+        common and next carry them (package.json with engines and scripts, strict tsconfig, canon
+        eslint config, vitest with coverage thresholds, husky pre-commit with lint-staged and
+        pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore,
+        .editorconfig, .gitattributes), then the declared layout, then grammar-based theme wiring,
+        then the minimal first shell with the baseline liveness route. No screens or behaviour beyond
+        what the shell proves.
   - reads:
       - repo
     writes: [source, evidence, firstRender]
@@ -123,7 +142,9 @@ steps:
     writes: [node, evidence, firstRender]
     action:
       en: Record the realised source root and codeRefs on the node; return the evidence bundle with the
-        capture.
+        capture. For a greenfield target, absence of the node is expected; inspect the nearest
+        existing ancestor/workspace, then create only that selected implementation scope node and
+        nothing beyond it.
 proofs:
   - id: scaffold-runs
     requirement:
@@ -135,13 +156,20 @@ proofs:
   - id: grammar-conforms
     requirement:
       en: Written markup uses the installed grammar's units; no ad-hoc markup bypassed it.
+  - id: baseline-runs
+    requirement:
+      en: The repository baseline for the next profile is present and executes — a staged change makes the
+        pre-commit hook run lint-staged, the pre-push hook runs typecheck and affected tests, and
+        .github/workflows/ci.yml parses and names the lint, typecheck, test and build gates. The
+        observed hook and CI output is recorded.
   - id: scope
     requirement:
       en: Every created file lives under the declared source root.
 blockers:
   - code: SDS_MISSING
     condition:
-      en: No settled architecture names the framework, shell shape or routing root.
+      en: The scaffold is asked to wire routing beyond the first shell, data boundaries or SDS-owned
+        dependencies, and no settled architecture names them.
   - code: GRAMMAR_UNBOUND
     condition:
       en: No bound grammar package resolves — markup cannot be written without it.
@@ -168,7 +196,7 @@ route:
   phase: [implement]
   intent: [scaffold, greenfield, new-source, frontend, interface, bootstrap, init]
   prerequisites:
-    - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
     - grammar bound
     - repository bound
+    - a settled SDS only when wiring SDS-owned dependencies or routing beyond the first shell
   riskHints: [source-edits, new-tree]

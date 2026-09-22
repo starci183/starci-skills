@@ -32,8 +32,10 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Source = the repository containing this .claude; the project registry lives
-// beside it at .workspaces/projects/<name>/work.json.
-const sourceRoot = path.dirname(skillRoot);
+// beside it at .workspaces/projects/<name>/work.json. STARCI_SOURCE_ROOT points
+// the registry lookup at another Source — the seam for fixtures and for a
+// runtime copy (a worktree) that does not sit inside its Source.
+const sourceRoot = process.env.STARCI_SOURCE_ROOT ? path.resolve(process.env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot);
 const arg = (n, d = null) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 ? process.argv[i + 1] : d; };
 const projectName = arg('project');
 const repoArg = arg('repo');
@@ -116,27 +118,29 @@ function assessRepos(repos) {
 }
 
 // Cold effort tiers for the plan table — no dispatch has run, so each leg's
-// estimate is a class guess, and the table says so ('estimate is cold').
+// estimate is a class guess, and the table says so ('estimate is cold'). The
+// tier is matched on the leg label, so a mode-named instance
+// (workspace.manage#stacks) is classed apart from its op's default mode.
 const COLD_MINUTES = { easy: 15, medium: 45, hard: 90 };
 const COLD_TIER = [
   [/^(provision\.ask|request\.analyze|scope\.define|scope\.finish|decision\.prepare|goal\.revise|workspace\.manage)$/, 'easy'],
-  [/\.(implement|refactor)$|^(integration|e2e|uat)\.verify$|^(release\.deliver|runtime\.operate)$/, 'hard'],
+  [/\.(implement|refactor)$|^(integration|e2e|uat)\.verify$|^(release\.deliver|runtime\.operate|workspace\.manage#stacks)$/, 'hard'],
 ];
 const tierOf = op => COLD_TIER.find(([re]) => re.test(op))?.[1] ?? 'medium';
 
-// Per-repo signals line for the STATE section. assess.mjs's output shape is
-// its own contract, so the lookup is tolerant: a repos/repositories list keyed
-// by repo|path|root|name, an object keyed by the repo path, or a raw dump.
+// Per-role line for the STATE section. assess.mjs --json prints one object for
+// one --repo and an array for several; each entry names its resolved `repo`.
+// A row shows its own repository's summary, never another repository's.
+const samePath = (a, b) => {
+  const norm = p => path.resolve(p);
+  return process.platform === 'win32' ? norm(a).toLowerCase() === norm(b).toLowerCase() : norm(a) === norm(b);
+};
 const assessLineFor = (data, repoPath) => {
-  const entries = Array.isArray(data?.repos) ? data.repos
-    : Array.isArray(data?.repositories) ? data.repositories : null;
-  const hit = entries?.find(e => [e.repo, e.path, e.root, e.name].includes(repoPath))
-    ?? (data?.repos?.[repoPath] ?? data?.repositories?.[repoPath] ?? null);
-  if (hit) {
-    const signals = hit.signals ?? hit.summary ?? hit.state ?? hit;
-    return typeof signals === 'string' ? signals : JSON.stringify(signals);
-  }
-  return JSON.stringify(data).slice(0, 160);
+  const entries = Array.isArray(data) ? data : data && typeof data === 'object' ? [data] : [];
+  const hit = entries.find(e => typeof e?.repo === 'string' && samePath(e.repo, repoPath));
+  if (!hit) return 'not assessed';
+  if (!hit.exists) return 'missing';
+  return `files ${hit.size?.files ?? 0}, loc ~${hit.size?.loc ?? 0}, tests ${hit.testInfra?.framework ?? 'none'}, starciwork ${hit.starciwork?.present ? 'present' : 'absent'}`;
 };
 
 // Owner config surface for the plan table: <skillRoot>/config.yaml (gitignored,
@@ -165,7 +169,15 @@ function ownerConfigSummary() {
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'goal';
 const workflowId = `wf-${slug(title || text)}-${Date.now().toString(36)}`;
 const goalIdentity = crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
-const chain = deriveOpChain(text);
+// Only a planned (status ok) chain is a chain. When no archetype matches,
+// route-plan reports the INTENT tier (needs-owner) — that is an underivable
+// chain the kernel derives at boot, never a stored or printed leg list.
+const derived = deriveOpChain(text);
+const chain = derived?.status === 'ok' ? derived : null;
+const underivable = chain ? null : {
+  status: derived?.status ?? 'unavailable',
+  reason: derived?.ambiguity?.note ?? derived?.reason ?? 'route-plan produced no chain',
+};
 if (legParams) {
   const ops = new Set((chain?.legs ?? []).map(l => l.op));
   const unknown = Object.keys(legParams).filter(op => !ops.has(op));
@@ -304,7 +316,7 @@ const willWrite = revisionBase
 if (planOnly) {
   const assess = assessRepos(scanRepos);
   const legs = (chain?.legs ?? []).map(l => {
-    const tier = tierOf(l.op);
+    const tier = tierOf(legLabel(l));
     return { seq: l.seq, op: legLabel(l), tier, estimateMinutes: COLD_MINUTES[tier], ...(l.params ? { params: l.params } : {}) };
   });
   const totalMinutes = legs.length ? legs.reduce((n, l) => n + l.estimateMinutes, 0) : null;
@@ -317,6 +329,7 @@ if (planOnly) {
     goalIdentity: revisionBase ? revisionBase.goal.goal_identity : goalIdentity,
     project: project ? { name: project.project, ownerRole: project.ownerRole, ownerRepo: project.ownerRepo, repos: project.repos, binding: project.file } : undefined,
     opChain: chain?.legs?.map(l => l.op) ?? null,
+    underivable: underivable ?? undefined,
     legs,
     estimate: { basis: 'cold', minutesPerTier: COLD_MINUTES, totalMinutes },
     assess: assess.available ? assess.data : null,
@@ -344,6 +357,7 @@ if (planOnly) {
     lines.push(`  total ~${totalMinutes}m — estimate is cold`);
   } else {
     lines.push('  underivable (kernel will derive at boot)');
+    lines.push(`  reason: ${underivable.status} — ${underivable.reason}`);
   }
   const cfg = out.config;
   lines.push(cfg.file
@@ -526,7 +540,7 @@ try {
     ledger.db.prepare('UPDATE workflows SET phase=?,goal_identity=? WHERE workflow_id=?').run('queued', goalIdentity, workflowId);
     ledger.db.prepare(
       'INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)'
-    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain, routing_bias: routingBias }), now);
+    ).run(workflowId, 0, goalIdentity, text, JSON.stringify({ derivedFrom: 'owner-prompt', opChain: chain, ...(underivable ? { underivable } : {}), routing_bias: routingBias }), now);
     ledger.db.prepare(
       "INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)"
     ).run(workflowId, 'goal', workflowId, JSON.stringify({ prompt: text, title: title || null, routing_bias: routingBias, at: now }), 'pending', now);
