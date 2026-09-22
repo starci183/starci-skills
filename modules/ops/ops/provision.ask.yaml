@@ -68,14 +68,17 @@ steps:
         alternatives for the owner to pick between. A bare single-option \"reply provided\"
         confirmation is degenerate: either the deliverable is named and re-verified, or the ask is
         the wrong lane — interactive actions inside a running product are uat.assisted checkpoints,
-        and informational answers carry the answer itself, not a confirmation flag. When the ask
-        presents alternatives the owner must judge (candidate draws, artifacts, plans), the report's
-        question.assets must list the exact repo-relative artifact paths — optionally {path, label}
-        — so the owner reviews the artifacts themselves, never a text description or a bare hash of
-        them. When the owner must pick per dimension (one candidate per screen, per variant, per
-        plan), question.picks declares each dimension as {id, label, choices} so the form renders a
-        required radio group per dimension and the receipt records structured picks — a free-text
-        \"type your picks in the note\" instruction is not an answer schema. Wait as long as the
+        and informational answers carry the answer itself, not a confirmation flag. Everything the
+        owner reads — question.text, option and pick labels — is written in the packet's
+        owner_language in plain words: what changes for the product and what each choice costs; internal
+        ids, digests and lineage terms go in question.refs, never in the text. When the ask presents
+        alternatives the owner must judge, declare the decision once as question.picks
+        ({id, label, choices}); question.options, when present, mirrors those choices in the same order
+        and is not a second question. Each choice carries the image that shows its outcome as
+        `image` (the accepted draw, the current implementation render, the proposed direction), every
+        path also listed in question.assets; a choice whose outcome has no artifact yet says so in its
+        label. The owner compares the artifacts themselves, never a text description or a bare hash;
+        a free-text \"type your picks in the note\" instruction is not an answer schema. Wait as long as the
         contract lets you."
   - reads:
       - question

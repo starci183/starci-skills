@@ -1317,6 +1317,10 @@ const resolveModel = (target) => {
 
 // dispatch-op.mjs's packet builder is not exported (it runs main() on import),
 // so the packet shape is replicated here: same fields, same returns contract.
+// The owner's language (config.yaml `language`) for every string the owner
+// reads; canonical records stay English. A broken config falls back to English.
+const ownerLanguage = () => { try { return loadConfig()?.language ?? 'en'; } catch { return 'en'; } };
+
 const buildPacket = ({ job, payload, model, goal, params }) => ({
   op: job.op_id ?? payload.opId,
   brief: `modules/ops/ops/${job.op_id ?? payload.opId}.yaml`,
@@ -1328,6 +1332,7 @@ const buildPacket = ({ job, payload, model, goal, params }) => ({
       goal_identity: payload.goal_binding?.identity ?? goal?.goal_identity ?? null,
     },
     attempt: job.attempt,
+    owner_language: ownerLanguage(),
     records: payload.records ?? [],
     owned_paths: (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? { path: p } : p)),
     ...(payload.cut ? { cut: payload.cut } : {}),
@@ -1360,6 +1365,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
   `brief: ${brief}  (your contract — never renegotiate it)`,
   ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow.id} goal_revision=${packet.context.workflow.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow.goal_identity ?? '(unbound)'}`,
+  `owner_language: ${packet.context.owner_language ?? 'en'} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
   `records: ${packet.context.records.join(', ') || '(none bound)'}`,
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
   `owned_paths: ${[...new Set(packet.context.owned_paths.map((p) => p.path))].join(', ') || '(per brief write-ceiling)'}`,

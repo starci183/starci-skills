@@ -35,6 +35,31 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
+import { loadConfig } from '../../engine/config.mjs';
+
+// The form speaks the owner's language (config.yaml `language`). Unknown
+// languages fall back to English; the op writes the question itself in the
+// same language (provision.ask, packet owner_language).
+const UI = {
+  en: { title: 'Owner decision', artifacts: 'Artifacts under review', choose: 'Choose', picks: 'Choose',
+    credentials: 'Credentials', note: 'Note to the workflow (optional)', submit: 'Submit answer',
+    answered: 'This ask is already answered — view only.', received: 'Answer received',
+    custody: 'Secret values land in encrypted stack custody and are exposed through *_FILE pointers — never in the ledger, the chat, or any log. Submitting wakes the workflow kernel.',
+    wakes: 'Submitting wakes the workflow kernel.' },
+  vi: { title: 'Quyết định của thầy', artifacts: 'Hình để so sánh', choose: 'Chọn', picks: 'Chọn',
+    credentials: 'Thông tin bí mật', note: 'Ghi chú cho workflow (không bắt buộc)', submit: 'Gửi câu trả lời',
+    answered: 'Câu hỏi này đã được trả lời, chỉ xem.', received: 'Đã nhận câu trả lời',
+    custody: 'Giá trị bí mật được lưu mã hoá trong stack custody và chỉ lộ qua con trỏ *_FILE, không bao giờ vào ledger, chat hay log. Gửi xong sẽ đánh thức kernel của workflow.',
+    wakes: 'Gửi xong sẽ đánh thức kernel của workflow.' },
+};
+const uiText = () => { let lang = 'en'; try { lang = loadConfig()?.language ?? 'en'; } catch { /* default */ } return { lang, t: UI[lang] ?? UI.en }; };
+
+// A single pick group whose choices match question.options one for one is the
+// same decision: render it once (the picks, with their images) and map the
+// chosen pick back to its option for the receipt.
+const mirroredPick = (question, pickGroups) =>
+  pickGroups.length === 1 && (question.options ?? []).length > 0
+  && pickGroups[0].choices.length === question.options.length ? pickGroups[0] : null;
 
 const PORT_BASE = 6969;
 const PORT_SCAN = 100; // 6969..7069 — the owner's "one memorable lane" band
@@ -327,7 +352,9 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
   }).join('\n');
   const varRows = fields.vars.map((v) => `<label><code>${esc(v)}</code></label>
       <input type="${fields.isSecret(v) ? 'password' : 'text'}" name="env:${esc(v)}" autocomplete="off" ${readonly ? 'disabled' : ''}>`).join('\n');
-  const options = (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" required ${readonly ? 'disabled' : ''}> ${esc(o)}</label>`).join('\n');
+  const { lang, t } = uiText();
+  const mirror = mirroredPick(question, pickGroupsOf(question, images));
+  const options = mirror ? '' : (question.options ?? []).map((o, i) => `<label class="opt"><input type="radio" name="option" value="${i}" required ${readonly ? 'disabled' : ''}> ${esc(typeof o === 'string' ? o : o?.label ?? '')}</label>`).join('\n');
   // A selection ask declares each pick dimension in question.picks — one
   // required radio group per {id, label, choices}, never free-text picks.
   // When picks are not declared, derive groups from the draw naming
@@ -345,7 +372,8 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
     return `<fieldset class="pick"><legend>${esc(p.label ?? p.id)}</legend><div class="cells">${cells}</div></fieldset>`;
   }).join('\n');
   const imgRows = (images ?? []).map((img, i) => pickedImages.has(i) ? '' : `<figure><img src="/${esc(nonce)}/img/${i}" alt="${esc(img.label)}"><figcaption><code>${esc(img.label)}</code></figcaption></figure>`).join('\n');
-  return `<!doctype html><html><head><meta charset="utf-8"><title>provision.ask — ${esc(workflowId)}</title>
+  const hasCredentials = fields.files.length > 0 || fields.vars.length > 0;
+  return `<!doctype html><html lang="${esc(lang)}"><head><meta charset="utf-8"><title>${esc(t.title)} — ${esc(workflowId)}</title>
 <style>
  body{font:14px/1.5 system-ui;margin:2rem auto;max-width:720px;padding:0 1rem;color:#222}
  h1{font-size:1.1rem}.q{white-space:pre-wrap;background:#f6f6f6;border:1px solid #ddd;padding:1rem;border-radius:6px}
@@ -364,20 +392,18 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
  button{margin-top:1.2rem;padding:.6rem 1.4rem;font-size:1rem;cursor:pointer}
  .note{color:#666;font-size:.85rem;margin-top:1.5rem}
 </style></head><body>
-<h1>Owner provision — <code>${esc(workflowId)}</code></h1>
+<h1>${esc(t.title)} — <code>${esc(workflowId)}</code></h1>
 <div class="q">${esc(question.text ?? '')}</div>
-${imgRows ? `<h3>Artifacts under review</h3>${imgRows}` : ''}
-${readonly ? '<p><b>This ask is already answered — view only.</b></p>' : ''}
+${imgRows ? `<h3>${esc(t.artifacts)}</h3>${imgRows}` : ''}
+${readonly ? `<p><b>${esc(t.answered)}</b></p>` : ''}
 <form method="post" action="/${esc(nonce)}/answer">
-${options ? `<h3>Choose</h3>${options}` : ''}
-${pickRows ? `<h3>Picks</h3>${pickRows}` : ''}
-<h3>Credentials</h3>
-${fileRows}
-${varRows}
-<label>Note to kernel (optional)</label><textarea name="note" rows="2" ${readonly ? 'disabled' : ''}></textarea>
-<button type="submit" ${readonly ? 'disabled' : ''}>Submit answer</button>
+${options ? `<h3>${esc(t.choose)}</h3>${options}` : ''}
+${pickRows ? `<h3>${esc(t.picks)}</h3>${pickRows}` : ''}
+${hasCredentials ? `<h3>${esc(t.credentials)}</h3>\n${fileRows}\n${varRows}` : ''}
+<label>${esc(t.note)}</label><textarea name="note" rows="2" ${readonly ? 'disabled' : ''}></textarea>
+<button type="submit" ${readonly ? 'disabled' : ''}>${esc(t.submit)}</button>
 </form>
-<p class="note">Secret values land in encrypted stack custody (<code>.starcistacks</code>) and are exposed through <code>*_FILE</code> pointers in <code>app.env</code> / the generated <code>.env.local</code> bridge — never in the ledger, the chat, or any log. Submitting wakes the workflow kernel.</p>
+<p class="note">${esc(hasCredentials ? t.custody : t.wakes)}</p>
 </body></html>`;
 };
 
@@ -532,7 +558,9 @@ const main = async () => {
           const r = spawnSync(process.execPath, [devEnv], { cwd: repo, stdio: 'ignore' });
           bridge = r.status === 0 ? 'refreshed' : 'refresh-failed';
         }
-        const optionIdx = params.get('option');
+        const mirror = mirroredPick(question, pickGroupsOf(question, images));
+        const mirroredIdx = mirror ? mirror.choices.findIndex((c) => String(c.id) === params.get(`pick:${mirror.id}`)) : -1;
+        const optionIdx = params.get('option') ?? (mirroredIdx >= 0 ? String(mirroredIdx) : null);
         const picks = {};
         for (const p of pickGroupsOf(question, images)) {
           const v = params.get(`pick:${p.id}`);
@@ -544,7 +572,7 @@ const main = async () => {
         const receipt = {
           schema: 'starci/ask-answer@1',
           workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
-          option: optionIdx != null ? (question.options ?? [])[Number(optionIdx)] ?? null : null,
+          option: optionIdx != null ? (() => { const o = (question.options ?? [])[Number(optionIdx)]; return o == null ? null : (typeof o === 'string' ? o : o.label ?? null); })() : null,
           picks: Object.keys(picks).length ? picks : null,
           custodyWritten, envWritten, pointersWritten, bridge, errors,
           note: params.get('note') || null, at: new Date().toISOString(),
@@ -557,7 +585,7 @@ const main = async () => {
         const wake = wakeKernel(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px system-ui;margin:3rem auto;max-width:560px">
-<h2>Answer received</h2><p>custody: ${esc(custodyWritten.join(', ') || 'none')} · env: ${esc(envWritten.join(', ') || 'none')} · pointers: ${esc(pointersWritten.join(', ') || 'none')} · wake: ${esc(wake.action)}</p>
+<h2>${esc(uiText().t.received)}</h2><p>custody: ${esc(custodyWritten.join(', ') || 'none')} · env: ${esc(envWritten.join(', ') || 'none')} · pointers: ${esc(pointersWritten.join(', ') || 'none')} · wake: ${esc(wake.action)}</p>
 ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` : ''}
 <p>You can close this tab — the workflow kernel has been notified.</p></body>`);
         done = true;
