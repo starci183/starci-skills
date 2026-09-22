@@ -7,28 +7,27 @@ this tree, and `examples/todo-app-frontend` is proven against the records here r
 
 ## Continuous verification
 
-`.github/workflows/todo-app-example.yml` runs on every push/PR touching `examples/**`, `schemas/**`,
-`scripts/checks/check-example-*.mjs` or `scripts/checks/**`, so the example's evidence comes from a declared GitHub-hosted
+`.github/workflows/todo-app-example.yml` runs on every push/PR touching `examples/**`, `packages/**`,
+`modules/schemas/**` or `scripts/checks/**`, so the example's evidence comes from a declared GitHub-hosted
 runner rather than a developer's laptop:
 
 - **records** - the runtime's own YAML loader and Work-tree layout gate over both example repositories,
   plus the fixture suite behind `scripts/checks/check-example-work.mjs`.
-- **backend** - this repository's unit tests and the read-only architecture check (`ok: true` and all six
-  backend coverage sections `checked`). The nest scoped-lint profile is wired but guarded off until lane
-  `ex-be-nest` brings it clean.
-- **frontend** - `examples/todo-app-frontend`'s type-check, unit tests, lint, production build, the
-  architecture check (three coverage sections `checked`) and its scoped-lint profile, which must already
-  report `status: clean`.
+- **backend** - this repository's type-check, unit tests and the `nest` scoped-lint gate
+  (`scripts/checks/check-scoped-lint.mjs`), which carries the architecture check as one of its machine
+  kinds and whose exit code is the verdict: `0` clean, `1` findings, `2` unavailable.
+- **frontend** - `examples/todo-app-frontend`'s type-check, unit tests, lint, production build and the
+  same gate on the `next` profile.
 - **live** - brings up this example's real dev stack (Postgres + Keycloak) with the committed DEMO-ONLY
-  SOPS secrets, builds and runs the real API and the real Next.js production server, and proves sign-in,
+  SOPS secrets, builds and runs the real API and the real Next.js production server, proves sign-in,
   the uniform wrong-password/unknown-email refusal, the full task lifecycle, CORS and persistence across an
-  API process restart with `curl` against the running services - never a mock.
-- **uat** - a placeholder that runs the Playwright harness under `examples/todo-app-frontend/uat/` once
-  lane `ex-uat-harness` adds it, uploading run evidence (screenshots, video, `result.md`, `run-ledger.json`)
-  as CI artifacts.
+  API process restart with `curl` against the running services - never a mock - and then runs the
+  Playwright UAT flows (`examples/todo-app-frontend/uat`) against that same stack, uploading each run's
+  `manifest.yaml`, `result.md`, screens and videos from the Work tree here as CI artifacts.
 
-No job needs a GitHub Actions secret: every credential the stack uses is the committed DEMO-ONLY age
-identity at `.starcistacks/dev/runtime/env/demo.agekey` and the `.enc` files it decrypts (see
+No job needs a GitHub Actions secret. `.starcistacks/dev/runtime/env/demo.agekey` is a demo key committed
+on purpose: it encrypts demo values only - every `.enc` file it opens holds a placeholder string, never a
+real credential - which is exactly why nothing real may ever be encrypted to it (see
 `scripts/with-dev-secrets.sh` and `.starcistacks/dev/runtime/env/KEYS.md`).
 
 ## Probes and metrics
