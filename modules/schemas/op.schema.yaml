@@ -1,0 +1,201 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:op:1
+type: object
+additionalProperties: false
+description: "The fixed shape of an operator manifest (modules/ops/ops/<id>.yaml). One op says one
+  thing in one place: `params` holds every tunable as typed data, `reads`/`writes` describe data only,
+  `steps` hold the rules that do the work (each rule exactly once), `proofs` hold what settle verifies,
+  and `policy` is the single map for op-specific policy. scripts/checks/check-op-manifest.mjs validates
+  this shape and the rules a schema cannot express (a number restated in prose when a param carries it,
+  a sentence written twice, a rule hidden in a read purpose, a joined write path, a proof citing a
+  check that does not exist)."
+required:
+  - schema
+  - id
+  - goal
+  - nodeKinds
+  - completionProfile
+  - sideEffects
+  - graphPolicy
+  - reads
+  - writes
+  - steps
+  - proofs
+  - blockers
+  - route
+properties:
+  schema:
+    const: starci/op@1
+    description: Manifest kind discriminator. Every op manifest names its own shape.
+  id:
+    type: string
+    minLength: 1
+    pattern: "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)+$"
+    description: "The operation id, `<family>.<verb>` (a qualifier may sit between them); it equals the file's basename."
+  goal:
+    $ref: "#/$defs/prose"
+    description: One sentence saying what the operation establishes. The registry indexes its first sentence.
+  params:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      $ref: "#/$defs/param"
+    description: "Typed tunables. Every number an agent could otherwise guess from prose lives here
+      once, with a default; steps cite it by name (`params.<name>`) and never restate its value."
+  nodeKinds:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+  completionProfile:
+    type: string
+    minLength: 1
+  sideEffects:
+    type: array
+    items: {type: string, minLength: 1}
+    description: What the op changes outside its own evidence. An empty list is a claim of none.
+  graphPolicy:
+    type: object
+    description: How this op may touch the Work graph. Shape owned by modules/ops/_common.yaml.
+  reads:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, path, purpose]
+      properties:
+        id: {$ref: "#/$defs/slug"}
+        path: {type: string, minLength: 1}
+        purpose:
+          $ref: "#/$defs/prose"
+          description: "What data sits at this path. A rule about what the op must or must never do
+            with it belongs in the step that applies it."
+  writes:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, path, content]
+      properties:
+        id: {$ref: "#/$defs/slug"}
+        path:
+          type: string
+          minLength: 1
+          description: "One path per entry. A glob covers a family of files; ` + ` joining several
+            paths hides how many artifacts the op owes."
+        schema:
+          type: string
+          minLength: 1
+          description: The schema const the written file carries, when the write is a structured document.
+        fields:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1}
+          description: The field names the written document carries.
+        content:
+          $ref: "#/$defs/prose"
+          description: What the written data holds.
+  steps:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [reads, writes, action]
+      properties:
+        reads: {$ref: "#/$defs/slugList"}
+        writes: {$ref: "#/$defs/slugList"}
+        action:
+          $ref: "#/$defs/prose"
+          description: "The rules of this step. Every rule the op enforces appears in exactly one
+            step, and a rule about a tunable cites `params.<name>` instead of its value."
+  proofs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, requirement]
+      properties:
+        id: {$ref: "#/$defs/slug"}
+        requirement:
+          $ref: "#/$defs/prose"
+          description: What settle verifies, phrased as the verification — not a second copy of the step rule.
+        check:
+          type: string
+          minLength: 1
+          description: The executable that proves this requirement — a repository-relative path that exists.
+  blockers:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [code, condition]
+      properties:
+        code:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]*$"
+        condition: {$ref: "#/$defs/prose"}
+  placeholders:
+    type: object
+    additionalProperties: {type: string, minLength: 1}
+    description: The `<name>` tokens the reads/writes paths use, and what selects each one.
+  layoutPolicy:
+    type: object
+    description: Where artifacts land and which validator refuses a wrong layout.
+  policy:
+    type: object
+    minProperties: 1
+    description: "The one map for op-specific policy. Anything an op used to declare as its own
+      top-level `*Policy`, `*Authority`, `executionModes`, `findingSchema` or `modes` key lives here."
+  route:
+    type: object
+    additionalProperties: false
+    required: [nodeKinds, phase, intent]
+    description: The resolver index scripts/route/route-op.mjs matches on; an agent never reads the whole manifest to route.
+    properties:
+      nodeKinds: {$ref: "#/$defs/stringList"}
+      phase: {$ref: "#/$defs/stringList"}
+      intent: {$ref: "#/$defs/stringList"}
+      prerequisites: {$ref: "#/$defs/stringList"}
+      riskHints: {$ref: "#/$defs/stringList"}
+$defs:
+  prose:
+    type: object
+    additionalProperties: false
+    required: [en]
+    properties:
+      en: {type: string, minLength: 1}
+  slug:
+    type: string
+    minLength: 1
+    pattern: "^[a-z][A-Za-z0-9-]*$"
+  slugList:
+    type: array
+    items: {$ref: "#/$defs/slug"}
+  stringList:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+  param:
+    type: object
+    additionalProperties: false
+    required: [type, default, setBy, doc]
+    description: "One tunable: its type, the value that applies when nobody sets it, who may set it,
+      and one sentence of meaning."
+    properties:
+      type:
+        enum: [integer, number, string, boolean, enum]
+      default: {}
+      min: {type: number}
+      max: {type: number}
+      enum:
+        type: array
+        minItems: 2
+        items: {type: [string, number, boolean]}
+      setBy:
+        enum: [owner, kernel]
+        description: "`owner` — only a goal leg may carry it; `kernel` — the kernel sets it at enqueue."
+      doc: {$ref: "#/$defs/prose"}

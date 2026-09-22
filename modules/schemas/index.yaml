@@ -309,6 +309,22 @@ schemas:
       whenNot: Not the goal record itself — the goal lives in the goals table; this is only the derived-plan file contract.
       selectedBy: The kernel agent's plan step — driver-loop.yaml tick.plan.
 
+  - id: starci/op@1
+    file: modules/schemas/op.schema.yaml
+    dialect: json-schema
+    subsystem: kernel
+    governs: "The shape of every operator manifest under modules/ops/ops/: typed `params` for tunables, `reads`/`writes` as data, one rule per `steps[].action`, `proofs` as what settle verifies, and one `policy` map for op-specific policy."
+    binds: modules/ops/ops/*.yaml
+    usedBy:
+      - scripts/checks/check-op-manifest.mjs (validates the shape plus PARAM_RESTATED, RULE_DUPLICATED, RULE_IN_DATA, PATH_JOINED, CHECK_MISSING)
+      - scripts/route/build-ops-registry.mjs (indexes id/goal/params/route into modules/ops/registry.yaml)
+      - scripts/kernel/api.mjs (enqueue validates --params against the op's params block; dispatch merges defaults into the packet)
+    business:
+      question: "What is an operation, exactly — and where does each of its rules and numbers live?"
+      whenNeeded: Every op manifest edit; the check refuses a stray key, a restated number or a rule written twice.
+      whenNot: Not the op's return envelope — that is starci/op-report@1 in modules/kernel/verdict-contract.yaml.
+      selectedBy: "The manifest's own `schema: starci/op@1` stamp."
+
   - id: starci/agent-hierarchy@1
     file: modules/schemas/agent-hierarchy.yaml
     dialect: prose-contract
