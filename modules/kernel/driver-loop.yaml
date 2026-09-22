@@ -287,9 +287,11 @@ tick:
         contract/effect and explicitly returned to queued by no-effect
         rejection or `api reconcile`; that row no longer holds a lease.
       starvation: >-
-        'contested-lease' / 'no free slot' is a wait reason, not a failure —
-        the loop records it and yields; it does not force
-        (runtimes.yaml maxParallelOps). A
+        A dispatch refused because another in-flight job already holds the
+        capacity-1 path lease or machine budget it needs comes back
+        `dispatch-rejected` with the reserve reasons attached — a wait reason,
+        not a failure. The loop records it and yields; it does not force
+        (modules/models/runtimes.yaml maxParallelOps). A
         path lease remains the durable fence until explicit settle/reconcile;
         expiry is a recovery signal, never proof that a prior worker cannot
         still write.
@@ -570,9 +572,9 @@ replanLineage: >-
   {replannedFrom, blocker, pathDelta, routingReason} on the plan-derived
   event: which plan it supersedes, the typed blocker or trigger that forced
   it, the owned_paths delta vs the prior legs, and why the legs routed as
-  they did (api.yaml plan; a re-plan with no lineage is refused
-  plan-lineage-missing — a new plan with no history is a quiet rewrite,
-  never allowed). The same fields ride a re-enqueue that exists because a
+  they did (modules/kernel/api.yaml plan records the fields verbatim and does
+  not refuse an omitted lineage — supplying it is the kernel's obligation, and
+  a new plan with no history is a quiet rewrite this loop never files). The same fields ride a re-enqueue that exists because a
   leg was re-planned.
 replanTriggers:
   - trigger: s0-measured-wrong

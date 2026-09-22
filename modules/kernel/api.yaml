@@ -425,7 +425,7 @@ commands:
     returns: '{ok:true,jobId,reconciled:true,dispatchId,status:queued,attempt,effectState:none,attemptConsumed:false,leasesReleased,machineRefsReleased,cleanup}'
     refuses:
       - job-unknown
-      - job-not-reconcilable: 'status is neither effect_unknown nor the idempotent already-queued case'
+      - job-not-reconcilable: 'status is neither effect_unknown nor the idempotent case of a row already back at queued'
       - dispatch-identity-missing: 'no exact managed Dispatch id is bound'
       - accepted-contract-exists: 'operation authority may have landed; never infer no effect'
       - worker-report-exists: 'worker evidence exists; use ordinary consume/check/settle'
