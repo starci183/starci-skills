@@ -141,12 +141,10 @@ test('the skill keeps secrets in the browser and delegates verdict/report ingest
 
 test('on Windows npm and npx launch through node and npm-cli, never a .cmd shim Node refuses to spawn',async()=>{
   const {launchFor}=await import('../scripts/uat/assisted-runner.mjs');
-  const node=String.raw`C:Program Files
-odejs
-ode.exe`;
+  const node=['C:','Program Files','nodejs','node.exe'].join(path.win32.sep);
   const npx=launchFor(['npx','playwright','test','--headed'],{platform:'win32',execPath:node});
   assert.equal(npx.file,node);
-  assert.match(npx.args[0],/node_modules[\/]npm[\/]bin[\/]npx-cli\.js$/);
+  assert.equal(npx.args[0],['C:','Program Files','nodejs','node_modules','npm','bin','npx-cli.js'].join(path.win32.sep));
   assert.deepEqual(npx.args.slice(1),['playwright','test','--headed']);
   assert.equal(launchFor(['npm','run','uat'],{platform:'win32',execPath:node}).args[0].endsWith('npm-cli.js'),true);
   assert.deepEqual(launchFor(['node','cli.js'],{platform:'win32',execPath:node}),{file:node,args:['cli.js']});
