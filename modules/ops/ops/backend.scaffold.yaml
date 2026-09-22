@@ -23,11 +23,17 @@ reads:
       en: "Read the selected implementation record this scaffold realises: declared owners paths, refs
         into the settled design, proof demands and validator freshness. A scaffold with no selected
         record is a scope/graph gap: report it; do not invent the record or its path."
+  - id: baseline
+    path: CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and nest)
+    purpose:
+      en: The NestJS stack every project uses and the toolchain a new backend repository carries from its
+        first commit — manifest and engines, strict TypeScript, canon lint, jest with coverage
+        thresholds, git hooks, CI gates, Codecov and Sonar configuration, ignore rules and line endings.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,data}/**/index.yaml
     purpose:
-      en: REQUIRED for greenfield. If no settled design names the stack and tree shape, report sds-gap —
-        do not guess a framework.
+      en: The settled design for business-specific layout and the dependencies it owns (database, cache,
+        vector store, auth) beyond the baseline health surface. A baseline-only scaffold reads none.
   - id: business
     path: .starciwork/features/<feature>/{br,ac,fr,nfr}/**/index.yaml
     purpose:
@@ -87,16 +93,17 @@ writes:
 steps:
   - reads:
       - target
+      - baseline
       - architecture
       - business
     writes: [evidence]
     action:
-      en: Resolve what the new source must be — stack, tree shape, entry points and the skeleton-level
-        acceptance the records declare. Every layout decision traces to a settled record; anything
-        undecided is a named gap, not a choice. The stack, layout, naming, ports and module
-        boundaries are decided by the flat design records, never by the scaffold agent. Read
-        accepted requirements the new service must satisfy at skeleton level (entry points, health
-        surface, declared acceptance ids).
+      en: Resolve what the new source must be. The stack comes from CONTEXT.md and the toolchain from the
+        repository baseline, so a baseline-only scaffold needs no design record. Business-specific
+        layout, naming, ports, module boundaries and every wired dependency beyond the baseline health
+        surface come from the settled flat design records, never from the scaffold agent; an undecided
+        one is a named gap, not a choice. Read accepted requirements the new service must satisfy at
+        skeleton level (entry points, health surface, declared acceptance ids).
   - reads:
       - repo
       - conventions
@@ -109,13 +116,18 @@ steps:
         around. Read the house rules the new tree must conform to from its first commit — lint kits,
         layout contract, naming.
   - reads:
+      - baseline
       - architecture
       - conventions
     writes: [source]
     action:
-      en: Write the manifest and toolchain configs first (package.json/tsconfig/eslint/test runner per
-        house kits), then the declared layout, then the minimal skeleton — entrypoint plus the
-        health surface the records require. No business behaviour beyond what the skeleton proves.
+      en: Write the manifest and toolchain first, exactly as knowledge/repository-baseline.yaml shapes
+        common and nest carry them (package.json with engines and scripts, strict tsconfig, canon
+        eslint config, jest with coverage thresholds, husky pre-commit with lint-staged and pre-push,
+        .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore, .editorconfig,
+        .gitattributes), then the declared layout, then the minimal skeleton — entrypoint plus the
+        baseline liveness surface and any health the settled records add. No business behaviour
+        beyond what the skeleton proves.
   - reads:
       - repo
     writes: [source, evidence]
@@ -137,13 +149,21 @@ proofs:
     requirement:
       en: The new tree passes the house checks that apply to it — scoped lint and pattern checks — from
         its first commit.
+  - id: baseline-runs
+    requirement:
+      en: The repository baseline for the nest profile is present and executes — a staged change makes the
+        pre-commit hook run lint-staged, the pre-push hook runs typecheck and affected tests, and
+        .github/workflows/ci.yml parses and names the lint, typecheck, test and build gates. The
+        observed hook and CI output is recorded.
   - id: scope
     requirement:
       en: Every created file lives under the declared source root; nothing outside it was written.
 blockers:
   - code: SDS_MISSING
     condition:
-      en: No settled architecture names the stack, layout or entry points the scaffold must realise.
+      en: The scaffold is asked to wire SDS-owned dependencies (database, cache, vector store, auth) or
+        business-specific layout beyond the baseline health surface, and no settled architecture
+        names them.
   - code: REPO_UNBOUND
     condition:
       en: No bound repository checkout exists to receive the new tree.
@@ -170,6 +190,6 @@ route:
   phase: [implement]
   intent: [scaffold, greenfield, new-source, backend, bootstrap, init]
   prerequisites:
-    - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
     - repository bound
+    - a settled SDS only when wiring SDS-owned dependencies or business layout beyond the baseline health surface
   riskHints: [source-edits, new-tree]
