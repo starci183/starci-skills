@@ -200,7 +200,7 @@ test('api report immediately wakes an idle Kernel after committing the durable r
   // so terminal-read projects the provider input prompt (turn-idle), which is
   // the exact state report filing is allowed to wake.
   fs.writeFileSync(fx.env.STARCI_FAKE_ORCA_STATE,JSON.stringify({
-    sends:0,terminalCommand:'codex --model gpt-5.6-sol',terminalModel:'gpt-5.6-sol',
+    sends:0,terminalCommand:'codex --model gpt-6-sol',terminalModel:'gpt-6-sol',
   }));
 
   fileReport(fx,jobId,{outcome:'done',sentinel:'WAKE-KERNEL'});

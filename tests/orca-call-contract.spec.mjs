@@ -44,12 +44,12 @@ const logged=fx=>fs.existsSync(fx.log)
 
 test('argv is assembled from calls.yaml — declared flags only, in contract order',t=>{
   const fx=stubEnv(t);
-  const out=call(fx,`c=>c('worker-start',{task:'task-1',worktree:'wt',agent:'codex',model:'gpt-5.6-sol','display-name':'[Op] x',run:'run-1',from:'kernel-1'})`);
+  const out=call(fx,`c=>c('worker-start',{task:'task-1',worktree:'wt',agent:'codex',model:'gpt-6-sol','display-name':'[Op] x',run:'run-1',from:'kernel-1'})`);
   assert.equal(out.outcome,'ok');
   const start=logged(fx).find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   assert.ok(start,'worker-start never reached the binary');
   assert.deepEqual(start,['orchestration','worker-start','--task','task-1','--worktree','wt','--agent','codex',
-    '--model','gpt-5.6-sol','--display-name','[Op] x','--run','run-1','--from','kernel-1','--json'],
+    '--model','gpt-6-sol','--display-name','[Op] x','--run','run-1','--from','kernel-1','--json'],
     'argv order and content are calls.yaml flags order plus defaults.jsonFlag');
 });
 

@@ -88,7 +88,7 @@ const uniqueTerminals = process.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS === '1';
 // Handles that terminal close refuses ('*' refuses every close).
 const closeFails = new Set((process.env.STARCI_FAKE_ORCA_CLOSE_FAILS || '').split(',').map(s => s.trim()).filter(Boolean));
 const record = handle => (state.terminals || {})[handle] || null;
-const renderedModel = handle => effectiveModelOverride || record(handle)?.model || state.terminalModel || 'gpt-5.6-sol';
+const renderedModel = handle => effectiveModelOverride || record(handle)?.model || state.terminalModel || 'gpt-6-sol';
 const isQwen = handle => /(?:^|\s)qwen(?:\.exe)?(?:\s|$)/i.test(String(record(handle)?.command ?? state.terminalCommand ?? ''));
 const PROMPT = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message\n> ' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt\n> ');
 const DEAD = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
@@ -212,7 +212,7 @@ else if (verb === 'orchestration worker-show') {
   else
     out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1' },
       worker: { state: 'ready', agent_terminal_handle: 'fake-terminal-1',
-        startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-5.6-sol' } } } },
+        startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-6-sol' } } } },
       observation: { exactWorker: true } } });
 }
 else if (verb === 'orchestration worker-stop')

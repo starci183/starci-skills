@@ -144,8 +144,8 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>
     const at=Date.now();
     ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,1,0,'kernel','kernel',?,'running',?,?,?)")
       .run(`kernel-${wf}`,wf,json({
-        route:{host:'orca',agent:'codex',model:'gpt-5.6-sol',runtimePool:'codex-agent'},
-        hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-5.6-sol',terminalHandle:'term-kernel'}},
+        route:{host:'orca',agent:'codex',model:'gpt-6-sol',runtimePool:'codex-agent'},
+        hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-kernel'}},
       }),'term-kernel',at,at);
   });
   const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
@@ -160,7 +160,7 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>
   assert.equal(kernel?.nodeId,`agent:kernel:${wf}`);
   assert.equal(kernel?.parentNodeId,`workflow:${wf}`);
   assert.equal(kernel?.runtime?.agent,'codex');
-  assert.equal(kernel?.runtime?.model,'gpt-5.6-sol');
+  assert.equal(kernel?.runtime?.model,'gpt-6-sol');
   assert.equal(op?.parentNodeId,kernel?.nodeId);
   assert.equal(op?.opId,'docs.author');
   assert.ok(body?.edges?.some(e=>e.parentNodeId===kernel.nodeId&&e.childNodeId===op.nodeId));
@@ -366,7 +366,7 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',t
     const at=Date.now(),jobId=`kernel-${wf}`;
     ledger.enqueueJob({jobId,workflowId:wf,kind:'kernel',role:'kernel',payload:{
       hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,
-        role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-5.6-sol',terminalHandle:'term-k7-kernel'}},
+        role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-k7-kernel'}},
     }});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='term-k7-kernel' WHERE job_id=?").run(jobId);
     ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")

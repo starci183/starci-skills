@@ -20,7 +20,7 @@ const fixture=t=>{
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-5.6-sol, effort: high}\n');
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
@@ -65,7 +65,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   assert.equal(firstOut?.generation,0);assert.equal(firstOut?.promptSubmitted,true);
   let state=json(fs.readFileSync(f.state,'utf8'));
   assert.match(state.commands[0],/\bcodex\b/i);
-  assert.match(state.commands[0],/(?:^|\s)--model\s+['"]?gpt-5\.6-sol['"]?(?:\s|$)/i);
+  assert.match(state.commands[0],/(?:^|\s)--model\s+['"]?gpt-6-sol['"]?(?:\s|$)/i);
   assert.match(state.commands[0],/--ask-for-approval\s+never/);
   assert.match(state.commands[0],/--sandbox\s+danger-full-access/);
   assert.match(state.terminals[firstOut.terminal].prompt,new RegExp(ROOT.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
