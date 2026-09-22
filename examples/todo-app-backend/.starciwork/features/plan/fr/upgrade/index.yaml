@@ -34,8 +34,6 @@ change:
   reason: "v9-3's run proved the cap half live and exercised the app's own upgradePlan door; the
     blockedBy because text claiming 'has not run' is corrected to name the still-pending gateway leg
     (no webhook simulation per the owner directive). The edge stays."
-  withdraws:
-    - "uat.verify has not run this flow against the running product yet."
 
 blockedBy:
   - {record: gap.plan.live-proof, because: "uat.verify has now run this flow's cap half live (uat.plan.upgrade-after-cap, run 20260919T143402Z) and it proves; the checkout leg the mainFlow depends on is not walked - integration.plan.sepay is inprogress, the live gateway leg remains unproven (gap.plan.sepay-not-reachable), and the owner directive forbids simulating the signed webhook."}

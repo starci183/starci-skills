@@ -42,7 +42,7 @@ surface:
       Changing the route or the request body key is breaking for the shop's sign-out; the
       answer shape is fixed at {revoked: true}.
 guarantees:
-  - verify never invents a person: a token that names no live session is refused, not resolved.
+  - "verify never invents a person: a token that names no live session is refused, not resolved."
   - revoke never reports failure for an already-dead token; forgetting is unconditional.
 consumerObligations:
   - checkout verifies the bearer on every person-scoped door and propagates the provider's refusal

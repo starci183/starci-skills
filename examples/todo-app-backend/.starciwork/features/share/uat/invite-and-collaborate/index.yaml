@@ -1,7 +1,8 @@
 schema: work/uat-flow@1
 id: uat.share.invite-and-collaborate
 title: Invite an editor, have them complete a task, then revoke them
-state: inprogress
+state: todo
+activity: verifying
 entry: /tasks/:taskId/share
 actor: owner
 accounts: accounts.yaml
@@ -26,4 +27,4 @@ cleanup:
 proves: [fr.share.invite, fr.share.accept, fr.share.revoke, br.share.role.permissions, br.share.revoke.on-read]
 blockedBy:
   - {record: gap.share.live-proof, because: "uat.verify has now run this flow twice (runs/20260919T142631Z-5c10a673, runs/20260919T142709Z-5c10a673); both settle partial-pass, never pass - the owner-side legs (invite, pending list, t-revoke-pending, cleanup) are proven live, while the invitee legs cannot be walked at all because the product has no acceptance surface (see the gap's statement)."}
-change: {rev: 1, kind: clarifying, at: 2026-09-19T14:30:00.000Z, reason: "v9-5 implemented the spec and ran it against the live shared stack. The realm seeds only two accounts, so the record's 'third person' viewer was invited as a run-namespaced address; the invitee accept/complete/read legs have no UI to walk (no accept route, no inbox, no invitation delivery, ownership-only task list) and are recorded not-run, so the record is partially provable - inprogress, not done."}
+change: {rev: 1, kind: initial, at: 2026-09-19T14:30:00.000Z, reason: "v9-5 implemented the spec and ran it against the live shared stack. The realm seeds only two accounts, so the record's 'third person' viewer was invited as a run-namespaced address; the invitee accept/complete/read legs have no UI to walk (no accept route, no inbox, no invitation delivery, ownership-only task list) and are recorded not-run, so the record is partially provable - inprogress, not done."}

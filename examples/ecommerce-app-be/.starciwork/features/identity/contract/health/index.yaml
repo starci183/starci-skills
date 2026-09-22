@@ -28,7 +28,7 @@ guarantees:
   - a 200 means both named dependencies answered in that instant; the door never reports "ok" for a dependency it did not ping.
   - an unhealthy answer is a typed 503 naming which dependency refused, so the consumer can cascade honestly instead of guessing.
 consumerObligations:
-  - checkout treats any non-2xx answer, a timeout, or an unreachable service as identity: unreachable on its own /health, and cascades to its own DEPENDENCY_UNAVAILABLE 503 - it never reports identity healthy on a guess.
+  - "checkout treats any non-2xx answer, a timeout, or an unreachable service as identity: unreachable on its own /health, and cascades to its own DEPENDENCY_UNAVAILABLE 503 - it never reports identity healthy on a guess."
 refs: [decision.checkout.ops-doors]
 
 requiresProof:

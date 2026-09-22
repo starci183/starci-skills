@@ -2,20 +2,18 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: urn:work:business-rule:1
 type: object
 additionalProperties: false
-description: "One business rule - a statement about the product that is true whatever screen or endpoint a
-  person reaches it through. It is a leaf, so it authors a state, and it is the record the rest of the tree
-  hangs off: acceptance criteria say how it is proven, a module says where it lives in source, and evidence
-  says it was observed. The rule owns its change history in one block, because a rule that quietly acquires
-  and loses statements without a revision is a rule nobody can trust a past proof of."
+description: "One rule the product promises to keep, and the criteria that decide whether it is kept. The
+  statements are the promise and the criteria are how anybody checks it; a rule with statements and no
+  criterion is an intention. Since v11 the criteria are carried inline on this record rather than as
+  separate ac/ files: a criterion has no identity apart from the rule it accepts, so it keeps its own id and
+  shares the rule's lifecycle, and a criterion that genuinely needs its own state or its own evidence is a
+  sign the rule is really two rules."
 required:
   - schema
   - id
   - title
   - state
   - statements
-  - acceptanceCriteria
-  - module
-  - change
 properties:
   schema:
     const: work/business-rule@1
@@ -24,67 +22,395 @@ properties:
   id:
     type: string
     pattern: ^br(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
-    description: "The rule's stable id, a lowercase dot-path under the br family: br.<feature>.<scope...>;
-      example br.task.title.required. The prefix is enforced so that a reference to br.x anywhere in the tree
-      is unambiguously a rule, and the dot-path makes the id an address a reader can follow to the file
-      without a registry."
+    description: "The rule's stable id, a lowercase dot-path under the br family: br.<feature>.<name>;
+      example br.task.title.required. The prefix is enforced so a reference to br.x is unambiguously a rule
+      rather than a requirement that happens to read like one."
   title:
     $ref: "#/$defs/prose"
-    description: The rule in one line, as a person would say it out loud. It is what a reader sees in a list
-      of rules, so it states the rule rather than naming the area it belongs to.
+    description: The rule in one sentence, written as what the product promises rather than as what it
+      forbids where both are available - a reader should learn the rule from this line without the
+      statements.
   state:
     $ref: "#/$defs/state"
+  activity:
+    $ref: "#/$defs/activity"
   statements:
     type: array
     minItems: 1
     uniqueItems: true
     items:
       $ref: "#/$defs/prose"
-    description: The rule itself, one sentence per clause. Clauses are separate items rather than one
-      paragraph because a change withdraws or adds a clause, and a clause that cannot be named separately
-      cannot be withdrawn separately.
+    description: What the rule actually promises, one clause each, each true or false about a running
+      product. They are split rather than written as a paragraph because a revision withdraws clauses, and a
+      clause that cannot be named cannot be withdrawn.
+  acceptance:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: "The criteria that decide whether the statements hold, carried inline since the v11
+      collapse. Each keeps the id its former ac/ record had, so a reference to the old id still resolves and
+      the canonical form is `<this record's id>#<criterion id>`. A criterion here carries no state, change,
+      evidence or provenBy of its own: it shares the rule's, and one that needs its own belongs in a rule of
+      its own."
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - given
+        - when
+        - then
+      properties:
+        id:
+          type: string
+          pattern: ^ac(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){3,}$
+          description: The criterion's own id, which must be `ac.` plus this rule's id without its family
+            segment plus the criterion's name - the same place-law the file under ac/ lived under. The gate
+            refuses an id its place does not imply, and refuses one a second rule also claims.
+        given:
+          $ref: "#/$defs/prose"
+          description: The situation the criterion starts from.
+        when:
+          $ref: "#/$defs/prose"
+          description: What happens to it.
+        then:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/$defs/prose"
+          description: What must be observable afterwards, one observation each, concrete enough that two
+            people checking it would agree. A `then` that restates the `when` is a criterion that checks
+            nothing.
   authorityRefs:
     type: array
     minItems: 1
     uniqueItems: true
     items:
       $ref: "#/$defs/prose"
-    description: Where the rule's authority comes from - owner intent, a regulation, a contract - quoted
-      well enough that a later reader can weigh it. It is optional because not every rule is contested, and
-      present when the rule would otherwise read as an arbitrary preference somebody may reverse.
-  openQuestions:
+    description: Where the rule's authority comes from - an owner's ruling, a regulation, a decision record
+      - quoted so that a later reader can tell a rule somebody decided from a rule somebody assumed.
+  module:
+    oneOf:
+      - $ref: "#/$defs/prose"
+      - type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+    description: "The module-root directory or directories that enforce this rule. It is a plain string for
+      the ordinary one-module case and a list where the rule genuinely spans more than one path; either way
+      each entry is the directory a reader would call the module's root, never an individual file, so a file
+      moving inside it during a refactor is not by itself a broken reference."
+  appliesTo:
+    $ref: "#/$defs/appliesTo"
+  refs:
+    $ref: "#/$defs/refs"
+  dependsOn:
+    $ref: "#/$defs/dependsOn"
+  subscribes:
+    $ref: "#/$defs/subscribes"
+  blockedBy:
+    $ref: "#/$defs/blockedBy"
+  conflictsWith:
+    $ref: "#/$defs/conflictsWith"
+  blockers:
+    $ref: "#/$defs/blockers"
+  requiresProof:
+    $ref: "#/$defs/requiresProof"
+  provenBy:
+    $ref: "#/$defs/provenBy"
+  evidence:
+    $ref: "#/$defs/slug"
+    description: The single evidence directory under this record's evidence/ folder that carries what was
+      observed of this rule directly. At most one, because a rule has one current answer to what was last
+      observed of it.
+  verificationSource:
+    $ref: "#/$defs/verificationSource"
+  because:
+    $ref: "#/$defs/because"
+  change:
+    $ref: "#/$defs/change"
+dependentRequired:
+  because:
+    - verificationSource
+allOf:
+  - if:
+      type: object
+      properties:
+        verificationSource:
+          const: authored-claim
+      required:
+        - verificationSource
+    then:
+      type: object
+      required:
+        - because
+      properties:
+        because: true
+    description: "Done means proven or says so. A record whose done rests on an authored claim rather than
+      a run must carry the sentence saying why no run proves it - without it the label is a done record
+      asserting itself, which is the one shape the rule exists to refuse."
+$defs:
+  prose:
+    type: string
+    minLength: 1
+    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
+      a written one, so it is refused at the type.
+  fieldName:
+    type: string
+    pattern: ^[A-Za-z][A-Za-z0-9_]*$
+    description: A field name as the wire carries it. Casing is not normalised, because an event's payload
+      names are the real names a consumer destructures and rewriting them here would describe a different
+      message.
+  recordId:
+    type: string
+    pattern: ^(?:br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event|environment|identity|fixture)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: "The id of any record in the tree, family prefix included, optionally addressing one
+      criterion the record carries inline as `<record id>#<criterion>`. Requiring a known prefix means an
+      unresolvable reference is caught as a malformed id rather than surviving as a plausible-looking
+      string."
+  eventId:
+    type: string
+    pattern: ^event(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: The id of a `work/event@1` record. It is its own type so that a subscription to something
+      that is not an event is a malformed id here rather than a resolution failure later.
+  state:
+    enum:
+      - uninvestigate
+      - todo
+      - done
+    description: "Whether this leaf has not been looked at, is outstanding, or is finished, and nothing
+      else. There is deliberately no in-progress value: `todo` plus `activity` says that, and
+      `effectiveState: suspended` is derived by the runtime when an input a done record was proved against
+      has moved. Authoring either would let a record claim a status something else is supposed to compute."
+  activity:
+    enum:
+      - idle
+      - investigating
+      - implementing
+      - verifying
+    description: What is happening to this record right now, beside its state rather than inside it. `todo`
+      with `idle` is defined work nobody is running; `todo` with any other value is work in flight. It is a
+      separate field because activity changes many times inside one state and a lifecycle that encoded both
+      would record a restart as a change of status.
+  verificationSource:
+    enum:
+      - kernel-observed
+      - observed
+      - authored-claim
+    description: "Where this record's verification came from: kernel-observed means a live kernel workflow
+      ran it and settled the record on what it saw, observed means the listed commands were really run and
+      their results recorded outside any kernel workflow, and authored-claim means a person or an agent
+      wrote the sentence and nothing ran at all. The three read identically as prose and mean completely
+      different things, so the label is written rather than inferred; without it, the cheapest way to make
+      a tree look proven is to write more sentences."
+  because:
+    type: string
+    minLength: 1
+    description: "Why no run proves this record, required whenever `verificationSource: authored-claim` is
+      what carries its done. Without it, an authored claim is indistinguishable from a proof nobody got
+      round to recording."
+  subscribes:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/eventId"
+    description: The events this record consumes, by id. It is the inbound half of the event coupling and
+      is authored on the consumer, because the producer must not have to know who listens.
+  refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: Semantic inputs this record read, by id, without implying any execution order. An edge
+      records what was bound so that a change invalidates exactly the dependents that read the part which
+      moved, and nothing else.
+  dependsOn:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: Prerequisites that must genuinely be effectively done before this record can be. It is
+      deliberately not where a reviewed-but-todo specification seed goes - that is `refs` - because using
+      it for an intentionally todo input would deadlock delivery.
+  blockedBy:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - because
+      properties:
+        record:
+          $ref: "#/$defs/recordId"
+          description: The record this one waits on, by id. It is an edge rather than a sentence so that the
+            gate can resolve it and refuse a wait on something that no longer exists.
+        rev:
+          type: integer
+          minimum: 1
+          description: The blocking record's `change.rev` at the moment this blocker was authored, omitted
+            only when the wait does not depend on a particular revision holding. A blocker whose target has
+            since reached done at or past this rev is stale, and the gate refuses it rather than letting it
+            go quietly out of date.
+        because:
+          $ref: "#/$defs/prose"
+          description: What the wait is actually about, in a sentence that a reader can check against the
+            target. It is required because an edge with no reason is a fact nobody can re-evaluate when the
+            target moves.
+    description: What this record waits on, as edges rather than prose. An absence with no owner is not
+      authored here as a sentence; it becomes a `work/gap@1` record and this list points at its id like any
+      other.
+  conflictsWith:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - because
+      properties:
+        record:
+          $ref: "#/$defs/recordId"
+          description: The record that currently cannot be true at the same time as this one.
+        rev:
+          type: integer
+          minimum: 1
+          description: The revision of the target the conflict was observed against. The gate refuses a
+            mismatch against the target's current rev, so a conflict already settled by an edit surfaces
+            instead of standing.
+        because:
+          $ref: "#/$defs/prose"
+          description: Why the two cannot both hold, stated so that settling the conflict is a decidable
+            question rather than a matter of taste.
+    description: "Pairwise conflicts only. Three or more records that are each individually true and jointly
+      unsatisfiable are a set only a decision can settle, and they are authored as `tension` on the
+      `work/policy-decision@1` that owns settling them."
+  blockers:
     type: array
     minItems: 1
     uniqueItems: true
     items:
       $ref: "#/$defs/prose"
-    description: What about this rule is genuinely undecided, each question naming the policy decision that
-      owns it. It keeps an unsettled rule honest instead of letting it read as agreed, and it is the reason
-      such a rule can sit at todo without looking like forgotten work.
-  acceptanceCriteria:
+    description: "Impediments that are facts about the world rather than edges into the tree - an
+      unavailable environment, a tool nobody has. They are kept out of lifecycle state deliberately: the
+      record is still todo, and the blocker explains why it has not moved."
+  requiresProof:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: What this record needs before anybody may call it proven, broken down by kind. The kinds
+      are a closed set so that a weaker bar cannot be invented by choosing a new word for it.
+    properties:
+      unit:
+        $ref: "#/$defs/proofDemand"
+      e2e:
+        $ref: "#/$defs/proofDemand"
+      uat:
+        $ref: "#/$defs/proofDemand"
+      perf:
+        $ref: "#/$defs/proofDemand"
+      live:
+        $ref: "#/$defs/proofDemand"
+      implementation:
+        $ref: "#/$defs/proofDemand"
+      measurement:
+        $ref: "#/$defs/proofDemand"
+      requirements:
+        $ref: "#/$defs/proofDemand"
+      transitions:
+        $ref: "#/$defs/proofDemand"
+      provider:
+        $ref: "#/$defs/proofDemand"
+      consumer:
+        $ref: "#/$defs/proofDemand"
+  proofDemand:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: What satisfying one kind means here, stated concretely enough that a checker can decide it
+      rather than a reader judging it. An empty demand would be a kind named and nothing asked of it.
+    not:
+      properties:
+        required:
+          const: true
+        optional:
+          const: true
+      required:
+        - required
+        - optional
+    properties:
+      required:
+        const: true
+        description: This kind must be satisfied. It is only ever true, because the absence of the key
+          already says the kind is not demanded.
+      optional:
+        const: true
+        description: This kind counts when it is present but does not hold the record back. It may not
+          appear beside `required` - a demand that is both is a demand that has not been decided.
+      command:
+        $ref: "#/$defs/prose"
+        description: The exact command that satisfies this kind, runnable as written. Naming it on the
+          record is what stops the demand being satisfiable by whatever run happens to be convenient later.
+      forEach:
+        type: string
+        pattern: ^[a-z][A-Za-z0-9.]*$
+        description: The name of a field on this same record whose every entry must be satisfied separately.
+          It turns a single tick into a count that grows with the record, instead of a proof recorded
+          against an older, shorter list continuing to read as complete.
+      note:
+        $ref: "#/$defs/prose"
+        description: What this kind is actually asking for on this record, where the kind's name alone would
+          leave two readers expecting different runs.
+  provenBy:
+    type: object
+    additionalProperties: false
+    description: What actually satisfied each demanded kind. It is written by the kernel from
+      `requiresProof` and the provers' own `proves` edges; an agent-authored one is a record speaking for
+      other records, and goes quietly false when one of them stops covering the path.
+    properties:
+      unit:
+        $ref: "#/$defs/proofRefs"
+      e2e:
+        $ref: "#/$defs/proofRefs"
+      uat:
+        $ref: "#/$defs/proofRefs"
+      perf:
+        $ref: "#/$defs/proofRefs"
+      live:
+        $ref: "#/$defs/proofRefs"
+      implementation:
+        $ref: "#/$defs/proofRefs"
+      measurement:
+        $ref: "#/$defs/proofRefs"
+      requirements:
+        $ref: "#/$defs/proofRefs"
+      transitions:
+        $ref: "#/$defs/proofRefs"
+      provider:
+        $ref: "#/$defs/proofRefs"
+      consumer:
+        $ref: "#/$defs/proofRefs"
+  proofRefs:
     type: array
-    minItems: 1
     uniqueItems: true
     items:
-      $ref: "#/$defs/slug"
-    description: The acceptance criteria that prove this rule, each named by the last segment of its id -
-      the same name as its directory under ac/. The full criterion id is this rule's id with the br prefix
-      replaced by ac and this name appended, so the short form is the id relative to its owner and cannot
-      drift from it. A rule with no criterion states something nobody can check, so at least one is required.
-  module:
-    $ref: "#/$defs/prose"
-    description: The one source module that owns this rule, as a repository-relative path; example
-      src/auth/sign-in. One rule names one module so that a change to the rule has a single place to land,
-      and so evidence about that path is evidence about this rule.
-  evidence:
-    $ref: "#/$defs/slug"
-    description: The single evidence directory under this record's evidence/ folder that carries the proof
-      it was observed working. It is one pointer and nothing more - no list of what did the observing and no
-      capture time - because the forward edge is already authored on the other side (a UAT flow or an
-      implementation declares what it `proves`) and the capture time is already in the manifest. A copy of
-      either here would be a second source of truth for the same fact, and when two copies disagree there is
-      no answer to which is right. At most one directory is allowed, because a record has one current answer
-      to whether it holds; a replaced proof stays in its own manifest, marked stale.
+      $ref: "#/$defs/proofRef"
+    description: Everything that satisfied one kind. An empty list is information - it says the kind was
+      demanded and nothing has yet answered it, which is a different fact from the kind not being asked for.
+  proofRef:
+    type: string
+    pattern: ^[a-z0-9]+(?:[-.][a-z0-9]+)*(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: "One thing that satisfied a demand: the id of the record that proved it, the name of an
+      evidence directory, or an evidence directory and one assertion inside it written as name#assertion."
   change:
     type: object
     additionalProperties: false
@@ -92,80 +418,307 @@ properties:
       - rev
       - kind
       - at
-    description: What the last edit to this rule did. It exists so that a proof recorded against an earlier
-      revision can be judged rather than assumed still valid.
+    description: One authored edit to this record. Change is authored and staleness is derived, so this
+      block says what a person did and never what the runtime concluded from it.
     properties:
       rev:
         type: integer
         minimum: 1
-        description: The rule's revision number, starting at 1 and incremented by every edit that changes
-          what the rule says. Evidence is read against a revision, so an unincremented revision silently
-          relabels old proof as current proof.
+        description: The revision this edit produced, counting from 1. Other records cite it in `blockedBy`
+          and `conflictsWith`, which is what lets the gate tell a wait that is still true from one that has
+          already been answered.
       kind:
         enum:
           - initial
           - editorial
           - clarifying
           - breaking
-        description: "What this revision did to the meaning: initial is the first statement of the rule;
-          editorial changes wording and nothing else; clarifying makes explicit what the rule already
-          implied; breaking changes what the product must do. The distinction is what lets a checker decide
-          whether existing evidence survives the edit, so collapsing it into a bare version number would
-          force every edit to invalidate everything or nothing."
+        description: "What the edit did to what the record promises: initial is the first write, editorial
+          changes wording without changing meaning, clarifying adds precision without withdrawing anything,
+          and breaking removes or replaces a statement. The set is closed so that a withdrawal cannot be
+          under-reported by inventing a gentler word for it."
       at:
         $ref: "#/$defs/timestamp"
-        description: When this revision was made, UTC. It orders a rule's revisions against the capture time
-          of the evidence claiming to prove it.
       withdraws:
         type: array
         minItems: 1
         uniqueItems: true
         items:
           $ref: "#/$defs/prose"
-        description: The exact statements this revision removed, quoted as they stood. A withdrawn clause is
-          written out rather than deleted silently because evidence exists that proved it, and a reader of
-          that evidence must be able to see what it was proving and that the product no longer promises it.
+        description: The statements this revision removes, quoted verbatim, so that a reader of the next
+          revision can see exactly what the record stopped saying rather than inferring it from a diff. A
+          withdrawn clause is written out rather than deleted silently because evidence exists that proved
+          it, and a reader of that evidence must be able to see what it was proving. What belongs here is
+          normative content this record carried - not a sentence about the work that has since stopped
+          being true, such as a blocker explaining that a run has not happened, which is removed by
+          removing the blocker.
+      retains:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+        description: The statements an editorial pass keeps verbatim. It exists so that an edit which
+          rewrites half a paragraph is not forced to withdraw the whole thing to be honest about what moved.
       reason:
         $ref: "#/$defs/prose"
-        description: Why the revision was made, in the owner's terms. It is what a reader needs when the
-          change withdrew something that was working as specified.
+        description: Why the edit was made, naming what changed outside this record. It is the sentence that
+          makes a revision readable a year later, when the diff alone says only that words are different.
     allOf:
       - if:
+          type: object
           properties:
             withdraws:
               type: array
           required:
             - withdraws
         then:
+          type: object
           properties:
             kind:
               const: breaking
           required:
             - kind
-        description: Withdrawing a statement is a breaking change by definition - the product stops promising
-          something it promised - so a withdrawal recorded as editorial or clarifying is refused rather than
-          accepted and quietly under-reported.
-$defs:
-  prose:
-    type: string
-    minLength: 1
-    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
-      a written one, so it is refused at the type.
-  slug:
-    type: string
-    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
-      written twice by two authors is the same string.
+        description: Withdrawing content is a breaking change by definition - the record stops saying
+          something it said - so a withdrawal recorded as editorial or clarifying is refused rather than
+          accepted and quietly under-reported. It is the same rule scripts/checks/work-change.mjs runs as
+          WITHDRAWS_WITHOUT_BREAKING, stated here so a record is refused at its shape as well as at the gate.
   timestamp:
     type: string
     pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
     description: An ISO 8601 instant in UTC. The zone is pinned to Z so two records written on two machines
       are ordered against each other without knowing where either was written.
-  state:
-    enum:
-      - todo
-      - done
-    description: "Whether this leaf is outstanding or finished, and nothing else. There is deliberately no
-      third authored value: `stale` is derived by the checker when an input a done record was proved against
-      has moved, and authoring it would let a record claim a status the checker is supposed to compute -
-      which is how a tree starts reporting its own opinion of its freshness instead of a measured one."
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
+      written twice by two authors is the same string.
+  featureId:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A feature's own id - the directory name under features/ and the id its
+      features/<feature>/index.yaml carries. It has no family prefix because a feature is the owner of
+      families rather than a member of one.
+  sha256:
+    type: string
+    pattern: ^[a-f0-9]{64}$
+    description: A lowercase hex SHA-256. It is pinned to one case and one length so that two records
+      digesting the same bytes produce the same string.
+  appliesTo:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: "An outbound edge naming a record - owned by any feature - that this one's requirement
+      reaches even though it does not own it and does not edit it. The gate only resolves the ids; it does
+      not require the target to acknowledge the edge back. The derived consequence is one sentence: a done
+      record that acquires an appliesTo edge newer than its proof reads as suspended until it is re-proven
+      against the new constraint. It is authored only on work/business-rule@1 and work/sds-component@1 -
+      work/data@1 in particular does not carry it, because a data record's relationship to the rules it
+      embodies is refs, an inbound reading, not an outbound constraint."
+  checkId:
+    type: string
+    pattern: ^[a-z][A-Za-z0-9]*$
+    description: The name of an observed-feedback check, as the flow declares it and the run manifest
+      reports it back. One spelling on both sides is what lets the two be matched by string equality rather
+      than by a reader pairing them up.
+  stateMachine:
+    type: object
+    additionalProperties: false
+    required:
+      - initial
+      - states
+      - transitions
+    description: The lifecycle this record's subject moves through, written as states and the transitions
+      between them rather than as prose about what usually happens. It is here because a lifecycle
+      described in sentences has no answer to the transition nobody mentioned, and that transition is where
+      the subject ends up in a state no rule covers.
+    properties:
+      initial:
+        $ref: "#/$defs/slug"
+        description: The state a new instance starts in.
+      states:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: Every state the subject can be in. A state reached by a transition and missing from
+          this list is a state nobody designed.
+      terminal:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: The states nothing leaves. It is authored rather than derived from the absence of an
+          outgoing transition, because a state that merely has no transition yet and one that is genuinely
+          final are different facts with the same shape.
+      note:
+        $ref: "#/$defs/prose"
+        description: What a reader must understand about the machine that the states and transitions cannot
+          carry - why a state that looks final is not marked terminal, for instance.
+      transitions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: Every way the subject moves between states, one entry each. The list is the contract a
+          proof demand can iterate, which is how a lifecycle's coverage becomes a count rather than a
+          judgement.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - to
+            - on
+          properties:
+            id:
+              $ref: "#/$defs/slug"
+              description: The transition's own name, so a proof can name which one it exercised.
+            from:
+              oneOf:
+                - $ref: "#/$defs/slug"
+                - type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    $ref: "#/$defs/slug"
+              description: The state or states this transition leaves. A list is the honest shape where the
+                same move is available from several states, rather than the same transition written out
+                several times under different ids.
+            to:
+              $ref: "#/$defs/slug"
+              description: The state it arrives in.
+            on:
+              oneOf:
+                - $ref: "#/$defs/prose"
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - timer
+                  properties:
+                    timer:
+                      $ref: "#/$defs/prose"
+                      description: The duration, or the plain-language description of the clock that fires
+                        the transition.
+              description: What fires the transition - the event, or a timer object where what actually
+                fires it is a clock rather than anything anybody did. Both shapes are accepted because a
+                digest window closing and a person clicking are both real causes, and forcing the first into
+                the language of the second invents an event nobody emits.
+            guard:
+              $ref: "#/$defs/prose"
+              description: What must hold for the transition to be taken. It is separate from the trigger
+                because the trigger arriving and the move being allowed are different questions, and a
+                machine that merges them cannot describe a refused attempt.
+            effect:
+              $ref: "#/$defs/prose"
+              description: What the transition changes besides the state itself.
+  sequence:
+    type: object
+    additionalProperties: false
+    required:
+      - participants
+      - steps
+    description: The observable exchange between this component and the things around it. Only interactions
+      an end-to-end run could actually see are bound here - an internal call nobody can observe is design
+      detail, and binding it would make the design prove itself.
+    properties:
+      participants:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: Who takes part, by the name each step uses. At least two, because a sequence with one
+          participant is a description of a function.
+      note:
+        $ref: "#/$defs/prose"
+        description: What the sequence deliberately leaves out and why - the retry loop that is the same two
+          observable messages again, the internal step no run can see.
+      steps:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: The exchange in order, one message each.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - from
+            - to
+            - message
+          properties:
+            from:
+              $ref: "#/$defs/slug"
+            to:
+              $ref: "#/$defs/slug"
+            message:
+              $ref: "#/$defs/prose"
+              description: What passes, and how it could be observed - the request and the word http, the
+                write and the word write. Naming the observation is what keeps the sequence checkable
+                against a real run.
+  extensions:
+    type: object
+    additionalProperties: false
+    description: Declarations that belong to a numbered extension of the Work model rather than to this
+      family's own vocabulary. They are namespaced so that a field the core model later adopts does not
+      collide with one an extension already used.
+    properties:
+      work3:
+        type: object
+        additionalProperties: false
+        description: The third Work extension, which is where a record declares the external systems it
+          talks to.
+        properties:
+          integrations:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            description: "The external systems this record reaches, each owed exactly one work/integration@1
+              record at features/<feature>/integration/<id>/index.yaml. A declared integration with no
+              record is an incomplete tree: the declaration is the claim that something outside the product
+              is depended on, and the record is where that dependency is proven against the real provider."
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - id
+                - provider
+              properties:
+                id:
+                  $ref: "#/$defs/slug"
+                  description: "The integration this declaration owes a record for, by the name that
+                    record's own folder carries: the tree owes exactly one record at
+                    features/<feature>/integration/<id>/index.yaml, so the declaration and the record it
+                    owes are matched by the folder name rather than by a reader's judgement."
+                provider:
+                  $ref: "#/$defs/slug"
+                  description: The external system by name.
+                sandbox:
+                  oneOf:
+                    - $ref: "#/$defs/prose"
+                    - type: boolean
+                  description: What can be run against without touching the provider's production - the
+                    sandbox described, or a bare true where the provider's whole dev instance is one.
+                credential:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - name
+                    - providedBy
+                    - where
+                  description: The credential this product authenticates with, named and never carried.
+                  properties:
+                    name:
+                      type: string
+                      pattern: ^[A-Z][A-Z0-9_]*$
+                      description: The exact environment variable the client reads.
+                    providedBy:
+                      $ref: "#/$defs/slug"
+                      description: Who supplies the value - the owner, never the agent and never the
+                        repository.
+                    where:
+                      $ref: "#/$defs/prose"
+                      description: The sealed custody path the value is read from.

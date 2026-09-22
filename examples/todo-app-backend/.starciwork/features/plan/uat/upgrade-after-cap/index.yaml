@@ -1,7 +1,8 @@
 schema: work/uat-flow@1
 id: uat.plan.upgrade-after-cap
 title: Hit the cap, get refused, upgrade, create past it
-state: inprogress
+state: todo
+activity: verifying
 entry: /plan/usage
 actor: owner-at-cap
 accounts: accounts.yaml

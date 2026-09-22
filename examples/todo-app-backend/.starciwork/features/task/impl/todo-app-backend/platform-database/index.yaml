@@ -15,7 +15,7 @@ revision: 750bd4b1502aa47f44462f16e68a693c0a7d3803
 # Renamed from modules/integrations/postgres to modules/platform/databases/postgresql/primary on
 # ex-nivo-shape, matching nivo's centralised-entities/named-connection convention.
 proves: [data.task.task]
-change: {rev: 1, kind: clarifying, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
+change: {rev: 1, kind: initial, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
   owners now also claims the shipped HTTP readiness door, src/features/todo/http/health - the health
   controller's only function is to probe this module's PostgresPrimaryClient, so the door belongs to
   the record that owns the dependency it reports on. Record metadata only; the revision pin and the

@@ -31,8 +31,6 @@ change:
     is done) and is removed. The remaining blocker is the uat half this record requires, named
     explicitly as gap.plan.live-proof (the same root fr.plan.upgrade already cites) so the blockedBy
     chain roots at the real gap.
-  withdraws:
-    - "No usage screen or downgrade action exists yet at app/plan for an owner to actually reach; this backend-only lane does not build the frontend."
 
 blockedBy:
   - {record: gap.plan.live-proof, because: "The screen exists and is render-proven, but this record requires live uat proof and uat.verify has not run the downgrade surface against the running product yet."}

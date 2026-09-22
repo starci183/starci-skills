@@ -14,8 +14,9 @@ options:
       quiet-hours case this feature does not build.
   - id: one-rolling-window-per-channel
     summary: One window per person per channel. It opens on the first admitted event and closes
-      windowMs later; every event admitted before close joins the group; the group becomes one message
-      at close. There is no separate do-not-disturb clock.
+      windowMs later - 10 minutes by default, configurable per pipeline instance; every event admitted
+      before close joins the group; the group becomes one message at close. There is no separate
+      do-not-disturb clock.
     consequence: Simple, and it is what "so several events become one message" literally asks for. It
       does not model calendar-time quiet hours (e.g. never before 7am); that is future scope, not
       claimed here.
@@ -24,4 +25,3 @@ recommendationReason: The brief's own wording - "a per-person quiet window and a
   events become one message" - describes one mechanism, not two. Building the calendar do-not-disturb
   clock without a caller that needs it would be unproven scope with no test behind it.
 chosen: one-rolling-window-per-channel
-defaultWindow: 10 minutes, configurable per pipeline instance via windowMs

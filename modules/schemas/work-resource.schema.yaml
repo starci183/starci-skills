@@ -300,13 +300,14 @@ $defs:
   verificationSource:
     enum:
       - kernel-observed
-      - example-toolkit
+      - observed
       - authored-claim
-    description: "Where this record's verification came from: kernel-observed means the runtime ran it and
-      saw the result, example-toolkit means one of the scripts/example/ tools ran the commands outside any
-      kernel workflow, and authored-claim means a person or an agent wrote the sentence. The three read
-      identically as prose and mean completely different things, so the label is written rather than
-      inferred."
+    description: "Where this record's verification came from: kernel-observed means a live kernel workflow
+      ran it and settled the record on what it saw, observed means the listed commands were really run and
+      their results recorded outside any kernel workflow, and authored-claim means a person or an agent
+      wrote the sentence and nothing ran at all. The three read identically as prose and mean completely
+      different things, so the label is written rather than inferred; without it, the cheapest way to make
+      a tree look proven is to write more sentences."
   because:
     type: string
     minLength: 1
@@ -548,7 +549,12 @@ $defs:
         items:
           $ref: "#/$defs/prose"
         description: The statements this revision removes, quoted verbatim, so that a reader of the next
-          revision can see exactly what the product stopped promising rather than inferring it from a diff.
+          revision can see exactly what the record stopped saying rather than inferring it from a diff. A
+          withdrawn clause is written out rather than deleted silently because evidence exists that proved
+          it, and a reader of that evidence must be able to see what it was proving. What belongs here is
+          normative content this record carried - not a sentence about the work that has since stopped
+          being true, such as a blocker explaining that a run has not happened, which is removed by
+          removing the blocker.
       retains:
         type: array
         minItems: 1
@@ -561,6 +567,25 @@ $defs:
         $ref: "#/$defs/prose"
         description: Why the edit was made, naming what changed outside this record. It is the sentence that
           makes a revision readable a year later, when the diff alone says only that words are different.
+    allOf:
+      - if:
+          type: object
+          properties:
+            withdraws:
+              type: array
+          required:
+            - withdraws
+        then:
+          type: object
+          properties:
+            kind:
+              const: breaking
+          required:
+            - kind
+        description: Withdrawing content is a breaking change by definition - the record stops saying
+          something it said - so a withdrawal recorded as editorial or clarifying is refused rather than
+          accepted and quietly under-reported. It is the same rule scripts/checks/work-change.mjs runs as
+          WITHDRAWS_WITHOUT_BREAKING, stated here so a record is refused at its shape as well as at the gate.
   timestamp:
     type: string
     pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
@@ -582,3 +607,221 @@ $defs:
     pattern: ^[a-f0-9]{64}$
     description: A lowercase hex SHA-256. It is pinned to one case and one length so that two records
       digesting the same bytes produce the same string.
+  appliesTo:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: "An outbound edge naming a record - owned by any feature - that this one's requirement
+      reaches even though it does not own it and does not edit it. The gate only resolves the ids; it does
+      not require the target to acknowledge the edge back. The derived consequence is one sentence: a done
+      record that acquires an appliesTo edge newer than its proof reads as suspended until it is re-proven
+      against the new constraint. It is authored only on work/business-rule@1 and work/sds-component@1 -
+      work/data@1 in particular does not carry it, because a data record's relationship to the rules it
+      embodies is refs, an inbound reading, not an outbound constraint."
+  checkId:
+    type: string
+    pattern: ^[a-z][A-Za-z0-9]*$
+    description: The name of an observed-feedback check, as the flow declares it and the run manifest
+      reports it back. One spelling on both sides is what lets the two be matched by string equality rather
+      than by a reader pairing them up.
+  stateMachine:
+    type: object
+    additionalProperties: false
+    required:
+      - initial
+      - states
+      - transitions
+    description: The lifecycle this record's subject moves through, written as states and the transitions
+      between them rather than as prose about what usually happens. It is here because a lifecycle
+      described in sentences has no answer to the transition nobody mentioned, and that transition is where
+      the subject ends up in a state no rule covers.
+    properties:
+      initial:
+        $ref: "#/$defs/slug"
+        description: The state a new instance starts in.
+      states:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: Every state the subject can be in. A state reached by a transition and missing from
+          this list is a state nobody designed.
+      terminal:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: The states nothing leaves. It is authored rather than derived from the absence of an
+          outgoing transition, because a state that merely has no transition yet and one that is genuinely
+          final are different facts with the same shape.
+      note:
+        $ref: "#/$defs/prose"
+        description: What a reader must understand about the machine that the states and transitions cannot
+          carry - why a state that looks final is not marked terminal, for instance.
+      transitions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: Every way the subject moves between states, one entry each. The list is the contract a
+          proof demand can iterate, which is how a lifecycle's coverage becomes a count rather than a
+          judgement.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - to
+            - on
+          properties:
+            id:
+              $ref: "#/$defs/slug"
+              description: The transition's own name, so a proof can name which one it exercised.
+            from:
+              oneOf:
+                - $ref: "#/$defs/slug"
+                - type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    $ref: "#/$defs/slug"
+              description: The state or states this transition leaves. A list is the honest shape where the
+                same move is available from several states, rather than the same transition written out
+                several times under different ids.
+            to:
+              $ref: "#/$defs/slug"
+              description: The state it arrives in.
+            on:
+              oneOf:
+                - $ref: "#/$defs/prose"
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - timer
+                  properties:
+                    timer:
+                      $ref: "#/$defs/prose"
+                      description: The duration, or the plain-language description of the clock that fires
+                        the transition.
+              description: What fires the transition - the event, or a timer object where what actually
+                fires it is a clock rather than anything anybody did. Both shapes are accepted because a
+                digest window closing and a person clicking are both real causes, and forcing the first into
+                the language of the second invents an event nobody emits.
+            guard:
+              $ref: "#/$defs/prose"
+              description: What must hold for the transition to be taken. It is separate from the trigger
+                because the trigger arriving and the move being allowed are different questions, and a
+                machine that merges them cannot describe a refused attempt.
+            effect:
+              $ref: "#/$defs/prose"
+              description: What the transition changes besides the state itself.
+  sequence:
+    type: object
+    additionalProperties: false
+    required:
+      - participants
+      - steps
+    description: The observable exchange between this component and the things around it. Only interactions
+      an end-to-end run could actually see are bound here - an internal call nobody can observe is design
+      detail, and binding it would make the design prove itself.
+    properties:
+      participants:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: Who takes part, by the name each step uses. At least two, because a sequence with one
+          participant is a description of a function.
+      note:
+        $ref: "#/$defs/prose"
+        description: What the sequence deliberately leaves out and why - the retry loop that is the same two
+          observable messages again, the internal step no run can see.
+      steps:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: The exchange in order, one message each.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - from
+            - to
+            - message
+          properties:
+            from:
+              $ref: "#/$defs/slug"
+            to:
+              $ref: "#/$defs/slug"
+            message:
+              $ref: "#/$defs/prose"
+              description: What passes, and how it could be observed - the request and the word http, the
+                write and the word write. Naming the observation is what keeps the sequence checkable
+                against a real run.
+  extensions:
+    type: object
+    additionalProperties: false
+    description: Declarations that belong to a numbered extension of the Work model rather than to this
+      family's own vocabulary. They are namespaced so that a field the core model later adopts does not
+      collide with one an extension already used.
+    properties:
+      work3:
+        type: object
+        additionalProperties: false
+        description: The third Work extension, which is where a record declares the external systems it
+          talks to.
+        properties:
+          integrations:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            description: "The external systems this record reaches, each owed exactly one work/integration@1
+              record at features/<feature>/integration/<id>/index.yaml. A declared integration with no
+              record is an incomplete tree: the declaration is the claim that something outside the product
+              is depended on, and the record is where that dependency is proven against the real provider."
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - id
+                - provider
+              properties:
+                id:
+                  $ref: "#/$defs/slug"
+                  description: "The integration this declaration owes a record for, by the name that
+                    record's own folder carries: the tree owes exactly one record at
+                    features/<feature>/integration/<id>/index.yaml, so the declaration and the record it
+                    owes are matched by the folder name rather than by a reader's judgement."
+                provider:
+                  $ref: "#/$defs/slug"
+                  description: The external system by name.
+                sandbox:
+                  oneOf:
+                    - $ref: "#/$defs/prose"
+                    - type: boolean
+                  description: What can be run against without touching the provider's production - the
+                    sandbox described, or a bare true where the provider's whole dev instance is one.
+                credential:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - name
+                    - providedBy
+                    - where
+                  description: The credential this product authenticates with, named and never carried.
+                  properties:
+                    name:
+                      type: string
+                      pattern: ^[A-Z][A-Z0-9_]*$
+                      description: The exact environment variable the client reads.
+                    providedBy:
+                      $ref: "#/$defs/slug"
+                      description: Who supplies the value - the owner, never the agent and never the
+                        repository.
+                    where:
+                      $ref: "#/$defs/prose"
+                      description: The sealed custody path the value is read from.

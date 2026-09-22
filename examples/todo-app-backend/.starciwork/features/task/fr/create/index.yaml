@@ -28,7 +28,7 @@ requiresProof:
   uat:
     required: true
 
-change: {rev: 1, kind: clarifying, at: 2026-09-19T12:00:00.000Z, reason: "The record's flow was spec-wrong about enforced behavior (v6-3 Q2-2): create-precondition.contract.spec.ts proves the real CreateTaskHandler calls TaskCreationPolicy.assertMayCreate before writing and propagates PlanCapExceededException - the plan-cap refusal has always been on this path, the flow just never said so. Added the cap exceptionFlow, the br.plan.caps.limit compose and the contract ref; nothing else moved. This resolves the tension contract.plan.create-precondition's conflictsWith declared - no policy decision was needed because code and contract already agreed and only this record lagged."}
+change: {rev: 1, kind: initial, at: 2026-09-19T12:00:00.000Z, reason: "The record's flow was spec-wrong about enforced behavior (v6-3 Q2-2): create-precondition.contract.spec.ts proves the real CreateTaskHandler calls TaskCreationPolicy.assertMayCreate before writing and propagates PlanCapExceededException - the plan-cap refusal has always been on this path, the flow just never said so. Added the cap exceptionFlow, the br.plan.caps.limit compose and the contract ref; nothing else moved. This resolves the tension contract.plan.create-precondition's conflictsWith declared - no policy decision was needed because code and contract already agreed and only this record lagged."}
 
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 # An agent-authored provenBy is refused: it would be this record speaking for another one.

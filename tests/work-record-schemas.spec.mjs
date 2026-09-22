@@ -28,16 +28,26 @@ const ajv = new Ajv2020({strict: true, allErrors: true});
 
 const readSchema = file => parseYaml(fs.readFileSync(path.join(schemaDir, file), 'utf8'));
 
-// The family list is read off the schema files rather than typed out here. A hand-kept list is a third copy
-// of the same fact - the directory has it, each schema's `schema` const has it - and the copy that rots is
-// always the one a spec keeps privately.
-const SCHEMA_FILES = Object.fromEntries(fs.readdirSync(schemaDir)
-  .filter(name => /^work-[a-z-]+\.schema\.yaml$/.test(name))
-  .map(name => {
-    const family = readSchema(name)?.properties?.schema?.const;
-    assert.ok(typeof family === 'string' && family.startsWith('work/'), `${name} does not pin a work/ family on its schema key`);
-    return [family, name];
+// The family list is read off the catalog rather than typed out here. A hand-kept list is a third copy of
+// the same fact - the catalog has it, each schema's `schema` const has it - and the copy that rots is
+// always the one a spec keeps privately. `subsystem: work-tree` is what the catalog calls the schemas a
+// .starciwork tree's own files carry; `node scripts/checks/check-schema-catalog.mjs` keeps that list from
+// drifting away from the files. The one entry with no `properties.schema.const` is the metadata monolith,
+// which discriminates through a oneOf instead and is not a per-family authority.
+const catalog = parseYaml(fs.readFileSync(path.join(schemaDir, 'index.yaml'), 'utf8'));
+const SCHEMA_FILES = Object.fromEntries((catalog?.schemas ?? [])
+  .filter(entry => entry?.subsystem === 'work-tree' && entry?.dialect === 'json-schema')
+  .map(entry => [entry, readSchema(path.basename(String(entry.file)))?.properties?.schema?.const])
+  .filter(([, family]) => typeof family === 'string')
+  .map(([entry, family]) => {
+    assert.equal(family, String(entry.id).trim(), `${entry.file} pins ${family} on its schema key, which is not the ${entry.id} the catalog lists it under`);
+    return [family, path.basename(String(entry.file))];
   }));
+
+// v11 collapsed every acceptance criterion onto the rule it accepts, so no file in the example stamps
+// work/acceptance-criterion@1 any more. work-layout.yaml still declares the ac family folder, so the
+// schema stays and this is the one family the tree encodes inline rather than as its own record.
+const INLINED_FAMILIES = new Set(['work/acceptance-criterion@1']);
 
 const compiled = new Map(Object.entries(SCHEMA_FILES).map(([family, file]) => [family, ajv.compile(readSchema(file))]));
 const validatorFor = family => compiled.get(family);
@@ -57,10 +67,7 @@ function recordFiles() {
   return found.sort();
 }
 
-// The example tree names 8 families this lane never schema'd (work/critique@1, work/derived@1,
-// work/resource@1, work/contract@1, work/gap@1, work/event@1, work/integration@1, starci/uat-run-manifest@1).
-// Writing them is real work the merge deferred - until they exist, asserting coverage asserts a gap.
-test('every record family named in the example has a schema, and every schema is named by the example', {skip:'8 families lack schemas (work/critique@1, work/derived@1, work/resource@1, work/contract@1, work/gap@1, work/event@1, work/integration@1, starci/uat-run-manifest@1) - schemas pending'}, () => {
+test('every record family named in the example has a schema, and every schema is named by the example', () => {
   const files = recordFiles();
   assert.ok(files.length > 0, 'the example tree has no record files; the subject of this spec is missing');
   const named = new Set();
@@ -78,11 +85,11 @@ test('every record family named in the example has a schema, and every schema is
   assert.deepEqual(unparseable, [], 'these example records are not valid YAML, so no schema can accept them');
   const unknown = [...named].filter(family => !SCHEMA_FILES[family]);
   assert.deepEqual(unknown, [], 'the example names these schemas and no schema file defines them');
-  const unused = Object.keys(SCHEMA_FILES).filter(family => !named.has(family));
+  const unused = Object.keys(SCHEMA_FILES).filter(family => !named.has(family) && !INLINED_FAMILIES.has(family));
   assert.deepEqual(unused, [], 'these schemas are defined and no example record exercises them');
 });
 
-test('every record in the example validates against the schema it names', {skip:'blocked on the missing family schemas above - and current records carry fields the lane schemas predate'}, () => {
+test('every record in the example validates against the schema it names', () => {
   const rejected = [];
   for (const file of recordFiles()) {
     let record;
@@ -127,7 +134,12 @@ const base = {
     title: 'A task without a title does not exist',
     state: 'todo',
     statements: ['A task is created only with a non-empty title.'],
-    acceptanceCriteria: ['refuses-empty'],
+    acceptance: [{
+      id: 'ac.task.title.required.refuses-empty',
+      given: 'A creation request',
+      when: 'Its title is empty',
+      then: ['Creation is refused.']
+    }],
     module: 'src/task/create',
     change: {rev: 2, kind: 'breaking', at: '2026-09-18T02:11:00.000Z'}
   }),
@@ -222,24 +234,29 @@ test('no leaf schema accepts a derived state, and none accepts an authored stale
 test('evidence records what was observed, and refuses a pass that contradicts its own assertions', () => {
   const manifest = () => ({
     schema: 'work/evidence@1',
-    id: 'proves-title',
     record: 'br.task.title.required',
     recordDigest: 'a'.repeat(64),
+    codeDigest: {algorithm: 'sha256', files: [{path: 'src/task/create/create.handler.ts', sha256: 'b'.repeat(64)}], digest: 'c'.repeat(64)},
     outcome: 'pass',
-    assertions: [{id: 'ac.task.title.required.refuses-empty', outcome: 'pass', observation: 'npm run test:unit -- src/task/create exited 0'}],
+    assertions: [{
+      id: 'br.task.title.required#ac.task.title.required.refuses-empty',
+      command: 'npx jest src/task/create',
+      exit: 0,
+      outcome: 'pass',
+      observation: 'npx jest src/task/create exited 0'
+    }],
     provenance: {
-      actor: 'starci-kernel',
-      tool: 'starci-kernel',
+      actor: 'example-evidence',
+      tool: 'scripts/example/example-evidence.mjs',
       environment: 'local',
-      servedVersions: [{repository: 'todo-app-backend', commit: 'f'.repeat(40), artifact: 'worktree'}],
       capturedAt: '2026-09-18T04:38:00.000Z'
     }
   });
   assert.equal(validatorFor('work/evidence@1')(manifest()), true, 'the ordinary manifest shape must validate or every other case here is meaningless');
 
-  const undigested = manifest();
-  delete undigested.recordDigest;
-  refuses('work/evidence@1', undigested, 'without the digest of the record it was captured against, expiry can only be noticed by somebody who happens to remember, which is to say not noticed');
+  const unreplayable = manifest();
+  delete unreplayable.assertions[0].command;
+  refuses('work/evidence@1', unreplayable, 'a prose observation alone cannot be replayed, only read; the command is what lets a later run compare outcomes rather than re-read a claim');
 
   const contradictory = manifest();
   contradictory.assertions[0].outcome = 'fail';
@@ -261,27 +278,45 @@ test('evidence records what was observed, and refuses a pass that contradicts it
   refuses('work/evidence@1', unmarked, 'a reason for expiry without the mark leaves the evidence reading as current');
 });
 
-test('an implementation must say whether its verification was observed or asserted', () => {
+test('an implementation names owners, plural, and labels a verification it did not run', () => {
   const module = () => ({
     schema: 'work/implementation@1',
-    id: 'impl.task.todo-app.ownership',
+    id: 'impl.task.todo-app-backend.ownership',
     title: 'Ownership binding and its guard',
     state: 'done',
     repository: 'todo-app-backend',
-    directory: 'src/task/ownership',
-    files: ['ownership.guard.ts'],
+    owners: [{role: 'module', path: 'src/task/ownership'}, {role: 'route', path: 'src/app/tasks'}],
     revision: '6'.repeat(40),
     proves: ['br.task.single-owner'],
     verification: ['npm run test:unit -- src/task/ownership exited 0'],
     verificationSource: 'kernel-observed'
   });
   assert.equal(validatorFor('work/implementation@1')(module()), true, 'the ordinary implementation shape must validate');
-  const unlabelled = module();
-  delete unlabelled.verificationSource;
-  refuses('work/implementation@1', unlabelled, 'prose the kernel did not produce is a claim, and an unlabelled verification line makes a claim indistinguishable from a run');
+
+  // work-layout.yaml: one screen or one flow spans more than one owned artifact, and a single
+  // directory/files pair cannot name more than one shape at a time, so the gate refuses both fields.
+  const pathed = module();
+  delete pathed.owners;
+  pathed.directory = 'src/task/ownership';
+  pathed.files = ['ownership.guard.ts'];
+  refuses('work/implementation@1', pathed, 'directory/files is the shape owners[] replaced; a record carrying it names one artifact where the work spans several');
+
+  const nameless = module();
+  nameless.owners = [{path: 'src/task/ownership'}];
+  refuses('work/implementation@1', nameless, 'an owner entry without a role names a path and not what it is, which is what a reader needs to know before opening it');
+
   const invented = module();
   invented.verificationSource = 'reviewed';
-  refuses('work/implementation@1', invented, 'a third source would be a way of describing a claim that is neither observed nor owned');
+  refuses('work/implementation@1', invented, 'a fourth source would be a way of describing a claim that is neither run by the kernel, run by somebody, nor admitted as a claim');
+
+  // Every other schema needs a sibling evidence.yaml OR this declaration; the declaration is worthless
+  // without the sentence saying why nothing ran.
+  const claimed = module();
+  delete claimed.verification;
+  claimed.verificationSource = 'authored-claim';
+  refuses('work/implementation@1', claimed, 'an authored claim with no because is a done record asserting itself');
+  claimed.because = 'The module is a re-export; there is nothing to run that its consumers do not already run.';
+  assert.equal(validatorFor('work/implementation@1')(claimed), true, 'with its reason, an authored claim is the declaration work-layout.yaml allows in place of a run');
 });
 
 test('a proof demand may not be both required and optional, and must ask for something', () => {
