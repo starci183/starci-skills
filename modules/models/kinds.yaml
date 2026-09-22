@@ -76,7 +76,8 @@ vocabularies:
   # pin its behaviour against, so restructuring it would be an unverifiable edit. The gap is closed by authoring
   # the tests first - the work waits for them rather than guessing at safety - which is why the route goes to
   # `test.author` and not to the user.
-  # Keep this list in step with the blocker kinds of `modules/kernel/verdict-contract.yaml`.
+  # The one authority for blocker kinds: scripts/kernel/report-envelope.mjs loads this list as
+  # BLOCKER_KINDS and modules/kernel/verdict-contract.yaml cites it.
   blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, test-gap, environment, authority]
   # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
   verdicts: [pass, findings, rejected, gate-failed]

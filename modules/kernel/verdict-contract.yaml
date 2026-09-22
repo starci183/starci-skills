@@ -76,10 +76,10 @@ returns:
         uat/e2e/perf red reports `failed` and routes to lane.build repair.
       blocked: >-
         Progress needs something outside the grant — maps to outcome
-        `blocked` (typed blocker required, kind one of BLOCKER_KINDS:
-        shared-change, srs-gap, sds-gap, interface-gap, brand-gap,
-        grammar-gap, test-gap, environment, authority) or `ask` (a question
-        the kernel
+        `blocked` (a typed blocker is required; the kinds are
+        modules/models/kinds.yaml blockers, which
+        scripts/kernel/report-envelope.mjs loads as BLOCKER_KINDS and the
+        envelope validates against) or `ask` (a question the kernel
         may answer only from offered options, else needUser).
     note: >-
       The packet's three-value enum is the agent-facing compression. On the

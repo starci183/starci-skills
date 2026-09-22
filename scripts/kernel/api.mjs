@@ -34,7 +34,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   openLedger, ledgerFileFor, machineFileFor, openMachine,
-  newToken, SETTLED_JOB_STATUSES, reserveTwoPhase,
+  newToken, JOB_STATUSES, reserveTwoPhase,
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
@@ -67,12 +67,12 @@ import { terminalRename } from '../api/orca/terminal-rename.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
-// The kernel-agent status vocabulary. enqueue writes 'queued' — the durable
-// engine's own word (ledger.enqueueJob). settle writes the engine's settled
-// vocabulary: 'succeeded'|'failed'.
-const FINAL_SETTLED = [...new Set(SETTLED_JOB_STATUSES)];
-const SETTLED = [...new Set([...FINAL_SETTLED, 'effect_unknown'])];
-const DISPATCHABLE = ['queued', 'leased', 'running', 'answering'];
+// The status vocabulary is engine/ledger-db.mjs JOB_STATUSES; these are the
+// three views this gate reasons in. enqueue writes 'queued' and settle writes
+// 'succeeded'|'failed' — the durable engine's own words.
+const FINAL_SETTLED = [...JOB_STATUSES.settled];
+const SETTLED = [...JOB_STATUSES.settled, ...JOB_STATUSES.fenced];
+const DISPATCHABLE = [...JOB_STATUSES.dispatchable];
 // The reports.outcome vocabulary — the worker-facing half of the op IPC.
 const REPORT_OUTCOMES = OP_REPORT_OUTCOMES;
 // Kernel verdict ↔ worker outcome consistency at settle: a pass settles a
@@ -147,7 +147,7 @@ const usage = (code) => {
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
-  report   --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
+  report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
@@ -1003,7 +1003,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
   `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory.`,
   `reporting: your answer is a starci/op-report@1 JSON envelope — report.json on disk (the artifact) filed into the ledger (the durable signal):`,
-  `  {"outcome":"done|partial|failed|ask|blocked","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
+  `  {"outcome":"${REPORT_OUTCOMES.join("|")}","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
   `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,

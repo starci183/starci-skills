@@ -8,8 +8,21 @@ const require=createRequire(import.meta.url);
 
 // The ledger's small store vocabulary: a token mint and the settled-job set.
 export const newToken=()=>crypto.randomBytes(24).toString('hex');
-/** A job in one of these states holds nothing the runtime still needs from it: its result is recorded or void. */
-export const SETTLED_JOB_STATUSES=['succeeded','failed','cancelled'];
+/**
+ * The complete jobs.status vocabulary, in one place, grouped by what a row in that state still owes:
+ * `dispatchable` rows are the live frontier (a queued row is the queue entry; leased/running/answering
+ * hold a worker), `fenced` keeps a launch whose effect is unproven until `api reconcile` settles it, and
+ * `settled` holds nothing the runtime still needs — its result is recorded or void. Every caller derives
+ * its own set from this; nothing re-spells the strings. jobs.status carries no SQL CHECK: adding one to an
+ * existing ledger means rebuilding the table under its foreign key and indexes, which migrateLedger
+ * (additive DDL only) cannot do safely.
+ */
+export const JOB_STATUSES=Object.freeze({
+  dispatchable:Object.freeze(['queued','leased','running','answering']),
+  fenced:Object.freeze(['effect_unknown']),
+  settled:Object.freeze(['succeeded','failed','cancelled']),
+});
+export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
 /**
  * The retention policy of the ledger, in one place: the bound generation keeps ONE state body, its
  * `transition:`/`bind:` checkpoint rows and only the latest `save:` row; a dropped generation keeps nothing;
