@@ -926,6 +926,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   serve-ask (`c2e4564cb`): ảnh lấy từ draws.yaml của report, bỏ fallback toàn cục, có options thì không suy picks.
   Merge lane P3 của phiên fork (`f68c490be`): baseline ghim phiên bản toolchain nest/next.
 
+- 06:45 tick: Modules 6 cut business.decide (3 partial, 1 done); Collab business.decide 2 done 1 partial, 9 job ready;
+  AUTH interface.draw đang chạy trên gpt-6-sol (worker-start managed vẫn chạy được, chỉ terminal Codex tương tác
+  hỏng); WSPV implement a29 partial. 8 lần claude bị từ chối ở worker-start trong 50 phút (onboarding) → circuit 2
+  phút reset → vòng lặp. Vá backoff (`7a8281413`): mở lại cùng lỗi trong 1h thì nghỉ x5, tối đa 1h.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
