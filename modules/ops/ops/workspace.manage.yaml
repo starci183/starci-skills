@@ -3,7 +3,17 @@ id: workspace.manage
 goal:
   en: Create or reconstruct one canonical .starciwork workspace from a new purpose or selected
     existing source and old worktrees, with verified bindings, preserved provenance and validated
-    scope.
+    scope, and declare its .starcistacks application stacks from the settled design.
+params:
+  mode:
+    type: enum
+    enum: [select, prepare, import, stacks]
+    default: select
+    setBy: kernel
+    doc:
+      en: The execution mode this dispatch runs. The kernel sets it from the approved leg that names a
+        mode (workspace.manage#stacks is stacks); select leaves the choice between prepare and import
+        to the first step.
 nodeKinds: [operations]
 completionProfile: operations
 sideEffects:
@@ -51,8 +61,9 @@ steps:
       - profile
     writes: []
     action:
-      en: "Select prepare for a new or explicitly revised Work purpose, or import for an existing
-        source/worktree pilot. Resolve one canonical destination, then load exactly that operation
+      en: "Run the mode params.mode names. When it is select, choose prepare for a new or explicitly
+        revised Work purpose, or import for an existing source/worktree pilot; stacks runs only when
+        named. Resolve one canonical destination, then load exactly that operation
         contract. Repository binding, inventory, preservation and validation are internal steps, not
         separate operators. Mode permissions never combine. Resolve the execution profile and actual
         tool availability before selecting instruments; this does not switch the model/runtime or
@@ -603,6 +614,128 @@ policy:
         intentAuthority: approved-intent-not-inferred-source
         cleanup: explicit-exact-preserved-inactive-only
         registeredWorktreeRemoval: git-without-force
+    stacks:
+      id: workspace.manage
+      goal:
+        en: Declare the whole application's .starcistacks tree for the owner repository from the settled
+          SDS component inventory and prove it statically conformant.
+      nodeKinds: [operations]
+      completionProfile: operations
+      sideEffects:
+        - .starcistacks declaration, environment directories, compose files, runbooks and encrypted
+          secret pairs inside the owner repository
+        - scoped documentation commits only when authorized
+        - no container start, deployment, remote host, DNS or credential-provider effect
+      graphPolicy:
+        mode: selected-scope-only
+        location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+        prerequisiteState: done
+        dispatch: never
+      reads:
+        - id: target
+          path: .starciwork/<scope>/index.yaml
+          purpose:
+            en: The selected stacks scope record, its refs to the settled design and its assertions. For an
+              explicitly new target, absence is expected.
+        - id: architecture
+          path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
+          purpose:
+            en: The settled component inventory, deployment and integration records — frontend, APIs,
+              workers, init/migration jobs, stateful services, ingress and external dependencies —
+              that the declaration lists.
+        - id: layout
+          path: modules/schemas/stacks-layout.yaml
+          purpose:
+            en: The .starcistacks tree contract — declaration, environment directories, compose files,
+              runbooks, secret pairs and the refused shapes.
+        - id: application-stacks
+          path: knowledge/application-stacks.yaml + docs/application-stacks.md +
+            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+          purpose:
+            en: The whole-application dev and VPS contract and the declaration's field schema.
+        - id: repo
+          path: repository:<repo-id>/<bound-paths>
+          purpose:
+            en: The owner repository checkout, HEAD, dirty state and any existing .starcistacks tree to
+              reconcile.
+      writes:
+        - id: declaration
+          path: .starcistacks/application-stacks.yaml
+          fields: [schema, sources, components, environments, k8s]
+          content:
+            en: The one declaration per repository, against modules/schemas/application-stacks.schema.yaml.
+        - id: environments
+          path: .starcistacks/<environment>/**
+          fields: [composeFiles, runbook, secrets, runtime, seeds, infra]
+          content:
+            en: One directory per declared environment in the stacks-layout.yaml shape — declared compose
+              files, README.md runbook, <name>/<name>.enc secret pairs with the plaintext member
+              gitignored, runtime config/env/files, seeds and infra.
+        - id: node
+          path: .starciwork/<scope>/index.yaml
+          fields: [completion.inputDigest, completion.evidence]
+          content:
+            en: Bind the stacks scope completion to its actual evidence.
+        - id: evidence
+          path: E/manifest.yaml
+          fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+          content:
+            en: The rendered deployment models, the exact stacks check commands and outputs, and every
+              component's source record.
+      steps:
+        - reads:
+            - target
+            - architecture
+            - application-stacks
+          writes: []
+          action:
+            en: Resolve the component inventory from the settled design records. Every component, environment
+              binding and external dependency traces to a settled record or an explicit justified
+              exclusion; an unsettled component is a named gap, not a choice. The owner's production
+              environment is the declaration's vps environment.
+        - reads:
+            - repo
+            - layout
+            - application-stacks
+          writes: [declaration, environments]
+          action:
+            en: Write .starcistacks/application-stacks.yaml, then exactly one directory per declared
+              environment in the stacks-layout.yaml shape. Reconcile an existing tree instead of
+              creating a parallel one; generate declared local secrets once and store only encrypted
+              members as tracked files.
+        - reads:
+            - repo
+            - layout
+          writes: [node, evidence]
+          action:
+            en: Render each environment's deployment model with docker compose config or docker stack
+              config, run the stacks check on it per environment, and record the commands, outputs,
+              limitations and unrun cases. Stop without starting any stack.
+      proofs:
+        - id: stacks-conformant
+          check: scripts/checks/stacks.mjs
+          requirement:
+            en: "`node bin/starci.mjs stacks check <repo-root> --environment <env> --deployment-model
+              <rendered>` passed for every declared environment on the rendered models, and its output
+              is recorded — static conformance only, never a claim the stack ran."
+        - id: inventory-traced
+          requirement:
+            en: Every declared component names the settled design record it realises or its justified
+              exclusion.
+      blockers:
+        - code: SDS_UNSETTLED
+          condition:
+            en: No settled design names the components, environments or external dependencies to declare.
+        - code: SECRET_CUSTODY_MISSING
+          condition:
+            en: A declared secret cannot be encrypted with an available custody key; plaintext is never
+              written as a tracked file.
+      placeholders:
+        scope: Selected stacks scope slug
+        feature: Feature folder holding the settled design records
+        environment: An environment the declaration admits
+        repo-id: Resolved owner repository resource ID
+        bound-paths: Inspected source read set
 route:
   nodeKinds: [operations]
   phase: [scope, pre-implementation]

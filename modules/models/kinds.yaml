@@ -350,11 +350,11 @@ kinds:
     role: implement
     operator: backend.scaffold
     readOnly: false
-    # Greenfield: there is no owning code to read - the reads are the settled design that decides
-    # the stack/layout and the conventions the new tree must satisfy from its first commit.
+    # Greenfield: there is no owning code to read. The stack is fixed and the toolchain comes from
+    # repository-baseline; settled design is read only for layout and dependencies beyond it.
     reads: [srs, sds, decision]
     writes: [code]
-    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement, application-stacks]
+    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement, application-stacks, repository-baseline]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
@@ -368,10 +368,11 @@ kinds:
     operator: interface.scaffold
     readOnly: false
     # Greenfield interface: grammar and brand are required inputs because the first markup is
-    # written in the installed grammar with settled tokens - a scaffold cannot invent either.
+    # written in the installed grammar with settled tokens - a scaffold cannot invent either. The
+    # toolchain comes from repository-baseline.
     reads: [srs, sds, design, brand, grammar]
     writes: [code, asset]
-    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement]
+    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement, repository-baseline]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []

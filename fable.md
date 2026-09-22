@@ -851,6 +851,70 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   bằng `git commit --only`. Phiên fork mở lane archetype spec-foundation/greenfield-scaffold,
   supervisor sẽ merge.
 
+- 03:50 Thầy uỷ quyền: "thầy ngủ trò tự duyệt, miễn dậy xong workflows". Supervisor trả lời ask
+  giao diện/direction thay thầy, ghi rõ trong note của receipt là trả lời theo uỷ quyền, kèm lý do.
+  Không làm: UAT có người (đăng nhập, OAuth consent của thầy), chốt nhà cung cấp thanh toán
+  (`decision.workspace-provision.payment-provider-shortlist` còn open). Vá thêm: ask theo ngôn
+  ngữ thầy + mỗi lựa chọn có hình (`759b02af0`), runner UAT spawn npx trên Windows (`ca21ddb89`,
+  `cc3d29d93`), watchdog `--repair` + chỉ wake khi actionable (`e21a2e77d`).
+
+- 04:00 Theo uỷ quyền, supervisor trả lời ask login AUTH `ctx_1db4e4509029`: Desktop A + Mobile A
+  (bố cục chia đôi, form phẳng; mobile cùng họ phẳng), lý do ghi trong note receipt. Kernel AUTH
+  chạy tiếp implement a12 → audit a3. WSPV đang soạn lại ask checkout-review tiếng Việt có hình.
+  F3 xong (53/65 replay, 19 fail thật) nhưng giữ chưa merge vì phiên draw chưa land ui records
+  cùng file. F3 báo hai lỗi script: `example-derive.mjs:215` bỏ qua outcome evidence (record fail
+  vẫn derive `done`), `check-example-work.mjs:557` cho qua record `done` có evidence fail.
+
+- 04:10 Ask WSPV mới `ctx_8cc8fa06b8bd` đúng chuẩn (tiếng Việt, 4 chỗ lệch, mỗi hướng có hình và chi
+  phí). Supervisor chọn A (giữ như sản phẩm thật): không hiển thị điều chưa có thật; A không chốt
+  nhà cung cấp thanh toán. Thống kê từ 21/9 09:27: AUTH 24 succeeded / 23 failed (13 blocked,
+  10 verdict fail); WSPV 39 / 54 (24 blocked, 30 verdict fail). Blocked là chỗ lãng phí cần đào.
+
+- 04:40 Thầy chốt: chạy trên `main` mặc định, worktree chỉ khi prompt yêu cầu (`3557748a4`). Xoá worktree
+  accounting (đã nằm trong main); commit WIP refactor 206 file vào nhánh của nó (`bab51287`), không merge.
+  Thầy yêu cầu hai workflow mới (3 module + AgentOS; Collab chat nhóm): plan in chuỗi sai vì thiếu
+  archetype full-stack; phiên fork thêm `feature-build-fullstack` trong lane archetype, chưa persist goal.
+  Lane P (4 vá lãng phí) đang chạy trong worktree vì sửa api.mjs kernel đang chạy. `check-orca-tree` bỏ
+  qua terminal của ledger khác (`0c434ed88`).
+
+- 04:45 Thầy gõ `ok` cho hai goal mới (nivo-modules-agentos, nivo-collab-group-chat), có điều kiện: chỉ
+  persist + start-kernel khi plan lập lại in đúng chuỗi `request.analyze > scope.define > business.decide >
+  architecture.decide > interface.draw > work.author > backend.implement > interface.implement >
+  interface.audit > e2e.verify > uat.verify > review.verify` (brand.decide chỉ khi chưa có brand đã duyệt).
+  Lệch thì không persist, để sáng.
+
+- 05:05 Merge lane archetype của phiên fork (`533f76be1`). Plan lại hai goal: prompt gốc khớp nhầm
+  spec-foundation (5 leg, không implement) vì cụm "đóng SRS/SDS còn thiếu"; prompt modules khớp nhầm refactor
+  vì tên nhánh WIP. Diễn đạt lại (giữ ý, bỏ hai cụm gây nhầm) thì cả hai ra 13 leg full-stack, nhưng có
+  `brand.decide` trong khi nivo đã có brand duyệt (rev 1, 21/9) → trái điều kiện của thầy, KHÔNG persist.
+  Phiên fork sửa cả hai lỗi planner (ưu tiên spec-foundation, điều kiện brand) trong nhánh mới.
+  Prompt đã diễn đạt lại dùng để persist: bỏ "SRS/SDS còn thiếu" → "chốt nốt quyết định nghiệp vụ và kiến
+  trúc"; bỏ câu nhánh refactor WIP khỏi prompt modules (WIP chỉ tham khảo, ghi ở đây).
+
+- 05:20 Lane Q (routing theo độ khó của phiên fork) xanh nhưng HOÃN merge tới sáng: nó đổi route của mọi op
+  cho hai kernel đang chạy; việc suy nghĩ sẽ thử claude-agent trước, mà Claude Code trên máy chưa xong
+  onboarding (probe quota vẫn báo ok, không thấy màn onboarding) → mỗi dispatch think bị readiness từ
+  chối, nghỉ 5 phút, rồi vẫn sang codex; implement medium chuyển sang qwen3.8-flash giữa các vòng sửa
+  audit. Sáng: thầy xong onboarding Claude Code → merge lane Q (trial merge chỉ conflict
+  tests/config.spec.mjs) → thầy quyết pin kernel.
+
+### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
+
+| Nhóm | Số | Bản chất | Hướng vá |
+|---|---|---|---|
+| Audit/e2e/integration fail thật | ~20 | vòng chất lượng bắt lỗi sản phẩm | giữ |
+| Chết không report | 27 | hạ tầng: dispatch reject, worker chết, đêm nay lỗi `--parent` | đã vá `--parent`, rejectDispatch đóng terminal (L) |
+| Ask bị tính failed | ~16 | outcome `ask` settle thành blocked, đốt attempt, thổi phồng tỉ lệ hỏng | ask là trạng thái chờ: settle `awaiting-owner`, không tốn attempt |
+| Dispatch khi điều kiện chưa đủ | ~7 | SRS/SDS todo, record audit chưa có, lineage draw chưa có | `api dispatch` kiểm `route.prerequisites` trước khi spawn |
+| `provision.ask` không nói rõ hỏi gì | 5 | kernel gọi op hỏi mà không đưa câu hỏi → `QUESTION_UNCLEAR` | enqueue `provision.ask` bắt buộc params câu hỏi có cấu trúc |
+| Sai công cụ theo provider | 3 | ImageGen/trình duyệt giao cho agent không có | route lọc `riskHints host-tool-required` theo capability agent card |
+| Sai owned path | 1 | | |
+
+Phát hiện lớn nhất: quyền uỷ nhiệm của thầy không tồn tại trong runtime, nên op draw AUTH a5 từ
+chối câu trả lời A+A của supervisor. Vá `dab1859b8`: `config.yaml delegation` (asks, until,
+excludes), packet mang `owner_delegation`, serve-ask ghi `answeredBy`. Op cũng cảnh báo Desktop A
+có nguy cơ trái anatomy Grammar; supervisor sẽ chọn B+B khi ask mới lên để audit sau không fail cứng.
+
 Mở:
 - AUTH chờ hai gate của thầy: chọn direction login (form `ctx_1db4e4509029` đã `dead`, cần
   kernel re-serve khi thầy dậy) và chạy assisted OAuth run-04 (Docker đã bật; cần `npm run

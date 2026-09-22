@@ -138,3 +138,19 @@ test('the skill keeps secrets in the browser and delegates verdict/report ingest
   assert.match(skill,/ok.*fail.*cancel/s);assert.match(skill,/never opens `\.starciwork\/runtime\.sqlite`/i);
   assert.ok(skill.includes(PROTOCOL_PREFIX.replace(/@/g,'@'))||skill.includes('STARCI_ASSISTED_UAT_PROTOCOL'));
 });
+
+test('on Windows npm and npx launch through node and npm-cli, never a .cmd shim Node refuses to spawn',async()=>{
+  const {launchFor}=await import('../scripts/uat/assisted-runner.mjs');
+  const node=['C:','Program Files','nodejs','node.exe'].join(path.win32.sep);
+  const npx=launchFor(['npx','playwright','test','--headed'],{platform:'win32',execPath:node});
+  assert.equal(npx.file,node);
+  assert.equal(npx.args[0],['C:','Program Files','nodejs','node_modules','npm','bin','npx-cli.js'].join(path.win32.sep));
+  assert.deepEqual(npx.args.slice(1),['playwright','test','--headed']);
+  assert.equal(launchFor(['npm','run','uat'],{platform:'win32',execPath:node}).args[0].endsWith('npm-cli.js'),true);
+  assert.deepEqual(launchFor(['node','cli.js'],{platform:'win32',execPath:node}),{file:node,args:['cli.js']});
+  assert.deepEqual(launchFor(['npx','playwright'],{platform:'linux',execPath:'/usr/bin/node'}),{file:'npx',args:['playwright']});
+  const real=launchFor(['npx','--version']);
+  const r=(await import('node:child_process')).spawnSync(real.file,real.args,{encoding:'utf8',windowsHide:true});
+  assert.equal(r.error,undefined,'npx launches on this host without spawn EINVAL');
+  assert.equal(r.status,0);
+});

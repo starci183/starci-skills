@@ -35,6 +35,11 @@ parallel: {gear: 1}
 # script default; --interval-ms on the command line wins over this key.
 supervisor:
   pollIntervalMs: null
+# delegation — while the owner is away, a named delegate (e.g. the supervisor chat) may
+# answer owner asks until the given time; excluded classes stay owner-only. null = none.
+#   delegation: {asks: supervisor, until: 2026-09-23T09:00:00+07:00,
+#     excludes: [credentials, oauth-consent, payments, legal, payment-provider]}
+delegation: null
 # budgets — owner-declared ceilings surfaced by every plan before `ok`, so the
 # envelope the owner approves shows the caps the kernel was configured with.
 # Null = unbounded. These are caps, not targets.

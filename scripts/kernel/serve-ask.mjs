@@ -35,7 +35,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
-import { loadConfig } from '../../engine/config.mjs';
+import { loadConfig, activeDelegation } from '../../engine/config.mjs';
 
 // The form speaks the owner's language (config.yaml `language`). Unknown
 // languages fall back to English; the op writes the question itself in the
@@ -561,6 +561,18 @@ const main = async () => {
         const mirror = mirroredPick(question, pickGroupsOf(question, images));
         const mirroredIdx = mirror ? mirror.choices.findIndex((c) => String(c.id) === params.get(`pick:${mirror.id}`)) : -1;
         const optionIdx = params.get('option') ?? (mirroredIdx >= 0 ? String(mirroredIdx) : null);
+        // answered_by: absent means the owner. A delegate may answer only while
+        // config.yaml delegation names it and has not expired.
+        const answeredBy = (params.get('answered_by') || 'owner').trim();
+        let delegation = null;
+        if (answeredBy !== 'owner') {
+          try { delegation = activeDelegation(); } catch { delegation = null; }
+          if (!delegation || delegation.asks !== answeredBy) {
+            res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+            res.end(`answered_by ${answeredBy} is not an active owner delegate (config.yaml delegation)`);
+            return;
+          }
+        }
         const picks = {};
         for (const p of pickGroupsOf(question, images)) {
           const v = params.get(`pick:${p.id}`);
@@ -574,13 +586,14 @@ const main = async () => {
           workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
           option: optionIdx != null ? (() => { const o = (question.options ?? [])[Number(optionIdx)]; return o == null ? null : (typeof o === 'string' ? o : o.label ?? null); })() : null,
           picks: Object.keys(picks).length ? picks : null,
+          answeredBy, ...(delegation ? { delegation } : {}),
           custodyWritten, envWritten, pointersWritten, bridge, errors,
           note: params.get('note') || null, at: new Date().toISOString(),
         };
         fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
         ledger.transaction(() => ledger.appendEvent({
           workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
-          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, custodyWritten, envWritten, pointersWritten, errors },
+          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy, custodyWritten, envWritten, pointersWritten, errors },
         }));
         const wake = wakeKernel(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });

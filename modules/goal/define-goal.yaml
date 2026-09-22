@@ -30,19 +30,21 @@ input:
     project mode: a name resolved through
     <source>/.workspaces/projects/<name>/work.json
     (starci/workspace-binding@1), where <source> is the repository containing
-    this .claude. Each repositories.<role>.pathFromSource resolves to a project
+    this .claude, or STARCI_SOURCE_ROOT when set. Each repositories.<role>.pathFromSource resolves to a project
     repository — all of them are cold-scanned by --plan — and work.ownerRole
     names the repository that owns the project ledger: the goal persists to
     <owner-repo>/.starciwork/runtime.sqlite, never to the host repo that holds
     .claude/.workspaces. Mutually exclusive with repo.
   title: optional short name; derived from the prompt when absent
   plan: >-
-    dry-run flag. Prints the plan table and writes nothing: STATE (per-repo
-    cold signals from scripts/goal/assess.mjs --repo <each repo in scope>
-    --json — degrades to 'assess unavailable' when the script is absent or
+    dry-run flag. Prints the plan table and writes nothing: STATE (one line per
+    role summarizing that role's own repository from scripts/goal/assess.mjs
+    --repo <each repo in scope> --json — files, loc, test framework, starciwork
+    present — degrading to 'assess unavailable' when the script is absent or
     fails, never blocks), GOAL text, OP CHAIN (the derived legs, each mapped to
     a cold tier estimate easy=15m / medium=45m / hard=90m, labelled 'estimate
-    is cold'), WILL-WRITE list and the resolved ledger path. The skill shows
+    is cold'; `underivable (kernel will derive at boot)` with route-plan's
+    reason when it forms no chain), WILL-WRITE list and the resolved ledger path. The skill shows
     the table to the owner; only an explicit ok re-runs without --plan, which
     is the run that persists.
   revise: >-
@@ -60,7 +62,7 @@ input:
 derives:
   goal_markdown: the goal statement rendered from the prompt
   goal_identity: sha256(markdown) — the identity every later generation must match
-  op_chain: 'route-plan output: ordered op legs with per-leg produces/consumes; stored in goals.json — the kernel re-derives at boot and diffs, never trusts it blindly'
+  op_chain: 'route-plan output when its status is ok: ordered op legs with per-leg produces/consumes; stored in goals.json — the kernel re-derives at boot and diffs, never trusts it blindly. Any other status stores opChain null plus underivable {status, reason}.'
   assess: 'per-repo cold signals from scripts/goal/assess.mjs (--repo <p> [--repo <p2>] --json); plan-only, advisory, null when unavailable'
 
 writes:
