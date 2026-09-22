@@ -971,6 +971,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 08:10 Yên. Collab architecture.decide 8 slice done; WSPV implement a31 done, kernel đang xử lý (transition-ready);
   Modules business.decide a10 partial, chờ op; AUTH owner-gate 4 + dependency 3, idle-waiting đúng. Không vá gì.
 
+- 08:25 WSPV transition-ready 13 phút mà kernel báo active: câu tóm tắt "Running now:" của kernel bị đọc như spinner,
+  nên wake theo report và watchdog đều bỏ qua. Vá `667195c4c` (từ trạng thái + ":"/"now" là văn xuôi) + spec; đã đánh
+  thức WSPV, kernel đang chạy. Modules đã tiêu thụ báo cáo, chạy 7 op song song và dọn bản ghi scope lạc. AUTH, Collab chờ đúng.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
