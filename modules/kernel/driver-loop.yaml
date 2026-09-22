@@ -502,7 +502,11 @@ verdictTable:
       (first free port in 6969..7069, nonce path), writes submitted values to
       sealed custody/.env.local without any agent seeing them, files a
       sanitized `ask-answered` event, and wakes the kernel. The ask leg stays
-      parked meanwhile; runnable frontier ops keep driving.
+      parked meanwhile; runnable frontier ops keep driving. `api status`
+      awaitingOwner[] lists every op whose latest attempt waits on the owner
+      and whether its ask is answered; an answered one is re-enqueued, and
+      that attempt spends no business retry (verdict-contract.yaml
+      retryAccounting.ownerWait).
     citation: "modules/models/kinds.yaml routes; modules/kernel/verdict-contract.yaml BLOCKER_KINDS; modules/ops/ops/provision.ask.yaml"
 
   - verdict: suspicion      # the mid-flight wrongness signal

@@ -87,6 +87,14 @@ test('only explicit no-effect infrastructure failures resume without consuming b
   assert.equal(retryDisposition(refused).resumable,false,'no-effect alone is not enough without durable reusable classification');
 });
 
+test('an attempt settled awaiting-owner advances the durable attempt but spends no business retry',()=>{
+  const asked={job_id:'ask1',attempt:3,payload_json:JSON.stringify({retry:{businessAttempt:2}}),result_json:JSON.stringify({verdict:'awaiting-owner',kernelVerdict:'blocked'})};
+  assert.deepEqual(retryDisposition(asked),{retryClass:'owner-answer',effectState:'unknown',resumable:false,consumesBusinessRetry:false});
+  assert.deepEqual(deriveRetryLineage(asked),{retryOf:'ask1',resumeOf:null,attempt:4,businessAttempt:2,retryClass:'owner-answer',effectState:'unknown',resumed:false,reusesDurableAttempt:false,consumesBusinessRetry:false});
+  const blocked={job_id:'b1',attempt:1,result_json:JSON.stringify({verdict:'blocked'})};
+  assert.equal(retryDisposition(blocked).consumesBusinessRetry,true,'a typed blocker is still a business attempt');
+});
+
 test('workspace.manage derives explicit migration slices instead of claiming broad workspace roots',()=>{
   const file=path.resolve(import.meta.dirname,'../modules/ops/ops/workspace.manage.yaml');
   const policy=parseYaml(fs.readFileSync(file,'utf8')).policy.modePolicy.ownershipDerivation;

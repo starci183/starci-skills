@@ -26,6 +26,9 @@ forbidden:
   - unsupervised-dispatch-inject-as-success
 capabilities:
   schema: starci/claude-capabilities@1
+  # Evidence, nivo ledger 2026-09-23: claude-agent never ran interface.draw or interface.audit, so neither
+  # image_gen.imagegen nor browser-dom is proven; a tool is listed here after a settled pass shows it.
+  hostTools: []
   orca:
     nativeManagedAgent: supported
     agentId: claude

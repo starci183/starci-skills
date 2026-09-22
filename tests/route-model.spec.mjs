@@ -70,11 +70,11 @@ test('--kind model.manageWorkflow --risk high resolves or fails typed, never sil
   }
 });
 
-test('kindRequires capability gate: interface.draw cannot be hoisted onto a pool without imagegen',t=>{
+test('host-tool gate: interface.draw cannot be hoisted onto a pool whose agent lacks image_gen.imagegen',t=>{
   // regression: prefer devin-agent hoisted devin ahead of codex on
   // interface.draw, whose contract requires built-in image_gen.imagegen that
-  // only the codex pool provides — one burned dispatch. kindRequires makes the
-  // rejection structural and named.
+  // only the codex agent card lists — one burned dispatch. route.riskHints
+  // host-tool-required + capabilities.hostTools make the rejection structural and named.
   const ownerRoot=fixture(t).dir();
   // interface.draw is think work, so a non-frontier pool is not on its chain at all; the frontier pool
   // without imagegen is on it and must be rejected by name.

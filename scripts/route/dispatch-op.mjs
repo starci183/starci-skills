@@ -73,8 +73,10 @@ function paramValueError(name, def, value) {
  *  it may set a `setBy: kernel` param outright and may relay an owner param only
  *  when the leg already names it. An undeclared name, a wrong type, a value
  *  outside its bounds or a setter that has no authority is a refusal — the
- *  kernel never guesses a tunable it was not given. */
-export function resolveOpParams(opDoc, { leg = null, flag = null } = {}) {
+ *  kernel never guesses a tunable it was not given. A `required: true` param
+ *  has no default: with `enforceRequired` (enqueue) its absence is refused;
+ *  without it (a packet rendered for a job enqueued earlier) it is omitted. */
+export function resolveOpParams(opDoc, { leg = null, flag = null, enforceRequired = false } = {}) {
   const declared = opDoc?.params && typeof opDoc.params === 'object' ? opDoc.params : {};
   const legValues = leg && typeof leg === 'object' ? leg : {};
   const flagValues = flag && typeof flag === 'object' ? flag : {};
@@ -96,8 +98,18 @@ export function resolveOpParams(opDoc, { leg = null, flag = null } = {}) {
     }
   }
 
+  const missing = Object.entries(declared).filter(([name, def]) => def?.required === true && !Object.hasOwn(overrides, name));
+  if (enforceRequired && missing.length) {
+    const [name, def] = missing[0];
+    const via = def.setBy === 'owner' ? 'the approved goal leg (define-goal --params)' : `--params '{"${name}": <${def.type}>}'`;
+    return { ok: false, reason: 'params-invalid', param: name,
+      detail: `${opDoc?.id ?? 'this op'} requires params.${name} (${def.type}, set by ${def.setBy}): ${def.doc?.en ?? ''} — none was given; re-run enqueue with ${via}` };
+  }
   const params = {};
-  for (const [name, def] of Object.entries(declared)) params[name] = Object.hasOwn(overrides, name) ? overrides[name] : def.default;
+  for (const [name, def] of Object.entries(declared)) {
+    if (Object.hasOwn(overrides, name)) params[name] = overrides[name];
+    else if (Object.hasOwn(def ?? {}, 'default')) params[name] = def.default;
+  }
   return { ok: true, params, overrides };
 }
 

@@ -56,10 +56,22 @@ test('an unknown top-level key, a missing section and a wrong id are SCHEMA_INVA
   assert.ok(checkFixture(misnamed).findings.some((f) => f.code === 'SCHEMA_INVALID' && /but the file is/.test(f.message)));
 });
 
-test('a param without a default or with an unknown setter is SCHEMA_INVALID', () => {
+test('a param carries a default or required: true, exactly one, and a known setter', () => {
   const undefaulted = validOp();
   undefaulted.params = { maxRounds: { type: 'integer', setBy: 'kernel', doc: { en: 'How many rounds.' } } };
-  assert.ok(checkFixture(undefaulted).findings.some((f) => f.code === 'SCHEMA_INVALID' && /missing default/.test(f.message)));
+  assert.ok(checkFixture(undefaulted).findings.some((f) => f.code === 'PARAM_DEFAULT' && /neither/.test(f.message)));
+
+  const both = validOp();
+  both.params = { subject: { type: 'string', default: 'x', required: true, setBy: 'kernel', doc: { en: 'What is asked.' } } };
+  assert.ok(checkFixture(both).findings.some((f) => f.code === 'PARAM_DEFAULT' && /both/.test(f.message)));
+
+  const required = validOp();
+  required.params = { subject: { type: 'string', required: true, setBy: 'kernel', doc: { en: 'What is asked.' } } };
+  assert.deepEqual(checkFixture(required).findings, [], 'a required param without a default holds the shape');
+
+  const falseRequired = validOp();
+  falseRequired.params = { subject: { type: 'string', default: 'x', required: false, setBy: 'kernel', doc: { en: 'What is asked.' } } };
+  assert.ok(checkFixture(falseRequired).findings.some((f) => f.code === 'SCHEMA_INVALID' && /required/.test(f.message)), 'required is true or absent');
 
   const strangeSetter = validOp();
   strangeSetter.params = { maxRounds: { type: 'integer', default: 5, setBy: 'agent', doc: { en: 'How many rounds.' } } };

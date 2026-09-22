@@ -305,7 +305,8 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
   interface.audit:
     skill: starci
-    # Visual/Grammar conformance is an independent verdict about quality: think work.
+    # Visual/Grammar conformance is an independent verdict about quality: think work. Its browser-dom host
+    # tool (route.riskHints) admits only a pool whose agent card lists it (capabilities.hostTools).
     chain: [claude-agent, codex-agent]
     environments:
       - {environment: claude, profiles: [claude-agent]}

@@ -29,7 +29,6 @@ launch:
     dispatch: return-preamble-and-send
     adapter: qwen
     nestedAgents: forbidden
-  imageGeneration: false      # both profiles false in registry.yaml targets
 
 position:
   automaticChains: excluded   # costPolicy, verbatim

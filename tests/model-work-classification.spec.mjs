@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../engine/yaml.mjs';
-import {kindRoute,raiseToFloor,selectPool} from '../scripts/agent/models.mjs';
+import {hostToolsRequired,kindRoute,raiseToFloor,selectPool} from '../scripts/agent/models.mjs';
 
 // runtimes.yaml roleOfKind is the allocator's reading of every kind: role, think/hands-on work and the
 // least difficulty it routes at. These specs hold the owner's rules on that table: canonical-record and
@@ -66,8 +66,8 @@ test('think kinds resolve to a frontier model at every difficulty, Claude first 
   for(const kind of thinkKinds)for(const difficulty of DIFFICULTY){
     const up=selectPool({kind,difficulty,runtimes});
     assert.ok(FRONTIER.has(up.modelId),`${kind}@${difficulty} -> ${up.target}/${up.modelId}`);
-    const needsImage=(runtimes.kindRequires?.[kind]??[]).length>0;
-    assert.equal(up.target,needsImage?'codex-agent':'claude-agent',`${kind}@${difficulty} leads with Claude unless a capability forbids it`);
+    const needsTool=hostToolsRequired(kind).length>0;
+    assert.equal(up.target,needsTool?'codex-agent':'claude-agent',`${kind}@${difficulty} leads with Claude unless a host tool forbids it`);
     const down=selectPool({kind,difficulty,runtimes,capacity:claudeDown});
     assert.deepEqual([down.target,down.modelId],['codex-agent','gpt-6-sol'],`${kind}@${difficulty} with Claude down`);
   }
@@ -109,7 +109,7 @@ test('hands-on orders lead with Qwen and Devin, overflow to Codex then Claude, a
   const registry=read('modules/models/registry.yaml');
   for(const kind of handsOnKinds){
     const chain=registry.operators[kind]?.chain;
-    if(!chain||(runtimes.kindRequires?.[kind]??[]).length)continue;
+    if(!chain||hostToolsRequired(kind).length)continue;
     assert.ok(['qwen-agent','devin-agent'].includes(chain[0]),`${kind} chain ${chain} must lead with Qwen or Devin`);
     assert.deepEqual(chain.slice(-2),['codex-agent','claude-agent'],`${kind} overflows to Codex then Claude`);
   }
@@ -117,7 +117,7 @@ test('hands-on orders lead with Qwen and Devin, overflow to Codex then Claude, a
 
 test('hands-on kinds land on Qwen or Devin below insane when those pools have room',()=>{
   for(const kind of handsOnKinds){
-    if((runtimes.kindRequires?.[kind]??[]).length)continue;
+    if(hostToolsRequired(kind).length)continue;
     for(const difficulty of ['easy','medium','hard']){
       const r=selectPool({kind,difficulty,runtimes});
       assert.ok(['qwen-agent','devin-agent'].includes(r.target),`${kind}@${difficulty} -> ${r.target}`);

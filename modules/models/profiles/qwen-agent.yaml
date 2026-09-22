@@ -49,7 +49,7 @@ business:
   whenNot:
     - Think work — canonical records and quality verdicts run on the frontier pools only.
     - Hard and insane work — the pool pins no model there, so a hard floor starts the order at Devin.
-    - Image routes — no imageGeneration on any profile.
+    - Host-tool routes — the qwen agent card lists no host tool (modules/models/agents/qwen.yaml capabilities.hostTools).
     - Any work needing nested/sub agents — the `agent` tool is excluded and nestedAgents is forbidden.
   pickedBy: >-
     Allocator by role + tier; chains place it first for execution kinds and the

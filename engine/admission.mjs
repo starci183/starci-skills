@@ -105,20 +105,26 @@ const object=value=>{
 const payloadOf=job=>object(job?.payload??job?.payload_json);
 const resultOf=job=>object(job?.result??job?.result_json);
 
+/** The settled verdict of an attempt that asked the owner and waits for the answer. */
+export const AWAITING_OWNER='awaiting-owner';
+
 /**
  * Classify a settled attempt for retry accounting. Infrastructure is free only when the durable result
  * explicitly proves `effectState: none`; unknown or partial effects consume the ordinary business budget.
+ * An attempt settled `awaiting-owner` asked a question and did not fail: its successor is a new durable
+ * attempt (the ask attempt ran) that spends no business retry.
  */
 export function retryDisposition(job){
   const result=resultOf(job),reason=String(result.reason??'');
   const infrastructure=result.retryClass==='infrastructure'||reason==='dispatch-rejected'||reason==='provider-unavailable';
   const explicitlyReusable=(result.retryable===true&&result.attemptConsumed===false)||result.retryClass==='infrastructure';
   const noEffect=infrastructure&&result.effectState==='none'&&explicitlyReusable;
+  const ownerAnswer=!noEffect&&result.verdict===AWAITING_OWNER;
   return {
-    retryClass:noEffect?'infrastructure':'business',
+    retryClass:noEffect?'infrastructure':ownerAnswer?'owner-answer':'business',
     effectState:result.effectState??'unknown',
     resumable:noEffect,
-    consumesBusinessRetry:!noEffect,
+    consumesBusinessRetry:!noEffect&&!ownerAnswer,
   };
 }
 

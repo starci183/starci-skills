@@ -29,7 +29,6 @@ capacity:
 
 launch:
   orca: {kind: managed-agent, agent: claude}   # registry.yaml orcaLaunch — worker-start path
-  imageGeneration: false        # runtimes.yaml: claude-agent provides no imagegen
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 
@@ -41,7 +40,7 @@ business:
     - The [Kernel] seat — config.example.yaml pins `kernel.model: claude-opus-5-5`.
     - Hands-on overflow when the Qwen, Devin and Codex pools cannot take the work (prefer-then-overflow, runtimes.yaml allocation.policy).
   whenNot:
-    - "Image-generation routes: the pool provides no imagegen — interface.draw/interface.asset never route here (runtimes.yaml kindRequires)."
+    - "Host-tool routes: the agent card lists no host tool, so interface.draw/interface.asset (image_gen.imagegen) and interface.audit (browser-dom) pass it for codex-agent (route.riskHints host-tool-required, modules/models/agents/claude.yaml capabilities.hostTools)."
     - "Hands-on work as first pick: every hands-on order puts it last, keeping Opus for thinking."
   pickedBy: >-
     The kernel allocator via role preference + tier + qualification (selection.yaml);

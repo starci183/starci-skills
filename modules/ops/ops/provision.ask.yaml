@@ -12,6 +12,13 @@ goal:
     a live page) is a human-gated UAT checkpoint and belongs to `uat.assisted.{prepare,verify}` with
     an evidence receipt, not to a provision ask."
 params:
+  subject:
+    type: string
+    required: true
+    setBy: kernel
+    doc:
+      en: The one-sentence provision or decision this ask requests from the owner, as the asking operation
+        raised it.
   minOptions:
     type: integer
     default: 2
@@ -29,7 +36,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: question
-    path: the operation goal (section 'Question for the owner') and the operation that asked it
+    path: params.subject in the packet, and the operation that asked it
     purpose:
       en: Read what is asked for exactly as it was raised - which operation, what it blocks, which kind of
         provision (credential, account, dataset, authority, irreversible) - before anything is

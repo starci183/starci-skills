@@ -172,3 +172,38 @@ test('the dispatch packet carries the brief defaults with the overrides on top',
   assert.match(body.prompt, new RegExp(`params: .*${owned.name}=${chosen}`),
     'the agent prompt must state the resolved values');
 });
+
+// provision.ask must say what it asks: params.subject is required of the kernel
+// at enqueue and has no default a missing question could hide behind.
+test('provision.ask declares params.subject as a required kernel string', () => {
+  const def = briefOf('provision.ask').params.subject;
+  assert.deepEqual([def.type, def.required, def.setBy, Object.hasOwn(def, 'default')], ['string', true, 'kernel', false]);
+  const refused = resolveOpParams(briefOf('provision.ask'), { enforceRequired: true });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, 'params-invalid');
+  assert.equal(refused.param, 'subject');
+  assert.match(refused.detail, /params\.subject/);
+  assert.match(refused.detail, /--params '\{"subject"/);
+  const legacy = resolveOpParams(briefOf('provision.ask'), {});
+  assert.equal(legacy.ok, true, 'a job enqueued before the param existed still renders a packet');
+  assert.equal(Object.hasOwn(legacy.params, 'subject'), false);
+});
+
+test('enqueue refuses provision.ask without params.subject and says how to re-enqueue', (t) => {
+  const fx = fixture(t), repo = fx.repo(), wf = 'wf-params-ask';
+  seedGoal(repo, wf, [{ seq: 1, op: 'provision.ask' }]);
+  const r = runApi('enqueue', '--repo', repo, '--workflow', wf, '--op', 'provision.ask', '--paths', '.starciwork/features/x/decision', '--json');
+  assert.equal(r.status, 1, `expected a refusal, got ${r.status}: ${r.stdout}`);
+  const refusal = out(r);
+  assert.deepEqual([refusal?.ok, refusal?.reason, refusal?.param], [false, 'params-invalid', 'subject']);
+  assert.match(refusal.detail, /re-run enqueue with --params/);
+  assert.equal(read(repo, (l) => l.db.prepare('SELECT COUNT(*) n FROM jobs WHERE workflow_id=?').get(wf).n), 0);
+
+  const subject = 'Which payment provider should checkout use: SePay or VNPAY?';
+  const ok = out(runApi('enqueue', '--repo', repo, '--workflow', wf, '--op', 'provision.ask', '--paths', '.starciwork/features/x/decision',
+    '--params', JSON.stringify({ subject }), '--json'));
+  assert.equal(ok?.params?.subject, subject);
+  const body = out(runApi('dispatch', '--repo', repo, '--job', ok.job_id, '--json'));
+  assert.equal(body?.packet?.params?.subject, subject, 'the packet carries the question');
+  assert.match(body.prompt, /params: .*subject="Which payment provider/, 'the op prompt shows what it asks');
+});

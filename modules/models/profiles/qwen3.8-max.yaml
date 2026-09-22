@@ -25,7 +25,6 @@ launch:
     dispatch: return-preamble-and-send
     adapter: qwen
     nestedAgents: forbidden
-  imageGeneration: false
 
 position:
   automaticChains: excluded   # registry.yaml selection + costPolicy: "Qwen 3.8 Max
