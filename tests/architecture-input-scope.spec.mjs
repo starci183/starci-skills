@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createRequire} from 'node:module';
-import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
+import {checkScopedLint,settingMatches} from '../scripts/checks/check-scoped-lint.mjs';
 import {checkArchitecture} from '../scripts/checks/architecture/index.mjs';
 
 function fixture(t){
@@ -135,4 +135,12 @@ test('real broad TypeScript programs retain explicit configuration roles without
   report=await checkScopedLint(f.root,[],options);
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
   assert.ok(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files.includes('jest.config.ts'));
+});
+
+test('an effective setting that only adds a rule\'s own ESLint defaultOptions still matches the expected setting',()=>{
+  assert.equal(settingMatches([2,{}],[2],[{}]),true,'no-console folds its [{}] default into the effective config');
+  assert.equal(settingMatches([2,{default:'generic',readonly:'generic'}],[2,{default:'generic',readonly:'generic'}],[{default:'array'}]),true);
+  assert.equal(settingMatches([2,{allow:['warn']}],[2],[{}]),false,'options beyond the defaults stay a mismatch');
+  assert.equal(settingMatches([1,{}],[2],[{}]),false,'severity never folds');
+  assert.equal(settingMatches([2,{}],[2],undefined),false,'without declared defaults the comparison stays exact');
 });

@@ -180,7 +180,8 @@ function parseContract(repository, bound, document = readContract(repository)) {
     if (!['undefined', 'null', 'nullish'].includes(entry.absence)) throw Error(`${label}.absence must be undefined, null or nullish.`);
     return { id: entry.id, owner: bind(entry.owner, `${label}.owner`), binding: entry.binding, absence: entry.absence };
   });
-  const transports = array(contract.transports, 'errorState.transports').map((transport, index) => {
+  // A transport-free app declares no roots; architecture frontend.transport roots stay inventoried regardless.
+  const transports = array(contract.transports, 'errorState.transports', { nonempty: false }).map((transport, index) => {
     const label = `errorState.transports[${index}]`;
     exactKeys(transport, ['root', 'mode', 'envelopeIds'], label);
     const root = exactRelative(transport.root, `${label}.root`);

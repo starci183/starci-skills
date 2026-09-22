@@ -322,7 +322,7 @@ profiles:
         status: implemented
       - id: NEST-FEATURE-FILE-SHAPE
         sourceRuleIds: [BE-FOLDER-2, BE-FOLDER-5, BE-FOLDER-6, BE-NAMING-1, BE-NAMING-2, BE-NAMING-4, BE-NAMING-7, BE-NAMING-8]
-        applicability: { include: ['src/features/**/*.{ts,mts,cts,tsx}', 'src/modules/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts'] }
+        applicability: { include: ['src/features/**/*.{ts,mts,cts,tsx}', 'src/modules/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.{spec,test}.{ts,mts,cts,tsx}', '**/*-{spec,test}.{ts,mts,cts,tsx}', '**/__tests__/**'] }
         mechanical:
           requirement: Enforce adopted feature/application/transport placement and filename, class, enum, type and GraphQL surface syntax.
           check: { kind: architecture, ruleIds: [BE_FEATURE_LAYOUT_INVALID, BE_SOURCE_NAME_INVALID] }
