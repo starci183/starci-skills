@@ -138,6 +138,11 @@ export async function watchdogTick() {
   const outputAgeMs = lastOutputAt == null ? null : Math.max(0, Date.now() - lastOutputAt);
 
   if (classified.state === 'turn-idle') {
+    // A kernel waiting on the owner or on a running op has nothing to do; waking
+    // it every tick only burns a turn. Wake only when status says the Kernel
+    // can move something now (frontier.actionable).
+    const actionable = status.value?.frontier?.actionable;
+    if (actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
     if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', outputAgeMs };
     const sent = terminalSend({ terminal, text: buildWakePrompt(workflowId), enter: true });
     return {
