@@ -150,7 +150,10 @@ test('the canon kit version has one owner: each shape cites the exact version co
 // End to end: materialise each shape exactly as a scaffold must, install it, and run every gate the
 // scaffold proof runs - the runtime's own check-scoped-lint included - so a baseline edit cannot drift
 // from the checker again. check-scoped-lint loads the target's own ESLint, canon kit and TypeScript, so
-// it needs node_modules; this test skips only when the npm registry is unreachable.
+// it needs node_modules and minutes of install time, so it runs only when STARCI_E2E_BASELINE=1 (the
+// release checklist in docs/releasing.md runs it before tagging), and then skips only when the npm
+// registry is unreachable.
+const E2E = process.env.STARCI_E2E_BASELINE === '1';
 const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const OFFLINE = /\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUNREACH)\b/;
 const registryResolves = () => dns.lookup('registry.npmjs.org').then(() => true, () => false);
@@ -198,6 +201,7 @@ async function bootsAndAnswers(cwd, script) {
 describe('each baseline shape materialises into a repository every gate accepts', { concurrency: 2 }, () => {
   for (const [profile, start] of [['nest', 'start:prod'], ['next', 'start']]) {
     it(`${profile}: install, check-scoped-lint, typecheck, lint, test, build and ${start} all pass`, { timeout: 900_000 }, async t => {
+      if (!E2E) { t.skip('set STARCI_E2E_BASELINE=1 to materialise, install and run every gate on this shape'); return; }
       const offline = 'npm registry unreachable: the target-local toolchain cannot be installed';
       if (!await registryResolves()) { t.skip(offline); return; }
       const root = fs.mkdtempSync(path.join(os.tmpdir(), `sbl-${profile}-`));

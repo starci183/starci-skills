@@ -10,6 +10,8 @@ npm run check   # node --check on every .mjs, ops registry regen check, host con
 npm test        # node --test tests/*.spec.mjs
 ```
 
+Before tagging, run `STARCI_E2E_BASELINE=1 node --test tests/repository-baseline.spec.mjs`. It materialises the nest and next repository baselines, installs them from the npm registry, and requires check-scoped-lint, typecheck, lint, tests, build and the start script's `/health/live` to pass; plain `npm test` skips it because it takes minutes and needs the network.
+
 Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
 
 ## Make an archive
