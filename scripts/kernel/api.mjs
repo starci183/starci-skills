@@ -63,6 +63,7 @@ import { classifyAgentScreen } from './terminal-liveness.mjs';
 import { selectPool, resolveLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
+import { opInputPaths, recordInputs, staleInputs, staleOperationsOf } from './input-digests.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
@@ -1752,6 +1753,13 @@ function cmdDispatch(ledger, args, repo) {
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams });
+  // The law inputs this attempt binds, digested now so survey/status can say
+  // when one changed under a settled result (scripts/kernel/input-digests.mjs).
+  // A digest failure records nothing rather than refusing the dispatch.
+  const inputs = (() => {
+    try { return recordInputs(skillRoot, opInputPaths(briefDoc, { params: dispatchParams, mode: payload.mode ?? dispatchParams.mode ?? null })); }
+    catch { return null; }
+  })();
   const priorFailures = job.attempt > 1 ? (() => {
     const row = db.prepare('SELECT attempt, checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC LIMIT 1')
       .get(job.workflow_id, op, job.attempt);
@@ -1866,7 +1874,7 @@ function cmdDispatch(ledger, args, repo) {
   // Managed-agent launch (managed-agent / native-managed-agent): the run →
   // task → worker-start → return-preamble → attest pipeline owns this profile.
   if (MANAGED_KINDS.includes(model.kind)) {
-    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve });
+    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs });
   }
   if (model.kind !== 'command-terminal') {
     throw Object.assign(new Error(`spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`), { code: 'managed-agent' });
@@ -1978,7 +1986,7 @@ function cmdDispatch(ledger, args, repo) {
     const now = Date.now();
     fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
-      context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing } },
+      context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(handle, JSON.stringify(payload), now, jobId);
@@ -2112,7 +2120,7 @@ const cleanupManagedWorker = (dispatchId) => {
 // path as a dead terminal spawn (job failed + event + infra-provider incident
 // on attestation failures) — after stopping and releasing whatever partial
 // Dispatch the attempt created, per calls.yaml settle-dispatch.
-function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve }) {
+function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, worktree, title, reserve, inputs = null }) {
   const db = ledger.db;
 
   const reconcileFailure = (effectState, dispatchId) => {
@@ -2249,7 +2257,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     // the dispatch authority; dispatch_id is the worker's Dispatch id.
     fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
-      context: { packet, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing } },
+      context: { packet, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(dispatchId, JSON.stringify(payload), now, jobId);
