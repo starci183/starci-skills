@@ -661,15 +661,15 @@ function planChain({ sstar, s0, ops, prodTable, hints }) {
     tests.needsSatisfiedBy.push(`${scope.legId} (bounded canonicalization scope)`);
     workspace.needsSatisfiedBy.push(`${refactor.legId} (path consumers migrated before canonical root reconstruction)`);
   }
-  // spec-foundation: after the SDS settles, a second workspace.manage leg
-  // declares .starcistacks from its component inventory (the op whose
-  // import-slice ownership and starci-stacks-check cover that root), then
-  // review.verify checks the reconstructed Work and stack roots.
+  // spec-foundation: after the SDS settles, workspace.manage's stacks mode
+  // (the leg instance names the mode; the kernel enqueues params.mode=stacks)
+  // declares .starcistacks from its component inventory, then review.verify
+  // checks the reconstructed Work and stack roots.
   if (hints.specFoundation) {
     const stacks = ensureLeg('workspace.manage', {
       instance: 'stacks',
       forVar: { family: 'workspace', suffix: 'stacks', state: 'managed' },
-      injected: 'declare .starcistacks dev/prod from the settled SDS component inventory (starci-stacks-check)',
+      injected: 'workspace.manage stacks mode (params.mode=stacks): .starcistacks from the settled SDS component inventory',
     });
     const arch = legs.get('architecture.decide');
     if (arch) {

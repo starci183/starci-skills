@@ -118,11 +118,13 @@ function assessRepos(repos) {
 }
 
 // Cold effort tiers for the plan table — no dispatch has run, so each leg's
-// estimate is a class guess, and the table says so ('estimate is cold').
+// estimate is a class guess, and the table says so ('estimate is cold'). The
+// tier is matched on the leg label, so a mode-named instance
+// (workspace.manage#stacks) is classed apart from its op's default mode.
 const COLD_MINUTES = { easy: 15, medium: 45, hard: 90 };
 const COLD_TIER = [
   [/^(provision\.ask|request\.analyze|scope\.define|scope\.finish|decision\.prepare|goal\.revise|workspace\.manage)$/, 'easy'],
-  [/\.(implement|refactor)$|^(integration|e2e|uat)\.verify$|^(release\.deliver|runtime\.operate)$/, 'hard'],
+  [/\.(implement|refactor)$|^(integration|e2e|uat)\.verify$|^(release\.deliver|runtime\.operate|workspace\.manage#stacks)$/, 'hard'],
 ];
 const tierOf = op => COLD_TIER.find(([re]) => re.test(op))?.[1] ?? 'medium';
 
@@ -314,7 +316,7 @@ const willWrite = revisionBase
 if (planOnly) {
   const assess = assessRepos(scanRepos);
   const legs = (chain?.legs ?? []).map(l => {
-    const tier = tierOf(l.op);
+    const tier = tierOf(legLabel(l));
     return { seq: l.seq, op: legLabel(l), tier, estimateMinutes: COLD_MINUTES[tier], ...(l.params ? { params: l.params } : {}) };
   });
   const totalMinutes = legs.length ? legs.reduce((n, l) => n + l.estimateMinutes, 0) : null;

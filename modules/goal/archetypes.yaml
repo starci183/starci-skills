@@ -211,7 +211,7 @@ archetypes:
       - {op: workspace.manage,    leg: workAuthor, note: "import mode: reconstruct the canonical .starciwork in the owner repository from the existing Work source with provenance, source untouched; its setup scope record is the bounded scope, so scope.define is not a leg"}
       - {op: business.decide,     leg: decide,     note: "review and extend the SRS against the vision; imported leaves confirmed to todo"}
       - {op: architecture.decide, leg: decide,     note: "SDS/contracts/integrations for every feature, including the component inventory the stacks declare"}
-      - {op: workspace.manage,    leg: workAuthor, note: "stacks instance: declare .starcistacks dev/prod from the settled component inventory and run starci-stacks-check — workspace.manage is the op whose import-slice ownership and layout checks cover .starcistacks"}
+      - {op: workspace.manage,    leg: workAuthor, note: "stacks mode (the kernel enqueues params.mode=stacks): declares the .starcistacks tree for dev and vps (production) from the settled component inventory and passes the stacks check; a frontier-hard leg"}
       - {op: review.verify,       leg: verify,     note: "read-only Work and application-stack conformance checks over the reconstructed roots"}
     exclusions:
       - {op: request.analyze, why: "the approved goal entry is the analyzed intake; workspace.manage consumes it directly"}

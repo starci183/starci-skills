@@ -1423,7 +1423,11 @@ ops:
     family: workspace
     goal: Create or reconstruct one canonical .starciwork workspace from a new purpose or selected
       existing source and old worktrees, with verified bindings, preserved provenance and validated
-      scope.
+      scope, and declar
+    params:
+      mode:
+        default: select
+        setBy: kernel
     nodeKinds:
       - operations
     completionProfile: operations
