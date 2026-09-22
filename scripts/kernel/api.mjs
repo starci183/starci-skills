@@ -39,7 +39,7 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  admitOpSlot, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
+  AWAITING_OWNER, admitOpSlot, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
 } from '../../engine/admission.mjs';
 import {
   activeDelegation, allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
@@ -257,6 +257,22 @@ const goalLegParams = (goal, opId) => {
 };
 const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
+const jobResultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
+/**
+ * A settled attempt that asked the owner a question is a wait, not a failure. Settle records it as
+ * result.verdict `awaiting-owner`; an attempt a kernel settled `blocked` on a filed `ask` report
+ * before that verdict existed reads the same, so its successor is accounted identically.
+ */
+const isAwaitingOwner = (db, row) => {
+  const result = jobResultOf(row);
+  if (result.verdict === AWAITING_OWNER) return true;
+  if (row?.status !== 'failed' || result.verdict !== 'blocked' || !row.op_id) return false;
+  return Boolean(db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' LIMIT 1")
+    .get(row.workflow_id, row.op_id, row.attempt));
+};
+const withOwnerWaitResult = (db, row) => (row && isAwaitingOwner(db, row) && jobResultOf(row).verdict !== AWAITING_OWNER
+  ? { ...row, result_json: JSON.stringify({ ...jobResultOf(row), verdict: AWAITING_OWNER, kernelVerdict: 'blocked' }) }
+  : row);
 const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?.managed?.agentTerminalHandle
   ?? payload?.orca?.agentTerminalHandle
   ?? payload?.hierarchy?.runtime?.terminalHandle
@@ -523,7 +539,8 @@ const agentHierarchyOf = (db, workflowId) => {
     title: workflow.title ?? workflowId, status: workflow.phase ?? null,
     generation: workflow.generation ?? 0,
   };
-  const nodes = db.prepare('SELECT * FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(workflowId).map(hierarchyNodeOf);
+  const nodes = db.prepare('SELECT * FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(workflowId)
+    .map((row) => ({ ...hierarchyNodeOf(row), verdict: isAwaitingOwner(db, row) ? AWAITING_OWNER : (jobResultOf(row).verdict ?? null) }));
   const edges = nodes.map((node) => ({
     parentNodeId: node.parentNodeId,
     childNodeId: node.nodeId,
@@ -738,6 +755,25 @@ function cmdStatus(ledger, args) {
     .map((cause) => [cause, queued.filter((item) => item.queuedBecause === cause).length])
     .filter(([, n]) => n > 0));
 
+  // Settled asks are waits on the owner, projected apart from failures. Only an
+  // op's latest attempt still waits: an older one was already re-enqueued.
+  const failedRows = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id").all(workflowId);
+  const ownerWaits = failedRows.filter((row) => isAwaitingOwner(db, row));
+  const askAnswers = new Map();
+  for (const event of db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') ORDER BY seq").all(workflowId)) {
+    const dispatchId = parseJson(event.payload_json, {})?.dispatchId;
+    if (dispatchId) askAnswers.set(dispatchId, event.kind === 'ask-answered' ? 'answered' : 'superseded');
+  }
+  const latestAttempt = new Map();
+  for (const row of workflowJobs) if (row.op_id) latestAttempt.set(row.op_id, Math.max(latestAttempt.get(row.op_id) ?? 0, row.attempt));
+  const awaitingOwner = ownerWaits.filter((row) => latestAttempt.get(row.op_id) === row.attempt).map((row) => {
+    const dispatchId = jobResultOf(row).askDispatchId
+      ?? db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' ORDER BY created_at DESC LIMIT 1").get(workflowId, row.op_id, row.attempt)?.dispatch_id
+      ?? null;
+    return { jobId: row.job_id, opId: row.op_id, attempt: row.attempt, dispatchId, answer: (dispatchId && askAnswers.get(dispatchId)) ?? 'pending' };
+  });
+  const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
+
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
@@ -765,10 +801,11 @@ function cmdStatus(ledger, args) {
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : null,
   };
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, activeLeases: leases, inboxPending, reports, workers };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers };
   emit(out,
     [
-      `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+      `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
+      ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
     ].join('\n'),
@@ -780,7 +817,7 @@ function cmdHierarchy(ledger, args) {
   const out = { ok: true, ...agentHierarchyOf(ledger.db, args.workflow) };
   emit(out, [
     `${out.workflow.nodeId} (${out.workflow.status ?? '-'})`,
-    ...out.nodes.map((node) => `  ${node.parentNodeId} -> ${node.nodeId} [${node.status}]${node.runtime.model ? ` ${node.runtime.agent ?? '-'} / ${node.runtime.model}` : ''}`),
+    ...out.nodes.map((node) => `  ${node.parentNodeId} -> ${node.nodeId} [${node.status}${node.verdict === AWAITING_OWNER ? ` ${AWAITING_OWNER}` : ''}]${node.runtime.model ? ` ${node.runtime.agent ?? '-'} / ${node.runtime.model}` : ''}`),
   ].join('\n'), args.json);
 }
 
@@ -1038,9 +1075,9 @@ function cmdEnqueue(ledger, args) {
     // limit is budgeted against `businessAttempt`, which only advances when the
     // prior attempt actually spent one — an infrastructure launch rejected
     // before any effect does not (engine/admission.mjs deriveRetryLineage).
-    const priorJob = db.prepare('SELECT job_id,attempt,payload_json,result_json FROM jobs WHERE workflow_id=? AND op_id=? ORDER BY attempt DESC LIMIT 1')
+    const priorJob = db.prepare('SELECT job_id,workflow_id,op_id,status,attempt,payload_json,result_json FROM jobs WHERE workflow_id=? AND op_id=? ORDER BY attempt DESC LIMIT 1')
       .get(workflowId, args.op);
-    const retry = priorJob ? deriveRetryLineage(priorJob) : null;
+    const retry = priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob)) : null;
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
@@ -2263,6 +2300,7 @@ function cmdSettle(ledger, args, repo) {
 
   let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
+  let awaitingOwner = false;
   ledger.transaction(() => {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -2310,6 +2348,14 @@ function cmdSettle(ledger, args, repo) {
         }
       }
     }
+    // An ask is a wait on the owner, not a failed attempt: the row settles (the
+    // worker is released and the next attempt is a new job), but the recorded
+    // verdict says what happened and retry accounting spends no business attempt
+    // on it (engine/admission.mjs retryDisposition).
+    if (verdict === 'blocked' && reportOutcome === 'ask') {
+      awaitingOwner = true;
+      Object.assign(result, { verdict: AWAITING_OWNER, kernelVerdict: verdict, askDispatchId: dispatchId });
+    }
     if (verdict === 'pass') {
       if (reportOutcome !== 'done') {
         throw Object.assign(new Error(`pass requires a filed done report for ${jobId}`), { code: 'pass-report-missing' });
@@ -2340,7 +2386,7 @@ function cmdSettle(ledger, args, repo) {
       .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(db, job)).changes > 0;
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefs, reportsConsumed },
+      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed },
     });
   });
 
@@ -2408,8 +2454,8 @@ function cmdSettle(ledger, args, repo) {
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}) };
-  emit(out, `settled ${jobId} verdict=${verdict} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}) };
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
 }
 
 // The operation Task an op holds, whichever launch kind opened it, and the

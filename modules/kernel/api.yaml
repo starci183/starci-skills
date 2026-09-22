@@ -177,6 +177,8 @@ commands:
         pool to be full of
       'frontier.queuedCauses': '{<cause>: <count>} — the same rows tallied by cause, omitting causes with no rows'
       jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
+      failures: '{failed, awaitingOwner} — the `failed` rows split: an attempt settled awaiting-owner (verdict-contract.yaml retryAccounting.ownerWait) is a wait, never a failure'
+      awaitingOwner: '[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means the Kernel re-enqueues the op now, `pending` means the owner has not answered'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
@@ -192,7 +194,7 @@ commands:
     returns:
       schema: 'starci/agent-hierarchy@1'
       workflow: '{nodeId, role: workflow, workflowId, title, status, generation}'
-      nodes: '[{nodeId,parentNodeId,role,workflowId,jobId,opId,attempt,generation,status,runtime:{host,agent,provider,model,profile,runtimePool,runId,taskId,dispatchId,terminalHandle}}]'
+      nodes: '[{nodeId,parentNodeId,role,workflowId,jobId,opId,attempt,generation,status,verdict,runtime:{host,agent,provider,model,profile,runtimePool,runId,taskId,dispatchId,terminalHandle}}] — verdict is result_json.verdict (pass|fail|blocked|awaiting-owner), null while unsettled'
       edges: '[{parentNodeId,childNodeId,relation: coordinates|dispatches}]'
     identityRules:
       - 'titles such as [Kernel]/[Op], tab order and parentPaneKey never define ownership'
@@ -315,7 +317,9 @@ commands:
       resumed, reusesDurableAttempt, consumesBusinessRetry}. `attempt` is
       durable dispatch identity; `businessAttempt` is what a route's retry
       limit is budgeted against, and it does not advance for a launch the
-      prior result proved rejected before any effect.
+      prior result proved rejected before any effect (retryClass
+      infrastructure) nor after an attempt that settled awaiting-owner
+      (retryClass owner-answer).
       `records` is the explicit closed read binding carried
       unchanged into the dispatch packet; omission means no Work record is
       bound and never licenses repository-wide discovery.
@@ -680,7 +684,9 @@ commands:
       checks row the kernel''s re-run recorded
     writes: >-
       jobs.status -> succeeded|failed + result_json {verdict,...} (a blocked
-      verdict settles failed; the typed blocker rides the report); the
+      verdict settles failed; the typed blocker rides the report; a blocked
+      verdict on a filed `ask` report records verdict awaiting-owner —
+      verdict-contract.yaml retryAccounting.ownerWait); the
       reports row''s
       consumed_at is set — consumption the kernel did not mark via
       `api consume-report` is enforced by settle itself, so a report is
@@ -713,7 +719,7 @@ commands:
       verdict, recorded reportFiled:false. A --report file with no reports
       row is validated and filed on the job's behalf first — an invalid one
       is simply not filed (the settle stands on the kernel's verdict).
-    returns: '{ok:true, jobId, verdict, status, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?}'
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
