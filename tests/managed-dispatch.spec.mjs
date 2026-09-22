@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 
@@ -12,30 +11,14 @@ const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
-const ORCA_DIR=path.join(ROOT,'scripts','api','orca');
-const QUOTA_MODULE=path.join(ROOT,'scripts','api','quota','index.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
-// Managed dispatch rides pinned sibling lanes: the scripts/api/orca
-// orchestration wrappers (runCreate/taskCreate/workerStart/orchDispatch/
-// workerShow/workerStop/workerRelease exports), api.mjs's managed-agent
-// branch and scripts/api/quota/index.mjs probeQuota. Kernel boot deliberately
-// does not use those orchestration wrappers: every Kernel is a dedicated Orca
+// Managed dispatch rides the scripts/api/orca orchestration wrappers
+// (runCreate/taskCreate/workerStart/orchDispatch/workerShow/workerStop/
+// workerRelease), api.mjs's managed-agent branch and
+// scripts/api/quota/index.mjs probeQuota. Kernel boot deliberately does not
+// use those orchestration wrappers: every Kernel is a dedicated Orca
 // terminal, while operation agents retain their routed managed lifecycle.
-const ORCH=await (async()=>{
-  const fns={};
-  for(const f of fs.readdirSync(ORCA_DIR).filter(f=>f.endsWith('.mjs')).sort()){
-    try{Object.assign(fns,await import(pathToFileURL(path.join(ORCA_DIR,f)).href));}catch{/* half-landed lane */}
-  }
-  return fns;
-})();
-const ORCH_LANDED=['runCreate','taskCreate','workerStart','orchDispatch','workerShow','workerStop','workerRelease']
-  .every(n=>typeof ORCH[n]==='function');
-const API_SRC=fs.readFileSync(API,'utf8');
-const MANAGED_DISPATCH_LANDED=ORCH_LANDED&&/cmdDispatchManaged|MANAGED_KINDS/.test(API_SRC);
-const QUOTA_LANDED=fs.existsSync(QUOTA_MODULE);
-const skipDispatch=MANAGED_DISPATCH_LANDED?false:'managed dispatch lane has not landed yet (orchestration wrappers missing, or api.mjs still refuses kind managed-agent)';
-const skipQuota=QUOTA_LANDED?false:'quota probe lane (scripts/api/quota/index.mjs) has not landed yet — probeQuota(agent) is required for explicit-pin fail-closed coverage';
 
 const fixture=(t,{dead=[],stale=[]}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-managed-'));
@@ -133,7 +116,7 @@ test('kernel pin precedence: --agent flag beats the config pin',t=>{
   assert.equal(plan.launch,'terminal');
 });
 
-test('kernel pin precedence: an unavailable explicit pin fails closed instead of silently substituting Devin',{skip:skipQuota},t=>{
+test('kernel pin precedence: an unavailable explicit pin fails closed instead of silently substituting Devin',t=>{
   // The pin is codex; the fake host reports codex dead in `account list`.
   // Kernel identity is an owner decision. Fallback remains legal for routed
   // operations, not for this explicit Kernel pin.
@@ -149,7 +132,7 @@ test('kernel pin precedence: an unavailable explicit pin fails closed instead of
 
 /* ------------------------------------------- managed dispatch lifecycle */
 
-test('managed dispatch: route persists the decision, spawn marks the job running, settle stops+releases the worker',{skip:skipDispatch},t=>{
+test('managed dispatch: route persists the decision, spawn marks the job running, settle stops+releases the worker',t=>{
   const fx=fixture(t);
   const jobId='job-managed-1';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
@@ -213,7 +196,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.ok(after.includes('orchestration worker-release'),`settle must worker-release the dispatch — log: ${after.join(', ')}`);
 });
 
-test('Claude auth rejection circuits every shared-auth pool and reuses the logical operation attempt',{skip:skipDispatch||skipQuota},t=>{
+test('Claude auth rejection circuits every shared-auth pool and reuses the logical operation attempt',t=>{
   const fx=fixture(t,{stale:['claude']});
   fx.env.STARCI_FAKE_ORCA_MODE='auth';
   const jobId='job-claude-auth-circuit';
@@ -275,7 +258,7 @@ test('Claude auth rejection circuits every shared-auth pool and reuses the logic
   assert.equal(ledgerRead(fx.repo,db=>db.prepare('SELECT attempt FROM jobs WHERE job_id=?').get(jobId)?.attempt),1);
 });
 
-test('historical workflow incident text cannot poison provider routing',{skip:skipDispatch||skipQuota},t=>{
+test('historical workflow incident text cannot poison provider routing',t=>{
   const fx=fixture(t);
   const workflowId='wf-incident-routing';
   const jobId='job-incident-routing';
@@ -300,7 +283,7 @@ test('historical workflow incident text cannot poison provider routing',{skip:sk
     'routing must use typed provider-health signals, not arbitrary incident prose');
 });
 
-test('Claude auth fallback advances only after partial effects reconcile and never on unknown effects',{skip:skipDispatch||skipQuota},t=>{
+test('Claude auth fallback advances only after partial effects reconcile and never on unknown effects',t=>{
   const exercise=(mode,suffix)=>{
     const fx=fixture(t,{stale:['claude']});
     fx.env.STARCI_FAKE_ORCA_MODE=mode;
@@ -338,7 +321,7 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
   assert.equal(unknown.fx.calls().includes('orchestration worker-release'),false);
 });
 
-test('managed prompt stall with exact exited worker is retried as the same logical attempt',{skip:skipDispatch||skipQuota},t=>{
+test('managed prompt stall with exact exited worker is retried as the same logical attempt',t=>{
   const fx=fixture(t);
   fx.env.STARCI_FAKE_ORCA_MODE='prompt-stalled';
   const workflowId='wf-prompt-stalled';
@@ -372,7 +355,7 @@ test('managed prompt stall with exact exited worker is retried as the same logic
   assert.ok(fx.calls().includes('orchestration worker-show'));
 });
 
-test('reconcile converts a fenced effect_unknown prompt stall into the same queued job',{skip:skipDispatch||skipQuota},t=>{
+test('reconcile converts a fenced effect_unknown prompt stall into the same queued job',t=>{
   const fx=fixture(t,{stale:['claude']});
   const workflowId='wf-late-reconcile';
   const jobId='job-late-reconcile';

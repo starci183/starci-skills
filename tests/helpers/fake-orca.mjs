@@ -33,6 +33,16 @@
 //                          entry reports a refreshable stale OAuth token.
 //   STARCI_FAKE_ORCA_EFFECTIVE_MODEL overrides the model rendered by the
 //                          terminal for requested/effective mismatch coverage.
+//   STARCI_FAKE_ORCA_UNIQUE_TERMINALS='1' hands every `terminal create` a fresh
+//                          handle (fake-terminal-<n>) instead of reusing
+//                          fake-terminal-1 — the kernel-restart spec proves the
+//                          replacement terminal is a different one.
+//
+// State the specs read back: `commands` (every --command in creation order),
+// `counter` (terminals created) and `terminals[handle]` = {handle, connected,
+// writable, sent, prompt, command, model}. A spec may write connected:false
+// onto one terminal record between runs; `terminal show`/`read` then report
+// that exact terminal dead while the others stay live.
 export const FAKE_ORCA = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
 import fs from 'node:fs';
 const argv = process.argv.slice(2);
@@ -52,27 +62,41 @@ const commandModel = command => {
   const match = String(command || '').match(/(?:^|\s)(?:-m|--model)\s+["']?([^\s"']+)/i);
   return match?.[1] ?? null;
 };
-const renderedModel = () => effectiveModelOverride || state.terminalModel || 'gpt-5.6-sol';
-const isQwen = () => /(?:^|\s)qwen(?:\.exe)?(?:\s|$)/i.test(String(state.terminalCommand || ''));
-const PROMPT = () => (isQwen() ? 'Qwen\nmodel: ' + renderedModel() + '\nType your message\n> ' : 'Codex\nmodel: ' + renderedModel() + '\nEnter a prompt\n> ');
-const DEAD = () => (isQwen() ? 'Qwen\nmodel: ' + renderedModel() + '\nType your message' : 'Codex\nmodel: ' + renderedModel() + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
-const LIVE = () => (isQwen() ? 'Qwen' : 'Codex') + '\nmodel: ' + renderedModel() + '\nThinking hard\nesc to interrupt\ntokens 96\n';
+const uniqueTerminals = process.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS === '1';
+const record = handle => (state.terminals || {})[handle] || null;
+const renderedModel = handle => effectiveModelOverride || record(handle)?.model || state.terminalModel || 'gpt-5.6-sol';
+const isQwen = handle => /(?:^|\s)qwen(?:\.exe)?(?:\s|$)/i.test(String(record(handle)?.command ?? state.terminalCommand ?? ''));
+const PROMPT = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message\n> ' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt\n> ');
+const DEAD = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
+const LIVE = h => (isQwen(h) ? 'Qwen' : 'Codex') + '\nmodel: ' + renderedModel(h) + '\nThinking hard\nesc to interrupt\ntokens 96\n';
+// A spec may mark one terminal record dead; mode 'dead-terminal' kills them all.
+const isDead = handle => mode === 'dead-terminal' || record(handle)?.connected === false;
+const hasSent = handle => { const r = record(handle); return r ? !!r.sent : state.sends > 0; };
 const verb = argv.slice(0, 2).join(' ');
 if (verb === 'terminal create') {
   state.terminalCommand = arg('command');
   state.terminalModel = commandModel(state.terminalCommand);
+  state.counter = (state.counter || 0) + 1;
+  state.commands = [...(state.commands || []), state.terminalCommand];
+  const handle = uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1';
+  state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: true, writable: true,
+    sent: false, prompt: null, command: state.terminalCommand, model: state.terminalModel } };
   save();
-  out({ ok: true, result: { terminal: { handle: 'fake-terminal-1', title: arg('title'), connected: true, writable: true } } });
+  out({ ok: true, result: { terminal: { handle, title: arg('title'), connected: true, writable: true } } });
 }
 else if (verb === 'terminal read')
-  mode === 'dead-terminal'
+  isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-      screen: mode === 'auth' ? DEAD() : (state.sends > 0 ? LIVE() : PROMPT()) } } });
-else if (verb === 'terminal send') { state.sends += 1; save(); out({ ok: true, result: { sent: true } }); }
+      screen: mode === 'auth' ? DEAD(arg('terminal')) : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal'))) } } });
+else if (verb === 'terminal send') {
+  const r = record(arg('terminal'));
+  if (r) { r.sent = true; r.prompt = arg('text'); }
+  state.sends += 1; save(); out({ ok: true, result: { sent: true } });
+}
 else if (verb === 'terminal close') out({ ok: true, result: { closed: arg('terminal') } });
 else if (verb === 'terminal show')
-  mode === 'dead-terminal'
+  isDead(arg('terminal'))
     ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'running', connected: true, writable: true, lastOutputAt: Date.now() } } });
 else if (verb === 'terminal rename')

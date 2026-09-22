@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
@@ -18,36 +19,10 @@ const fixture=t=>{
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-5.6-sol, effort: high}\n');
-  fs.writeFileSync(state,JSON.stringify({counter:0,terminals:{},commands:[]}));
-  fs.writeFileSync(fake,`import fs from 'node:fs';
-const file=process.env.FAKE_ORCA_STATE;
-const state=JSON.parse(fs.readFileSync(file,'utf8'));
-const args=process.argv.slice(2),at=name=>{const i=args.indexOf(name);return i<0?null:args[i+1]};
-const save=()=>fs.writeFileSync(file,JSON.stringify(state));
-const ok=result=>{console.log(JSON.stringify({ok:true,result}));process.exit(0)};
-if(args[0]==='terminal'&&args[1]==='create'){
-  const handle='term_fake_'+(++state.counter);
-  const command=at('--command');
-  const model=String(command||'').match(/(?:^|\\s)(?:-m|--model)\\s+["']?([^\\s"']+)/i)?.[1]??null;
-  state.terminals[handle]={handle,connected:true,writable:true,sent:false,prompt:null,command,model};
-  state.commands.push(command);save();ok({terminal:{handle,connected:true,writable:true}});
-}
-const handle=at('--terminal'),term=state.terminals[handle];
-if(args[0]==='terminal'&&args[1]==='show')ok({terminal:term??{handle,connected:false,writable:false}});
-if(args[0]==='terminal'&&args[1]==='read'){
-  const tail=term?.sent?['Codex','model: '+term.model,'Thinking · 1s (esc twice to interrupt)']:['Codex','model: '+term.model,'Enter a prompt','❭'];
-  ok({terminal:{...term,tail}});
-}
-if(args[0]==='terminal'&&args[1]==='send'){
-  if(!term){console.error('missing terminal');process.exit(1)}
-  term.sent=true;term.prompt=at('--text');save();ok({send:{handle,accepted:true}});
-}
-if(args[0]==='terminal'&&args[1]==='close'){
-  if(term){term.connected=false;term.writable=false;save()}ok({close:{handle}});
-}
-console.error('unsupported '+args.join(' '));process.exit(2);
-`);
-  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),FAKE_ORCA_STATE:state,STARCI_OWNER_ROOT:ownerRoot};
+  fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
+  fs.writeFileSync(fake,FAKE_ORCA);
+  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
+    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot};
   const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   return {repo,state,run};
 };
