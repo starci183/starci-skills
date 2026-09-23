@@ -20,7 +20,8 @@
 //
 // Ask-report lifecycle in the ledger (modules/kernel/api.yaml askLifecycle):
 // `ask-serving` on bind, `ask-serving-expired` on --ttl, `ask-superseded`
-// when this run parks a replacement for an earlier ask of the same op, and
+// when this run parks a replacement for an earlier ask of the same op and
+// subject (params.subject, else question.refs), and
 // `ask-answered` on submission.
 
 import fs from 'node:fs';
@@ -66,6 +67,25 @@ const PORT_SCAN = 100; // 6969..7069 — the owner's "one memorable lane" band
 const DEFAULT_TTL_MS = 4 * 60 * 60 * 1000;
 
 const parseJson = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
+
+// What an ask report is about: the asking job's params.subject (report.from
+// names the job) and the question's refs.
+export const askSubjectOf = (db, row) => {
+  const rj = parseJson(row?.report_json, {}) ?? {};
+  let subject = null;
+  if (rj.from) {
+    const job = db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(rj.from);
+    const s = parseJson(job?.payload_json, {})?.params?.subject;
+    if (typeof s === 'string' && s.trim()) subject = s.trim();
+  }
+  const refs = (Array.isArray(rj.question?.refs) ? rj.question.refs : []).map(String).filter(Boolean);
+  return { subject, refs };
+};
+export const sameAskSubject = (a, b) => {
+  if (a.subject && b.subject) return a.subject === b.subject;
+  if (a.refs.length && b.refs.length) return a.refs.some((ref) => b.refs.includes(ref));
+  return !(a.subject || b.subject || a.refs.length || b.refs.length);
+};
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const parseArgs = (argv) => {
@@ -458,13 +478,20 @@ const main = async () => {
   // served: without the event it stays open forever in every projection of
   // the ledger, and the owner can act on a question the workflow moved past.
   // --review reads; it never retires anything.
+  // "The same op" is not enough: one workflow runs several provision.ask jobs
+  // at once, one per decision, and a later ask about Accounting once retired
+  // the open Chatbot and Shell questions. A replacement asks the same thing:
+  // the same params.subject, else overlapping question.refs; only when
+  // neither side names its subject does the op alone decide.
+  const newSubject = askSubjectOf(db, report);
   const superseded = readonly ? [] : db.prepare(
-    `SELECT r.dispatch_id FROM reports r
+    `SELECT r.dispatch_id, r.report_json FROM reports r
       WHERE r.workflow_id=? AND r.outcome='ask' AND r.op_id IS ? AND r.report_id < ?
         AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
           AND e.kind IN ('ask-answered','ask-superseded')
           AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
-      ORDER BY r.report_id`).all(args.workflow, report.op_id ?? null, report.report_id);
+      ORDER BY r.report_id`).all(args.workflow, report.op_id ?? null, report.report_id)
+    .filter((row) => sameAskSubject(askSubjectOf(db, row), newSubject));
   if (superseded.length) {
     ledger.transaction(() => {
       for (const row of superseded) {

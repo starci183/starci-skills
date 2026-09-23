@@ -13,13 +13,13 @@ const ROOT=path.resolve(import.meta.dirname,'..');
 const SERVE_ASK=path.join(ROOT,'scripts','kernel','serve-ask.mjs');
 const WORKFLOW='wf-serve-ask';
 
-const seedAskReport=(ledger,{dispatchId,opId='provision.ask',workflowId=WORKFLOW,at=Date.now()})=>{
+const seedAskReport=(ledger,{dispatchId,opId='provision.ask',workflowId=WORKFLOW,at=Date.now(),refs=null})=>{
   ledger.transaction(db=>{
     db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at)
       VALUES(?,?,?,?,?,?,?,?)`)
       .run(workflowId,dispatchId,opId,1,1,'ask',
         JSON.stringify({schema:'starci/op-report@1',outcome:'ask',summary:`ask from ${dispatchId}`,
-          question:{text:'which way?',options:['a','b']}}),at);
+          question:{text:'which way?',options:['a','b'],...(refs?{refs}:{})}}),at);
   });
 };
 
@@ -67,6 +67,24 @@ test('an unanswered ask of a different op is not superseded',async t=>{
       'two ops may legitimately hold one owner gate each');
     assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id).sort(),
       ['ctx_other_op','ctx_serving']);
+  });
+});
+
+// Live Modules: three provision.ask jobs asked about Chatbot, Shell auth and
+// Accounting; serving the Accounting ask retired the other two open questions.
+test('an ask of the same op about a different subject is not superseded',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_chatbot',refs:['decision.chatbot.d-chatbot-customer-channel-proof']});
+    seedAskReport(ledger,{dispatchId:'ctx_shell_old',refs:['decision.instance-management.shell-api-authentication']});
+    seedAskReport(ledger,{dispatchId:'ctx_shell_new',refs:['decision.instance-management.shell-api-authentication']});
+
+    const r=serve(repoRoot);
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.deepEqual(askEvents(ledger,'ask-superseded').map(p=>[p.dispatchId,p.by]),
+      [['ctx_shell_old','ctx_shell_new']],'only the earlier ask about the same decision is retired');
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id).sort(),['ctx_chatbot','ctx_shell_new'],
+      'the Chatbot question stays open for the owner');
   });
 });
 

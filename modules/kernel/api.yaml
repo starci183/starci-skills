@@ -846,7 +846,7 @@ askLifecycle:
   events:
     - ask-serving: 'the localhost form is bound and answering. payload {dispatchId, url, fields, ttlMs}; the newest ask-serving for a dispatch is the URL that counts'
     - ask-serving-expired: 'the --ttl window closed with no submission. payload {dispatchId}; the URL is dead until a re-serve appends a newer ask-serving'
-    - ask-superseded: 'a later ask report for the same (workflow, op) was served and retires this one. payload {dispatchId: <retired ask>, by: <the ask now serving>, opId}; terminal — a retired ask is closed without an answer and is never relayed to the owner'
+    - ask-superseded: 'a later ask report for the same (workflow, op) and the same subject (the asking job params.subject, else overlapping question.refs) was served and retires this one; an ask of the same op about another subject stays open. payload {dispatchId: <retired ask>, by: <the ask now serving>, opId}; terminal — a retired ask is closed without an answer and is never relayed to the owner'
     - ask-answered: 'the owner submitted the form. payload {dispatchId, receiptPath, custodyWritten, envWritten, pointersWritten, errors} — names and custody paths only, never values; terminal'
   open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id; modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead or unserved before it reaches the owner'
 
