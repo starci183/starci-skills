@@ -1179,6 +1179,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   theo lệnh thầy: Orca về 0 task, 0 worker. Merge lane S `6b9d6d565` (repository ở workspace.yaml, không ở _resources); kernel Mia
   Mia chạy lại prepare. Còn chờ: thầy hoàn tất bước chọn giao diện của Claude Code, và lane R2.
 
+- 14:15 Thầy hoàn tất onboarding Claude Code (hasCompletedOnboarding=true). Khởi động kernel Collab vẫn lỗi create: Orca hết giờ
+  chờ handle, lần này không để lại terminal. Lane R không đổi phần tạo terminal, nên lỗi ở phía Orca với TUI agent tương tác
+  (cmd và claude --version tạo được; claude --model ... thì không), cùng dấu hiệu sự cố Codex 21:45 tối qua. Đã gửi dữ kiện
+  cho R2 (fork). 4 workflow nivo chờ R2.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
