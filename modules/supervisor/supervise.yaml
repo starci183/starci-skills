@@ -94,6 +94,13 @@ loop:
       do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
 
 guardrails:
+  - id: chat-only-debug-mode
+    rule: the supervisor is the owner's debug mode and lives in the chat. It leaves no footprint in
+      the Orca tree the owner reads - it never creates terminals, tasks, runs or workers (no
+      "[Supervisor] ..." probe or helper terminal), and a probe or cleanup it needs runs as a CLI
+      call from the chat itself. An Orca action that can only be issued from a bound terminal
+      (task-update fenced to a run's coordinator) is not the supervisor's; it is reported to the
+      owner or fixed in the runtime so the kernel, settle or finish performs it.
   - id: restart-cooldown
     rule: a kernel is restarted only when a contract it must obey actually changed AND its current
       leg is governed by that contract, or its terminal is proven dead — never on a timer, never
