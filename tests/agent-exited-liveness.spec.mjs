@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
-import {classifyAgentScreen,exitedAgentPromptRow} from '../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen,exitedAgentPromptRow,shellPromptPrefix,shellReceivedText} from '../scripts/kernel/terminal-liveness.mjs';
 import {sendWakeWithProof,sendEnterWithProof} from '../scripts/kernel/wake-delivery.mjs';
 
 // 2026-09-24 02:23: a nudge was typed into a DEAD op terminal (term_8a556567, mm-work
@@ -126,4 +126,108 @@ test('status reads an exited worker dead, observe names it, and nudge refuses wi
   assert.deepEqual([json(nudged.stdout).reason,json(nudged.stdout).delivery],['agent-exited','agent-exited']);
   assert.equal(fx.sends().length,before,'nothing typed into the shell');
   assert.equal(fx.events('op-worker-nudged').length,0);
+});
+
+/* ---------------------------------------- nivo term_8f9e0611, 03:56 */
+
+// 2026-09-24 03:56 (after the guard above landed): nivo op-architecture.decide-e64bfaaea3 (Codex, attempt
+// 11, term_8f9e0611). observe read turn-idle (stale-active: the "Working (10m 46s ...)" row had frozen),
+// nudge typed the wake and PowerShell ran it (ParserError MissingLoopStatement); the event said
+// delivered/wake-text because the shell's echo of the text looked like the wake landing. Captured frame,
+// 80 columns: the Codex frame ends at its input row, the footer row below it is gone - overwritten by
+// PowerShell's prompt, which is followed by the echoed wake and the parser error.
+const NIVO_TRANSCRIPT=['    … +18 lines (ctrl + t to view transcript)','      }','    }',
+  '• Ran orca orchestration check --terminal term_8f9e0611-1faa-415b-a343-4a2c2e3e8','24f --json','  └ {',
+  '      "id": "e1790393-c1bf-437a-b6a9-146c93d5b9be",','    … +19 lines (ctrl + t to view transcript)','      }','    }',
+  '• Ran node D:\\Repositories\\starci-academy-backend\\.claude\\scripts\\kernel\\api.mjs',' op-contract --repo D:',
+  '  │ \\Repositories\\nivo-backend --job op-architecture.decide-e64bfaaea3',
+  '  └ # dispatch contract — [Op] architecture.decide (job op-architecture.decide-e','64bfaaea3)',
+  '    … +107 lines (ctrl + t to view transcript)','    (node:39400) ExperimentalWarning: SQLite is an experimental feature and migh',
+  't change at any time','    (Use `node --trace-warnings ...` to show where the warning was created)',
+  '• Working (10m 46s • esc to interrupt) · 1 background terminal running · /ps to','view · /stop to close',
+  '› Ask Codex to do anything'];
+const NIVO_PS='PS D:\\Repositories\\nivo-backend>';
+const NIVO_WAKE='Operation liveness wake for durable job op-architecture.decide-e64bfaaea3 (architecture.decide) attempt 11. Your accepted contract remains running but no durable report is filed. Re-read the exact contract with api op-contract, continue only inside its existing authority, and file exactly one api report. Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.';
+const wrap80=line=>{const rows=[];for(let i=0;i<line.length;i+=80)rows.push(line.slice(i,i+80));return rows;};
+const NIVO_AFTER=[...NIVO_TRANSCRIPT,...wrap80(`${NIVO_PS} ${NIVO_WAKE}`),'At line:1 char:366',
+  '+ ... . Report done, partial, failed, ask or blocked truthfully; do not wai ...',
+  '+                                                                  ~','Missing statement body in do loop.',
+  '    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordExce','ption',
+  '    + FullyQualifiedErrorId : MissingLoopStatement','',NIVO_PS].join('\n');
+// The frame before the wake, the two ways it could have looked: PowerShell's prompt over the footer row,
+// bare or followed by what was left of the footer it did not clear.
+const NIVO_EXITED_BARE=[...NIVO_TRANSCRIPT,NIVO_PS].join('\n');
+const NIVO_EXITED_RESIDUE=[...NIVO_TRANSCRIPT,`${NIVO_PS} % left · ~\\nivo-backend`].join('\n');
+// A frozen Codex still drawing its footer: nothing on screen says the process is gone.
+const NIVO_FROZEN=[...NIVO_TRANSCRIPT,'  gpt-6-sol high · 58% left · ~\\nivo-backend'].join('\n');
+// The shell mid-echo: the wake typed after the prompt, not yet run.
+const NIVO_TYPING=[...NIVO_TRANSCRIPT,...wrap80(`${NIVO_PS} ${NIVO_WAKE}`)].join('\n');
+
+test('nivo 03:56: a Codex frame frozen at Working with a shell prompt under its input row is agent-exited',()=>{
+  assert.equal(exitedAgentPromptRow(NIVO_EXITED_BARE),NIVO_PS);
+  assert.equal(exitedAgentPromptRow(NIVO_EXITED_RESIDUE),`${NIVO_PS} % left · ~\\nivo-backend`,'a prompt over an uncleared footer row');
+  assert.equal(exitedAgentPromptRow(NIVO_AFTER),NIVO_PS);
+  assert.equal(exitedAgentPromptRow(NIVO_TYPING),null,'mid-echo the last row is the wrapped wake, not a prompt');
+  assert.equal(exitedAgentPromptRow(NIVO_FROZEN),null,'a frozen frame that still draws its footer proves nothing');
+  // A launch typed under an old agent frame is not an exit, and a live agent never ends in a prompt row.
+  assert.equal(exitedAgentPromptRow([...NIVO_TRANSCRIPT,`${NIVO_PS} codex --model gpt-6-sol -c model_reasoning_effort=high`].join('\n')),null);
+  for(const frame of [LIVE_QWEN,IDLE_CLAUDE,IDLE_CODEX,NIVO_FROZEN]) assert.equal(exitedAgentPromptRow(frame),null);
+  assert.equal(shellPromptPrefix('PS D:\\Repositories\\nivo-backend> Operation liveness'),NIVO_PS);
+  assert.equal(shellPromptPrefix('  └ PS D:\\x> git status'),null,'a transcript row is not the shell');
+});
+
+test('nivo 03:56: text a shell received is never a delivered wake',()=>{
+  assert.deepEqual(shellReceivedText(NIVO_AFTER,NIVO_WAKE,NIVO_FROZEN)?.evidence,'shell-echo');
+  assert.deepEqual(shellReceivedText(NIVO_TYPING,NIVO_WAKE,NIVO_FROZEN)?.evidence,'shell-echo','wrapped at 80 columns mid-word');
+  assert.equal(shellReceivedText([NIVO_FROZEN,'Missing statement body in do loop.','    + FullyQualifiedErrorId : MissingLoopStatement'].join('\n'),'x',NIVO_FROZEN)?.evidence,'shell-error');
+  // An agent that echoes the wake in its own input row or transcript is the delivery, not a shell.
+  const landed=[...NIVO_TRANSCRIPT,`› ${NIVO_WAKE.slice(0,76)}`,'• Working (1s • esc to interrupt)','› Ask Codex to do anything'].join('\n');
+  assert.equal(shellReceivedText(landed,NIVO_WAKE,NIVO_FROZEN),null);
+  // Mid-turn exit: the frame before the send looked alive, the frames after show PowerShell echoing it.
+  let s=stub([NIVO_FROZEN,NIVO_TYPING,NIVO_AFTER]);
+  const woke=sendWakeWithProof({terminal:'t',text:NIVO_WAKE,deps:s.deps});
+  assert.deepEqual([woke.ok,woke.delivery,woke.evidence,woke.splitRetried],[false,'agent-exited','shell-echo',false]);
+  assert.equal(s.calls.length,1,'no retry, no Enter into the shell');
+  // The frame read immediately before typing decides, not the caller's older observation.
+  s=stub([NIVO_EXITED_RESIDUE]);
+  const refused=sendWakeWithProof({terminal:'t',text:NIVO_WAKE,before:NIVO_FROZEN,deps:s.deps});
+  assert.deepEqual([refused.ok,refused.delivery,refused.evidence],[false,'agent-exited','shell-prompt']);
+  assert.equal(s.calls.length,0,'nothing typed');
+  // No frame at all: nothing is typed blind.
+  const blind={calls:[],deps:{send:(i)=>{blind.calls.push(i);return {ok:true};},read:()=>({ok:false,error:'terminal_gone'}),sleep:()=>{}}};
+  assert.deepEqual([sendWakeWithProof({terminal:'t',text:NIVO_WAKE,deps:blind.deps}).delivery,blind.calls.length],['unreadable',0]);
+});
+
+test('nudge: an agent that dies under a stale-active frame gets no delivered claim and the shell is recorded',t=>{
+  const fx=opFixture(t);
+  const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  // Frozen for 20 minutes (stale-active turn-idle), and the host shell reads whatever is typed next.
+  fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:NIVO_FROZEN,lastOutputAt:Date.now()-20*60_000,shellAfterSend:NIVO_PS});});
+  const before=fx.sends().length;
+  const nudged=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']);
+  assert.notEqual(nudged.status,0);
+  const out=json(nudged.stdout);
+  assert.deepEqual([out.reason,out.delivery,out.evidence,out.typed],['agent-exited','agent-exited','shell-echo',true],nudged.stdout);
+  assert.equal(fx.sends().length,before+1,'one send, never retried into the shell');
+  assert.equal(fx.events('op-worker-nudged').length,0,'no nudge is recorded as delivered');
+  assert.equal(fx.events('op-worker-wake-to-shell').length,1);
+  // The shell is left behind: status reads the worker dead, and a second nudge types nothing.
+  const status=json(fx.run(['status','--repo',fx.repo,'--workflow',fx.workflowId,'--json']).stdout);
+  assert.equal(status.workers.find(w=>w.jobId===fx.jobId).liveness,'agent-exited');
+  const again=json(fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']).stdout);
+  assert.equal(again.reason,'agent-exited');
+  assert.equal(fx.sends().length,before+1);
+});
+
+test('nudge: the residue frame (prompt over the footer) is refused before anything is typed',t=>{
+  const fx=opFixture(t);
+  const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:NIVO_EXITED_RESIDUE,lastOutputAt:Date.now()-20*60_000});});
+  const before=fx.sends().length;
+  const nudged=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']);
+  assert.notEqual(nudged.status,0);
+  assert.deepEqual([json(nudged.stdout).reason,json(nudged.stdout).worker.liveness],['agent-exited','agent-exited']);
+  assert.equal(fx.sends().length,before,'nothing typed');
 });

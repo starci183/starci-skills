@@ -104,11 +104,67 @@ const SHELL_PROMPT_ROWS = [
   // POSIX: "$", "#", "%", "user@host:~/x$", "user@host ~ %", "bash-5.2$", "(venv) user@host:~$"
   /^(?:\([^)]*\)\s*)?(?:[\w.-]+@[\w.-]+(?:[:\s]\S*)?\s*|[\w.-]+-\d+(?:\.\d+)*)?[$#%]$/,
 ];
-/** The bare shell prompt row a frame ends in (its agent has exited), or null. */
+// A shell prompt at the START of a row, whatever follows it on that row.
+const SHELL_PROMPT_PREFIXES = [
+  /^PS\s+(?:[A-Za-z]:|\\\\|[\w.]+::)[^>]*>(?=\s|$)/,                     // PowerShell: "PS D:\x> ..."
+  /^[A-Za-z]:\\[^<>|*?"\r\n]*>(?=\s|$)/,                                   // cmd.exe: "D:\x> ..."
+  /^(?:\([^)]*\)\s*)?[\w.-]+@[\w.-]+(?::\S*|\s+\S+)?\s*[$#%](?=\s|$)/,     // POSIX: "user@host:~/x$ ..."
+];
+/** The shell prompt a row starts with, or null. */
+export function shellPromptPrefix(row) {
+  const text = String(row ?? '').trim();
+  for (const pattern of SHELL_PROMPT_PREFIXES) { const match = pattern.exec(text); if (match) return match[0]; }
+  return null;
+}
+// The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯", Qwen's
+// "*   Type your message") and footers (Codex "gpt-6-sol high · 62% left", Claude "bypass permissions").
+const AGENT_FOOT_ROW = /^\s*[›❯❭](?:\s|$)|^\s*\*\s{2,}Type your message|\bAsk Codex\b|\bMessage Devin\b|bypass permissions|\d+% (?:context )?left\b|esc to (?:interrupt|cancel)/iu;
+// An agent command typed after a prompt: a launch still starting, never an exit.
+const AGENT_LAUNCH = /^(?:&\s*)?["']?[\w:\\/.~-]*?\b(?:claude|codex|qwen|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
+/**
+ * The shell prompt row a frame ends in because its agent exited, or null. Two shapes:
+ *  - the LAST non-empty row is a bare prompt ("PS D:\x>");
+ *  - the LAST non-empty row STARTS with a prompt and the rows just above it are the agent's own input
+ *    row or footer. A Codex op killed mid-turn (nivo term_8f9e0611, 2026-09-24 03:56) froze its frame at
+ *    "• Working (10m 46s • esc to interrupt)" / "› Ask Codex to do anything", and PowerShell printed its
+ *    prompt over the footer row without clearing it: "PS D:\x> <what is left of the footer>". No agent
+ *    draws a shell prompt BELOW its own input box, so that row is the host shell. The frame read
+ *    stale-active turn-idle, and the nudge typed into it was run by PowerShell (ParserError).
+ * A prompt followed by an agent command ("PS D:\x> codex --model ...") is a launch, not an exit.
+ */
 export function exitedAgentPromptRow(screen) {
   const rows = String(screen ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
   const last = rows.at(-1);
-  return last && SHELL_PROMPT_ROWS.some((pattern) => pattern.test(last)) ? last : null;
+  if (!last) return null;
+  if (SHELL_PROMPT_ROWS.some((pattern) => pattern.test(last))) return last;
+  const prompt = shellPromptPrefix(last);
+  if (!prompt || AGENT_LAUNCH.test(last.slice(prompt.length).trim())) return null;
+  return rows.slice(-7, -1).some((row) => AGENT_FOOT_ROW.test(row) && !shellPromptPrefix(row)) ? last : null;
+}
+
+// What a shell prints when it tries to run prose as a command.
+const SHELL_ERROR = /FullyQualifiedErrorId\s*:|CategoryInfo\s*:\s*\w*Error|ParserError|is not recognized as (?:the name of a cmdlet|an internal or external command)|: command not found\b|syntax error near unexpected token/i;
+const squash = (text) => String(text ?? '').replace(/\s+/g, '');
+const WAKE_KEY_CHARS = 40;
+/**
+ * Proof from a frame read AFTER a send that the text went to a host shell, not an agent: the text
+ * follows a shell prompt on the screen (wrapped rows joined), or a shell error appeared that `before`
+ * did not show. Returns {row, evidence: 'shell-echo'|'shell-error'} or null.
+ */
+export function shellReceivedText(after, text, before = '') {
+  const rows = String(after ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+  const key = squash(text).slice(0, WAKE_KEY_CHARS);
+  if (key.length >= 12) {
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      const prompt = shellPromptPrefix(rows[i]);
+      if (!prompt) continue;
+      const typed = squash([rows[i].slice(prompt.length), ...rows.slice(i + 1, i + 8)].join(''));
+      if (typed.startsWith(key)) return { row: rows[i], evidence: 'shell-echo' };
+    }
+  }
+  const errorRow = rows.find((row) => SHELL_ERROR.test(row));
+  if (errorRow && !SHELL_ERROR.test(String(before ?? ''))) return { row: errorRow, evidence: 'shell-error' };
+  return null;
 }
 
 export const WEDGE_MINUTES = 30;

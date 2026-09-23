@@ -793,8 +793,23 @@ commands:
       the wake is retried once split - the text with enter:false, proven staged
       in the input row, then Enter-only, proven again - and the result and
       event carry splitRetried:true with splitOutcome delivered-after-split, or
-      unstaged/unsubmitted on a terminal-send-failed
+      unstaged/unsubmitted on a terminal-send-failed. A worker whose agent
+      exited is never woken (scripts/kernel/terminal-liveness.mjs
+      exitedAgentPromptRow: the frame ends in a bare shell prompt, or in a
+      prompt row drawn under the agent's own input row/footer, as when
+      PowerShell's prompt overwrites a dead Codex's footer without clearing
+      it): the frame is re-read immediately before typing, whatever observe
+      saw, and refuses with reason 'agent-exited' and nothing typed; an
+      unreadable frame types nothing (delivery unreadable). A frame read
+      after the send that shows a host shell got the text (the text after a
+      shell prompt, a new shell error, or a bare prompt) is never delivered:
+      reason 'agent-exited', delivery agent-exited, evidence
+      shell-echo|shell-error|shell-prompt, typed:true, no retry, and one
+      event 'op-worker-wake-to-shell' instead of op-worker-nudged (nivo
+      term_8f9e0611, 2026-09-24 03:56: PowerShell ran a nudge and its echo
+      read as delivered). Recover the job with reconcile --dead-worker.
     refuses:
+      - 'agent-exited (field `reason`, exit 1): the worker''s agent exited - before the send (nothing typed) or under it (typed:true, a shell received the text); run api reconcile --job <id> --dead-worker'
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'
       - job-not-running: 'only the current running attempt may be nudged'

@@ -109,7 +109,8 @@
 // `counter` (terminals created), `closed` (every handle `terminal close` took,
 // in order) and `terminals[handle]` = {handle, connected, writable, sent,
 // prompt, command, model, title, worktree, closed}. A spec may write
-// connected:false onto one terminal record between runs; `terminal show`/
+// connected:false onto one terminal record between runs (lastOutputAt: <ms> pins
+// what `terminal show` reports, a frozen frame's age; shellAfterSend: see terminal send); `terminal show`/
 // `read` then report that exact terminal dead while the others stay live.
 // stale:true instead makes `terminal show` refuse the handle with Orca's typed
 // terminal_handle_stale, the answer a live Orca gives after a host reboot.
@@ -295,7 +296,18 @@ else if (verb === 'terminal send' && dropEnterSend && (arg('text') ?? '')) {
 else if (verb === 'terminal send') {
   const r = record(arg('terminal'));
   const text = arg('text') ?? '';
-  if (r && text) { r.sent = true; r.prompt = text; if (stuckPaste) r.staged = true; }
+  // terminals[h].shellAfterSend = '<prompt>': the agent under the frame is dead and a
+  // host shell reads the input - the text lands after that prompt (wrapped at 80
+  // columns) and PowerShell answers a ParserError (nivo term_8f9e0611, 2026-09-24).
+  if (r && text && typeof r.shellAfterSend === 'string') {
+    const line = r.shellAfterSend + ' ' + text;
+    const wrapped = []; for (let i = 0; i < line.length; i += 80) wrapped.push(line.slice(i, i + 80));
+    r.screen = [String(r.screen ?? ''), ...wrapped, 'At line:1 char:366', 'Missing statement body in do loop.',
+      '    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException',
+      '    + FullyQualifiedErrorId : MissingLoopStatement', r.shellAfterSend].join('\n');
+    r.shellRan = [...(r.shellRan || []), text];
+  }
+  else if (r && text) { r.sent = true; r.prompt = text; if (stuckPaste) r.staged = true; }
   else if (r && !text && argv.includes('--enter')) {
     r.enters = (r.enters || 0) + 1;
     if (stuckPaste === 'enter' || stuckPaste === 'inline-enter' || stuckPaste === 'blocked') r.staged = false;
@@ -341,7 +353,7 @@ else if (verb === 'terminal show' && record(arg('terminal'))?.stale === true)
 else if (verb === 'terminal show')
   isDead(arg('terminal'))
     ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })
-    : out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'running', connected: true, writable: true, lastOutputAt: Date.now() } } });
+    : out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'running', connected: true, writable: true, lastOutputAt: record(arg('terminal'))?.lastOutputAt ?? Date.now() } } });
 else if (verb === 'terminal rename')
   out({ ok: true, result: { terminal: { handle: arg('terminal'), title: arg('title') } } });
 // ---- orchestration verbs (managed-agent lifecycle) ----

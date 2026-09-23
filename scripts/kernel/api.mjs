@@ -575,6 +575,20 @@ function cmdNudge(ledger, args) {
   // A dropped wake (ok receipt, idle frame, no text) is retried once split -
   // text, then Enter-only - and says so: splitRetried/splitOutcome.
   const delivered = deliveryFieldsOf(proof);
+  // The agent exited after the observation: the frame read right before typing
+  // ended in a shell (nothing typed), or the frames after the send show a shell
+  // got the text. Never a delivery; reconcile --dead-worker recovers the job.
+  if (!proof.ok && proof.delivery === 'agent-exited') {
+    const typed = Boolean(proof.sent);
+    if (typed) ledger.transaction(() => ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'op-worker-wake-to-shell', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle,
+        priorLiveness: worker.liveness, shellPrompt: proof.shellPrompt ?? null, ...delivered },
+    }));
+    const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', ...delivered, shellPrompt: proof.shellPrompt ?? null, typed, worker };
+    emit(out, `nudge REFUSED for ${jobId}: the worker's agent exited (${typed ? `a shell received the wake: '${proof.shellPrompt}'` : `its terminal shows the shell prompt '${proof.shellPrompt}'; nothing was typed`}) - run api reconcile --job ${jobId} --dead-worker`, args.json);
+    process.exit(1);
+  }
   if (!proof.ok) {
     const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error };
     emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})`, args.json);

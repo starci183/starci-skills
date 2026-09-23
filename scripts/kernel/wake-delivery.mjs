@@ -30,7 +30,7 @@
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, wakeDeliveryOf, exitedAgentPromptRow, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -56,6 +56,18 @@ const exitedRefusal = (screen) => {
     enterRetried: false, splitRetried: false, splitOutcome: null, split: null, screenState: 'agent-exited' } : null;
 };
 
+// The wake reached a host shell, not an agent: the text follows a shell prompt, a
+// shell error appeared, or the frame now ends in a bare prompt. nivo term_8f9e0611
+// (2026-09-24 03:56): PowerShell echoed and ran a nudge, and the echoed text was
+// read as the wake landing - delivery 'delivered'. It is never delivered.
+const shellRefusal = (after, text, before, extra) => {
+  const shell = shellReceivedText(after, text, before);
+  const row = shell ? null : exitedAgentPromptRow(after);
+  if (!shell && !row) return null;
+  return { ok: false, delivery: 'agent-exited', evidence: shell ? shell.evidence : 'shell-prompt', shellPrompt: shell?.row ?? row,
+    sendErrorCode: null, enterRetried: false, splitRetried: false, splitOutcome: null, split: null, screenState: 'agent-exited', ...extra };
+};
+
 // No trace of the wake and the provider still at its prompt: the send was dropped.
 const isLost = (proof) => proof?.delivery === 'unproven' && proof.screenState === 'turn-idle';
 
@@ -77,6 +89,8 @@ function splitRetry({ terminal, text, before, stagedPattern, reads, intervalMs, 
     sleep(intervalMs);
     const after = read();
     if (after == null) continue;
+    // Text staged at a shell prompt is not an agent's input row: never press Enter on it.
+    if (shellReceivedText(after, text, before) || exitedAgentPromptRow(after)) return { ok: false, outcome: SPLIT_OUTCOMES.unstaged, proof: null, sends, shell: after };
     const proof = wakeDeliveryOf({ before, after, text, stagedPattern });
     if (WAITING_FOR_ENTER.has(proof.screenState)) staged = proof;
   }
@@ -106,9 +120,19 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   reads = WAKE_PROOF_READS, intervalMs = WAKE_PROOF_INTERVAL_MS, deps = {} }) {
   const read = screenReader(deps.read ?? terminalRead, terminal);
   const send = deps.send ?? terminalSend, sleep = deps.sleep ?? sleepSync;
-  const before = typeof beforeScreen === 'string' ? beforeScreen : (read() ?? '');
-  const exited = exitedRefusal(before);
+  // The frame read immediately before typing decides, however recent the
+  // caller's own read was: an agent can exit between an observation and the
+  // send (nivo term_8f9e0611). A caller's frame that already shows a shell
+  // refuses too, and with no frame at all nothing is typed blind.
+  const callerBefore = typeof beforeScreen === 'string' ? beforeScreen : null;
+  const exitedEarlier = callerBefore != null ? exitedRefusal(callerBefore) : null;
+  if (exitedEarlier) return exitedEarlier;
+  const fresh = read();
+  const exited = exitedRefusal(fresh);
   if (exited) return exited;
+  const before = fresh ?? callerBefore;
+  if (before == null) return { ok: false, delivery: 'unreadable', evidence: 'unreadable', sent: null, sendErrorCode: null,
+    enterRetried: false, splitRetried: false, splitOutcome: null, split: null, screenState: null };
   const sent = send({ terminal, text, enter: true });
   let proof = null, enterRetried = false;
   // A confirmed send the frame agrees with (proven, or no longer idle) needs
@@ -118,6 +142,8 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
     if (i > 0) sleep(intervalMs);
     const after = read();
     if (after == null) continue;
+    const shell = shellRefusal(after, text, before, { sent, sendErrorCode: sendCodeOf(sent) });
+    if (shell) return shell;
     proof = wakeDeliveryOf({ before, after, text, stagedPattern });
     if (PROVEN.has(proof.delivery) && !WAITING_FOR_ENTER.has(proof.screenState)) break;
     if (WAITING_FOR_ENTER.has(proof.screenState)) {
@@ -129,6 +155,8 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   let split = null;
   if (isLost(proof) && !enterRetried && !sent?.enterRetry?.ok) {
     split = splitRetry({ terminal, text, before, stagedPattern, reads, intervalMs, read, send, sleep });
+    if (split.shell) return shellRefusal(split.shell, text, before, { sent, sendErrorCode: sendCodeOf(sent), splitRetried: true,
+      splitOutcome: split.outcome, split: { sends: split.sends } });
     if (split.proof) proof = split.proof;
   }
   const screenDelivery = proof?.delivery ?? 'unreadable';

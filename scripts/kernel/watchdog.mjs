@@ -213,7 +213,9 @@ export async function watchdogTick() {
     const proof = sendWakeWithProof({ terminal, text: buildWakePrompt(workflowId), before: String(read.screen ?? '') });
     return {
       ok: proof.ok, workflowId, phase, terminal,
-      action: proof.ok ? 'woken' : 'wake-failed', ...stale, outputAgeMs, ...deliveryFieldsOf(proof),
+      // A shell got the wake (the agent exited under it): the next tick sees the shell and replaces the kernel.
+      action: proof.ok ? 'woken' : proof.delivery === 'agent-exited' ? 'kernel-exited' : 'wake-failed', ...stale, outputAgeMs, ...deliveryFieldsOf(proof),
+      ...(proof.shellPrompt ? { shellPrompt: proof.shellPrompt } : {}),
       receipt: proof.sent?.receipt ?? null, error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null),
     };
   }
