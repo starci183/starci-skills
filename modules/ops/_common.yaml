@@ -241,6 +241,8 @@ sections:
         An operation never opens, queries or copies that file: it reads its contract with `api
         op-contract` and files `api report` for its own job, and the api refuses every kernel verb
         from an op terminal (modules/kernel/api.yaml conventions.callerBoundary, inc-360891316369).
+        Messages between workflows (`api peers`, `notify`, `inbox`) are kernel verbs too: work
+        that belongs to another workflow is named in the op's report, and the kernel routes it.
         An operation's produced
         records (intake.json, a goal revision) travel as report evidence under its declared write
         ceiling; it never emits checks, contracts, inbox commands or report rows directly —

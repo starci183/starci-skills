@@ -112,12 +112,12 @@ boundary:
 # ============================================================================
 tick:
   order:
-    - survey    # api survey --workflow — the tick opens on the ledger, never on memory
+    - survey    # api survey --workflow — the tick opens on the ledger, never on memory; then api inbox (peer messages)
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
     - drive     # loop{ status -> reconcile effect_unknown -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
     - finish    # api finish --workflow — every job settled AND the final verify passed
-  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, finish"
+  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, inbox, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, finish"
 
   survey:
     rule: >-
@@ -130,6 +130,11 @@ tick:
       dispatched, what settled, what is parked is all re-read each tick
       (the api's status/survey projections apply the same discipline on the
       durable spine).
+    peerInbox: >-
+      Every wake, after survey and before planning, read `api inbox --workflow
+      <id>`: peer workflows of this ledger send their requests, heads-ups,
+      handoffs and replies there, and what they say can change your plan.
+      Act on each and ack it (§ peers below).
 
   plan:
     rule: >-
@@ -265,6 +270,8 @@ tick:
       `worker-wedged` is not a wait either: api observe each id in
       `frontier.wedgedJobs` once, then api nudge it to interrupt the stuck
       command, or reconcile and re-dispatch the attempt.
+      `peer-message` (`frontier.peerMessageKeys`) is not a wait either: read
+      `api inbox`, act on each message and ack it (§ peers below).
       `frontier.askReserveDispatches` (an unanswered ask whose serve-ask form
       expired or was never served) is not a wait either: re-serve each with
       serve-ask --dispatch before yielding; a dead link is not an owner wait.
@@ -714,7 +721,48 @@ escalation:
     - kind: BUDGET-EXHAUSTED
       why: "every route past its limit asks the user"
       via: needUser
+    - kind: PEER-DISAGREEMENT
+      why: "two workflows of the ledger both claim, or both refuse, a scope or a shared contract change after exchanging messages (§ peers); who should do a piece of work is otherwise settled between the peers, never asked"
+      via: "provision.ask naming both workflows and the message keys"
   citation: "modules/goal/legality.yaml ambiguityRules; modules/models/kinds.yaml routes; modules/ops/ops/provision.ask.yaml owner-request kinds"
+
+# ============================================================================
+# PEERS — workflows of one ledger that build in the same source repositories
+#    talk to each other instead of through the owner (modules/kernel/api.yaml
+#    peers, notify, inbox; the peer rule is api.yaml peers.rule).
+# ============================================================================
+peers:
+  who: >-
+    `api peers --workflow <id>` lists every running peer: its title, current
+    leg and the owned_paths of its open jobs, plus the messages pending
+    between you. Read it before planning work that may sit in another
+    workflow's scope and before touching a path a peer's job owns.
+  request: >-
+    Work you need that belongs to a peer's scope (its goal, its records, a
+    path its open job owns: phone verification in the Login workflow while
+    you build Collab) is `api notify --to <peer> --kind request`, never work
+    you do yourself and never an owner question about who should do it. Carry
+    on with the rest of the frontier; the reply lands in your inbox and wakes
+    you.
+  headsUp: >-
+    When you change a shared contract, API, schema, migration or Work record a
+    peer reads, send it `--kind heads-up` (`--to peers` when every peer reads
+    it). Repo-wide work no workflow owns (an uncommitted migration, a shared
+    config) is taken with a heads-up or given with `--kind handoff` to the
+    peer whose scope it is. `api enqueue` already sends the owned_paths
+    overlap heads-up; its receipt `peerOverlap` names the jobs.
+  ack: >-
+    Every received message is acked with `api inbox --ack <key> --disposition
+    <what you did>` (built it, queued it as <job>, adjusted the plan, declined
+    because ..., answered in <key>); the sender reads that disposition back. A
+    request also gets `api notify --kind reply --reply-to <key>`.
+  escalate: >-
+    Only a disagreement the peers cannot settle between them goes to the
+    owner (escalation.mustAskOwner PEER-DISAGREEMENT).
+  boundary: >-
+    peers, notify and inbox are Kernel verbs; an op never uses them
+    (api.yaml conventions.callerBoundary). An op that finds work outside its
+    contract says so in its report and the Kernel routes it.
 
 # ============================================================================
 # 5 — FAILURE HANDLING. The failure shapes this loop meets in practice, and

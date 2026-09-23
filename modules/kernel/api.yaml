@@ -38,8 +38,8 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    Twenty verbs. Pure reads return projections and touch no row (survey,
-    status, hierarchy, op-contract) and `estimate` computes slice sizing from
+    Twenty-five verbs. Pure reads return projections and touch no row (survey,
+    status, hierarchy, peers, op-contract) and `estimate` computes slice sizing from
     modules/models/runtimes.yaml without reading the ledger at all; `observe`
     is the kernel's window onto its own job's exact op terminal screen —
     reasoning context and never evidence — and is the one screen read that
@@ -47,7 +47,7 @@ about:
     writes contracts, report files reports, consume-report integrates, check
     records re-runs); the rest are
     single ledger transactions that each append one hash-chained event (plan,
-    enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, settle, incident, finish). Every command prints
+    enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, notify, inbox --ack, settle, incident, finish). Every command prints
     one JSON object to stdout; a refusal exits non-zero with {ok:false,
     reason} — a refusal is a fact for the driver loop, never a crash to route
     around. The op lifecycle is fixed: enqueue -> route (model decision
@@ -103,8 +103,8 @@ conventions:
     terminal it owns, so a caller whose handle is the bound terminal of an op job (worker_id,
     payload managed/orca agentTerminalHandle, hierarchy runtime terminalHandle) is that op even as a
     managed worker-start agent whose env StarCi cannot set; (3) from an op caller every kernel verb
-    (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, settle, check,
-    consume-report, serve-ask, retire-ask, incident, finish) refuses `op-context-refused` before it runs, and `report`
+    (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, peers, notify, inbox,
+    settle, check, consume-report, serve-ask, retire-ask, incident, finish) refuses `op-context-refused` before it runs, and `report`
     refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
     binding the report binding then proves); each refusal appends 'op-caller-refused' on the op's
     job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
@@ -189,7 +189,14 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-question|worker-nudge-ready|worker-wedged|engaged|ask-reserve|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|ask-reserve|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      'frontier.peerMessageKeys': >-
+        [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
+        overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
+        Kernel; the state reads `peer-message` when no report, settle, worker question, idle or wedged
+        worker comes first, and its reason says to read `api inbox` and ack each key with a
+        disposition. An ack (or finish) clears it
+      peerMessages: '[{key, from, kind, subject, at}] — the same pending rows; empty once the workflow is finished'
       'frontier.staleOperations': >-
         [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
         whose law inputs changed since dispatch, which the Kernel re-dispatches as a new attempt
@@ -411,7 +418,15 @@ commands:
       defaults under them when it renders the packet. A `setBy: owner` name is
       accepted from --params only when the goal leg already carries it, and a
       `setBy: kernel` name is never accepted from a goal leg.
-    returns: '{ok:true, job_id, workflowId, op, status:queued, attempt, cut, params}'
+    returns: '{ok:true, job_id, workflowId, op, status:queued, attempt, cut, params, repository, peerOverlap:[{workflowId, jobId, path, ownPath}], peerHeadsUp:[{to, key, kind, subject}]}'
+    peerOverlap: >-
+      every open (queued|leased|running|answering|effect_unknown) job of a running peer (peers.rule)
+      holding an owned path equal to, above or below one of --paths (engine/admission.mjs
+      ownedPathsIntersect, the path-lease test) is listed in peerOverlap, and each such peer gets ONE
+      heads-up peer message in the same transaction naming the overlapping job pairs
+      (payload.overlapPairs, auto: enqueue-overlap; event 'peer-message-sent' on this workflow). A job
+      pair already announced in either direction is not announced again. It never refuses: the
+      capacity-1 path leases dispatch takes already serialize the writes
     refuses:
       - workflow-unknown: 'no workflows row'
       - workflow-finished: 'a finished phase takes no new work (finish below)'
@@ -773,6 +788,83 @@ commands:
     usedBy: 'drive.wait — answer every pending worker question before yielding'
 
   # --------------------------------------------------------------------------
+  # PEER MESSAGES — Kernel-to-Kernel mail between workflows that build in the
+  # same source. One product ledger holds several running workflows (nivo:
+  # app-auth, workspace-provision, modules-agentos, collab-group-chat) whose
+  # jobs write the same repositories. A Collab Kernel needed phone
+  # verification the Login workflow owns and asked the owner who should build
+  # it; workflows edited overlapping areas; a repo-wide migration was owned by
+  # no workflow. Peers settle that between themselves through inbox rows of
+  # kind peer-message. These are Kernel verbs: an op never sends or reads them.
+  # --------------------------------------------------------------------------
+
+  peers:
+    args: '--workflow <id>'
+    rule: >-
+      A peer is every OTHER workflow of the same ledger whose phase is running, that is not
+      archived, and that shares a source root (workflows.source_roots_json) with --workflow; a
+      workflow with no recorded roots shares every root. define-goal records the ledger's own repo
+      as every workflow's root and a job's `repository` is mostly unset, so in practice every
+      running workflow of one ledger is a peer: the ledger is one product whose binding spans its
+      repositories (nivo-backend + nivo-fe)
+    reads: 'workflows rows; the open (queued|leased|running|answering|effect_unknown) jobs of each peer; pending peer-message inbox rows'
+    writes: 'nothing — pure projection'
+    returns: >-
+      {ok:true, workflowId, rule, peers:[{workflowId, title, phase, currentLeg:{jobId, op, status,
+      attempt}|null (the most recently moved in-flight job, else the latest queued one),
+      ownedPaths:[{jobId, op, status, paths[]}], pending:{toPeer:[{key, from, to, kind, subject, at}],
+      fromPeer:[...]}}]}
+    refuses:
+      - workflow-unknown
+    usedBy: 'before planning work that may belong to another workflow''s scope, and to see who owns a path before touching it'
+
+  notify:
+    args: '--workflow <from> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply> --subject <s> --body <text> [--reply-to <key>] [--refs <csv>]'
+    kinds: >-
+      request (work the sender needs that lies in the peer's scope — the peer builds it or answers
+      why not), heads-up (the sender changed or will change a shared contract, record or path the
+      peer reads), handoff (the sender gives the peer a piece of work or ownership, e.g. a repo-wide
+      change no workflow owns), reply (answers a received message; --reply-to is required)
+    reads: 'the sender and every target workflows row; the sender''s received message --reply-to names; the targets'' pending peer messages'
+    writes: >-
+      one inbox row per target {workflow_id: <target>, kind: peer-message, key: pm-<12 hex>, status
+      pending, payload {from, fromTitle, kind, subject, body, replyTo, refs[], at}} and one event
+      'peer-message-sent' {to, key, kind, subject, replyTo} on the sender. `--to peers` sends to
+      every current peer (none is ok:true with sent []). A message identical to one still pending
+      for that target (same from, kind, subject, body, replyTo) is not written again: its key comes
+      back with deduped:true
+    returns: '{ok:true, workflowId, kind, subject, replyTo, sent:[{to, key, kind, subject, deduped?}]}'
+    refuses:
+      - workflow-unknown
+      - workflow-finished: 'a finished sender sends nothing'
+      - peer-kind-invalid: '--kind is not request|heads-up|handoff|reply'
+      - peer-message-empty: '--subject or --body is blank'
+      - reply-to-missing: '--kind reply without --reply-to'
+      - reply-to-unknown: '--reply-to names no peer message the sender received'
+      - reply-to-mismatch: 'the targets do not include the sender of the --reply-to message'
+      - 'peer-self / peer-unknown / peer-not-running / peer-not-shared-source: a target is the sender, no workflow of this ledger, finished or archived, or shares no source root. Nothing is written for any target'
+    usedBy: 'drive — a request instead of doing a peer''s work or asking the owner who should; a heads-up on every shared-contract change; a reply to every request'
+
+  inbox:
+    args: '--workflow <id> [--ack <key> --disposition <text>]'
+    reads: 'peer-message inbox rows addressed to --workflow, and the latest 20 it sent'
+    writes: >-
+      without --ack nothing. --ack sets that pending row status applied, disposition_json
+      {disposition, by, at} and applied_at, and appends 'peer-message-acked' {key, from, kind,
+      disposition} on --workflow; the sender reads the disposition back in its own `api inbox` sent
+      list
+    returns: >-
+      {ok:true, workflowId, pending:[{key, from, fromTitle, kind, subject, body, replyTo, refs[], at}],
+      sent:[{key, to, kind, subject, replyTo, at, status, disposition, appliedAt}] newest first}  |
+      --ack: {ok:true, workflowId, acked:{key, from, kind, subject, disposition}, pending:<n left>}
+    refuses:
+      - workflow-unknown
+      - peer-message-unknown: '--ack names no peer message in this workflow''s inbox'
+      - peer-message-not-pending: 'already acked (the existing disposition is quoted) or closed by finish'
+      - disposition-missing: '--disposition is blank (absent is a usage error, exit 2)'
+    usedBy: 'drive — every wake reads it before planning; each message is acted on and acked with what was done'
+
+  # --------------------------------------------------------------------------
   # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
   # checks beside. These rows (engine/schema.sql reports/contracts/checks)
   # are the truth.
@@ -1075,14 +1167,14 @@ askLifecycle:
 # TABLE MAP — which command touches which ledger table (ledger-db.mjs DDL).
 # ============================================================================
 tableMap:
-  workflows:  {read: [survey, status, hierarchy, plan, enqueue, incident, finish], write: [dispatch, finish]}
+  workflows:  {read: [survey, status, hierarchy, plan, enqueue, peers, notify, inbox, incident, finish], write: [dispatch, finish]}
   goals:      {read: [survey, plan, route], write: [plan]}
-  jobs:       {read: [survey, status, hierarchy, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, reconcile, settle]}
-  inbox:      {read: [survey, status], write: [finish]}
+  jobs:       {read: [survey, status, hierarchy, enqueue, peers, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, reconcile, settle]}
+  inbox:      {read: [survey, status, peers, notify, inbox, questions, reply, enqueue], write: [enqueue, notify, inbox, questions, reply, finish]}
   signals:    {read: [survey], write: [finish]}
   leases:     {read: [status, dispatch, reconcile, settle], write: [dispatch, reconcile, settle]}
   incidents:  {read: [survey, route], write: [dispatch, incident]}
-  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, report, consume-report, check, settle, incident, finish]}
+  events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, questions, reply, notify, inbox, report, consume-report, check, settle, incident, finish]}
   reports:    {read: [survey, status, reconcile, consume-report, settle], write: [report, consume-report, settle]}
   contracts:  {read: [survey, status, reconcile, op-contract], write: [dispatch]}
   checks:     {read: [settle], write: [check]}

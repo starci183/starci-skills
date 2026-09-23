@@ -20,6 +20,10 @@
 //   observe  --repo <path> --job <job_id> [--lines <n>]
 //   questions --repo <path> --workflow <id>
 //   reply    --repo <path> --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
+//   peers    --repo <path> --workflow <id>
+//   notify   --repo <path> --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply>
+//            --subject <s> --body <text> [--reply-to <key>] [--refs <csv>]
+//   inbox    --repo <path> --workflow <id> [--ack <key> --disposition <text>]
 //   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
 //   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
@@ -45,6 +49,7 @@ import {
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
+  ownedPathsIntersect,
 } from '../../engine/admission.mjs';
 import {
   activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
@@ -177,6 +182,10 @@ const usage = (code) => {
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
   reply    --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
+  peers    --workflow <id>
+  notify   --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply>
+           --subject <s> --body <text> [--reply-to <key>] [--refs <csv>]
+  inbox    --workflow <id> [--ack <key> --disposition <text>]
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
   report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
@@ -755,6 +764,249 @@ function cmdReply(ledger, args) {
   emit(out, `replied to ${messageId} (${item.jobId})${toOwner ? ': routed to the owner through outcome ask' : ''}`, args.json);
 }
 
+/* --------------------------------------------------------- peer messages */
+// Several workflows of one product repo share its ledger and build in the
+// same source repositories (nivo: Login, workspace provision, modules and
+// collab in nivo-backend + nivo-fe). With no channel between their Kernels a
+// Collab Kernel that needed the Login workflow's phone verification asked the
+// owner who should build it, two workflows edited overlapping areas, and a
+// repo-wide migration was owned by no workflow. Peers now talk through the
+// ledger inbox (kind peer-message): `api notify` writes one pending row per
+// target, the target's status frontier is actionable until its Kernel reads
+// `api inbox` and acks each row with a disposition the sender can read back,
+// and `api enqueue` sends an automatic heads-up when a new job's owned_paths
+// overlap an open job of a peer. These are Kernel verbs; an op never sends.
+//
+// PEER RULE: every other workflow of the same ledger that is phase running,
+// not archived, and shares a source root with this one; a workflow with no
+// recorded roots shares every root. define-goal records the ledger's own repo
+// as each workflow's source_roots_json and a job's `repository` is rarely set,
+// so in practice every running workflow of one ledger is a peer: the ledger
+// is one product and its binding spans the product's repositories.
+const PEER_MESSAGE = 'peer-message';
+const PEER_MESSAGE_KINDS = ['request', 'heads-up', 'handoff', 'reply'];
+const PEER_RULE = 'every other running, unarchived workflow of this ledger that shares a source root (source_roots_json; unrecorded roots share all)';
+const PEER_OPEN_JOB_STATUSES = [...DISPATCHABLE, ...JOB_STATUSES.fenced];
+const PEER_SENT_LIMIT = 20;
+const sourceRootKey = (root) => {
+  const resolved = path.resolve(String(root)).replace(/[\\/]+$/, '');
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+};
+const sourceRootsOf = (wf) => {
+  const roots = parseJson(wf?.source_roots_json ?? '', null);
+  return Array.isArray(roots) ? roots.filter((root) => typeof root === 'string' && root.trim()).map(sourceRootKey) : [];
+};
+const sharesSourceRoot = (a, b) => {
+  const left = sourceRootsOf(a), right = sourceRootsOf(b);
+  return !left.length || !right.length || left.some((root) => right.includes(root));
+};
+const peerWorkflowsOf = (db, self) => db.prepare("SELECT * FROM workflows WHERE workflow_id<>? AND phase='running' AND archived_at IS NULL ORDER BY created_at,workflow_id")
+  .all(self.workflow_id).filter((wf) => sharesSourceRoot(self, wf));
+/** Why `to` is not a running peer of `self`, or null when it is. */
+const peerRefusalOf = (db, self, to) => {
+  if (to === self.workflow_id) return { code: 'peer-self', detail: `${to} is the sending workflow itself` };
+  const wf = getWorkflow(db, to);
+  if (!wf) return { code: 'peer-unknown', detail: `no workflow ${to} in this ledger` };
+  if (wf.phase !== 'running' || wf.archived_at != null) {
+    return { code: 'peer-not-running', detail: `${to} is ${wf.archived_at != null ? 'archived' : `phase ${wf.phase ?? 'unset'}`}; only a running workflow is a peer` };
+  }
+  if (!sharesSourceRoot(self, wf)) return { code: 'peer-not-shared-source', detail: `${to} shares no source root with ${self.workflow_id}` };
+  return null;
+};
+const peerOpenJobsOf = (db, workflowId) => db.prepare(`SELECT job_id,op_id,status,attempt,payload_json,created_at,updated_at FROM jobs
+    WHERE workflow_id=? AND kind<>'kernel' AND status IN (${PEER_OPEN_JOB_STATUSES.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
+  .all(workflowId, ...PEER_OPEN_JOB_STATUSES)
+  .map((row) => ({ jobId: row.job_id, op: row.op_id ?? jobPayloadOf(row).opId ?? null, status: row.status, attempt: row.attempt,
+    paths: ownedPathsOf(jobPayloadOf(row)), updatedAt: row.updated_at ?? row.created_at ?? 0 }));
+/** A workflow's current leg: its most recently moved in-flight job, else its latest queued one. */
+const currentLegOf = (jobs) => {
+  const inFlight = jobs.filter((job) => job.status !== 'queued').sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+  const pick = inFlight ?? jobs.filter((job) => job.status === 'queued').at(-1) ?? null;
+  return pick ? { jobId: pick.jobId, op: pick.op, status: pick.status, attempt: pick.attempt } : null;
+};
+const peerMessageOf = (row) => {
+  const payload = parseJson(row.payload_json, {}) ?? {};
+  return {
+    key: row.key, to: row.workflow_id, from: payload.from ?? null, fromTitle: payload.fromTitle ?? null, kind: payload.kind ?? null,
+    subject: payload.subject ?? null, body: payload.body ?? null, replyTo: payload.replyTo ?? null,
+    refs: Array.isArray(payload.refs) ? payload.refs : [], at: payload.at ?? row.created_at,
+    status: row.status, disposition: parseJson(row.disposition_json ?? '', null), appliedAt: row.applied_at ?? null,
+  };
+};
+// Every peer-message row, read by kind and filtered in JS: json_extract over
+// the whole inbox would also parse the other kinds' payloads.
+const peerMessageRows = (db) => db.prepare('SELECT * FROM inbox WHERE kind=? ORDER BY inbox_id').all(PEER_MESSAGE);
+const pendingPeerMessagesOf = (db, workflowId) => db.prepare("SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND status='pending' ORDER BY inbox_id")
+  .all(workflowId, PEER_MESSAGE).map(peerMessageOf);
+const pathsIntersectSafe = (a, b) => { try { return ownedPathsIntersect(a, b); } catch { return false; } };
+/**
+ * One pending peer-message row in `to`'s inbox plus the sender's 'peer-message-sent' event. The
+ * caller holds the transaction and has already proven `to` a running peer.
+ */
+const writePeerMessage = (ledger, { from, to, kind, subject, body, replyTo = null, refs = [], extra = {}, now = Date.now() }) => {
+  const key = `pm-${newToken().slice(0, 12)}`;
+  const payload = { from: from.workflow_id, fromTitle: from.title ?? null, kind, subject, body, replyTo, refs, at: now, ...extra };
+  ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?, 'pending',?)")
+    .run(to, PEER_MESSAGE, key, JSON.stringify(payload), now);
+  ledger.appendEvent({ workflowId: from.workflow_id, entityType: 'workflow', entityId: from.workflow_id, kind: 'peer-message-sent',
+    payload: { to, key, kind, subject, replyTo, ...(extra.auto ? { auto: extra.auto } : {}) } });
+  return { to, key, kind, subject };
+};
+/**
+ * The enqueue-time overlap heads-up. Every open job of a running peer holding an owned path equal to,
+ * above or below one of the new job's paths is returned as {workflowId, jobId, path, ownPath}, and
+ * each such peer gets ONE heads-up naming the overlapping job pairs. A job pair already announced
+ * (either direction) is never announced again. Nothing is blocked: the capacity-1 path leases
+ * dispatch takes already serialize the writes.
+ */
+const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = Date.now() }) => {
+  const db = ledger.db, overlap = [], messages = [];
+  const peers = peerWorkflowsOf(db, self);
+  if (!peers.length) return { overlap, messages };
+  const pairKey = (other) => [jobId, other].sort().join('|');
+  const announced = new Set(peerMessageRows(db).flatMap((row) => {
+    const pairs = parseJson(row.payload_json, {})?.overlapPairs;
+    return Array.isArray(pairs) ? pairs : [];
+  }));
+  for (const peer of peers) {
+    const hits = [];
+    for (const job of peerOpenJobsOf(db, peer.workflow_id)) {
+      for (const peerPath of job.paths) {
+        const ownPath = ownedPaths.find((own) => pathsIntersectSafe(own, peerPath));
+        if (ownPath) hits.push({ workflowId: peer.workflow_id, jobId: job.jobId, op: job.op, path: peerPath, ownPath });
+      }
+    }
+    if (!hits.length) continue;
+    overlap.push(...hits.map(({ workflowId, jobId: peerJob, path: peerPath, ownPath }) => ({ workflowId, jobId: peerJob, path: peerPath, ownPath })));
+    const fresh = hits.filter((hit) => !announced.has(pairKey(hit.jobId)));
+    if (!fresh.length) continue;
+    const pairs = [...new Set(fresh.map((hit) => pairKey(hit.jobId)))];
+    for (const pair of pairs) announced.add(pair);
+    const peerJobs = [...new Set(fresh.map((hit) => hit.jobId))];
+    const subject = `overlap: ${op} (${jobId}) owns paths your open job${peerJobs.length > 1 ? 's' : ''} ${peerJobs.join(', ')} own${peerJobs.length > 1 ? '' : 's'}`;
+    const body = `${self.title ?? self.workflow_id} (${self.workflow_id}) enqueued ${op} as ${jobId} owning ${ownedPaths.join(', ')}. `
+      + `It overlaps ${fresh.map((hit) => `${hit.jobId} (${hit.op ?? '-'}) ${hit.path}`).join('; ')}. `
+      + 'The path lease serializes the writes and nothing is blocked. If the two changes conflict in intent or in a shared contract, '
+      + `agree the order or the owner of the change with ${self.workflow_id} (api notify --kind reply --reply-to <this key>), then ack this message with what you decided.`;
+    messages.push(writePeerMessage(ledger, { from: self, to: peer.workflow_id, kind: 'heads-up', subject, body,
+      refs: [jobId, ...peerJobs], extra: { auto: 'enqueue-overlap', overlapPairs: pairs }, now }));
+  }
+  return { overlap, messages };
+};
+
+function cmdPeers(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow;
+  const self = getWorkflow(db, workflowId);
+  if (!self) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const pendingRows = peerMessageRows(db).filter((row) => row.status === 'pending').map(peerMessageOf);
+  const peers = peerWorkflowsOf(db, self).map((wf) => {
+    const jobs = peerOpenJobsOf(db, wf.workflow_id);
+    const brief = ({ key, from, to, kind, subject, at }) => ({ key, from, to, kind, subject, at });
+    return {
+      workflowId: wf.workflow_id, title: wf.title ?? null, phase: wf.phase ?? null, currentLeg: currentLegOf(jobs),
+      ownedPaths: jobs.filter((job) => job.paths.length).map(({ jobId, op, status, paths }) => ({ jobId, op, status, paths })),
+      pending: {
+        toPeer: pendingRows.filter((m) => m.to === wf.workflow_id && m.from === workflowId).map(brief),
+        fromPeer: pendingRows.filter((m) => m.to === workflowId && m.from === wf.workflow_id).map(brief),
+      },
+    };
+  });
+  const out = { ok: true, workflowId, rule: PEER_RULE, peers };
+  emit(out, [
+    `peers ${workflowId}: ${peers.length} running peer(s)`,
+    ...peers.flatMap((peer) => [
+      `  ${peer.workflowId} "${peer.title ?? '-'}" leg=${peer.currentLeg ? `${peer.currentLeg.op ?? '-'}:${peer.currentLeg.status} (${peer.currentLeg.jobId})` : '-'} pending to-peer=${peer.pending.toPeer.length} from-peer=${peer.pending.fromPeer.length}`,
+      ...peer.ownedPaths.map((job) => `    ${job.jobId} ${job.op ?? '-'} ${job.status}: ${job.paths.join(', ')}`),
+    ]),
+  ].join('\n'), args.json);
+}
+
+function cmdNotify(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow;
+  const self = getWorkflow(db, workflowId);
+  if (!self) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (self.phase === 'finished') {
+    throw Object.assign(new Error(`workflow ${workflowId} is finished; a finished workflow sends no peer message`), { code: 'workflow-finished' });
+  }
+  const kind = String(args.kind).trim();
+  if (!PEER_MESSAGE_KINDS.includes(kind)) {
+    throw Object.assign(new Error(`--kind must be ${PEER_MESSAGE_KINDS.join('|')}, got '${kind}'`), { code: 'peer-kind-invalid' });
+  }
+  const subject = String(args.subject).trim(), body = String(args.body).trim();
+  if (!subject || !body) throw Object.assign(new Error('notify needs a non-empty --subject and --body'), { code: 'peer-message-empty' });
+  const replyTo = args['reply-to'] ? String(args['reply-to']).trim() : null;
+  let original = null;
+  if (replyTo) {
+    const row = db.prepare('SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key=? ORDER BY inbox_id DESC LIMIT 1').get(workflowId, PEER_MESSAGE, replyTo);
+    if (!row) throw Object.assign(new Error(`--reply-to ${replyTo} names no peer message ${workflowId} received`), { code: 'reply-to-unknown' });
+    original = peerMessageOf(row);
+  } else if (kind === 'reply') {
+    throw Object.assign(new Error('a reply names the message it answers with --reply-to <key>'), { code: 'reply-to-missing' });
+  }
+  const wanted = String(args.to).trim();
+  const targets = wanted === 'peers' ? peerWorkflowsOf(db, self).map((wf) => wf.workflow_id) : csvList(wanted);
+  for (const to of new Set(targets)) {
+    const refusal = peerRefusalOf(db, self, to);
+    if (refusal) throw Object.assign(new Error(refusal.detail), { code: refusal.code });
+  }
+  if (original && !targets.includes(original.from)) {
+    throw Object.assign(new Error(`--reply-to ${replyTo} came from ${original.from}; a reply goes back to its sender`), { code: 'reply-to-mismatch' });
+  }
+  const refs = csvList(args.refs);
+  const sent = [];
+  ledger.transaction(() => {
+    const now = Date.now();
+    for (const to of [...new Set(targets)]) {
+      // A Kernel re-sending after a crash sends the same message, not a second one.
+      const same = pendingPeerMessagesOf(db, to).find((m) => m.from === workflowId && m.kind === kind && m.subject === subject
+        && m.body === body && (m.replyTo ?? null) === replyTo);
+      if (same) { sent.push({ to, key: same.key, kind, subject, deduped: true }); continue; }
+      sent.push(writePeerMessage(ledger, { from: self, to, kind, subject, body, replyTo, refs, now }));
+    }
+  });
+  const out = { ok: true, workflowId, kind, subject, replyTo, sent };
+  emit(out, `notify ${workflowId} [${kind}] ${subject} -> ${sent.map((m) => `${m.to} (${m.key}${m.deduped ? ', already pending' : ''})`).join(', ') || 'no running peer'}`, args.json);
+}
+
+function cmdInbox(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow;
+  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  if (args.ack != null) {
+    const key = String(args.ack).trim();
+    const disposition = typeof args.disposition === 'string' ? args.disposition.trim() : '';
+    if (!disposition) throw Object.assign(new Error('an ack says what was done: --disposition <text>'), { code: 'disposition-missing' });
+    const row = db.prepare("SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key=? ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, inbox_id DESC LIMIT 1")
+      .get(workflowId, PEER_MESSAGE, key);
+    if (!row) throw Object.assign(new Error(`no peer message ${key} in ${workflowId}'s inbox`), { code: 'peer-message-unknown' });
+    const message = peerMessageOf(row);
+    if (row.status !== 'pending') {
+      throw Object.assign(new Error(`peer message ${key} is already ${row.status}${message.disposition?.disposition ? `: ${message.disposition.disposition}` : ''}`), { code: 'peer-message-not-pending' });
+    }
+    ledger.transaction(() => {
+      const now = Date.now();
+      db.prepare("UPDATE inbox SET status='applied', disposition_json=?, applied_at=? WHERE inbox_id=? AND status='pending'")
+        .run(JSON.stringify({ disposition, by: workflowId, at: now }), now, row.inbox_id);
+      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'peer-message-acked',
+        payload: { key, from: message.from, kind: message.kind, disposition } });
+    });
+    const out = { ok: true, workflowId, acked: { key, from: message.from, kind: message.kind, subject: message.subject, disposition },
+      pending: pendingPeerMessagesOf(db, workflowId).length };
+    emit(out, `acked ${key} from ${message.from} [${message.kind}] ${message.subject}: ${disposition} (${out.pending} still pending)`, args.json);
+    return;
+  }
+  const pending = pendingPeerMessagesOf(db, workflowId)
+    .map(({ key, from, fromTitle, kind, subject, body, replyTo, refs, at }) => ({ key, from, fromTitle, kind, subject, body, replyTo, refs, at }));
+  const sent = peerMessageRows(db).map(peerMessageOf).filter((m) => m.from === workflowId).slice(-PEER_SENT_LIMIT).reverse()
+    .map(({ key, to, kind, subject, replyTo, at, status, disposition, appliedAt }) => ({ key, to, kind, subject, replyTo, at, status, disposition, appliedAt }));
+  const out = { ok: true, workflowId, pending, sent };
+  emit(out, [
+    `inbox ${workflowId}: ${pending.length} pending peer message(s)`,
+    ...pending.map((m) => `  ${m.key} from ${m.from} [${m.kind}] ${m.subject}${m.replyTo ? ` (reply to ${m.replyTo})` : ''}\n    ${m.body}${m.refs.length ? `\n    refs: ${m.refs.join(', ')}` : ''}`),
+    ...(sent.length ? [`sent (latest ${sent.length}):`] : []),
+    ...sent.map((m) => `  ${m.key} to ${m.to} [${m.kind}] ${m.subject} — ${m.status}${m.disposition?.disposition ? `: ${m.disposition.disposition}` : ''}`),
+  ].join('\n'), args.json);
+}
+
 const AGENT_HIERARCHY_SCHEMA = 'starci/agent-hierarchy@1';
 const workflowNodeId = (workflowId) => `workflow:${workflowId}`;
 const kernelNodeId = (workflowId) => `agent:kernel:${workflowId}`;
@@ -903,7 +1155,7 @@ function askFormAlive(payload, { probeMs = 1500 } = {}) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'ask-reserve', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'ask-reserve', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -1252,12 +1504,18 @@ function cmdStatus(ledger, args) {
       .map((row) => ({ ...(parseJson(row.payload_json, {}) ?? {}), messageId: row.key, bridged: true, state: 'pending' }))
       .filter((item) => item.jobId && workers.some((worker) => worker.jobId === item.jobId)), error: null };
   const workerQuestions = workerAsks.pending.map(({ messageId, jobId, opId, attempt, question, options, askedAt, bridged }) => ({ messageId, jobId, opId, attempt, question, options, askedAt, bridged }));
+  // A peer workflow's pending message (api notify, or the enqueue overlap
+  // heads-up) waits on this Kernel until it reads api inbox and acks it. It
+  // ranks below the reports, settles and blocked workers already in flight.
+  const peerMessages = wf.phase === 'finished' ? []
+    : pendingPeerMessagesOf(db, workflowId).map(({ key, from, kind, subject, at }) => ({ key, from, kind, subject, at }));
   const frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
     : settleReady.length > 0 ? 'settle-ready'
     : workerQuestions.length > 0 ? 'worker-question'
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : wedgedWorkers.length > 0 ? 'worker-wedged'
+    : peerMessages.length > 0 ? 'peer-message'
     : openOperations > 0 ? 'engaged'
     // Nothing open, but a question is with the owner: the workflow waits on
     // them, not on the Kernel, so nothing should wake it until the answer.
@@ -1273,7 +1531,7 @@ function cmdStatus(ledger, args) {
   const stale = staleInputProjection(db, wf);
   const staleOperations = staleOperationsOf(stale.staleInput);
   const staleReady = staleOperations.filter((item) => !item.heldBy);
-  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0;
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0;
   const frontier = {
     state: frontierState,
     actionable,
@@ -1286,9 +1544,10 @@ function cmdStatus(ledger, args) {
     wedgedJobs: wedgedWorkers.map((worker) => worker.jobId),
     settleReadyJobs: settleReady,
     askReserveDispatches: askReserve,
+    peerMessageKeys: peerMessages.map((message) => message.key),
     queued,
     queuedCauses,
-    reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged'].includes(frontierState))
+    reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'peer-message'].includes(frontierState))
       ? `unanswered ask(s) ${askReserve.join(', ')} have no live form (never served or the serve-ask ttl expired); re-serve each with api serve-ask --workflow <id> --dispatch <id> before yielding`
       : frontierState === 'worker-question'
       ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked the coordinator through orca orchestration ask and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
@@ -1296,6 +1555,8 @@ function cmdStatus(ledger, args) {
       ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
       : frontierState === 'worker-wedged'
       ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
+      : frontierState === 'peer-message'
+      ? `${peerMessages.length} peer message(s) wait on you (${peerMessages.map((message) => `${message.key} ${message.kind} from ${message.from}`).join(', ')}); read api inbox --workflow <id>, act on each (a request in your scope becomes work, a heads-up adjusts your plan, answer with api notify --kind reply --reply-to <key>), then ack each with api inbox --ack <key> --disposition <what you did> before yielding`
       : frontierState === 'awaiting-owner'
       ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}; the answer or api incident --resolve wakes the Kernel`
       : frontierState === 'orphaned-frontier'
@@ -1321,13 +1582,14 @@ function cmdStatus(ledger, args) {
     cutSets.push({ op: row.op_id, id: set.id, total: set.total, passed: set.passed, open: set.open, jobs: set.jobs,
       ...(set.open.length === 1 ? { closingOrdinal: set.open[0], closingJob: set.jobs[set.open[0]]?.jobId ?? null, closingCheck: CUT_SET_CLOSING_CHECK } : {}) });
   }
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, ...stale };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, ...stale };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
+      ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
       ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} has no live form; re-serve: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
@@ -1614,7 +1876,7 @@ function cmdEnqueue(ledger, args, repo) {
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
 
-  let job;
+  let job, peers = { overlap: [], messages: [] };
   ledger.transaction(() => {
     const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, args.op).a;
     // A retry's provenance. `attempt` is durable dispatch identity; the route's
@@ -1652,10 +1914,14 @@ function cmdEnqueue(ledger, args, repo) {
       kind: 'job-enqueued', payload: { opId: args.op, attempt, records: records.length, ownedPaths: ownedPaths.length, risk: payload.risk, cut, repository: payload.repository ?? null },
     });
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+    // Owned paths that overlap an open job of a running peer workflow: the
+    // receipt names them and each such peer gets one heads-up. Never a refusal.
+    peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now });
   });
 
-  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null, repository: payload.repository ?? null };
-  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})`, args.json);
+  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null, repository: payload.repository ?? null,
+    peerOverlap: peers.overlap, peerHeadsUp: peers.messages };
+  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
 }
 
 /* ----------------------------------------------------------------- route */
@@ -3861,7 +4127,7 @@ function cmdConsumeReport(ledger, args) {
 const OP_ROLE = 'op';
 const opLaunchEnv = (jobId) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId });
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'reply', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'finish']);
+  'questions', 'reply', 'peers', 'notify', 'inbox', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'finish']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -3896,6 +4162,7 @@ async function main() {
     enqueue: ['workflow', 'op', 'paths'], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: ['job'], nudge: ['job'], observe: ['job'],
     questions: ['workflow'], reply: ['workflow', 'message'],
+    peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
     'consume-report': ['job'], 'serve-ask': ['workflow'], 'retire-ask': ['workflow', 'dispatch', 'reason'],
@@ -3908,6 +4175,7 @@ async function main() {
   if (cmd === 'report' && args.outcome) need(REPORT_OUTCOMES.includes(args.outcome), `report --outcome must be ${REPORT_OUTCOMES.join('|')}, got '${args.outcome}'`);
   if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
+  if (cmd === 'inbox' && args.ack != null) need(args.disposition, 'inbox --ack <key> needs --disposition <what was done>');
   if (cmd === 'incident') {
     need(args.workflow, 'incident needs --workflow');
     if (!args.resolve) { need(args.kind, 'incident needs --kind (or --resolve <incidentId>)'); need(args.detail, 'incident needs --detail'); }
@@ -3946,6 +4214,9 @@ async function main() {
       case 'observe': return cmdObserve(ledger, args);
       case 'questions': return cmdQuestions(ledger, args);
       case 'reply': return cmdReply(ledger, args);
+      case 'peers': return cmdPeers(ledger, args);
+      case 'notify': return cmdNotify(ledger, args);
+      case 'inbox': return cmdInbox(ledger, args);
       case 'settle': return cmdSettle(ledger, args, repo);
       case 'report': return cmdReport(ledger, args, repo);
       case 'op-contract': return cmdOpContract(ledger, args);

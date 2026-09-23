@@ -88,6 +88,16 @@ BOUNDARY — hard rules, non-negotiable:
     OAuth run, a consent screen) is `api incident --kind owner-gate --holds
     <ops|jobs>`, resolved with `api incident --resolve` once its receipt
     lands (modules/kernel/api.yaml incident.ownerGate).
+  - PEERS: other running workflows of this ledger build in the same source
+    (`api peers --workflow {workflowId}`). On every wake read `api inbox
+    --workflow {workflowId}` before planning, act on each message and ack it
+    with `api inbox --ack <key> --disposition <what you did>`. Work you need
+    that belongs to a peer's scope (e.g. phone verification in the Login
+    workflow) is `api notify --to <peer> --kind request`, never done yourself
+    and never an owner question about who should do it; a change to a shared
+    contract or record a peer reads is `--kind heads-up`; answer a request
+    with `--kind reply --reply-to <key>`. Only a disagreement the peers cannot
+    settle goes to the owner (driver-loop.yaml peers).
   - Do not end a turn with runnable jobs or a machine-resolvable blocker. A
     model turn becoming idle is not workflow completion. Re-survey after every
     repair or settlement and continue until no immediately executable durable
@@ -197,7 +207,8 @@ LOOP:
     evidence) → `turn-idle` or `staged-input` worker with no report gets exactly `api nudge --job <id>`
     (a staged paste gets one Enter) → a worker question (status `workerQuestions`, frontier
     `worker-question`) gets `api questions` then `api reply --message <id>` with `--body` for technical
-    guidance inside its contract or `--to-owner` for an owner decision → worker files
+    guidance inside its contract or `--to-owner` for an owner decision → a pending peer
+    message (frontier `peer-message`) gets `api inbox`, its action and an ack → worker files
     api report → api consume-report (integrated) → re-run the op's checks →
     api check (results recorded) → api settle (enforces the consumed report,
     releases the worker; verify evidence BYTES — an op's last words are never
