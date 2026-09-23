@@ -198,7 +198,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -1010,24 +1010,35 @@ commands:
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
 
   serve-ask:
-    args: '--workflow <id> [--dispatch <id>] [--ttl <ms>]'
+    args: '--workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]'
     reads: 'the workflow row; with --dispatch, the reports row that filed that ask'
     writes: >-
-      nothing itself: it launches scripts/kernel/serve-ask.mjs detached, which
-      binds the localhost form and appends ask-serving (ask-serving-expired on
-      --ttl, ask-answered on submit). It is how a Kernel clears
+      Parks the ask for the owner; it serves NO form by default (owner,
+      2026-09-24: a form URL is served only when the owner asks for it).
+      scripts/kernel/serve-ask.mjs parkAsk supersedes the earlier asks it
+      replaces (ask-superseded, their Telegram messages deleted:
+      ask-message-closed), sends the owner the question with its numbered
+      options and one "Generate URL" button (scripts/connectors/telegram.mjs
+      notifyAsk; deduped while the notice is in the chat) and appends
+      ask-notified {dispatchId, onDemand:true, via:telegram, messageId, key,
+      fresh, fields}. The Telegram bridge serves the form when the owner
+      presses the button (serve-ask.mjs --on-demand telegram: ask-serving
+      with onDemand, ask-serving-expired on --ttl, ask-answered on submit).
+      `--now` also launches the form at once for local use; with Telegram off
+      (or a failed send: ask-notify-failed) the form is launched at once as
+      before, with the gateway and tunnel kept up. It is how a Kernel clears
       frontier.askReserveDispatches without leaving the api surface. With
       config.yaml asks.autoAcceptRecommended on, an ask that carries a
       recommended option and falls in no class of asks.excludes (credential
       and handover.review asks always do) is answered in-process instead
       (scripts/kernel/serve-ask.mjs autoAcceptAsk): the answer receipt,
       ask-answered with answeredBy auto-recommended, ask-auto-accepted, the
-      kernel wake and one Telegram message; no form is launched.
-    returns: '{ok:true, workflowId, dispatchId, pid, servedBy} | {ok:true, workflowId, dispatchId, autoAccepted:true, optionIndex, option, answeredBy, receiptPath, wake, telegram}'
+      kernel wake and one Telegram message; nothing is served.
+    returns: '{ok:true, workflowId, dispatchId, onDemand:true, telegram:{notified, messageId, fresh}, superseded[], pid:null} | {ok:true, workflowId, dispatchId, pid, servedBy, onDemand:false, servedBecause, telegram?, connectors?} | {ok:true, workflowId, dispatchId, autoAccepted:true, optionIndex, option, answeredBy, receiptPath, wake, telegram}'
     refuses:
       - workflow-unknown
       - ask-unknown
-    usedBy: 'drive.wait — an ask-reserve frontier re-serves each askReserveDispatches entry'
+    usedBy: 'drive.wait — an ask-reserve frontier parks each askReserveDispatches entry; an askOnDemandDispatches entry needs nothing'
   retire-ask:
     args: '--workflow <id> --dispatch <id> --reason <text>'
     reads: 'the reports row that filed that ask; its ask-answered/ask-superseded events'
@@ -1035,9 +1046,12 @@ commands:
       one event ask-superseded {dispatchId, by:null, opId, retired:true, reason}
       - the terminal kind every open-ask reader already honours - so the owner
       is no longer asked a question the workflow has outgrown (a premise a
-      later merge changed, an ask a later attempt made moot). An ask already
-      answered or superseded writes nothing and returns retired:false.
-    returns: '{ok:true, workflowId, dispatchId, retired, reason|already}'
+      later merge changed, an ask a later attempt made moot). The ask's
+      Telegram messages are deleted (edited to "no longer needs an answer"
+      only where Telegram refuses the delete) and ask-message-closed records
+      it. An ask already answered or superseded writes nothing and returns
+      retired:false.
+    returns: '{ok:true, workflowId, dispatchId, retired, reason|already, telegramDeleted?, telegramEdited?}'
     refuses:
       - workflow-unknown
       - ask-unknown
@@ -1275,12 +1289,15 @@ askLifecycle:
   servedBy: scripts/kernel/serve-ask.mjs
   ordering: events are ordered by events.seq — event_id is a random token and orders nothing
   events:
-    - ask-serving: 'the localhost form is bound and answering. payload {dispatchId, url, fields, ttlMs}; the newest ask-serving for a dispatch is the URL that counts'
+    - ask-notified: 'api serve-ask (serve-ask.mjs parkAsk) told the owner on Telegram: the question with a Generate URL button, no link, no form. payload {dispatchId, onDemand:true, via:telegram, messageId, key, fresh, fields}. The ask then waits on the owner with no form (frontier.askOnDemandDispatches, supervisor liveness on-demand); like ask-serving it reopens an ask superseded before it'
+    - ask-notify-failed: 'the Telegram notice could not be sent. payload {dispatchId, error}; api serve-ask then served the form at once'
+    - ask-serving: 'the localhost form is bound and answering. payload {dispatchId, url, pid, fields, ttlMs, onDemand?, requestedBy?} (onDemand/requestedBy telegram when the owner pressed Generate URL); the newest ask-serving for a dispatch is the URL that counts'
     - ask-serving-expired: 'the --ttl window closed with no submission. payload {dispatchId}; the URL is dead until a re-serve appends a newer ask-serving'
     - ask-superseded: 'a later ask report for the same (workflow, op) and the same subject (the asking job params.subject, else overlapping question.refs) was served and retires this one; an ask of the same op about another subject stays open. payload {dispatchId: <retired ask>, by: <the ask now serving>, opId}; terminal — a retired ask is closed without an answer and is never relayed to the owner'
     - ask-answered: 'the owner submitted the form. payload {dispatchId, receiptPath, answeredBy, optionIndex, custodyWritten, envWritten, pointersWritten, errors} — names and custody paths only, never values; terminal. The receipt (starci/ask-answer@1) carries option, optionIndex (the picked option''s position in question.options), picks, answeredBy, note and at. On a handover.review ask serve-ask refuses a delegate''s approve (403): only the owner approves a handover'
     - ask-auto-accepted: 'config.yaml asks.autoAcceptRecommended answered the ask with its recommended option instead of serving it; appended with the ask-answered (answeredBy auto-recommended) it audits. payload {dispatchId, opId, optionIndex, option, recommendedReason, receiptPath, rule {key, autoAcceptRecommended, excludes, source: structured|text}, config {autoAcceptRecommended, excludes, source}}. A handover.review, credential or excluded-kind ask never gets one'
-  open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id; modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead or unserved before it reaches the owner'
+    - ask-message-closed: 'the ask no longer waits (answered, auto-accepted, retired or superseded) and its Telegram messages were removed. payload {dispatchId, reason, deleted[], edited[], failed[]}: deleted, or edited to say it was answered where Telegram refuses a delete (older than 48 h); the bridge sweep retries a failed one'
+  open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id (a supersede followed by ask-notified or ask-serving is open again); modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead, unserved or on-demand before it reaches the owner'
 
 # ============================================================================
 # TABLE MAP — which command touches which ledger table (ledger-db.mjs DDL).

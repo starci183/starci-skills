@@ -70,8 +70,7 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { quitAgent } from './quit-agent.mjs';
-import { markAskClosed } from '../connectors/telegram.mjs';
-import { autoAcceptAsk, supersedeEarlierAsks } from './serve-ask.mjs';
+import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
@@ -199,7 +198,7 @@ const usage = (code) => {
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
-  serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>]
+  serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]
   retire-ask --workflow <id> --dispatch <id> --reason <text>
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
   incident --workflow <id> --resolve <incidentId> [--detail <s>]
@@ -214,7 +213,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -1463,12 +1462,12 @@ function cmdStatus(ledger, args) {
   const failedRows = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id").all(workflowId);
   const ownerWaits = failedRows.filter((row) => isAwaitingOwner(db, row));
   const askAnswers = new Map();
-  // The last lifecycle event wins; an ask served again after a supersede is
-  // pending again until it is answered.
-  for (const event of db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded','ask-serving') ORDER BY seq").all(workflowId)) {
+  // The last lifecycle event wins; an ask parked again (served, or notified
+  // for on-demand serving) after a supersede is pending again until answered.
+  for (const event of db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded','ask-serving','ask-notified') ORDER BY seq").all(workflowId)) {
     const dispatchId = parseJson(event.payload_json, {})?.dispatchId;
     if (!dispatchId) continue;
-    if (event.kind === 'ask-serving') { if (askAnswers.get(dispatchId) === 'superseded') askAnswers.delete(dispatchId); continue; }
+    if (event.kind === 'ask-serving' || event.kind === 'ask-notified') { if (askAnswers.get(dispatchId) === 'superseded') askAnswers.delete(dispatchId); continue; }
     askAnswers.set(dispatchId, event.kind === 'ask-answered' ? 'answered' : 'superseded');
   }
   const latestAttempt = new Map();
@@ -1510,14 +1509,23 @@ function cmdStatus(ledger, args) {
   // served its scope ask as its own Claude Code background shell, Claude Code
   // reaped it under memory pressure, and status kept calling the ask served,
   // so nothing woke the Kernel while the owner's link returned nothing.
-  const askReserve = pendingOwner.filter((item) => {
-    if (!item.dispatchId) return false;
-    const served = lastLifecycle(item.dispatchId, 'ask-serving');
-    const expired = lastLifecycle(item.dispatchId, 'ask-serving-expired');
-    if (served == null || (expired != null && expired > served)) return true;
+  const formLive = (dispatchId) => {
+    const served = lastLifecycle(dispatchId, 'ask-serving');
+    const expired = lastLifecycle(dispatchId, 'ask-serving-expired');
+    if (served == null || (expired != null && expired > served)) return false;
     const payload = parseJson(db.prepare('SELECT payload_json FROM events WHERE seq=?').get(served)?.payload_json, {}) ?? {};
-    return askFormAlive(payload) === false;
-  }).map((item) => item.dispatchId);
+    return askFormAlive(payload) !== false;
+  };
+  // Owner, 2026-09-24: a form is served only when the owner asks for it. An
+  // ask parkAsk told the owner about on Telegram (ask-notified) waits on the
+  // owner with no form at all - its link is generated from the chat's button
+  // (and regenerated after the form expires or dies) - so it is healthy
+  // (askOnDemandDispatches), never the Kernel's to re-serve.
+  const askOnDemand = [], askReserve = [];
+  for (const item of pendingOwner) {
+    if (!item.dispatchId || formLive(item.dispatchId)) continue;
+    (lastLifecycle(item.dispatchId, 'ask-notified') != null ? askOnDemand : askReserve).push(item.dispatchId);
+  }
   const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
 
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
@@ -1600,11 +1608,12 @@ function cmdStatus(ledger, args) {
     deadWorkerJobs: deadWorkers.map((worker) => worker.jobId),
     settleReadyJobs: settleReady,
     askReserveDispatches: askReserve,
+    askOnDemandDispatches: askOnDemand,
     peerMessageKeys: peerMessages.map((message) => message.key),
     queued,
     queuedCauses,
     reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'].includes(frontierState))
-      ? `unanswered ask(s) ${askReserve.join(', ')} have no live form (never served or the serve-ask ttl expired); re-serve each with api serve-ask --workflow <id> --dispatch <id> before yielding`
+      ? `unanswered ask(s) ${askReserve.join(', ')} never reached the owner (not notified on Telegram, and no live form: never served, or the serve-ask ttl expired); park each with api serve-ask --workflow <id> --dispatch <id> before yielding`
       : frontierState === 'worker-question'
       ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked the coordinator through orca orchestration ask and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
       : frontierState === 'settle-ready'
@@ -1618,7 +1627,7 @@ function cmdStatus(ledger, args) {
       : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
       ? handoverReason(handover, workflowId)
       : frontierState === 'awaiting-owner'
-      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}; the answer or api incident --resolve wakes the Kernel`
+      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram with a Generate URL button (the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
@@ -1651,7 +1660,8 @@ function cmdStatus(ledger, args) {
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
-      ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} has no live form; re-serve: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
+      ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
+      ...askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
       ...staleOperations.map((item) => `  stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
@@ -4313,15 +4323,21 @@ function ensureAskConnectors() {
   return { gateway: gateway?.ok === true, tunnel: tunnel?.ok === true, publicBase: tunnel?.publicBase ?? null };
 }
 
-// `serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>]`: launch the
-// owner-facing ask form (scripts/kernel/serve-ask.mjs) detached. A StarCi
-// Next Kernel held an ask-reserve for an hour (inc-2558dd227dfd): status told
-// it to re-serve with serve-ask.mjs, but its hard boundary allows mutations
-// only through api.mjs, so the owner never got a live form. The form itself
-// records ask-serving on bind; this verb only launches it for a real ask.
-// An ask config.yaml asks.autoAcceptRecommended answers (serve-ask.mjs
-// autoAcceptAsk) is answered here instead, in-process, so the calling Kernel
-// reads the answer in this verb's own output and no form is launched.
+// `serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]`: park an
+// owner ask. A StarCi Next Kernel held an ask-reserve for an hour
+// (inc-2558dd227dfd) because it could mutate only through api.mjs, so this
+// verb is the Kernel's one way to put a question in front of the owner.
+// Owner, 2026-09-24: a form URL is served only when the owner asks for it. So
+// with Telegram ready this verb serves NOTHING: parkAsk (serve-ask.mjs)
+// supersedes the asks it replaces, sends the owner the question with a
+// "Generate URL" button and records `ask-notified`; the Telegram bridge serves
+// the form (scripts/kernel/serve-ask.mjs --on-demand telegram) when the button
+// is pressed. `--now` also launches the form at once (local use), and with
+// Telegram off or unreachable the form is launched at once as before, since
+// nothing else could ever serve it. An ask config.yaml
+// asks.autoAcceptRecommended answers (serve-ask.mjs autoAcceptAsk) is
+// answered here instead, in-process, so the calling Kernel reads the answer
+// in this verb's own output and nothing is served.
 async function cmdServeAsk(ledger, args, repo) {
   const db = ledger.db, workflowId = args.workflow;
   if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -4335,22 +4351,33 @@ async function cmdServeAsk(ledger, args, repo) {
   if (report && !answered) {
     const auto = await autoAcceptAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report });
     if (auto.accepted) {
-      supersedeEarlierAsks(ledger, workflowId, report);
+      const superseded = supersedeEarlierAsks(ledger, workflowId, report);
+      await closeAskMessages(ledger, { ledgerFile: ledgerFileFor(repo), workflowId, dispatchIds: superseded, reason: 'retired' });
       const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null, telegram: auto.telegram?.sent ? 'sent' : (auto.telegram?.skipped ?? auto.telegram?.error ?? null) };
       emit(out, `ask ${report.dispatch_id} auto-accepted by config.yaml asks.autoAcceptRecommended: option ${auto.optionIndex + 1} (${auto.option}), answeredBy ${auto.answeredBy}; no form served. It binds like an owner answer for this business choice: re-enqueue the op with the answer bound (receipt ${auto.receiptPath}); a later owner answer supersedes it`, args.json);
       return;
     }
   }
-  // With a tunnel configured, the owner answers through response.<domain>:
-  // the Kernel keeps the gateway and tunnel up itself (both starts are
-  // idempotent) instead of waiting for someone to launch them.
-  const connectors = ensureAskConnectors();
+  // Tell the owner, serve on demand (parkAsk). An answered ask (or none) goes
+  // straight to serve-ask.mjs, which refuses it with its own error.
+  const parked = report && !answered ? await parkAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report }) : null;
+  const notice = parked?.notified ? { notified: true, messageId: parked.telegram?.messageId ?? null, fresh: Boolean(parked.telegram?.sent) } : null;
+  if (parked?.notified && args.now !== true) {
+    const out = { ok: true, workflowId, dispatchId: report.dispatch_id, onDemand: true, telegram: notice, superseded: parked.superseded, pid: null, servedBy: null };
+    emit(out, `ask ${report.dispatch_id} parked: the owner has it on Telegram with a Generate URL button (${notice.fresh ? 'sent now' : 'already in the chat'}); no form is served until the owner asks for one. status reads awaiting-owner; the answer's ask-answered wakes you`, args.json);
+    return;
+  }
+  // Served now: --now (local use), or Telegram is off / unreachable so nothing
+  // else could serve it. Without a Telegram notice the gateway and tunnel are
+  // kept up here (both starts are idempotent) so a public link exists.
+  const connectors = parked?.notified ? null : ensureAskConnectors();
   const script = path.join(skillRoot, 'scripts', 'kernel', 'serve-ask.mjs');
   const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
   const child = spawn(process.execPath, argv, { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot });
   child.unref();
-  const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/serve-ask.mjs', ...(connectors ? { connectors } : {}) };
-  emit(out, `serve-ask launched for ${workflowId}${dispatchId ? ` dispatch ${dispatchId}` : ''} (pid ${out.pid}); status shows ask-serving once the form binds`, args.json);
+  const why = parked ? (parked.notified ? 'now' : `telegram: ${parked.telegram?.skipped ?? parked.telegram?.error ?? 'not sent'}`) : null;
+  const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/serve-ask.mjs', onDemand: false, ...(notice ? { telegram: notice } : {}), ...(why ? { servedBecause: why } : {}), ...(connectors ? { connectors } : {}) };
+  emit(out, `serve-ask launched for ${workflowId}${dispatchId ? ` dispatch ${dispatchId}` : ''} (pid ${out.pid}${why ? `, ${why}` : ''}); status shows ask-serving once the form binds`, args.json);
 }
 
 /* ------------------------------------------------------------ retire-ask */
@@ -4375,9 +4402,11 @@ async function cmdRetireAsk(ledger, args, repo) {
   }
   ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, kind: 'ask-superseded',
     payload: { dispatchId, by: null, opId: report.op_id ?? null, retired: true, reason } });
-  // The owner's Telegram message for it now says it no longer needs an answer.
-  const telegram = await markAskClosed({ ledgerFile: ledgerFileFor(repo), workflowId, dispatchId, reason: 'retired' }).catch(() => null);
-  const out = { ok: true, workflowId, dispatchId, retired: true, reason, ...(telegram?.edited ? { telegramEdited: telegram.edited } : {}) };
+  // The ask's Telegram messages leave the owner's chat (deleted; edited to
+  // "no longer needs an answer" only where Telegram refuses the delete).
+  const [telegram] = await closeAskMessages(ledger, { ledgerFile: ledgerFileFor(repo), workflowId, dispatchIds: [dispatchId], reason: 'retired' });
+  const out = { ok: true, workflowId, dispatchId, retired: true, reason,
+    ...(telegram?.deleted?.length ? { telegramDeleted: telegram.deleted } : {}), ...(telegram?.edited?.length ? { telegramEdited: telegram.edited } : {}) };
   emit(out, `retired ask ${dispatchId}: ${reason}`, args.json);
 }
 

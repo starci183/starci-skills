@@ -7,9 +7,10 @@
 // giản, ghi rõ ràng ra mọi thứ". So each workflow gets a readable Vietnamese
 // section: its goal, every leg by name (done / running / waiting / not yet),
 // what is running and for how long, the latest report, the owner's pending
-// questions with their links, what is stuck, and a finish time. Owner asks
-// still reach Telegram only from the kernel (serve-ask); this is the
-// supervisor's status digest. Ledgers are read read-only.
+// questions (with a link only while a form serves; forms are served on demand
+// from the ask's Telegram button or /asks), what is stuck, and a finish time.
+// Owner asks still reach Telegram only from the kernel (api serve-ask); this
+// is the supervisor's status digest. Ledgers are read read-only.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
@@ -40,6 +41,7 @@ const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
 const displayName = (wf) => ALIASES[baseName(wf)] ?? baseName(wf);
 
 const parse = (s, fb = null) => { try { return JSON.parse(s); } catch { return fb; } };
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
 const dur = (ms) => (ms == null ? '?' : ms < 60000 ? '<1 phút' : ms < 3600000 ? `${Math.round(ms / 60000)} phút` : `${(ms / 3600000).toFixed(1)} giờ`);
@@ -85,8 +87,12 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null }
     .filter((r) => !closed.has(r.dispatch_id))
     .map((r) => {
       const q = parse(r.report_json, {})?.question ?? {};
-      const serving = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='ask-serving' AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(wf.workflow_id, r.dispatch_id);
-      const url = parse(serving?.payload_json, {})?.url ?? null;
+      // Only a form that still serves has a link: a form is served on demand (the ask's Telegram
+      // "Generate URL" button, or /asks), so an expired or exited one shows none.
+      const serving = db.prepare("SELECT seq, payload_json FROM events WHERE workflow_id=? AND kind='ask-serving' AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(wf.workflow_id, r.dispatch_id);
+      const ended = serving && db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-serving-expired' AND json_extract(payload_json,'$.dispatchId')=? AND seq>? LIMIT 1").get(wf.workflow_id, r.dispatch_id, serving.seq);
+      const payload = parse(serving?.payload_json, {}) ?? {};
+      const url = serving && !ended && !(Number.isInteger(payload.pid) && !alive(payload.pid)) ? payload.url ?? null : null;
       const nonce = url ? /\/(a-[0-9a-f]+)/.exec(url)?.[1] : null;
       return { op: r.op_id, text: clip(q.text ?? '', 160), link: nonce && publicBase ? `${publicBase}/${nonce}` : url };
     });
@@ -137,7 +143,7 @@ export function workflowSection(r, { now = Date.now() } = {}) {
   if (failed.length) line.push(`⚠️ Lần gần nhất thất bại, kernel sẽ thử lại: ${esc(failed.join(', '))}`);
   if (todo.length) line.push(`⬜ Còn lại: ${esc(todo.join(' → '))}`);
   if (r.lastReport) line.push(`📝 Báo cáo gần nhất (${esc(legVi(r.lastReport.op))}, ${esc(OUTCOME_VI[r.lastReport.outcome] ?? r.lastReport.outcome)}, ${esc(clock(r.lastReport.at))}): ${esc(r.lastReport.summary)}`);
-  for (const a of r.asks) line.push(`❓ Đang chờ thầy trả lời (${esc(legVi(a.op))}): ${esc(a.text)}${a.link ? `\n   ${esc(a.link)}` : ''}`);
+  for (const a of r.asks) line.push(`❓ Đang chờ thầy trả lời (${esc(legVi(a.op))}): ${esc(a.text)}${a.link ? `\n   ${esc(a.link)}` : '\n   (bấm /asks để lấy link trả lời)'}`);
   for (const g of r.ownerGates) line.push(`🔒 Chờ thầy: ${esc(g)}`);
   if (r.runtime.length) line.push(`🐞 Sạn runtime đang mở: ${r.runtime.length} (supervisor đang xử lý)`);
   line.push(r.etaAt == null
@@ -156,7 +162,7 @@ export function progressMessages(rows, { now = Date.now() } = {}) {
   const header = [
     `<b>[StarCi] Báo cáo tiến độ lúc ${esc(clock(now))}</b>`,
     `${ok.length} workflow đang chạy · ${ok.reduce((n, r) => n + r.done, 0)}/${ok.reduce((n, r) => n + r.total, 0)} chặng đã xong`,
-    asks ? `❓ ${asks} câu hỏi đang chờ thầy trả lời (link ở từng workflow bên dưới)` : '❓ Không có câu hỏi nào đang chờ thầy',
+    asks ? `❓ ${asks} câu hỏi đang chờ thầy trả lời (/asks gửi từng câu kèm nút tạo link)` : '❓ Không có câu hỏi nào đang chờ thầy',
     `🐞 ${runtime} sạn runtime đang mở`,
     etas.length ? `🕒 Dự kiến xong tất cả: khoảng ${esc(clock(Math.max(...etas)))}` : '',
     ...rows.filter((r) => r.error).map((r) => `⚠️ Không đọc được ledger ${esc(r.repo)}: ${esc(r.error)}`),

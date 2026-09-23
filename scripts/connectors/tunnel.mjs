@@ -26,13 +26,28 @@
 // STARCI_CLOUDFLARED_ARGS (a JSON list of prefix args) replace the binary for
 // tests, the way STARCI_ORCA_COMMAND does for Orca; STARCI_TUNNEL_BACKOFF_MS
 // sets the first restart delay.
+//
+// One manager per host, enforced three ways (18 managers once ran at once):
+// `run` claims <state>/tunnel.lock and a loser exits at once (exit 1); the
+// winner re-checks every STARCI_TUNNEL_OWNER_CHECK_MS (30 s) that the lock
+// still names it and exits the moment another live process holds it; and a
+// starter (`start`, ensureAskConnectors) never launches while a manager is
+// alive or one it launched in the last 30 s is still starting
+// (<state>/tunnel.starting.json). `status` is the health the supervisor reads:
+// the manager, cloudflared and gateway pids and whether each lives, whether
+// the gateway answers on its port, every `tunnel.mjs run` process on the host
+// (more than one is a leak), `healthy`, and `problems`.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
-import { argsOf, claimManager, lockHolder, ownerConfig, pidAlive, readJson, recordAlive, spawnDetached, stateFile, writeJson } from './lib.mjs';
+import { argsOf, claimManager, lockHolder, markStarting, ownerConfig, pidAlive, readJson, recordAlive, spawnDetached, startingHolder, stateFile, writeJson } from './lib.mjs';
+import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
+
+export const TUNNEL_FILE = fileURLToPath(import.meta.url);
 
 const QUICK_URL = /https:\/\/(?!api\.)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.trycloudflare\.com\b/i;
 const CONNECTED = /Registered tunnel connection|Connection [0-9a-f-]+ registered/i;
@@ -145,11 +160,14 @@ export function superviseTunnel(cf, { port, env = process.env, secretEnv = env, 
   launch();
   return {
     state: () => ({ ...state }),
-    stop() {
+    save,
+    // `save: false` when this manager lost the tunnel to another: its record must not overwrite theirs.
+    stop({ save: record = true } = {}) {
       stopped = true; clearTimeout(timer);
       const running = child; child = null;
       if (running) { try { running.kill(); } catch { /* gone */ } }
-      state.childPid = null; state.connected = false; state.stoppedAt = new Date().toISOString(); save();
+      state.childPid = null; state.connected = false; state.stoppedAt = new Date().toISOString();
+      if (record) save();
     },
   };
 }
@@ -161,19 +179,124 @@ export function superviseTunnel(cf, { port, env = process.env, secretEnv = env, 
  * manager holds the lock or owns tunnel.json: {ok:false, holder}. Otherwise it supervises
  * cloudflared and returns {ok:true, handle, release}.
  */
-export function runManager(cf, { port, env = process.env, secretEnv = env } = {}) {
+export function runManager(cf, { port, env = process.env, secretEnv = env, checkMs = Number(env.STARCI_TUNNEL_OWNER_CHECK_MS ?? 30000), onLost = () => {} } = {}) {
   const claim = claimManager('tunnel', { current: tunnelState(env), env });
   if (!claim.ok) return { ok: false, holder: claim.holder ?? null };
-  try {
-    return { ok: true, handle: superviseTunnel(cf, { port, env, secretEnv }), release: claim.release };
-  } catch (error) { claim.release(); throw error; }
+  let handle;
+  try { handle = superviseTunnel(cf, { port, env, secretEnv }); } catch (error) { claim.release(); throw error; }
+  // The lock decides who owns the tunnel. A manager whose lock another live process now holds
+  // stops its cloudflared without touching tunnel.json and reports it (the CLI exits); one whose
+  // lock vanished takes it back, so a single manager always holds it.
+  const lockFile = stateFile('tunnel.lock', env);
+  const check = () => {
+    const held = readJson(lockFile);
+    if (held && held.pid !== process.pid && recordAlive(held)) {
+      clearInterval(timer);
+      handle.stop({ save: false });
+      onLost(held);
+      return false;
+    }
+    if (!held) {
+      try { fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), { flag: 'wx' }); } catch { /* another claimant got there first: the next check decides */ }
+    }
+    if (tunnelState(env)?.pid !== process.pid) handle.save();
+    return true;
+  };
+  const timer = Number.isFinite(checkMs) && checkMs > 0 ? setInterval(check, checkMs) : null;
+  timer?.unref?.();
+  const release = () => { clearInterval(timer); claim.release(); };
+  return { ok: true, handle, release, check };
 }
 
-/** A live manager: the one tunnel.json names, or the holder of the manager lock (one still starting). */
+/**
+ * A live manager: the one tunnel.json names, the holder of the manager lock, or one a starter
+ * launched moments ago that has not claimed the lock yet.
+ */
 export const managerAlive = (env = process.env) => {
   const state = tunnelState(env);
-  return recordAlive(state) ? state : lockHolder('tunnel', env);
+  return recordAlive(state) ? state : lockHolder('tunnel', env) ?? startingHolder('tunnel', env);
 };
+
+/**
+ * Make sure the ask gateway and the tunnel manager run (connectors.cloudflare on): each is launched
+ * detached only when no live one exists (gatewayAlive / managerAlive, which count a launch still
+ * starting), so this never adds a second manager. Never throws: {ok, gateway, tunnel} | {skipped}.
+ * A spec run never launches the real cloudflared (STARCI_CLOUDFLARED_COMMAND must point at a fake).
+ */
+export function ensureAskConnectors({ env = process.env, config = undefined, spawn: launch = spawnDetached } = {}) {
+  try {
+    if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
+    if (env.NODE_TEST_CONTEXT && !env.STARCI_CLOUDFLARED_COMMAND) return { ok: true, skipped: 'test context' };
+    const owner = config === undefined ? ownerConfig() : config;
+    if (!owner) return { ok: false, error: 'config.yaml cannot be read' };
+    const connectors = connectorsConfig(owner, env), cf = connectors.cloudflare, port = String(connectors.gateway.port);
+    if (cf.mode === 'off') return { ok: true, skipped: 'connectors.cloudflare.mode is off' };
+    const out = { ok: true };
+    if (gatewayAlive(env)) out.gateway = { already: gatewayState(env)?.pid ?? true };
+    else { const pid = launch(GATEWAY_FILE, ['run', '--port', port], { env }); markStarting('gateway', pid, env); out.gateway = { launched: pid }; }
+    const live = managerAlive(env);
+    if (live) out.tunnel = { already: live.pid ?? true };
+    else {
+      cloudflaredPlan(cf, { port: Number(port), configFile: stateFile('cloudflared.yml', env), env, secretEnv: connectorEnv(owner, env) });
+      const pid = launch(TUNNEL_FILE, ['run', '--port', port], { env });
+      markStarting('tunnel', pid, env);
+      out.tunnel = { launched: pid };
+    }
+    return out;
+  } catch (error) {
+    return { ok: false, error: String(error?.message ?? error) };
+  }
+}
+
+/** Whether something answers HTTP on 127.0.0.1:<port> — the gateway 404s `/` with its no-store headers. */
+export const probeGateway = (port, { timeoutMs = 3000 } = {}) => new Promise((resolve) => {
+  if (!Number.isInteger(Number(port)) || Number(port) <= 0) { resolve({ reachable: false, status: null }); return; }
+  const req = http.get({ host: '127.0.0.1', port: Number(port), path: '/', timeout: timeoutMs }, (res) => {
+    res.resume();
+    resolve({ reachable: true, status: res.statusCode ?? null, gateway: res.headers['x-robots-tag'] === 'noindex, nofollow' });
+  });
+  req.on('timeout', () => req.destroy(new Error('timeout')));
+  req.on('error', () => resolve({ reachable: false, status: null }));
+});
+
+/** Every `tunnel.mjs run` process on this host ({pid, commandLine}), or null when the table cannot be read. */
+export function tunnelProcesses() {
+  try {
+    const r = process.platform === 'win32'
+      ? spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'tunnel\\.mjs\\S*\\s+run' } | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }"],
+      { encoding: 'utf8', windowsHide: true, timeout: 20000 })
+      : spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8', timeout: 10000 });
+    if (r.status !== 0 && !r.stdout) return null;
+    return String(r.stdout ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+      .map((line) => { const m = /^(\d+)\s+(.*)$/.exec(line); return m ? { pid: Number(m[1]), commandLine: m[2] } : null; })
+      .filter((p) => p && /tunnel\.mjs\S*\s+run\b/.test(p.commandLine) && p.pid !== process.pid);
+  } catch { return null; }
+}
+
+/**
+ * The connectors' health for the supervisor: {healthy, problems[], manager, cloudflared, gateway,
+ * publicBase, managers}. Healthy = one live manager holding the lock, its cloudflared alive and
+ * connected, the gateway alive and answering on its port, and no second `tunnel.mjs run`.
+ */
+export async function tunnelHealth({ env = process.env, processes = tunnelProcesses, probe = probeGateway } = {}) {
+  const state = tunnelState(env), gw = gatewayState(env), lock = lockHolder('tunnel', env);
+  const manager = { pid: state?.pid ?? null, alive: recordAlive(state), lockPid: lock?.pid ?? null };
+  const cloudflared = { pid: state?.childPid ?? null, alive: pidAlive(state?.childPid), connected: state?.connected === true, restarts: state?.restarts ?? 0, lastExit: state?.lastExit ?? null };
+  const port = gw?.port ?? state?.gatewayPort ?? null;
+  const gateway = { pid: gw?.pid ?? null, alive: recordAlive(gw), port, ...(await probe(port)) };
+  const managers = processes ? processes() : null;
+  const problems = [];
+  if (!manager.alive) problems.push('no live tunnel manager (tunnel.mjs start)');
+  else if (manager.lockPid !== manager.pid) problems.push(manager.lockPid ? `tunnel.lock names ${manager.lockPid}, tunnel.json names ${manager.pid}` : 'the tunnel manager holds no tunnel.lock (started before the lock existed): restart it');
+  if (manager.alive && !cloudflared.alive) problems.push('cloudflared is not running (the manager restarts it with backoff)');
+  else if (manager.alive && !cloudflared.connected) problems.push('cloudflared has no registered edge connection yet');
+  if (!gateway.alive) problems.push('no live ask gateway (ask-gateway.mjs start)');
+  if (!gateway.reachable) problems.push(`nothing answers on 127.0.0.1:${port ?? '?'} (the gateway port): the public host returns 502`);
+  const leaked = (managers ?? []).filter((p) => p.pid !== manager.pid);
+  if (leaked.length) problems.push(`${leaked.length} extra tunnel manager(s) running: ${leaked.map((p) => p.pid).join(', ')} — kill them (only ${manager.pid ?? 'none'} owns the tunnel)`);
+  return { healthy: problems.length === 0, problems, manager, cloudflared, gateway, publicBase: publicBase(env), managers };
+}
 
 const loadCloudflare = () => {
   const config = ownerConfig();
@@ -181,12 +304,16 @@ const loadCloudflare = () => {
   return { config, connectors: connectorsConfig(config), secretEnv: connectorEnv(config) };
 };
 
-function main() {
+async function main() {
   const args = argsOf(process.argv.slice(2));
   const verb = args._[0] ?? 'status';
   const state = tunnelState();
   const out = (value) => console.log(JSON.stringify(value));
-  if (verb === 'status') { out({ ok: true, running: Boolean(managerAlive()), publicBase: publicBase(), ...(state ?? {}) }); return; }
+  if (verb === 'status') {
+    const health = await tunnelHealth({ processes: args.fast ? null : tunnelProcesses });
+    out({ ok: true, running: Boolean(managerAlive()), publicBase: publicBase(), ...(state ?? {}), health });
+    return;
+  }
   if (verb === 'stop') {
     for (const pid of [state?.pid, state?.childPid]) if (pid && pidAlive(pid)) { try { process.kill(pid); } catch { /* gone */ } }
     out({ ok: true, stopped: state?.pid ?? null }); return;
@@ -208,12 +335,14 @@ function main() {
     const live = managerAlive();
     if (live) { out({ ok: true, already: true, pid: live.pid, publicBase: publicBase() }); return; }
     try { cloudflaredPlan(cf, { port, configFile: stateFile('cloudflared.yml'), secretEnv }); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
-    const pid = spawnDetached(fileURLToPath(import.meta.url), ['run', '--port', String(port)]);
+    const pid = spawnDetached(TUNNEL_FILE, ['run', '--port', String(port)]);
+    markStarting('tunnel', pid);
     out({ ok: true, launched: pid, mode: cf.mode, hostname: cf.hostname, state: tunnelStateFile() }); return;
   }
   if (verb === 'run') {
     let managed;
-    try { managed = runManager(cf, { port, secretEnv }); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
+    const lost = (holder) => { console.error(JSON.stringify({ ok: false, lost: true, error: `tunnel manager ${holder?.pid ?? '?'} holds tunnel.lock; this one exits` })); process.exit(0); };
+    try { managed = runManager(cf, { port, secretEnv, onLost: lost }); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
     if (!managed.ok) { out({ ok: false, already: true, error: 'another tunnel manager owns the tunnel state', pid: managed.holder?.pid ?? null }); process.exit(1); }
     const stop = () => { managed.handle.stop(); managed.release(); process.exit(0); };
     process.on('SIGINT', stop); process.on('SIGTERM', stop); process.on('exit', managed.release);

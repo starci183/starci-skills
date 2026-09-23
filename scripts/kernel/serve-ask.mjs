@@ -1,10 +1,13 @@
 // `serve-ask` — renders the one pending owner question of an `outcome: ask`
 // op report as a localhost form and lands the answer durably, without any
-// model agent ever seeing a secret value. Spawned detached by the Kernel (or
-// the launcher chat) when it parks an ask leg; exits after one submission or
-// on --ttl. Port: first free in 6969 +0..100 (the owner-facing ask lane).
+// model agent ever seeing a secret value. Spawned detached ON DEMAND: by the
+// Telegram command bridge when the owner presses an ask's "Generate URL"
+// button (--on-demand telegram), or by `api serve-ask --now` / a Kernel whose
+// Telegram is off (parkAsk below tells the owner instead of serving). Exits
+// after one submission or on --ttl. Port: first free in 6969 +0..100 (the
+// owner-facing ask lane).
 //
-//   node serve-ask.mjs --repo <path> --workflow <id> [--dispatch <id>] [--ttl <ms>] [--json]
+//   node serve-ask.mjs --repo <path> --workflow <id> [--dispatch <id>] [--ttl <ms>] [--on-demand <via>] [--json]
 //
 // Submit flow: custody fields named '*.key|*.txt|*.json' in the question text
 // are written through <repo>/scripts/stack-secret.mjs set --from-file (the
@@ -19,14 +22,18 @@
 // terminal so it can re-verify custody presence and settle the ask.
 //
 // Ask-report lifecycle in the ledger (modules/kernel/api.yaml askLifecycle):
-// `ask-serving` on bind, `ask-serving-expired` on --ttl, `ask-superseded`
-// when this run parks a replacement for an earlier ask of the same op and
-// subject (params.subject, else question.refs), and
-// `ask-answered` on submission.
+// `ask-notified` when parkAsk told the owner (link on demand), `ask-serving`
+// on bind (onDemand/requestedBy when the bridge asked for it),
+// `ask-serving-expired` on --ttl, `ask-superseded` when a replacement for an
+// earlier ask of the same op and subject (params.subject, else
+// question.refs) is parked, `ask-answered` on submission, and
+// `ask-message-closed` when the ask's Telegram messages were deleted.
 //
-// On bind the owner is also told on Telegram when config.yaml
-// connectors.telegram is set up (scripts/connectors/telegram.mjs notifyAsk):
-// the question, its options and the form's link on the public gateway host.
+// Telegram (scripts/connectors/telegram.mjs, docs/connectors.md): parkAsk —
+// what `api serve-ask` runs — sends the owner the question with a "Generate
+// URL" button and serves nothing; this form never sends a message itself. On
+// submit (and for an ask a replacement supersedes) closeAskMessages deletes
+// the ask's messages from the chat.
 //
 // Auto-accept (config.yaml asks.autoAcceptRecommended, engine/config.mjs
 // askAutoAcceptPolicy): an ask that carries a recommended option
@@ -52,6 +59,7 @@ import { classifyAgentScreen } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, askAutoAcceptPolicy } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
+// notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, autoAcceptDecision } from './ask-recommendation.mjs';
 
@@ -527,7 +535,7 @@ export const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig
  * message. Returns {accepted:false, why} and writes nothing otherwise. `wake` and `notify` are
  * injectable for specs.
  */
-export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, report, policy = loadAskPolicy(), wake = wakeKernel, notify = notifyAutoAccepted, now = Date.now() }) {
+export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, report, policy = loadAskPolicy(), wake = wakeKernel, notify = notifyAutoAccepted, close = markAskClosed, now = Date.now() }) {
   const db = ledger.db;
   const rj = parseJson(report.report_json, {}) ?? {};
   const question = rj.question ?? { text: rj.summary ?? '', options: [] };
@@ -567,8 +575,61 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
     });
   });
   const woke = wake(ledger, { workflowId, dispatchId: report.dispatch_id, receiptPath, answeredBy: AUTO_ACCEPTED_BY });
+  // An ask the owner was already told about (auto-accept turned on later) leaves the chat.
+  await closeAskMessages(ledger, { ledgerFile, workflowId, dispatchIds: [report.dispatch_id], reason: 'answered', by: AUTO_ACCEPTED_BY, close });
   const telegram = await Promise.resolve(notify({ ledgerFile, workflowId, dispatchId: report.dispatch_id, label })).catch(() => null);
   return { accepted: true, dispatchId: report.dispatch_id, optionIndex: index, option: label, source, receiptPath, answeredBy: AUTO_ACCEPTED_BY, wake: woke, telegram };
+}
+
+/**
+ * Take the Telegram messages of closed asks off the owner's chat (telegram.mjs markAskClosed: delete,
+ * else edit to "answered"), and record each removal as `ask-message-closed` {dispatchId, reason,
+ * deleted, edited, failed}. Never throws; `close` is injectable for specs.
+ */
+export async function closeAskMessages(ledger, { ledgerFile, workflowId, dispatchIds, reason = 'answered', by = null, close = markAskClosed }) {
+  const out = [];
+  for (const dispatchId of dispatchIds ?? []) {
+    const r = await Promise.resolve(close({ ledgerFile, workflowId, dispatchId, reason, by })).catch(() => null);
+    if (r && (r.deleted?.length || r.edited?.length)) {
+      try {
+        ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, kind: 'ask-message-closed',
+          payload: { dispatchId, reason, deleted: r.deleted ?? [], edited: r.edited ?? [], failed: r.failed ?? [] } });
+      } catch { /* the chat is already clean; the record is best effort */ }
+    }
+    out.push({ dispatchId, ...(r ?? { ok: false }) });
+  }
+  return out;
+}
+
+/**
+ * Park one filed, unanswered ask for the owner — what `api serve-ask` runs after auto-accept
+ * declined it. Earlier asks it replaces are superseded (supersedeEarlierAsks) and their messages
+ * leave the chat; then the owner is told on Telegram (telegram.mjs notifyAsk: the question, its
+ * options and a "Generate URL" button, no link — the form is served only when the owner presses
+ * it). A delivered notice (sent now, or one already in the chat) is recorded `ask-notified`
+ * {dispatchId, onDemand:true, via:'telegram', messageId, key, fresh, fields}: the ask then waits on
+ * the owner with no form, and the frontier reads it awaiting-owner, not ask-reserve. A failed send
+ * is recorded `ask-notify-failed`; Telegram off records nothing. Returns {notified, superseded,
+ * telegram}; the caller serves the form now when `notified` is false.
+ */
+export async function parkAsk({ ledger, ledgerFile, repo, workflowId, report, notify = notifyAsk, close = markAskClosed }) {
+  const superseded = supersedeEarlierAsks(ledger, workflowId, report);
+  if (superseded.length) await closeAskMessages(ledger, { ledgerFile, workflowId, dispatchIds: superseded, reason: 'retired', close });
+  const rj = parseJson(report.report_json, {}) ?? {};
+  const question = rj.question ?? { text: rj.summary ?? '', options: [] };
+  const fields = fieldsOf(`${question.text ?? ''}\n${(question.options ?? []).map((o) => (typeof o === 'string' ? o : o?.label ?? '')).join('\n')}`);
+  const telegram = await Promise.resolve(notify({ ledgerFile, repo, workflowId, dispatchId: report.dispatch_id }))
+    .catch((error) => ({ ok: false, error: String(error?.message ?? error) }));
+  const notified = Boolean(telegram?.sent) || telegram?.skipped === 'already notified';
+  if (notified) {
+    ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-notified',
+      payload: { dispatchId: report.dispatch_id, onDemand: true, via: 'telegram', messageId: telegram.messageId ?? null, key: telegram.key ?? null,
+        fresh: Boolean(telegram.sent), fields: { files: fields.files, vars: fields.vars } } });
+  } else if (telegram?.ok === false) {
+    ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-notify-failed',
+      payload: { dispatchId: report.dispatch_id, error: String(telegram.error ?? '').slice(0, 300) } });
+  }
+  return { notified, superseded, telegram };
 }
 
 const main = async () => {
@@ -591,8 +652,12 @@ const main = async () => {
   if (answered && !readonly) { console.error(JSON.stringify({ ok: false, error: `ask ${report.dispatch_id} already answered` })); process.exit(1); }
 
   // Parking a replacement ask retires the ones it replaces
-  // (supersedeEarlierAsks). --review reads; it never retires anything.
-  if (!readonly) supersedeEarlierAsks(ledger, args.workflow, report);
+  // (supersedeEarlierAsks), and their Telegram messages leave the chat.
+  // --review reads; it never retires anything.
+  if (!readonly) {
+    const superseded = supersedeEarlierAsks(ledger, args.workflow, report);
+    if (superseded.length) await closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: superseded, reason: 'retired' });
+  }
 
   // An ask config.yaml asks.autoAcceptRecommended answers is never served.
   if (!readonly) {
@@ -733,8 +798,8 @@ const main = async () => {
 ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` : ''}
 <p>You can close this tab — the workflow kernel has been notified.</p></body>`);
         done = true;
-        // The owner's Telegram message for this ask now says it was answered.
-        markAskClosed({ ledgerFile: file, workflowId: args.workflow, dispatchId: report.dispatch_id, reason: 'answered', by: answeredBy })
+        // Answered: the ask's Telegram messages are deleted, then the form stops serving.
+        closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: [report.dispatch_id], reason: 'answered', by: answeredBy })
           .catch(() => {}).finally(() => setTimeout(() => { server.close(); process.exit(0); }, 400).unref());
         } catch (error) {
           // A failed write must not kill the one-shot server before the owner
@@ -759,16 +824,15 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   server.once('listening', () => {
     const bound = server.address().port;
     const url = `http://127.0.0.1:${bound}/${nonce}`;
+    const onDemand = typeof args['on-demand'] === 'string' && args['on-demand'] ? args['on-demand'] : null;
     ledger.appendEvent({
       workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
-      kind: 'ask-serving', payload: { dispatchId: report.dispatch_id, url, pid: process.pid, fields: { files: fields.files, vars: fields.vars }, ttlMs: ttl },
+      kind: 'ask-serving', payload: { dispatchId: report.dispatch_id, url, pid: process.pid, fields: { files: fields.files, vars: fields.vars }, ttlMs: ttl,
+        ...(onDemand ? { onDemand: true, requestedBy: onDemand } : {}) },
     });
+    // Nothing is sent to Telegram here: the owner already has the ask's notice
+    // (parkAsk), and the bridge that asked for this form edits it to carry the link.
     console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, url, port: bound, ttlMs: ttl }));
-    // The one Telegram send point (docs/connectors.md): the owner learns of the
-    // ask, with its public gateway link, the moment the form binds. It never
-    // throws and a missing token or chat id is one stderr line, so the form
-    // serves either way; a --review form asks nothing and sends nothing.
-    if (!readonly) notifyAsk({ ledgerFile: file, workflowId: args.workflow, dispatchId: report.dispatch_id }).catch(() => {});
   });
   tryNext();
   setTimeout(() => {

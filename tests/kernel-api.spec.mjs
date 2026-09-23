@@ -94,7 +94,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
-    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],askReserveDispatches:[],peerMessageKeys:[],
+    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],peerMessageKeys:[],
     queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish',
   });
@@ -498,6 +498,19 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   // An older event with no pid is judged by its port: nothing listens on port 9.
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:9/a-w'}}));
   assert.equal(frontier().state,'ask-reserve','a closed port is a dead link');
+  // Owner, 2026-09-24: api serve-ask tells the owner on Telegram and serves nothing; the owner's
+  // Generate URL button serves the form. A notified ask with no form is a healthy owner wait.
+  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-notified',payload:{dispatchId:'ctx_tax',onDemand:true,via:'telegram',messageId:7}}));
+  f=frontier();
+  assert.deepEqual([f.state,f.actionable,f.askReserveDispatches,f.askOnDemandDispatches],['awaiting-owner',false,[],['ctx_tax']],'notified, link on demand: not the Kernel\'s to re-serve');
+  assert.match(f.reason,/ctx_tax is on Telegram with a Generate URL button/);
+  // Its on-demand form expires: still healthy, the owner regenerates the link from the same button.
+  seed(repo,ledger=>{
+    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-v',pid:process.pid,onDemand:true,requestedBy:'telegram'}});
+    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving-expired',payload:{dispatchId:'ctx_tax'}});
+  });
+  f=frontier();
+  assert.deepEqual([f.state,f.askReserveDispatches,f.askOnDemandDispatches],['awaiting-owner',[],['ctx_tax']]);
 });
 
 // StarCi Next base-repos recorded an owner-gate for a missing brand before any

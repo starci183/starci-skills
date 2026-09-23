@@ -9,6 +9,9 @@ import {
   bridgeState, bridgeText, BRIDGE_NAME, ONLINE_MS,
 } from '../scripts/connectors/telegram-bridge.mjs';
 import { claimManager, stateDir } from '../scripts/connectors/lib.mjs';
+import { askKeyOf, readSentStore } from '../scripts/connectors/telegram.mjs';
+import { ledgerResolver } from '../scripts/connectors/ask-gateway.mjs';
+import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
 import { collectProgress, progressMessages } from '../scripts/supervisor/progress-report.mjs';
 import { resumeAll } from '../scripts/kernel/resume-all.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
@@ -284,4 +287,138 @@ test('the registry heartbeats, validates ids, and ignores files that are not sup
   fs.writeFileSync(path.join(dir, 'broken.json'), '{nope');
   fs.writeFileSync(path.join(dir, 'sup-a.inbox.jsonl'), '');
   assert.deepEqual(listSupervisors({ env }).map((s) => s.id), ['sup-a']);
+});
+
+/* ------------------------------------------------------------ owner asks on demand */
+// Owner, 2026-09-24: "1 link response.starci.org trỏ vào các question thôi, với lại khi yêu cầu thì
+// mới serve url! trò báo tele, tele có nút generate url thì mới serve. trả lời xong xóa".
+
+const WF = 'wf-ask';
+const seedAskReport = (ledger, { dispatchId, question }) => {
+  if (!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(WF)) seedWorkflow(ledger, { id: WF, state: { phase: 'running' } });
+  ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
+    .run(WF, dispatchId, 'provision.ask', 1, 1, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'ask', question: { refs: [dispatchId], ...question } }), Date.now());
+};
+const askEvents = (ledger, kind) => ledger.db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(WF, kind).map((r) => JSON.parse(r.payload_json));
+const exited = async (pid, ms = 30000) => {
+  const alive = () => { try { process.kill(pid, 0); return true; } catch (error) { return error.code === 'EPERM'; } };
+  for (const end = Date.now() + ms; alive();) { if (Date.now() > end) return false; await new Promise((r) => setTimeout(r, 100)); }
+  return true;
+};
+const button = (key) => `ask:${key}`;
+
+test('/asks lists every open ask of the connector repos, one message each with its own Generate URL button', async (t) => {
+  const bot = await fakeBot(t);
+  await withLedger(t, async ({ ledger, repoRoot }) => {
+    seedAskReport(ledger, { dispatchId: 'ctx_a', question: { text: 'Chọn cổng thanh toán?', options: ['VNPay', 'MoMo'] } });
+    seedAskReport(ledger, { dispatchId: 'ctx_b', question: { text: 'Tên miền nào?', options: [] } });
+    seedAskReport(ledger, { dispatchId: 'ctx_done', question: { text: 'Đã xong?', options: [] } });
+    ledger.appendEvent({ workflowId: WF, entityType: 'report', entityId: 'ctx_done', kind: 'ask-answered', payload: { dispatchId: 'ctx_done' } });
+    const { env, bridge } = setup(t, bot, { repos: () => [repoRoot], sweepEveryMs: -1 });
+    bot.updates.push(message('/asks'));
+    await bridge.pollOnce();
+    const [head, ...listed] = bot.sent();
+    assert.equal(head.text, vi.asksHead(2));
+    assert.equal(listed.length, 2, 'an answered ask is not listed');
+    assert.deepEqual(listed.map((m) => m.reply_markup.inline_keyboard[0][0].callback_data).sort(), ['ctx_a', 'ctx_b'].map((d) => button(askKeyOf(WF, d))).sort());
+    assert.ok(listed.every((m) => m.reply_markup.inline_keyboard[0][0].text === 'Tạo link trả lời'));
+    assert.ok(listed.some((m) => /Chọn cổng thanh toán\?/.test(m.text) && /1\. VNPay\n2\. MoMo/.test(m.text)));
+    assert.ok(listed.every((m) => !/https?:\/\//.test(m.text)), 'listing serves nothing, so it links nothing');
+    assert.deepEqual(askEvents(ledger, 'ask-serving'), []);
+    const store = readSentStore(env);
+    assert.equal(store.asks[`${WF}|ctx_a`].messageIds.length, 1, 'the listed message is remembered, so it is deleted with the ask');
+    assert.equal(store.asks[`${WF}|ctx_a`].repo, repoRoot);
+    for (const d of ['ctx_a', 'ctx_b']) ledger.appendEvent({ workflowId: WF, entityType: 'report', entityId: d, kind: 'ask-answered', payload: { dispatchId: d } });
+    bot.updates.push(message('/asks'));
+    await bridge.pollOnce();
+    assert.equal(bot.sent().at(-1).text, vi.asksNone);
+    assert.match(vi.help, /\/asks/);
+  });
+});
+
+test('the Generate URL button serves the form on demand and edits the message with the public link; the answer deletes it and stops serving', async (t) => {
+  const bot = await fakeBot(t);
+  await withLedger(t, async ({ ledger, repoRoot }) => {
+    seedAskReport(ledger, { dispatchId: 'ctx_pick', question: { text: 'Gói Pro giá bao nhiêu?', options: ['99k', '199k'] } });
+    const ensured = [];
+    const { env, bridge } = setup(t, bot, {
+      repos: () => [repoRoot], serveTtlMs: 120000, sweepEveryMs: 0,
+      ensureConnectors: () => { ensured.push(1); return { ok: true }; }, publicBaseOf: () => 'https://response.example.org',
+    });
+    const key = askKeyOf(WF, 'ctx_pick');
+    bot.updates.push(callback(button(key), { messageId: 91 }));
+    await bridge.pollOnce();
+    const [serving] = askEvents(ledger, 'ask-serving');
+    assert.ok(serving, 'the press served the form');
+    t.after(() => { try { process.kill(serving.pid); } catch { /* exited */ } });
+    assert.deepEqual([serving.onDemand, serving.requestedBy], [true, 'telegram'], 'the on-demand serve is recorded as such');
+    assert.equal(bot.of('answerCallbackQuery')[0].text, vi.askGenerating, 'the press is answered at once');
+    const nonce = new URL(serving.url).pathname.slice(1);
+    const edit = bot.of('editMessageText').at(-1);
+    assert.equal(edit.message_id, 91, 'the pressed message itself carries the link');
+    assert.match(edit.text, new RegExp(`Trả lời tại: https://response\\.example\\.org/${nonce}`));
+    assert.match(edit.text, /Gói Pro giá bao nhiêu\?/);
+    assert.ok(!edit.text.includes('127.0.0.1'), 'a decision ask carries only the public link');
+    assert.equal(edit.reply_markup.inline_keyboard[0][0].callback_data, button(key), 'the button stays: an expired link is regenerated');
+    assert.equal(ensured.length, 1, 'the gateway and tunnel are ensured for a public link');
+    assert.equal(ledgerResolver({ repos: () => [repoRoot] })(nonce)?.url, serving.url, 'response.<domain> routes the nonce while it serves');
+
+    bot.updates.push(callback(button(key), { messageId: 91 }));
+    await bridge.pollOnce();
+    assert.equal(askEvents(ledger, 'ask-serving').length, 1, 'a second press reuses the live form');
+
+    const res = await fetch(`${serving.url}/answer`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'option=1' });
+    assert.equal(res.status, 200);
+    assert.equal(await exited(serving.pid), true, 'the answered form stops serving');
+    assert.equal(ledgerResolver({ repos: () => [repoRoot] })(nonce), null, 'and the gateway no longer routes it');
+    await bridge.pollOnce();
+    assert.ok(bot.of('deleteMessage').some((p) => p.message_id === 91), 'the answered ask\'s message is deleted');
+    assert.deepEqual(readSentStore(env).asks[`${WF}|ctx_pick`].messageIds, []);
+    assert.equal(readSentStore(env).asks[`${WF}|ctx_pick`].closed, 'answered');
+  });
+});
+
+test('a credential ask\'s button gives the localhost link to answer on the machine; an ended form goes back to the button; a closed ask\'s button removes its message', async (t) => {
+  const bot = await fakeBot(t);
+  await withLedger(t, async ({ ledger, repoRoot }) => {
+    seedAskReport(ledger, { dispatchId: 'ctx_key', question: { text: 'Nhập vnpay-hash-secret.key', options: [] } });
+    const url = 'http://127.0.0.1:6970/a-00112233445566778899';
+    const spawned = [], ensured = [];
+    const spawnServe = (target) => {
+      spawned.push(target);
+      ledger.appendEvent({ workflowId: WF, entityType: 'report', entityId: 'ctx_key', kind: 'ask-serving',
+        payload: { dispatchId: 'ctx_key', url, pid: process.pid, fields: { files: ['vnpay-hash-secret.key'], vars: [] }, ttlMs: 3600000, onDemand: true, requestedBy: 'telegram' } });
+      return process.pid;
+    };
+    const { bridge } = setup(t, bot, {
+      repos: () => [repoRoot], spawnServe, sweepEveryMs: 0,
+      ensureConnectors: () => { ensured.push(1); return { ok: true }; }, publicBaseOf: () => 'https://response.example.org',
+    });
+    const key = askKeyOf(WF, 'ctx_key');
+    bot.updates.push(callback(button(key), { messageId: 92 }));
+    await bridge.pollOnce();
+    assert.deepEqual(spawned.map((s) => [s.repo, s.workflowId, s.dispatchId]), [[repoRoot, WF, 'ctx_key']]);
+    let edit = bot.of('editMessageText').at(-1);
+    assert.equal(edit.message_id, 92);
+    assert.match(edit.text, /KHÔNG đưa ra ngoài\. Thầy trả lời TRÊN MÁY, mở link localhost này tại máy:/);
+    assert.ok(edit.text.includes(url), 'the credential form is linked on localhost');
+    assert.ok(!edit.text.includes('response.example.org'), 'never on the public host');
+    assert.equal(ensured.length, 0, 'a credential ask never needs the tunnel');
+
+    // The form ends (ttl): the sweep takes the dead link back off and keeps the button.
+    ledger.appendEvent({ workflowId: WF, entityType: 'report', entityId: 'ctx_key', kind: 'ask-serving-expired', payload: { dispatchId: 'ctx_key' } });
+    await bridge.pollOnce();
+    edit = bot.of('editMessageText').at(-1);
+    assert.equal(edit.message_id, 92);
+    assert.ok(!edit.text.includes(url) && /Tạo link trả lời/.test(edit.text), 'back to the Generate URL notice');
+    assert.equal(edit.reply_markup.inline_keyboard[0][0].callback_data, button(key));
+
+    // Retired meanwhile: its button removes the message instead of serving.
+    ledger.appendEvent({ workflowId: WF, entityType: 'report', entityId: 'ctx_key', kind: 'ask-superseded', payload: { dispatchId: 'ctx_key', by: null, retired: true } });
+    bot.updates.push(callback(button(key), { messageId: 93 }));
+    await bridge.pollOnce();
+    assert.equal(bot.of('answerCallbackQuery').at(-1).text, vi.askClosed);
+    assert.ok(bot.of('deleteMessage').some((p) => p.message_id === 93));
+    assert.equal(spawned.length, 1, 'nothing is served for a closed ask');
+  });
 });

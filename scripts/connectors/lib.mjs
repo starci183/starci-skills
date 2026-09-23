@@ -91,6 +91,21 @@ export const lockHolder = (name, env = process.env) => {
   return held && recordAlive(held) ? held : null;
 };
 
+/**
+ * A manager a starter just launched but that has not claimed its lock yet (node takes a while to
+ * start on a loaded host). `start` records `<state>/<name>.starting.json` {pid, at} right after the
+ * spawn, and every liveness test counts it for STARTING_MS while that pid lives, so two starters in
+ * that window do not both launch a manager.
+ */
+export const STARTING_MS = 30_000;
+export const markStarting = (name, pid, env = process.env) => {
+  if (Number.isInteger(pid) && pid > 0) writeJson(stateFile(`${name}.starting.json`, env), { pid, at: Date.now(), startedAt: new Date().toISOString() });
+};
+export const startingHolder = (name, env = process.env, { windowMs = STARTING_MS, now = Date.now() } = {}) => {
+  const rec = readJson(stateFile(`${name}.starting.json`, env));
+  return rec && Number.isFinite(rec.at) && now - rec.at < windowMs && pidAlive(rec.pid) ? rec : null;
+};
+
 /** Launch `node <script> ...args` detached from this process, output discarded. */
 export const spawnDetached = (script, args = [], { env = process.env } = {}) => {
   const child = spawn(process.execPath, [script, ...args], { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot, env });
@@ -164,17 +179,71 @@ export function servingAsks(db, { now = Date.now() } = {}) {
     if (!dispatchId || seen.has(`${row.workflow_id}\u0000${dispatchId}`)) continue;
     seen.add(`${row.workflow_id}\u0000${dispatchId}`);
     if (closedAfter.get(row.workflow_id, dispatchId, row.seq)) continue;
-    if (Number.isFinite(payload.ttlMs) && row.created_at + payload.ttlMs <= now) continue;
-    const nonce = nonceOf(payload.url);
-    if (!nonce || !isLoopbackUrl(payload.url)) continue;
-    out.push({
-      seq: row.seq, workflowId: row.workflow_id, dispatchId, url: payload.url, nonce, pid: payload.pid ?? null,
-      fields: payload.fields ?? { files: [], vars: [] }, credential: isCredentialAsk(payload.fields),
-      createdAt: row.created_at, expiresAt: Number.isFinite(payload.ttlMs) ? row.created_at + payload.ttlMs : null,
-    });
+    const ask = servingRecord(row, payload, now);
+    if (ask) out.push(ask);
   }
   return out;
 }
+
+// One ask-serving row as an open form, or null: past its ttl, not a loopback nonce URL, or its
+// recorded serve-ask process is gone (the form stops being served the moment its process exits).
+function servingRecord(row, payload, now) {
+  if (Number.isFinite(payload.ttlMs) && row.created_at + payload.ttlMs <= now) return null;
+  const nonce = nonceOf(payload.url);
+  if (!nonce || !isLoopbackUrl(payload.url)) return null;
+  if (Number.isInteger(payload.pid) && !pidAlive(payload.pid)) return null;
+  return {
+    seq: row.seq, workflowId: row.workflow_id, dispatchId: payload.dispatchId, url: payload.url, nonce, pid: payload.pid ?? null,
+    fields: payload.fields ?? { files: [], vars: [] }, credential: isCredentialAsk(payload.fields), onDemand: payload.onDemand === true,
+    createdAt: row.created_at, expiresAt: Number.isFinite(payload.ttlMs) ? row.created_at + payload.ttlMs : null,
+  };
+}
+
+/**
+ * One filed ask as the owner-facing connectors see it (read-only on `db`): {workflowId, dispatchId,
+ * title, question, closed, serving}, or null when no ask report was filed for it. `closed` is
+ * 'answered', 'superseded' (retired, and not re-parked since: a later ask-notified or ask-serving
+ * reopens it), else null. `serving` is the live form (servingAsks' rules) or null: an open ask
+ * with no live form is healthy, its link is generated on demand from Telegram.
+ */
+export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) {
+  const report = db.prepare("SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+  if (!report) return null;
+  const last = (kinds) => db.prepare(`SELECT seq, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${kinds.map(() => '?').join(',')})
+    AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, ...kinds, dispatchId) ?? null;
+  const answered = last(['ask-answered']), superseded = last(['ask-superseded']), reopened = last(['ask-serving', 'ask-notified']);
+  const closed = answered ? 'answered' : superseded && !(reopened && reopened.seq > superseded.seq) ? 'superseded' : null;
+  let serving = null;
+  const row = last(['ask-serving']);
+  if (!closed && row) {
+    const ended = last(['ask-serving-expired', 'ask-superseded']);
+    if (!(ended && ended.seq > row.seq)) serving = servingRecord({ ...row, workflow_id: workflowId }, parse(row.payload_json, {}) ?? {}, now);
+  }
+  const rj = parse(report.report_json, {}) ?? {};
+  return {
+    workflowId, dispatchId, title: db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null,
+    question: rj.question ?? { text: rj.summary ?? '', options: [] }, closed, serving,
+  };
+}
+
+/** Every open ask of one ledger (askState with closed null), newest report first, in live workflows only. */
+export function openAskList(db, { now = Date.now() } = {}) {
+  const rows = db.prepare(`SELECT r.workflow_id, r.dispatch_id FROM reports r JOIN workflows w ON w.workflow_id=r.workflow_id
+    WHERE r.outcome='ask' AND w.archived_at IS NULL AND (w.phase IS NULL OR w.phase<>'finished') ORDER BY r.report_id DESC`).all();
+  const seen = new Set(), out = [];
+  for (const row of rows) {
+    const id = `${row.workflow_id}\u0000${row.dispatch_id}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const state = askState(db, row.workflow_id, row.dispatch_id, { now });
+    if (state && !state.closed) out.push(state);
+  }
+  return out;
+}
+
+/** The repos the Telegram store names (asks notified from any ledger), so the gateway can route their forms. */
+export const notifiedRepos = (env = process.env) =>
+  [...new Set(Object.values(readJson(stateFile('telegram-sent.json', env))?.asks ?? {}).map((a) => a?.repo).filter((r) => typeof r === 'string' && r))];
 
 /** Open one repo's ledger read-only for `fn`, always closing it; a missing or unreadable ledger yields `fallback`. */
 export function withLedgerRead(repo, fn, fallback = null) {

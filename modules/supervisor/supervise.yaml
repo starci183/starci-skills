@@ -49,9 +49,11 @@ loop:
       (node scripts/kernel/watchdog.mjs --repo <repo> --workflow <id> --repair; without --repair it
       only reports wake-needed and never wakes) — a kernel that yields is
       woken by the transition that has work for it (api report, an answered ask) and the watchdog
-      is the fallback for a missed or racing wake; (4) parked asks re-serve on kernel survey —
-      the digest tags every open ask live, stale, dead or unserved, and only a `live` tag is
-      relayed to the owner.
+      is the fallback for a missed or racing wake; (4) parked asks re-park on kernel survey —
+      the digest tags every open ask live, stale, dead, unserved or on-demand, and only a `live`
+      tag is relayed to the owner. `on-demand` is healthy: the kernel's api serve-ask told the
+      owner on Telegram (ask-notified) and the form is served only when the owner presses the
+      ask's "Generate URL" button or asks with /asks; never re-serve it.
       Steps (2) and (3) are one idempotent command: node scripts/kernel/resume-all.mjs
       [--wait-orca] starts a --repair watchdog for every running, unarchived workflow of every
       product ledger listed in config.yaml supervisor.repos (or --repo; nothing is discovered)
@@ -66,8 +68,11 @@ loop:
       do: read the printed digest — new op reports, open asks with their liveness tag + serving
         URL, fresh direction artifacts, kernel liveness; a `dead` tag is a recorded
         ask-serving-expired, `stale` is a URL that did not answer 2xx inside the probe window,
-        `unserved` is an ask no form was ever started for — each needs a re-serve before it can
-        reach the owner; open new direction images and check them against the current
+        `unserved` is an ask no form was ever started for — each needs a re-park (api serve-ask)
+        before it can reach the owner, unless it is `on-demand` (on Telegram, served when the owner
+        presses its button). Connector health is `node scripts/connectors/tunnel.mjs status`
+        (its `health` names the manager, cloudflared, gateway reachability, extra managers and `problems`);
+        open new direction images and check them against the current
         contracts (concepts.yaml rules, full-page chrome, concrete data, ui.flow coverage)
     - step: form
       do: |
@@ -116,7 +121,7 @@ loop:
         not yet), the latest report, pending questions with their response.<domain> links,
         owner gates, open runtime defects and a finish time. A terse table was rejected
         ("ghi rõ ràng ra mọi thứ"); keep it readable. Owner asks themselves still reach
-        Telegram only from the kernel's serve-ask.
+        Telegram only from the kernel's api serve-ask (a question with a Generate URL button).
     - step: sleep
       do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
 

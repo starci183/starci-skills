@@ -10,7 +10,8 @@ import {parseYaml} from '../engine/yaml.mjs';
 import {servingAsks,askRepos} from '../scripts/connectors/lib.mjs';
 import {createGateway,ledgerResolver} from '../scripts/connectors/ask-gateway.mjs';
 import {parseQuickTunnelUrl,parseConnected,cloudflaredPlan,cloudflaredConfigText,superviseTunnel,tunnelState} from '../scripts/connectors/tunnel.mjs';
-import {notifyAsk,markAskClosed,sendMessage,redact,discoverChats} from '../scripts/connectors/telegram.mjs';
+import {notifyAsk,markAskClosed,sendMessage,redact,discoverChats,askKeyOf,recordAskMessage,textFor} from '../scripts/connectors/telegram.mjs';
+import {parkAsk} from '../scripts/kernel/serve-ask.mjs';
 
 // scripts/connectors/* publish serve-ask forms through one gateway + one Cloudflare tunnel and tell the
 // owner on Telegram (docs/connectors.md). Every spec here runs on fakes: no network, no cloudflared.
@@ -253,75 +254,92 @@ const telegramConfig=(extra={})=>withConnectors({secretsFile:null,cloudflare:{mo
 const DECISION={text:'Chốt giá gói Pro?',options:['99.000đ/tháng','Để sau']};
 const deps=(machineHome,extra={})=>({config:telegramConfig(),env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',sleepImpl:async()=>{},warn:()=>{},...extra});
 
-test('serve-ask binding notifies once: workflow, question, numbered options and the public gateway link, in config language',async t=>{
-  await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
-    seedServing(ledger,{workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price',url:`http://127.0.0.1:6973/${NONCE}`,title:'miamia-pricing',question:DECISION});
+// Owner, 2026-09-24: the question goes to Telegram with a "Generate URL" button; the form is served
+// only when the owner presses it (telegram-bridge.spec.mjs covers the press).
+const seedAsk=(ledger,{workflowId,dispatchId,question,title=null})=>{
+  if(!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId))seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:title}});
+  ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)`)
+    .run(workflowId,dispatchId,'provision.ask',1,1,'ask',JSON.stringify({schema:'starci/op-report@1',outcome:'ask',question}),Date.now());
+};
+
+test('a parked ask is told once: workflow, question, numbered options and a Generate URL button, no link, in config language',async t=>{
+  await withLedger(t,async({ledger,ledgerFile,machineHome,repoRoot})=>{
+    seedAsk(ledger,{workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price',title:'miamia-pricing',question:DECISION});
     const bot=fakeBot(),warnings=[];
     const logs=[];const saved={log:console.log,error:console.error,warn:console.warn};
     console.log=console.error=console.warn=(...a)=>logs.push(a.join(' '));
     let first,second;
     try{
-      first=await notifyAsk({ledgerFile,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
-      second=await notifyAsk({ledgerFile,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
+      first=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
+      second=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
     }finally{Object.assign(console,saved);}
     assert.equal(first.sent,1);assert.equal(first.ok,true);
-    assert.equal(second.skipped,'already sent','the same ask-serving event is never sent twice');
+    assert.equal(first.key,askKeyOf('wf-miamia-pricing-x1','ctx_price'));
+    assert.equal(second.skipped,'already notified','an ask whose notice is in the chat is not sent again');
+    assert.equal(second.messageId,first.messageId);
     assert.equal(bot.calls.length,1);
     const [call]=bot.calls;
     assert.equal(call.url,`http://bot.invalid/bot${TOKEN}/sendMessage`);
     assert.equal(call.body.chat_id,'4242');
-    assert.equal(call.body.link_preview_options?.is_disabled,true,'no link preview fetches the bearer URL');
+    assert.equal(call.body.link_preview_options?.is_disabled,true);
     const text=call.body.text;
     assert.match(text,/^\[StarCi\] Có câu hỏi cần thầy trả lời\nWorkflow: miamia-pricing \(wf-miamia-pricing-x1\)\n\nCâu hỏi:\nChốt giá gói Pro\?/);
     assert.match(text,/Lựa chọn:\n1\. 99\.000đ\/tháng\n2\. Để sau/);
-    assert.match(text,new RegExp(`Trả lời tại: https://response\\.example\\.org/${NONCE}`),'the link is the form on the public gateway host');
-    assert.ok(!text.includes('127.0.0.1'),'a decision ask carries no localhost link');
+    assert.match(text,/Form trả lời chưa mở\. Khi thầy muốn trả lời, bấm "Tạo link trả lời"/);
+    assert.ok(!/https?:\/\//.test(text),'no form is served yet, so no link of any kind');
+    assert.deepEqual(call.body.reply_markup,{inline_keyboard:[[{text:'Tạo link trả lời',callback_data:`ask:${first.key}`}]]},'one button, labelled in config language');
+    assert.ok(Buffer.byteLength(call.body.reply_markup.inline_keyboard[0][0].callback_data)<=64,'callback_data fits Telegram\'s 64 bytes');
+    assert.equal(textFor('en').generate,'Generate URL');
+    const store=JSON.parse(fs.readFileSync(path.join(machineHome,'StarCi','runtime','connectors','telegram-sent.json'),'utf8'));
+    assert.deepEqual(store.asks['wf-miamia-pricing-x1|ctx_price'].messageIds,[first.messageId]);
+    assert.equal(store.asks['wf-miamia-pricing-x1|ctx_price'].repo,repoRoot,'the store knows where the ask lives, for the button');
+    assert.equal(store.keys[first.key],'wf-miamia-pricing-x1|ctx_price');
     assert.deepEqual(warnings,[]);
-    const out=JSON.stringify([first,second])+logs.join('\n')+fs.readFileSync(path.join(machineHome,'StarCi','runtime','connectors','telegram-sent.json'),'utf8');
+    const out=JSON.stringify([first,second])+logs.join('\n')+JSON.stringify(store);
     assert.ok(!out.includes(TOKEN)&&!out.includes('AAFakeToken'),'the token never reaches output, logs or state');
+    // A closed ask is never told.
+    ledger.appendEvent({workflowId:'wf-miamia-pricing-x1',entityType:'report',entityId:'ctx_price',kind:'ask-answered',payload:{dispatchId:'ctx_price'}});
+    assert.equal((await notifyAsk({ledgerFile,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(path.join(machineHome,'fresh'),{fetchImpl:bot.fetchImpl}))).skipped,'already answered');
   });
 });
 
-test('a re-served ask sends its new link and points the earlier message at it',async t=>{
-  await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
-    seedServing(ledger,{workflowId:'wf-a',dispatchId:'ctx_a',url:`http://127.0.0.1:6973/${NONCE}`,question:DECISION});
+test('parkAsk records ask-notified with the ask fields when the owner is told, ask-notify-failed when the send fails, nothing when Telegram is off',async t=>{
+  await withLedger(t,async({ledger,ledgerFile,machineHome,repoRoot})=>{
+    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_old',question:{text:'Cổng thanh toán? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
+    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_new',question:{text:'Cổng thanh toán? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
+    const rows=()=>ledger.db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id='wf-park' AND kind IN ('ask-notified','ask-notify-failed','ask-superseded','ask-message-closed') ORDER BY seq").all().map(r=>[r.kind,JSON.parse(r.payload_json)]);
+    const report=id=>ledger.db.prepare("SELECT * FROM reports WHERE workflow_id='wf-park' AND dispatch_id=?").get(id);
     const bot=fakeBot();
-    const first=await notifyAsk({ledgerFile,workflowId:'wf-a',dispatchId:'ctx_a'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
-    ledger.appendEvent({workflowId:'wf-a',entityType:'report',entityId:'ctx_a',kind:'ask-serving-expired',payload:{dispatchId:'ctx_a'}});
-    ledger.appendEvent({workflowId:'wf-a',entityType:'report',entityId:'ctx_a',kind:'ask-serving',payload:{dispatchId:'ctx_a',url:'http://127.0.0.1:6980/a-99999999999999999f',pid:1,fields:{files:[],vars:[]},ttlMs:3600000}});
-    const again=await notifyAsk({ledgerFile,workflowId:'wf-a',dispatchId:'ctx_a'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
-    assert.equal(again.sent,1);assert.equal(again.reserve,true);
-    const sends=bot.sends();
-    assert.equal(sends.length,2);
-    assert.match(sends[1].body.text,/^\[StarCi\] Link mới \(thay link cũ\)/);
-    assert.match(sends[1].body.text,/Trả lời tại: https:\/\/response\.example\.org\/a-99999999999999999f/);
-    const edit=bot.calls.find(c=>c.method==='editMessageText');
-    assert.equal(edit?.body.message_id,first.messageId,'the earlier message is edited, not left pointing at a dead link');
-    assert.match(edit.body.text,/đã được thay bằng link mới/);
+    const notify=a=>notifyAsk(a,deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    const close=a=>markAskClosed(a,deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    const old=await parkAsk({ledger,ledgerFile,repo:repoRoot,workflowId:'wf-park',report:report('ctx_old'),notify,close});
+    assert.equal(old.notified,true);
+    const parked=await parkAsk({ledger,ledgerFile,repo:repoRoot,workflowId:'wf-park',report:report('ctx_new'),notify,close});
+    assert.deepEqual([parked.notified,parked.superseded],[true,['ctx_old']],'the replacement retires the earlier ask');
+    const events=rows();
+    assert.deepEqual(events.map(([k,p])=>[k,p.dispatchId]),[['ask-notified','ctx_old'],['ask-superseded','ctx_old'],['ask-message-closed','ctx_old'],['ask-notified','ctx_new']]);
+    const notified=events.at(-1)[1];
+    assert.deepEqual([notified.onDemand,notified.via,notified.fresh,notified.key],[true,'telegram',true,askKeyOf('wf-park','ctx_new')]);
+    assert.deepEqual(notified.fields,{files:[],vars:['VNPAY_TMN_CODE']},'the credential fields ride along, for the kernel and supervisor');
+    assert.deepEqual(events[2][1].deleted,[old.telegram.messageId],'the superseded ask left the chat');
+    assert.ok(bot.calls.some(c=>c.method==='deleteMessage'&&c.body.message_id===old.telegram.messageId));
+    assert.equal(bot.calls.filter(c=>c.method==='sendMessage').length,2,'parkAsk never serves, it only tells');
+    // Telegram off: nothing is recorded, and the caller (api serve-ask) serves the form itself.
+    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_off',question:{text:'q',options:[],refs:['decision.off']}});
+    const off=await parkAsk({ledger,ledgerFile,repo:repoRoot,workflowId:'wf-park',report:report('ctx_off'),close,
+      notify:a=>notifyAsk(a,deps(machineHome,{fetchImpl:bot.fetchImpl,config:withConnectors({secretsFile:null}),env:{LOCALAPPDATA:machineHome}}))});
+    assert.deepEqual([off.notified,off.telegram.skipped],[false,'telegram off']);
+    const failing=fakeBot({status:400,json:{ok:false,description:'Bad Request: chat not found'}});
+    seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_fail',question:{text:'q2',options:[],refs:['decision.fail']}});
+    const failed=await parkAsk({ledger,ledgerFile,repo:repoRoot,workflowId:'wf-park',report:report('ctx_fail'),close,notify:a=>notifyAsk(a,deps(path.join(machineHome,'f'),{fetchImpl:failing.fetchImpl}))});
+    assert.equal(failed.notified,false);
+    assert.deepEqual(rows().slice(4).map(([k,p])=>[k,p.dispatchId]),[['ask-notify-failed','ctx_fail']]);
   });
 });
 
-test('a credential ask says to answer on the machine and gets the public link only when exposeCredentialAsks is on',async t=>{
+test('the notifier never throws into its caller: off, incomplete, answered, failing and spec runs are quiet no-ops',async t=>{
   await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
-    seedServing(ledger,{workflowId:'wf-nivo-pay-x2',dispatchId:'ctx_vnpay',url:`http://127.0.0.1:6974/${CRED}`,fields:{files:['vnpay-hash-secret.key'],vars:['VNPAY_TMN_CODE']},
-      question:{text:'Nhập VNPAY_TMN_CODE và vnpay-hash-secret.key',options:[]}});
-    const local=fakeBot();
-    await notifyAsk({ledgerFile,workflowId:'wf-nivo-pay-x2',dispatchId:'ctx_vnpay'},deps(machineHome,{fetchImpl:local.fetchImpl}));
-    const text=local.calls[0].body.text;
-    assert.match(text,/Nhập VNPAY_TMN_CODE/,'the question is still sent');
-    assert.match(text,/KHÔNG đưa ra ngoài. Thầy trả lời TRÊN MÁY, mở link localhost này tại máy:/);
-    assert.ok(text.includes('http://127.0.0.1:6974/'),'owner 2026-09-23: the credential ask carries its localhost link, answered at the machine');
-    assert.ok(!text.includes('response.example.org'),'no public link for a credential ask by default');
-    const exposed=fakeBot();
-    await notifyAsk({ledgerFile,workflowId:'wf-nivo-pay-x2',dispatchId:'ctx_vnpay'},
-      deps(path.join(machineHome,'exposed'),{fetchImpl:exposed.fetchImpl,config:telegramConfig({exposeCredentialAsks:true})}));
-    assert.ok(exposed.calls[0].body.text.includes(`https://response.example.org/${CRED}`),'exposeCredentialAsks opts the public link in');
-  });
-});
-
-test('the notifier never throws into serve-ask: off, incomplete, answered, failing and spec runs are quiet no-ops',async t=>{
-  await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
-    seedServing(ledger,{workflowId:'wf-a',dispatchId:'ctx_a',url:`http://127.0.0.1:6973/${NONCE}`,question:DECISION});
+    seedAsk(ledger,{workflowId:'wf-a',dispatchId:'ctx_a',question:DECISION});
     const bot=fakeBot(),ask={ledgerFile,workflowId:'wf-a',dispatchId:'ctx_a'};
     const warned=[],warn=w=>warned.push(w);
     const off=await notifyAsk(ask,deps(machineHome,{fetchImpl:bot.fetchImpl,warn,config:withConnectors({secretsFile:null}),env:{LOCALAPPDATA:machineHome}}));
@@ -375,34 +393,45 @@ test('discover-chat lists chat ids, types and names only',async()=>{
   assert.equal(bot.calls[0].method,'getUpdates');
 });
 
-test('the one send point is serve-ask binding; the supervisor and the kernel api carry no Telegram call',()=>{
+test('the one send point is the kernel api\'s parkAsk; serve-ask binding and the supervisor send nothing',()=>{
   const read=p=>fs.readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
-  assert.match(read('scripts/kernel/serve-ask.mjs'),/if \(!readonly\) notifyAsk\(\{ ledgerFile: file, workflowId: args\.workflow, dispatchId: report\.dispatch_id \}\)/);
+  const serveAsk=read('scripts/kernel/serve-ask.mjs');
+  assert.match(serveAsk,/export async function parkAsk\(\{[^}]*notify = notifyAsk/,'parkAsk is where an ask is told');
+  assert.doesNotMatch(serveAsk,/notifyAsk\(\{ ledgerFile: file/,'a binding form never sends a message (the bridge edits the notice)');
   for(const p of ['scripts/supervisor/poll.mjs','scripts/kernel/watchdog.mjs'])
     assert.doesNotMatch(read(p),/connectors\/telegram|api\.telegram\.org/,`${p} must not notify`);
-  // retire-ask edits the owner's existing message; the kernel api never sends a new one.
-  assert.doesNotMatch(read('scripts/kernel/api.mjs'),/notifyAsk|sendMessage|api\.telegram\.org/,'the kernel api never sends');
-  assert.match(read('scripts/kernel/api.mjs'),/import \{ markAskClosed \} from '\.\.\/connectors\/telegram\.mjs'/);
+  const api=read('scripts/kernel/api.mjs');
+  assert.doesNotMatch(api,/sendMessage\(|api\.telegram\.org|connectors\/telegram\.mjs/,'the kernel api reaches Telegram only through serve-ask.mjs parkAsk/closeAskMessages');
+  assert.match(api,/await parkAsk\(\{ ledger, ledgerFile: ledgerFileFor\(repo\), repo, workflowId, report \}\)/);
 });
 
-// The owner asked that an answered question stop looking open in Telegram:
-// the sent message is edited in place, the question kept and the link gone.
-test('an answered or retired ask edits its Telegram message and drops the link',async t=>{
-  await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
-    seedServing(ledger,{workflowId:'wf-close',dispatchId:'ctx_close',url:`http://127.0.0.1:6975/${NONCE}`,question:{text:'Cổng thanh toán nào?',options:['VNPay','MoMo']}});
+// Owner, 2026-09-24: "trả lời xong xóa" — an answered or retired ask leaves the chat.
+test('an answered or retired ask deletes every message that shows it; one Telegram will not delete is edited instead',async t=>{
+  await withLedger(t,async({ledger,ledgerFile,machineHome,repoRoot})=>{
+    seedAsk(ledger,{workflowId:'wf-close',dispatchId:'ctx_close',question:{text:'Cổng thanh toán nào?',options:['VNPay','MoMo']}});
     const bot=fakeBot();
-    await notifyAsk({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_close'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    const told=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-close',dispatchId:'ctx_close'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
+    await recordAskMessage({workflowId:'wf-close',dispatchId:'ctx_close',messageId:555,url:'http://127.0.0.1:6975/a-0123456789abcdef01'},{env:{LOCALAPPDATA:machineHome}});
     const closed=await markAskClosed({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_close',reason:'answered',by:'owner'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
-    assert.deepEqual([closed.ok,closed.edited,closed.reason],[true,101,'answered'],'the message the ask was sent as (fakeBot ids start at 101)');
-    const edit=bot.calls.at(-1);
-    assert.match(edit.url,/editMessageText$/);
-    assert.equal(edit.body.message_id,101);
-    assert.match(edit.body.text,/^\[StarCi\] Đã trả lời \(lúc .*owner\)/);
-    assert.match(edit.body.text,/Cổng thanh toán nào\?/);
-    assert.ok(!edit.body.text.includes('/a-'),'the answered message carries no link');
+    assert.deepEqual([closed.ok,closed.reason,closed.deleted,closed.edited],[true,'answered',[told.messageId,555],[]],'the notice and the /asks copy are both deleted');
+    assert.deepEqual(bot.calls.filter(c=>c.method==='deleteMessage').map(c=>[c.body.chat_id,c.body.message_id]),[['4242',told.messageId],['4242',555]]);
+    assert.equal(bot.calls.filter(c=>c.method==='editMessageText').length,0);
     const again=await markAskClosed({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_close',reason:'retired'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
-    assert.equal(again.skipped,'already answered','a closed message is edited once');
+    assert.equal(again.skipped,'already answered','a closed ask is removed once');
     const never=await markAskClosed({ledgerFile,workflowId:'wf-close',dispatchId:'ctx_never'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
     assert.equal(never.skipped,'no message sent for this ask');
+
+    // Older than 48 h: Telegram refuses the delete, so the message is edited to say so, with no link or button.
+    seedAsk(ledger,{workflowId:'wf-old',dispatchId:'ctx_old',question:{text:'Tên miền?',options:['a','b']}});
+    const stale=fakeBot();
+    const refuse=async(url,init)=>url.endsWith('/deleteMessage')
+      ?{ok:false,status:400,json:async()=>({ok:false,description:"Bad Request: message can't be deleted for everyone"})}:stale.fetchImpl(url,init);
+    const oldTold=await notifyAsk({ledgerFile,workflowId:'wf-old',dispatchId:'ctx_old'},deps(machineHome,{fetchImpl:stale.fetchImpl}));
+    const retired=await markAskClosed({ledgerFile,workflowId:'wf-old',dispatchId:'ctx_old',reason:'retired'},deps(machineHome,{fetchImpl:refuse}));
+    assert.deepEqual([retired.deleted,retired.edited],[[],[oldTold.messageId]]);
+    const edit=stale.calls.find(c=>c.method==='editMessageText');
+    assert.match(edit.body.text,/^\[StarCi\] Câu hỏi này không cần trả lời nữa \(lúc /);
+    assert.match(edit.body.text,/Tên miền\?/);
+    assert.equal(edit.body.reply_markup,undefined,'the edit drops the button');
   });
 });

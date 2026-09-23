@@ -82,14 +82,20 @@ const probe = async (url, timeoutMs) => {
 // appends 'ask-serving-expired'), so a dead ask costs no network at all;
 // everything else is probed once per cycle. An ask that a replacement
 // retired ('ask-superseded') is not open and never reaches here.
+// An ask the kernel parked on Telegram (`ask-notified`) is served only when the
+// owner presses its "Generate URL" button: with no live form it is `on-demand`,
+// which is healthy — never relayed, never re-served.
 export const askLiveness = async (db, dispatchId, { timeoutMs = PROBE_TIMEOUT_MS } = {}) => {
+  const notified = lastEvent(db, 'ask-notified', dispatchId);
+  const idle = (fallback) => (notified ? { url: null, liveness: 'on-demand' } : fallback);
   const serving = lastEvent(db, 'ask-serving', dispatchId);
-  if (!serving) return { url: null, liveness: 'unserved' };
+  if (!serving) return idle({ url: null, liveness: 'unserved' });
   const url = JSON.parse(serving.payload_json ?? '{}').url ?? null;
   const expired = lastEvent(db, 'ask-serving-expired', dispatchId);
-  if (expired && expired.seq > serving.seq) return { url, liveness: 'dead' };
-  if (!url) return { url: null, liveness: 'unserved' };
-  return { url, liveness: await probe(url, timeoutMs) };
+  if (expired && expired.seq > serving.seq) return idle({ url, liveness: 'dead' });
+  if (!url) return idle({ url: null, liveness: 'unserved' });
+  const liveness = await probe(url, timeoutMs);
+  return liveness === 'live' ? { url, liveness } : idle({ url, liveness });
 };
 
 export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEOUT_MS } = {}) => {
@@ -99,12 +105,12 @@ export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEO
         SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
           AND e.kind='ask-answered'
           AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
-      -- a supersede closes an ask unless it was served again afterwards (a
-      -- wrongly retired question the kernel re-serves is open again)
+      -- a supersede closes an ask unless it was parked again afterwards, served
+      -- or notified (a wrongly retired question the kernel re-parks is open again)
       AND NOT EXISTS (
         SELECT 1 FROM events s WHERE s.workflow_id=r.workflow_id AND s.kind='ask-superseded'
           AND json_extract(s.payload_json,'$.dispatchId')=r.dispatch_id
-          AND NOT EXISTS (SELECT 1 FROM events v WHERE v.workflow_id=r.workflow_id AND v.kind='ask-serving'
+          AND NOT EXISTS (SELECT 1 FROM events v WHERE v.workflow_id=r.workflow_id AND v.kind IN ('ask-serving','ask-notified')
             AND json_extract(v.payload_json,'$.dispatchId')=r.dispatch_id AND v.seq > s.seq))
       ORDER BY r.report_id DESC`).all();
   const seen = new Set(); const out = [];

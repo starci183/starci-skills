@@ -284,17 +284,20 @@ tick:
       `frontier.deadWorkerJobs` (reconcile.deadWorker below).
       `peer-message` (`frontier.peerMessageKeys`) is not a wait either: read
       `api inbox`, act on each message and ack it (§ peers below).
-      `frontier.askReserveDispatches` (an unanswered ask whose serve-ask form
-      expired or was never served) is not a wait either: re-serve each with
-      serve-ask --dispatch before yielding; a dead link is not an owner wait.
-      A re-serve config.yaml asks.autoAcceptRecommended answers returns
-      autoAccepted with the recommended option instead of a form: the ask is
-      answered (answeredBy auto-recommended), so re-enqueue the op with it
+      `frontier.askReserveDispatches` (an unanswered ask that never reached
+      the owner: not notified on Telegram and no live serve-ask form) is not
+      a wait either: park each with `api serve-ask --dispatch` before
+      yielding. A park config.yaml asks.autoAcceptRecommended answers returns
+      autoAccepted with the recommended option instead: the ask is answered
+      (answeredBy auto-recommended), so re-enqueue the op with it
       (provisionAsk below).
       `awaiting-owner` (no open operation, at least one unanswered ask) is a
       legitimate wait: yield naming the pending ask dispatch ids; the
-      answer's ask-answered wake brings you back. A pending handover ask is
-      this wait too. `handover-answered`, `finish-ready` and `handover-due`
+      answer's ask-answered wake brings you back. An ask in
+      `frontier.askOnDemandDispatches` is this wait with no form at all: the
+      owner has it on Telegram and the form is served only when they press
+      its "Generate URL" button (again after it expires), so never re-serve
+      it. A pending handover ask is this wait too. `handover-answered`, `finish-ready` and `handover-due`
       are never waits: each is the next handover move (handoverLoop below),
       and `api status` `handover` names it.
     reconcile: >-
@@ -589,11 +592,17 @@ verdictTable:
       (modules/ops/_common.yaml "Bounded finish and blockers"; owner ruling
       2026-09-23: asking for a credential does not mean not doing the
       work). When a report lands with outcome ask, the kernel runs
-      `api serve-ask --workflow <id> --dispatch <id>`, which launches
+      `api serve-ask --workflow <id> --dispatch <id>`, which parks it: the
+      owner gets the question on Telegram with a "Generate URL" button
+      (`ask-notified`) and NO form is served yet (owner, 2026-09-24). When
+      the owner presses it, the Telegram bridge launches
       scripts/kernel/serve-ask.mjs detached — it serves the question as a localhost form
-      (first free port in 6969..7069, nonce path), writes submitted values to
+      (first free port in 6969..7069, nonce path; public at
+      response.<domain>/a-<nonce> unless it asks for credentials), writes submitted values to
       sealed custody/.env.local without any agent seeing them, files a
-      sanitized `ask-answered` event, and wakes the kernel. With config.yaml
+      sanitized `ask-answered` event, deletes the ask's Telegram message and
+      wakes the kernel. With Telegram off, `api serve-ask` serves the form
+      at once as before (`--now` does so on purpose). With config.yaml
       asks.autoAcceptRecommended on, an ask that carries a recommended option
       (question.recommended, or exactly one option marked "(khuyến nghị)",
       "(recommended)" or "(đề xuất)") and falls in no class of asks.excludes
@@ -690,7 +699,9 @@ handoverLoop:
     not exactly the options approve, feedback, question in that order.
     Settle it `blocked` (awaiting-owner, no business attempt spent), run
     `api serve-ask --workflow <id> --dispatch <ask dispatch>`, and yield on
-    `awaiting-owner`; an expired form is `ask-reserve` like any other ask.
+    `awaiting-owner`; like any other ask it is served on demand from its
+    Telegram button, and only an ask that never reached the owner is
+    `ask-reserve`.
   approve: >-
     `handover-answered` with decision approve and byOwner true: enqueue
     handover.review again. It reads the approval and files done; record one

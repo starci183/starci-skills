@@ -18,12 +18,27 @@
 //
 // Commands (English only): /start and /choose show one button per registered
 // supervisor (🟢 online / ⚪ offline); /status sends the progress report
-// (scripts/supervisor/progress-report.mjs) from the bridge itself; /help. Any
+// (scripts/supervisor/progress-report.mjs) from the bridge itself; /asks lists
+// every open owner ask across the connector repos, one message each with its
+// own "Generate URL" button; /help. Any
 // other text goes to the chat's routed supervisor: appended to
 // <state>/supervisors/<id>.inbox.jsonl and acknowledged as a reply. A message
 // with no route auto-routes when exactly one supervisor is registered, else it
 // is held and delivered once the owner picks one. Replies follow config.yaml
 // `language` (vi, else en). The supervisor side is scripts/supervisor/channel.mjs.
+//
+// Owner asks on demand (owner, 2026-09-24: "khi yêu cầu thì mới serve url"):
+// a kernel's `api serve-ask` only sends the question with a "Generate URL"
+// button (callback_data `ask:<16 hex>`, telegram.mjs askKeyOf). Pressing it
+// here answers the callback, launches scripts/kernel/serve-ask.mjs for that ask
+// detached (--on-demand telegram; it hides its children's windows) unless its
+// form already serves, waits for the form to bind (its ask-serving event), makes
+// sure the gateway and tunnel run (tunnel.mjs ensureAskConnectors), and edits
+// the pressed message to carry the link: https://<host>/a-<nonce>, or for a
+// credential ask the localhost link with "answer on the machine". A closed ask's
+// button removes its message instead. Every poll round (at most once a minute)
+// the bridge sweeps the store (telegram.mjs sweepAskMessages): the messages of
+// asks that closed are deleted and a link whose form ended is taken back off.
 //
 // Registry: <state>/supervisors/<id>.json {id, label, repos, registeredAt,
 // heartbeatAt}; a supervisor is online while its heartbeat is younger than
@@ -35,10 +50,17 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { configRoot } from '../../engine/config.mjs';
-import { argsOf, claimManager, lockHolder, ownerConfig, pidAlive, readJson, recordAlive, sourceRootOf, spawnDetached, stateFile, writeJson } from './lib.mjs';
-import { botCall, DEFAULT_API_BASE, redact, telegramSettings } from './telegram.mjs';
+import { configRoot, connectorsConfig } from '../../engine/config.mjs';
+import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { argsOf, askRepos, askState, claimManager, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive, readJson, recordAlive, sourceRootOf, spawnDetached, stateFile, withLedgerRead, writeJson } from './lib.mjs';
+import {
+  ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, linkFor, recordAskMessage, redact,
+  removeAskMessage, sweepAskMessages, telegramSettings, textFor,
+} from './telegram.mjs';
+import { ensureAskConnectors, publicBase } from './tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from '../supervisor/progress-report.mjs';
+
+export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
 
 export const BRIDGE_NAME = 'telegram-bridge';
 export const BRIDGE_FILE = fileURLToPath(import.meta.url);
@@ -62,11 +84,16 @@ const TEXT = {
     gone: 'That supervisor is no longer registered. /choose another one.',
     textOnly: 'Only text messages are forwarded to a supervisor.',
     statusFailed: 'The progress report could not be built right now.',
+    asksNone: 'No question is waiting for you.',
+    asksHead: (n) => `${n} open question(s). Press "Generate URL" under the one you want to answer:`,
+    askClosed: 'This question no longer needs an answer.',
+    askGenerating: 'Opening the answer form…',
     unknown: 'Unknown command.',
     help: [
       'Commands:',
       '/choose — pick the supervisor to talk to',
       '/status — the progress report',
+      '/asks — every open question, each with a Generate URL button',
       '/help — this list',
       'Any other text goes to the supervisor you picked.',
     ].join('\n'),
@@ -82,11 +109,16 @@ const TEXT = {
     gone: 'Supervisor này không còn đăng ký. Thầy /choose supervisor khác nhé.',
     textOnly: 'Chỉ tin nhắn chữ mới được chuyển cho supervisor.',
     statusFailed: 'Chưa dựng được báo cáo tiến độ lúc này.',
+    asksNone: 'Không có câu hỏi nào đang chờ thầy.',
+    asksHead: (n) => `${n} câu hỏi đang chờ thầy. Thầy bấm "Tạo link trả lời" dưới câu muốn trả lời:`,
+    askClosed: 'Câu hỏi này không cần trả lời nữa.',
+    askGenerating: 'Đang mở form trả lời…',
     unknown: 'Lệnh không có.',
     help: [
       'Các lệnh:',
       '/choose — chọn supervisor để nói chuyện',
       '/status — báo cáo tiến độ',
+      '/asks — các câu hỏi đang chờ, mỗi câu có nút tạo link trả lời',
       '/help — danh sách lệnh',
       'Tin nhắn thường sẽ được chuyển cho supervisor thầy đang chọn.',
     ].join('\n'),
@@ -279,15 +311,35 @@ const defaultStatusMessages = (config, env) => {
   return progressMessages(collectProgress(repos, { config }));
 };
 
+// The repositories whose open asks /asks lists: the connector repos plus every repo a notice named.
+const defaultAskRepos = (env) => {
+  try { return askRepos(connectorsConfig(ownerConfig() ?? undefined, env), { env, extra: notifiedRepos(env) }); } catch { return []; }
+};
+const defaultSpawnServe = (env) => ({ repo, workflowId, dispatchId, ttlMs = null }) => spawnDetached(SERVE_ASK_FILE,
+  ['--repo', repo, '--workflow', workflowId, '--dispatch', dispatchId, '--on-demand', 'telegram', ...(ttlMs ? ['--ttl', String(ttlMs)] : [])],
+  { env: { ...process.env, ...env } });
+const readAskState = (ledgerFile, workflowId, dispatchId, now) => {
+  try {
+    if (!ledgerFile || !fs.existsSync(ledgerFile)) return null;
+    const handle = inspectLedger({ file: ledgerFile });
+    try { return askState(handle.db, workflowId, dispatchId, { now }); } finally { try { handle.close(); } catch { /* closed */ } }
+  } catch { return null; }
+};
+
 /**
  * The bridge over one state directory. Every seam is injectable for the specs: `settings()` (what
- * telegramSettings returns), the Bot API host and fetch, the clock, the log sink, the online window
- * and the /status builder. `pollOnce()` runs one getUpdates round; `handleUpdate()` one update.
+ * telegramSettings returns), the Bot API host and fetch, the clock, the log sink, the online window,
+ * the /status builder, and for owner asks the repos /asks reads, the serve-ask launcher, the
+ * connector starter, the public base, the waits and the sweep interval (0 sweeps every round).
+ * `pollOnce()` runs one getUpdates round; `handleUpdate()` one update.
  */
 export function createBridge({
   env = process.env, settings = () => telegramSettings({ env }), apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
   fetchImpl = fetch, sleepImpl = sleep, now = Date.now, log = () => {}, onlineMs, timeoutS = POLL_TIMEOUT_S,
   statusMessages = () => defaultStatusMessages(ownerConfig(), env),
+  repos = () => defaultAskRepos(env), spawnServe = defaultSpawnServe(env), serveTtlMs = null,
+  ensureConnectors = () => ensureAskConnectors({ env: { ...process.env, ...env } }), publicBaseOf = () => publicBase(env),
+  serveWaitMs = 30000, tunnelWaitMs = 20000, waitStepMs = 250, sweepEveryMs = 60000,
 } = {}) {
   let current = null;
   const say = (line) => { try { log(redact(line, current?.token)); } catch { /* logging never breaks the bridge */ } };
@@ -355,6 +407,127 @@ export function createBridge({
     return { ok: true };
   };
 
+  /* ---------------------------------------------------------- owner asks on demand */
+
+  // Real waits, not sleepImpl: the specs stub sleepImpl to return at once, and a wait for a form
+  // to bind must still take wall-clock time.
+  const waitFor = async (probe, ms) => {
+    const end = Date.now() + ms;
+    for (;;) {
+      const value = probe();
+      if (value) return value;
+      if (Date.now() >= end) return null;
+      await new Promise((resolve) => setTimeout(resolve, waitStepMs));
+    }
+  };
+  const askLink = (serving) => {
+    const expose = current.telegram?.exposeCredentialAsks === true;
+    return { expose, needsTunnel: !serving.credential || expose };
+  };
+  const askText = (state, { serving = null, base = null, note = null } = {}) => {
+    const workflow = { id: state.workflowId, title: state.title };
+    if (!serving) return askMessage({ workflow, question: state.question, language: current.language, note });
+    const { expose } = askLink(serving);
+    const link = linkFor({ url: serving.url, credential: serving.credential }, { base, exposeCredentialAsks: expose });
+    return askMessage({ workflow, question: state.question, link, expiresAt: serving.expiresAt, language: current.language, note });
+  };
+  // Where one ask lives: the store entry its button key names, else a scan of the repos' open asks.
+  const targetOf = (key) => {
+    const entry = askEntryByKey(key, env);
+    if (entry?.workflowId && (entry.ledgerFile || entry.repo)) {
+      const ledgerFile = entry.ledgerFile ?? ledgerFileFor(entry.repo);
+      return { workflowId: entry.workflowId, dispatchId: entry.dispatchId, ledgerFile, repo: entry.repo ?? path.dirname(path.dirname(ledgerFile)) };
+    }
+    let listed = [];
+    try { listed = repos(); } catch { listed = []; }
+    for (const repo of listed) {
+      const hit = withLedgerRead(repo, (db) => openAskList(db, { now: now() }).find((a) => askKeyOf(a.workflowId, a.dispatchId) === key) ?? null, null);
+      if (hit) return { workflowId: hit.workflowId, dispatchId: hit.dispatchId, repo, ledgerFile: ledgerFileFor(repo) };
+    }
+    return null;
+  };
+  const stateOf = (target) => readAskState(target?.ledgerFile, target?.workflowId, target?.dispatchId, now());
+  const removeMessage = (messageId) => removeAskMessage({ token: current.token, chatId: current.chatId, messageId, fallbackText: t().askClosed, apiBase, fetchImpl, sleepImpl });
+
+  /** Edit the pressed message to `text` (the button kept); a message that cannot be edited is sent anew. */
+  const showAsk = async (messageId, key, text) => {
+    const markup = askButton(current.language, key);
+    if (messageId) {
+      const edited = await call('editMessageText', { chat_id: current.chatId, message_id: messageId, text, link_preview_options: { is_disabled: true }, reply_markup: markup });
+      if (edited.ok || /message is not modified/i.test(edited.error ?? '')) return messageId;
+    }
+    const sent = await send(text, { markup });
+    return sent.ok ? sent.result?.message_id ?? null : null;
+  };
+
+  /** The "Generate URL" button: serve the ask's form on demand and put its link in the message. */
+  const onAskButton = async (query, key) => {
+    const messageId = query.message?.message_id ?? null;
+    const target = targetOf(key);
+    const state = target ? stateOf(target) : null;
+    if (!state || state.closed) {
+      await call('answerCallbackQuery', { callback_query_id: query.id, text: t().askClosed });
+      if (messageId) await removeMessage(messageId);
+      say(`ask button ${key}: no open ask${state?.closed ? ` (${state.closed})` : ''}; message removed`);
+      return { closed: state?.closed ?? 'unknown' };
+    }
+    await call('answerCallbackQuery', { callback_query_id: query.id, text: t().askGenerating });
+    let serving = state.serving;
+    if (!serving) {
+      let pid = null;
+      try { pid = spawnServe({ repo: target.repo, workflowId: target.workflowId, dispatchId: target.dispatchId, ttlMs: serveTtlMs }); } catch (error) { say(`ask ${key}: serve-ask did not launch: ${error?.message ?? error}`); }
+      say(`ask ${key}: serve-ask launched on demand (pid ${pid ?? '-'})`);
+      let latest = null;
+      serving = pid ? await waitFor(() => { latest = stateOf(target); return latest?.closed ? latest : latest?.serving ?? null; }, serveWaitMs) : null;
+      if (serving?.closed) { if (messageId) await removeMessage(messageId); return { closed: serving.closed }; }
+      if (!serving) {
+        await showAsk(messageId, key, askText(state, { note: textFor(current.language).serveFailed }));
+        say(`ask ${key}: the form did not bind within ${serveWaitMs} ms`);
+        return { served: false };
+      }
+    }
+    let base = null;
+    if (askLink(serving).needsTunnel) {
+      let ensured = null;
+      try { ensured = ensureConnectors(); } catch (error) { ensured = { ok: false, error: String(error?.message ?? error) }; }
+      if (ensured?.ok === false) say(`ask ${key}: connectors not started: ${ensured.error}`);
+      base = publicBaseOf() ?? await waitFor(() => publicBaseOf(), tunnelWaitMs);
+    }
+    const shown = await showAsk(messageId, key, askText(state, { serving, base }));
+    await recordAskMessage({ workflowId: target.workflowId, dispatchId: target.dispatchId, repo: target.repo, ledgerFile: target.ledgerFile, messageId: shown, url: serving.url }, { env, now: now() });
+    const link = linkFor({ url: serving.url, credential: serving.credential }, { base, exposeCredentialAsks: askLink(serving).expose });
+    say(`ask ${key} served on demand: ${link.public ? 'public link' : link.reason}`);
+    return { served: true, public: link.public, reason: link.reason, messageId: shown };
+  };
+
+  /** /asks: every open ask of the repos, one message each with its own button (a live form's link shown). */
+  const onAsks = async () => {
+    let listed = [];
+    try { listed = repos(); } catch { listed = []; }
+    const asks = listed.flatMap((repo) => withLedgerRead(repo, (db) => openAskList(db, { now: now() }).map((ask) => ({ ...ask, repo })), []));
+    if (!asks.length) return send(t().asksNone);
+    await send(t().asksHead(asks.length));
+    const base = asks.some((a) => a.serving) ? publicBaseOf() : null;
+    for (const ask of asks) {
+      const key = askKeyOf(ask.workflowId, ask.dispatchId);
+      const sent = await send(askText(ask, { serving: ask.serving, base }), { markup: askButton(current.language, key) });
+      if (!sent.ok) continue;
+      await recordAskMessage({ workflowId: ask.workflowId, dispatchId: ask.dispatchId, repo: ask.repo, ledgerFile: ledgerFileFor(ask.repo),
+        messageId: sent.result?.message_id ?? null, url: ask.serving?.url ?? undefined }, { env, now: now() });
+    }
+    say(`listed ${asks.length} open ask(s)`);
+    return { ok: true, count: asks.length };
+  };
+
+  let lastSweep = -Infinity;
+  const sweep = async () => {
+    if (!(sweepEveryMs >= 0) || now() - lastSweep < sweepEveryMs) return null;
+    lastSweep = now();
+    const r = await sweepAskMessages({ repos }, { env, apiBase, fetchImpl, sleepImpl, now: now(), settings: current, warn: say });
+    if (r.closed?.length || r.unlinked?.length) say(`sweep: ${r.closed.length} closed ask(s) cleared, ${r.unlinked.length} dead link(s) removed`);
+    return r;
+  };
+
   const onMessage = async (message) => {
     const text = typeof message.text === 'string' ? message.text : typeof message.caption === 'string' ? message.caption : null;
     if (text == null || !text.trim()) return send(t().textOnly, { replyTo: message.message_id });
@@ -364,12 +537,15 @@ export function createBridge({
     say(`command /${name}`);
     if (name === 'start' || name === 'choose') return chooser();
     if (name === 'status') return onStatus();
+    if (name === 'asks') return onAsks();
     if (name === 'help') return send(t().help);
     return send(`${t().unknown}\n\n${t().help}`);
   };
 
   const onCallback = async (query) => {
     const data = String(query.data ?? '');
+    const ask = ASK_CALLBACK.exec(data);
+    if (ask) return onAskButton(query, ask[1]);
     const sup = data.startsWith('sup:') ? getSupervisor(data.slice(4), env) : null;
     if (!sup) {
       await call('answerCallbackQuery', { callback_query_id: query.id, text: data.startsWith('sup:') ? t().gone : undefined });
@@ -440,6 +616,8 @@ export function createBridge({
       await handleUpdate(update);
       count += 1;
     }
+    // Asks that closed leave the chat, and links to forms that ended are taken back off.
+    try { await sweep(); } catch (error) { say(`sweep failed: ${error?.message ?? error}`); }
     return { ok: true, count };
   };
 

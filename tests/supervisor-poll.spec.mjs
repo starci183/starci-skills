@@ -152,6 +152,21 @@ test('a form that answers non-2xx is stale, and an ask never served is unserved'
   });
 });
 
+// Owner, 2026-09-24: api serve-ask tells the owner on Telegram (ask-notified) and serves nothing
+// until the Generate URL button is pressed. Such an ask is healthy with no form.
+test('an ask notified on Telegram with no live form is on-demand, not unserved or dead; a live form stays live',async t=>{
+  const url=await listen(t,(req,res)=>{res.writeHead(200);res.end('ok');});
+  await withLedger(t,async({ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAsk(ledger,{dispatchId:'ctx_told',events:[{kind:'ask-notified'}]});
+    seedAsk(ledger,{dispatchId:'ctx_ended',events:[{kind:'ask-notified'},{kind:'ask-serving',url:'http://127.0.0.1:1/old'},{kind:'ask-serving-expired'}]});
+    seedAsk(ledger,{dispatchId:'ctx_open',events:[{kind:'ask-notified'},{kind:'ask-serving',url}]});
+    seedAsk(ledger,{dispatchId:'ctx_reparked',events:[{kind:'ask-superseded'},{kind:'ask-notified'}]});
+    const byDispatch=Object.fromEntries((await openAsks(ledger.db)).map(a=>[a.dispatch_id,a.liveness]));
+    assert.deepEqual(byDispatch,{ctx_told:'on-demand',ctx_ended:'on-demand',ctx_open:'live',ctx_reparked:'on-demand'},'a notify after a supersede reopens the ask');
+  });
+});
+
 test('a re-served ask is probed again, not left dead by the earlier expiry',async t=>{
   const url=await listen(t,(req,res)=>{res.writeHead(200);res.end('ok');});
   await withLedger(t,async({ledger})=>{

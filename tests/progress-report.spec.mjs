@@ -38,6 +38,11 @@ test('the progress report spells out each workflow in Vietnamese with a finish t
     assert.match(text, new RegExp(`Chờ tới lượt: ${LEG_VI['architecture.decide']}`));
     assert.match(text, /Chọn cổng thanh toán nào\?\n\s+https:\/\/response\.example\.org\/a-0123456789abcdef01/);
     assert.match(text, /Dự kiến xong: ~4\.0 giờ nữa \(khoảng/);
+    // Forms are served on demand: once this one ended it has no link, and the report points at /asks.
+    ledger.appendEvent({ workflowId: wf, entityType: 'report', entityId: 'ctx_q', kind: 'ask-serving-expired', payload: { dispatchId: 'ctx_q' } });
+    const ended = workflowProgress(ledger.db, row, { publicBase: 'https://response.example.org' });
+    assert.deepEqual(ended.asks.map((a) => a.link), [null]);
+    assert.match(progressMessages([{ repo: 'r', ...ended }]).join('\n'), /Chọn cổng thanh toán nào\?\n\s+\(bấm \/asks để lấy link trả lời\)/);
   });
 });
 

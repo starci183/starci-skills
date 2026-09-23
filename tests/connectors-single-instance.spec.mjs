@@ -6,7 +6,9 @@ import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {claimManager,lockHolder,recordAlive} from '../scripts/connectors/lib.mjs';
-import {tunnelState} from '../scripts/connectors/tunnel.mjs';
+import {ensureAskConnectors,managerAlive,tunnelHealth,tunnelState} from '../scripts/connectors/tunnel.mjs';
+import {createGateway} from '../scripts/connectors/ask-gateway.mjs';
+import {parseYaml} from '../engine/yaml.mjs';
 
 // `api serve-ask` runs `tunnel.mjs start` for every ask, and concurrent starts each launched a manager
 // before the first wrote tunnel.json: nine managers, nine cloudflared. A manager (tunnel `run`,
@@ -73,6 +75,92 @@ test('two ask gateways started at once leave exactly one serving',async t=>{
   assert.equal(serving.length,1,JSON.stringify(runs.map(r=>r.answer)));
   assert.equal(runs.find(r=>r!==serving[0]).answer?.already,true);
   assert.equal(lockHolder('gateway',env)?.pid,serving[0].answer.pid);
+});
+
+// 18 `tunnel.mjs run --port 7070` managers once ran at once, and response.<domain> answered 502 after
+// the supervisor killed 17 of them.
+test('a tunnel manager that loses tunnel.lock to another live process stops its cloudflared and exits',async t=>{
+  const home=tmp(t,'starci-tunnel-lost-');
+  const fake=path.join(home,'fake-cloudflared.cjs');
+  const launched=path.join(home,'cloudflared-pids.txt');
+  fs.writeFileSync(fake,`require('fs').appendFileSync(${JSON.stringify(launched)},process.pid+'\\n');process.stderr.write('Registered tunnel connection connIndex=0\\n');setTimeout(()=>process.exit(0),60000);`);
+  const manager=path.join(home,'manager.mjs');
+  fs.writeFileSync(manager,`import {runManager} from ${JSON.stringify(TUNNEL)};
+const r=runManager({mode:'quick'},{port:7070,env:process.env,checkMs:100,onLost:h=>{console.log(JSON.stringify({lost:h.pid}));process.exit(0);}});
+console.log(JSON.stringify({ok:r.ok,pid:process.pid}));
+if(!r.ok)process.exit(1);
+setInterval(()=>{},1000);`);
+  const env={...process.env,LOCALAPPDATA:home,STARCI_CLOUDFLARED_COMMAND:process.execPath,STARCI_CLOUDFLARED_ARGS:JSON.stringify([fake])};
+  const {child,answer}=await firstLine([manager],env);
+  t.after(()=>kill(child.pid));
+  assert.equal(answer?.ok,true);
+  const pids=()=>fs.existsSync(launched)?fs.readFileSync(launched,'utf8').split('\n').filter(Boolean).map(Number):[];
+  for(const end=Date.now()+8000;!pids().length&&Date.now()<end;)await new Promise(r=>setTimeout(r,50));
+  const [cloudflared]=pids();
+  t.after(()=>kill(cloudflared));
+  // The lock vanishes (a manager started before the lock existed never wrote one): the owner takes it back.
+  const lock=path.join(home,'StarCi','runtime','connectors','tunnel.lock');
+  fs.rmSync(lock,{force:true});
+  for(const end=Date.now()+5000;!fs.existsSync(lock)&&Date.now()<end;)await new Promise(r=>setTimeout(r,50));
+  assert.equal(lockHolder('tunnel',env)?.pid,child.pid,'a manager whose lock vanished re-claims it');
+  // Another live process now holds the lock: this manager is not the owner and must go.
+  const gone=new Promise(resolve=>child.on('exit',code=>resolve(code)));
+  let out='';child.stdout.on('data',c=>{out+=c;});
+  fs.writeFileSync(lock,JSON.stringify({pid:process.pid,startedAt:new Date().toISOString()}));
+  const code=await Promise.race([gone,new Promise(r=>setTimeout(()=>r('timeout'),10000))]);
+  assert.equal(code,0,'the manager exited on its own');
+  assert.match(out,new RegExp(`"lost":${process.pid}`));
+  for(const end=Date.now()+5000;Date.now()<end;){try{process.kill(cloudflared,0);}catch{break;}await new Promise(r=>setTimeout(r,50));}
+  assert.throws(()=>process.kill(cloudflared,0),'its cloudflared was stopped with it');
+  assert.equal(tunnelState(env)?.childPid,cloudflared,'the loser leaves tunnel.json alone (it is the winner\'s to write)');
+});
+
+test('ensureAskConnectors starts the gateway and one manager, never a second while one is alive or still starting',t=>{
+  const home=tmp(t,'starci-ensure-');
+  const env={LOCALAPPDATA:home,STARCI_CLOUDFLARED_COMMAND:process.execPath};
+  const config={...parseYaml(fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')),connectors:{secretsFile:null,cloudflare:{mode:'quick'}}};
+  const spawned=[];
+  // The launched processes are stood in for by this live process, still starting (no lock yet).
+  const spawn=(script,args)=>{spawned.push([path.basename(script),...args]);return process.pid;};
+  assert.equal(ensureAskConnectors({env:{...env,STARCI_CONNECTORS_OFF:'1'},config,spawn}).skipped,'STARCI_CONNECTORS_OFF');
+  assert.equal(ensureAskConnectors({env:{LOCALAPPDATA:home,NODE_TEST_CONTEXT:'child'},config,spawn}).skipped,'test context','a spec never starts the real cloudflared');
+  const first=ensureAskConnectors({env,config,spawn});
+  assert.deepEqual([first.ok,first.gateway,first.tunnel],[true,{launched:process.pid},{launched:process.pid}]);
+  assert.deepEqual(spawned,[['ask-gateway.mjs','run','--port','7070'],['tunnel.mjs','run','--port','7070']]);
+  const second=ensureAskConnectors({env,config,spawn});
+  assert.deepEqual([second.gateway,second.tunnel],[{already:true},{already:process.pid}],'a manager still starting counts as alive');
+  assert.equal(spawned.length,2,'no second manager');
+  // Past the starting window with no lock and a dead pid, a manager is launched again.
+  fs.writeFileSync(path.join(home,'StarCi','runtime','connectors','tunnel.starting.json'),JSON.stringify({pid:deadPid(),at:Date.now()}));
+  assert.deepEqual(ensureAskConnectors({env,config,spawn}).tunnel,{launched:process.pid});
+  assert.equal(managerAlive(env)?.pid,process.pid);
+});
+
+test('tunnel status reports health: manager, cloudflared, gateway reachability, and every extra manager',async t=>{
+  const home=tmp(t,'starci-health-');
+  const env={LOCALAPPDATA:home};
+  const dir=path.join(home,'StarCi','runtime','connectors');
+  fs.mkdirSync(dir,{recursive:true});
+  const server=createGateway({resolve:()=>null});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>new Promise(resolve=>server.close(()=>resolve())));
+  const port=server.address().port,at=new Date().toISOString();
+  fs.writeFileSync(path.join(dir,'gateway.json'),JSON.stringify({pid:process.pid,port,startedAt:at}));
+  fs.writeFileSync(path.join(dir,'tunnel.json'),JSON.stringify({pid:process.pid,childPid:process.pid,connected:true,baseUrl:'https://response.example.org',gatewayPort:port,startedAt:at}));
+  fs.writeFileSync(path.join(dir,'tunnel.lock'),JSON.stringify({pid:process.pid,startedAt:at}));
+  const healthy=await tunnelHealth({env,processes:()=>[{pid:process.pid,commandLine:'node tunnel.mjs run --port 7070'}]});
+  assert.equal(healthy.healthy,true,JSON.stringify(healthy.problems));
+  assert.deepEqual([healthy.manager.pid,healthy.cloudflared.alive,healthy.gateway.reachable,healthy.gateway.status,healthy.gateway.gateway],[process.pid,true,true,404,true]);
+  assert.equal(healthy.publicBase,'https://response.example.org');
+  const leaked=await tunnelHealth({env,processes:()=>[{pid:process.pid},{pid:4242},{pid:4343}]});
+  assert.equal(leaked.healthy,false);
+  assert.match(leaked.problems.join('\n'),/2 extra tunnel manager\(s\) running: 4242, 4343/);
+  fs.rmSync(path.join(dir,'tunnel.lock'));
+  await new Promise(resolve=>server.close(()=>resolve()));
+  const down=await tunnelHealth({env,processes:null});
+  assert.equal(down.healthy,false);
+  assert.match(down.problems.join('\n'),/holds no tunnel\.lock/);
+  assert.match(down.problems.join('\n'),/nothing answers on 127\.0\.0\.1:\d+ .*502/,'a gateway that does not answer is why the public host 502s');
 });
 
 test('a manager lock whose holder died, or that an earlier boot left, is taken over; a live one is not',t=>{

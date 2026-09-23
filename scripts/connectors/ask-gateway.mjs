@@ -10,9 +10,12 @@
 //
 // Routing: `/a-<nonce>` and `/a-<nonce>/...` (GET, HEAD, POST) are proxied to
 // the loopback form whose latest open `ask-serving` event names that nonce in
-// one of the configured repos' ledgers (read-only). Everything else is 404 and
-// is never forwarded. A credential ask (the form asks for custody files or env
-// values) is refused with 403 unless connectors.telegram.exposeCredentialAsks
+// one of the configured repos' ledgers (read-only), or of a repo a Telegram ask
+// notice named. Everything else is 404 and is never forwarded, and so is a
+// nonce whose serve-ask process has exited: a form is served only while it
+// waits (on demand from the Telegram "Generate URL" button, until it is
+// answered or its ttl ends). A credential ask (the form asks for custody files
+// or env values) is refused with 403 unless connectors.telegram.exposeCredentialAsks
 // is true: the owner answers those on the machine through the localhost link.
 // Binds 127.0.0.1 only; cloudflared connects from this host.
 import '../lib/hide-child-windows.mjs';
@@ -20,7 +23,9 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectorsConfig } from '../../engine/config.mjs';
-import { argsOf, askRepos, claimManager, lockHolder, NONCE, ownerConfig, pidAlive, readJson, recordAlive, servingAsksAcross, spawnDetached, stateFile, writeJson } from './lib.mjs';
+import { argsOf, askRepos, claimManager, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, pidAlive, readJson, recordAlive, servingAsksAcross, spawnDetached, startingHolder, stateFile, writeJson } from './lib.mjs';
+
+export const GATEWAY_FILE = fileURLToPath(import.meta.url);
 
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'host']);
 const MAX_BODY = 1024 * 1024;
@@ -97,8 +102,9 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
 }
 
 export const gatewayState = (env = process.env) => readJson(stateFile('gateway.json', env));
-// Alive: gateway.json names a live process of this boot, or a gateway holds the start lock.
-export const gatewayAlive = (env = process.env) => recordAlive(gatewayState(env)) || Boolean(lockHolder('gateway', env));
+// Alive: gateway.json names a live process of this boot, a gateway holds the start lock, or a
+// starter launched one moments ago that has not claimed it yet.
+export const gatewayAlive = (env = process.env) => recordAlive(gatewayState(env)) || Boolean(lockHolder('gateway', env)) || Boolean(startingHolder('gateway', env));
 
 const settings = (args) => {
   const config = ownerConfig();
@@ -121,7 +127,9 @@ async function run(args) {
   process.on('exit', claim.release);
   const live = () => { try { return connectorsConfig(ownerConfig() ?? undefined); } catch { return null; } };
   const server = createGateway({
-    resolve: ledgerResolver({ repos: () => askRepos(live(), { extra }) }),
+    // The configured repos plus every repo a Telegram ask notice named (a kernel's `api serve-ask`
+    // notifies from its own repo).
+    resolve: ledgerResolver({ repos: () => askRepos(live(), { extra: [...extra, ...notifiedRepos()] }) }),
     exposeCredentialAsks: () => live()?.telegram?.exposeCredentialAsks === true,
     language: () => ownerConfig()?.language ?? 'en',
   });
@@ -147,7 +155,8 @@ function main() {
     if (gatewayAlive()) { console.log(JSON.stringify({ ok: true, already: true, ...state })); return; }
     const { port } = settings(args);
     const pass = [].concat(args.repo ?? []).filter((r) => typeof r === 'string').flatMap((r) => ['--repo', r]);
-    const pid = spawnDetached(fileURLToPath(import.meta.url), ['run', '--port', String(port), ...pass]);
+    const pid = spawnDetached(GATEWAY_FILE, ['run', '--port', String(port), ...pass]);
+    markStarting('gateway', pid);
     console.log(JSON.stringify({ ok: true, launched: pid, gateway: `http://127.0.0.1:${port}` })); return;
   }
   if (verb === 'run') return run(args);
