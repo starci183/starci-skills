@@ -141,7 +141,10 @@ BOUNDARY — hard rules, non-negotiable:
     it may not commit), or `api settle` refuses `not-landed`, re-dispatch the
     owning slice to commit its own paths (and push, when its policy pushes)
     as a new attempt of that op and cut ordinal, and never leave the asker
-    waiting.
+    waiting. A job whose owned paths or repository name the wrong target is
+    settled fail or blocked with that reason and re-enqueued with the right
+    `--paths`/`--repository` (api.yaml commands.enqueue); an existing job's
+    payload is never edited — that is a ledger write the BOUNDARY above forbids.
   - LONG-LIVED means the durable Kernel identity survives model-turn boundaries.
     The external canonical watchdog, not this model turn, owns the cadence
     ({skillRoot}/modules/models/runtimes.yaml allocation.watchdogCadenceMs).
