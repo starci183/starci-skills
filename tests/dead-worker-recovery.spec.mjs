@@ -157,6 +157,10 @@ test('an uncommitted change on the owned paths fences the job effect_unknown wit
   assert.equal(plain.status,1);
   assert.match(plain.stderr,/dead-worker-fenced/);
   assert.equal(status(run).frontier.actionable,true,'a fenced job stays the Kernel\'s to settle');
+  const settled=run('settle','--job',JOB,'--verdict','fail');
+  assert.equal(settled.status,0,settled.stderr||settled.stdout);
+  assert.equal(job().status,'failed','the Kernel settles the fenced attempt; a retry is a new attempt');
+  assert.equal(leases(),0);
 }));
 
 test('a commit on the owned paths since dispatch fences the job even with a clean tree',t=>world(t,({repoRoot,run,job})=>{

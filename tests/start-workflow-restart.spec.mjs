@@ -191,6 +191,32 @@ test('a kernel restart closes the previous kernel terminal before the new one is
   }finally{ledger.close();}
 });
 
+test('after a host reboot the kernel handle Orca no longer knows is replaced with no close call and no incident',t=>{
+  const f=fixture(t);
+  const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','a reboot leaves no terminal to close','--json');
+  assert.equal(defined.status,0,defined.stderr);
+  const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
+  const first=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(first.status,0,first.stderr);
+  const firstKernel=json(first.stdout)?.terminal;assert.ok(firstKernel);
+
+  const state=readState(f);
+  state.terminals[firstKernel].stale=true;
+  fs.writeFileSync(f.state,JSON.stringify(state));
+  const restarted=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--json');
+  assert.equal(restarted.status,0,restarted.stderr);
+  assert.notEqual(json(restarted.stdout)?.terminal,firstKernel);
+  assert.equal(f.callArgv().some(argv=>argv.slice(0,2).join(' ')==='terminal close'),false,'nothing is left to close');
+
+  const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
+  try{
+    const cleared=json(ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-stale-cleared'").get(workflowId)?.payload_json);
+    assert.deepEqual(cleared?.terminalClosed,{handle:firstKernel,ok:true,gone:true});
+    assert.equal(cleared?.reason,'terminal_handle_stale');
+    assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM incidents WHERE workflow_id=?").get(workflowId).n,0);
+  }finally{ledger.close();}
+});
+
 test('a stale kernel terminal the host refuses to close is an incident, not silence — the restart still proceeds',t=>{
   const f=fixture(t);
   const defined=f.run(DEFINE_GOAL,'--repo',f.repo,'--text','a refused close must not be swallowed','--json');

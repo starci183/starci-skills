@@ -36,7 +36,7 @@ import { openLedger, ledgerFileFor, transitionWorkflowToRunning } from '../../en
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
-import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
@@ -355,7 +355,10 @@ async function signalHealth(signal) {
   if (!value.terminal) return { live: false, reason: 'signal has no terminal handle', terminal: null, value };
   const shown = terminalShow({ terminal: value.terminal });
   const live = shown.ok && shown.connected && shown.writable;
-  return { live, reason: live ? 'terminal connected' : (shown.error || shown.exitCause || 'terminal disconnected'), terminal: shown.terminal, value };
+  // A running Orca that no longer knows the handle (every terminal after a
+  // host reboot) proves there is nothing left to close.
+  const gone = !shown.ok && TERMINAL_GONE_CODES.has(shown.errorCode);
+  return { live, gone, reason: live ? 'terminal connected' : gone ? shown.errorCode : (shown.error || shown.exitCause || 'terminal disconnected'), terminal: shown.terminal, value };
 }
 
 // Best-effort settlement of a managed dispatch (stale kernel replacement or a
@@ -479,6 +482,7 @@ try {
     // A restart closes the previous kernel terminal BEFORE the new one is
     // recorded — one workflow, one live kernel terminal.
     if (priorHealth.value?.dispatch) releaseManagedWorker(priorHealth.value.dispatch);
+    else if (priorHealth.gone) staleKernel.terminalClosed = { handle: staleKernel.terminal, ok: true, gone: true };
     else staleKernel.terminalClosed = closeStaleKernelTerminal(staleKernel.terminal);
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(target);
     const at = Date.now();
