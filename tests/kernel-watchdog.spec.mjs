@@ -73,6 +73,8 @@ test('a Kernel yield summary that says "Running now:" is turn-idle, not active',
   // later yielded under " Running (codex):" and sat 20 minutes unwoken).
   assert.equal(classifyAgentScreen(' Running (codex):\n   •  ctx_f38 — payment-pending audit\n Yielding — wait reason: audit reports.\n❭ Ask Devin to build features').state,'turn-idle');
   assert.equal(classifyAgentScreen('• Working (4m 36s · esc to interrupt) · 1 background terminal running\n› Ask Codex').state,'active');
+  // A wrapped prose line that happens to start with lowercase "running." is not a spinner.
+  assert.equal(classifyAgentScreen(' Yield state:  backend.implement — 3/8 settled; wave 4 (routing)\n running. Remaining: tasks → approval ∥ notification → gateway.\n❭ Ask Devin to build features').state,'turn-idle');
   assert.equal(classifyAgentScreen('○ Running command\n│ $ node api.mjs status\n❭ Guide Devin while it works').state,'active','a real status line still wins');
   assert.equal(classifyAgentScreen('• Running canonical status\n› Ask Codex to do anything').state,'active');
 });

@@ -37,7 +37,12 @@ export function classifyAgentScreen(screen) {
   // own prose: a yield summary headed "Running now:" once read as activity,
   // and both the watchdog and the report wake skipped a Kernel that sat at its
   // prompt with a filed report.
-  const active = /(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)\b(?!\s*:|\s+now\b|[^\n]*:[ \t]*(?:\n|$))|esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
+  // Status words are matched case-sensitively: a spinner writes "Working",
+  // "Thinking", "Running"; a wrapped prose line that starts with "running."
+  // (a Collab Kernel yield summary) is not one.
+  const statusWord = /(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)\b(?!\s*:|\s+now\b|[^\n]*:[ \t]*(?:\n|$))/;
+  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
+  const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) };
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
   // prompt row is turn-idle unless a current activity marker above wins.
