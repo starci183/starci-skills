@@ -56,11 +56,17 @@ test('an active frame is trusted only while output is recent (allocation.livenes
 });
 
 // A canned Orca for the watchdog: `terminal show` reports STARCI_TEST_LAST_OUTPUT_AT, `terminal read`
-// shows STARCI_TEST_SCREEN, `terminal send` appends its argv to STARCI_TEST_SEND_LOG.
+// shows STARCI_TEST_SCREEN, `terminal send` appends its argv to STARCI_TEST_SEND_LOG. A submitted wake
+// shows on the next frame (echoed under the input glyph, a turn running): scripts/kernel/wake-delivery.mjs
+// retries a wake whose frame stays idle with no trace of it as lost.
 const STUB=String.raw`const fs=require('fs');const argv=process.argv.slice(2);const verb=argv.slice(0,2).join(' ');
 const out=o=>console.log(JSON.stringify(o));const handle='kern-term-1';
 if(verb==='terminal show'){out({ok:true,result:{terminal:{handle,connected:true,writable:true,status:'running',lastOutputAt:Number(process.env.STARCI_TEST_LAST_OUTPUT_AT)}}});process.exit(0);}
-if(verb==='terminal read'){out({ok:true,result:{terminal:{handle,screen:process.env.STARCI_TEST_SCREEN||''}}});process.exit(0);}
+if(verb==='terminal read'){const log=process.env.STARCI_TEST_SEND_LOG;
+  const sent=(fs.existsSync(log)?fs.readFileSync(log,'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l)):[])
+    .filter(a=>a.includes('--enter')&&a.indexOf('--text')>=0&&a[a.indexOf('--text')+1]).at(-1);
+  const screen=(process.env.STARCI_TEST_SCREEN||'')+(sent?'\n› '+sent[sent.indexOf('--text')+1]+'\n• Working (1s • esc to interrupt)\n› Ask Codex to do anything':'');
+  out({ok:true,result:{terminal:{handle,screen}}});process.exit(0);}
 if(verb==='terminal send'){fs.appendFileSync(process.env.STARCI_TEST_SEND_LOG,JSON.stringify(argv)+'\n');out({ok:true,result:{sent:true}});process.exit(0);}
 out({ok:true,result:{}});`;
 

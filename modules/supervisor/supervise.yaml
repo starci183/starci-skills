@@ -161,6 +161,21 @@ guardrails:
       call from the chat itself. An Orca action that can only be issued from a bound terminal
       (task-update fenced to a run's coordinator) is not the supervisor's; it is reported to the
       owner or fixed in the runtime so the kernel, settle or finish performs it.
+  - id: notice-delivery-proven
+    rule: |
+      A notice the supervisor types into a kernel terminal is delivered only when the screen shows
+      it, never on the terminal-send receipt. To a Codex kernel it is always sent split: (1)
+      `node scripts/api/orca/terminal-send.mjs --terminal <h> --text-file <f> --no-enter`, (2)
+      terminal-read the screen and confirm the text sits in the input row ("› <text>" or
+      "[Pasted Content N chars]"), (3) `terminal-send --terminal <h> --text ""` (Enter only), (4)
+      terminal-read again and confirm the text left the input row (echoed in the transcript or a
+      turn running). A text+Enter send to Codex was accepted ok:true with no error code while
+      nothing reached the screen (term_28a694d9, 2026-09-24; the kernel sat idle from 19:59 to
+      01:45). If step (2) shows nothing, the notice is not delivered: report it, do not send a
+      blind Enter. Other agents may take text+Enter, proven the same way (step 4) and retried
+      split when the screen still shows the idle prompt. The runtime's own wakes (api nudge, the
+      transition wake, the watchdog, the ask-answered wake) do this in
+      scripts/kernel/wake-delivery.mjs (splitRetried, splitOutcome).
   - id: restart-cooldown
     rule: a kernel is restarted only when a contract it must obey actually changed AND its current
       leg is governed by that contract, or its terminal is proven dead — never on a timer, never

@@ -32,8 +32,8 @@ const world=(t,prefix)=>{
   const orcaState=()=>(fs.existsSync(stateFile)?json(fs.readFileSync(stateFile,'utf8')):null)??{sends:0};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   // The Kernel terminal is a Claude frame at its idle prompt until a send changes it.
-  const seedKernelTerminal=()=>writeState(s=>{s.terminals={...(s.terminals??{}),[KERNEL]:{handle:KERNEL,connected:true,writable:true,
-    sent:false,prompt:null,command:'claude --model claude-opus-5-5',screen:KERNEL_IDLE}};});
+  const seedKernelTerminal=(screen=KERNEL_IDLE,command='claude --model claude-opus-5-5')=>writeState(s=>{s.terminals={...(s.terminals??{}),[KERNEL]:{handle:KERNEL,connected:true,writable:true,
+    sent:false,prompt:null,command,screen}};});
   // Every non-empty `terminal send` to the Kernel is one wake typed into it.
   const kernelWakes=()=>(fs.existsSync(logFile)?fs.readFileSync(logFile,'utf8').trim().split('\n').filter(Boolean).map(json):[])
     .map(e=>e.argv).filter(a=>a[0]==='terminal'&&a[1]==='send'&&a[a.indexOf('--terminal')+1]===KERNEL)
@@ -208,4 +208,46 @@ test('ask-answered wake: agent_prompt_stalled with the wake landed is kernel-wok
   const missed=askWake(w,workflowId,'lost');
   assert.deepEqual([missed.action,missed.delivery,missed.error],['kernel-wake-failed','failed','agent_prompt_stalled'],JSON.stringify(missed));
   assert.equal(events().length,1,'no event for the wake that never landed');
+});
+
+/* ------------------------------------------ dropped send (Codex), split retry */
+
+// 2026-09-24 01:45: the Codex Kernel term_28a694d9 (wf-miamia-base-repos) took two text+Enter sends that
+// Orca answered ok:true with no error code while nothing reached the screen; its ledger was silent from
+// 19:59, every watchdog wake dropped the same way. The same text with enter:false staged in the input row
+// and an Enter-only send submitted it. Every Kernel wake path now retries a wake whose frame stays idle with
+// no trace of it once that way (scripts/kernel/wake-delivery.mjs) - STARCI_FAKE_ORCA_DROP_ENTER_SEND.
+const CODEX_KERNEL_IDLE=['• Yielding - waiting on the base-repos report.','','› Ask Codex to do anything','','  gpt-6-sol high · 62% context left'].join('\n');
+const CODEX_COMMAND='codex -m gpt-6-sol';
+const shapes=wakes=>wakes.map(w=>[w.text?'wake':'',w.enter]);
+
+test('transition wake: a dropped text+Enter send to a Codex Kernel is kernel-woken after the split retry',t=>{
+  const fx=reportWorld(t);
+  fx.seedKernelTerminal(CODEX_KERNEL_IDLE,CODEX_COMMAND);
+  const wake=fx.fileReport({STARCI_FAKE_ORCA_DROP_ENTER_SEND:'1'}).kernelWake;
+  assert.deepEqual([wake.action,wake.delivery,wake.evidence,wake.splitRetried,wake.splitOutcome],
+    ['kernel-woken','delivered','wake-text',true,'delivered-after-split'],JSON.stringify(wake));
+  assert.deepEqual(shapes(fx.kernelWakes()),[['wake',true],['wake',false],['',true]],'the dropped send, the staged text, one Enter');
+  const [event]=fx.woken();
+  assert.deepEqual([event.delivery,event.splitRetried,event.splitOutcome],['delivered',true,'delivered-after-split']);
+});
+
+test('watchdog wake: a dropped send to a Codex Kernel is woken after the split retry; an unstaged split is wake-failed',t=>{
+  const fx=watchdogWorld(t);
+  fx.seedKernelTerminal(CODEX_KERNEL_IDLE,CODEX_COMMAND);
+  const {status,result,stderr}=fx.tick({STARCI_FAKE_ORCA_DROP_ENTER_SEND:'1'});
+  assert.equal(status,0,stderr||JSON.stringify(result));
+  assert.deepEqual([result.ok,result.action,result.delivery,result.evidence,result.splitRetried,result.splitOutcome,result.error],
+    [true,'woken','delivered','wake-text',true,'delivered-after-split',null],JSON.stringify(result));
+  const wakes=fx.kernelWakes();
+  assert.deepEqual(shapes(wakes),[['wake',true],['wake',false],['',true]]);
+  assert.match(wakes[1].text,/Watchdog liveness wake for wf-watchdog-wake/);
+
+  const lost=watchdogWorld(t);
+  lost.seedKernelTerminal(CODEX_KERNEL_IDLE,CODEX_COMMAND);
+  const missed=lost.tick({STARCI_FAKE_ORCA_DROP_ENTER_SEND:'all'});
+  assert.equal(missed.status,1,'a wake the split could not stage fails the tick');
+  assert.deepEqual([missed.result.ok,missed.result.action,missed.result.delivery,missed.result.splitRetried,missed.result.splitOutcome],
+    [false,'wake-failed','failed',true,'unstaged'],JSON.stringify(missed.result));
+  assert.deepEqual(shapes(lost.kernelWakes()),[['wake',true],['wake',false]],'no blind Enter');
 });

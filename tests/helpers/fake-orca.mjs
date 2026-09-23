@@ -60,6 +60,14 @@
 //                          input box shows the pasted text itself (the tail of
 //                          it, first row behind the glyph) the way Devin renders
 //                          an inline paste - no "[Pasted Content]" marker.
+//   STARCI_FAKE_ORCA_DROP_ENTER_SEND '1' | 'all': the Codex drop seen on
+//                          term_28a694d9 (2026-09-24). A non-empty send with
+//                          --enter answers ok:true and changes nothing. '1': a
+//                          --no-enter send stages the text in the input row
+//                          ("› <text>" under a seeded screen, else "[Pasted
+//                          Content]") and an Enter-only send submits it (a
+//                          Codex turn runs with the text echoed). 'all': the
+//                          --no-enter send is dropped too.
 //   STARCI_FAKE_ORCA_PREAMBLE overrides the `orchestration dispatch` preamble
 //                          text (default 'fake dispatch preamble').
 //
@@ -173,7 +181,11 @@ const wrapRows = (text, width) => { const rows = []; let row = '';
   for (const word of String(text).split(' ')) { if (row && (row + ' ' + word).length > width) { rows.push(row); row = word; } else row = row ? row + ' ' + word : word; }
   if (row) rows.push(row); return rows; };
 const CLAUDE_CHROME = ['─────', '❯', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
-const SCREEN_OF = r => r.stalledWake === 'queued'
+const dropEnterSend = process.env.STARCI_FAKE_ORCA_DROP_ENTER_SEND || '';
+const codexRows = text => wrapRows(text, 76).map((row, i) => (i === 0 ? '› ' : '  ') + row);
+const SCREEN_OF = r => r.dropStaged ? [String(r.screen), ...codexRows(r.prompt)].join('\n')
+  : r.dropSubmitted ? [String(r.screen), ...codexRows(r.prompt), '• Working (2s • esc to interrupt)', '› Ask Codex to do anything'].join('\n')
+  : r.stalledWake === 'queued'
   ? ['● Bash(node scripts/kernel/api.mjs op-contract)', '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)', '─────',
     ...wrapRows(r.prompt, 76).map((row, i) => (i === 0 ? '❯ ' : '  ') + row), '─────', '  Press up to edit queued messages, Enter to send them immediately'].join('\n')
   : r.stalledWake === 'landed'
@@ -251,6 +263,15 @@ else if (verb === 'terminal send' && ((['/exit', '/quit'].includes(arg('text') ?
   state.quits = [...(state.quits || []), { handle: arg('terminal'), text: arg('text') }];
   save(); out({ ok: true, result: { sent: true } });
 }
+else if (verb === 'terminal send' && dropEnterSend && (arg('text') ?? '')) {
+  // STARCI_FAKE_ORCA_DROP_ENTER_SEND: text+Enter is accepted and lost; a
+  // --no-enter send stages the text unless the knob is 'all'.
+  const r = record(arg('terminal'));
+  if (r && !argv.includes('--enter') && dropEnterSend !== 'all') { r.prompt = arg('text'); r.dropStaged = true; r.staged = true; }
+  else state.droppedSends = (state.droppedSends || 0) + 1;
+  state.sends += 1; save();
+  out({ ok: true, result: { sent: true } });
+}
 else if (verb === 'terminal send') {
   const r = record(arg('terminal'));
   const text = arg('text') ?? '';
@@ -258,6 +279,7 @@ else if (verb === 'terminal send') {
   else if (r && !text && argv.includes('--enter')) {
     r.enters = (r.enters || 0) + 1;
     if (stuckPaste === 'enter' || stuckPaste === 'inline-enter' || stuckPaste === 'blocked') r.staged = false;
+    if (r.dropStaged) { r.dropStaged = false; r.dropSubmitted = true; r.staged = false; r.sent = true; }
     if (!r.sent) r.sent = true;
   }
   state.sends += 1; save();

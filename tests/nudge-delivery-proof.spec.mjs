@@ -151,3 +151,70 @@ test('nudge: agent_prompt_blocked followed by a confirmed Enter-only send is del
   assert.equal(fx.orcaState().terminals['fake-terminal-1'].enters,1,'terminal-send sent the one Enter');
   assert.equal(fx.events('op-worker-nudged')[0].sendErrorCode,'agent_prompt_blocked');
 });
+
+/* ------------------------------------------------- dropped send, split retry */
+
+// 2026-09-24 01:45: the Codex Kernel term_28a694d9 took a text+Enter terminal-send, Orca answered ok:true
+// with no error code, and nothing reached the screen - twice. The receipt alone called it delivered, so
+// every watchdog wake since 19:59 was lost. The same text with enter:false staged in the input row and an
+// Enter-only send submitted it. A frame that stays idle with no trace of the wake is now retried once that
+// way (scripts/kernel/wake-delivery.mjs splitRetry).
+const CODEX_IDLE=['• Yielding - waiting on the base-repos report.','','› Ask Codex to do anything','','  gpt-6-sol high · 62% context left'].join('\n');
+const CODEX_STAGED=[CODEX_IDLE,...wrap(WAKE).map((r,i)=>(i?'  ':'› ')+r)].join('\n');
+const CODEX_RUNNING=[CODEX_IDLE,...wrap(WAKE).map((r,i)=>(i?'  ':'› ')+r),'• Working (2s • esc to interrupt)','› Ask Codex to do anything'].join('\n');
+const sendsOf=s=>s.calls.map(c=>[c.text===WAKE?'wake':c.text,c.enter]);
+
+test('sendWakeWithProof: an ok receipt whose frame stays idle is lost and retried split - text, then Enter-only',()=>{
+  assert.equal(wakeDeliveryOf({before:CODEX_IDLE,after:CODEX_STAGED,text:WAKE}).delivery,'staged','the --no-enter text is staged in the Codex input row');
+  const s=stub({sends:[{ok:true}],screens:[CODEX_IDLE,CODEX_IDLE,CODEX_IDLE,CODEX_IDLE,CODEX_STAGED,CODEX_RUNNING]});
+  const r=sendWakeWithProof({terminal:'t',text:WAKE,deps:s.deps});
+  assert.deepEqual([r.ok,r.delivery,r.evidence,r.splitRetried,r.splitOutcome,r.enterRetried],[true,'delivered','wake-text',true,'delivered-after-split',false]);
+  assert.deepEqual(sendsOf(s),[['wake',true],['wake',false],['',true]]);
+  assert.equal(r.sendErrorCode,null,'the dropped send carried no error code');
+  // A repaint a beat late is not a loss: the second look shows the wake, no split.
+  const late=stub({sends:[{ok:true}],screens:[CODEX_IDLE,CODEX_IDLE,CODEX_RUNNING]});
+  const lr=sendWakeWithProof({terminal:'t',text:WAKE,deps:late.deps});
+  assert.deepEqual([lr.ok,lr.delivery,lr.splitRetried],[true,'delivered',false]);
+  assert.deepEqual(sendsOf(late),[['wake',true]]);
+  // A confirmed send whose frame now runs a turn keeps the receipt: one look, one send.
+  const running=['• Working (1s • esc to interrupt)','› Ask Codex to do anything'].join('\n');
+  const ok=stub({sends:[{ok:true}],screens:[CODEX_IDLE,running]});
+  const or=sendWakeWithProof({terminal:'t',text:WAKE,deps:ok.deps});
+  assert.deepEqual([or.ok,or.delivery,or.evidence,or.splitRetried],[true,'delivered','receipt',false]);
+  assert.equal(ok.calls.length,1);
+});
+
+test('sendWakeWithProof: a split that never stages or never submits still fails truthfully',()=>{
+  const s=stub({sends:[{ok:true}],screens:[CODEX_IDLE]});
+  const r=sendWakeWithProof({terminal:'t',text:WAKE,deps:s.deps});
+  assert.deepEqual([r.ok,r.delivery,r.evidence,r.splitRetried,r.splitOutcome],[false,'failed','unproven',true,'unstaged']);
+  assert.deepEqual(sendsOf(s),[['wake',true],['wake',false]],'no blind Enter when the text never staged');
+  const u=stub({sends:[{ok:true}],screens:[CODEX_IDLE,CODEX_IDLE,CODEX_IDLE,CODEX_IDLE,CODEX_STAGED]});
+  const ur=sendWakeWithProof({terminal:'t',text:WAKE,deps:u.deps});
+  assert.deepEqual([ur.ok,ur.delivery,ur.evidence,ur.splitOutcome],[false,'failed','staged','unsubmitted']);
+  assert.deepEqual(sendsOf(u),[['wake',true],['wake',false],['',true]]);
+});
+
+test('nudge: a dropped text+Enter send is recovered through the split retry and says so',t=>{
+  const fx=fixture(t);
+  const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json'],{STARCI_FAKE_ORCA_DROP_ENTER_SEND:'1'});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const out=json(r.stdout);
+  assert.deepEqual([out.ok,out.nudged,out.delivery,out.evidence,out.splitRetried,out.splitOutcome],[true,true,'delivered','wake-text',true,'delivered-after-split']);
+  assert.equal(out.sendErrorCode,undefined);
+  const worker=fx.orcaState().terminals['fake-terminal-1'];
+  assert.deepEqual([fx.orcaState().droppedSends,worker.enters,worker.dropSubmitted],[1,1,true],'one dropped send, one Enter-only send submitted the staged wake');
+  const [event]=fx.events('op-worker-nudged');
+  assert.deepEqual([event.delivery,event.splitRetried,event.splitOutcome],['delivered',true,'delivered-after-split']);
+});
+
+test('nudge: when even the split does not stage, the nudge fails with no event',t=>{
+  const fx=fixture(t);
+  const r=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json'],{STARCI_FAKE_ORCA_DROP_ENTER_SEND:'all'});
+  assert.equal(r.status,1);
+  const out=json(r.stdout);
+  assert.deepEqual([out.ok,out.reason,out.delivery,out.splitRetried,out.splitOutcome],[false,'terminal-send-failed','failed',true,'unstaged']);
+  assert.equal(fx.orcaState().droppedSends,2,'the text+Enter send and the --no-enter send were both dropped');
+  assert.equal(fx.orcaState().terminals['fake-terminal-1'].enters??0,0,'no Enter for text that never staged');
+  assert.equal(fx.events('op-worker-nudged').length,0);
+});

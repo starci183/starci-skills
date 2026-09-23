@@ -558,7 +558,9 @@ function cmdNudge(ledger, args) {
   // terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f).
   const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedInputEvidenceOf(db, job).stagedPattern });
   const sent = proof.sent ?? {};
-  const delivered = { delivery: proof.delivery, evidence: proof.evidence, ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), ...(proof.enterRetried ? { enterRetried: true } : {}) };
+  // A dropped wake (ok receipt, idle frame, no text) is retried once split -
+  // text, then Enter-only - and says so: splitRetried/splitOutcome.
+  const delivered = deliveryFieldsOf(proof);
   if (!proof.ok) {
     const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error };
     emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})`, args.json);

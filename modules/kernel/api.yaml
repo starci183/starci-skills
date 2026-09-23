@@ -604,7 +604,7 @@ commands:
     returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
     refuses:
       - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
-      - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done; and, for a read marked `layoutChain` (interface.draw reads.shell), a bound ui record whose `route` sits under a layout of the layout tree (.starciwork/shell/index.yaml) that is not settled. An unresolved placeholder, a record outside a Work tree, an invalid tree, or a ui record not yet written / without a route is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}|{kind:layout-unsettled, read, record, route, layouts:[{node,reasons}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
+      - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done. An unresolved placeholder, a record outside a Work tree or an invalid tree is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
@@ -763,7 +763,7 @@ commands:
       appends op-worker-nudged. It creates no job, contract, lease, retry,
       verdict or authority.
     returns: >-
-      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,delivery?:delivered|queued,evidence?:wake-text|queued-marker|screen|receipt,sendErrorCode?,enterRetried?,reason?,worker,receipt?}
+      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,delivery?:delivered|queued,evidence?:wake-text|queued-marker|screen|receipt,sendErrorCode?,enterRetried?,splitRetried?,splitOutcome?:delivered-after-split|unstaged|unsubmitted,reason?,worker,receipt?}
       — nudged:false with ok:true and exit 0 is a SKIP, not a refusal: reason
       'report-filed' (the durable answer already exists) or 'worker-active'
       (the turn is running). A worker whose liveness is `staged-input` (its
@@ -777,6 +777,13 @@ commands:
       agent_prompt_stalled / agent_prompt_blocked with the wake on screen is a
       nudge (op-worker-nudged carries delivery and sendErrorCode), never
       terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f)
+      A frame that stays turn-idle with no wake text, no queued marker and no
+      staged input is a dropped send whatever the receipt said (a Codex Kernel
+      took ok:true text+Enter sends that never reached its screen, 2026-09-24):
+      the wake is retried once split - the text with enter:false, proven staged
+      in the input row, then Enter-only, proven again - and the result and
+      event carry splitRetried:true with splitOutcome delivered-after-split, or
+      unstaged/unsubmitted on a terminal-send-failed
     refuses:
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'

@@ -13,6 +13,20 @@
 //   failed    — neither the receipt nor the screen shows it landed.
 // A wake left unsubmitted in the input row (staged-input, or Devin's idle
 // "Press Enter to send queued messages") gets one Enter-only send.
+//
+// A lost wake gets one split retry. On 2026-09-24 the Codex Kernel
+// term_28a694d9 (TUI prompt "› Ask Codex to do anything") took a text+Enter
+// send, Orca answered ok:true with no error code, and nothing reached the
+// screen - twice; on the receipt alone every watchdog wake from 19:59 to 01:45
+// read delivered. The same text sent with enter:false appeared in the input
+// row and an Enter-only send submitted it. So a frame that still reads
+// turn-idle with no wake text, no queued marker and no staged input is lost
+// whatever the receipt said, and the wake is retried once as two sends: the
+// text with enter:false, proven staged in the input row, then Enter-only,
+// proven from the screen again. The receipt fields say so: splitRetried:true,
+// splitOutcome 'delivered-after-split' | 'unstaged' | 'unsubmitted'. A receipt
+// that already carries terminal-send's own Orca-confirmed Enter-only retry
+// (agent_prompt_blocked) is that same split and is not repeated.
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
@@ -22,6 +36,7 @@ const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
 export const WAKE_PROOF_READS = 3;
 export const WAKE_PROOF_INTERVAL_MS = 1000;
+export const SPLIT_OUTCOMES = Object.freeze({ delivered: 'delivered-after-split', unstaged: 'unstaged', unsubmitted: 'unsubmitted' });
 
 const sendCodeOf = (sent) => sent?.errorCode ?? sent?.enterRetry?.after ?? null;
 
@@ -32,16 +47,49 @@ const screenReader = (read, terminal) => () => {
   } catch { return null; }
 };
 
+// No trace of the wake and the provider still at its prompt: the send was dropped.
+const isLost = (proof) => proof?.delivery === 'unproven' && proof.screenState === 'turn-idle';
+
 /**
  * The receipt/event fields a proven wake adds (api nudge, the transition wake,
- * the watchdog, the ask-answered wake): {delivery, evidence, sendErrorCode?, enterRetried?}.
+ * the watchdog, the ask-answered wake):
+ * {delivery, evidence, sendErrorCode?, enterRetried?, splitRetried?, splitOutcome?}.
  */
 export const deliveryFieldsOf = (proof) => ({ delivery: proof.delivery, evidence: proof.evidence,
-  ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), ...(proof.enterRetried ? { enterRetried: true } : {}) });
+  ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), ...(proof.enterRetried ? { enterRetried: true } : {}),
+  ...(proof.splitRetried ? { splitRetried: true, splitOutcome: proof.splitOutcome } : {}) });
+
+// The split retry of a lost wake: `text` with enter:false, proven staged in the
+// input row, then one Enter-only send, proven from the screen.
+function splitRetry({ terminal, text, before, stagedPattern, reads, intervalMs, read, send, sleep }) {
+  const sends = [send({ terminal, text, enter: false })];
+  let staged = null;
+  for (let i = 0; i < Math.max(1, reads) && !staged; i += 1) {
+    sleep(intervalMs);
+    const after = read();
+    if (after == null) continue;
+    const proof = wakeDeliveryOf({ before, after, text, stagedPattern });
+    if (WAITING_FOR_ENTER.has(proof.screenState)) staged = proof;
+  }
+  if (!staged) return { ok: false, outcome: SPLIT_OUTCOMES.unstaged, proof: null, sends };
+  sends.push(send({ terminal, text: '', enter: true }));
+  let proof = staged;
+  for (let i = 0; i < Math.max(1, reads); i += 1) {
+    sleep(intervalMs);
+    const after = read();
+    if (after == null) continue;
+    proof = wakeDeliveryOf({ before, after, text, stagedPattern });
+    if (!WAITING_FOR_ENTER.has(proof.screenState)) break;
+  }
+  // The text left the input row: submitted.
+  const submitted = !WAITING_FOR_ENTER.has(proof.screenState);
+  return { ok: submitted, outcome: submitted ? SPLIT_OUTCOMES.delivered : SPLIT_OUTCOMES.unsubmitted, proof, sends };
+}
 
 /**
  * Type `text` into `terminal` with Enter and prove from the screen what happened.
- * Returns {ok, delivery, evidence, sent, sendErrorCode, enterRetried, screenState}.
+ * Returns {ok, delivery, evidence, sent, sendErrorCode, enterRetried, splitRetried, splitOutcome, split, screenState};
+ * `sent` is the first (text+Enter) receipt, `split.sends` the split retry's receipts.
  * `before` is a frame the caller just read (it saves one terminal read).
  * `deps` ({read, send, sleep}) replaces the Orca wrappers in unit specs.
  */
@@ -52,29 +100,38 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   const before = typeof beforeScreen === 'string' ? beforeScreen : (read() ?? '');
   const sent = send({ terminal, text, enter: true });
   let proof = null, enterRetried = false;
-  // A confirmed send needs one look (queued vs delivered); an unconfirmed one
-  // gets a few, because a TUI repaints the queued text a beat later.
-  const attempts = sent?.ok ? 1 : Math.max(1, reads);
-  for (let i = 0; i < attempts + (enterRetried ? 1 : 0); i += 1) {
+  // A confirmed send the frame agrees with (proven, or no longer idle) needs
+  // one look; an unconfirmed one, or a confirmed one the frame calls lost,
+  // gets a few, because a TUI repaints the typed text a beat later.
+  for (let i = 0; i < Math.max(1, reads) + (enterRetried ? 1 : 0); i += 1) {
     if (i > 0) sleep(intervalMs);
     const after = read();
     if (after == null) continue;
     proof = wakeDeliveryOf({ before, after, text, stagedPattern });
     if (PROVEN.has(proof.delivery) && !WAITING_FOR_ENTER.has(proof.screenState)) break;
-    if (WAITING_FOR_ENTER.has(proof.screenState) && !enterRetried) {
-      enterRetried = true;
-      send({ terminal, text: '', enter: true });
+    if (WAITING_FOR_ENTER.has(proof.screenState)) {
+      if (!enterRetried) { enterRetried = true; send({ terminal, text: '', enter: true }); }
+      continue;
     }
+    if (sent?.ok && !isLost(proof)) break;
+  }
+  let split = null;
+  if (isLost(proof) && !enterRetried && !sent?.enterRetry?.ok) {
+    split = splitRetry({ terminal, text, before, stagedPattern, reads, intervalMs, read, send, sleep });
+    if (split.proof) proof = split.proof;
   }
   const screenDelivery = proof?.delivery ?? 'unreadable';
   const waiting = WAITING_FOR_ENTER.has(proof?.screenState);
   const delivery = PROVEN.has(screenDelivery) && !waiting ? screenDelivery
+    : split ? (split.ok ? 'delivered' : 'failed')
     : sent?.ok && !waiting ? 'delivered'
     : 'failed';
   const evidence = PROVEN.has(screenDelivery) && !waiting ? (screenDelivery === 'queued' ? 'queued-marker' : 'wake-text')
+    : split?.ok ? 'screen'
     : delivery === 'delivered' ? 'receipt'
     : screenDelivery;
   return { ok: delivery !== 'failed', delivery, evidence, sent, sendErrorCode: sendCodeOf(sent), enterRetried,
+    splitRetried: Boolean(split), splitOutcome: split?.outcome ?? null, split: split ? { sends: split.sends } : null,
     screenState: proof?.screenState ?? null };
 }
 
