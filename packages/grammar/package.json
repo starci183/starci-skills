@@ -1,6 +1,6 @@
 {
   "name": "@starci/grammar",
-  "version": "0.4.13",
+  "version": "0.5.0",
   "description": "Reusable StarCi React components, compositions, and packaged visual DNA.",
   "keywords": [
     "starci",
@@ -22,6 +22,11 @@
   ],
   "files": [
     "dist",
+    "!dist/stories",
+    "!dist/__test__",
+    "!dist/**/*.stories.*",
+    "!dist/**/*.spec.*",
+    "!dist/**/*.test.*",
     "README.md",
     "LICENSE"
   ],
@@ -54,8 +59,10 @@
   },
   "scripts": {
     "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
-    "typecheck": "tsc -p tsconfig.build.json --noEmit",
-    "test": "npm run build && node --test src/common/index.test.mjs src/core/index.test.mjs src/package-boundary.test.mjs && vitest run --config vitest.config.ts src/shipped-geometry.spec.ts src/core/shipped-claims.spec.tsx src/common/conformance.spec.ts src/common/styles.spec.ts src/core/family.spec.tsx src/core/styles.spec.ts src/core/surface-card-family.spec.tsx src/core/scrollable-surfaces.spec.tsx src/core/primitive/Badge/index.spec.tsx src/core/primitive/Button/index.spec.tsx src/core/primitive/Divider/index.spec.tsx src/core/primitive/Heading/index.spec.tsx src/core/primitive/Icon/index.spec.tsx src/core/primitive/IconButton/index.spec.tsx src/core/primitive/IconTile/index.spec.tsx src/core/primitive/Input/index.spec.tsx src/core/primitive/PressableField/index.spec.tsx src/core/primitive/Progress/index.spec.tsx src/core/primitive/Text/index.spec.tsx src/core/primitive/TextAction/index.spec.tsx src/core/primitive/Label/index.spec.tsx src/core/primitive/RankArtwork/index.spec.tsx src/core/composite/EmptyNotice/index.spec.tsx src/core/branch/Tabs/index.spec.tsx src/core/branch/Subnav/index.spec.tsx src/core/branch/Tooltip/index.spec.tsx src/core/composition/NavigationFeatureNav/index.spec.tsx src/core/composition/NavigationFeatureNav/styles.spec.ts src/core/composition/Sidebar/index.spec.tsx src/core/composition/Sidebar/styles.spec.ts src/core/composition/collapse.spec.tsx src/core/composition/WorkspaceShell/index.spec.tsx src/core/composition/ChatWorkspace/index.spec.tsx src/heritage/index.spec.tsx src/heritage/styles.spec.ts src/offset-pop/index.spec.tsx src/offset-pop/render.spec.tsx src/offset-pop/styles.spec.ts",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.stories.json",
+    "test": "npm run build && node --test src/common/index.test.mjs src/core/index.test.mjs src/offset-pop/index.test.mjs src/package-boundary.test.mjs && vitest run --config vitest.config.ts src/shipped-geometry.spec.ts src/core/shipped-claims.spec.tsx src/common/conformance.spec.ts src/common/styles.spec.ts src/core/family.spec.tsx src/core/styles.spec.ts src/core/surface-card-family.spec.tsx src/core/scrollable-surfaces.spec.tsx src/core/primitive/Badge/index.spec.tsx src/core/primitive/Button/index.spec.tsx src/core/primitive/Divider/index.spec.tsx src/core/primitive/Heading/index.spec.tsx src/core/primitive/Icon/index.spec.tsx src/core/primitive/IconButton/index.spec.tsx src/core/primitive/IconTile/index.spec.tsx src/core/primitive/Input/index.spec.tsx src/core/primitive/PressableField/index.spec.tsx src/core/primitive/Progress/index.spec.tsx src/core/primitive/Text/index.spec.tsx src/core/primitive/TextAction/index.spec.tsx src/core/primitive/Label/index.spec.tsx src/core/primitive/RankArtwork/index.spec.tsx src/core/composite/EmptyNotice/index.spec.tsx src/core/branch/Tabs/index.spec.tsx src/core/branch/Subnav/index.spec.tsx src/core/branch/Subnav/styles.spec.ts src/core/branch/Tooltip/index.spec.tsx src/core/composition/NavigationFeatureNav/index.spec.tsx src/core/composition/NavigationFeatureNav/styles.spec.ts src/core/composition/Sidebar/index.spec.tsx src/core/composition/Sidebar/styles.spec.ts src/core/composition/collapse.spec.tsx src/core/composition/WorkspaceShell/index.spec.tsx src/core/composition/ChatWorkspace/index.spec.tsx src/heritage/index.spec.tsx src/heritage/styles.spec.ts src/offset-pop/index.spec.tsx src/offset-pop/render.spec.tsx src/offset-pop/styles.spec.ts src/offset-pop/family.spec.tsx src/offset-pop/shipped-claims.spec.tsx src/offset-pop/surface-card-family.spec.tsx src/offset-pop/scrollable-surfaces.spec.tsx src/offset-pop/conformance.spec.ts src/core/branch/Accordion/index.spec.tsx src/core/branch/AlertDialog/index.spec.tsx src/core/branch/Calendar/index.spec.tsx src/core/branch/ComboBox/index.spec.tsx src/core/branch/DataTable/index.spec.tsx src/core/branch/DatePicker/index.spec.tsx src/core/branch/DateRangePicker/index.spec.tsx src/core/branch/Dialog/index.spec.tsx src/core/branch/Disclosure/index.spec.tsx src/core/branch/Drawer/index.spec.tsx src/core/branch/DropdownMenu/index.spec.tsx src/core/branch/ListBox/index.spec.tsx src/core/branch/Popover/index.spec.tsx src/core/branch/Select/index.spec.tsx src/core/branch/Toast/index.spec.tsx src/core/composite/Alert/index.spec.tsx src/core/composite/AvatarGroup/index.spec.tsx src/core/composite/Breadcrumbs/index.spec.tsx src/core/composite/ButtonGroup/index.spec.tsx src/core/composite/CheckboxGroup/index.spec.tsx src/core/composite/DescriptionList/index.spec.tsx src/core/composite/Fieldset/index.spec.tsx src/core/composite/Form/index.spec.tsx src/core/composite/Pagination/index.spec.tsx src/core/composite/RadioGroup/index.spec.tsx src/core/composite/SegmentedControl/index.spec.tsx src/core/composite/Stepper/index.spec.tsx src/core/composite/TagGroup/index.spec.tsx src/core/composite/Timeline/index.spec.tsx src/core/composition/BottomNav/index.spec.tsx src/core/composition/Footer/index.spec.tsx src/core/composition/TopBar/index.spec.tsx src/core/primitive/Avatar/index.spec.tsx src/core/primitive/Checkbox/index.spec.tsx src/core/primitive/CloseButton/index.spec.tsx src/core/primitive/DateField/index.spec.tsx src/core/primitive/Field/index.spec.tsx src/core/primitive/FileDropzone/index.spec.tsx src/core/primitive/Image/index.spec.tsx src/core/primitive/Kbd/index.spec.tsx src/core/primitive/Link/index.spec.tsx src/core/primitive/Meter/index.spec.tsx src/core/primitive/NumberField/index.spec.tsx src/core/primitive/ProgressCircle/index.spec.tsx src/core/primitive/Rating/index.spec.tsx src/core/primitive/SearchField/index.spec.tsx src/core/primitive/Skeleton/index.spec.tsx src/core/primitive/Slider/index.spec.tsx src/core/primitive/Spinner/index.spec.tsx src/core/primitive/Switch/index.spec.tsx src/core/primitive/Textarea/index.spec.tsx src/core/primitive/TimeField/index.spec.tsx src/offset-pop/components-forms.spec.ts src/offset-pop/components-navigation.spec.ts src/offset-pop/components-overlays.spec.ts src/core/branch/SurfaceCard/index.spec.tsx src/core/branch/SurfaceListCard/index.spec.tsx src/core/branch/SurfaceAccordionCard/index.spec.tsx src/core/branch/Rail/index.spec.tsx src/core/branch/MarkdownArticle/index.spec.tsx src/core/composite/VerticalScrollRegion/index.spec.tsx src/core/primitive/SectionHeader/index.spec.tsx src/core/OtpInput.spec.tsx src/stories/catalog.spec.ts",
+    "test:a11y": "vitest run --config vitest.a11y.config.ts",
+    "pack:check": "npm run build && node --test src/package-boundary.test.mjs",
     "prepack": "npm run typecheck && npm test",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
@@ -85,7 +92,8 @@
     "jsdom": "^30",
     "playwright": "latest",
     "@testing-library/react": "^16",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@internationalized/date": "^3.12.4"
   },
   "license": "MIT",
   "publishConfig": {

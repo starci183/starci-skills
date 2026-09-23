@@ -11,21 +11,26 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.4.13"
-  checkout: 41be722701c439e76910f80a8cbb65261da72e01
-  captured: "2026-09-05"
+  version: "0.5.0"
+  checkout: b6a13be97a9d1e15b7d3f628709158e81c744a2a
+  captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
+  familyEntry: "@starci/grammar/core"
   limitations: |
     This is not a claim that the currently installed package has these APIs or gaps. Before use,
     inspect the selected repository's manifest/lockfile, exported types, renderers and CSS; record
     actual source/version in .starciwork. If source is unavailable, report unverified; do not infer
     current APIs or defects from old tables. Prefer @starci/grammar/common as the current public
     consumer entry where the installed package supports it; verify exports rather than inventing APIs.
+    DNA.yaml is generated from source and held to it by scripts/checks/grammar-knowledge.mjs; the other
+    topics are authored.
 topics:
   - id: dna
     path: DNA.yaml
     title: DNA
-    summary: Tokens, renderers, props, claims and gaps at the pinned version.
+    summary: |
+      dna.ts values, root tokens with dark/forced-colours values, the 95 renderers with closed prop
+      values, classes and rule ids, and gaps at the pinned version (generated, drift-checked).
   - id: idioms
     path: idioms.yaml
     title: Idioms
@@ -33,11 +38,14 @@ topics:
   - id: playbook
     path: playbook.yaml
     title: Playbook
-    summary: Composition references for approved business shapes.
+    summary: |
+      Composition references for approved business shapes, and the 0.5.0 composition rules for forms
+      (Form, Fieldset, Field), overlays inside the family root, the single Toaster and its placement,
+      and mobile navigation chrome (TopBar, BottomNav).
   - id: family
     path: family.yaml
     title: Family
-    summary: Common/family boundaries, CSS direction and snapshot gaps.
+    summary: Common/family boundaries, CSS direction, what Core paints for the 0.5.0 renderers, and gaps.
 guidance:
   - id: confirm-family-root
     requirement: |
@@ -47,6 +55,14 @@ guidance:
       package name. Current public consumer entry: @starci/grammar/common (verify installed).
     rationale: |
       Package names do not prove export graphs; consumer entry and Common internals differ.
+  - id: one-root-holds-everything
+    requirement: |
+      Render the whole app — page chrome, content, every overlay trigger and the one Toaster — inside a
+      single `CoreGrammarRoot`. Overlays portal into the nearest Grammar root, so a trigger outside the
+      root opens an unstyled overlay in `<body>`.
+    rationale: |
+      Core's tokens and theme live on `[data-grammar-family="core"]`; anything outside that subtree reads
+      none of them.
   - id: gaps-are-findings
     requirement: |
       A recorded gap is a finding; extending the library needs separately authorized scope and op.

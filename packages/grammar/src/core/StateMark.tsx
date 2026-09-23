@@ -6,7 +6,12 @@ export type StateMarkProps = {
     readonly state: PresentationState
 }
 
-/** Draw the check mark used by successful neutral states. */
+/**
+ * Draw the check mark used by successful neutral states.
+ *
+ * Contract: STATE-1 (the carrier is chosen from the named state through `treatmentFor`) and ICON-6
+ * (the mark is decorative, so it is always `aria-hidden`; the state's words carry the meaning).
+ */
 export const StateMark = (props: StateMarkProps) => {
     const treatment = treatmentFor(props.state)
     if (treatment.mark !== "check") return null
@@ -14,6 +19,7 @@ export const StateMark = (props: StateMarkProps) => {
     return (
         <svg
             aria-hidden="true"
+            data-contract="STATE-1 ICON-6"
             data-grammar-state-mark="check"
             focusable="false"
             viewBox="0 0 20 20"

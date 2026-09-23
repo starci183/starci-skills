@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
+import { WorkspaceShell } from "../WorkspaceShell/index.js"
 import { NavigationFeatureNav } from "./index.js"
 
 afterEach(cleanup)
@@ -92,5 +94,21 @@ describe("Core NavigationFeatureNav", () => {
         for (const pressable of actions.querySelectorAll("button, a[href]")) {
             expect(pressable.matches(":where(button, [role=\"button\"], a[href])")).toBe(true)
         }
+    })
+})
+
+describe.each(FAMILY_WRAPS)("NavigationFeatureNav landmarks under %s", (family, wrap) => {
+    const bar = <NavigationFeatureNav identity="Brand" navigation={<a href="/a">A</a>} navigationLabel="Primary" compactNavigationTrigger={<button type="button">Menu</button>} compactNavigationTriggerLabel="Open navigation" />
+
+    it("is the banner on its own", () => {
+        render(wrap(bar))
+        expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))
+        expect(screen.getAllByRole("banner")).toHaveLength(1)
+    })
+
+    it("stays the only, un-nested banner inside WorkspaceShell's header slot", () => {
+        const { container } = render(wrap(<WorkspaceShell header={bar} primary={<p>Body</p>} primaryLabel="Body" />))
+        expect(screen.getAllByRole("banner")).toHaveLength(1)
+        expect(container.querySelectorAll("header header")).toHaveLength(0)
     })
 })

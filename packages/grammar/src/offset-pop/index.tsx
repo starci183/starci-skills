@@ -2,13 +2,33 @@
 
 import {
     COMMON_GRAMMAR_COMPONENTS,
-    COMMON_UI_RULE_IDS,
     defineGrammarFamily,
-    defineGrammarRuleConformance,
     type GrammarComponentRenderer,
     type GrammarRootProps,
 } from "../common/index.js"
 import { createElement } from "react"
+
+// Offset Pop inherits every Common renderer and type, exactly like Core; the names Offset Pop defines
+// itself (its root, tokens, DNA, conformance) win over the same names below. A consumer may import
+// renderers from this entry or from @starci/grammar/common; both name the same Common components.
+export * from "../common/index.js"
+
+export {
+    OFFSET_POP_BAND_TOKEN_NAMES,
+    OFFSET_POP_DARK_TOKEN_DEFAULTS,
+    OFFSET_POP_DNA,
+    OFFSET_POP_SPACING_SCALE,
+    OFFSET_POP_TOKEN_DEFAULTS,
+    OFFSET_POP_TOKEN_NAMES,
+    type OffsetPopBandTokenName,
+    type OffsetPopDna,
+    type OffsetPopSpacingStep,
+    type OffsetPopSpacingValue,
+    type OffsetPopTokenDefaults,
+    type OffsetPopTokenName,
+} from "./dna.js"
+
+export { OFFSET_POP_FAMILY_EVIDENCE, offsetPopRuleConformance } from "./conformance.js"
 
 /** Installs the Offset Pop scope without changing Common root props or behavior. */
 const OffsetPopGrammarRootRenderer: GrammarComponentRenderer<GrammarRootProps> = (props) => {
@@ -29,25 +49,6 @@ export const offsetPopGrammar = defineGrammarFamily({
         },
         extensions: {},
     },
-})
-
-const OFFSET_POP_FAMILY_EVIDENCE = {
-    "ACCENT-1": ["Offset Pop binds one scoped pink decision accent."],
-    "BOUNDARY-1": ["Offset Pop material targets emitted Common surface and frame hooks."],
-    "COLOR-5": ["Offset Pop owns scoped light, dark, system, and forced-color variables."],
-    "FOCUS-1": ["Offset Pop keeps Common focus ownership and supplies a visible family focus color."],
-    "GAP-2": ["Family geometry uses the invariant Common spacing scale."],
-    "MOTION-2": ["Reduced motion removes Offset Pop transforms and transition duration."],
-    "PADDING-3": ["Offset Pop does not add a second inset owner to Common surface content."],
-    "RESPONSIVE-4": ["Narrow viewports retain content and reduce only family shadow geometry."],
-    "STATE-2": ["Pending and loading remain Common-owned; family CSS only reads emitted state hooks."],
-    "SURFACE-1": ["Top and nested surface treatments preserve Common surface roles."],
-} as const
-
-export const offsetPopRuleConformance = defineGrammarRuleConformance({
-    familyId: "offset-pop",
-    inheritedCommonRules: COMMON_UI_RULE_IDS.filter((rule) => !(rule in OFFSET_POP_FAMILY_EVIDENCE)),
-    familyEvidence: OFFSET_POP_FAMILY_EVIDENCE,
 })
 
 export const OffsetPopGrammarRoot = offsetPopGrammar.components.GrammarRoot

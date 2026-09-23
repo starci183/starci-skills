@@ -30,19 +30,27 @@ import turtleUrl from './assets/turtle.png';
 
 const meta: Meta = {
   title: 'Grammar/Core anatomy',
-  parameters: { layout: 'fullscreen' },
+  // Pinned to Core with a consumer accent override. The reference renders were captured with
+  // #2F6BFF; white on it is 4.49:1, one hair under AA, so the override is the nearest AA-safe
+  // blue (#2F69FF, 4.58:1 with the white accent foreground).
+  globals: { grammarFamily: 'core' },
+  parameters: {
+    layout: 'fullscreen',
+    grammar: { bleed: true, rootStyle: { ['--starci-core-accent' as string]: '#2F69FF' } },
+  },
 };
 export default meta;
 
 type Story = StoryObj;
 
+// NavigationFeatureNav owns the `<nav aria-label="Primary">` landmark; the slot takes bare links.
 const navDestinations = (
-  <nav aria-label="Primary" style={{ display: 'flex', gap: '1.5rem' }}>
+  <div style={{ display: 'flex', gap: '1.5rem' }}>
     <a href="#" aria-current="page">Tasks</a>
     <a href="#">Notifications</a>
     <a href="#">Plan</a>
     <a href="#">Privacy</a>
-  </nav>
+  </div>
 );
 
 const topNav = (
@@ -154,6 +162,7 @@ export const TasksScreen: Story = {
             </SurfaceCard>
             <SurfaceListCard
               label="All tasks"
+              headingLevel={2}
               fact="4 tasks"
               footer={<Text tone="muted">Completed tasks stay here until you delete them.</Text>}
             >
@@ -215,9 +224,12 @@ export const EmptyState: Story = {
               <Heading level={1}>Your tasks</Heading>
               <Text tone="muted">A little progress, every day.</Text>
             </div>
-            <SurfaceListCard label="All tasks" fact="0 tasks">
-              <EmptyNotice message="No tasks yet." description="Add the first one above." />
-            </SurfaceListCard>
+            <SurfaceListCard
+              label="All tasks"
+              headingLevel={2}
+              fact="0 tasks"
+              empty={<EmptyNotice message="No tasks yet." description="Add the first one above." />}
+            />
           </div>
         </PageContainer>
       }

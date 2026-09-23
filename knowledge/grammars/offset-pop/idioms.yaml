@@ -1,0 +1,297 @@
+schema: starci/knowledge-source@1
+id: grammar.offset-pop.idioms
+title: Offset Pop — idioms
+purpose: |
+  The treatments Offset Pop reaches for again and again, as the family's CSS ships them: how an object,
+  a press, a decision, a selection and a current destination look in this family, and which props on
+  which published renderers produce them. Taste, not law. Universal law lives in knowledge/ui; what each
+  renderer is and owns lives in DNA.yaml; family boundaries and owner decisions are in family.yaml.
+appliesTo:
+  - grammar
+family: offset-pop
+provenance:
+  package: "@starci/grammar"
+  version: "0.5.0"
+  checkout: b6a13be97a9d1e15b7d3f628709158e81c744a2a
+  captured: "2026-09-23"
+  publicEntry: "@starci/grammar/common"
+  sources:
+    - packages/grammar/src/offset-pop/styles.css
+    - packages/grammar/src/offset-pop/components-forms.css
+    - packages/grammar/src/offset-pop/components-overlays.css
+    - packages/grammar/src/offset-pop/components-navigation.css
+  limitations: |
+    Unlike StarCi Core's idioms, which were promoted from product source, these are PACKAGE idioms: the
+    evidence is the family stylesheet, not a product that used it. No product source has been observed
+    yet. Composition cells name only renderers and props the package publishes; verify the installed
+    exports before composing, and do not invent APIs.
+promotion:
+  bar: |
+    A treatment the family CSS applies to at least two distinct renderers with the same meaning. A
+    treatment the CSS applies to one renderer only is recorded under seenOnce and is not composed from
+    as house style. Once product source exists, product occurrences replace CSS occurrences as evidence.
+idioms:
+  - id: sticker-surface
+    title: A top-level object is a sticker — ink outline plus hard offset shadow
+    summary: |
+      Whatever sits directly on the canvas wears the 2px ink outline and an unblurred ink shadow
+      displaced down-right; anything inside it keeps the outline and loses the shadow.
+    cases:
+      - id: card-on-canvas
+        when: A card sits directly on the page canvas
+        composition: |
+          SurfaceCard depth="top" (the default). The bounded frame gets the outline, the family surface
+          radius (1.5rem, 1.25rem narrow) and `--shadow-surface` (0.25rem x 0.5rem, y 0.25rem narrow)
+        evidence:
+          css:
+            - "styles.css: [data-grammar-surface-depth=\"top\"]"
+          renderers:
+            - SurfaceCard
+            - SurfaceListCard
+            - SurfaceAccordionCard
+      - id: card-in-card
+        when: A surface sits inside another surface
+        composition: |
+          SurfaceCard depth="nested": outline kept, shadow dropped, `--surface-secondary` fill (blush
+          `#f8dbe8` in light) — the nesting reads as a pressed-in pocket, not a second sticker
+        evidence:
+          css:
+            - "styles.css: [data-grammar-surface-depth=\"nested\"]"
+      - id: overlay-surface
+        when: An overlay opens
+        composition: |
+          Dialog, AlertDialog, Drawer, Popover, DropdownMenu, Toast — each surface is outlined and throws
+          the same hard shadow; dialog, drawer and toast take the surface radius, popover and menu the
+          control radius
+        evidence:
+          css:
+            - "components-overlays.css: [data-grammar-overlay-surface]"
+          renderers:
+            - Dialog
+            - Drawer
+            - Popover
+            - DropdownMenu
+            - Toast
+      - id: data-sheet
+        when: A table or calendar is a destination of its own
+        composition: |
+          DataTable and Calendar are outlined raised sheets (a smaller shadow at 30rem and below)
+        evidence:
+          renderers:
+            - DataTable
+            - Calendar
+    notes: |
+      This is the BOUNDARY-6 departure the family owner is asked to confirm (family.yaml). Do not add an
+      app-level border or blur shadow on top: the family already draws both halves.
+
+  - id: press-travel
+    title: Press moves the object into its shadow
+    summary: |
+      A pressable object slides by the shadow offset and its shadow collapses, as if pushed flat. No
+      meaning rides on it and reduced motion removes the travel.
+    cases:
+      - id: button-press
+        when: Any Button is pressed
+        composition: |
+          Button (every variant): outline, `0.25rem 0.25rem` ink shadow, weight 800; `:active` translates
+          `0.25rem, 0.25rem` and the shadow goes to zero
+        evidence:
+          renderers:
+            - Button
+            - ButtonGroup
+      - id: whole-card-press
+        when: A whole card is one action
+        composition: |
+          SurfaceCard with its whole-card action: the top frame travels and its shadow shortens; a nested
+          one only moves down .25rem
+        evidence:
+          renderers:
+            - SurfaceCard
+      - id: control-press
+        when: A field-shaped trigger, a choice or a slider thumb is pressed
+        composition: |
+          Select/ComboBox/DatePicker triggers, Checkbox, Radio, Switch and the Slider thumb collapse their
+          shadow into the same travel (`data-pressed` / `data-dragging`)
+        evidence:
+          renderers:
+            - Select
+            - Checkbox
+            - Slider
+
+  - id: one-pink-per-decision
+    title: One pink fill per decision, ink everywhere else
+    summary: |
+      A view has one pink-filled action — the thing it is asking for. Everything else is ink on cream,
+      and text that needs the accent reads `accentText`, never the fill pink.
+    cases:
+      - id: primary-action
+        when: A surface asks for one decision
+        composition: |
+          One Button variant="primary" (pink fill, ink label — ink on pink is 5.23:1, white would fail);
+          other actions are secondary/outline/ghost Buttons or TextAction
+        evidence:
+          renderers:
+            - Button
+      - id: overlay-confirm
+        when: A dialog, toast or alert carries its single action
+        composition: |
+          AlertDialog confirm (pink; critical when `tone="negative"`), the Toast `action`, the Alert
+          `action` — each is filled pink by the family without an app class
+        evidence:
+          css:
+            - "components-overlays.css: [data-grammar-overlay-action=\"confirm\"], [data-grammar-toast-action], [data-grammar-alert-actions]"
+          renderers:
+            - AlertDialog
+            - Toast
+            - Alert
+      - id: accent-as-text
+        when: A word must carry the accent
+        composition: |
+          Text tone="accent", SectionHeader eyebrow, a current Tabs label and MarkdownArticle links
+          (`--link`): all read `--offset-pop-accent-text` (#b8005f light, #ff7ab8 dark). The `Link`
+          renderer is the exception by design: ink text with a pink underline (see current-is-marked-twice)
+        evidence:
+          renderers:
+            - Text
+            - SectionHeader
+            - Tabs
+            - MarkdownArticle
+    notes: |
+      The single pink also marks selection, current and focus (ACCENT-3/COLOR-3 inherited, an owner
+      decision in family.yaml): keep the non-colour carrier of each (fill on the action, outline for
+      focus, leading edge for selection, underline for a destination).
+
+  - id: selected-row
+    title: A selected row is a soft pink pocket with a pink leading edge
+    summary: |
+      In any list the reader picks from, hover washes the row yellow, keyboard focus rings it in pink on
+      its own edge, and the chosen row fills soft pink with a pink bar on its leading edge and an
+      accent-text label.
+    cases:
+      - id: pick-from-a-list
+        when: A list of options is itself the control
+        composition: |
+          ListBox selectionMode="single" or "multiple", Select and ComboBox options, DataTable with selectable
+          rows. Selected: `--accent-soft` fill (blush-pink light, plum dark), `inset 0.25rem` pink edge,
+          `accentText` label; hover: yellow 32% wash on an unselected, enabled row; focus: 2px pink ring,
+          offset 0
+        evidence:
+          css:
+            - "components-navigation.css: ListBox, DataTable rows"
+            - "components-forms.css: [data-grammar-popover] [data-grammar-option]"
+          renderers:
+            - ListBox
+            - Select
+            - ComboBox
+            - DataTable
+      - id: static-rows
+        when: Rows only report facts
+        composition: |
+          StaticStateRow inside SurfaceListCard: no hover, no focus treatment; one 2px ink seam between
+          rows; a non-neutral state draws a .25rem inset stripe in its semantic colour
+        evidence:
+          renderers:
+            - StaticStateRow
+            - SurfaceListCard
+
+  - id: current-is-marked-twice
+    title: The current destination is marked by pink AND by shape
+    summary: |
+      Where the reader is gets the pink, but always with a second, non-colour cue: a pill, a raised
+      tile, an underline, `aria-current`.
+    cases:
+      - id: tab-bar
+        when: A mobile tab bar shows where the reader is
+        composition: |
+          BottomNav: the current item's icon sits in a pink pill with an ink outline and a small hard
+          shadow; the label stays ink at weight 800
+        evidence:
+          renderers:
+            - BottomNav
+      - id: pages-and-days
+        when: One of many peers is current
+        composition: |
+          Pagination current page (pink, raised pill), Calendar selected day (raised pink tile), Stepper
+          current step (pink marker; complete steps mint, errors critical), Timeline current entry
+        evidence:
+          renderers:
+            - Pagination
+            - Calendar
+            - Stepper
+            - Timeline
+      - id: in-copy
+        when: The destination is inline text
+        composition: |
+          Link: ink text with a 2px pink underline; `isCurrent` thickens it to .2em. Breadcrumbs mark the
+          current page the same way
+        evidence:
+          renderers:
+            - Link
+            - Breadcrumbs
+
+  - id: semantic-fill-with-ink
+    title: Outcomes are palette fills with ink text
+    summary: |
+      Success is mint, warning yellow, danger critical red, info blush — always filled, always with the
+      ink as the text colour, in light and dark alike.
+    cases:
+      - id: tone-bearing
+        when: A renderer carries a PresentationState tone
+        composition: |
+          Alert, Toast, StateMark, Meter, Stepper states: `tone`/`state` affirmative → mint,
+          cautionary → yellow, negative → critical, informative → blush, pending → pink; neutral stays
+          unpainted (TRUTH-1)
+        evidence:
+          renderers:
+            - Alert
+            - Toast
+            - StateMark
+            - Meter
+
+  - id: sheet-from-an-edge
+    title: A sheet throws its shadow away from the edge it came from
+    summary: |
+      Drawers are stickers too, but their hard shadow points into the page, never into the screen edge.
+    cases:
+      - id: bottom-sheet
+        when: A phone task opens from the bottom
+        composition: |
+          Drawer placement="bottom" (grab handle shown by default): upward hard shadow, surface radius
+        evidence:
+          renderers:
+            - Drawer
+      - id: side-sheet
+        when: A wide-screen task opens from the side
+        composition: |
+          Drawer placement="right" (shadow to the left) or "left" (shadow to the right)
+        evidence:
+          renderers:
+            - Drawer
+    notes: |
+      One renderer, four placements with the same rule; recorded as an idiom because the rule is the
+      family's, and TopBar menus open the same Drawer.
+
+seenOnce:
+  note: |
+    Treatments the family CSS applies in one place. Use the underlying renderer freely; do not cite them
+    as reusable house style.
+  compositions:
+    - id: blush-backdrop
+      composition: |
+        The modal backdrop is a 72% blush tint in light (a pink-tinted near-black in explicit dark)
+        instead of a grey scrim
+      where: components-overlays.css
+      secondOccurrenceWouldSettle: |
+        Whether blush is the family's way to push the page back
+    - id: display-heading
+      composition: |
+        Heading scale="display": weight 900, tracking -.045em, line-height .96, balanced wrapping
+      where: styles.css
+      secondOccurrenceWouldSettle: |
+        Whether the ultra-heavy tight setting extends to any other headline role
+    - id: yellow-badge
+      composition: |
+        BottomNav badge: yellow fill, ink outline, ink count
+      where: components-navigation.css
+      secondOccurrenceWouldSettle: |
+        Whether yellow is the family's attention (count) colour beyond the dock

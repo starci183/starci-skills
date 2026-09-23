@@ -1,0 +1,939 @@
+/*
+ * Common overlay and feedback anatomy: Dialog, AlertDialog, Drawer, Popover, DropdownMenu, Toast,
+ * Toaster, Alert, Spinner, Skeleton, ProgressCircle, Meter, CloseButton, Kbd.
+ *
+ * Structure only, from Common semantic variables (with `--starci-core-*` geometry hooks a family may
+ * set). Every overlay surface is portalled INTO the nearest `.grammar-common-root` (see
+ * `src/core/overlayScope.tsx`), so these rules and every family's scoped rules reach it.
+ */
+@layer starci-grammar-common {
+    /* ---------------------------------------------------------------- shared overlay tone */
+    :is(.starci-core-alert, .starci-core-toast, .starci-core-meter, .starci-core-alert-dialog) {
+        --starci-core-overlay-tone: var(--muted, GrayText);
+    }
+
+    :is(.starci-core-alert, .starci-core-toast, .starci-core-meter, .starci-core-alert-dialog)[data-grammar-tone="informative"] {
+        --starci-core-overlay-tone: var(--info, var(--accent, Highlight));
+    }
+
+    :is(.starci-core-alert, .starci-core-toast, .starci-core-meter, .starci-core-alert-dialog)[data-grammar-tone="affirmative"] {
+        --starci-core-overlay-tone: var(--success, CanvasText);
+    }
+
+    :is(.starci-core-alert, .starci-core-toast, .starci-core-meter, .starci-core-alert-dialog)[data-grammar-tone="cautionary"] {
+        --starci-core-overlay-tone: var(--warning, CanvasText);
+    }
+
+    :is(.starci-core-alert, .starci-core-toast, .starci-core-meter, .starci-core-alert-dialog)[data-grammar-tone="negative"] {
+        --starci-core-overlay-tone: var(--danger, CanvasText);
+    }
+
+    :is(.starci-core-alert, .starci-core-toast, .starci-core-meter, .starci-core-alert-dialog)[data-grammar-tone="pending"],
+    .starci-core-meter[data-grammar-tone="neutral"] {
+        --starci-core-overlay-tone: var(--accent, Highlight);
+    }
+
+    /* ---------------------------------------------------------------- modal backdrop */
+    .starci-core-overlay-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--grammar-page-inset, 1rem);
+        background: color-mix(in srgb, var(--foreground, CanvasText) 40%, transparent);
+        overscroll-behavior: contain;
+    }
+
+    .starci-core-overlay-backdrop[data-entering] {
+        animation: starci-core-overlay-fade var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-overlay-backdrop[data-exiting] {
+        animation: starci-core-overlay-fade var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1)) reverse;
+    }
+
+    @keyframes starci-core-overlay-fade {
+        from {
+            opacity: 0;
+        }
+    }
+
+    @keyframes starci-core-overlay-rise {
+        from {
+            opacity: 0;
+            transform: translateY(0.5rem) scale(0.98);
+        }
+    }
+
+    /* ---------------------------------------------------------------- dialog + alert dialog */
+    /* The container is sized to the dialog so a press on the empty backdrop counts as "outside". */
+    .starci-core-dialog-container {
+        display: flex;
+        width: min(100%, 32rem);
+        max-height: 100%;
+        min-width: 0;
+        outline: none;
+    }
+
+    .starci-core-dialog-container[data-size="sm"] {
+        width: min(100%, 24rem);
+    }
+
+    .starci-core-dialog-container[data-size="lg"] {
+        width: min(100%, 48rem);
+    }
+
+    .starci-core-dialog-container[data-size="full"] {
+        width: 100%;
+        height: 100%;
+    }
+
+    .starci-core-dialog-container[data-entering] {
+        animation: starci-core-overlay-rise var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-dialog,
+    .starci-core-drawer {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex: 1;
+        flex-direction: column;
+        gap: var(--grammar-section-gap, 1rem);
+        max-height: calc(100dvh - 2 * var(--grammar-page-inset, 1rem));
+        overflow: hidden;
+        padding: 1.5rem;
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        background: var(--surface, Canvas);
+        color: var(--surface-foreground, CanvasText);
+        box-shadow: var(--starci-core-surface-shadow, var(--shadow-surface, 0 8px 28px color-mix(in srgb, var(--foreground, CanvasText) 12%, transparent)));
+        outline: none;
+    }
+
+    .starci-core-overlay-header {
+        display: flex;
+        min-width: 0;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--grammar-row-gap, 0.75rem);
+    }
+
+    .starci-core-overlay-heading-group {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .starci-core-overlay-title {
+        margin: 0;
+        color: var(--surface-foreground, CanvasText);
+        font-size: 1.125rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-overlay-description {
+        margin: 0;
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .starci-core-overlay-body {
+        min-height: 0;
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .starci-core-overlay-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    [data-grammar-overlay-action] {
+        display: contents;
+    }
+
+    /* A destructive confirm paints the Common danger pair, never the decision accent. */
+    [data-grammar-overlay-action="confirm"][data-grammar-tone="negative"] > [data-component="Button"] {
+        background: var(--danger, CanvasText);
+        color: var(--danger-foreground, Canvas);
+    }
+
+    .starci-core-alert-dialog-icon {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--starci-core-overlay-tone) 16%, transparent);
+        color: var(--starci-core-overlay-tone);
+    }
+
+    .starci-core-alert-dialog-icon > svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    @media (max-width: 30rem) {
+        .starci-core-overlay-footer {
+            flex-direction: column-reverse;
+            align-items: stretch;
+        }
+
+        .starci-core-overlay-footer > [data-component="Button"],
+        .starci-core-overlay-footer > [data-grammar-overlay-action] > [data-component="Button"] {
+            width: 100%;
+        }
+    }
+
+    /* ---------------------------------------------------------------- drawer / bottom sheet */
+    .starci-core-drawer-backdrop {
+        align-items: stretch;
+        justify-content: stretch;
+        padding: 0;
+    }
+
+    .starci-core-drawer-content {
+        position: fixed;
+        display: flex;
+        min-width: 0;
+        max-height: 100dvh;
+        outline: none;
+    }
+
+    .starci-core-drawer-content[data-placement="right"],
+    .starci-core-drawer-content[data-placement="left"] {
+        inset-block: 0;
+        width: min(100%, 24rem);
+    }
+
+    .starci-core-drawer-content[data-placement="right"] {
+        inset-inline-end: 0;
+    }
+
+    .starci-core-drawer-content[data-placement="left"] {
+        inset-inline-start: 0;
+    }
+
+    .starci-core-drawer-content[data-placement="top"],
+    .starci-core-drawer-content[data-placement="bottom"] {
+        inset-inline: 0;
+        max-height: 85dvh;
+    }
+
+    .starci-core-drawer-content[data-placement="top"] {
+        top: 0;
+    }
+
+    .starci-core-drawer-content[data-placement="bottom"] {
+        bottom: 0;
+    }
+
+    .starci-core-drawer {
+        max-height: none;
+        border-radius: 0;
+    }
+
+    .starci-core-drawer[data-placement="right"] {
+        border-start-start-radius: var(--starci-core-surface-radius, 1rem);
+        border-end-start-radius: var(--starci-core-surface-radius, 1rem);
+    }
+
+    .starci-core-drawer[data-placement="left"] {
+        border-start-end-radius: var(--starci-core-surface-radius, 1rem);
+        border-end-end-radius: var(--starci-core-surface-radius, 1rem);
+    }
+
+    .starci-core-drawer[data-placement="bottom"] {
+        padding-block-end: max(1.5rem, env(safe-area-inset-bottom));
+        border-start-start-radius: var(--starci-core-surface-radius, 1rem);
+        border-start-end-radius: var(--starci-core-surface-radius, 1rem);
+    }
+
+    .starci-core-drawer[data-placement="top"] {
+        border-end-start-radius: var(--starci-core-surface-radius, 1rem);
+        border-end-end-radius: var(--starci-core-surface-radius, 1rem);
+    }
+
+    .starci-core-drawer-handle {
+        display: flex;
+        justify-content: center;
+        margin-block: -0.75rem -0.25rem;
+        padding-block: 0.5rem;
+        cursor: grab;
+        touch-action: none;
+    }
+
+    .starci-core-drawer-handle > [data-slot="drawer-handle-bar"] {
+        width: 2.5rem;
+        height: 0.3125rem;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--muted, GrayText) 55%, transparent);
+    }
+
+    .starci-core-drawer-content[data-entering][data-placement="right"] {
+        animation: starci-core-drawer-from-end var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-drawer-content[data-entering][data-placement="left"] {
+        animation: starci-core-drawer-from-start var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-drawer-content[data-entering][data-placement="bottom"] {
+        animation: starci-core-drawer-from-bottom var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-drawer-content[data-entering][data-placement="top"] {
+        animation: starci-core-drawer-from-top var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    @keyframes starci-core-drawer-from-end {
+        from {
+            transform: translateX(100%);
+        }
+    }
+
+    @keyframes starci-core-drawer-from-start {
+        from {
+            transform: translateX(-100%);
+        }
+    }
+
+    @keyframes starci-core-drawer-from-bottom {
+        from {
+            transform: translateY(100%);
+        }
+    }
+
+    @keyframes starci-core-drawer-from-top {
+        from {
+            transform: translateY(-100%);
+        }
+    }
+
+    /* ---------------------------------------------------------------- popover */
+    .starci-core-popover,
+    .starci-core-menu-popover {
+        max-width: min(20rem, calc(100vw - 2rem));
+        overflow: auto;
+        border-radius: var(--starci-core-control-radius, 0.75rem);
+        background: var(--surface, Canvas);
+        color: var(--surface-foreground, CanvasText);
+        box-shadow: var(--starci-core-surface-shadow, var(--shadow-surface, 0 8px 28px color-mix(in srgb, var(--foreground, CanvasText) 12%, transparent)));
+        outline: none;
+    }
+
+    .starci-core-popover[data-entering],
+    .starci-core-menu-popover[data-entering] {
+        animation: starci-core-overlay-fade var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-popover-dialog {
+        display: flex;
+        flex-direction: column;
+        gap: var(--grammar-inline-gap, 0.5rem);
+        padding: 1rem;
+        outline: none;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    /* The body is one flex item of the dialog stack; long content wraps inside the 20rem surface. */
+    .starci-core-popover-body {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-popover-dialog > .starci-core-overlay-title {
+        font-size: 1rem;
+    }
+
+    .starci-core-popover-arrow svg {
+        display: block;
+        fill: var(--surface, Canvas);
+    }
+
+    .starci-core-popover-arrow[data-placement="bottom"] svg {
+        transform: rotate(180deg);
+    }
+
+    /* ---------------------------------------------------------------- dropdown menu */
+    .starci-core-menu-popover {
+        min-width: max(12rem, var(--trigger-width, 0px));
+    }
+
+    .starci-core-menu {
+        display: flex;
+        flex-direction: column;
+        padding: 0.25rem;
+        outline: none;
+    }
+
+    .starci-core-menu-section {
+        display: flex;
+        flex-direction: column;
+    }
+
+    :is(.starci-core-menu-section, .starci-core-menu-item) + .starci-core-menu-section,
+    .starci-core-menu-section + .starci-core-menu-item {
+        margin-block-start: 0.25rem;
+        padding-block-start: 0.25rem;
+        border-block-start: 1px solid var(--separator, GrayText);
+    }
+
+    .starci-core-menu-section-label {
+        padding: 0.375rem 0.75rem 0.25rem;
+        color: var(--muted, GrayText);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .starci-core-menu-item {
+        display: flex;
+        min-width: 0;
+        min-block-size: var(--starci-core-control-min-size, 2.75rem);
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+        padding: 0.5rem 0.75rem;
+        border-radius: calc(var(--starci-core-control-radius, 0.75rem) - 0.25rem);
+        color: var(--surface-foreground, CanvasText);
+        cursor: pointer;
+        font-size: 0.875rem;
+        outline: none;
+        text-decoration: none;
+    }
+
+    .starci-core-menu-item:is([data-focused], [data-hovered], [data-open]) {
+        background: var(--surface-secondary, Canvas);
+    }
+
+    .starci-core-menu-item[data-focus-visible] {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: -2px;
+    }
+
+    .starci-core-menu-item[data-disabled] {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .starci-core-menu-item[data-grammar-tone="negative"] {
+        color: var(--danger, CanvasText);
+    }
+
+    .starci-core-menu-item-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+    }
+
+    .starci-core-menu-item-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .starci-core-menu-item-description {
+        color: var(--muted, GrayText);
+        font-size: 0.75rem;
+    }
+
+    .starci-core-menu-item-shortcut {
+        flex: none;
+        margin-inline-start: auto;
+        color: var(--muted, GrayText);
+    }
+
+    .starci-core-menu-indicator {
+        display: inline-flex;
+        flex: none;
+        width: 1rem;
+        color: var(--accent, Highlight);
+    }
+
+    .starci-core-menu-submenu-indicator {
+        display: inline-flex;
+        flex: none;
+        color: var(--muted, GrayText);
+    }
+
+    /* ---------------------------------------------------------------- toaster + toast */
+    .starci-core-toaster {
+        position: fixed;
+        z-index: 60;
+        display: flex;
+        width: min(24rem, calc(100vw - 2 * var(--grammar-page-inset, 1rem)));
+        flex-direction: column;
+        pointer-events: none;
+    }
+
+    .starci-core-toaster:is([data-placement="top-start"], [data-placement="top"], [data-placement="top-end"]) {
+        top: var(--grammar-page-inset, 1rem);
+    }
+
+    .starci-core-toaster:is([data-placement="bottom-start"], [data-placement="bottom"], [data-placement="bottom-end"]) {
+        bottom: max(var(--grammar-page-inset, 1rem), env(safe-area-inset-bottom));
+    }
+
+    .starci-core-toaster:is([data-placement="top-start"], [data-placement="bottom-start"]) {
+        inset-inline-start: var(--grammar-page-inset, 1rem);
+    }
+
+    .starci-core-toaster:is([data-placement="top-end"], [data-placement="bottom-end"]) {
+        inset-inline-end: var(--grammar-page-inset, 1rem);
+    }
+
+    .starci-core-toaster:is([data-placement="top"], [data-placement="bottom"]) {
+        inset-inline: 0;
+        margin-inline: auto;
+    }
+
+    .starci-core-toaster-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--grammar-inline-gap, 0.5rem);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    /* Newest toast (first in the queue) sits nearest the screen edge. */
+    .starci-core-toaster:is([data-placement="bottom-start"], [data-placement="bottom"], [data-placement="bottom-end"]) > .starci-core-toaster-list {
+        flex-direction: column-reverse;
+    }
+
+    .starci-core-toaster-item {
+        pointer-events: auto;
+    }
+
+    .starci-core-toast {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        align-items: start;
+        gap: 0.5rem 0.75rem;
+        padding: 0.75rem 0.5rem 0.75rem 1rem;
+        border-radius: var(--starci-core-surface-radius, 1rem);
+        background: var(--surface, Canvas);
+        color: var(--surface-foreground, CanvasText);
+        box-shadow: var(--starci-core-surface-shadow, var(--shadow-surface, 0 8px 28px color-mix(in srgb, var(--foreground, CanvasText) 12%, transparent)));
+        animation: starci-core-overlay-rise var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-toast-indicator {
+        display: inline-flex;
+        margin-block-start: 0.125rem;
+        color: var(--starci-core-overlay-tone);
+    }
+
+    .starci-core-toast-indicator[data-grammar-toast-indicator] {
+        width: 0.625rem;
+        height: 0.625rem;
+        margin-block-start: 0.375rem;
+        border-radius: 999px;
+        background: var(--starci-core-overlay-tone);
+    }
+
+    .starci-core-toast-copy {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.125rem;
+        align-self: center;
+    }
+
+    .starci-core-toast-title {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-toast-description {
+        margin: 0;
+        color: var(--muted, GrayText);
+        font-size: 0.8125rem;
+        line-height: 1.45;
+    }
+
+    .starci-core-toast-action {
+        align-self: center;
+    }
+
+    @media (max-width: 40rem) {
+        .starci-core-toaster {
+            inset-inline: var(--grammar-page-inset, 1rem);
+            width: auto;
+            margin-inline: 0;
+        }
+    }
+
+    /* ---------------------------------------------------------------- alert banner */
+    .starci-core-alert {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: var(--grammar-row-gap, 0.75rem);
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in srgb, var(--starci-core-overlay-tone) 40%, transparent);
+        border-radius: var(--starci-core-control-radius, 0.75rem);
+        background: color-mix(in srgb, var(--starci-core-overlay-tone) 10%, var(--surface, Canvas));
+        color: var(--surface-foreground, CanvasText);
+    }
+
+    .starci-core-alert-indicator {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        margin-block-start: 0.0625rem;
+        color: var(--starci-core-overlay-tone);
+    }
+
+    .starci-core-alert-indicator > svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .starci-core-alert-content {
+        display: flex;
+        min-width: min(100%, 12rem);
+        flex: 1;
+        flex-direction: column;
+        gap: 0.125rem;
+    }
+
+    .starci-core-alert-title {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.4;
+    }
+
+    .starci-core-alert-description {
+        display: block;
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .starci-core-alert-actions {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        gap: var(--grammar-inline-gap, 0.5rem);
+        margin-inline-start: auto;
+    }
+
+    /* ---------------------------------------------------------------- close button */
+    .starci-core-close-button {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: var(--starci-core-control-min-size, 2.75rem);
+        height: var(--starci-core-control-min-size, 2.75rem);
+        margin: -0.5rem -0.5rem 0 0;
+        padding: 0;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted, GrayText);
+        cursor: pointer;
+    }
+
+    .starci-core-close-button[data-size="sm"] {
+        width: 2rem;
+        height: 2rem;
+        margin: 0;
+    }
+
+    .starci-core-close-button > svg {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .starci-core-close-button:is([data-hovered], [data-pressed]) {
+        background: var(--surface-secondary, Canvas);
+        color: var(--surface-foreground, CanvasText);
+    }
+
+    .starci-core-close-button[data-focus-visible] {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: 2px;
+    }
+
+    .starci-core-close-button[data-disabled] {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    /* ---------------------------------------------------------------- kbd */
+    .starci-core-kbd {
+        display: inline-flex;
+        min-width: 1.5rem;
+        height: 1.5rem;
+        align-items: center;
+        justify-content: center;
+        gap: 0.125rem;
+        padding: 0 0.375rem;
+        border: 1px solid var(--border, CanvasText);
+        border-radius: 0.375rem;
+        background: var(--surface-secondary, Canvas);
+        color: var(--surface-foreground, CanvasText);
+        font-family: var(--starci-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .starci-core-kbd abbr {
+        text-decoration: none;
+    }
+
+    /* ---------------------------------------------------------------- spinner */
+    .starci-core-spinner {
+        display: inline-flex;
+        flex: none;
+        width: 1.5rem;
+        height: 1.5rem;
+        color: var(--accent, Highlight);
+    }
+
+    .starci-core-spinner[data-tone="current"] {
+        color: inherit;
+    }
+
+    .starci-core-spinner[data-size="sm"] {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .starci-core-spinner[data-size="lg"] {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    .starci-core-spinner > svg {
+        width: 100%;
+        height: 100%;
+        animation: starci-core-spin 0.8s linear infinite;
+    }
+
+    @keyframes starci-core-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes starci-core-pulse {
+        50% {
+            opacity: 0.4;
+        }
+    }
+
+    /* ---------------------------------------------------------------- skeleton */
+    .starci-core-skeleton-group {
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .starci-core-skeleton {
+        position: relative;
+        display: block;
+        overflow: hidden;
+        border-radius: 0.25rem;
+        background: color-mix(in srgb, var(--foreground, CanvasText) 9%, transparent);
+        pointer-events: none;
+    }
+
+    .starci-core-skeleton-group > .starci-core-skeleton {
+        width: 100%;
+        height: 0.875em;
+    }
+
+    .starci-core-skeleton[data-grammar-skeleton-line="last"] {
+        width: 60%;
+    }
+
+    .starci-core-skeleton[data-shape="rect"] {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: var(--starci-core-surface-radius, 1rem);
+    }
+
+    .starci-core-skeleton[data-shape="rect"][data-ratio="square"] {
+        aspect-ratio: 1;
+    }
+
+    .starci-core-skeleton[data-shape="rect"][data-ratio="wide"] {
+        aspect-ratio: 3 / 1;
+    }
+
+    .starci-core-skeleton[data-shape="circle"] {
+        flex: none;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 999px;
+    }
+
+    .starci-core-skeleton[data-shape="circle"][data-size="sm"] {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    .starci-core-skeleton[data-shape="circle"][data-size="lg"] {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    /* ---------------------------------------------------------------- progress circle */
+    .starci-core-progress-circle {
+        display: inline-flex;
+        flex: none;
+        width: 2rem;
+        height: 2rem;
+        color: var(--accent, Highlight);
+    }
+
+    .starci-core-progress-circle[data-size="sm"] {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .starci-core-progress-circle[data-size="lg"] {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    .starci-core-progress-circle svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .starci-core-progress-circle [data-slot="progress-circle-track-circle"] {
+        stroke: color-mix(in srgb, var(--foreground, CanvasText) 12%, transparent);
+    }
+
+    .starci-core-progress-circle [data-slot="progress-circle-fill-circle"] {
+        stroke: currentColor;
+        transition: stroke-dashoffset var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-progress-circle[data-indeterminate="true"] svg {
+        animation: starci-core-spin 1s linear infinite;
+    }
+
+    /* ---------------------------------------------------------------- meter */
+    .starci-core-meter {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.375rem;
+    }
+
+    .starci-core-meter-header {
+        display: flex;
+        min-width: 0;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-meter-label {
+        color: var(--foreground, CanvasText);
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .starci-core-meter-output {
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .starci-core-meter-track {
+        overflow: hidden;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--foreground, CanvasText) 10%, transparent);
+    }
+
+    .starci-core-meter-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: var(--starci-core-overlay-tone);
+        transition: width var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    /* ---------------------------------------------------------------- reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-overlay-backdrop,
+        .starci-core-dialog-container,
+        .starci-core-drawer-content,
+        .starci-core-popover,
+        .starci-core-menu-popover,
+        .starci-core-toast,
+        .starci-core-skeleton,
+        .starci-core-skeleton::before,
+        .starci-core-skeleton::after {
+            animation: none;
+        }
+
+        .starci-core-progress-circle [data-slot="progress-circle-fill-circle"],
+        .starci-core-meter-fill {
+            transition: none;
+        }
+
+        /* Busy stays perceivable without rotation: a slow opacity pulse replaces the spin. */
+        .starci-core-spinner > svg,
+        .starci-core-progress-circle[data-indeterminate="true"] svg {
+            animation: starci-core-pulse 1.6s ease-in-out infinite;
+        }
+    }
+
+    /* ---------------------------------------------------------------- forced colors */
+    @media (forced-colors: active) {
+        [data-grammar-overlay-surface],
+        .starci-core-alert,
+        .starci-core-kbd {
+            border: 1px solid CanvasText;
+        }
+
+        .starci-core-menu-item:is([data-focused], [data-hovered]) {
+            forced-color-adjust: none;
+            background: Highlight;
+            color: HighlightText;
+        }
+
+        .starci-core-meter-fill,
+        .starci-core-toast-indicator[data-grammar-toast-indicator] {
+            forced-color-adjust: none;
+            background: CanvasText;
+        }
+    }
+}

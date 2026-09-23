@@ -1,0 +1,2568 @@
+schema: starci/knowledge-source@1
+id: grammar.offset-pop.dna
+title: Offset Pop — DNA
+purpose: |
+  Package snapshot of the Offset Pop Grammar family: the DNA module's values (the Core-shaped colour,
+  geometry, rhythm, elevation and motion groups plus the family's `offset` and `palette` groups), the
+  tokens Offset Pop's sheets set on its root with their dark and forced-colours values, the 95 Common
+  renderers it publishes with their closed prop values, classes and stamped rule ids, and gaps.
+  Historical observation only — not a claim that the currently installed package has these APIs or
+  gaps. Static source inspection does not prove runtime behavior.
+appliesTo:
+  - grammar
+family: offset-pop
+provenance:
+  package: "@starci/grammar"
+  version: "0.5.0"
+  checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
+  captured: "2026-09-23"
+  publicEntry: "@starci/grammar/common"
+  familyEntry: "@starci/grammar/offset-pop"
+  styleEntrypoint: "@starci/grammar/offset-pop/styles.css"
+  generatedBy: "scripts/checks/grammar-knowledge.mjs --write (dna, tokens[], renderers[], identity.counts, provenance.digests)"
+  driftCheck: |
+    `node scripts/checks/grammar-knowledge.mjs` (and `tests/grammar-knowledge.spec.mjs` under `npm test`)
+    compares this file with the source: `dna` must deep-equal every object `src/offset-pop/dna.ts`
+    exports (accentText and the `offset`/`palette` groups included), each token row's value, dark value
+    and overrides must equal what the family sheets set on the root, and the renderer rows must equal
+    the Common registry census, closed values included.
+  method: |
+    * dna — every frozen object `src/offset-pop/dna.ts` exports, loaded by stripping its TypeScript
+      types, key for key.
+    * tokens[] — every custom property the family's own sheets (`src/offset-pop/styles.css` and the three
+      `components-*.css` it imports) assign on the family root
+      `.grammar-common-root[data-grammar-family="offset-pop"]`: the `--offset-pop-*` contract, the
+      compatibility names (`--offset-pop-surface-muted`, `--offset-pop-transition`) and the Common
+      semantic variables the family binds (`--accent`, `--accent-soft`, `--link`, `--field-*`, …).
+      `value` is the light/default value, `dark` the explicit `[data-grammar-theme="dark"]` value, and
+      `overrides` every other root-level block (system dark, narrow width, reduced motion, forced
+      colours). The five band names Offset Pop re-exports (`OFFSET_POP_BAND_TOKEN_NAMES`) are Common's
+      and carry Common's value (`valueFrom: common`). Custom properties set below the root (the
+      per-state `--offset-pop-state-color`, the field ring) are family internals and are not rows.
+    * renderers[] — the same Common registry census as common/DNA.yaml (Offset Pop replaces only
+      `GrammarRoot`), plus `closedValues`, measured exactly as in starci/DNA.yaml.
+  limitations: |
+    Snapshot generated 2026-09-23 from @starci/grammar@0.5.0 source (integration commit plus the
+    `lane-op/polish` row and Subnav fixes), read statically. Before use, inspect the selected
+    repository's manifest/lockfile, exported types, renderers and CSS; record actual source/version in
+    .starciwork. If source is unavailable, report unverified; do not infer current APIs or defects from
+    these tables. Family boundaries are in family.yaml; composition references are idioms.yaml and
+    playbook.yaml.
+  digests:
+    - path: "packages/grammar/src/offset-pop/index.tsx"
+      sha256: "2606e85f26dac7bc82e8d3edaa0ec23df23e5df0576b9273b66d537f3cef2994"
+    - path: "packages/grammar/src/offset-pop/dna.ts"
+      sha256: "ce2128258d3016f50a9d8b1465c95b81b9c1b2e4fe6b11f05fae9edee00cb7fc"
+    - path: "packages/grammar/src/offset-pop/conformance.ts"
+      sha256: "b00eee49ac2f40d08a1632c878c581d43e1b030034639ac7821c172e52eecc0b"
+    - path: "packages/grammar/src/offset-pop/styles.css"
+      sha256: "44fe44e9c78ffd1205580259d725a051c3d2d7540fc5613ffa52900d9dc2ed86"
+    - path: "packages/grammar/src/offset-pop/components-forms.css"
+      sha256: "f5e8fdc2862aa4ec23d3a7d4590c7201c6651fcafc8a20910efd2952c7f83f39"
+    - path: "packages/grammar/src/offset-pop/components-overlays.css"
+      sha256: "8a278f04d4d6dc0b1496e3eba0fe5bf46ef305f6f089f915b6ebe9fe3902f57d"
+    - path: "packages/grammar/src/offset-pop/components-navigation.css"
+      sha256: "b126d9cc0ee5933dc9550d95f8a76aca1d417d86e924d147dbfafe9b913469a9"
+    - path: "packages/grammar/src/common/registry.tsx"
+      sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
+identity:
+  package: "@starci/grammar"
+  version: "0.5.0"
+  familyId: "offset-pop"
+  dnaId: "offset-pop"
+  checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
+  rootComponent: "OffsetPopGrammarRoot"
+  familyDefinition: "offsetPopGrammar = defineGrammarFamily({ id: \"offset-pop\", replacements: { GrammarRoot }, extensions: {} })"
+  familyScope: "data-grammar-family=\"offset-pop\""
+  cssLayer: "starci-grammar-offset-pop"
+  styleEntrypoint: "@starci/grammar/offset-pop/styles.css"
+  familySheets:
+    - "src/offset-pop/styles.css (imports ../common/styles.css first)"
+    - "src/offset-pop/components-forms.css"
+    - "src/offset-pop/components-overlays.css"
+    - "src/offset-pop/components-navigation.css"
+  publicEntry: "@starci/grammar/common"
+  conformance: "offsetPopRuleConformance: 33 family-owned rules (OFFSET_POP_FAMILY_EVIDENCE), 117 inherited, of 150"
+  familyOwnedRules:
+    - ACCENT-1
+    - BOUNDARY-1
+    - BOUNDARY-4
+    - BOUNDARY-5
+    - BOUNDARY-6
+    - COLOR-5
+    - CONTROL-STATE-2
+    - CORE-BOUNDARY-1
+    - CORE-BOUNDARY-4
+    - CORE-BOUNDARY-5
+    - CORE-SURFACE-2
+    - FLOW-2
+    - FONT-6
+    - FOCUS-1
+    - GAP-4
+    - MARGIN-2
+    - MEASURE-5
+    - MOTION-1
+    - MOTION-2
+    - MOTION-3
+    - OVERFLOW-2
+    - PADDING-2
+    - PADDING-3
+    - PADDING-4
+    - RESPONSIVE-1
+    - STATE-5
+    - SURFACE-1
+    - SURFACE-2
+    - SURFACE-3
+    - SURFACE-4
+    - TONE-2
+    - TONE-3
+    - TRUTH-1
+  contrast:
+    source: "src/offset-pop/dna.ts header table, asserted in src/offset-pop/styles.spec.ts"
+    pairs:
+      - pair: "foreground on canvas / surface / surfaceSecondary"
+        light: "16.86 / 17.49 / 13.78"
+        dark: "17.47 / 15.44 / 12.80"
+      - pair: "muted on canvas / surface / surfaceSecondary"
+        light: "5.81 / 6.03 / 4.75"
+        dark: "10.16 / 8.98 / 7.45"
+      - pair: "accentForeground (ink) on accent (pink)"
+        light: "5.23"
+        dark: "5.23"
+      - pair: "accentText on canvas / surface / surfaceSecondary"
+        light: "6.22 / 6.45 / 5.09"
+        dark: "7.65 / 6.76 / 5.61"
+      - pair: "focus (pink) on canvas / surface, non-text"
+        light: "3.22 / 3.34"
+        dark: "5.42 / 4.79"
+      - pair: "danger foreground (ink) on critical red"
+        light: "4.72"
+        dark: "4.72"
+    notes: |
+      White on the family pink is 3.40:1 and white on the critical red 3.77:1, so both fills carry the
+      ink as their foreground. Pink as body-size text on the light canvas is 3.22:1, which is why text
+      reads `accentText` and the pink stays a fill and a ring.
+  rendererTreatment: |
+    The family replaces no renderer except GrammarRoot; every one of the 95 is Common's, painted by the
+    family sheets through `data-component`, `data-grammar-*` hooks and vendor state attributes. The 53
+    renderers added in 0.5.0 are each targeted by a family rule (asserted by the
+    `components-{forms,overlays,navigation}.spec.ts` suites).
+  counts:
+    renderers: 95
+    tokens: 82
+    claimEntries: 402
+    gaps: 3
+
+observations:
+  - id: one-seam-per-row-pair
+    observation: |
+      Static rows (`[data-grammar-row]`, StaticStateRow) have no hover or focus treatment, and the seam
+      between two rows is exactly one 2px line: the family repaints Common's between-rows edge
+      (`[data-grammar-row] + [data-grammar-row]`, `border-block-start` at the outline width) instead of
+      adding a second edge below each row. BOUNDARY-3 stays inherited.
+  - id: interactive-rows
+    observation: |
+      ListBox options, Select/ComboBox options and selectable DataTable rows are their own pointer and
+      focus target and take their states from the vendor's attributes: `data-hovered` (or `data-focused`
+      on a popover option) paints the yellow 32% wash on an unselected, enabled row; `data-focus-visible`
+      a 2px `--focus` ring at offset 0 on the row edge (DataTable keeps Common's inset pink ring);
+      selected paints `--accent-soft` (theme-aware: `#f8dbe8` light, `#3b2936` dark) with an
+      `inset 0.25rem` pink leading edge and the `--offset-pop-accent-text` label. Reduced motion drops the
+      transitions and any transform; forced colours keep a Highlight edge in place of the fill.
+  - id: current-and-selected-share-the-soft-fill
+    observation: |
+      A focused, hovered or open DropdownMenu item and the selected row states read the same
+      theme-aware `--accent-soft` fill in every theme, so there is no separate dark-only rule for them.
+
+dna:
+  OFFSET_POP_BAND_TOKEN_NAMES:
+    bandOffset: "--starci-core-band-offset"
+    bandHeight: "--starci-core-band-height"
+    bandSubnavHeight: "--starci-core-band-subnav-height"
+    railOffset: "--starci-core-rail-offset"
+    subnavOffset: "--starci-core-subnav-offset"
+  OFFSET_POP_DARK_TOKEN_DEFAULTS:
+    "--offset-pop-canvas": "#17121d"
+    "--offset-pop-surface": "#251d2c"
+    "--offset-pop-surface-secondary": "#3b2936"
+    "--offset-pop-foreground": "#fff8ef"
+    "--offset-pop-muted": "#c8bdca"
+    "--offset-pop-border": "#fff8ef"
+    "--offset-pop-separator": "#fff8ef"
+    "--offset-pop-success": "#91e4ca"
+    "--offset-pop-success-foreground": "#1c1524"
+    "--offset-pop-warning": "#ffd447"
+    "--offset-pop-warning-foreground": "#1c1524"
+    "--offset-pop-danger": "#e84a5f"
+    "--offset-pop-danger-foreground": "#1c1524"
+    "--offset-pop-info": "#f8d8e6"
+    "--offset-pop-info-foreground": "#1c1524"
+    "--offset-pop-accent-text": "#ff7ab8"
+    "--offset-pop-accent-soft": "#3b2936"
+    "--offset-pop-ink": "#fff8ef"
+    "--offset-pop-shadow-ink": "#050306"
+  OFFSET_POP_DNA:
+    id: "offset-pop"
+    version: 1
+    color:
+      accent: "#ff3593"
+      accentForeground: "#1c1524"
+      focus: "#ff3593"
+      light:
+        canvas: "#fff8ef"
+        surface: "#fffdf9"
+        surfaceSecondary: "#f8dbe8"
+        foreground: "#1c1524"
+        muted: "#675f6c"
+        border: "#1c1524"
+        separator: "#1c1524"
+        success: "#91e4ca"
+        successForeground: "#1c1524"
+        warning: "#ffd447"
+        warningForeground: "#1c1524"
+        danger: "#e84a5f"
+        dangerForeground: "#1c1524"
+        info: "#f8d8e6"
+        infoForeground: "#1c1524"
+        accentText: "#b8005f"
+        accentSoft: "#f8dbe8"
+      dark:
+        canvas: "#17121d"
+        surface: "#251d2c"
+        surfaceSecondary: "#3b2936"
+        foreground: "#fff8ef"
+        muted: "#c8bdca"
+        border: "#fff8ef"
+        separator: "#fff8ef"
+        success: "#91e4ca"
+        successForeground: "#1c1524"
+        warning: "#ffd447"
+        warningForeground: "#1c1524"
+        danger: "#e84a5f"
+        dangerForeground: "#1c1524"
+        info: "#f8d8e6"
+        infoForeground: "#1c1524"
+        accentText: "#ff7ab8"
+        accentSoft: "#3b2936"
+    geometry:
+      pageMeasure: "80rem"
+      readingMeasure: "72ch"
+      surfaceRadius: "1.5rem"
+      controlRadius: "1rem"
+      pillRadius: "999px"
+    rhythm:
+      inlineGap: "0.5rem"
+      rowGap: "0.75rem"
+      sectionGap: "1rem"
+      regionGap: "1.5rem"
+      pageInset: "clamp(1rem, 3vw, 2rem)"
+    elevation:
+      surface: "var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)"
+    motion:
+      duration: "140ms"
+      easing: "cubic-bezier(.2, .8, .2, 1)"
+    offset:
+      x: "0.25rem"
+      y: "0.5rem"
+      outlineWidth: "2px"
+      ink: "#1c1524"
+      shadowInk: "#1c1524"
+      dark:
+        ink: "#fff8ef"
+        shadowInk: "#050306"
+    palette:
+      pink: "#ff3593"
+      blush: "#f8d8e6"
+      yellow: "#ffd447"
+      mint: "#91e4ca"
+      critical: "#e84a5f"
+  OFFSET_POP_SPACING_SCALE:
+    "0": "0rem"
+    "1": "0.25rem"
+    "2": "0.5rem"
+    "3": "0.75rem"
+    "4": "1rem"
+    "5": "1.25rem"
+    "6": "1.5rem"
+    "8": "2rem"
+    "10": "2.5rem"
+    "12": "3rem"
+    "16": "4rem"
+    "0.5": "0.125rem"
+    "1.5": "0.375rem"
+    "2.5": "0.625rem"
+  OFFSET_POP_TOKEN_DEFAULTS:
+    "--offset-pop-accent": "#ff3593"
+    "--offset-pop-accent-foreground": "#1c1524"
+    "--offset-pop-focus": "#ff3593"
+    "--offset-pop-canvas": "#fff8ef"
+    "--offset-pop-surface": "#fffdf9"
+    "--offset-pop-surface-secondary": "#f8dbe8"
+    "--offset-pop-foreground": "#1c1524"
+    "--offset-pop-muted": "#675f6c"
+    "--offset-pop-border": "#1c1524"
+    "--offset-pop-separator": "#1c1524"
+    "--offset-pop-success": "#91e4ca"
+    "--offset-pop-success-foreground": "#1c1524"
+    "--offset-pop-warning": "#ffd447"
+    "--offset-pop-warning-foreground": "#1c1524"
+    "--offset-pop-danger": "#e84a5f"
+    "--offset-pop-danger-foreground": "#1c1524"
+    "--offset-pop-info": "#f8d8e6"
+    "--offset-pop-info-foreground": "#1c1524"
+    "--offset-pop-accent-text": "#b8005f"
+    "--offset-pop-accent-soft": "#f8dbe8"
+    "--offset-pop-page-measure": "80rem"
+    "--offset-pop-reading-measure": "72ch"
+    "--offset-pop-surface-radius": "1.5rem"
+    "--offset-pop-control-radius": "1rem"
+    "--offset-pop-pill-radius": "999px"
+    "--offset-pop-page-inset": "clamp(1rem, 3vw, 2rem)"
+    "--offset-pop-inline-gap": "0.5rem"
+    "--offset-pop-row-gap": "0.75rem"
+    "--offset-pop-section-gap": "1rem"
+    "--offset-pop-region-gap": "1.5rem"
+    "--offset-pop-surface-shadow": "var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)"
+    "--offset-pop-motion-duration": "140ms"
+    "--offset-pop-motion-easing": "cubic-bezier(.2, .8, .2, 1)"
+    "--offset-pop-shadow-x": "0.25rem"
+    "--offset-pop-shadow-y": "0.5rem"
+    "--offset-pop-outline-width": "2px"
+    "--offset-pop-ink": "#1c1524"
+    "--offset-pop-shadow-ink": "#1c1524"
+    "--offset-pop-pink": "#ff3593"
+    "--offset-pop-blush": "#f8d8e6"
+    "--offset-pop-yellow": "#ffd447"
+    "--offset-pop-mint": "#91e4ca"
+    "--offset-pop-critical": "#e84a5f"
+  OFFSET_POP_TOKEN_NAMES:
+    accent: "--offset-pop-accent"
+    accentForeground: "--offset-pop-accent-foreground"
+    focus: "--offset-pop-focus"
+    canvas: "--offset-pop-canvas"
+    surface: "--offset-pop-surface"
+    surfaceSecondary: "--offset-pop-surface-secondary"
+    foreground: "--offset-pop-foreground"
+    muted: "--offset-pop-muted"
+    border: "--offset-pop-border"
+    separator: "--offset-pop-separator"
+    success: "--offset-pop-success"
+    successForeground: "--offset-pop-success-foreground"
+    warning: "--offset-pop-warning"
+    warningForeground: "--offset-pop-warning-foreground"
+    danger: "--offset-pop-danger"
+    dangerForeground: "--offset-pop-danger-foreground"
+    info: "--offset-pop-info"
+    infoForeground: "--offset-pop-info-foreground"
+    accentText: "--offset-pop-accent-text"
+    accentSoft: "--offset-pop-accent-soft"
+    pageMeasure: "--offset-pop-page-measure"
+    readingMeasure: "--offset-pop-reading-measure"
+    surfaceRadius: "--offset-pop-surface-radius"
+    controlRadius: "--offset-pop-control-radius"
+    pillRadius: "--offset-pop-pill-radius"
+    pageInset: "--offset-pop-page-inset"
+    inlineGap: "--offset-pop-inline-gap"
+    rowGap: "--offset-pop-row-gap"
+    sectionGap: "--offset-pop-section-gap"
+    regionGap: "--offset-pop-region-gap"
+    elevation: "--offset-pop-surface-shadow"
+    motionDuration: "--offset-pop-motion-duration"
+    motionEasing: "--offset-pop-motion-easing"
+    shadowX: "--offset-pop-shadow-x"
+    shadowY: "--offset-pop-shadow-y"
+    outlineWidth: "--offset-pop-outline-width"
+    ink: "--offset-pop-ink"
+    shadowInk: "--offset-pop-shadow-ink"
+    pink: "--offset-pop-pink"
+    blush: "--offset-pop-blush"
+    yellow: "--offset-pop-yellow"
+    mint: "--offset-pop-mint"
+    critical: "--offset-pop-critical"
+
+tokens:
+  - name: "--accent"
+    value: "var(--offset-pop-accent)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:67"
+  - name: "--accent-foreground"
+    value: "var(--offset-pop-accent-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:68"
+  - name: "--accent-soft"
+    value: "var(--offset-pop-accent-soft)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:109"
+  - name: "--accent-soft-foreground"
+    value: "var(--offset-pop-accent-text)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:110"
+  - name: "--background"
+    value: "var(--offset-pop-canvas)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:70"
+  - name: "--border"
+    value: "var(--offset-pop-border)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:77"
+  - name: "--danger"
+    value: "var(--offset-pop-danger)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:83"
+  - name: "--danger-foreground"
+    value: "var(--offset-pop-danger-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:84"
+  - name: "--default"
+    value: "var(--offset-pop-surface-secondary)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:100"
+  - name: "--field-background"
+    value: "var(--offset-pop-surface)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:87"
+  - name: "--field-border"
+    value: "var(--offset-pop-border)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:88"
+  - name: "--field-foreground"
+    value: "var(--offset-pop-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:89"
+  - name: "--field-placeholder"
+    value: "var(--offset-pop-muted)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:90"
+  - name: "--field-radius"
+    value: "var(--offset-pop-control-radius)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:92"
+  - name: "--focus"
+    value: "var(--offset-pop-focus)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:69"
+  - name: "--foreground"
+    value: "var(--offset-pop-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:71"
+  - name: "--info"
+    value: "var(--offset-pop-info)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:85"
+  - name: "--info-foreground"
+    value: "var(--offset-pop-info-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:86"
+  - name: "--link"
+    value: "var(--offset-pop-accent-text)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:111"
+  - name: "--muted"
+    value: "var(--offset-pop-muted)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:76"
+  - name: "--offset-pop-accent"
+    value: "#ff3593"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Highlight"
+    source: "packages/grammar/src/offset-pop/styles.css:28"
+  - name: "--offset-pop-accent-foreground"
+    value: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "HighlightText"
+    source: "packages/grammar/src/offset-pop/styles.css:29"
+  - name: "--offset-pop-accent-soft"
+    value: "#f8dbe8"
+    dark: "#3b2936"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#3b2936"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:47"
+  - name: "--offset-pop-accent-text"
+    value: "#b8005f"
+    dark: "#ff7ab8"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#ff7ab8"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:46"
+  - name: "--offset-pop-blush"
+    value: "#f8d8e6"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:17"
+  - name: "--offset-pop-border"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:36"
+  - name: "--offset-pop-canvas"
+    value: "#fff8ef"
+    dark: "#17121d"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#17121d"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:31"
+  - name: "--offset-pop-control-radius"
+    value: "1rem"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:56"
+  - name: "--offset-pop-critical"
+    value: "#e84a5f"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:20"
+  - name: "--offset-pop-danger"
+    value: "#e84a5f"
+    dark: "#e84a5f"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#e84a5f"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:42"
+  - name: "--offset-pop-danger-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:43"
+  - name: "--offset-pop-focus"
+    value: "#ff3593"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Highlight"
+    source: "packages/grammar/src/offset-pop/styles.css:30"
+  - name: "--offset-pop-foreground"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:34"
+  - name: "--offset-pop-info"
+    value: "#f8d8e6"
+    dark: "#f8d8e6"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#f8d8e6"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:44"
+  - name: "--offset-pop-info-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:45"
+  - name: "--offset-pop-ink"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:21"
+  - name: "--offset-pop-inline-gap"
+    value: "var(--grammar-inline-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:53"
+  - name: "--offset-pop-mint"
+    value: "#91e4ca"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:19"
+  - name: "--offset-pop-motion-duration"
+    value: "140ms"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-reduced-motion: reduce)"
+        value: "0ms"
+    source: "packages/grammar/src/offset-pop/styles.css:59"
+  - name: "--offset-pop-motion-easing"
+    value: "cubic-bezier(.2, .8, .2, 1)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:60"
+  - name: "--offset-pop-muted"
+    value: "#675f6c"
+    dark: "#c8bdca"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#c8bdca"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "GrayText"
+    source: "packages/grammar/src/offset-pop/styles.css:35"
+  - name: "--offset-pop-outline-width"
+    value: "2px"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:23"
+  - name: "--offset-pop-page-inset"
+    value: "var(--grammar-page-inset)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:50"
+  - name: "--offset-pop-page-measure"
+    value: "80rem"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:48"
+  - name: "--offset-pop-pill-radius"
+    value: "999px"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:57"
+  - name: "--offset-pop-pink"
+    value: "#ff3593"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Highlight"
+    source: "packages/grammar/src/offset-pop/styles.css:16"
+  - name: "--offset-pop-reading-measure"
+    value: "72ch"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:49"
+  - name: "--offset-pop-region-gap"
+    value: "var(--grammar-region-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:51"
+  - name: "--offset-pop-row-gap"
+    value: "var(--grammar-row-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:54"
+  - name: "--offset-pop-section-gap"
+    value: "var(--grammar-section-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:52"
+  - name: "--offset-pop-separator"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:37"
+  - name: "--offset-pop-shadow-ink"
+    value: "#1c1524"
+    dark: "#050306"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#050306"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:22"
+  - name: "--offset-pop-shadow-x"
+    value: "0.25rem"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:24"
+  - name: "--offset-pop-shadow-y"
+    value: "0.5rem"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (max-width: 40rem)"
+        value: "0.25rem"
+    source: "packages/grammar/src/offset-pop/styles.css:25"
+  - name: "--offset-pop-success"
+    value: "#91e4ca"
+    dark: "#91e4ca"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#91e4ca"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:38"
+  - name: "--offset-pop-success-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:39"
+  - name: "--offset-pop-surface"
+    value: "#fffdf9"
+    dark: "#251d2c"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#251d2c"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:32"
+  - name: "--offset-pop-surface-muted"
+    value: "var(--offset-pop-surface-secondary)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:63"
+  - name: "--offset-pop-surface-radius"
+    value: "1.5rem"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (max-width: 40rem)"
+        value: "1.25rem"
+    source: "packages/grammar/src/offset-pop/styles.css:55"
+  - name: "--offset-pop-surface-secondary"
+    value: "#f8dbe8"
+    dark: "#3b2936"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#3b2936"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:33"
+  - name: "--offset-pop-surface-shadow"
+    value: "var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "none"
+    source: "packages/grammar/src/offset-pop/styles.css:58"
+  - name: "--offset-pop-transition"
+    value: "var(--offset-pop-motion-duration) var(--offset-pop-motion-easing)"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-reduced-motion: reduce)"
+        value: "0ms linear"
+    source: "packages/grammar/src/offset-pop/styles.css:64"
+  - name: "--offset-pop-warning"
+    value: "#ffd447"
+    dark: "#ffd447"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#ffd447"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:40"
+  - name: "--offset-pop-warning-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:41"
+  - name: "--offset-pop-yellow"
+    value: "#ffd447"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:18"
+  - name: "--radius"
+    value: "var(--offset-pop-control-radius)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:91"
+  - name: "--separator"
+    value: "var(--offset-pop-separator)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:78"
+  - name: "--shadow-surface"
+    value: "var(--offset-pop-surface-shadow)"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "none"
+    source: "packages/grammar/src/offset-pop/styles.css:93"
+  - name: "--starci-core-band-height"
+    value: "calc(4rem + 1px)"
+    valueFrom: "common"
+    source: "packages/grammar/src/common/styles.css:1538"
+  - name: "--starci-core-band-offset"
+    value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
+    valueFrom: "common"
+    source: "packages/grammar/src/common/styles.css:1534"
+  - name: "--starci-core-band-subnav-height"
+    value: "calc(3.25rem + 1px)"
+    valueFrom: "common"
+    source: "packages/grammar/src/common/styles.css:1547"
+  - name: "--starci-core-bottom-nav-block-size"
+    value: "calc(4.5rem + var(--offset-pop-outline-width) * 1.5 + var(--offset-pop-shadow-y) * 0.5)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/components-navigation.css:106"
+  - name: "--starci-core-rail-offset"
+    value: "var(--starci-core-band-offset, 5.5rem)"
+    valueFrom: "common-fallback"
+    source: "packages/grammar/src/common/styles.css:1390"
+  - name: "--starci-core-subnav-offset"
+    value: "var(--starci-core-band-height, 4rem)"
+    valueFrom: "common-fallback"
+    source: "packages/grammar/src/common/styles.css:1694"
+  - name: "--success"
+    value: "var(--offset-pop-success)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:79"
+  - name: "--success-foreground"
+    value: "var(--offset-pop-success-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:80"
+  - name: "--surface"
+    value: "var(--offset-pop-surface)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:72"
+  - name: "--surface-foreground"
+    value: "var(--offset-pop-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:73"
+  - name: "--surface-secondary"
+    value: "var(--offset-pop-surface-secondary)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:74"
+  - name: "--surface-secondary-foreground"
+    value: "var(--offset-pop-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:75"
+  - name: "--warning"
+    value: "var(--offset-pop-warning)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:81"
+  - name: "--warning-foreground"
+    value: "var(--offset-pop-warning-foreground)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:82"
+
+renderers:
+  - component: "Accordion"
+    propsType: "AccordionProps"
+    kind: "branch"
+    group: "navigation"
+    source: "packages/grammar/src/core/branch/Accordion/index.tsx"
+    closedValues:
+      - prop: "headingLevel"
+        values: ["2", "3", "4", "5", "6"]
+    claims: ["FOCUS-1", "FOCUS-2", "MOTION-2", "STATE-7"]
+    computedClaims: []
+    classes:
+      - "starci-core-generic-accordion"
+      - "starci-core-generic-accordion-body"
+      - "starci-core-generic-accordion-heading"
+      - "starci-core-generic-accordion-indicator"
+      - "starci-core-generic-accordion-item"
+      - "starci-core-generic-accordion-panel"
+      - "starci-core-generic-accordion-root"
+      - "starci-core-generic-accordion-title"
+      - "starci-core-generic-accordion-trigger"
+  - component: "Alert"
+    propsType: "AlertProps"
+    kind: "composite"
+    group: "overlays"
+    source: "packages/grammar/src/core/composite/Alert/index.tsx"
+    closedValues:
+      - prop: "tone"
+        type: "PresentationState"
+      - prop: "urgency"
+        values: ["polite", "assertive"]
+    claims: ["FEEDBACK-2", "FEEDBACK-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-alert"
+      - "starci-core-alert-actions"
+      - "starci-core-alert-content"
+      - "starci-core-alert-description"
+      - "starci-core-alert-indicator"
+      - "starci-core-alert-title"
+  - component: "AlertDialog"
+    propsType: "AlertDialogProps"
+    kind: "branch"
+    group: "overlays"
+    source: "packages/grammar/src/core/branch/AlertDialog/index.tsx"
+    closedValues:
+      - prop: "tone"
+        type: "PresentationState"
+    claims: ["ACTION-2", "CORE-BOUNDARY-4", "CTA-4", "FEEDBACK-3", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-alert-dialog"
+      - "starci-core-alert-dialog-icon"
+      - "starci-core-dialog"
+      - "starci-core-dialog-container"
+      - "starci-core-overlay-backdrop"
+      - "starci-core-overlay-body"
+      - "starci-core-overlay-description"
+      - "starci-core-overlay-footer"
+      - "starci-core-overlay-header"
+      - "starci-core-overlay-heading-group"
+      - "starci-core-overlay-title"
+  - component: "Avatar"
+    propsType: "AvatarProps"
+    kind: "primitive"
+    group: "navigation"
+    source: "packages/grammar/src/core/primitive/Avatar/index.tsx"
+    closedValues:
+      - prop: "size"
+        values: ["sm", "md", "lg"]
+    claims: ["ICON-6", "MEDIA-5"]
+    computedClaims: []
+    classes:
+      - "starci-core-avatar"
+  - component: "AvatarGroup"
+    propsType: "AvatarGroupProps"
+    kind: "composite"
+    group: "navigation"
+    source: "packages/grammar/src/core/composite/AvatarGroup/index.tsx"
+    closedValues:
+      - prop: "size"
+        type: "AvatarSize"
+    claims: ["ICON-6", "MEDIA-5"]
+    computedClaims: []
+    classes:
+      - "starci-core-avatar"
+      - "starci-core-avatar-group"
+  - component: "Badge"
+    propsType: "BadgeProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Badge/index.tsx"
+    closedValues:
+      - prop: "tone"
+        values: ["neutral", "accent", "success", "warning", "danger"]
+    claims: ["ICON-2", "TRUTH-1"]
+    computedClaims: []
+    classes: []
+  - component: "BottomNav"
+    propsType: "BottomNavProps"
+    kind: "composition"
+    group: "navigation"
+    source: "packages/grammar/src/core/composition/BottomNav/index.tsx"
+    closedValues:
+      - prop: "position"
+        values: ["fixed", "static"]
+      - prop: "visibility"
+        values: ["compact", "always"]
+    claims: ["ACTION-3", "FOCUS-1", "FOCUS-2", "ICON-6", "LAYOUT-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-bottom-nav"
+      - "starci-core-bottom-nav-badge"
+      - "starci-core-bottom-nav-icon"
+      - "starci-core-bottom-nav-item"
+      - "starci-core-bottom-nav-label"
+      - "starci-core-bottom-nav-list"
+      - "starci-core-bottom-nav-slot"
+      - "starci-core-nav-visually-hidden"
+  - component: "Breadcrumbs"
+    propsType: "BreadcrumbsProps"
+    kind: "composite"
+    group: "navigation"
+    source: "packages/grammar/src/core/composite/Breadcrumbs/index.tsx"
+    closedValues: []
+    claims: ["ACTION-3", "ICON-6", "LAYOUT-3", "OVERFLOW-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-breadcrumb"
+      - "starci-core-breadcrumb-label"
+      - "starci-core-breadcrumb-leading"
+      - "starci-core-breadcrumbs"
+      - "starci-core-breadcrumbs-list"
+  - component: "Button"
+    propsType: "ButtonProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Button/index.tsx"
+    closedValues:
+      - prop: "variant"
+        values: ["primary", "secondary", "tertiary", "outline", "ghost"]
+      - prop: "size"
+        values: ["sm", "md", "lg"]
+      - prop: "width"
+        values: ["content", "fill"]
+      - prop: "target"
+        values: ["_blank", "_self"]
+      - prop: "type"
+        values: ["button", "submit", "reset"]
+    claims: []
+    computedClaims: ["MEASURE-2"]
+    classes:
+      - "starci-core-button"
+  - component: "ButtonGroup"
+    propsType: "ButtonGroupProps"
+    kind: "composite"
+    group: "forms"
+    source: "packages/grammar/src/core/composite/ButtonGroup/index.tsx"
+    closedValues:
+      - prop: "orientation"
+        values: ["horizontal", "vertical"]
+      - prop: "width"
+        values: ["content", "fill"]
+    claims: ["FOCUS-2", "TRUTH-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-button-group"
+  - component: "Calendar"
+    propsType: "CalendarProps"
+    kind: "branch"
+    group: "navigation"
+    source: "packages/grammar/src/core/branch/Calendar/index.tsx"
+    closedValues: []
+    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-2", "ICON-5", "TRUTH-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-calendar"
+      - "starci-core-calendar-day"
+      - "starci-core-calendar-header"
+      - "starci-core-calendar-heading"
+      - "starci-core-calendar-month"
+      - "starci-core-calendar-nav"
+      - "starci-core-calendar-weekday"
+  - component: "ChatWorkspace"
+    propsType: "ChatWorkspaceProps"
+    kind: "composition"
+    group: "base"
+    source: "packages/grammar/src/core/composition/ChatWorkspace/index.tsx"
+    closedValues:
+      - prop: "railWidth"
+        values: ["compact", "standard", "wide"]
+    claims: ["BOUNDARY-1", "FONT-2", "GAP-5", "OVERFLOW-2", "OVERFLOW-4", "OVERFLOW-5", "PADDING-0", "PADDING-2", "PADDING-3", "PADDING-4", "SURFACE-2", "TONE-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-chat-workspace"
+      - "starci-core-chat-workspace-composer"
+      - "starci-core-chat-workspace-conversation"
+      - "starci-core-chat-workspace-drawer-body"
+      - "starci-core-chat-workspace-drawer-close"
+      - "starci-core-chat-workspace-drawer-content"
+      - "starci-core-chat-workspace-drawer-dialog"
+      - "starci-core-chat-workspace-header"
+      - "starci-core-chat-workspace-inline-rail"
+      - "starci-core-chat-workspace-layout"
+      - "starci-core-chat-workspace-layout-without-rail"
+      - "starci-core-chat-workspace-overlay-rail"
+      - "starci-core-chat-workspace-primary"
+      - "starci-core-chat-workspace-rail-trigger"
+      - "starci-core-chat-workspace-rail-trigger-boundary"
+  - component: "Checkbox"
+    propsType: "CheckboxProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/Checkbox/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-checkbox"
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-control"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+  - component: "CheckboxGroup"
+    propsType: "CheckboxGroupProps"
+    kind: "composite"
+    group: "forms"
+    source: "packages/grammar/src/core/composite/CheckboxGroup/index.tsx"
+    closedValues:
+      - prop: "orientation"
+        values: ["vertical", "horizontal"]
+    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1", "FIELD-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-checkbox"
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-control"
+      - "starci-core-choice-group"
+      - "starci-core-choice-group-options"
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+  - component: "CloseButton"
+    propsType: "CloseButtonProps"
+    kind: "primitive"
+    group: "overlays"
+    source: "packages/grammar/src/core/primitive/CloseButton/index.tsx"
+    closedValues:
+      - prop: "size"
+        values: ["sm", "md"]
+    claims: ["A11Y-2", "FOCUS-1", "ICON-5"]
+    computedClaims: []
+    classes:
+      - "starci-core-close-button"
+  - component: "ComboBox"
+    propsType: "ComboBoxProps"
+    kind: "branch"
+    group: "forms"
+    source: "packages/grammar/src/core/branch/ComboBox/index.tsx"
+    closedValues:
+      - prop: "menuTrigger"
+        values: ["input", "focus", "manual"]
+    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2", "LAYOUT-4", "STATE-3"]
+    computedClaims: []
+    classes:
+      - "grammar-common-root"
+      - "starci-core-combo-box"
+      - "starci-core-combo-box-group"
+      - "starci-core-combo-box-input"
+      - "starci-core-combo-box-trigger"
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-spinner"
+      - "starci-core-list"
+      - "starci-core-list-empty"
+      - "starci-core-list-option"
+      - "starci-core-list-option-copy"
+      - "starci-core-list-option-description"
+      - "starci-core-list-option-label"
+      - "starci-core-list-popover"
+  - component: "DataTable"
+    propsType: "DataTableProps"
+    kind: "branch"
+    group: "navigation"
+    source: "packages/grammar/src/core/branch/DataTable/index.tsx"
+    closedValues:
+      - prop: "direction"
+        values: ["ascending", "descending"]
+      - prop: "selectionMode"
+        values: ["none", "single", "multiple"]
+    claims: ["CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "LAYOUT-3", "STATE-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-data-table"
+      - "starci-core-data-table-body"
+      - "starci-core-data-table-cell"
+      - "starci-core-data-table-checkbox"
+      - "starci-core-data-table-column"
+      - "starci-core-data-table-content"
+      - "starci-core-data-table-header"
+      - "starci-core-data-table-placeholder"
+      - "starci-core-data-table-row"
+      - "starci-core-data-table-scroll"
+      - "starci-core-data-table-sort"
+  - component: "DateField"
+    propsType: "DateFieldProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/DateField/index.tsx"
+    closedValues:
+      - prop: "granularity"
+        values: ["day", "hour", "minute", "second"]
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-date-field"
+      - "starci-core-date-group"
+      - "starci-core-date-input"
+      - "starci-core-date-segment"
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-label"
+      - "starci-core-form-label--screen-reader"
+  - component: "DatePicker"
+    propsType: "DatePickerProps"
+    kind: "branch"
+    group: "forms"
+    source: "packages/grammar/src/core/branch/DatePicker/index.tsx"
+    closedValues:
+      - prop: "granularity"
+        type: "DateGranularity"
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
+    computedClaims: []
+    classes:
+      - "grammar-common-root"
+      - "starci-core-calendar"
+      - "starci-core-calendar-cell"
+      - "starci-core-calendar-grid"
+      - "starci-core-calendar-header"
+      - "starci-core-calendar-heading"
+      - "starci-core-calendar-nav"
+      - "starci-core-date-group"
+      - "starci-core-date-picker"
+      - "starci-core-date-popover"
+      - "starci-core-date-suffix"
+      - "starci-core-date-trigger"
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+  - component: "DateRangePicker"
+    propsType: "DateRangePickerProps"
+    kind: "branch"
+    group: "forms"
+    source: "packages/grammar/src/core/branch/DateRangePicker/index.tsx"
+    closedValues:
+      - prop: "granularity"
+        type: "DateGranularity"
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
+    computedClaims: []
+    classes:
+      - "grammar-common-root"
+      - "starci-core-calendar"
+      - "starci-core-calendar-cell"
+      - "starci-core-calendar-grid"
+      - "starci-core-calendar-header"
+      - "starci-core-calendar-heading"
+      - "starci-core-calendar-nav"
+      - "starci-core-date-group"
+      - "starci-core-date-picker"
+      - "starci-core-date-popover"
+      - "starci-core-date-range-separator"
+      - "starci-core-date-suffix"
+      - "starci-core-date-trigger"
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+  - component: "DescriptionList"
+    propsType: "DescriptionListProps"
+    kind: "composite"
+    group: "navigation"
+    source: "packages/grammar/src/core/composite/DescriptionList/index.tsx"
+    closedValues:
+      - prop: "layout"
+        values: ["columns", "stacked"]
+    claims: ["HIERARCHY-3", "TRUTH-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-description-list"
+      - "starci-core-description-pair"
+      - "starci-core-description-term"
+      - "starci-core-description-value"
+  - component: "Dialog"
+    propsType: "DialogProps"
+    kind: "branch"
+    group: "overlays"
+    source: "packages/grammar/src/core/branch/Dialog/index.tsx"
+    closedValues:
+      - prop: "size"
+        values: ["sm", "md", "lg", "full"]
+    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-dialog"
+      - "starci-core-dialog-container"
+      - "starci-core-overlay-backdrop"
+      - "starci-core-overlay-body"
+      - "starci-core-overlay-description"
+      - "starci-core-overlay-footer"
+      - "starci-core-overlay-header"
+      - "starci-core-overlay-heading-group"
+      - "starci-core-overlay-title"
+  - component: "Disclosure"
+    propsType: "DisclosureProps"
+    kind: "branch"
+    group: "navigation"
+    source: "packages/grammar/src/core/branch/Disclosure/index.tsx"
+    closedValues:
+      - prop: "headingLevel"
+        values: ["2", "3", "4", "5", "6"]
+    claims: ["FOCUS-1", "MOTION-2", "STATE-7"]
+    computedClaims: []
+    classes:
+      - "starci-core-disclosure"
+      - "starci-core-disclosure-body"
+      - "starci-core-disclosure-heading"
+      - "starci-core-disclosure-indicator"
+      - "starci-core-disclosure-panel"
+      - "starci-core-disclosure-title"
+      - "starci-core-disclosure-trigger"
+  - component: "Divider"
+    propsType: "DividerProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Divider/index.tsx"
+    closedValues: []
+    claims: ["BOUNDARY-5", "GAP-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-divider"
+      - "starci-core-divider-rule"
+  - component: "Drawer"
+    propsType: "DrawerProps"
+    kind: "branch"
+    group: "overlays"
+    source: "packages/grammar/src/core/branch/Drawer/index.tsx"
+    closedValues:
+      - prop: "placement"
+        values: ["left", "right", "top", "bottom"]
+    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-drawer"
+      - "starci-core-drawer-backdrop"
+      - "starci-core-drawer-content"
+      - "starci-core-drawer-handle"
+      - "starci-core-overlay-backdrop"
+      - "starci-core-overlay-body"
+      - "starci-core-overlay-description"
+      - "starci-core-overlay-footer"
+      - "starci-core-overlay-header"
+      - "starci-core-overlay-heading-group"
+      - "starci-core-overlay-title"
+  - component: "DropdownMenu"
+    propsType: "DropdownMenuProps"
+    kind: "branch"
+    group: "overlays"
+    source: "packages/grammar/src/core/branch/DropdownMenu/index.tsx"
+    closedValues:
+      - prop: "placement"
+        values: ["bottom start", "bottom end", "top start", "top end"]
+    claims: ["CORE-BOUNDARY-4", "CTA-2", "FOCUS-1", "FOCUS-2", "FOCUS-5", "LAYOUT-4", "MOTION-2"]
+    computedClaims: ["CONTROL-STATE-3"]
+    classes:
+      - "starci-core-menu"
+      - "starci-core-menu-indicator"
+      - "starci-core-menu-item"
+      - "starci-core-menu-item-copy"
+      - "starci-core-menu-item-description"
+      - "starci-core-menu-item-label"
+      - "starci-core-menu-item-shortcut"
+      - "starci-core-menu-popover"
+      - "starci-core-menu-section"
+      - "starci-core-menu-section-label"
+      - "starci-core-menu-submenu-indicator"
+  - component: "EmptyNotice"
+    propsType: "EmptyNoticeProps"
+    kind: "composite"
+    group: "base"
+    source: "packages/grammar/src/core/composite/EmptyNotice/index.tsx"
+    closedValues:
+      - prop: "iconSource"
+        type: "IconSource"
+      - prop: "actionVariant"
+        type: "ButtonVariant"
+    claims: ["GAP-3", "PADDING-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-empty-notice"
+  - component: "FencedCodeBlock"
+    propsType: "FencedCodeBlockProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/MarkdownArticle/index.tsx"
+    closedValues: []
+    claims: ["OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "Field"
+    propsType: "FieldProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/Field/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2"]
+    computedClaims: []
+    classes:
+      - "grammar-common-root"
+      - "starci-core-field"
+      - "starci-core-field-control"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-label"
+      - "starci-core-field-required"
+      - "starci-core-form-label--screen-reader"
+  - component: "Fieldset"
+    propsType: "FieldsetProps"
+    kind: "composite"
+    group: "forms"
+    source: "packages/grammar/src/core/composite/Fieldset/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-fieldset"
+      - "starci-core-fieldset-actions"
+      - "starci-core-fieldset-fields"
+      - "starci-core-fieldset-legend"
+      - "starci-core-form-label--screen-reader"
+  - component: "FileDropzone"
+    propsType: "FileDropzoneProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/FileDropzone/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2", "FIELD-3", "FOCUS-5", "ICON-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-label"
+      - "starci-core-field-required"
+      - "starci-core-file-dropzone"
+      - "starci-core-file-dropzone-files"
+      - "starci-core-file-dropzone-icon"
+      - "starci-core-file-dropzone-input"
+      - "starci-core-file-dropzone-prompt"
+      - "starci-core-file-dropzone-target"
+      - "starci-core-form-label--screen-reader"
+  - component: "Footer"
+    propsType: "FooterProps"
+    kind: "composition"
+    group: "navigation"
+    source: "packages/grammar/src/core/composition/Footer/index.tsx"
+    closedValues: []
+    claims: ["A11Y-4", "CTA-2", "HIERARCHY-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-footer"
+      - "starci-core-footer-brand"
+      - "starci-core-footer-directory"
+      - "starci-core-footer-group"
+      - "starci-core-footer-group-label"
+      - "starci-core-footer-legal"
+      - "starci-core-footer-links"
+      - "starci-core-footer-main"
+  - component: "Form"
+    propsType: "FormProps"
+    kind: "composite"
+    group: "forms"
+    source: "packages/grammar/src/core/composite/Form/index.tsx"
+    closedValues:
+      - prop: "method"
+        values: ["get", "post"]
+      - prop: "validationBehavior"
+        values: ["native", "aria"]
+    claims: ["ACTION-1", "ACTION-2", "FEEDBACK-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-form"
+  - component: "GrammarRoot"
+    propsType: "GrammarRootProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/GrammarRoot/index.tsx"
+    closedValues:
+      - prop: "theme"
+        values: ["system", "light", "dark"]
+    claims: ["COLOR-5"]
+    computedClaims: []
+    classes:
+      - "grammar-common-root"
+  - component: "Heading"
+    propsType: "HeadingProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Heading/index.tsx"
+    closedValues:
+      - prop: "level"
+        values: ["1", "2", "3", "4"]
+      - prop: "scale"
+        values: ["standard", "display"]
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "FONT-3", "FONT-4", "FONT-6", "TONE-2"]
+    classes: []
+  - component: "HorizontalScrollRegion"
+    propsType: "HorizontalScrollRegionProps"
+    kind: "composite"
+    group: "base"
+    source: "packages/grammar/src/core/composite/HorizontalScrollRegion/index.tsx"
+    closedValues:
+      - prop: "overflow"
+        values: ["always", "needed"]
+    claims: []
+    computedClaims: ["MEASURE-3", "OVERFLOW-3", "OVERFLOW-4", "OVERFLOW-5", "PADDING-1"]
+    classes:
+      - "starci-core-horizontal-scroll-region"
+  - component: "Icon"
+    propsType: "IconProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Icon/index.tsx"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+      - prop: "usage"
+        values: ["heading", "leading", "chip"]
+    claims: ["ICON-1", "ICON-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-icon"
+      - "starci-core-icon-skeleton"
+  - component: "IconButton"
+    propsType: "IconButtonProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/IconButton/index.tsx"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+    claims: ["A11Y-2", "ICON-5"]
+    computedClaims: []
+    classes:
+      - "starci-core-icon-button"
+  - component: "IconTile"
+    propsType: "IconTileProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/IconTile/index.tsx"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+      - prop: "tone"
+        values: ["neutral", "accent", "success", "warning", "danger"]
+      - prop: "size"
+        values: ["sm", "md"]
+    claims: []
+    computedClaims: ["OVERFLOW-2", "SURFACE-4", "SURFACE-5", "TONE-2"]
+    classes:
+      - "starci-core-icon-tile"
+  - component: "Image"
+    propsType: "ImageProps"
+    kind: "primitive"
+    group: "navigation"
+    source: "packages/grammar/src/core/primitive/Image/index.tsx"
+    closedValues:
+      - prop: "aspect"
+        values: ["square", "landscape", "portrait", "wide", "auto"]
+      - prop: "fit"
+        values: ["cover", "contain"]
+      - prop: "loading"
+        values: ["lazy", "eager"]
+    claims: ["MEDIA-2", "MEDIA-4", "MEDIA-5", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-image"
+      - "starci-core-image-element"
+      - "starci-core-image-fallback"
+  - component: "IncludedMark"
+    propsType: "IncludedMarkProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/IncludedMark/index.tsx"
+    closedValues: []
+    claims: ["ICON-6", "TRUTH-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-included-mark"
+  - component: "Input"
+    propsType: "InputProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Input/index.tsx"
+    closedValues:
+      - prop: "kind"
+        values: ["email", "password", "newPassword", "code", "text"]
+      - prop: "variant"
+        values: ["primary", "secondary"]
+    claims: ["FONT-1", "GAP-2", "TONE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-input"
+      - "starci-core-input-control"
+      - "starci-core-input-field"
+      - "starci-core-input-resting-control"
+      - "starci-core-input-resting-label"
+      - "starci-core-input-reveal"
+      - "starci-core-input-reveal-icon"
+      - "starci-core-input-reveal-label"
+  - component: "Kbd"
+    propsType: "KbdProps"
+    kind: "primitive"
+    group: "overlays"
+    source: "packages/grammar/src/core/primitive/Kbd/index.tsx"
+    closedValues: []
+    claims: ["ICON-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-kbd"
+  - component: "Label"
+    propsType: "LabelProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Label/index.tsx"
+    closedValues:
+      - prop: "depth"
+        values: ["top", "nested"]
+      - prop: "as"
+        values: ["span", "h2", "h3", "h4", "h5", "h6"]
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "MARGIN-0"]
+    classes:
+      - "starci-core-label"
+  - component: "LeadingNumber"
+    propsType: "LeadingNumberProps"
+    kind: "core"
+    group: "base"
+    source: "packages/grammar/src/core/LeadingNumber.tsx"
+    closedValues: []
+    claims: ["FONT-2", "TONE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-leading-number"
+  - component: "Link"
+    propsType: "LinkProps"
+    kind: "primitive"
+    group: "navigation"
+    source: "packages/grammar/src/core/primitive/Link/index.tsx"
+    closedValues:
+      - prop: "kind"
+        values: ["internal", "external"]
+      - prop: "visited"
+        values: ["distinct", "uniform"]
+    claims: ["ACTION-3", "FOCUS-1", "ICON-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-link"
+      - "starci-core-link-external-icon"
+      - "starci-core-nav-visually-hidden"
+  - component: "ListBox"
+    propsType: "ListBoxProps"
+    kind: "branch"
+    group: "navigation"
+    source: "packages/grammar/src/core/branch/ListBox/index.tsx"
+    closedValues:
+      - prop: "selectionMode"
+        values: ["none", "single", "multiple"]
+    claims: ["CONTROL-STATE-3", "FOCUS-2", "ICON-6", "STATE-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-list-box"
+      - "starci-core-list-box-copy"
+      - "starci-core-list-box-description"
+      - "starci-core-list-box-empty"
+      - "starci-core-list-box-indicator"
+      - "starci-core-list-box-item"
+      - "starci-core-list-box-label"
+      - "starci-core-list-box-leading"
+      - "starci-core-list-box-row"
+      - "starci-core-list-box-trailing"
+  - component: "MarkdownArticle"
+    propsType: "MarkdownArticleProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/MarkdownArticle/index.tsx"
+    closedValues:
+      - prop: "measure"
+        values: ["reading", "compact"]
+    claims: ["OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "MarkdownTableFrame"
+    propsType: "MarkdownTableFrameProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/MarkdownArticle/index.tsx"
+    closedValues: []
+    claims: ["OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "MediaFrame"
+    propsType: "MediaFrameProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/MediaFrame/index.tsx"
+    closedValues:
+      - prop: "aspect"
+        values: ["landscape", "portrait", "square", "auto"]
+      - prop: "fit"
+        values: ["cover", "contain"]
+      - prop: "treatment"
+        values: ["framed", "plain"]
+    claims: ["FLOW-3", "GAP-2", "MARGIN-0"]
+    computedClaims: ["BOUNDARY-5", "OVERFLOW-2", "SURFACE-1", "SURFACE-3"]
+    classes:
+      - "starci-core-media-caption"
+      - "starci-core-media-frame"
+      - "starci-core-media-viewport"
+  - component: "Meter"
+    propsType: "MeterProps"
+    kind: "primitive"
+    group: "overlays"
+    source: "packages/grammar/src/core/primitive/Meter/index.tsx"
+    closedValues:
+      - prop: "tone"
+        type: "PresentationState"
+    claims: ["A11Y-3", "ACCENT-4", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-meter"
+      - "starci-core-meter-fill"
+      - "starci-core-meter-header"
+      - "starci-core-meter-label"
+      - "starci-core-meter-output"
+      - "starci-core-meter-track"
+  - component: "NavigationFeatureNav"
+    propsType: "NavigationFeatureNavProps"
+    kind: "composition"
+    group: "base"
+    source: "packages/grammar/src/core/composition/NavigationFeatureNav/index.tsx"
+    closedValues:
+      - prop: "position"
+        values: ["static", "sticky"]
+    claims: ["BOUNDARY-1", "GAP-2", "GAP-3", "MEASURE-2", "PADDING-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-navigation-feature-nav"
+      - "starci-core-navigation-feature-nav-actions"
+      - "starci-core-navigation-feature-nav-compact-navigation"
+      - "starci-core-navigation-feature-nav-feature"
+      - "starci-core-navigation-feature-nav-identity"
+      - "starci-core-navigation-feature-nav-navigation"
+      - "starci-core-navigation-feature-nav-primary"
+  - component: "NumberField"
+    propsType: "NumberFieldProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/NumberField/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-number-field"
+      - "starci-core-number-field-group"
+      - "starci-core-number-field-input"
+      - "starci-core-number-field-step"
+  - component: "OtpInput"
+    propsType: "OtpInputProps"
+    kind: "core"
+    group: "base"
+    source: "packages/grammar/src/core/OtpInput.tsx"
+    closedValues: []
+    claims: ["OVERFLOW-3", "OVERFLOW-5", "PADDING-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-horizontal-scroll-region"
+      - "starci-core-otp-field"
+      - "starci-core-otp-label"
+      - "starci-core-visually-hidden"
+  - component: "PageContainer"
+    propsType: "PageContainerProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/PageContainer/index.tsx"
+    closedValues:
+      - prop: "measure"
+        values: ["reading", "product", "full"]
+    claims: []
+    computedClaims: ["MARGIN-AUTO", "MEASURE-1"]
+    classes:
+      - "starci-core-page-container"
+  - component: "Pagination"
+    propsType: "PaginationProps"
+    kind: "composite"
+    group: "navigation"
+    source: "packages/grammar/src/core/composite/Pagination/index.tsx"
+    closedValues: []
+    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-pagination"
+      - "starci-core-pagination-item"
+      - "starci-core-pagination-list"
+      - "starci-core-pagination-page"
+      - "starci-core-pagination-step"
+      - "starci-core-pagination-step-label"
+      - "starci-core-pagination-summary"
+  - component: "Popover"
+    propsType: "PopoverProps"
+    kind: "branch"
+    group: "overlays"
+    source: "packages/grammar/src/core/branch/Popover/index.tsx"
+    closedValues:
+      - prop: "placement"
+        values: ["top", "bottom", "start", "end"]
+    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-overlay-title"
+      - "starci-core-popover"
+      - "starci-core-popover-arrow"
+      - "starci-core-popover-body"
+      - "starci-core-popover-dialog"
+  - component: "PressableField"
+    propsType: "PressableFieldProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/PressableField/index.tsx"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+    claims: ["FLOW-4", "FONT-1", "FONT-2", "GAP-2", "MEASURE-2", "PADDING-1", "PADDING-3", "SURFACE-4", "TONE-1", "TONE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-pressable-field"
+      - "starci-core-pressable-field-content"
+      - "starci-core-pressable-field-placeholder"
+      - "starci-core-pressable-field-shortcut"
+  - component: "PrimaryRailLayout"
+    propsType: "PrimaryRailLayoutProps"
+    kind: "composition"
+    group: "base"
+    source: "packages/grammar/src/core/composition/PrimaryRailLayout/index.tsx"
+    closedValues:
+      - prop: "railWidth"
+        values: ["compact", "standard", "wide"]
+      - prop: "align"
+        values: ["start", "stretch"]
+      - prop: "collapsedOrder"
+        values: ["primary-first", "rail-first"]
+    claims: ["GAP-5"]
+    computedClaims: []
+    classes:
+      - "starci-core-primary-rail-container"
+      - "starci-core-primary-rail-layout"
+      - "starci-core-primary-region"
+      - "starci-core-rail-region"
+  - component: "Progress"
+    propsType: "ProgressProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Progress/index.tsx"
+    closedValues: []
+    claims: ["MEASURE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-progress"
+  - component: "ProgressCircle"
+    propsType: "ProgressCircleProps"
+    kind: "primitive"
+    group: "overlays"
+    source: "packages/grammar/src/core/primitive/ProgressCircle/index.tsx"
+    closedValues:
+      - prop: "size"
+        values: ["sm", "md", "lg"]
+    claims: ["A11Y-3", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-progress-circle"
+  - component: "RadioGroup"
+    propsType: "RadioGroupProps"
+    kind: "composite"
+    group: "forms"
+    source: "packages/grammar/src/core/composite/RadioGroup/index.tsx"
+    closedValues:
+      - prop: "orientation"
+        type: "ChoiceOrientation"
+    claims: ["A11Y-1", "FIELD-1", "FOCUS-2", "STATE-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-control"
+      - "starci-core-choice-group"
+      - "starci-core-choice-group-options"
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-radio"
+  - component: "Rail"
+    propsType: "RailProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/Rail/index.tsx"
+    closedValues:
+      - prop: "landmark"
+        values: ["complementary"]
+      - prop: "height"
+        values: ["content", "fill"]
+      - prop: "mode"
+        values: ["flow", "sticky"]
+      - prop: "width"
+        values: ["compact", "standard", "wide"]
+      - prop: "state"
+        type: "PresentationState"
+      - prop: "collapse"
+        values: ["expanded", "collapsed"]
+      - prop: "motion"
+        values: ["static", "animated", "reduced"]
+      - prop: "inset"
+        values: ["none", "content"]
+      - prop: "headingLevel"
+        values: ["2", "3", "4", "5", "6"]
+    claims: ["GAP-4"]
+    computedClaims: ["MEASURE-6", "OVERFLOW-3", "PADDING-3", "PADDING-5"]
+    classes:
+      - "starci-core-rail"
+      - "starci-core-rail-body"
+      - "starci-core-rail-footer"
+      - "starci-core-rail-frame"
+      - "starci-core-visually-hidden"
+  - component: "RankArtwork"
+    propsType: "RankArtworkProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/RankArtwork/index.tsx"
+    closedValues:
+      - prop: "kind"
+        values: ["first", "second", "third", "cup"]
+    claims: ["ICON-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-rank-artwork"
+  - component: "Rating"
+    propsType: "RatingProps"
+    kind: "primitive"
+    group: "navigation"
+    source: "packages/grammar/src/core/primitive/Rating/index.tsx"
+    closedValues: []
+    claims: ["A11Y-3", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "ICON-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-rating"
+      - "starci-core-rating-glyph"
+      - "starci-core-rating-input"
+      - "starci-core-rating-item"
+  - component: "SearchField"
+    propsType: "SearchFieldProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/SearchField/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-spinner"
+      - "starci-core-search-field"
+      - "starci-core-search-field-clear"
+      - "starci-core-search-field-group"
+      - "starci-core-search-field-input"
+  - component: "SectionHeader"
+    propsType: "SectionHeaderProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/SectionHeader/index.tsx"
+    closedValues:
+      - prop: "level"
+        values: ["1", "2", "3", "4", "5", "6"]
+      - prop: "composition"
+        values: ["section-header", "context-intro"]
+    claims: ["GAP-2", "GAP-5"]
+    computedClaims: ["FLOW-3", "MARGIN-0"]
+    classes:
+      - "starci-core-section-action"
+      - "starci-core-section-description"
+      - "starci-core-section-eyebrow"
+      - "starci-core-section-header"
+      - "starci-core-section-header-copy"
+      - "starci-core-section-title"
+  - component: "SegmentedControl"
+    propsType: "SegmentedControlProps"
+    kind: "composite"
+    group: "forms"
+    source: "packages/grammar/src/core/composite/SegmentedControl/index.tsx"
+    closedValues:
+      - prop: "width"
+        values: ["content", "fill"]
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-2", "FOCUS-2", "STATE-6"]
+    computedClaims: []
+    classes:
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-label"
+      - "starci-core-form-label--screen-reader"
+      - "starci-core-segment"
+      - "starci-core-segmented-control"
+      - "starci-core-segmented-control-group"
+  - component: "Select"
+    propsType: "SelectProps"
+    kind: "branch"
+    group: "forms"
+    source: "packages/grammar/src/core/branch/Select/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-3", "LAYOUT-4", "STATE-6"]
+    computedClaims: []
+    classes:
+      - "grammar-common-root"
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-spinner"
+      - "starci-core-list"
+      - "starci-core-list-option"
+      - "starci-core-list-option-copy"
+      - "starci-core-list-option-description"
+      - "starci-core-list-option-label"
+      - "starci-core-list-popover"
+      - "starci-core-select"
+      - "starci-core-select-indicator"
+      - "starci-core-select-trigger"
+      - "starci-core-select-value"
+  - component: "Sidebar"
+    propsType: "SidebarProps"
+    kind: "composition"
+    group: "base"
+    source: "packages/grammar/src/core/composition/Sidebar/index.tsx"
+    closedValues:
+      - prop: "presentation"
+        values: ["rail", "drawer"]
+      - prop: "toggleSource"
+        type: "IconSource"
+    claims: ["FLOW-4", "FONT-2", "GAP-1", "PADDING-0", "PADDING-2", "PADDING-3"]
+    computedClaims: ["FONT-1", "GAP-3", "MEASURE-2", "MEASURE-6", "OVERFLOW-2", "PADDING-1", "SURFACE-4", "TONE-1", "TONE-2"]
+    classes:
+      - "starci-core-sidebar"
+      - "starci-core-sidebar-footer"
+      - "starci-core-sidebar-header"
+      - "starci-core-sidebar-item"
+      - "starci-core-sidebar-item-label"
+      - "starci-core-sidebar-item-trailing"
+      - "starci-core-sidebar-list"
+      - "starci-core-sidebar-section"
+      - "starci-core-sidebar-section-label"
+      - "starci-core-sidebar-toggle"
+  - component: "Skeleton"
+    propsType: "SkeletonProps"
+    kind: "primitive"
+    group: "overlays"
+    source: "packages/grammar/src/core/primitive/Skeleton/index.tsx"
+    closedValues:
+      - prop: "shape"
+        values: ["text", "rect", "circle"]
+      - prop: "ratio"
+        values: ["square", "landscape", "wide"]
+      - prop: "size"
+        values: ["sm", "md", "lg"]
+    claims: ["MEDIA-5", "MOTION-2", "STATE-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-skeleton"
+      - "starci-core-skeleton-group"
+  - component: "Slider"
+    propsType: "SliderProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/Slider/index.tsx"
+    closedValues:
+      - prop: "orientation"
+        values: ["horizontal", "vertical"]
+    claims: ["A11Y-1", "A11Y-3", "FEEDBACK-1", "FIELD-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-label"
+      - "starci-core-form-label--screen-reader"
+      - "starci-core-slider"
+      - "starci-core-slider-fill"
+      - "starci-core-slider-header"
+      - "starci-core-slider-output"
+      - "starci-core-slider-thumb"
+      - "starci-core-slider-track"
+  - component: "Spinner"
+    propsType: "SpinnerProps"
+    kind: "primitive"
+    group: "overlays"
+    source: "packages/grammar/src/core/primitive/Spinner/index.tsx"
+    closedValues:
+      - prop: "size"
+        values: ["sm", "md", "lg"]
+      - prop: "tone"
+        values: ["accent", "current"]
+    claims: ["MOTION-1", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-spinner"
+  - component: "StateMark"
+    propsType: "StateMarkProps"
+    kind: "core"
+    group: "base"
+    source: "packages/grammar/src/core/StateMark.tsx"
+    closedValues:
+      - prop: "state"
+        type: "PresentationState"
+    claims: ["ICON-6", "STATE-1"]
+    computedClaims: []
+    classes: []
+  - component: "StaticStateRow"
+    propsType: "StaticStateRowProps"
+    kind: "composite"
+    group: "base"
+    source: "packages/grammar/src/core/composite/StaticStateRow/index.tsx"
+    closedValues:
+      - prop: "state"
+        type: "PresentationState"
+      - prop: "verdict"
+        values: ["success", "danger"]
+    claims: ["BOUNDARY-3", "GAP-1", "GAP-3", "PADDING-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-static-row"
+      - "starci-core-static-row-copy"
+  - component: "Stepper"
+    propsType: "StepperProps"
+    kind: "composite"
+    group: "navigation"
+    source: "packages/grammar/src/core/composite/Stepper/index.tsx"
+    closedValues:
+      - prop: "orientation"
+        values: ["horizontal", "vertical"]
+    claims: ["FOCUS-1", "ICON-6", "STATE-1"]
+    computedClaims: ["FOCUS-2", "HIERARCHY-3"]
+    classes:
+      - "starci-core-nav-visually-hidden"
+      - "starci-core-step"
+      - "starci-core-step-body"
+      - "starci-core-step-control"
+      - "starci-core-step-copy"
+      - "starci-core-step-description"
+      - "starci-core-step-label"
+      - "starci-core-step-marker"
+      - "starci-core-stepper"
+      - "starci-core-stepper-list"
+  - component: "Subnav"
+    propsType: "SubnavProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/Subnav/index.tsx"
+    closedValues:
+      - prop: "position"
+        values: ["static", "sticky"]
+      - prop: "visibility"
+        values: ["always", "compact"]
+    claims: ["BOUNDARY-1", "FLOW-4", "GAP-2", "GAP-3", "PADDING-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-subnav"
+      - "starci-core-subnav-identity"
+      - "starci-core-subnav-leading"
+      - "starci-core-subnav-title"
+      - "starci-core-subnav-toggle"
+  - component: "SurfaceAccordionCard"
+    propsType: "SurfaceAccordionCardProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/SurfaceAccordionCard/index.tsx"
+    closedValues:
+      - prop: "depth"
+        values: ["top", "nested"]
+      - prop: "headingLevel"
+        type: "SurfaceHeadingLevel"
+    claims: ["BOUNDARY-3", "GAP-2", "MARGIN-0", "PADDING-0", "PADDING-3", "PADDING-4", "PADDING-5", "TONE-1"]
+    computedClaims: ["BOUNDARY-5", "BOUNDARY-6", "OVERFLOW-1", "OVERFLOW-2", "SURFACE-1", "SURFACE-2"]
+    classes:
+      - "starci-core-accordion-body"
+      - "starci-core-accordion-heading"
+      - "starci-core-accordion-panel"
+      - "starci-core-accordion-root"
+      - "starci-core-accordion-row"
+      - "starci-core-accordion-scroll-region"
+      - "starci-core-accordion-shell"
+      - "starci-core-accordion-trigger"
+      - "starci-core-surface-accordion-card"
+      - "starci-core-surface-label"
+  - component: "SurfaceCard"
+    propsType: "SurfaceCardProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/SurfaceCard/index.tsx"
+    closedValues:
+      - prop: "depth"
+        values: ["top", "nested"]
+      - prop: "headingLevel"
+        type: "SurfaceHeadingLevel"
+      - prop: "state"
+        type: "PresentationState"
+      - prop: "frame"
+        values: ["bounded", "frameless"]
+      - prop: "scroll"
+        values: ["page", "contained"]
+      - prop: "composition"
+        values: ["single", "joined"]
+      - prop: "measure"
+        values: ["content", "form", "formCompact"]
+      - prop: "height"
+        values: ["auto", "fill"]
+    claims: ["GAP-2"]
+    computedClaims: ["BOUNDARY-5", "BOUNDARY-6", "GAP-0", "OVERFLOW-1", "OVERFLOW-2", "PADDING-0", "PADDING-4", "SURFACE-1", "SURFACE-2", "SURFACE-4"]
+    classes:
+      - "starci-core-form-scroll-viewport"
+      - "starci-core-form-surface"
+      - "starci-core-form-surface--compact"
+      - "starci-core-frameless-surface"
+      - "starci-core-surface"
+      - "starci-core-surface-card"
+      - "starci-core-surface-content"
+      - "starci-core-surface-highlight"
+      - "starci-core-surface-highlight-sweep"
+      - "starci-core-surface-label"
+  - component: "SurfaceCopyGroup"
+    propsType: "SurfaceCopyGroupProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/SurfaceCopyGroup/index.tsx"
+    closedValues:
+      - prop: "density"
+        values: ["compact", "comfortable"]
+    claims: []
+    computedClaims: ["GAP-2", "GAP-3"]
+    classes:
+      - "starci-core-surface-copy-group"
+  - component: "SurfaceListCard"
+    propsType: "SurfaceListCardProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/SurfaceListCard/index.tsx"
+    closedValues:
+      - prop: "depth"
+        values: ["top", "nested"]
+      - prop: "headingLevel"
+        type: "SurfaceHeadingLevel"
+    claims: ["GAP-2", "OVERFLOW-2", "PADDING-0", "SURFACE-2"]
+    computedClaims: ["FONT-1", "FONT-2", "TONE-2"]
+    classes:
+      - "starci-core-list-shell"
+      - "starci-core-owned-collection"
+      - "starci-core-surface"
+      - "starci-core-surface-fact"
+      - "starci-core-surface-footer"
+      - "starci-core-surface-label"
+      - "starci-core-surface-list"
+  - component: "Switch"
+    propsType: "SwitchProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/Switch/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-choice"
+      - "starci-core-choice-content"
+      - "starci-core-choice-control"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-switch"
+  - component: "Tabs"
+    propsType: "TabsProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/Tabs/index.tsx"
+    closedValues:
+      - prop: "labelVisibility"
+        values: ["responsive", "always"]
+      - prop: "inset"
+        values: ["page", "none"]
+    claims: ["FLOW-2", "GAP-2", "PADDING-3"]
+    computedClaims: ["PADDING-5"]
+    classes:
+      - "starci-core-horizontal-scroll-region"
+      - "starci-core-tab-content"
+      - "starci-core-tab-label"
+      - "starci-core-tabs"
+      - "starci-core-tabs-frame"
+      - "starci-core-tabs-scroll"
+  - component: "TagGroup"
+    propsType: "TagGroupProps"
+    kind: "composite"
+    group: "navigation"
+    source: "packages/grammar/src/core/composite/TagGroup/index.tsx"
+    closedValues:
+      - prop: "selectionMode"
+        values: ["none", "single", "multiple"]
+      - prop: "size"
+        values: ["sm", "md", "lg"]
+    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "ICON-5", "ICON-6", "STATE-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-tag"
+      - "starci-core-tag-empty"
+      - "starci-core-tag-group"
+      - "starci-core-tag-label"
+      - "starci-core-tag-leading"
+      - "starci-core-tag-list"
+      - "starci-core-tag-remove"
+  - component: "Text"
+    propsType: "TextProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Text/index.tsx"
+    closedValues:
+      - prop: "as"
+        values: ["div", "p", "span"]
+      - prop: "size"
+        values: ["xs", "sm", "md", "metric-lead"]
+      - prop: "tone"
+        values: ["default", "muted", "accent"]
+      - prop: "weight"
+        values: ["normal", "medium", "semibold"]
+      - prop: "live"
+        values: ["off", "polite", "assertive"]
+      - prop: "overflow"
+        values: ["wrap", "truncate", "clamp-2"]
+      - prop: "parentEmphasis"
+        values: ["accent-soft"]
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "FONT-3", "FONT-5", "GAP-2", "TONE-1", "TONE-2", "TONE-3"]
+    classes:
+      - "starci-core-text"
+  - component: "TextAction"
+    propsType: "TextActionProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/TextAction/index.tsx"
+    closedValues:
+      - prop: "appearance"
+        type: "ActionAppearance"
+      - prop: "size"
+        type: "ActionTextSize"
+      - prop: "target"
+        values: ["_blank", "_self"]
+    claims: []
+    computedClaims: ["FONT-1", "FONT-2", "FONT-3", "GAP-2", "MEASURE-3", "PADDING-1", "PADDING-2", "PADDING-3", "SURFACE-4", "TONE-1", "TONE-2", "TONE-3"]
+    classes:
+      - "starci-core-text-action"
+      - "starci-core-text-action-resting"
+  - component: "Textarea"
+    propsType: "TextareaProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/Textarea/index.tsx"
+    closedValues: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-field"
+      - "starci-core-field-count"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-label"
+      - "starci-core-field-meta"
+      - "starci-core-form-label--screen-reader"
+      - "starci-core-textarea"
+      - "starci-core-textarea-control"
+  - component: "TimeField"
+    propsType: "TimeFieldProps"
+    kind: "primitive"
+    group: "forms"
+    source: "packages/grammar/src/core/primitive/TimeField/index.tsx"
+    closedValues:
+      - prop: "granularity"
+        values: ["hour", "minute", "second"]
+      - prop: "hourCycle"
+        values: ["12", "24"]
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
+    computedClaims: []
+    classes:
+      - "starci-core-field"
+      - "starci-core-field-description"
+      - "starci-core-field-error"
+      - "starci-core-field-label"
+      - "starci-core-form-label--screen-reader"
+      - "starci-core-time-field"
+  - component: "Timeline"
+    propsType: "TimelineProps"
+    kind: "composite"
+    group: "navigation"
+    source: "packages/grammar/src/core/composite/Timeline/index.tsx"
+    closedValues: []
+    claims: ["HIERARCHY-3", "ICON-6", "STATE-1", "TRUTH-1"]
+    computedClaims: []
+    classes:
+      - "starci-core-timeline"
+      - "starci-core-timeline-copy"
+      - "starci-core-timeline-description"
+      - "starci-core-timeline-item"
+      - "starci-core-timeline-marker"
+      - "starci-core-timeline-time"
+      - "starci-core-timeline-title"
+  - component: "Toast"
+    propsType: "ToastProps"
+    kind: "branch"
+    group: "overlays"
+    source: "packages/grammar/src/core/branch/Toast/index.tsx"
+    closedValues: []
+    claims: ["A11Y-4", "CORE-BOUNDARY-4", "FEEDBACK-3", "FOCUS-5", "ICON-6", "LAYOUT-4", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-toast"
+      - "starci-core-toast-action"
+      - "starci-core-toast-copy"
+      - "starci-core-toast-description"
+      - "starci-core-toast-indicator"
+      - "starci-core-toast-title"
+      - "starci-core-toaster"
+      - "starci-core-toaster-item"
+      - "starci-core-toaster-list"
+      - "starci-core-visually-hidden"
+  - component: "Toaster"
+    propsType: "ToasterProps"
+    kind: "branch"
+    group: "overlays"
+    source: "packages/grammar/src/core/branch/Toast/index.tsx"
+    closedValues:
+      - prop: "placement"
+        values: ["top-start", "top", "top-end", "bottom-start", "bottom", "bottom-end"]
+    claims: ["A11Y-4", "CORE-BOUNDARY-4", "FEEDBACK-3", "FOCUS-5", "ICON-6", "LAYOUT-4", "MOTION-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-toast"
+      - "starci-core-toast-action"
+      - "starci-core-toast-copy"
+      - "starci-core-toast-description"
+      - "starci-core-toast-indicator"
+      - "starci-core-toast-title"
+      - "starci-core-toaster"
+      - "starci-core-toaster-item"
+      - "starci-core-toaster-list"
+      - "starci-core-visually-hidden"
+  - component: "Tooltip"
+    propsType: "TooltipProps"
+    kind: "branch"
+    group: "base"
+    source: "packages/grammar/src/core/branch/Tooltip/index.tsx"
+    closedValues:
+      - prop: "placement"
+        values: ["top", "bottom"]
+    claims: ["FLOW-2", "FONT-1", "PADDING-1", "PADDING-2"]
+    computedClaims: []
+    classes:
+      - "starci-core-tooltip"
+      - "starci-core-tooltip-content"
+  - component: "TopBar"
+    propsType: "TopBarProps"
+    kind: "composition"
+    group: "navigation"
+    source: "packages/grammar/src/core/composition/TopBar/index.tsx"
+    closedValues:
+      - prop: "visibility"
+        values: ["compact", "always"]
+      - prop: "position"
+        values: ["static", "sticky"]
+    claims: ["A11Y-2", "ICON-5", "STATE-7"]
+    computedClaims: []
+    classes:
+      - "starci-core-top-bar"
+      - "starci-core-top-bar-actions"
+      - "starci-core-top-bar-brand"
+      - "starci-core-top-bar-menu-trigger"
+      - "starci-core-top-bar-navigation"
+  - component: "VerticalScrollRegion"
+    propsType: "VerticalScrollRegionProps"
+    kind: "composite"
+    group: "base"
+    source: "packages/grammar/src/core/composite/VerticalScrollRegion/index.tsx"
+    closedValues:
+      - prop: "as"
+        values: ["div", "ul", "ol"]
+      - prop: "overflow"
+        values: ["always", "needed"]
+    claims: []
+    computedClaims: ["MEASURE-7", "OVERFLOW-3", "OVERFLOW-4"]
+    classes: []
+  - component: "WorkspaceShell"
+    propsType: "WorkspaceShellProps"
+    kind: "composition"
+    group: "base"
+    source: "packages/grammar/src/core/composition/WorkspaceShell/index.tsx"
+    closedValues:
+      - prop: "mainLandmark"
+        values: ["shell"]
+      - prop: "navigationTrack"
+        values: ["fixed", "intrinsic"]
+      - prop: "navigationVisibility"
+        values: ["always", "wide"]
+      - prop: "railMode"
+        values: ["flow", "sticky"]
+      - prop: "railWidth"
+        values: ["compact", "standard", "wide"]
+      - prop: "railInset"
+        values: ["none", "content"]
+      - prop: "railPosition"
+        values: ["leading", "trailing"]
+      - prop: "headerLandmark"
+        values: ["shell", "slot"]
+      - prop: "align"
+        values: ["start", "stretch"]
+    claims: ["BOUNDARY-1", "BOUNDARY-4", "GAP-5", "MARGIN-5", "MEASURE-1", "OVERFLOW-4"]
+    computedClaims: []
+    classes:
+      - "starci-core-workspace-shell"
+      - "starci-core-workspace-shell-compact-header"
+      - "starci-core-workspace-shell-compact-navigation"
+      - "starci-core-workspace-shell-floating-layer"
+      - "starci-core-workspace-shell-header"
+      - "starci-core-workspace-shell-layout"
+      - "starci-core-workspace-shell-leading-rule"
+      - "starci-core-workspace-shell-navigation"
+      - "starci-core-workspace-shell-primary"
+      - "starci-core-workspace-shell-rail"
+
+gaps:
+  - components:
+      - "BottomNav"
+      - "Toaster"
+    missing: |
+      the fixed BottomNav publishes `--starci-core-bottom-nav-offset` and nothing reads it (see
+      common/DNA.yaml): Offset Pop draws the dock with a thicker ink top edge and an upward hard shadow,
+      and a bottom-placed Toaster still lands on top of it. Content padding and toaster placement are
+      the app's
+    evidence:
+      - "packages/grammar/src/common/components-navigation.css"
+      - "packages/grammar/src/offset-pop/components-navigation.css"
+      - "packages/grammar/src/common/components-overlays.css"
+  - components:
+      - "Offset Pop token contract"
+    missing: |
+      no DNA name for the press vector or the small chip shadow. Button and its press use a literal
+      `0.25rem 0.25rem` offset, the current BottomNav pill and selected ListBox row `0.125rem 0.1875rem`;
+      only the surface/overlay shadow reads `--offset-pop-shadow-x/-y`, so the narrow-viewport shadow
+      drop (0.5rem to 0.25rem) moves surfaces but not buttons or chips
+    evidence:
+      - "packages/grammar/src/offset-pop/styles.css"
+      - "packages/grammar/src/offset-pop/components-navigation.css"
+  - components:
+      - "Offset Pop palette"
+    missing: |
+      `yellow` and `mint` have no semantic name of their own beyond warning and success: the yellow row
+      wash (`color-mix(… yellow 32% …)`) and the yellow BottomNav badge read the palette ink directly,
+      so an adapter that retunes `--offset-pop-warning` leaves those washes on the old yellow
+    evidence:
+      - "packages/grammar/src/offset-pop/components-navigation.css"
+      - "packages/grammar/src/offset-pop/components-forms.css"
+      - "packages/grammar/src/offset-pop/dna.ts"

@@ -20,12 +20,16 @@ export type SurfaceCardHeight = "auto" | "fill"
 
 /** Identifies the outer labelled surface-card anatomy. */
 export const surfaceCardClassName = cn("starci-core-surface-card") ?? "starci-core-surface-card"
-/** Selects an owned measure and height contract without exposing structural class hooks to consumers. */
-export const getSurfaceCardClassName = (measure: SurfaceCardMeasure, height: SurfaceCardHeight) => cn(
+/**
+ * Selects an owned measure contract without exposing structural class hooks to consumers.
+ *
+ * Height is not a class: the fill form is drawn by `[data-grammar-surface-height="fill"]` on the same
+ * root, so the old `starci-core-surface-card--fill` modifier (which no sheet ever selected) is gone.
+ */
+export const getSurfaceCardClassName = (measure: SurfaceCardMeasure) => cn(
     surfaceCardClassName,
     measure === "form" || measure === "formCompact" ? formSurfaceClassName : undefined,
     measure === "formCompact" ? formCompactSurfaceClassName : undefined,
-    height === "fill" ? "starci-core-surface-card--fill" : undefined,
 )
 /** Identifies the external label row of a surface card. */
 export const surfaceLabelClassName = cn("starci-core-surface-label") ?? "starci-core-surface-label"

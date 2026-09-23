@@ -15,17 +15,19 @@
         --starci-core-surface: oklch(100% 0.0008 354.13);
         --starci-core-surface-secondary: oklch(95.24% 0.0012 354.13);
         --starci-core-foreground: oklch(21.03% 0.0015 354.13);
-        --starci-core-muted: oklch(55.17% 0.003 354.13);
+        --starci-core-muted: oklch(52% 0.003 354.13);
         --starci-core-border: oklch(90% 0.0015 354.13);
         --starci-core-separator: oklch(92% 0.0015 354.13);
         --starci-core-success: oklch(73.29% 0.1941 162.85);
         --starci-core-success-foreground: oklch(21.03% 0.0059 162.85);
         --starci-core-warning: oklch(78.19% 0.159 84.37);
         --starci-core-warning-foreground: oklch(21.03% 0.0059 84.37);
-        --starci-core-danger: oklch(65.32% 0.2335 37.78);
+        --starci-core-danger: oklch(55% 0.2 37.78);
         --starci-core-danger-foreground: oklch(99.11% 0 0);
         --starci-core-info: oklch(72% 0.17 250);
         --starci-core-info-foreground: oklch(21.03% 0.0059 250);
+        --starci-core-accent-text: #6a3cf2;
+        --starci-core-accent-soft: oklch(95.5% 0.03 287);
         --starci-core-page-measure: 80rem;
         --starci-core-reading-measure: 72ch;
         --starci-core-page-inset: var(--grammar-page-inset);
@@ -61,6 +63,9 @@
         --danger-foreground: var(--starci-core-danger-foreground);
         --info: var(--starci-core-info);
         --info-foreground: var(--starci-core-info-foreground);
+        --accent-soft: var(--starci-core-accent-soft);
+        --accent-soft-foreground: var(--starci-core-accent-text);
+        --link: var(--starci-core-accent-text);
         --field-background: var(--starci-core-surface);
         --field-border: transparent;
         --field-foreground: var(--starci-core-foreground);
@@ -88,10 +93,27 @@
         --starci-core-success-foreground: oklch(21.03% 0.0059 162.85);
         --starci-core-warning: oklch(82.03% 0.1392 88.38);
         --starci-core-warning-foreground: oklch(21.03% 0.0059 88.38);
-        --starci-core-danger: oklch(59.4% 0.1973 36.67);
-        --starci-core-danger-foreground: oklch(99.11% 0 0);
+        --starci-core-danger: oklch(70% 0.17 36.67);
+        --starci-core-danger-foreground: oklch(21.03% 0.0059 36.67);
         --starci-core-info: oklch(72% 0.17 250);
         --starci-core-info-foreground: oklch(21.03% 0.0059 250);
+        --starci-core-accent-text: #a48bff;
+        --starci-core-accent-soft: oklch(30% 0.07 287);
+    }
+
+    /*
+     * The violet is a FILL (white on it is 5.1:1) but not a text colour: 3.95:1 on the dark canvas
+     * and 4.44:1 on the light secondary surface. Where Common paints the accent as TEXT - a link,
+     * the current tab and bottom-nav destination, the current step number, the section eyebrow -
+     * the family re-declares the accent on that element as the themed, text-safe accent, so each
+     * Common rule reads it unchanged and its other states (current link, disabled) keep their own.
+     */
+    .grammar-common-root[data-grammar-family="core"] :is(.starci-core-link, .starci-core-text-action[data-appearance="tab"][data-current="true"], .starci-core-bottom-nav-item[data-grammar-current="true"], .starci-core-step[data-grammar-step-state="current"] .starci-core-step-marker) {
+        --accent: var(--starci-core-accent-text);
+    }
+
+    .grammar-common-root[data-grammar-family="core"] .starci-core-section-eyebrow {
+        --starci-core-accent: var(--starci-core-accent-text);
     }
 
     /* StarCi labelled surfaces paint one material box around label and content. */
@@ -136,10 +158,12 @@
             --starci-core-success-foreground: oklch(21.03% 0.0059 162.85);
             --starci-core-warning: oklch(82.03% 0.1392 88.38);
             --starci-core-warning-foreground: oklch(21.03% 0.0059 88.38);
-            --starci-core-danger: oklch(59.4% 0.1973 36.67);
-            --starci-core-danger-foreground: oklch(99.11% 0 0);
+            --starci-core-danger: oklch(70% 0.17 36.67);
+            --starci-core-danger-foreground: oklch(21.03% 0.0059 36.67);
             --starci-core-info: oklch(72% 0.17 250);
             --starci-core-info-foreground: oklch(21.03% 0.0059 250);
+            --starci-core-accent-text: #a48bff;
+            --starci-core-accent-soft: oklch(30% 0.07 287);
         }
     }
 
@@ -162,6 +186,8 @@
             --starci-core-danger-foreground: Canvas;
             --starci-core-info: CanvasText;
             --starci-core-info-foreground: Canvas;
+            --starci-core-accent-text: CanvasText;
+            --starci-core-accent-soft: Canvas;
             --starci-core-surface-shadow: none;
         }
     }

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
+import { contrastSuite } from "../__test__/contrastSuite.js"
 
 const css = readFileSync(resolve(process.cwd(), "src/heritage/styles.css"), "utf8")
 const commonRendererSource = [
@@ -68,3 +69,6 @@ describe("Heritage family CSS", () => {
         expect(css).not.toContain("PublicSiteHeader")
     })
 })
+
+/* The forest green and the brick red are text-safe in both themes; their fills carry white in light and night ink in dark. */
+contrastSuite("heritage", { accent: { text: "var(--accent)" }, danger: { text: "var(--danger)" } })

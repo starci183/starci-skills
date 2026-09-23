@@ -25,4 +25,11 @@ describe("Label", () => {
         expect(markup).toContain("data-grammar-label=\"true\"")
         expect(markup).toContain(">Session setup</h3>")
     })
+
+    it.each(["h2", "h3", "h4", "h5", "h6"] as const)("takes the %s rank a surface's place in the outline needs", (as) => {
+        const markup = renderToStaticMarkup(<Label as={as}>Session setup</Label>)
+        expect(markup).toContain(`<${as} `)
+        expect(markup).toContain(`>Session setup</${as}>`)
+        expect(markup).toContain("data-grammar-label=\"true\"")
+    })
 })

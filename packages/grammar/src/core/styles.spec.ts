@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { STARCI_CORE_TOKEN_DEFAULTS, STARCI_CORE_TOKEN_NAMES } from "./dna.js"
+import { STARCI_CORE_DARK_TOKEN_DEFAULTS, STARCI_CORE_TOKEN_DEFAULTS, STARCI_CORE_TOKEN_NAMES } from "./dna.js"
+import { contrastSuite } from "../__test__/contrastSuite.js"
 
 const coreCss = readFileSync(new URL("./styles.css", import.meta.url), "utf8")
 const commonCss = readFileSync(new URL("../common/styles.css", import.meta.url), "utf8")
@@ -205,4 +206,29 @@ describe("Core capability styles", () => {
         expect(css).toMatch(/data-grammar-workspace-navigation-visibility="wide"[\s\S]*?\.starci-core-workspace-shell-navigation[\s\S]*?display: none;/)
         expect(css).toMatch(/data-grammar-workspace-navigation-visibility="wide"\]\[data-grammar-workspace-rail="absent"\][\s\S]*?grid-template-areas: "primary";/)
     })
+})
+
+describe("Core DNA dark values", () => {
+    it("keeps every dark and system-dark CSS value equal to the DNA", () => {
+        const body = (opener: RegExp) => {
+            const at = coreCss.search(opener)
+            expect(at, String(opener)).toBeGreaterThan(-1)
+            return coreCss.slice(at, coreCss.indexOf("}", at))
+        }
+        const dark = body(/\.grammar-common-root\[data-grammar-family="core"\]\[data-grammar-theme="dark"\]\s*\{/)
+        const system = body(/\.grammar-common-root\[data-grammar-family="core"\]\[data-grammar-theme="system"\]\s*\{/)
+        for (const [name, value] of Object.entries(STARCI_CORE_DARK_TOKEN_DEFAULTS)) {
+            expect(dark, `dark ${name}`).toContain(`${name}: ${value};`)
+            expect(system, `system ${name}`).toContain(`${name}: ${value};`)
+        }
+    })
+})
+
+/*
+ * The violet is a fill, so the accent paints text through the themed text-safe accent; the danger
+ * is text-safe itself (a deeper red in light, a lighter one with ink on it in dark).
+ */
+contrastSuite("core", {
+    accent: { text: "var(--starci-core-accent-text)", routes: { sheets: ["src/core/styles.css"], properties: ["--accent", "--starci-core-accent"] } },
+    danger: { text: "var(--danger)" },
 })

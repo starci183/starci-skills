@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { useState } from "react"
 import { renderToString } from "react-dom/server"
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest"
+import { GRAMMAR_ROOT_CASES, expectInFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Tabs } from "./index.js"
 
 vi.stubGlobal("ResizeObserver", class ResizeObserver {
@@ -196,4 +197,18 @@ describe("Core Tabs", () => {
         expect(first.getAttribute("aria-controls")).toBe("detached-target")
     })
 
+})
+
+describe.each(GRAMMAR_ROOT_CASES)("Tabs strip keyboard reach under $name", ({ Root, family }) => {
+    it("adds no Tab stop of its own: every scrolled destination is already a focusable tab", () => {
+        const { container } = render(<Root><Tabs label="Dashboard" selectedKey="overview" items={[
+            { id: "overview", label: "Overview" },
+            { id: "community", label: "Community" },
+        ]} onSelect={() => undefined} /></Root>)
+        const strip = container.querySelector("[data-grammar-tabs-overflow='scroll']")
+        expect(strip).not.toBeNull()
+        expect(strip?.hasAttribute("tabindex")).toBe(false)
+        expect(strip?.hasAttribute("role")).toBe(false)
+        expectInFamilyScope(screen.getByRole("tab", { name: "Overview" }), family)
+    })
 })

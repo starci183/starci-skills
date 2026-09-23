@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { COMMON_SPACING_SCALE } from "../../../common/spacing.js"
 import { PressableField } from "./index.js"
+import { isPaintClaim } from "../../../__test__/styleClaims.js"
 import {
     pressableFieldClassName,
     pressableFieldContentClassName,
@@ -104,14 +105,16 @@ describe("Core PressableField", () => {
 
     it("backs every data-contract claim it emits with a shipped rule", () => {
         const { container } = render(<PressableField label="Search" placeholder="Search" source={SearchGlyph} shortcut="Ctrl K" />)
+        // Paint claims only: the nested Icon's ICON-1 / ICON-6 promise behaviour, not a declaration.
         const claimed = [...container.querySelectorAll("[data-contract]")]
+            .filter((element) => (element.getAttribute("data-contract") ?? "").split(" ").some(isPaintClaim))
         expect(claimed).toHaveLength(4)
         for (const element of claimed) {
             const className = [...element.classList].find((token) => token.startsWith("starci-core-pressable-field"))
             expect(className, `claimed element without a Grammar class: ${element.outerHTML.slice(0, 120)}`).toBeDefined()
             const declarations = declarationsFor(className ?? "")
             expect(declarations.length, `no shipped declarations for .${className}`).toBeGreaterThan(0)
-            for (const claim of (element.getAttribute("data-contract") ?? "").split(" ").filter(Boolean)) {
+            for (const claim of (element.getAttribute("data-contract") ?? "").split(" ").filter(isPaintClaim)) {
                 expect(backsClaim(claim, declarations), `claim ${claim} on .${className} is not backed by the stylesheet`).toBe(true)
             }
         }

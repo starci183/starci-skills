@@ -1,0 +1,71 @@
+schema: starci/knowledge-source@1
+id: grammar.offset-pop
+title: Offset Pop Grammar — snapshot index
+purpose: |
+  Index for the Offset Pop Grammar snapshot: a playful, product-neutral visual family over the Common
+  contract — cream canvas, ink outlines, a hard offset shadow and one pink decision accent. Preserves
+  observations about one visual family; does not choose a default family or override business
+  requirements. UI knowledge supplies scope-selected reference criteria; the product owns facts,
+  content, routes, permissions, persistence and effects.
+appliesTo:
+  - grammar
+family: offset-pop
+provenance:
+  package: "@starci/grammar"
+  version: "0.5.0"
+  checkout: b6a13be97a9d1e15b7d3f628709158e81c744a2a
+  captured: "2026-09-23"
+  publicEntry: "@starci/grammar/common"
+  familyEntry: "@starci/grammar/offset-pop"
+  styleEntrypoint: "@starci/grammar/offset-pop/styles.css"
+  limitations: |
+    This is not a claim that the currently installed package has these APIs or gaps. Before use,
+    inspect the selected repository's manifest/lockfile, exported types, renderers and CSS; record
+    actual source/version in .starciwork. If source is unavailable, report unverified; do not infer
+    current APIs or defects from these tables. DNA.yaml is generated from source and held to it by
+    scripts/checks/grammar-knowledge.mjs; the other topics are authored. The family is product-neutral:
+    nothing here names a product, and a product's own copy, mascot and assets stay in that product.
+topics:
+  - id: dna
+    path: DNA.yaml
+    title: DNA
+    summary: |
+      dna.ts values (Core's shape plus `accentText`, `offset` and `palette`), root tokens with dark,
+      narrow, reduced-motion and forced-colours values, contrast table, the 95 renderers with closed
+      prop values, classes and rule ids, and gaps (generated, drift-checked).
+  - id: family
+    path: family.yaml
+    title: Family
+    summary: |
+      What Offset Pop owns over Common: the ink-outline-plus-hard-offset signature, pink as the decision
+      fill versus `accentText` for text, the 33 family-owned rules, and the two decisions the family
+      owner must confirm (the BOUNDARY-6 departure and the single-pink ACCENT-3/COLOR-3 reading).
+  - id: idioms
+    path: idioms.yaml
+    title: Idioms
+    summary: |
+      The family's recurring treatments as the package ships them (sticker surface, press travel, one
+      pink per decision, interactive row states, the dock, sheets that throw their shadow away from the
+      edge) — package idioms, not product observations.
+  - id: playbook
+    path: playbook.yaml
+    title: Playbook
+    summary: |
+      Composing a playful, mobile-first learning or consumer app: app shell with BottomNav, lesson and
+      practice flows, bottom-sheet Drawer, celebration and error feedback, forms, big touch targets.
+guidance:
+  - id: confirm-family-root
+    requirement: |
+      Confirm that the selected .starciwork design specification names Offset Pop, and render the app
+      inside one `OffsetPopGrammarRoot` (from `@starci/grammar/offset-pop`) with
+      `@starci/grammar/offset-pop/styles.css` imported. Renderers may be imported from
+      `@starci/grammar/common` or the family entry; both name the same Common components.
+    rationale: |
+      The family is only a scope: `[data-grammar-family="offset-pop"]` on the Common root. Without the
+      root or the sheet nothing on the page is Offset Pop.
+  - id: gaps-are-findings
+    requirement: |
+      A recorded gap or an owner decision flagged in family.yaml is a finding; changing the package
+      needs separately authorized scope and op.
+    rationale: |
+      Knowledge snapshots do not authorize library edits or product ops.

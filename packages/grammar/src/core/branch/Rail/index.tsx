@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react"
+import { createElement, useId, type ReactNode } from "react"
 import { assertPresentationState, treatmentFor, type PresentationState } from "../../state.js"
 import { railBodyClassName, railClassName, railFooterClassName, railFrameClassName } from "./classNames.js"
 
@@ -27,6 +27,8 @@ export type RailProps = (ComplementaryRailProps | ContentNavigationRailProps) & 
     readonly isLabelHidden?: boolean
     /** Grammar-owned content inset. `content` is exactly px-3 py-6. */
     readonly inset?: "none" | "content"
+    /** Outline rank of the rail's (possibly visually hidden) name. Default 2: a peer of the page's sections. */
+    readonly headingLevel?: 2 | 3 | 4 | 5 | 6
 }
 
 export const Rail = (props: RailProps) => {
@@ -43,6 +45,7 @@ export const Rail = (props: RailProps) => {
         motion = "static",
         isLabelHidden = false,
         inset = "none",
+        headingLevel = 2,
     } = props
     assertPresentationState(state)
     const headingId = useId()
@@ -58,13 +61,21 @@ export const Rail = (props: RailProps) => {
         inset === "content" ? "PADDING-3 PADDING-5" : null,
     ].filter(Boolean).join(" ")
 
+    /*
+     * At height="content" the body is the rail's scroll owner (`overflow-y: auto`), so it must be
+     * reachable without a pointer (WCAG 2.1.1, axe `scrollable-region-focusable`): a Tab stop named
+     * by the rail heading. A `fill` body clips instead of scrolling and a content-navigation body
+     * scrolls links that are themselves focusable, so neither adds a stop.
+     */
+    const isScrollOwner = height === "content" && landmark !== "content-navigation"
     const frame = (
         <div className={railFrameClassName} data-contract="GAP-4" data-grammar-rail-frame="true">
-            {landmark === "content-navigation" ? null : <h2 className={isLabelHidden ? "starci-core-visually-hidden" : undefined} data-grammar-rail-heading="true" id={headingId}>{label}</h2>}
+            {landmark === "content-navigation" ? null : createElement(`h${headingLevel}`, { className: isLabelHidden ? "starci-core-visually-hidden" : undefined, "data-grammar-rail-heading": "true", id: headingId }, label)}
             <div
                 className={railBodyClassName}
                 data-grammar-rail-body="true"
                 data-grammar-rail-inset={inset}
+                {...(isScrollOwner ? { "aria-labelledby": headingId, role: "region", tabIndex: 0 } : {})}
                 {...(bodyContract === "" ? {} : { "data-contract": bodyContract })}
             >{children}</div>
             {footer === undefined ? null : (

@@ -1,0 +1,65 @@
+name: grammar-package
+
+# Gates for the published @starci/grammar package (packages/grammar), which has its own install and
+# is not part of the root `npm test`. One job, in order:
+#   typecheck         - the shipped sources, plus stories and test helpers (tsconfig.stories.json)
+#   test              - build, node:test suites (incl. package-boundary), vitest node specs
+#   pack:check        - dist and `npm pack --dry-run` hold only the intended files: no stories/specs
+#   test:a11y         - every story, family x theme, axe via addon-a11y; fails on any violation not
+#                       waived in packages/grammar/.storybook/a11y-allowlist.json
+#   build-storybook   - the static Storybook still builds
+
+on:
+  push:
+    paths:
+      - 'packages/grammar/**'
+      - '.github/workflows/grammar-package.yml'
+  pull_request:
+    paths:
+      - 'packages/grammar/**'
+      - '.github/workflows/grammar-package.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grammar-package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  grammar:
+    name: typecheck + test + pack + a11y + storybook
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: packages/grammar
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/grammar/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for the Storybook browser runs
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test suite
+        run: npm test
+
+      - name: Pack check (no stories, specs or tests in the tarball)
+        run: npm run pack:check
+
+      - name: Storybook a11y gate
+        run: npm run test:a11y
+
+      - name: Build Storybook
+        run: npm run build-storybook

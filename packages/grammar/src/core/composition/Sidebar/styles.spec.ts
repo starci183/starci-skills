@@ -6,6 +6,7 @@ import { createElement } from "react"
 import { afterEach, describe, expect, it } from "vitest"
 import { COMMON_SPACING_SCALE } from "../../../common/spacing.js"
 import { Sidebar, type SidebarProps } from "./index.js"
+import { isPaintClaim } from "../../../__test__/styleClaims.js"
 
 afterEach(cleanup)
 
@@ -142,18 +143,19 @@ describe("Core Sidebar shipped geometry", () => {
     })
 
     it("backs every data-contract claim it emits with a shipped rule", () => {
+        // Paint claims only: a nested Icon's ICON-1 / ICON-6 promise behaviour, not a declaration.
         const elements = [
             ...claimedElements(createElement(Sidebar, props)),
             ...claimedElements(createElement(Sidebar, { ...props, isCollapsed: true })),
             ...claimedElements(createElement(Sidebar, { ...props, presentation: "drawer" })),
-        ]
+        ].filter((element) => (element.getAttribute("data-contract") ?? "").split(" ").some(isPaintClaim))
         expect(elements.length).toBeGreaterThan(0)
         for (const element of elements) {
             const className = [...element.classList].find((token) => token.startsWith("starci-core-sidebar"))
             expect(className, `claimed element without a Grammar class: ${element.outerHTML.slice(0, 120)}`).toBeDefined()
             const declarations = declarationsFor(className ?? "")
             expect(declarations.length, `no shipped declarations for .${className}`).toBeGreaterThan(0)
-            for (const claim of (element.getAttribute("data-contract") ?? "").split(" ").filter(Boolean)) {
+            for (const claim of (element.getAttribute("data-contract") ?? "").split(" ").filter(isPaintClaim)) {
                 expect(backsClaim(claim, declarations), `claim ${claim} on .${className} is not backed by the stylesheet`).toBe(true)
             }
         }

@@ -1,0 +1,253 @@
+/*
+ * Offset Pop treatment for the Common overlay and feedback components.
+ *
+ * Every selector is scoped to the Offset Pop root. That works for portalled surfaces because Common
+ * overlays portal INTO the nearest `.grammar-common-root` (never into <body>), so a dialog, drawer,
+ * popover or menu stays a descendant of `[data-grammar-family="offset-pop"]` and inherits its tokens.
+ * Signature: ink outline, hard offset shadow, blush backdrop tint, pink decision accent.
+ */
+@layer starci-grammar-offset-pop {
+    /* ---------------------------------------------------------------- tone vocabulary */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone] {
+        --offset-pop-tone-color: var(--offset-pop-surface-muted);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone="informative"] {
+        --offset-pop-tone-color: var(--info);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone="affirmative"] {
+        --offset-pop-tone-color: var(--success);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone="cautionary"] {
+        --offset-pop-tone-color: var(--warning);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone="negative"] {
+        --offset-pop-tone-color: var(--danger);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-tone="pending"] {
+        --offset-pop-tone-color: var(--accent);
+    }
+
+    /* ---------------------------------------------------------------- backdrop: blush tint */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-backdrop] {
+        background: color-mix(in srgb, var(--offset-pop-blush) 72%, transparent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"][data-grammar-theme="dark"] [data-grammar-overlay-backdrop] {
+        background: color-mix(in srgb, var(--offset-pop-shadow-ink) 72%, var(--offset-pop-pink) 8%);
+    }
+
+    /* ---------------------------------------------------------------- surfaces: ink + hard offset */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        color: var(--surface-foreground);
+        background: var(--surface);
+        box-shadow: var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="dialog"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="drawer"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="toast"] {
+        border-radius: var(--offset-pop-surface-radius);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="popover"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="menu"] {
+        border-radius: var(--offset-pop-control-radius);
+    }
+
+    /* Side and bottom sheets throw their hard shadow away from the edge they slide from. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="drawer"][data-placement="right"] {
+        box-shadow: calc(var(--offset-pop-shadow-x) * -1) 0 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="drawer"][data-placement="left"] {
+        box-shadow: var(--offset-pop-shadow-x) 0 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="drawer"][data-placement="bottom"] {
+        box-shadow: 0 calc(var(--offset-pop-shadow-y) * -1) 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface="drawer"][data-placement="top"] {
+        box-shadow: 0 var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-drawer-handle] > * {
+        background: var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Dialog"] :is(h1, h2, h3),
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="AlertDialog"] :is(h1, h2, h3),
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Drawer"] :is(h1, h2, h3),
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Popover"] :is(h1, h2, h3) {
+        color: var(--foreground);
+        font-weight: 900;
+        letter-spacing: -.03em;
+    }
+
+    /* ---------------------------------------------------------------- pink decision accent */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-action="confirm"] > [data-component="Button"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-toast-action] [data-component="Button"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-alert-actions] > [data-component="Button"] {
+        color: var(--accent-foreground);
+        background: var(--accent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-action="confirm"][data-grammar-tone="negative"] > [data-component="Button"] {
+        color: var(--danger-foreground);
+        background: var(--danger);
+    }
+
+    /* ---------------------------------------------------------------- menu */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item] {
+        font-weight: 700;
+    }
+
+    /* The soft pink fill is theme-aware (blush-pink in light, plum in dark), so one rule reads in every theme. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item]:is([data-focused], [data-hovered], [data-open]) {
+        background: var(--accent-soft);
+        color: var(--foreground);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item][data-selected] {
+        color: var(--offset-pop-accent-text);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item][data-grammar-tone="negative"] {
+        color: color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink));
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-section] + [data-grammar-menu-section],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-section] + [data-grammar-menu-item],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item] + [data-grammar-menu-section] {
+        border-block-start: var(--offset-pop-outline-width) solid var(--separator);
+    }
+
+    /* ---------------------------------------------------------------- toast */
+    /* Stacked toasts leave room for each hard shadow. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Toaster"] > ol {
+        gap: calc(var(--offset-pop-shadow-y) + 0.5rem);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Toast"] {
+        border-inline-start-width: calc(var(--offset-pop-outline-width) * 4);
+        border-inline-start-color: var(--offset-pop-tone-color);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Toast"] [data-grammar-toast-indicator] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        background: var(--offset-pop-tone-color);
+    }
+
+    /* ---------------------------------------------------------------- alert banner */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Alert"] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        border-radius: var(--offset-pop-control-radius);
+        color: var(--foreground);
+        background: color-mix(in srgb, var(--offset-pop-tone-color) 38%, var(--surface));
+        box-shadow: 0.25rem 0.25rem 0 var(--offset-pop-shadow-ink);
+        font-weight: 600;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Alert"] [data-slot="alert-root"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Alert"] :is(p, span) {
+        color: inherit;
+    }
+
+    /* ---------------------------------------------------------------- close button + kbd */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="CloseButton"] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        color: var(--foreground);
+        background: var(--surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="CloseButton"]:is([data-hovered], [data-focus-visible]) {
+        background: var(--offset-pop-yellow);
+        color: var(--offset-pop-ink);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="CloseButton"][data-pressed] {
+        transform: translate(1px, 1px);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Kbd"] {
+        border: var(--offset-pop-outline-width) solid var(--border);
+        border-radius: 0.5rem;
+        color: var(--foreground);
+        background: var(--surface);
+        box-shadow: 0 2px 0 var(--offset-pop-shadow-ink);
+        font-weight: 800;
+    }
+
+    /* ---------------------------------------------------------------- loading and measurement */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Spinner"][data-tone="accent"],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ProgressCircle"] {
+        color: var(--accent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ProgressCircle"] [data-slot="progress-circle-track-circle"] {
+        stroke: color-mix(in srgb, var(--offset-pop-ink) 18%, transparent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Skeleton"][data-shape],
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Skeleton"] > [data-grammar-skeleton-line] {
+        background: color-mix(in srgb, var(--offset-pop-blush) 78%, var(--surface));
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Skeleton"][data-shape="text"] {
+        background: transparent;
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-slot="meter-track"] {
+        height: 0.75rem;
+        border: var(--offset-pop-outline-width) solid var(--border);
+        background: var(--surface);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-slot="meter-fill"] {
+        background: var(--offset-pop-tone-color);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"][data-grammar-tone="neutral"] [data-slot="meter-fill"] {
+        background: var(--accent);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Meter"] [data-slot="label"] {
+        color: var(--foreground);
+        font-weight: 800;
+    }
+
+    /* ---------------------------------------------------------------- motion, theme, contrast */
+    @media (prefers-reduced-motion: reduce) {
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="CloseButton"][data-pressed] {
+            transform: none;
+        }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .grammar-common-root[data-grammar-family="offset-pop"][data-grammar-theme="system"] [data-grammar-overlay-backdrop] {
+            background: color-mix(in srgb, var(--offset-pop-shadow-ink) 72%, var(--offset-pop-pink) 8%);
+        }
+    }
+
+    @media (forced-colors: active) {
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-surface],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Alert"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="CloseButton"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Kbd"] {
+            border-color: CanvasText;
+            color: CanvasText;
+            background: Canvas;
+            box-shadow: none;
+        }
+
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-overlay-backdrop] {
+            background: transparent;
+        }
+    }
+}

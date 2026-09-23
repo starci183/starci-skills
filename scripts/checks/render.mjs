@@ -50,8 +50,11 @@ export const DEFAULT_BUCKETS=8;
 const ALPHA_FLOOR=128;
 /** Three is a list. Two rows are a pair the reader reads as two facts; three are a collection. */
 export const MIN_REPEATED_ITEMS=3;
-/** The card classes to look for when the family's DNA snapshot cannot be read. Only the family we ship. */
-export const FALLBACK_CARD_CLASSES={starci:['starci-core-surface','starci-core-surface-card']};
+/**
+ * The card classes to look for when the family's DNA snapshot cannot be read. Only the families we ship:
+ * both render the Common card renderers, so both carry Common's card classes.
+ */
+export const FALLBACK_CARD_CLASSES={starci:['starci-core-surface','starci-core-surface-card'],'offset-pop':['starci-core-surface','starci-core-surface-card']};
 const OFFENDER_CAP=20;
 
 const slash=value=>String(value??'').replaceAll('\\','/');

@@ -1,6 +1,8 @@
 import { cn } from "@heroui/react"
-import type { ReactNode } from "react"
+import { isValidElement, type ReactNode } from "react"
 import { Rail } from "../../branch/Rail/index.js"
+import { NavigationFeatureNav } from "../NavigationFeatureNav/index.js"
+import { TopBar } from "../TopBar/index.js"
 import {
     workspaceShellClassName,
     workspaceShellCompactHeaderClassName,
@@ -24,8 +26,31 @@ type WithoutRail = { readonly rail?: undefined; readonly railLabel?: never; read
 type WithCompactNavigation = { readonly compactNavigation: SlotContent; readonly compactNavigationLabel: string }
 type WithoutCompactNavigation = { readonly compactNavigation?: undefined; readonly compactNavigationLabel?: never }
 
+/**
+ * Who owns the page's single banner landmark when the shell has a `header`.
+ *
+ * `shell`: the shell's header wrapper is the `<header>` (banner) and the slot holds plain content.
+ * `slot`: the slot content is itself the banner (a `TopBar`, a `NavigationFeatureNav`, or an app
+ * bar that renders `<header>`), so the wrapper renders a plain `div` and never nests a second
+ * banner around it (axe `landmark-banner-is-top-level`, `landmark-no-duplicate-banner`).
+ */
+export type WorkspaceShellHeaderLandmark = "shell" | "slot"
+
+/** Grammar bars that own the banner themselves; hosting one flips the default to `slot`. */
+const BANNER_OWNERS: ReadonlySet<unknown> = new Set([TopBar, NavigationFeatureNav])
+
+/** Resolve the landmark rule: an explicit prop wins, otherwise a Grammar app bar in the slot owns it. */
+export const resolveWorkspaceHeaderLandmark = (header: ReactNode, headerLandmark?: WorkspaceShellHeaderLandmark): WorkspaceShellHeaderLandmark =>
+    headerLandmark ?? (isValidElement(header) && BANNER_OWNERS.has(header.type) ? "slot" : "shell")
+
 export type WorkspaceShellProps = (ShellOwnedMain | CallerOwnedMain) & (WithNavigation | WithoutNavigation) & (WithRail | WithoutRail) & (WithCompactNavigation | WithoutCompactNavigation) & {
     readonly header?: ReactNode
+    /**
+     * Landmark owner for `header` (see `WorkspaceShellHeaderLandmark`). Defaults to `slot` when the
+     * header is a `TopBar` or `NavigationFeatureNav`, otherwise `shell`. Pass `slot` when an
+     * app-owned bar that renders its own `<header>` goes in the slot.
+     */
+    readonly headerLandmark?: WorkspaceShellHeaderLandmark
     readonly compactHeader?: ReactNode
     readonly primary: ReactNode
     readonly primaryId?: string
@@ -49,7 +74,9 @@ export const WorkspaceShell = (props: WorkspaceShellProps) => {
     const leadingRule = railPosition === "leading" ? <div aria-hidden="true" className={workspaceShellLeadingRuleClassName} data-contract="BOUNDARY-4" data-grammar-workspace-leading-rule="true" /> : null
 
     return <div className={cn(workspaceShellClassName, props.className)} data-grammar-workspace-floating={hasFloatingLayer ? "present" : "absent"} data-grammar-workspace-shell="true">
-        {hasHeader ? <header className={workspaceShellHeaderClassName} data-contract="MARGIN-5" data-grammar-workspace-header="true">{props.header}</header> : null}
+        {hasHeader ? (resolveWorkspaceHeaderLandmark(props.header, props.headerLandmark) === "slot"
+            ? <div className={workspaceShellHeaderClassName} data-contract="MARGIN-5" data-grammar-workspace-header="true" data-grammar-workspace-header-landmark="slot">{props.header}</div>
+            : <header className={workspaceShellHeaderClassName} data-contract="MARGIN-5" data-grammar-workspace-header="true" data-grammar-workspace-header-landmark="shell">{props.header}</header>) : null}
         {hasCompactHeader ? <div className={workspaceShellCompactHeaderClassName} data-grammar-workspace-compact-header="true">{props.compactHeader}</div> : null}
         <div className={workspaceShellLayoutClassName} data-contract="GAP-5 MEASURE-1" data-grammar-workspace-align={props.align ?? "start"} data-grammar-workspace-navigation={hasNavigation ? "present" : "absent"} data-grammar-workspace-navigation-track={hasNavigation ? props.navigationTrack ?? "fixed" : undefined} data-grammar-workspace-navigation-visibility={hasNavigation ? props.navigationVisibility ?? "always" : undefined} data-grammar-workspace-rail={hasRail ? "present" : "absent"} data-grammar-workspace-rail-position={railPosition} data-grammar-workspace-rail-width={hasRail ? props.railWidth ?? "standard" : undefined}>
             {hasNavigation ? <nav aria-label={props.navigationLabel} className={workspaceShellNavigationClassName} data-grammar-workspace-navigation-region="true">{props.navigation}</nav> : null}

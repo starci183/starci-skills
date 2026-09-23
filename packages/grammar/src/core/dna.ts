@@ -4,6 +4,14 @@
  * This is presentation data, not a registry of UI laws. Product rules remain
  * outside the package; consumers use these values to render the same StarCi
  * family without rebuilding its palette, geometry or motion from memory.
+ *
+ * Every colour pair the family's CSS combines clears WCAG AA in light and dark; `styles.spec.ts`
+ * measures them through the resolved scope, HeroUI's vendor variables included. `accent` is the
+ * brand FILL (white text on it, and the focus ring); where the accent is painted as TEXT - links,
+ * the current tab and bottom-nav label, the section eyebrow, the soft accent pairing - the family
+ * reads `accentText`, which is themed because the violet fill is too dark to read on the dark
+ * canvas (3.95:1) and a hair too light on the secondary surface (4.44:1). `accentSoft` is the
+ * selected/soft tint that `accentText` and `muted` both stay AA on.
  */
 export const STARCI_CORE_DNA = Object.freeze({
     id: "starci-core",
@@ -17,17 +25,19 @@ export const STARCI_CORE_DNA = Object.freeze({
             surface: "oklch(100% 0.0008 354.13)",
             surfaceSecondary: "oklch(95.24% 0.0012 354.13)",
             foreground: "oklch(21.03% 0.0015 354.13)",
-            muted: "oklch(55.17% 0.003 354.13)",
+            muted: "oklch(52% 0.003 354.13)",
             border: "oklch(90% 0.0015 354.13)",
             separator: "oklch(92% 0.0015 354.13)",
             success: "oklch(73.29% 0.1941 162.85)",
             successForeground: "oklch(21.03% 0.0059 162.85)",
             warning: "oklch(78.19% 0.159 84.37)",
             warningForeground: "oklch(21.03% 0.0059 84.37)",
-            danger: "oklch(65.32% 0.2335 37.78)",
+            danger: "oklch(55% 0.2 37.78)",
             dangerForeground: "oklch(99.11% 0 0)",
             info: "oklch(72% 0.17 250)",
             infoForeground: "oklch(21.03% 0.0059 250)",
+            accentText: "#6a3cf2",
+            accentSoft: "oklch(95.5% 0.03 287)",
         }),
         dark: Object.freeze({
             canvas: "oklch(12% 0.0015 354.13)",
@@ -41,10 +51,12 @@ export const STARCI_CORE_DNA = Object.freeze({
             successForeground: "oklch(21.03% 0.0059 162.85)",
             warning: "oklch(82.03% 0.1392 88.38)",
             warningForeground: "oklch(21.03% 0.0059 88.38)",
-            danger: "oklch(59.4% 0.1973 36.67)",
-            dangerForeground: "oklch(99.11% 0 0)",
+            danger: "oklch(70% 0.17 36.67)",
+            dangerForeground: "oklch(21.03% 0.0059 36.67)",
             info: "oklch(72% 0.17 250)",
             infoForeground: "oklch(21.03% 0.0059 250)",
+            accentText: "#a48bff",
+            accentSoft: "oklch(30% 0.07 287)",
         }),
     }),
     geometry: Object.freeze({
@@ -111,6 +123,8 @@ export const STARCI_CORE_TOKEN_NAMES = Object.freeze({
     dangerForeground: "--starci-core-danger-foreground",
     info: "--starci-core-info",
     infoForeground: "--starci-core-info-foreground",
+    accentText: "--starci-core-accent-text",
+    accentSoft: "--starci-core-accent-soft",
     pageMeasure: "--starci-core-page-measure",
     readingMeasure: "--starci-core-reading-measure",
     surfaceRadius: "--starci-core-surface-radius",
@@ -178,6 +192,8 @@ export const STARCI_CORE_TOKEN_DEFAULTS = Object.freeze({
     "--starci-core-danger-foreground": STARCI_CORE_DNA.color.light.dangerForeground,
     "--starci-core-info": STARCI_CORE_DNA.color.light.info,
     "--starci-core-info-foreground": STARCI_CORE_DNA.color.light.infoForeground,
+    "--starci-core-accent-text": STARCI_CORE_DNA.color.light.accentText,
+    "--starci-core-accent-soft": STARCI_CORE_DNA.color.light.accentSoft,
     "--starci-core-page-measure": STARCI_CORE_DNA.geometry.pageMeasure,
     "--starci-core-reading-measure": STARCI_CORE_DNA.geometry.readingMeasure,
     "--starci-core-surface-radius": STARCI_CORE_DNA.geometry.surfaceRadius,
@@ -210,6 +226,8 @@ export const STARCI_CORE_DARK_TOKEN_DEFAULTS = Object.freeze({
     "--starci-core-danger-foreground": STARCI_CORE_DNA.color.dark.dangerForeground,
     "--starci-core-info": STARCI_CORE_DNA.color.dark.info,
     "--starci-core-info-foreground": STARCI_CORE_DNA.color.dark.infoForeground,
+    "--starci-core-accent-text": STARCI_CORE_DNA.color.dark.accentText,
+    "--starci-core-accent-soft": STARCI_CORE_DNA.color.dark.accentSoft,
 } satisfies Readonly<Partial<Record<StarCiCoreTokenName, string>>>)
 
 export type StarCiCoreTokenDefaults = typeof STARCI_CORE_TOKEN_DEFAULTS

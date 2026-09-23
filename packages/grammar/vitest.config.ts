@@ -3,10 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
-const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+import { viteFsAllow } from './.storybook/vite-fs-allow.ts';
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  // Serve node_modules even when it is a junction into another checkout (see vite-fs-allow.ts).
+  server: { fs: { allow: viteFsAllow(dirname) } },
   test: {
     projects: [{
       extends: true,

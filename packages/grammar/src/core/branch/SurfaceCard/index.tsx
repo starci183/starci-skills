@@ -2,7 +2,7 @@ import { Card } from "@heroui/react"
 import { useId, type ReactNode } from "react"
 import { assertPresentationState, treatmentFor, type PresentationState } from "../../state.js"
 import { VerticalScrollRegion } from "../../composite/VerticalScrollRegion/index.js"
-import { Label } from "../../primitive/Label/index.js"
+import { DEFAULT_SURFACE_HEADING_LEVEL, Label, type SurfaceHeadingLevel } from "../../primitive/Label/index.js"
 import {
     getSurfaceCardClassName,
     getSurfaceContentClassName,
@@ -43,6 +43,11 @@ export type SurfaceCardProps = (LabelledSurfaceCard | SelfNamedSurfaceCard) & {
     /** Optional content at the end of the external label row. It takes the fact's single place. */
     readonly labelEnd?: ReactNode
     readonly depth?: "top" | "nested"
+    /**
+     * Outline rank of the visible `label` (default 3). Pick the rank below the nearest heading
+     * above this surface so the page never skips a level.
+     */
+    readonly headingLevel?: SurfaceHeadingLevel
     readonly state?: PresentationState
     readonly wholeAction?: WholeCardAction
     /** Frameless content already owns its visible boundaries, so Core must not draw another shell. */
@@ -69,6 +74,7 @@ export const SurfaceCard = (props: SurfaceCardProps) => {
         fact,
         labelEnd,
         depth = "top",
+        headingLevel = DEFAULT_SURFACE_HEADING_LEVEL,
         state = "neutral",
         wholeAction,
         frame = "bounded",
@@ -151,6 +157,7 @@ export const SurfaceCard = (props: SurfaceCardProps) => {
                 data-grammar-surface-content="true"
                 data-grammar-surface-composition={composition}
                 isScrollable={contained}
+                {...(contained ? (label === undefined ? (accessibleName === undefined ? {} : { "aria-label": accessibleName }) : { "aria-labelledby": headingId }) : {})}
             >
                 {children}
             </VerticalScrollRegion>
@@ -166,7 +173,7 @@ export const SurfaceCard = (props: SurfaceCardProps) => {
 
     return (
         <Card.Root
-            className={getSurfaceCardClassName(measure, height) ?? ""}
+            className={getSurfaceCardClassName(measure) ?? ""}
             data-contract={rootContract}
             data-grammar-frame={frame}
             data-grammar-surface-composition={composition}
@@ -179,7 +186,7 @@ export const SurfaceCard = (props: SurfaceCardProps) => {
         >
             {label === undefined ? null : (
                 <Card.Header className={surfaceLabelClassName ?? ""} data-contract="GAP-2" data-grammar-surface-label="true">
-                    <Label as="h3" id={headingId}>{label}</Label>
+                    <Label as={`h${headingLevel}`} id={headingId}>{label}</Label>
                     {labelEnd ?? (fact === undefined ? null : <span>{fact}</span>)}
                 </Card.Header>
             )}

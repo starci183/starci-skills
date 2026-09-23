@@ -1,7 +1,7 @@
 import { Accordion } from "@heroui/react"
 import { type Key, type ReactNode, useId } from "react"
 import { VerticalScrollRegion } from "../../composite/VerticalScrollRegion/index.js"
-import { Label } from "../../primitive/Label/index.js"
+import { DEFAULT_SURFACE_HEADING_LEVEL, Label, type SurfaceHeadingLevel } from "../../primitive/Label/index.js"
 import { surfaceLabelClassName } from "../SurfaceCard/classNames.js"
 import { accordionBodyClassName, accordionCardClassName, accordionHeadingClassName, accordionPanelClassName, accordionRootClassName, accordionRowClassName, accordionScrollRegionClassName, getAccordionShellClassName, accordionTriggerClassName } from "./classNames.js"
 
@@ -24,6 +24,11 @@ type SurfaceAccordionCardIdentityProps = {
 type SurfaceAccordionCardCommonProps<Summary, Body> = SurfaceAccordionCardIdentityProps & {
     /** Top surfaces own elevation; nested surfaces own a subordinate border; omission is frameless. */
     readonly depth?: "top" | "nested"
+    /**
+     * Outline rank of the visible `label` (default 3). Pick the rank below the nearest heading
+     * above this surface so the page never skips a level.
+     */
+    readonly headingLevel?: SurfaceHeadingLevel
     readonly renderSummary: (summary: Summary) => ReactNode
     readonly renderBody: (body: Body) => ReactNode
     /** Convenience capability: make the row region a HeroUI Vertical ScrollShadow. */
@@ -57,6 +62,7 @@ const SurfaceAccordionRows = <Summary, Body>({
     label,
     ariaLabel,
     depth,
+    headingLevel = DEFAULT_SURFACE_HEADING_LEVEL,
     items,
     renderSummary,
     renderBody,
@@ -83,7 +89,7 @@ const SurfaceAccordionRows = <Summary, Body>({
         >
             {label === undefined ? null : (
                 <div className={surfaceLabelClassName} data-contract="GAP-2" data-grammar-surface-label="true">
-                    <Label as="h3" depth={depth ?? "top"} id={headingId}>{label}</Label>
+                    <Label as={`h${headingLevel}`} depth={depth ?? "top"} id={headingId}>{label}</Label>
                 </div>
             )}
             <div
@@ -102,7 +108,11 @@ const SurfaceAccordionRows = <Summary, Body>({
                 data-grammar-surface-depth={depth}
                 data-surface-context={depth === "nested" ? "nested" : depth === "top" ? "page" : undefined}
             >
-                <VerticalScrollRegion className={accordionScrollRegionClassName} isScrollable={isScrollable}>
+                <VerticalScrollRegion
+                    className={accordionScrollRegionClassName}
+                    isScrollable={isScrollable}
+                    {...(isScrollable ? (label === undefined ? (accessibleName === undefined ? {} : { "aria-label": accessibleName }) : { "aria-labelledby": headingId }) : {})}
+                >
                     <Accordion.Root
                         allowsMultipleExpanded
                         className={accordionRootClassName ?? ""}
@@ -159,6 +169,7 @@ export const SurfaceAccordionCard = <Summary, Body>(props: SurfaceAccordionCardP
             {...(props.label === undefined ? {} : { label: props.label })}
             {...(props.ariaLabel === undefined ? {} : { ariaLabel: props.ariaLabel })}
             {...(props.depth === undefined ? {} : { depth: props.depth })}
+            {...(props.headingLevel === undefined ? {} : { headingLevel: props.headingLevel })}
             items={[{
                 id: "surface-accordion-item",
                 isOpen: props.isOpen,
@@ -177,6 +188,7 @@ export const SurfaceAccordionCard = <Summary, Body>(props: SurfaceAccordionCardP
             {...(props.label === undefined ? {} : { label: props.label })}
             {...(props.ariaLabel === undefined ? {} : { ariaLabel: props.ariaLabel })}
             {...(props.depth === undefined ? {} : { depth: props.depth })}
+            {...(props.headingLevel === undefined ? {} : { headingLevel: props.headingLevel })}
             items={props.items}
             renderSummary={props.renderSummary}
             renderBody={props.renderBody}

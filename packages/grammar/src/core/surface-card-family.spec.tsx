@@ -69,7 +69,7 @@ describe("Common SurfaceListCard verdict rows", () => {
         const markup = renderToStaticMarkup(
             <CoreGrammarRoot>
                 <SurfaceListCard ariaLabel="Movement" isVerdict>
-                    <div data-verdict="success">Ada</div>
+                    <li data-verdict="success">Ada</li>
                 </SurfaceListCard>
             </CoreGrammarRoot>,
         )
