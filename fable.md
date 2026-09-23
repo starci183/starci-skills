@@ -1086,6 +1086,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   dependency, membership chạy. Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00: từ đây trò không trả lời ask
   thay thầy nữa. Chờ fork: P7b (landed-check theo repo đích) và P8 (lineage retry cut, spinner cũ).
 
+- 10:03 Ủy quyền đã hết, không trả lời ask. Collab membership xong (a10 done sau a2 partial), còn 5 slice dependency. WSPV một
+  worker audit đang chạy. Modules awaiting-owner. AUTH owner-gate. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
