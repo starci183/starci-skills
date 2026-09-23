@@ -118,6 +118,26 @@ layoutPolicy:
   checks: [starci-validate, starci-stacks-check]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
+  cutSetAuthority:
+    scope: workspace-manage-prepare-import
+    appliesWhen: The dispatch packet carries context.cut {id, ordinal, total} with total >= 2 for the
+      prepare or import mode, every cut job uses this same approved workspace.manage leg, mode and
+      goal binding, and the complete pairwise-disjoint path union (the root catalog .starciwork/index.yaml
+      in exactly one ordinal) was preflighted before the first slice launched.
+    permits: "The unchanged full `starci validate` over .starciwork may remain nonzero after a
+      NON-FINAL ordinal only for findings whose paths belong exclusively to not-yet-passed sibling
+      ordinals of the same cut set - typically CATALOG_DIRTY on the root catalog an unsettled later
+      ordinal owns. The current slice must pass an exact-slice validation of its own owned records
+      (`starci validate` scoped to them), the full command and its finding inventory stay unchanged
+      except for sibling-owned paths, and a finding a passed ordinal resolved may not reappear. The
+      raw nonzero full result is recorded as integration evidence, not as the slice's red verdict.
+      The Kernel records `cut-slice-postcondition` and `cut-regression-inventory` green for a
+      non-final pass; the FINAL ordinal must additionally record `full-regression-final` green from
+      the unchanged full validation before the leg advances."
+    forbids:
+      - declaring a non-final slice done without an exact-slice validation of its own records
+      - accepting a full-validation finding on a path this slice or a passed ordinal owns
+      - advancing the leg before the final ordinal records full-regression-final green
   modePolicy:
     selection: required-exactly-one
     implicitChain: false
