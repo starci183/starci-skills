@@ -184,6 +184,13 @@ async function main() {
   for (let i = 0; i < argv.length; i += 1) if (argv[i] === '--repo') repos.push(argv[++i]);
   const rows = collectProgress(reportRepos(repos));
   const messages = progressMessages(rows);
+  // One model-scorecard line (pool shares/pass rates, qwen tokens) over the same repos, last 24h; a failure adds nothing.
+  try {
+    const sc = await import('../agent/model-scorecard.mjs');
+    const line = `\n📊 ${esc(sc.summaryLine(sc.scorecardFor({ repos: reportRepos(repos), sinceHours: 24 })))}`;
+    const at = messages[0].indexOf('\n\n'); // end of the header block
+    messages[0] = at < 0 ? messages[0] + line : messages[0].slice(0, at) + line + messages[0].slice(at);
+  } catch { /* optional line */ }
   if (argv.includes('--json')) console.log(JSON.stringify({ rows, messages }, null, 2));
   else console.log(messages.join('\n\n———\n\n'));
   if (!argv.includes('--send')) return;
