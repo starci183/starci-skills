@@ -288,3 +288,33 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
     assert.ok(hook<api.indexOf("emit(out, `settled ${jobId}"),'before the settle reports');
   });
 });
+
+// Owner ruling 2026-09-24: a drawing notice shows the drawn PART (page content, overlay panel, layout
+// drawing), never the composite placed into the layout capture.
+test('a drawing notice sends each draw\'s part, never its composite; desktop and mobile both go',t=>{
+  withLedger(t,({repoRoot})=>{
+    const P=`${UI}/assets/directions`;
+    const files=[
+      put(repoRoot,`${UI}/index.yaml`,[
+        'schema: work/ui-screen@1','id: ui.shop.cart','assets:',
+        `  - {path: assets/directions/cart--page--desktop--light.content.png, role: direction-content, sha256: '${'a'.repeat(64)}'}`,
+        `  - path: assets/directions/cart--page--desktop--light.png`,'    role: direction',`    sha256: '${'b'.repeat(64)}'`,
+        '    composite: {presentation: page, breakpoint: desktop, theme: light, content: {path: assets/directions/cart--page--desktop--light.content.png}}',''].join('\n')),
+      put(repoRoot,`${P}/cart--page--desktop--light.png`,'composite-desktop'),
+      put(repoRoot,`${P}/cart--page--desktop--light.content.png`,'part-desktop'),
+      put(repoRoot,`${P}/cart--page--mobile--light.png`,'composite-mobile'),
+      put(repoRoot,`${P}/cart--page--mobile--light.content.png`,'part-mobile'),
+      put(repoRoot,`${UI}/evidence/r7/draws.yaml`,[
+        'schema: starci/ui-draws@1','draws:',
+        '  - id: cart-desktop','    screen: cart','    state: cart-ready','    breakpoint: desktop','    theme: light',
+        '    image: {path: assets/directions/cart--page--desktop--light.png}','    content: {path: assets/directions/cart--page--desktop--light.content.png}',
+        '  - id: cart-mobile','    screen: cart','    state: cart-ready','    breakpoint: mobile','    theme: light',
+        '    image: assets/directions/cart--page--mobile--light.png',''].join('\n')),
+    ];
+    const {picks}=collectDrawings({files,repo:repoRoot});
+    assert.deepEqual(picks.map(p=>path.basename(p.file)),['cart--page--desktop--light.content.png','cart--page--mobile--light.content.png'],'a legacy image: composite still finds its .content part');
+    assert.deepEqual(picks.map(p=>p.viewport),['desktop','mobile'],'the draw breakpoint names the band');
+    const noDraws=collectDrawings({files:files.filter(f=>!f.endsWith('draws.yaml')),repo:repoRoot});
+    assert.deepEqual(noDraws.picks.map(p=>path.basename(p.file)),['cart--page--desktop--light.content.png','cart--page--mobile--light.content.png'],'named composites collapse into their parts');
+  });
+});

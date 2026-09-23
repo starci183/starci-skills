@@ -32,6 +32,7 @@ import { configRoot } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { DEFAULT_API_BASE, botCall, redact, telegramSettings } from './telegram.mjs';
 import { argsOf, ownerConfig, readJson, stateFile, writeJson } from './lib.mjs';
+import { drawImageRefs, partOf } from '../work/direction-part.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
@@ -177,8 +178,10 @@ export const themeOf = (value) => { const v = String(value ?? '').toLowerCase();
 
 /**
  * The drawings one draw/asset report produced, in the order they were drawn:
- *  1. the draws[] of every draws.yaml the report names (image paths resolve against the draws file,
- *     then its ui record, then the repo) - the op's own index of its representative directions;
+ *  1. the draws[] of every draws.yaml the report names - each draw's `part`, else `content`, else `image`
+ *     (paths resolve against the draws file, then its ui record, then the repo) - the op's own index of
+ *     its representative directions;
+ * and every pick is the drawn part, never its composite (scripts/work/direction-part.mjs).
  *  2. else the images the report names, without the working copies (.source/.clean-source/
  *     .pre-final/.initial) and without evidence/ copies when the ui record holds the same set;
  *  3. else the representativeScreens[].directionAsset of the ui records it wrote.
@@ -191,15 +194,21 @@ export function collectDrawings({ files, repo }) {
   const nodes = [...nodeDirs.values()].map((dir) => ({ dir, label: uiLabelOf(dir), doc: readYaml(path.join(dir, 'index.yaml')) }));
   const nodeOf = (file) => { const d = uiNodeDirOf(file); return d ? nodes.find((n) => keyOf(n.dir) === keyOf(d)) ?? null : null; };
   const picks = new Map();
-  const add = (file, meta = {}) => {
-    if (!file || !isImage(file) || picks.has(keyOf(file))) return;
-    picks.set(keyOf(file), { file, screen: meta.screen ?? null, state: meta.state ?? null, viewport: meta.viewport ?? null, theme: meta.theme ?? null });
+  // The owner is sent the drawn PART (page content, overlay panel, layout drawing), never the composite
+  // placed into the layout capture (owner ruling 2026-09-24, scripts/work/direction-part.mjs); a composite
+  // named beside its own part collapses into one picture.
+  const partCache = new Map();
+  const add = (found, meta = {}) => {
+    if (!found || !isImage(found)) return;
+    const file = partOf(found, { cache: partCache }).file;
+    if (picks.has(keyOf(file))) return;
+    picks.set(keyOf(file), { file, screen: meta.screen ?? null, state: meta.state ?? null, viewport: meta.viewport ?? meta.breakpoint ?? null, theme: meta.theme ?? null });
   };
   for (const df of all.filter((f) => path.basename(f) === 'draws.yaml')) {
     const node = uiNodeDirOf(df);
     for (const d of arr(readYaml(df)?.draws)) {
-      if (typeof d?.image !== 'string') continue;
-      add(firstFile([path.resolve(path.dirname(df), d.image), node && path.resolve(node, d.image), path.resolve(repo, d.image)]), d);
+      const file = drawImageRefs(d).map((rel) => firstFile([path.resolve(path.dirname(df), rel), node && path.resolve(node, rel), path.resolve(repo, rel)])).find(Boolean);
+      add(file, d);
     }
   }
   // A ui record names its direction images on coverage.representativeScreens[] or coverage.map[] entries.

@@ -62,6 +62,8 @@ import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/tele
 // notifyAsk is parkAsk's (the kernel api's) send point; this form never sends a message.
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, autoAcceptDecision } from './ask-recommendation.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
 // The form speaks the owner's language (config.yaml `language`). Unknown
 // languages fall back to English; the op writes the question itself in the
@@ -218,29 +220,64 @@ const assetsOf = (assets, repo) => {
 // The images a draws.yaml names. Only a draws.yaml the ask's own report lists
 // is read: picking "the newest draws.yaml in the tree" once served another
 // workflow's candidates under an unrelated question.
+// Each draw names its image as a path or {path, sha256}; the owner-facing
+// one is `part`, then `content`, then `image` (drawImageRefs) — the composite
+// an older draws.yaml put in `image` is swapped for its part by ownerImages.
 export const drawsImages = (repo, drawsFile) => {
   const root = path.join(repo, '.starciwork');
   const newest = drawsFile;
   if (!newest || !fs.existsSync(newest)) return [];
+  const text = fs.readFileSync(newest, 'utf8');
+  let entries = null;
+  try { const doc = parseYaml(text); if (Array.isArray(doc?.draws)) entries = doc.draws.map((d) => ({ id: d?.id ?? null, refs: drawImageRefs(d) })); } catch { /* line scan below */ }
+  if (!entries) {
+    entries = [];
+    let id = null;
+    for (const line of text.split('\n')) {
+      const idM = line.match(/^\s+-\s+id:\s*(\S+)/) ?? line.match(/^\s+id:\s*(\S+)/);
+      if (idM) { id = idM[1]; continue; }
+      const imgM = line.match(/^\s+image:\s*(\S+)/);
+      if (imgM) entries.push({ id, refs: [imgM[1]] });
+    }
+  }
+  // draw entries resolve image paths against their ui-node dir, not
+  // necessarily the evidence dir holding draws.yaml — walk ancestors up
+  // to .starciwork until the relative path exists.
+  const resolve = (rel) => {
+    for (let up = 0, dir = path.dirname(newest); up < 6 && dir.startsWith(root); up++, dir = path.dirname(dir)) {
+      const cand = path.join(dir, rel);
+      if (fs.existsSync(cand)) return cand;
+    }
+    return null;
+  };
   const out = [];
-  let id = null;
-  for (const line of fs.readFileSync(newest, 'utf8').split('\n')) {
-    const idM = line.match(/^\s+-\s+id:\s*(\S+)/) ?? line.match(/^\s+id:\s*(\S+)/);
-    if (idM) { id = idM[1]; continue; }
-    const imgM = line.match(/^\s+image:\s*(\S+)/);
-    if (imgM) {
-      // draw entries resolve image paths against their ui-node dir, not
-      // necessarily the evidence dir holding draws.yaml — walk ancestors up
-      // to .starciwork until the relative path exists.
-      let abs = null, dir = path.dirname(newest);
-      for (let up = 0; up < 6 && dir.startsWith(root); up++, dir = path.dirname(dir)) {
-        const cand = path.join(dir, imgM[1]);
-        if (fs.existsSync(cand)) { abs = cand; break; }
-      }
-      if (abs && MIME[path.extname(abs).slice(1).toLowerCase()]) out.push({ label: id ?? imgM[1], abs });
+  for (const { id, refs } of entries) {
+    for (const rel of refs) {
+      const abs = resolve(rel);
+      if (abs && MIME[path.extname(abs).slice(1).toLowerCase()]) { out.push({ label: id ?? rel, abs }); break; }
     }
   }
   return out;
+};
+
+// Owner ruling 2026-09-24: the owner reviews the drawn PART (page content,
+// overlay panel, layout drawing), never the composite placed into the layout
+// capture — that stays evidence for interface.implement/audit. Every image an
+// ask serves goes through this: a composite becomes its part (the label
+// follows it, the original path stays an alias a declared pick still
+// matches), and a composite listed beside its own part collapses into one.
+export const toOwnerImages = (images, repo) => {
+  const repoRel = (abs) => path.relative(repo, abs).replace(/\\/g, '/');
+  const labels = new Map((images ?? []).map((img) => [img?.abs, img?.label]));
+  return ownerImages(images).map((img) => {
+    const aliases = [...new Set(img.aliases.flatMap((a) => [labels.get(a), repoRel(a)]).filter(Boolean))];
+    if (!img.composite) return { ...img, aliases };
+    // A label that is the composite's own file name follows the swap; a
+    // draw id or a declared label stays.
+    const named = String(img.label ?? '').replace(/\\/g, '/');
+    const label = !named || named.endsWith(path.basename(img.composite)) ? repoRel(img.abs) : img.label;
+    return { ...img, label, aliases };
+  });
 };
 
 export const reportImages = (files, repo) => {
@@ -359,7 +396,7 @@ export const pickGroupsOf = (question, images) => {
         if (obj.id == null) return null;
         if (c?.image) {
           const rel = String(c.image).replace(/\\/g, '/');
-          const idx = imgs.findIndex((img) => img.label === rel || img.abs.endsWith(rel));
+          const idx = imgs.findIndex((img) => img.label === rel || img.abs.replace(/\\/g, '/').endsWith(rel) || (img.aliases ?? []).some((a) => a === rel || String(a).endsWith(`/${rel}`)));
           if (idx >= 0) obj.image = { idx, label: imgs[idx].label };
         }
         return obj;
@@ -678,6 +715,7 @@ const main = async () => {
   let images = assetsOf(question.assets, repo);
   if (!images.length) images = imagesOf(qText, repo);
   if (!images.length) images = reportImages(rj.files, repo);
+  images = toOwnerImages(images, repo);
   const nonce = `a-${crypto.randomBytes(9).toString('hex')}`;
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 
