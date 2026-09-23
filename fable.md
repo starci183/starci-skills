@@ -1082,6 +1082,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   ledger, tự khai trong inc-f3f8d80df3dc) vì landed-check của P7 tìm đường dẫn frontend trong nivo-backend; giao fork P7b (resolve
   theo repo đích). Kernel cũng commit 94MB evidence vào nivo-backend với ALLOW_SECRET_SCAN=1: đưa vào danh sách buổi sáng.
 
+- 09:55 Không vá. WSPV đã xử lý a32/a33 sau khi được đánh thức (vá 36be1bf2c đúng), một worker audit đang chạy. Collab 6 slice
+  dependency, membership chạy. Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00: từ đây trò không trả lời ask
+  thay thầy nữa. Chờ fork: P7b (landed-check theo repo đích) và P8 (lineage retry cut, spinner cũ).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
