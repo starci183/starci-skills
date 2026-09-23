@@ -219,7 +219,7 @@ commands:
         unchanged full gates over the whole set before that settle. Ordinals settle out of order, so the
         closing ordinal is whichever is left, not the highest (inc-751dd1ac4492)
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
-      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it'
+      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready'
     refuses:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
@@ -636,10 +636,13 @@ commands:
       appends op-worker-nudged. It creates no job, contract, lease, retry,
       verdict or authority.
     returns: >-
-      {ok:true,jobId,nudged:true|false,reason?,worker,receipt?} — nudged:false
-      with ok:true and exit 0 is a SKIP, not a refusal: reason 'report-filed'
-      (the durable answer already exists) or 'worker-active' (the turn is
-      running)
+      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,reason?,worker,receipt?}
+      — nudged:false with ok:true and exit 0 is a SKIP, not a refusal: reason
+      'report-filed' (the durable answer already exists) or 'worker-active'
+      (the turn is running). A worker whose liveness is `staged-input` (its
+      paste never left the input row) gets ONE Enter-only send and no wake
+      text, action submit-staged-input: typing a wake on top of the paste
+      would bury it (inc-06aeecf432f1). Every other nudge is action wake
     refuses:
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'
@@ -673,7 +676,7 @@ commands:
       observation is READ-ONLY reasoning context, never evidence — an op's
       screen is never proof; only `api report` plus kernel-run `api check`
       rows settle a verdict
-    returns: '{ok:true, job, jobId, opId, attempt, ledgerStatus, terminal:{handle,connected,writable,status,idleMs,screenState?}, screen:<tail of last --lines lines, default 80, null when unreadable>, turnState:active|turn-idle|disconnected|unreadable|unknown, observedAt}'
+    returns: '{ok:true, job, jobId, opId, attempt, ledgerStatus, terminal:{handle,connected,writable,status,idleMs,screenState?}, screen:<tail of last --lines lines, default 80, null when unreadable>, turnState:active|staged-input|turn-idle|disconnected|unreadable|unknown, observedAt} — staged-input is an unsubmitted paste (status workers.liveness); api nudge submits it'
     refuses:
       - job-not-found: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has an observable worker terminal'

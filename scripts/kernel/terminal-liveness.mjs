@@ -41,14 +41,48 @@ export function gateRemedy(gate, { cwd = null } = {}) {
 // submitted (Codex renders it as "› [Pasted Content 5012 chars]"). Only the
 // LAST prompt row counts: a transcript row that quotes an earlier paste is not
 // the input box. Returns the staged input row, or null.
-export function stagedInputRow(screen, stagedPattern = /Pasted Content|\[Pasted text/i) {
+export const DEFAULT_STAGED_PATTERN = /Pasted Content|\[Pasted text/i;
+const INPUT_GLYPH = /^\s*[>›❯❭]\s*/u;
+const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+// A row shorter than this is too generic to call an echo of the sent text.
+const MIN_ECHO_CHARS = 12;
+/** True when `row` (input glyph and rail stripped) is a verbatim piece of the text sent to the terminal. */
+export function echoesSentText(row, sentText) {
+  const content = collapse(String(row ?? '').replace(INPUT_GLYPH, ''));
+  const sent = typeof sentText === 'string' ? collapse(sentText) : '';
+  return content.length >= MIN_ECHO_CHARS && sent.length > 0 && sent.includes(content);
+}
+
+/**
+ * The unsubmitted input region of a provider frame, or null: {row, start, above, rows}. `start` indexes
+ * the rail-stripped last-14 `rows`; `above` is every row before it. Two shapes count:
+ *  - the LAST input-glyph row carries a staged marker (`stagedPattern`: "[Pasted Content N chars]") or a
+ *    verbatim piece of `sentText`, the text the runtime typed into this terminal;
+ *  - with no later glyph row, the frame tail is two or more rows of `sentText` (a TUI that shows the paste
+ *    itself in its input box, glyph row empty or scrolled away).
+ * A Devin command-terminal worker sat 13 minutes with its whole inline contract in the input box; the
+ * contract text says "Running", "Working", "esc to interrupt", so the frame read `active` and `api nudge`
+ * skipped it as worker-active (inc-06aeecf432f1). Knowing the sent text is what tells a paste from a turn.
+ */
+export function stagedInputRegion(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null } = {}) {
   // A boxed input row (`│ > text │`) is still the input row: strip the rail.
   const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14)
     .map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
-  for (let i = rows.length - 1; i >= 0; i -= 1) {
-    if (/^\s*[>›❯❭]\s*/u.test(rows[i])) return stagedPattern.test(rows[i]) ? rows[i].trim() : null;
-  }
-  return null;
+  const echo = (row) => Boolean(sentText) && echoesSentText(row, sentText);
+  let glyph = -1;
+  for (let i = rows.length - 1; i >= 0; i -= 1) if (INPUT_GLYPH.test(rows[i])) { glyph = i; break; }
+  if (glyph >= 0 && (stagedPattern.test(rows[glyph]) || echo(rows[glyph])))
+    return { row: rows[glyph].trim(), start: glyph, above: rows.slice(0, glyph), rows };
+  if (!sentText) return null;
+  const after = rows.map((row, i) => ({ row, i })).filter(({ i }) => i > glyph);
+  const echoes = after.filter(({ row }) => echo(row));
+  if (echoes.length < 2 || echoes.at(-1).i < rows.length - 3) return null;
+  const start = glyph >= 0 ? glyph : echoes[0].i;
+  return { row: rows[echoes[0].i].trim(), start, above: rows.slice(0, start), rows };
+}
+
+export function stagedInputRow(screen, stagedPattern = DEFAULT_STAGED_PATTERN, { sentText = null } = {}) {
+  return stagedInputRegion(screen, { stagedPattern, sentText })?.row ?? null;
 }
 
 export const WEDGE_MINUTES = 30;
@@ -58,7 +92,21 @@ export const WEDGE_MINUTES = 30;
 // spinner (⎿ ☐ ☒ ...), Codex queued-message rows (↳), and a status/footer row.
 const SPINNER_COMPANION = /^\s*$|^\s*[─━═╌┄_-]{3,}|^\s*[⎿↳☐☒◻◼□■✓✔]|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b|^\s*(?:tip|hint)\b/iu;
 
-export function classifyAgentScreen(screen) {
+export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null } = {}) {
+  // An unsubmitted paste in the input row is never a running turn, whatever
+  // words the pasted text holds (inc-06aeecf432f1). Only the rows ABOVE the
+  // input region decide: a live spinner there is a turn with a queued
+  // follow-up (active), a gate or failure there keeps its name, and anything
+  // else is `staged-input` - the one Enter-only send submits it.
+  const staged = stagedInputRegion(screen, { stagedPattern, sentText });
+  if (staged) {
+    // The input region stands in as the prompt row, so a spinner followed by
+    // a finished answer reads finished exactly as it would above an empty row.
+    const above = classifyAgentScreen([...staged.above, '> '].join('\n'), { stagedPattern: /(?!)/ });
+    const recent = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14).join('\n');
+    if (['active', 'wedged', 'interactive-gate', 'failed'].includes(above.state)) return { ...above, recent };
+    return { state: 'staged-input', row: staged.row, recent };
+  }
   const lines = String(screen ?? '').split(/\r?\n/).filter(Boolean);
   const recentLines = lines.slice(-14);
   const recent = recentLines.join('\n');

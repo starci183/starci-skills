@@ -435,9 +435,9 @@ const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath }) => {
     if (!shown?.ok || shown.connected !== true || shown.writable !== true) return { action: 'kernel-unavailable', terminal };
     const read = terminalRead({ terminal, screen: true });
     const state = read?.ok ? classifyAgentScreen(read.screen).state : null;
-    if (state === 'queued-input') {
+    if (state === 'queued-input' || state === 'staged-input') {
       const sent = terminalSend({ terminal, text: '', enter: true });
-      return { action: sent?.ok ? 'kernel-queued-input-sent' : 'kernel-wake-failed', terminal, state };
+      return { action: sent?.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state };
     }
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
     const prompt = [

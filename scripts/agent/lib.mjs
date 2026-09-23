@@ -24,7 +24,7 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, gateRemedy, stagedInputRow } from '../kernel/terminal-liveness.mjs';
+import { classifyAgentScreen, gateRemedy, stagedInputRegion } from '../kernel/terminal-liveness.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -316,7 +316,13 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
 // screen is NOT started work: it gets exactly one Enter of its own, then
 // must leave the input row within stuckGraceMs or the submission is refused
 // with signal 'prompt-stuck' — the caller closes the terminal.
-export function awaitSubmission(handle, adapter) {
+// `sentText` is the exact text deliverPrompt typed. A card whose TUI shows an
+// inline paste verbatim (Devin) has no "[Pasted Content]" marker, and the
+// contract text itself says "Running"/"Working"/"tokens": read against the
+// whole screen that looked like activity and a paste that never left the
+// input box passed as submitted (inc-06aeecf432f1). With the sent text the
+// input region is found and only the rows above it can prove work began.
+export function awaitSubmission(handle, adapter, { sentText = null } = {}) {
   const spec = adapter?.submission && typeof adapter.submission === 'object' ? adapter.submission : {};
   const activity = regexp(spec.activityPattern, 'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens');
   const staged = regexp(spec.stagedPattern, 'Pasted Content|<file>|orca-dispatch-');
@@ -333,8 +339,12 @@ export function awaitSubmission(handle, adapter) {
     const failure = failureOnScreen(adapter, screen);
     if (read.ok && failure) return { ok: false, reason: `prompt submission rejected: ${failure.signal}`, screen, enters, ...failure };
     // Work that has begun wins: a staged-looking row under a live spinner is
-    // transcript or a queued follow-up, never a stuck first prompt.
-    const stuckRow = read.ok && !activity.test(screen) ? stagedInputRow(screen, staged) : null;
+    // transcript or a queued follow-up, never a stuck first prompt. Activity
+    // counts only ABOVE the staged input region - the paste's own words are
+    // not a spinner.
+    const region = read.ok ? stagedInputRegion(screen, { stagedPattern: staged, sentText }) : null;
+    const begun = read.ok && activity.test(region ? region.above.join('\n') : screen);
+    const stuckRow = region && !begun ? region.row : null;
     if (stuckRow) {
       if (stuckEnterAt === null) {
         terminalSend({ terminal: handle, text: '', enter: true });
@@ -346,7 +356,7 @@ export function awaitSubmission(handle, adapter) {
       }
       continue;
     }
-    if (read.ok && activity.test(screen)) return { ok: true, screen, enters, ...(stuckEnterAt !== null ? { unstuckByEnter: true } : {}) };
+    if (begun) return { ok: true, screen, enters, ...(stuckEnterAt !== null ? { unstuckByEnter: true } : {}) };
     if (read.ok && enters < maxEnter && (staged.test(screen) || input.test(screen))) {
       terminalSend({ terminal: handle, text: '', enter: true });
       enters += 1;
@@ -410,9 +420,11 @@ export function deliverPrompt({ handle, adapter, prompt, worktree, dispatchId = 
     const sendText = (d.prompt ?? 'Read <file> completely and follow it exactly.')
       .replace('<file>', file.replaceAll('\\', '/'));
     const send = sendLanded(terminalSend({ terminal: handle, text: sendText, enter: true }));
-    return { ...send, artifact: { file, dir, transient } };
+    return { ...send, sentText: sendText, artifact: { file, dir, transient } };
   }
-  return sendLanded(terminalSend({ terminal: handle, text: prompt, enter: true }));
+  // sentText is what the terminal was given: awaitSubmission and the api's
+  // liveness reads find an unsubmitted paste by it (inc-06aeecf432f1).
+  return { ...sendLanded(terminalSend({ terminal: handle, text: prompt, enter: true })), sentText: prompt };
 }
 
 // agent_prompt_stalled: Orca typed the text but could not see it submitted
@@ -570,7 +582,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
     const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree, dispatchId });
     artifact = send.artifact ?? null;
     if (!send.ok) return fail('send', send.error || 'send failed');
-    const submitted = awaitSubmission(handle, built.adapter);
+    const submitted = awaitSubmission(handle, built.adapter, { sentText: send.sentText ?? text });
     if (!submitted.ok) return fail('submission', submitted.reason, submitted.signal ?? null,
       { screen: submitted.screen, matched: submitted.matched });
     if (attest) {

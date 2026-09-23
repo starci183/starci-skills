@@ -146,11 +146,13 @@ export async function watchdogTick() {
   const classified = liveness.staleActive ? { ...screen, state: liveness.state } : screen;
   const stale = liveness.staleActive ? { screenState: screen.state, reason: 'stale-active', livenessReason: 'stale-active', activeStaleMs: ACTIVE_STALE_MS } : {};
 
-  if (classified.state === 'queued-input') {
-    // A queued message is already the Kernel's input; Enter delivers it.
-    if (!repair) return { ok: true, workflowId, phase, terminal, action: 'queued-input', outputAgeMs };
+  if (classified.state === 'queued-input' || classified.state === 'staged-input') {
+    // A queued message is already the Kernel's input; Enter delivers it. A
+    // staged paste (a wake typed but never submitted) is the same: Enter only,
+    // never a second wake on top of it (inc-06aeecf432f1).
+    if (!repair) return { ok: true, workflowId, phase, terminal, action: classified.state, outputAgeMs };
     const sent = terminalSend({ terminal, text: '', enter: true });
-    return { ok: sent.ok, workflowId, phase, terminal, action: sent.ok ? 'queued-input-sent' : 'wake-failed', outputAgeMs, error: sent.error ?? null };
+    return { ok: sent.ok, workflowId, phase, terminal, action: sent.ok ? `${classified.state}-sent` : 'wake-failed', outputAgeMs, error: sent.error ?? null };
   }
   if (classified.state === 'turn-idle') {
     // A kernel waiting on the owner or on a running op has nothing to do; waking

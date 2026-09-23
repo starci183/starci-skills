@@ -52,14 +52,14 @@ import { commitPolicyOf, landedProof, policyCommits, policyPushes } from './sett
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
-  awaitSubmission, awaitAttestation,
+  awaitSubmission, awaitAttestation, loadAdapter,
 } from '../agent/lib.mjs';
 import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -336,7 +336,26 @@ const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?
   ?? payload?.hierarchy?.runtime?.terminalHandle
   ?? (payload?.managed ? null : row?.worker_id)
   ?? null;
-const observeOperationWorker = (job, now = Date.now()) => {
+// What the runtime typed into an operation's terminal (the contract row, plus
+// the exact delivered text dispatch recorded) and how the worker's provider
+// renders a staged paste (its card's submission.stagedPattern). The classifier
+// needs both to tell an unsubmitted paste from a running turn: a Devin worker's
+// inline contract sat in its input box for 13 minutes and read `active` from
+// the words it contains (inc-06aeecf432f1).
+const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
+  const row = db?.prepare('SELECT markdown,context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+    .get(job.workflow_id, job.op_id ?? payload.opId ?? null, job.attempt) ?? null;
+  const context = parseJson(row?.context_json ?? '', {}) ?? {};
+  const sentText = [context.delivery?.text, row?.markdown].filter((text) => typeof text === 'string' && text).join('\n') || null;
+  const provider = payload.provider ?? payload.agent ?? null;
+  const cardPattern = provider ? loadAdapter(provider)?.card?.submission?.stagedPattern : null;
+  let stagedPattern = DEFAULT_STAGED_PATTERN;
+  if (typeof cardPattern === 'string' && cardPattern.trim()) {
+    try { stagedPattern = new RegExp(`${DEFAULT_STAGED_PATTERN.source}|${cardPattern}`, 'i'); } catch { /* the default still holds */ }
+  }
+  return { sentText, stagedPattern };
+};
+const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
   if (!terminalHandle) return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null, liveness: 'unknown', reason: 'operation terminal handle unavailable', observedAt: now };
   try {
@@ -348,12 +367,13 @@ const observeOperationWorker = (job, now = Date.now()) => {
     if (shown?.ok && connected && writable) {
       try {
         const read = terminalRead({ terminal: terminalHandle, screen: true });
-        if (read?.ok) screenState = classifyAgentScreen(read.screen).state;
+        if (read?.ok) screenState = classifyAgentScreen(read.screen, db ? stagedInputEvidenceOf(db, job) : {}).state;
       } catch { /* terminal-show fallback below remains conservative */ }
     }
     const stale = staleAwareState(screenState, outputAgeMs, ACTIVE_STALE_MS);
     const liveness = !shown?.ok ? 'unknown'
       : !connected || !writable ? 'disconnected'
+      : screenState === 'staged-input' ? 'staged-input'
       : screenState === 'wedged' ? 'wedged'
       : stale.staleActive ? 'turn-idle'
       : screenState === 'active' ? 'active'
@@ -391,10 +411,11 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
     const state = staleAwareState(classifyAgentScreen(read.screen).state, outputAgeMs, ACTIVE_STALE_MS).state;
     // A queued message waits for Enter: deliver it; it already asks the
-    // Kernel to act, and it reads status first.
-    if (state === 'queued-input') {
+    // Kernel to act, and it reads status first. A staged paste is submitted
+    // the same way, never buried under a second wake (inc-06aeecf432f1).
+    if (state === 'queued-input' || state === 'staged-input') {
       const sent = terminalSend({ terminal, text: '', enter: true });
-      return { action: sent?.ok ? 'kernel-queued-input-sent' : 'kernel-wake-failed', terminal, state };
+      return { action: sent?.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state };
     }
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
     const prompt = [
@@ -437,7 +458,7 @@ function cmdNudge(ledger, args) {
     emit(out, `nudge skipped for ${jobId}: report already filed (${report.outcome})`, args.json);
     return;
   }
-  const worker = observeOperationWorker(job);
+  const worker = observeOperationWorker(job, Date.now(), db);
   if (!worker.terminalHandle || !worker.connected || !worker.writable) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker };
     emit(out, `nudge REFUSED for ${jobId}: exact worker is unavailable`, args.json);
@@ -446,6 +467,26 @@ function cmdNudge(ledger, args) {
   if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') {
     const out = { ok: true, jobId, nudged: false, reason: 'worker-active', worker };
     emit(out, `nudge skipped for ${jobId}: exact worker is active`, args.json);
+    return;
+  }
+  // A staged, unsubmitted paste (the dispatch contract still in the input
+  // row) is not started work and not an idle prompt: typing a wake on top of
+  // it would bury it. One Enter-only send submits exactly what is there
+  // (inc-06aeecf432f1; the dispatch-time twin is scripts/agent/lib.mjs
+  // awaitSubmission).
+  if (worker.liveness === 'staged-input') {
+    const sent = terminalSend({ terminal: worker.terminalHandle, text: '', enter: true });
+    if (!sent.ok) {
+      const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', worker, error: sent.error };
+      emit(out, `nudge FAILED for ${jobId}: ${sent.error ?? 'terminal send failed'}`, args.json);
+      process.exit(1);
+    }
+    ledger.transaction(() => ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, action: 'submit-staged-input' },
+    }));
+    const out = { ok: true, jobId, nudged: true, action: 'submit-staged-input', worker, receipt: sent.receipt ?? null };
+    emit(out, `nudged ${jobId}: submitted the staged input on exact worker ${worker.terminalHandle} with one Enter`, args.json);
     return;
   }
   if (worker.liveness === 'interactive-gate' || worker.liveness === 'failed') {
@@ -474,7 +515,7 @@ function cmdNudge(ledger, args) {
     workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
     kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}) },
   }));
-  const out = { ok: true, jobId, nudged: true, worker, receipt: sent.receipt ?? null };
+  const out = { ok: true, jobId, nudged: true, action: 'wake', worker, receipt: sent.receipt ?? null };
   emit(out, `nudged ${jobId}: resumed exact worker ${worker.terminalHandle} to file its durable report`, args.json);
 }
 
@@ -488,7 +529,7 @@ function cmdNudge(ledger, args) {
 // 'op-observed' event (handle, turnState, screen byte length — the screen
 // itself stays out of the ledger).
 const OBSERVE_SCREEN_LINES = 80;
-const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle' };
+const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input' };
 function cmdObserve(ledger, args) {
   const db = ledger.db, jobId = args.job, now = Date.now();
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
@@ -527,7 +568,7 @@ function cmdObserve(ledger, args) {
     catch (error) { read = { ok: false, error: String(error?.message ?? error) }; }
     if (!read?.ok) turnState = 'unreadable';
     else {
-      screenState = classifyAgentScreen(read.screen).state;
+      screenState = classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
       const stale = staleAwareState(screenState, terminal.idleMs, ACTIVE_STALE_MS);
       turnState = OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
       if (stale.staleActive) terminal.livenessReason = 'stale-active';
@@ -898,7 +939,7 @@ function cmdStatus(ledger, args) {
       AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
     .all(workflowId, ...FINAL_SETTLED)
     .filter((job) => job.status === 'running' || operationTerminalHandleOf(job))
-    .map((job) => observeOperationWorker(job, now));
+    .map((job) => observeOperationWorker(job, now, db));
   const openOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
       AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).get(workflowId, ...FINAL_SETTLED).n;
   // Operations the Kernel can move right now with no wait at all: a queued job
@@ -1004,7 +1045,7 @@ function cmdStatus(ledger, args) {
     const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(report.job_id);
     return row && ['running', 'answering'].includes(row.status);
   }).map((report) => report.job_id);
-  const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
+  const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker whose turn has run past WEDGE_MINUTES on one shell command that
   // still shows no output (terminal-liveness.mjs) is stuck, not busy.
@@ -1054,7 +1095,7 @@ function cmdStatus(ledger, args) {
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
-        ? 'one or more exact running workers are at an idle provider prompt without a report; Kernel must call api nudge for each listed job now'
+        ? 'one or more exact running workers are at an idle provider prompt, or hold an unsubmitted paste in their input row, without a report; Kernel must call api nudge for each listed job now (a staged paste gets one Enter)'
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : staleReady.length > 0
@@ -2282,7 +2323,7 @@ function cmdDispatch(ledger, args, repo) {
   const sent = deliverPrompt({ handle, adapter, prompt: dispatched.preamble, worktree, dispatchId });
   artifact = sent.artifact ?? null;
   if (!sent.ok) return rejectCommand({ step: 'send', dispatchId, error: sent.error ?? 'terminal send failed' });
-  const submitted = awaitSubmission(handle, adapter);
+  const submitted = awaitSubmission(handle, adapter, { sentText: sent.sentText ?? dispatched.preamble });
   if (!submitted.ok) return rejectCommand({ step: 'submission', dispatchId, signal: submitted.signal ?? null,
     error: submitted.reason, details: submitted });
   const attested = awaitAttestation(handle, adapter);
@@ -2320,7 +2361,10 @@ function cmdDispatch(ledger, args, repo) {
     const now = Date.now();
     fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
-      context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
+      // delivery.text is exactly what the terminal was given (Orca preamble +
+      // Task spec, or the file-reference line): status/nudge/observe find an
+      // unsubmitted paste by it (inc-06aeecf432f1).
+      context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs, delivery: { text: sent.sentText ?? dispatched.preamble } },
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(handle, JSON.stringify(payload), now, jobId);
