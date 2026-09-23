@@ -28,6 +28,12 @@ open ledgers with `inspectLedger` (read-only) and never write one.
 State lives beside the machine arbiter: `%LOCALAPPDATA%/StarCi/runtime/connectors/`
 (`gateway.json`, `tunnel.json`, `cloudflared.yml`, `cloudflared.log`, `telegram-sent.json`).
 
+The gateway and the tunnel manager are single-instance per host. `start` is called by every
+serve-ask, often at once, so each `run` first claims `gateway.lock` / `tunnel.lock` in that
+directory with an exclusive create and refuses while another live manager holds the lock or owns
+`gateway.json` / `tunnel.json`. A recorded pid counts as live only if that process started in the
+current boot, so after a reboot a stale record never blocks a fresh start.
+
 ## Commands
 
 ```

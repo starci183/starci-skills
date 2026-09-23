@@ -31,7 +31,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
-import { argsOf, ownerConfig, pidAlive, readJson, spawnDetached, stateFile, writeJson } from './lib.mjs';
+import { argsOf, claimManager, lockHolder, ownerConfig, pidAlive, readJson, recordAlive, spawnDetached, stateFile, writeJson } from './lib.mjs';
 
 const QUICK_URL = /https:\/\/(?!api\.)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.trycloudflare\.com\b/i;
 const CONNECTED = /Registered tunnel connection|Connection [0-9a-f-]+ registered/i;
@@ -51,7 +51,7 @@ export const tunnelState = (env = process.env) => readJson(tunnelStateFile(env))
  */
 export function publicBase(env = process.env) {
   const s = tunnelState(env);
-  if (!s?.pid || !pidAlive(s.pid) || !s.baseUrl || !s.connected) return null;
+  if (!recordAlive(s) || !s.baseUrl || !s.connected) return null;
   return s.baseUrl;
 }
 
@@ -153,6 +153,27 @@ export function superviseTunnel(cf, { port, env = process.env, secretEnv = env, 
   };
 }
 
+/**
+ * The one tunnel manager for this host. `start` may be called by every serve-ask at once, and each
+ * call used to launch its own manager before the first wrote tunnel.json (nine managers, nine
+ * cloudflared). A manager now claims <state>/tunnel.lock first and refuses while another live
+ * manager holds the lock or owns tunnel.json: {ok:false, holder}. Otherwise it supervises
+ * cloudflared and returns {ok:true, handle, release}.
+ */
+export function runManager(cf, { port, env = process.env, secretEnv = env } = {}) {
+  const claim = claimManager('tunnel', { current: tunnelState(env), env });
+  if (!claim.ok) return { ok: false, holder: claim.holder ?? null };
+  try {
+    return { ok: true, handle: superviseTunnel(cf, { port, env, secretEnv }), release: claim.release };
+  } catch (error) { claim.release(); throw error; }
+}
+
+/** A live manager: the one tunnel.json names, or the holder of the manager lock (one still starting). */
+export const managerAlive = (env = process.env) => {
+  const state = tunnelState(env);
+  return recordAlive(state) ? state : lockHolder('tunnel', env);
+};
+
 const loadCloudflare = () => {
   const config = ownerConfig();
   if (!config) throw Error('config.yaml cannot be read');
@@ -164,7 +185,7 @@ function main() {
   const verb = args._[0] ?? 'status';
   const state = tunnelState();
   const out = (value) => console.log(JSON.stringify(value));
-  if (verb === 'status') { out({ ok: true, running: Boolean(state?.pid && pidAlive(state.pid)), publicBase: publicBase(), ...(state ?? {}) }); return; }
+  if (verb === 'status') { out({ ok: true, running: Boolean(managerAlive()), publicBase: publicBase(), ...(state ?? {}) }); return; }
   if (verb === 'stop') {
     for (const pid of [state?.pid, state?.childPid]) if (pid && pidAlive(pid)) { try { process.kill(pid); } catch { /* gone */ } }
     out({ ok: true, stopped: state?.pid ?? null }); return;
@@ -183,16 +204,18 @@ function main() {
     return;
   }
   if (verb === 'start') {
-    if (state?.pid && pidAlive(state.pid)) { out({ ok: true, already: true, pid: state.pid, publicBase: publicBase() }); return; }
+    const live = managerAlive();
+    if (live) { out({ ok: true, already: true, pid: live.pid, publicBase: publicBase() }); return; }
     try { cloudflaredPlan(cf, { port, configFile: stateFile('cloudflared.yml'), secretEnv }); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
     const pid = spawnDetached(fileURLToPath(import.meta.url), ['run', '--port', String(port)]);
     out({ ok: true, launched: pid, mode: cf.mode, hostname: cf.hostname, state: tunnelStateFile() }); return;
   }
   if (verb === 'run') {
-    let handle;
-    try { handle = superviseTunnel(cf, { port, secretEnv }); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
-    const stop = () => { handle.stop(); process.exit(0); };
-    process.on('SIGINT', stop); process.on('SIGTERM', stop);
+    let managed;
+    try { managed = runManager(cf, { port, secretEnv }); } catch (error) { out({ ok: false, error: error.message }); process.exit(2); }
+    if (!managed.ok) { out({ ok: false, already: true, error: 'another tunnel manager owns the tunnel state', pid: managed.holder?.pid ?? null }); process.exit(1); }
+    const stop = () => { managed.handle.stop(); managed.release(); process.exit(0); };
+    process.on('SIGINT', stop); process.on('SIGTERM', stop); process.on('exit', managed.release);
     return;
   }
   console.error('usage: tunnel.mjs start|run|status|stop|dry-run [--port <n>]'); process.exit(2);

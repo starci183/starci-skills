@@ -6,6 +6,7 @@
 // Every ledger read here goes through inspectLedger (read-only): the
 // connectors observe asks, they never write a ledger.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, machineFileFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
@@ -34,6 +35,60 @@ export const writeJson = (file, value) => {
 export const pidAlive = (pid) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; }
+};
+
+/** When this host last booted (ms). */
+export const hostBootAt = () => Date.now() - os.uptime() * 1000;
+/**
+ * Whether the process a state record names ({pid, startedAt}) is still that process: its pid is
+ * live AND it started in this boot. After a reboot the recorded pid may name an unrelated process,
+ * and a connector that trusted it would never start again.
+ */
+export const recordAlive = (record) => {
+  if (!record?.pid || !pidAlive(record.pid)) return false;
+  const started = Date.parse(record.startedAt ?? '');
+  return !Number.isFinite(started) || started >= hostBootAt() - 60_000;
+};
+
+/**
+ * Claim the single-manager lock <state>/<name>.lock for this process, created exclusively ('wx').
+ * `current` is the manager's state record (tunnel.json, gateway.json): a live one that is not this
+ * process owns the state even without the lock (a manager started before the lock existed).
+ * A lock whose holder is dead or from an earlier boot is stale and taken over; an unreadable lock
+ * younger than 5s is one being written. Returns {ok:true, release} or {ok:false, holder}.
+ */
+export function claimManager(name, { current = null, env = process.env } = {}) {
+  if (current && current.pid !== process.pid && recordAlive(current)) return { ok: false, holder: current };
+  const file = stateFile(`${name}.lock`, env);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      fs.writeFileSync(file, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), { flag: 'wx' });
+      const release = () => { try { if (readJson(file)?.pid === process.pid) fs.rmSync(file, { force: true }); } catch { /* gone */ } };
+      return { ok: true, release, file };
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      const held = readJson(file);
+      if (held && held.pid !== process.pid && recordAlive(held)) return { ok: false, holder: held };
+      if (!held) {
+        let age = Infinity;
+        try { age = Date.now() - fs.statSync(file).mtimeMs; } catch { /* vanished: retry */ }
+        if (age < 5000) return { ok: false, holder: null };
+      }
+      // Stale: move it aside under a unique name, so two claimants cannot both delete a fresh lock.
+      try { fs.renameSync(file, `${file}.stale-${process.pid}-${Date.now()}`); } catch { continue; }
+      for (const leftover of fs.readdirSync(path.dirname(file)).filter((f) => f.startsWith(`${name}.lock.stale-`))) {
+        try { fs.rmSync(path.join(path.dirname(file), leftover), { force: true }); } catch { /* best effort */ }
+      }
+    }
+  }
+  return { ok: false, holder: readJson(file) };
+}
+
+/** The live holder of a manager lock, or null. */
+export const lockHolder = (name, env = process.env) => {
+  const held = readJson(stateFile(`${name}.lock`, env));
+  return held && recordAlive(held) ? held : null;
 };
 
 /** Launch `node <script> ...args` detached from this process, output discarded. */

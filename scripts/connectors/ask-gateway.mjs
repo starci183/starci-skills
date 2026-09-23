@@ -19,7 +19,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectorsConfig } from '../../engine/config.mjs';
-import { argsOf, askRepos, NONCE, ownerConfig, pidAlive, readJson, servingAsksAcross, spawnDetached, stateFile, writeJson } from './lib.mjs';
+import { argsOf, askRepos, claimManager, lockHolder, NONCE, ownerConfig, pidAlive, readJson, recordAlive, servingAsksAcross, spawnDetached, stateFile, writeJson } from './lib.mjs';
 
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'host']);
 const MAX_BODY = 1024 * 1024;
@@ -96,7 +96,8 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
 }
 
 export const gatewayState = (env = process.env) => readJson(stateFile('gateway.json', env));
-export const gatewayAlive = (env = process.env) => { const s = gatewayState(env); return Boolean(s?.pid && pidAlive(s.pid)); };
+// Alive: gateway.json names a live process of this boot, or a gateway holds the start lock.
+export const gatewayAlive = (env = process.env) => recordAlive(gatewayState(env)) || Boolean(lockHolder('gateway', env));
 
 const settings = (args) => {
   const config = ownerConfig();
@@ -109,6 +110,14 @@ const settings = (args) => {
 
 async function run(args) {
   const { extra, port } = settings(args);
+  // One gateway per host: concurrent `start` calls each launch a `run`; only the one that claims
+  // <state>/gateway.lock (and finds no other live gateway in gateway.json) serves.
+  const claim = claimManager('gateway', { current: gatewayState() });
+  if (!claim.ok) {
+    console.log(JSON.stringify({ ok: false, already: true, error: 'another ask gateway owns the gateway state', pid: claim.holder?.pid ?? null }));
+    process.exit(1);
+  }
+  process.on('exit', claim.release);
   const live = () => { try { return connectorsConfig(ownerConfig() ?? undefined); } catch { return null; } };
   const server = createGateway({
     resolve: ledgerResolver({ repos: () => askRepos(live(), { extra }) }),
