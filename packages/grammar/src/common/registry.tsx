@@ -9,6 +9,7 @@ import {
     SurfaceAccordionCard, SurfaceCard, SurfaceCopyGroup, SurfaceListCard, Tabs, Text,
     TextAction, Tooltip, VerticalScrollRegion, WorkspaceShell,
 } from "./renderers.js"
+import { COMMON_NAVIGATION_COMPONENTS } from "./renderers-navigation.js"
 import type { ComponentProps, ComponentType, ElementType } from "react"
 
 export type GrammarComponentRenderer<Props> = ComponentType<Props>
@@ -27,6 +28,7 @@ export const COMMON_GRAMMAR_COMPONENTS = Object.freeze({
     Progress, Rail, RankArtwork, SectionHeader, Sidebar, StateMark, StaticStateRow, Subnav,
     SurfaceAccordionCard, SurfaceCard, SurfaceCopyGroup, SurfaceListCard, Tabs, Text,
     TextAction, Tooltip, VerticalScrollRegion, WorkspaceShell,
+    ...COMMON_NAVIGATION_COMPONENTS,
 } as const)
 export type CommonGrammarComponentName = keyof typeof COMMON_GRAMMAR_COMPONENTS
 

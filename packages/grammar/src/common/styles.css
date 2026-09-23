@@ -1,3 +1,4 @@
+@import "./components-navigation.css";
 /* Common owns only universal structure/scales. Families supply material DNA. */
 @layer starci-grammar-common, starci-grammar-core, starci-grammar-heritage, starci-grammar-offset-pop;
 
