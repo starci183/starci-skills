@@ -21,6 +21,13 @@ about:
 watchdog:
   executable: scripts/kernel/watchdog.mjs
   cadence: modules/models/runtimes.yaml allocation.watchdogCadenceMs
+  resume: >-
+    scripts/kernel/resume-all.mjs restarts the watchdogs a host reboot killed:
+    one --repair watchdog per running, unarchived workflow that has none,
+    once Orca answers (--wait-orca retries for a bounded time). Each watchdog
+    then replaces its dead Kernel through start-workflow; a kernel handle a
+    running Orca answers terminal_handle_stale for is gone, so nothing is
+    closed and no incident is opened for it.
   boundary: >-
     Liveness only. It reads canonical status/survey and the attested Kernel
     terminal. A connected terminal at its provider input prompt is turn-idle

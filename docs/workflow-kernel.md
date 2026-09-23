@@ -34,6 +34,17 @@ Normal Op completion does not wait for that cadence: `api report` commits the
 report row and immediately wakes the same Kernel when its provider turn is at
 the input prompt. The watchdog is the missed-event/disconnection fallback.
 
+A host shutdown loses every process but not the ledger, and a workflow resumes
+like a saga. `scripts/kernel/resume-all.mjs` (run at logon and every ten
+minutes by the scheduled tasks `--install-startup --apply` creates) starts one
+`--repair` watchdog per running workflow that has none, once Orca is up. Each
+watchdog relaunches its dead Kernel from the ledger. The Kernel's status then
+reads `worker-dead` for every op whose terminal died, and
+`api reconcile --job <id> --dead-worker` settles each one: a filed report is
+consumed, checked and settled; an attempt with provably no effect goes back to
+queued at the same attempt; one with any evidence of effect is fenced
+`effect_unknown` for the Kernel to inspect and settle.
+
 ## The tick — `modules/kernel/driver-loop.yaml`
 
 Each iteration, in order, expressed in api calls:

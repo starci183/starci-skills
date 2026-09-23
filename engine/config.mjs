@@ -209,9 +209,11 @@ export function validateConfig(config){
       throw Error(`Invalid config.yaml: parallel.gear ${parallel.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')}).`);
   }
   if(config?.supervisor!==undefined){
-    const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs;
-    if(!plain(supervisor)||Object.keys(supervisor).some(key=>key!=='pollIntervalMs')||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
-      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?} with an integer of at least 60000 ms, or null.');
+    const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos;
+    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?} with an integer of at least 60000 ms, or null.');
+    if(!(repos===undefined||repos===null||(Array.isArray(repos)&&repos.every(repo=>typeof repo==='string'&&repo.trim()))))
+      throw Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
   }
   if(config?.delegation!==undefined&&config.delegation!==null){
     const d=config.delegation;

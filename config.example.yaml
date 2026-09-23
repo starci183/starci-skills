@@ -34,8 +34,14 @@ parallel: {gear: 1}
 # supervisor — the monitoring chat's cadence. pollIntervalMs is how often
 # scripts/supervisor/poll.mjs prints a digest (at least 60000). null uses the
 # script default; --interval-ms on the command line wins over this key.
+# repos: the product ledger-owner repositories scripts/kernel/resume-all.mjs
+# resumes after a reboot (one watchdog per running workflow), relative to the
+# source root (the directory holding this skill) or absolute. Only these are
+# resumed - nothing is discovered - and [] resumes none; --repo on the command
+# line adds more.
 supervisor:
   pollIntervalMs: null
+  repos: []
 # delegation — while the owner is away, a named delegate (e.g. the supervisor chat) may
 # answer owner asks until the given time; excluded classes stay owner-only. null = none.
 #   delegation: {asks: supervisor, until: 2026-09-23T09:00:00+07:00,

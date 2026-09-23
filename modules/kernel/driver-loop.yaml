@@ -299,7 +299,8 @@ tick:
     deadWorker: >-
       A workflow survives a host shutdown like a saga: the ledger is the
       whole state, so a restarted Kernel (the watchdog relaunches it through
-      start-workflow) re-reads status and recovers each
+      start-workflow, and scripts/kernel/resume-all.mjs restarts the
+      watchdogs after a reboot) re-reads status and recovers each
       `worker-dead` job with `api reconcile --job <id> --dead-worker`
       (modules/kernel/api.yaml commands.reconcile.deadWorker). The answer
       names one route. recovery `settle`: the worker filed its report before
