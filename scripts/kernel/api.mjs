@@ -164,7 +164,7 @@ const usage = (code) => {
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id> [--retry-lineage]
+  reconcile --job <job_id> [--retry-lineage | --drop --reason <text>]
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
@@ -185,7 +185,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -2632,6 +2632,43 @@ function reconcileRetryLineage(ledger, args, job) {
   emit(out, `reconciled ${jobId}: retry lineage ${before?.retryOf ?? 'none'} -> ${after?.retryOf ?? after?.resumeOf ?? 'none'} (businessAttempt ${before?.businessAttempt ?? '-'} -> ${after?.businessAttempt ?? '-'})`, args.json);
 }
 
+// `reconcile --drop --reason <text>`: retire a QUEUED job that never crossed
+// the dispatch boundary. A StarCi Next Kernel held two cut ordinals behind a
+// failed seam whose grants broke the Work layout; the api had no way to drop
+// them, so the cut could not be re-planned and the workflow sat still. The row
+// settles `cancelled` with the reason, and every queued job that waits on it
+// is named so the Kernel re-points or drops those too.
+function reconcileDrop(ledger, args, job) {
+  const db = ledger.db, jobId = job.job_id;
+  if (job.status !== 'queued') {
+    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --drop retires only a queued job that was never dispatched`), { code: 'drop-not-queued' });
+  }
+  const reason = String(args.reason ?? '').trim();
+  if (!reason) throw Object.assign(new Error('--drop needs --reason <text>: a dropped job keeps why it was retired'), { code: 'drop-needs-reason' });
+  const payload = jobPayloadOf(job);
+  const evidence = dispatchEvidenceOf(db, job, payload);
+  if (evidence.length) {
+    throw Object.assign(new Error(`job ${jobId} was dispatched (${evidence.join(', ')}); a dispatched attempt settles through settle, never --drop`), { code: 'drop-dispatched', evidence });
+  }
+  const waiting = db.prepare("SELECT job_id,op_id,payload_json FROM jobs WHERE workflow_id=? AND status='queued' AND job_id<>?").all(job.workflow_id, jobId)
+    .filter((row) => {
+      const p = jobPayloadOf(row);
+      const seamOf = p.cut && payload.cut && p.cut.id === payload.cut.id && Number(payload.cut.ordinal) === 1 && Number(p.cut.ordinal) > 1;
+      return (Array.isArray(p.after) && p.after.includes(jobId)) || seamOf;
+    }).map((row) => row.job_id);
+  ledger.transaction(() => {
+    const now = Date.now();
+    db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
+      .run(JSON.stringify({ verdict: 'dropped', reason, at: now }), now, jobId);
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'job-dropped', payload: { op: job.op_id, attempt: job.attempt, reason, cut: payload.cut ?? null, waiting },
+    });
+  });
+  const out = { ok: true, jobId, dropped: true, status: 'cancelled', reason, waiting };
+  emit(out, `dropped ${jobId} (cancelled: ${reason})${waiting.length ? `; still waiting on it: ${waiting.join(', ')}` : ''}`, args.json);
+}
+
 // Re-open an effect_unknown dispatch only when the host can now prove that
 // the exact managed worker never crossed the operation boundary.  This is an
 // infrastructure retry, so it preserves the same job id and attempt number.
@@ -2641,6 +2678,7 @@ function cmdReconcile(ledger, args) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (args['retry-lineage']) return reconcileRetryLineage(ledger, args, job);
+  if (args.drop) return reconcileDrop(ledger, args, job);
   const payload = jobPayloadOf(job);
   if (job.status === 'queued') {
     const worker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;

@@ -369,6 +369,31 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(because(second).queuedBecause,'ready');
 });
 
+// A StarCi Next Kernel held two cut ordinals behind a failed seam whose grants
+// broke the Work layout and had no verb to retire them, so it could not re-plan.
+test('reconcile --drop retires a never-dispatched queued job and names what waits on it',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-drop';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
+  const enq=(...extra)=>{const r=api('enqueue','--workflow',wf,...extra);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).job_id;};
+  const seam=enq('--op','docs.author','--paths','docs/cut-1','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
+  const second=enq('--op','docs.author','--paths','docs/cut-2','--cut-id','c1','--cut-ordinal','2','--cut-total','2');
+  const third=enq('--op','docs.author','--paths','docs/after','--after',second);
+  assert.notEqual(api('reconcile','--job',second,'--drop').status,0,'a drop keeps its reason');
+  const dropped=api('reconcile','--job',second,'--drop','--reason','cut grants break the Work layout');
+  assert.equal(dropped.status,0,dropped.stderr);
+  assert.deepEqual([out(dropped).status,out(dropped).waiting],['cancelled',[third]]);
+  const s=api('status','--workflow',wf);
+  const q=out(s).frontier.queued;
+  assert.equal(q.find(x=>x.jobId===third).queuedBecause,'dependency-failed','its dependant is the Kernel\'s to move now');
+  assert.equal(q.some(x=>x.jobId===second),false);
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running',worker_id='w-1' WHERE job_id=?").run(seam));
+  const refused=api('reconcile','--job',seam,'--drop','--reason','x');
+  assert.notEqual(refused.status,0,'a dispatched job settles through settle');
+  assert.match(refused.stderr,/drop-not-queued/);
+});
+
 // Live Modules had nothing open but one unanswered tax ask whose job lineage
 // did not survive a later same-op job; status called it orphaned-frontier and
 // the watchdog woke the waiting kernel every five minutes.
