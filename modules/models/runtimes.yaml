@@ -122,7 +122,11 @@ allocation:
   watchdogCadenceMs: 300000
   observeCadenceMs: 180000
   stallAfterMs: 600000
-  liveness: {activeUnclassifiedMs: 120000}
+  # activeStaleMs: an `active` screen (spinner/"Working" row) is trusted only while the terminal still
+  # prints; a spinner re-renders every second, so output older than this is a frozen frame. The watchdog
+  # then treats the Kernel as turn-idle (reason stale-active) and wakes it, and a worker reads turn-idle
+  # for the nudge frontier (scripts/kernel/terminal-liveness.mjs staleAwareState).
+  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000}
   # settle's landed proof (scripts/kernel/settle-landed.mjs): one local git read, and the fetch a pushing
   # commitPolicy needs before origin/<branch> can be read.
   settleGit: {commandMs: 15000, fetchMs: 60000}

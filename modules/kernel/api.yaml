@@ -212,7 +212,7 @@ commands:
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
-      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn'
+      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it'
     refuses:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
@@ -349,7 +349,12 @@ commands:
       limit is budgeted against, and it does not advance for a launch the
       prior result proved rejected before any effect (retryClass
       infrastructure) nor after an attempt that settled awaiting-owner
-      (retryClass owner-answer).
+      (retryClass owner-answer). A cut enqueue chains only to its own
+      ordinal (engine/admission.mjs cutRetryLineage): the predecessor is the
+      latest job with the SAME op, cut id AND ordinal, `businessAttempt`
+      counts only that ordinal's business attempts, `effectState` is that
+      predecessor's, and `attempt` is the row's durable attempt; the first
+      job of an ordinal carries no `retry`, whatever sibling ordinals ran.
       `records` is the explicit closed read binding carried
       unchanged into the dispatch packet; omission means no Work record is
       bound and never licenses repository-wide discovery.
@@ -531,7 +536,23 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id>'
+    args: '--job <job_id> [--retry-lineage]'
+    retryLineage: >-
+      `--retry-lineage` is a separate repair, not a launch reconcile: for a
+      QUEUED job that never crossed the dispatch boundary it re-derives
+      payload.retry exactly as enqueue now would (the cut rule above: same
+      op + cut id + ordinal) from the jobs before its attempt, rewrites it in
+      one transaction and appends one event 'retry-lineage-repaired'
+      {attempt, cut, before, after}. An already-correct lineage writes
+      nothing and returns repaired:false. Returns
+      '{ok:true,jobId,repaired,attempt,cut,before,after}' (repaired:false
+      returns {retry} instead of before/after). Refuses
+      retry-lineage-not-queued (status is not queued) and
+      retry-lineage-dispatched (a contract, report, check, held lease,
+      worker id, managed/orca/runtime dispatch binding, rejectedDispatches
+      entry or dispatch-side event exists for the job; the refusal carries
+      `evidence`) — a dispatched attempt's lineage is history and is never
+      rewritten.
     reads: >-
       either an effect_unknown managed launch, or a queued row whose accepted
       contract still points at a connected+writable exact operation terminal;
@@ -558,6 +579,8 @@ commands:
     refuses:
       - job-unknown
       - job-not-reconcilable: 'status is neither effect_unknown nor the idempotent case of a row already back at queued'
+      - retry-lineage-not-queued: '--retry-lineage on a job that is not queued'
+      - retry-lineage-dispatched: '--retry-lineage on a job that was ever dispatched (refusal carries evidence[])'
       - dispatch-identity-missing: 'no exact managed Dispatch id is bound'
       - accepted-contract-exists: 'operation authority may have landed; never infer no effect'
       - worker-report-exists: 'worker evidence exists; use ordinary consume/check/settle'

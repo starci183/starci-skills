@@ -131,18 +131,21 @@ export function retryDisposition(job){
 /**
  * Derive the next retry/resume identity. A proven no-effect launch rejection reuses the queued durable
  * attempt; an effectful/business failure advances both durable and business attempt ordinals.
+ * `options.priorBusinessAttempt` overrides the predecessor's recorded business attempt (a cut ordinal counts
+ * its own chain, see cutRetryLineage); `options.attempt` is the durable attempt the new row actually takes
+ * when that differs from predecessor+1 (a cut ordinal shares the op's durable attempt counter).
  */
-export function deriveRetryLineage(priorJob){
+export function deriveRetryLineage(priorJob,{attempt=null,priorBusinessAttempt=null}={}){
   if(!priorJob?.job_id&&!priorJob?.jobId)throw Error('retry lineage needs a prior durable job');
   const payload=payloadOf(priorJob),disposition=retryDisposition(priorJob);
   const priorAttempt=Number(priorJob.attempt);
   if(!Number.isInteger(priorAttempt)||priorAttempt<1)throw Error('retry lineage needs a positive durable attempt');
-  const priorBusiness=Number(payload.retry?.businessAttempt??payload.businessAttempt??priorAttempt);
+  const priorBusiness=Number(priorBusinessAttempt??payload.retry?.businessAttempt??payload.businessAttempt??priorAttempt);
   const priorJobId=priorJob.job_id??priorJob.jobId;
   return {
     retryOf:disposition.resumable?null:priorJobId,
     resumeOf:disposition.resumable?priorJobId:null,
-    attempt:priorAttempt+(disposition.resumable?0:1),
+    attempt:disposition.resumable?priorAttempt:Number.isInteger(attempt)?attempt:priorAttempt+1,
     businessAttempt:priorBusiness+(disposition.consumesBusinessRetry?1:0),
     retryClass:disposition.retryClass,
     effectState:disposition.effectState,
@@ -150,4 +153,25 @@ export function deriveRetryLineage(priorJob){
     reusesDurableAttempt:disposition.resumable,
     consumesBusinessRetry:disposition.consumesBusinessRetry,
   };
+}
+
+/** The cut slice a job row carries, or null: {id, ordinal} identify one bounded SAME-op slice. */
+export function cutOf(job){
+  const cut=payloadOf(job).cut;
+  return cut&&cut.id!=null&&cut.ordinal!=null?{id:String(cut.id),ordinal:Number(cut.ordinal),total:Number(cut.total)}:null;
+}
+
+/**
+ * Retry lineage of a cut ordinal. A cut's ordinals share the op's durable attempt counter but are
+ * independent slices, so the predecessor is the latest job with the SAME op, cut id AND ordinal - never a
+ * sibling ordinal that happened to run later - and the business attempt counts only that ordinal's own
+ * business attempts (1 + every earlier same-ordinal attempt whose disposition consumed one). `ordinalJobs`
+ * are that ordinal's prior jobs (any order); the result is null when the ordinal has none (a first attempt).
+ */
+export function cutRetryLineage(ordinalJobs,{attempt=null}={}){
+  const jobs=[...(ordinalJobs??[])].sort((a,b)=>Number(a.attempt)-Number(b.attempt));
+  if(!jobs.length)return null;
+  const prior=jobs.at(-1);
+  const priorBusinessAttempt=1+jobs.slice(0,-1).filter(job=>retryDisposition(job).consumesBusinessRetry).length;
+  return deriveRetryLineage(prior,{attempt,priorBusinessAttempt});
 }

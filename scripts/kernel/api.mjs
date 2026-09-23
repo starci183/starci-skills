@@ -15,7 +15,7 @@
 //            [--paths <csv>] [--gear <n>]
 //   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
-//   reconcile --repo <path> --job <job_id>
+//   reconcile --repo <path> --job <job_id> [--retry-lineage]
 //   nudge    --repo <path> --job <job_id>
 //   observe  --repo <path> --job <job_id> [--lines <n>]
 //   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
@@ -41,7 +41,7 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  AWAITING_OWNER, admitOpSlot, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
+  AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
 } from '../../engine/admission.mjs';
 import {
   activeDelegation, allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
@@ -57,7 +57,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -162,7 +162,7 @@ const usage = (code) => {
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id>
+  reconcile --job <job_id> [--retry-lineage]
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
@@ -183,7 +183,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -207,6 +207,10 @@ const emit = (out, human, asJson) => {
 // still count as a live turn. One authority: modules/models/runtimes.yaml
 // allocation.liveness.activeUnclassifiedMs.
 const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
+// An `active` screen whose terminal printed nothing for this long is a frozen
+// frame: it reads turn-idle (reason stale-active) so the nudge frontier and the
+// transition wake reach it (allocation.liveness.activeStaleMs).
+const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
 
 // Operation statuses that hold one of the workflow's concurrent slots. A queued
 // job has not been dispatched and holds nothing; everything from the lease
@@ -279,6 +283,25 @@ const isAwaitingOwner = (db, row) => {
 const withOwnerWaitResult = (db, row) => (row && isAwaitingOwner(db, row) && jobResultOf(row).verdict !== AWAITING_OWNER
   ? { ...row, result_json: JSON.stringify({ ...jobResultOf(row), verdict: AWAITING_OWNER, kernelVerdict: 'blocked' }) }
   : row);
+/**
+ * The retry lineage a job of {workflowId, op, cut} at durable `attempt` carries, derived from the jobs
+ * before it (attempt < `attempt`). An uncut op chains to the op's latest attempt. A cut ordinal chains
+ * only to its own ordinal - the latest job with the SAME op, cut id AND ordinal - and counts only that
+ * ordinal's business attempts (engine/admission.mjs cutRetryLineage): a sibling ordinal that settled
+ * later is never its predecessor. Null when there is no predecessor (a first attempt).
+ */
+const retryLineageFor = (db, { workflowId, op, cut, attempt }) => {
+  const cols = 'job_id,workflow_id,op_id,status,attempt,payload_json,result_json';
+  if (cut) {
+    const ordinalJobs = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<?
+      AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=? ORDER BY attempt`)
+      .all(workflowId, op, attempt, String(cut.id), Number(cut.ordinal)).map((row) => withOwnerWaitResult(db, row));
+    return cutRetryLineage(ordinalJobs, { attempt });
+  }
+  const priorJob = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC LIMIT 1`)
+    .get(workflowId, op, attempt);
+  return priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob)) : null;
+};
 const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?.managed?.agentTerminalHandle
   ?? payload?.orca?.agentTerminalHandle
   ?? payload?.hierarchy?.runtime?.terminalHandle
@@ -299,9 +322,11 @@ const observeOperationWorker = (job, now = Date.now()) => {
         if (read?.ok) screenState = classifyAgentScreen(read.screen).state;
       } catch { /* terminal-show fallback below remains conservative */ }
     }
+    const stale = staleAwareState(screenState, outputAgeMs, ACTIVE_STALE_MS);
     const liveness = !shown?.ok ? 'unknown'
       : !connected || !writable ? 'disconnected'
       : screenState === 'wedged' ? 'wedged'
+      : stale.staleActive ? 'turn-idle'
       : screenState === 'active' ? 'active'
       : screenState === 'turn-idle' ? 'turn-idle'
       : screenState === 'interactive-gate' ? 'interactive-gate'
@@ -310,7 +335,7 @@ const observeOperationWorker = (job, now = Date.now()) => {
       : 'live-idle';
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness, connected, writable,
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
-      outputAgeMs, screenState, observedAt: now };
+      outputAgeMs, screenState, ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}), observedAt: now };
   } catch (error) {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'unknown', reason: String(error?.message ?? error), observedAt: now };
   }
@@ -333,7 +358,9 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     }
     const read = terminalRead({ terminal, screen: true });
     if (!read?.ok) return { action: 'kernel-unreadable', terminal, error: read?.error ?? null };
-    const state = classifyAgentScreen(read.screen).state;
+    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
+    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
+    const state = staleAwareState(classifyAgentScreen(read.screen).state, outputAgeMs, ACTIVE_STALE_MS).state;
     // A queued message waits for Enter: deliver it; it already asks the
     // Kernel to act, and it reads status first.
     if (state === 'queued-input') {
@@ -416,7 +443,7 @@ function cmdNudge(ledger, args) {
   }
   ledger.transaction(() => ledger.appendEvent({
     workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness },
+    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}) },
   }));
   const out = { ok: true, jobId, nudged: true, worker, receipt: sent.receipt ?? null };
   emit(out, `nudged ${jobId}: resumed exact worker ${worker.terminalHandle} to file its durable report`, args.json);
@@ -472,7 +499,9 @@ function cmdObserve(ledger, args) {
     if (!read?.ok) turnState = 'unreadable';
     else {
       screenState = classifyAgentScreen(read.screen).state;
-      turnState = OBSERVE_TURN_STATES[screenState] ?? 'unknown';
+      const stale = staleAwareState(screenState, terminal.idleMs, ACTIVE_STALE_MS);
+      turnState = OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
+      if (stale.staleActive) terminal.livenessReason = 'stale-active';
       screen = String(read.screen ?? '').split(/\r?\n/).slice(-lines).join('\n');
     }
   }
@@ -1282,9 +1311,8 @@ function cmdEnqueue(ledger, args) {
     // limit is budgeted against `businessAttempt`, which only advances when the
     // prior attempt actually spent one — an infrastructure launch rejected
     // before any effect does not (engine/admission.mjs deriveRetryLineage).
-    const priorJob = db.prepare('SELECT job_id,workflow_id,op_id,status,attempt,payload_json,result_json FROM jobs WHERE workflow_id=? AND op_id=? ORDER BY attempt DESC LIMIT 1')
-      .get(workflowId, args.op);
-    const retry = priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob)) : null;
+    // A cut ordinal's predecessor is its own ordinal, never a sibling slice.
+    const retry = retryLineageFor(db, { workflowId, op: args.op, cut, attempt });
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
@@ -2445,6 +2473,61 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
 }
 
 /* ----------------------------------------------------------- reconcile */
+// `reconcile --retry-lineage`: re-derive a QUEUED job's payload.retry from the
+// predecessor enqueue should have chained it to (retryLineageFor — for a cut,
+// the same op + cut id + ordinal). Only a row that never crossed the dispatch
+// boundary may be rewritten: no contract, report or check for its attempt, no
+// dispatch/worker binding in the payload, no held lease and no dispatch-side
+// event. Anything else is history, and history is never rewritten.
+const DISPATCH_EVENT_KINDS = ['op-dispatched', 'dispatch-rejected', 'dispatch-reconciled', 'live-worker-reconciled',
+  'report-filed', 'report-consumed', 'checks-recorded', 'op-settled', 'op-worker-nudged'];
+const dispatchEvidenceOf = (db, job, payload) => {
+  const key = [job.workflow_id, job.op_id, job.attempt];
+  const evidence = [];
+  if (db.prepare('SELECT 1 FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key)) evidence.push('contract');
+  if (db.prepare('SELECT 1 FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? LIMIT 1').get(...key)) evidence.push('report');
+  if (db.prepare('SELECT 1 FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key)) evidence.push('checks');
+  if (db.prepare('SELECT 1 FROM leases WHERE job_id=? LIMIT 1').get(job.job_id)) evidence.push('lease');
+  if (job.worker_id) evidence.push('worker');
+  if (payload.managed || payload.orca || payload.hierarchy?.runtime?.dispatchId || payload.hierarchy?.runtime?.terminalHandle
+    || (Array.isArray(payload.rejectedDispatches) && payload.rejectedDispatches.length)) evidence.push('dispatch-binding');
+  const events = db.prepare(`SELECT DISTINCT kind FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=?
+    AND kind IN (${DISPATCH_EVENT_KINDS.map(() => '?').join(',')})`).all(job.workflow_id, job.job_id, ...DISPATCH_EVENT_KINDS);
+  for (const { kind } of events) evidence.push(`event:${kind}`);
+  return evidence;
+};
+function reconcileRetryLineage(ledger, args, job) {
+  const db = ledger.db, jobId = job.job_id;
+  if (job.status !== 'queued') {
+    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --retry-lineage rewrites only a queued job that was never dispatched`), { code: 'retry-lineage-not-queued' });
+  }
+  const payload = jobPayloadOf(job);
+  const evidence = dispatchEvidenceOf(db, job, payload);
+  if (evidence.length) {
+    throw Object.assign(new Error(`job ${jobId} was dispatched (${evidence.join(', ')}); its retry lineage is history and is never rewritten`), { code: 'retry-lineage-dispatched', evidence });
+  }
+  const cut = payload.cut?.id != null && payload.cut?.ordinal != null ? payload.cut : null;
+  const before = payload.retry ?? null;
+  const after = retryLineageFor(db, { workflowId: job.workflow_id, op: job.op_id, cut, attempt: job.attempt });
+  if (JSON.stringify(before) === JSON.stringify(after)) {
+    const out = { ok: true, jobId, repaired: false, attempt: job.attempt, cut, retry: after };
+    emit(out, `reconcile ${jobId}: retry lineage already correct (retryOf ${after?.retryOf ?? after?.resumeOf ?? 'none'})`, args.json);
+    return;
+  }
+  ledger.transaction(() => {
+    const now = Date.now();
+    const next = { ...payload };
+    if (after) next.retry = after; else delete next.retry;
+    db.prepare("UPDATE jobs SET payload_json=?,updated_at=? WHERE job_id=? AND status='queued'").run(JSON.stringify(next), now, jobId);
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'retry-lineage-repaired', payload: { attempt: job.attempt, cut, before, after },
+    });
+  });
+  const out = { ok: true, jobId, repaired: true, attempt: job.attempt, cut, before, after };
+  emit(out, `reconciled ${jobId}: retry lineage ${before?.retryOf ?? 'none'} -> ${after?.retryOf ?? after?.resumeOf ?? 'none'} (businessAttempt ${before?.businessAttempt ?? '-'} -> ${after?.businessAttempt ?? '-'})`, args.json);
+}
+
 // Re-open an effect_unknown dispatch only when the host can now prove that
 // the exact managed worker never crossed the operation boundary.  This is an
 // infrastructure retry, so it preserves the same job id and attempt number.
@@ -2453,6 +2536,7 @@ function cmdReconcile(ledger, args) {
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
+  if (args['retry-lineage']) return reconcileRetryLineage(ledger, args, job);
   const payload = jobPayloadOf(job);
   if (job.status === 'queued') {
     const worker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;

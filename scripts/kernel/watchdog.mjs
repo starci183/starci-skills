@@ -23,7 +23,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -42,6 +42,9 @@ const once = has('once');
 const repair = has('repair');
 const asJson = has('json');
 const CADENCE_MS = allocationMs('watchdogCadenceMs');
+// An `active` screen older than this is a frozen frame, not a running turn
+// (modules/models/runtimes.yaml allocation.liveness.activeStaleMs).
+const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
 const intervalMs = Math.max(10_000, Number(valueOf('interval-ms')) || CADENCE_MS);
 
 const jsonFrom = stdout => {
@@ -133,9 +136,15 @@ export async function watchdogTick() {
 
   const read = terminalRead({ terminal, screen: true });
   if (!read.ok) return { ok: false, workflowId, phase, terminal, action: 'terminal-unreadable', error: read.error };
-  const classified = classifyKernelScreen(read.screen);
+  const screen = classifyKernelScreen(read.screen);
   const lastOutputAt = Number(shown.terminal?.lastOutputAt) || null;
   const outputAgeMs = lastOutputAt == null ? null : Math.max(0, Date.now() - lastOutputAt);
+  // An `active` classification is trusted only while output is recent: two
+  // starci-next Kernels printed nothing for 3.7 hours while an old spinner row
+  // kept them "active" and the watchdog never woke them.
+  const liveness = staleAwareState(screen.state, outputAgeMs, ACTIVE_STALE_MS);
+  const classified = liveness.staleActive ? { ...screen, state: liveness.state } : screen;
+  const stale = liveness.staleActive ? { screenState: screen.state, reason: 'stale-active', livenessReason: 'stale-active', activeStaleMs: ACTIVE_STALE_MS } : {};
 
   if (classified.state === 'queued-input') {
     // A queued message is already the Kernel's input; Enter delivers it.
@@ -148,12 +157,12 @@ export async function watchdogTick() {
     // it every tick only burns a turn. Wake only when status says the Kernel
     // can move something now (frontier.actionable).
     const actionable = status.value?.frontier?.actionable;
-    if (actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
-    if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', outputAgeMs };
+    if (actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
+    if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
     const sent = terminalSend({ terminal, text: buildWakePrompt(workflowId), enter: true });
     return {
       ok: sent.ok, workflowId, phase, terminal,
-      action: sent.ok ? 'woken' : 'wake-failed', outputAgeMs,
+      action: sent.ok ? 'woken' : 'wake-failed', ...stale, outputAgeMs,
       receipt: sent.receipt ?? null, error: sent.error ?? null,
     };
   }

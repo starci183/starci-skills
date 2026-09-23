@@ -782,6 +782,9 @@ failureHandling:
       watchdog additionally distinguishes an active LLM turn from the same
       connected terminal sitting at its input prompt. Every 5 minutes it reads
       api status/survey plus the attested frame; turn-idle wakes the same Kernel,
+      and so does an `active` frame whose terminal printed nothing for
+      modules/models/runtimes.yaml allocation.liveness.activeStaleMs (the result
+      carries reason stale-active: a frozen spinner row is not a running turn),
       while disconnected/unwritable exact proof re-enters start-workflow for a
       replacement. The Kernel itself never sleeps or polls to preserve liveness
       (scripts/kernel/watchdog.mjs; scripts/kernel/start-workflow.mjs;
