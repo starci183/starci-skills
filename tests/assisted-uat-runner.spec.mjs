@@ -3,19 +3,45 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import {spawnSync} from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {
   PROTOCOL_PREFIX,computeRequestBindings,digestFile,digestValue,inspectPreparedRequest,
   signalSession,startSession,validateLockedPlaywright,waitSession,
 } from '../scripts/uat/assisted-runner.mjs';
+import {acquireUatSlot,slotHolders} from '../scripts/uat/uat-slots.mjs';
+
+// Every detached worker this file starts takes its slot from a private semaphore capped at 1 — never the
+// machine's <runtime>/uat-slots — so a spec run cannot fill the owner's UAT ceiling (the worker inherits
+// this env when startSession spawns it).
+const SLOTS=fs.mkdtempSync(path.join(os.tmpdir(),'starci-uat-slots-runner-spec-'));
+process.env.STARCI_UAT_SLOTS_DIR=SLOTS;process.env.STARCI_UAT_MAX_CONCURRENT='1';
+test.after(()=>fs.rmSync(SLOTS,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+const pidAlive=pid=>{if(!Number.isInteger(pid)||pid<1)return false;try{process.kill(pid,0);return true;}catch(error){return error.code==='EPERM';}};
+const settle=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+// A detached worker (and its driver) must never outlive its spec: a finished run's worker is awaited, a
+// run the spec left mid-flight is killed with its process tree before the temp dir goes.
+const stopRuns=async assisted=>{
+  const runs=path.join(assisted,'runs'),pids=[];
+  for(const run of fs.existsSync(runs)?fs.readdirSync(runs):[]){
+    let state;try{state=parseYaml(fs.readFileSync(path.join(runs,run,'control','state.yaml'),'utf8'));}catch{continue;}
+    const live=[state.pid,state.childPid].filter(pidAlive);pids.push(...live);
+    if(['finished','failed','stale'].includes(state.phase))continue;
+    for(const pid of live){
+      if(process.platform==='win32')spawnSync('taskkill',['/PID',String(pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
+      else{try{process.kill(-pid,'SIGKILL');}catch{try{process.kill(pid,'SIGKILL');}catch{}}}
+    }
+  }
+  for(let i=0;i<200&&pids.some(pidAlive);i++)await settle(50);
+};
 
 const write=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,typeof value==='string'?value:stringifyYaml(value));};
 const schemaValidator=name=>new Ajv2020({allErrors:true,strict:false,formats:{'date-time':true}}).compile(parseYaml(fs.readFileSync(new URL(`../modules/schemas/${name}.schema.yaml`,import.meta.url),'utf8')));
 const fixture=t=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-assisted-uat-'));
-  t.after(()=>fs.rmSync(temp,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const assisted=path.join(temp,'E','assisted-uat'),requestFile=path.join(assisted,'request.yaml');
+  t.after(async()=>{await stopRuns(assisted);fs.rmSync(temp,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
   const scriptFile=path.join(assisted,'playwright','flow-login.spec.ts');
   const cleanupFile=path.join(assisted,'cleanup.yaml'),redactionFile=path.join(assisted,'redaction.yaml');
   const driverFile=path.join(temp,'fake-driver.mjs');
@@ -153,4 +179,29 @@ test('on Windows npm and npx launch through node and npm-cli, never a .cmd shim 
   const r=(await import('node:child_process')).spawnSync(real.file,real.args,{encoding:'utf8',windowsHide:true});
   assert.equal(r.error,undefined,'npx launches on this host without spawn EINVAL');
   assert.equal(r.status,0);
+});
+
+test('a worker waits queued for a machine-wide UAT slot, starts no browser work, then runs once one frees',async t=>{
+  const f=fixture(t),runDir=path.join(f.assisted,'runs','run-1');
+  const held=await acquireUatSlot({runId:'spec-holder',limit:1,pollMs:20});
+  t.after(()=>held.release());
+  let state=startSession({requestPath:f.requestFile,receiptPath:f.receiptFile,skipRunnerCheck:true});
+  for(let guard=0;state.phase!=='queued'&&guard<4;guard++)state=await waitSession({requestPath:f.requestFile,receiptPath:f.receiptFile,after:state.revision});
+  assert.equal(state.phase,'queued');assert.equal(state.event.type,'queued');
+  assert.equal(state.waitingForSlot,true);assert.equal(state.queuePosition,1);assert.equal(state.slotLimit,1);
+  assert.equal(fs.existsSync(path.join(runDir,'artifacts','screen.png')),false,'no driver runs while the run is queued');
+  const again=startSession({requestPath:f.requestFile,receiptPath:f.receiptFile,skipRunnerCheck:true});
+  assert.equal(again.phase,'queued');assert.equal(again.staleProcess,undefined,'a queued worker is alive, not stale');
+  held.release();
+  for(let guard=0;state.phase!=='waiting'&&guard<4;guard++)state=await waitSession({requestPath:f.requestFile,receiptPath:f.receiptFile,after:state.revision});
+  assert.equal(state.phase,'waiting');assert.equal(state.waitingForSlot,undefined);
+  assert.deepEqual(slotHolders().map(h=>h.runId),['run-1'],'the worker holds the only slot');
+  signalSession({requestPath:f.requestFile,receiptPath:f.receiptFile,value:'cancel',actor:'user'});
+  for(let guard=0;state.phase!=='finished'&&guard<8;guard++)state=await waitSession({requestPath:f.requestFile,receiptPath:f.receiptFile,after:state.revision});
+  assert.equal(state.phase,'finished');
+  assert.equal(parseYaml(fs.readFileSync(f.receiptFile,'utf8')).completionSignal.value,'cancel');
+  const worker=parseYaml(fs.readFileSync(path.join(runDir,'control','state.yaml'),'utf8')).pid;
+  for(let i=0;i<200&&pidAlive(worker);i++)await settle(50);
+  assert.equal(pidAlive(worker),false,'the worker exits after its receipt');
+  assert.deepEqual(slotHolders(),[],'the worker released its slot');
 });

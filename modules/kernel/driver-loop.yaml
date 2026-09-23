@@ -747,7 +747,16 @@ assistedUatLoop:
     machine postconditions, genuine sanitized artifacts and verified cleanup.
     Human `ok` means execution finished only. Final reconciliation, not the
     runner or either assisted op, projects current evidence into Work done.
-  citation: "modules/ops/ops/uat.assisted.{prepare,verify}.yaml; skills/run-assisted-uat/SKILL.md"
+  slots: >-
+    UAT runs share one machine-wide ceiling, config.yaml uat.maxConcurrent
+    (default 10, STARCI_UAT_MAX_CONCURRENT overrides): scripts/uat/uat-slots.mjs
+    keeps one lock file per slot under <runtime>/uat-slots and a FIFO queue of
+    waiters. The assisted-runner worker holds a slot before any browser or app
+    work and records phase queued (waitingForSlot, queuePosition) while it
+    waits; `uat-slots.mjs run -- <command>` gives any other UAT browser run the
+    same slot. A slot is released on every exit path; one whose holder died or
+    predates this boot is reclaimed. Waiting has no timeout of its own.
+  citation: "modules/ops/ops/uat.assisted.{prepare,verify}.yaml; skills/run-assisted-uat/SKILL.md; scripts/uat/uat-slots.mjs"
 
 # ============================================================================
 # 3 — RE-PLAN TRIGGERS. When the driver stops following the plan and makes a

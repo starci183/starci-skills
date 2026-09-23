@@ -14,6 +14,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
+import {acquireUatSlot} from './uat-slots.mjs';
 
 export const RUNNER_VERSION='1.0.0';
 export const PROTOCOL_PREFIX='@@STARCI_ASSISTED_UAT@@';
@@ -202,7 +203,9 @@ const writeAtomic=(file,value)=>{
 };
 const readState=runDir=>readYaml(stateFileOf(runDir));
 const writeState=(prepared,state)=>writeAtomic(stateFileOf(prepared.runDir),state);
-const publicState=state=>({runId:state.runId,phase:state.phase,revision:state.revision,pendingGate:state.pendingGate??null,event:state.event??null,receipt:state.phase==='finished'?state.receipt:null});
+// A queued run is alive and waiting for a machine-wide UAT slot (uat-slots.mjs), not dead.
+const publicState=state=>({runId:state.runId,phase:state.phase,revision:state.revision,pendingGate:state.pendingGate??null,event:state.event??null,receipt:state.phase==='finished'?state.receipt:null,
+  ...(state.phase==='queued'?{waitingForSlot:true,queuePosition:state.queuePosition??null,slotLimit:state.slotLimit??null}:{})});
 const updateState=(prepared,state,phase,event,extra={})=>{
   Object.assign(state,extra,{phase,revision:(state.revision??0)+1,event,updatedAt:iso()});writeState(prepared,state);return state;
 };
@@ -318,8 +321,7 @@ const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
   return receipt;
 };
 
-const workerMain=async prepared=>{
-  const state=readState(prepared.runDir);validateFreshState(prepared,state);
+const runSession=async(prepared,state,slot)=>{
   const sanitize=sanitizer(prepared),data={steps:[],checks:[],artifacts:[],postconditions:[],gates:[]};
   let completionSignal=null,launchExit=1,protocolError=null;
   const env=Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
@@ -333,7 +335,7 @@ const workerMain=async prepared=>{
     child.once('exit',code=>resolve(Number.isInteger(code)?code:1));
     child.once('error',error=>{protocolError=error;resolve(1);});
   });
-  updateState(prepared,state,'running',{type:'started',runId:prepared.runId},{pid:process.pid,childPid:child.pid});
+  updateState(prepared,state,'running',{type:'started',runId:prepared.runId},{pid:process.pid,childPid:child.pid,waitingForSlot:false,queuePosition:null,uatSlot:slot.slot});
   const timeout=setTimeout(()=>{protocolError=Object.assign(new Error('assisted UAT session timed out'),{code:'assisted-uat-timeout'});try{child.kill();}catch{}},prepared.request.limits.timeoutMs);
   const lines=readline.createInterface({input:child.stdout,crlfDelay:Infinity});
   try{
@@ -366,6 +368,16 @@ const workerMain=async prepared=>{
   if(!completionSignal)completionSignal={value:'cancel',actor:protocolError?'runner-protocol':'runner',recordedAt:iso()};
   if(protocolError)data.checks.push({id:'runner-protocol',command:'validate assisted UAT event protocol',exitCode:1,evidenceRefs:[]});
   finishReceipt(prepared,state,data,completionSignal,launchExit);
+};
+// The machine-wide UAT ceiling (config.yaml uat.maxConcurrent): no browser or app work starts before this
+// run holds a slot. While it waits the run state is `queued` with its FIFO position; the slot is released
+// on every exit path — this finally, and the uat-slots process 'exit' hook for a crash.
+const workerMain=async prepared=>{
+  const state=readState(prepared.runDir);validateFreshState(prepared,state);
+  const slot=await acquireUatSlot({runId:prepared.runId,onQueued:({position,limit,holders})=>{
+    updateState(prepared,state,'queued',{type:'queued',waitingForSlot:true,position,limit,holders},{waitingForSlot:true,queuePosition:position,slotLimit:limit});
+  }});
+  try{return await runSession(prepared,state,slot);}finally{slot.release();}
 };
 
 export function startSession({requestPath,receiptPath,skipRunnerCheck=false}={}){
@@ -417,7 +429,7 @@ export async function waitSession({requestPath,receiptPath,after=0}={}){
 
 const parseArgs=argv=>{const out={};for(let i=0;i<argv.length;i++){const token=argv[i];if(!token.startsWith('--'))continue;const key=token.slice(2);out[key]=argv[i+1]&&!argv[i+1].startsWith('--')?argv[++i]:true;}return out;};
 const print=value=>process.stdout.write(`${JSON.stringify(value,null,2)}\n`);
-const use=()=>{console.error('use: node scripts/uat/assisted-runner.mjs <inspect|start|wait|signal|run> --request <absolute request.yaml> --receipt <absolute new receipt.yaml> [--after n] [--value ok|fail|cancel]');process.exit(2);};
+const use=()=>{console.error('use: node scripts/uat/assisted-runner.mjs <inspect|start|status|wait|signal|run> --request <absolute request.yaml> --receipt <absolute new receipt.yaml> [--after n] [--value ok|fail|cancel]');process.exit(2);};
 
 async function interactive(args){
   let state=startSession({requestPath:args.request,receiptPath:args.receipt});print(state);
@@ -442,7 +454,16 @@ async function main(){
     if(command==='wait')return print({ok:true,...await waitSession({requestPath:args.request,receiptPath:args.receipt,after:Number(args.after??0)})});
     if(command==='signal')return print({ok:true,...signalSession({requestPath:args.request,receiptPath:args.receipt,value:args.value,actor:args.actor??'user'})});
     if(command==='run')return interactive(args);
+    if(command==='status'){
+      const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
+      if(fs.existsSync(prepared.receiptFile))return print({ok:true,runId:prepared.runId,phase:'finished',revision:null,receipt:prepared.receiptFile});
+      need(fs.existsSync(stateFileOf(prepared.runDir)),'assisted UAT session has not been started');
+      const state=readState(prepared.runDir);validateFreshState(prepared,state);
+      return print({ok:true,...publicState(state),...(!TERMINAL_PHASES.has(state.phase)&&!pidAlive(state.pid)?{staleProcess:true}:{})});
+    }
     if(command==='_worker'){
+      // A terminating signal exits through process 'exit', so the held UAT slot is released.
+      for(const sig of ['SIGINT','SIGTERM','SIGBREAK','SIGHUP'])process.on(sig,()=>process.exit(143));
       const prepared=inspectPreparedRequest({requestPath:args.request,receiptPath:args.receipt,allowExistingReceipt:true});
       try{return await workerMain(prepared);}catch(error){
         try{const state=readState(prepared.runDir);updateState(prepared,state,'failed',{type:'runner-failed',code:error?.code??'assisted-uat-error'},{pendingGate:null});}catch{}

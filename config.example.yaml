@@ -118,3 +118,9 @@ connectors:
 asks:
   autoAcceptRecommended: false
   excludes: [credential, irreversible-confirmation, handover]
+# uat — the machine-wide UAT ceiling. At most maxConcurrent UAT runs (a browser session, a player, the
+# app it drives) execute at once on this host, across every workflow; the rest wait queued for a slot
+# (scripts/uat/uat-slots.mjs, lock files under <runtime>/uat-slots). A slot whose holder died is
+# reclaimed. STARCI_UAT_MAX_CONCURRENT overrides it for one process tree.
+uat:
+  maxConcurrent: 10

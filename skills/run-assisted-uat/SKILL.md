@@ -64,6 +64,11 @@ overwrite an old receipt or reuse its run directory.
    A wait blocks on filesystem events and returns only for a new checkpoint or final receipt. Do not
    build a sleep/status loop around it.
 
+   It may first return `phase: queued` with `waitingForSlot: true` and a `queuePosition`: the machine
+   already runs its `uat.maxConcurrent` UAT sessions (config.yaml, default 10). The run is alive and
+   has opened nothing yet; tell the user its queue position and call `wait` again with that revision —
+   the browser opens when a slot frees.
+
 3. On a `checkpoint` event, relay exactly `event.gate.instruction` plus its fixed accepted values
    `ok`, `fail`, `cancel`. Do not add steps, reveal driver output, weaken the expectation, or ask the
    user to paste a password, token, recovery code or OTP into chat. Raw secrets and OTPs are never in chat; they are entered only

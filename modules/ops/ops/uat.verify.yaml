@@ -239,7 +239,10 @@ steps:
         significant steps, loading/error/skeleton observations and failure points. Real configured
         paid AI calls are permitted within the authorized flow; do not substitute mocked AI success.
         Record asynchronous operation/resource IDs promptly and verify actual completion, not merely
-        request acceptance.
+        request acceptance. Launch the browser run through
+        `node <Source>/.claude/scripts/uat/uat-slots.mjs run -- <project Playwright command>`, which holds
+        one of the machine-wide config.yaml uat.maxConcurrent UAT slots and waits queued while all are
+        busy.
   - reads:
       - flows
       - business

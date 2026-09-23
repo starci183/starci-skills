@@ -192,10 +192,29 @@ function validateAsks(asks){
     if(new Set(excludes).size!==excludes.length)bad('.excludes names each class once.');
   }
 }
+/**
+ * config.yaml `uat` — the machine-wide UAT ceiling: at most `maxConcurrent` UAT runs (browsers, players,
+ * the apps they drive) execute at once on this host; the rest queue for a slot (scripts/uat/uat-slots.mjs).
+ */
+export const UAT_DEFAULTS=Object.freeze({maxConcurrent:10});
+function validateUat(uat){
+  if(uat===null)return;
+  const bad=message=>{throw Error(`Invalid config.yaml: uat${message}`);};
+  if(!plain(uat))bad(' must be {maxConcurrent?} or null.');
+  for(const key of Object.keys(uat))if(key!=='maxConcurrent')bad(` has unknown key ${key} (allowed: maxConcurrent).`);
+  if(uat.maxConcurrent!==undefined&&uat.maxConcurrent!==null&&!(Number.isInteger(uat.maxConcurrent)&&uat.maxConcurrent>=1))bad('.maxConcurrent must be a positive integer (default 10) or null.');
+}
+/** The owner's UAT concurrency settings: {maxConcurrent, source}. An absent or null block is the default. */
+export function uatSettings(config=loadConfig()){
+  if(config?.uat!==undefined)validateUat(config.uat);
+  const value=plain(config?.uat)?config.uat.maxConcurrent:null;
+  return Number.isInteger(value)?{maxConcurrent:value,source:'uat'}:{maxConcurrent:UAT_DEFAULTS.maxConcurrent,source:'default'};
+}
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
+  if(config?.uat!==undefined)validateUat(config.uat);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){
