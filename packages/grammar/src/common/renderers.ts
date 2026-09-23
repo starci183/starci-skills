@@ -43,3 +43,4 @@ export { Tabs, type TabItem, type TabsProps } from "../core/branch/Tabs/index.js
 export { Tooltip, type TooltipPlacement, type TooltipProps } from "../core/branch/Tooltip/index.js"
 export { formCompactSurfaceClassName, formFieldClassName, formPageClassName, formScreenReaderLabelClassName, formScrollViewportClassName, formSurfaceClassName, horizontalScrollRegionClassName } from "../core/classNames.js"
 export * from "./renderers-forms.js"
+export * from "./renderers-overlays.js"
