@@ -984,6 +984,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   (stale-input: digest input luật ghi trong contracts.context_json, không DDL; dòng cũ không bao giờ stale). Check xanh,
   82/82 spec; status live trên ledger nivo chạy, staleInput rỗng.
 
+- 09:05 Modules architecture.decide: 3 slice done, 3 blocked vì quyết định SRS còn mở (accounting intake/budget/tax-estimation,
+  5 quyết định chatbot, instance-management shell-api-authentication); kernel đang xử lý, có thể thành ask ở vòng sau
+  (tax-estimation có thể mang tính pháp lý, sẽ hoãn cho thầy). WSPV audit a25 blocked do ảnh tablet sai viewport (op-defect).
+  Collab interface.draw a1 done. Context kernel Devin 62-69%, theo dõi. Không vá gì.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
