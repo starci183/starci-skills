@@ -65,6 +65,35 @@ const dirtyOf = (root, specs, timeoutMs, label) => {
   };
 };
 
+// The owned-path half of a dead worker's no-effect proof (api reconcile
+// --dead-worker): every uncommitted change under the job's owned paths, and
+// every commit on any ref that touched them since `sinceMs` (the dispatch
+// contract's time). {provable:false, why} when the paths cannot be read — an
+// unresolved repository, no git checkout holding an owned path, a git error —
+// because an unreadable tree is never proof of no effect. With no owned paths
+// there is nothing a worker could have changed: {provable:true, clean:true}.
+export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs }) {
+  const timeoutMs = allocationMs('settleGit.commandMs');
+  if ((placements ?? []).some((p) => p.unresolved)) return { provable: false, why: 'repository-unresolved' };
+  const items = placements ?? ownedPaths.map((owned) => ({ base, path: owned, role: null }));
+  if (!items.length) return { provable: true, clean: true, repos: [], dirty: [], commits: [] };
+  const repos = landingRepos({ base, ownedPaths, placements, timeoutMs });
+  if (!repos.size) return { provable: false, why: 'no-checkout' };
+  const since = new Date(Number.isFinite(sinceMs) ? sinceMs : 0).toISOString();
+  const dirty = [], commits = [], checked = [];
+  for (const [root, { specs, role }] of repos) {
+    const d = dirtyOf(root, specs, timeoutMs, repos.size > 1 ? `${root}:` : '');
+    if (d.error) return { provable: false, why: 'git-status', repo: root, error: d.error };
+    const log = git(root, ['log', '--all', `--since=${since}`, '--format=%H', '--', ...specs], timeoutMs);
+    if (!log.ok) return { provable: false, why: 'git-log', repo: root, error: log.error };
+    const shas = log.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
+    dirty.push(...d.dirty);
+    commits.push(...shas);
+    checked.push({ repo: root, role, paths: specs, dirty: d.dirty, commits: shas });
+  }
+  return { provable: true, clean: !dirty.length && !commits.length, since, repos: checked, dirty, commits };
+}
+
 // Returns {checked:false, why} when the job names no resolvable checkout (the
 // settle then behaves as it always has), else {checked:true, ok, reason?, detail}.
 // A placement with {unresolved} (a repository id the binding cannot resolve)

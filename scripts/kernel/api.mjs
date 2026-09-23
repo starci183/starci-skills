@@ -56,7 +56,7 @@ import {
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
-import { commitPolicyOf, landedProof, policyCommits, policyPushes } from './settle-landed.mjs';
+import { commitPolicyOf, landedProof, ownedPathEffects, policyCommits, policyPushes } from './settle-landed.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
@@ -66,7 +66,7 @@ import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
-import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { markAskClosed } from '../connectors/telegram.mjs';
@@ -180,7 +180,7 @@ const usage = (code) => {
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap]
+  reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker]
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
@@ -209,7 +209,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -379,6 +379,10 @@ const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
   }
   return { sentText, stagedPattern };
 };
+// The worker liveness values that prove the exact operation terminal can never
+// file its report: the terminal exists but is disconnected/unwritable, or a
+// running Orca answered that the handle names no terminal at all.
+const DEAD_WORKER_LIVENESS = ['disconnected', 'gone'];
 const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
   if (!terminalHandle) return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null, liveness: 'unknown', reason: 'operation terminal handle unavailable', observedAt: now };
@@ -395,7 +399,10 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
       } catch { /* terminal-show fallback below remains conservative */ }
     }
     const stale = staleAwareState(screenState, outputAgeMs, ACTIVE_STALE_MS);
-    const liveness = !shown?.ok ? 'unknown'
+    // 'gone' is a running Orca's typed answer that the handle names no
+    // terminal (after a host reboot Orca knows none of them); an unreachable
+    // Orca stays 'unknown' and never proves a worker dead.
+    const liveness = !shown?.ok ? (TERMINAL_GONE_CODES.has(shown?.errorCode) ? 'gone' : 'unknown')
       : !connected || !writable ? 'disconnected'
       : screenState === 'staged-input' ? 'staged-input'
       : screenState === 'wedged' ? 'wedged'
@@ -408,7 +415,8 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
       : 'live-idle';
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness, connected, writable,
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
-      outputAgeMs, screenState, ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}), observedAt: now };
+      outputAgeMs, screenState, ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
+      ...(shown?.errorCode ? { errorCode: shown.errorCode } : {}), observedAt: now };
   } catch (error) {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'unknown', reason: String(error?.message ?? error), observedAt: now };
   }
@@ -1167,7 +1175,7 @@ function askFormAlive(payload, { probeMs = 1500 } = {}) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready', 'ask-reserve', 'handover-due', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-dead', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready', 'ask-reserve', 'handover-due', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -1506,6 +1514,14 @@ function cmdStatus(ledger, args) {
   // A worker whose turn has run past WEDGE_MINUTES on one shell command that
   // still shows no output (terminal-liveness.mjs) is stuck, not busy.
   const wedgedWorkers = workers.filter((worker) => worker.liveness === 'wedged');
+  // A running job whose exact terminal is proven gone (disconnected, or a
+  // handle a live Orca no longer knows - every terminal after a host reboot)
+  // has no worker left to file its report. Without this it read 'engaged' and
+  // nothing ever woke the Kernel. A filed report takes the transition/settle
+  // states above instead; api reconcile --dead-worker recovers the rest.
+  const deadWorkers = workers.filter((worker) => DEAD_WORKER_LIVENESS.includes(worker.liveness)
+    && ['running', 'answering'].includes(worker.ledgerStatus)
+    && !reports.some((report) => report.job_id === worker.jobId));
   // A worker that asked its coordinator through `orca orchestration ask` waits
   // on the Kernel until `api reply` answers (inc-b944cbaef24b). The host inbox
   // is read only when a live operation terminal exists - the same condition
@@ -1528,6 +1544,7 @@ function cmdStatus(ledger, args) {
   const frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
     : settleReady.length > 0 ? 'settle-ready'
+    : deadWorkers.length > 0 ? 'worker-dead'
     : workerQuestions.length > 0 ? 'worker-question'
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : wedgedWorkers.length > 0 ? 'worker-wedged'
@@ -1561,17 +1578,20 @@ function cmdStatus(ledger, args) {
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
     workerQuestionJobs: [...new Set(workerQuestions.map((item) => item.jobId))],
     wedgedJobs: wedgedWorkers.map((worker) => worker.jobId),
+    deadWorkerJobs: deadWorkers.map((worker) => worker.jobId),
     settleReadyJobs: settleReady,
     askReserveDispatches: askReserve,
     peerMessageKeys: peerMessages.map((message) => message.key),
     queued,
     queuedCauses,
-    reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'].includes(frontierState))
+    reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'].includes(frontierState))
       ? `unanswered ask(s) ${askReserve.join(', ')} have no live form (never served or the serve-ask ttl expired); re-serve each with api serve-ask --workflow <id> --dispatch <id> before yielding`
       : frontierState === 'worker-question'
       ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked the coordinator through orca orchestration ask and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
       : frontierState === 'settle-ready'
       ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
+      : frontierState === 'worker-dead'
+      ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} still read running but the exact worker terminal is gone and no report is filed; run api reconcile --job <id> --dead-worker for each: a provably no-effect attempt returns to queued at the same attempt (route/dispatch it again), any effect evidence fences it effect_unknown for you to inspect and settle`
       : frontierState === 'worker-wedged'
       ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
       : frontierState === 'peer-message'
@@ -3296,17 +3316,182 @@ function reconcileDrop(ledger, args, job) {
   emit(out, `dropped ${jobId} (cancelled: ${reason})${waiting.length ? `; still waiting on it: ${waiting.join(', ')}` : ''}`, args.json);
 }
 
+// `reconcile --job <id> --dead-worker`: saga recovery of a RUNNING job whose
+// exact worker terminal is gone (status frontier 'worker-dead'). A host
+// shutdown kills every Orca terminal; the ledger still says running, and no
+// worker will ever file the report. Three routes, decided from the ledger and
+// git only - never from a screen:
+//   report filed      -> nothing is written; the ordinary consume/check/settle
+//                        route owns it (route:'settle').
+//   provably no effect -> the SAME job and attempt return to queued: leases
+//                        released, stale worker/terminal bindings cleared, one
+//                        'dead-worker-requeued' event. An infrastructure retry
+//                        that spends no business attempt, like the
+//                        effect_unknown no-effect rule above it.
+//   anything else     -> fenced effect_unknown with the evidence; leases stay
+//                        held and the Kernel inspects and settles it.
+// No effect means: no report, no checks row, no worker question, an op whose
+// manifest declares no effect outside its owned paths, and not one uncommitted
+// change or commit (any ref, since the dispatch contract) under the owned
+// paths. An unreadable tree is evidence, never proof. The same attempt is
+// requeued at most DEAD_WORKER_REQUEUE_LIMIT times; a worker that keeps dying
+// is fenced for the Kernel's business verdict.
+const DEAD_WORKER_REQUEUE_LIMIT = 3;
+// modules/ops/ops/<op>.yaml route.riskHints whose effects live outside the
+// owned paths, where git cannot prove their absence.
+const UNPROVABLE_EFFECT_HINTS = ['external-effects', 'runtime-effects', 'live-provider', 'destructive-gate'];
+const opRiskHints = (op) => {
+  try {
+    const hints = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))?.route?.riskHints;
+    return Array.isArray(hints) ? hints.map(String) : [];
+  } catch { return null; }
+};
+const EVIDENCE_CAP = 40;
+function reconcileDeadWorker(ledger, args, job, repo) {
+  const db = ledger.db, jobId = job.job_id, op = jobOpOf(job), payload = jobPayloadOf(job);
+  const prior = parseJson(job.result_json ?? '', {}) ?? {};
+  if (job.status === 'queued' && prior.reason === 'dead-worker-requeued') {
+    const out = { ok: true, jobId, recovery: 'requeued', alreadyRecovered: true, status: 'queued', attempt: job.attempt };
+    emit(out, `reconcile ${jobId}: dead worker already requeued (attempt ${job.attempt})`, args.json);
+    return;
+  }
+  if (job.status === 'effect_unknown' && prior.reason === 'dead-worker-fenced') {
+    const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: job.attempt, evidence: prior.evidence ?? [] };
+    emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and api settle it`, args.json);
+    return;
+  }
+  if (!['running', 'answering'].includes(job.status)) {
+    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --dead-worker recovers only a running or answering job`), { code: 'dead-worker-not-running' });
+  }
+  const worker = observeOperationWorker(job, Date.now(), db);
+  if (!DEAD_WORKER_LIVENESS.includes(worker.liveness)) {
+    const reason = worker.liveness === 'unknown' ? 'worker-liveness-unproven' : 'worker-alive';
+    const out = { ok: false, jobId, recovery: null, reason, worker };
+    emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written`, args.json);
+    process.exit(1);
+  }
+  const key = [job.workflow_id, op, job.attempt];
+  const contract = db.prepare('SELECT dispatch_id,created_at FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key) ?? null;
+  const dispatchId = payload.managed?.dispatchId ?? payload.orca?.dispatchId ?? payload.hierarchy?.runtime?.dispatchId
+    ?? contract?.dispatch_id ?? job.worker_id ?? null;
+  const report = db.prepare(`SELECT dispatch_id,outcome,consumed_at FROM reports WHERE workflow_id=?
+      AND (dispatch_id=? OR (op_id=? AND attempt=?)) ORDER BY created_at DESC LIMIT 1`)
+    .get(job.workflow_id, reportDispatchIdOf(db, job), op, job.attempt);
+  if (report) {
+    const next = report.consumed_at ? 'api check, then api settle' : 'api consume-report, api check, then api settle';
+    const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker,
+      report: { dispatchId: report.dispatch_id, outcome: report.outcome, consumed: Boolean(report.consumed_at) }, next };
+    emit(out, `reconcile ${jobId}: the dead worker filed report ${report.dispatch_id} (${report.outcome}); nothing written - ${next}`, args.json);
+    return;
+  }
+
+  const evidence = [];
+  if (db.prepare('SELECT 1 FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?').get(...key)) evidence.push('checks');
+  const asked = db.prepare("SELECT key FROM inbox WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.jobId')=?")
+    .all(job.workflow_id, WORKER_QUESTION, jobId);
+  for (const row of asked) evidence.push(`worker-question:${row.key}`);
+  const hints = opRiskHints(op);
+  if (hints == null) evidence.push('op-manifest-unreadable');
+  else for (const hint of hints) if (UNPROVABLE_EFFECT_HINTS.includes(hint)) evidence.push(`risk:${hint}`);
+  let paths;
+  try {
+    paths = ownedPathEffects({ base: repo, ownedPaths: ownedPathsOf(payload), placements: jobPlacements(db, job, repo),
+      sinceMs: contract?.created_at ?? job.created_at });
+  } catch (error) { paths = { provable: false, why: 'placement', error: String(error?.message ?? error) }; }
+  if (!paths.provable) evidence.push(`owned-paths-unverifiable:${paths.why}`);
+  else {
+    for (const file of paths.dirty) evidence.push(`dirty:${file}`);
+    for (const sha of paths.commits) evidence.push(`commit:${sha}`);
+  }
+  const effectEvidence = evidence.length > 0;
+  const priorDeaths = (payload.deadWorkers ?? []).filter((entry) => entry?.attempt === job.attempt && entry?.recovery === 'requeued').length;
+  if (priorDeaths >= DEAD_WORKER_REQUEUE_LIMIT) evidence.push(`infra-retries-exhausted:${priorDeaths}`);
+  const recovery = evidence.length ? 'fenced' : 'requeued';
+  const recorded = evidence.length > EVIDENCE_CAP ? [...evidence.slice(0, EVIDENCE_CAP), `+${evidence.length - EVIDENCE_CAP} more`] : evidence;
+  const workerProof = { terminal: worker.terminalHandle, liveness: worker.liveness, ...(worker.errorCode ? { errorCode: worker.errorCode } : {}),
+    terminalStatus: worker.terminalStatus ?? null };
+  const pathProof = paths.provable
+    ? { provable: true, since: paths.since ?? null, repos: (paths.repos ?? []).map((r) => ({ repo: r.repo, paths: r.paths, dirty: r.dirty.length, commits: r.commits.length })) }
+    : { provable: false, why: paths.why, ...(paths.error ? { error: String(paths.error).slice(0, 300) } : {}) };
+
+  // A managed Dispatch record may outlive its terminal on a host that did not
+  // restart; stop and release it before the slot is reused. Best effort and
+  // recorded only: the terminal is already proven gone, and after a reboot
+  // Orca no longer knows the Dispatch at all.
+  let cleanup = null;
+  if (recovery === 'requeued' && payload.managed?.dispatchId) {
+    const stop = bestEffort(() => workerStop({ dispatch: payload.managed.dispatchId }));
+    const release = bestEffort(() => workerRelease({ dispatch: payload.managed.dispatchId }));
+    cleanup = { dispatchId: payload.managed.dispatchId, stop: stop?.ok === true, release: release?.ok === true };
+  }
+
+  let machineRefs = [], leasesReleased = 0, result;
+  ledger.transaction(() => {
+    const now = Date.now();
+    const fresh = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
+    if (fresh?.status !== job.status) throw Object.assign(new Error(`job ${jobId} moved to ${fresh?.status} during recovery; re-read status`), { code: 'dead-worker-raced' });
+    const next = jobPayloadOf(job);
+    next.deadWorkers = [...(Array.isArray(next.deadWorkers) ? next.deadWorkers : []),
+      { attempt: job.attempt, dispatchId, ...workerProof, recovery, at: now }];
+    if (recovery === 'requeued') {
+      machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
+      leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
+      delete next.managed;
+      if (next.orca) { const { dispatchId: d, agentTerminalHandle: h, ...orca } = next.orca; next.orca = orca; }
+      if (next.hierarchy?.runtime) {
+        const { taskId, dispatchId: d, terminalHandle, ...runtime } = next.hierarchy.runtime;
+        next.hierarchy.runtime = runtime;
+      }
+      result = { reason: 'dead-worker-requeued', effectState: 'none', attemptConsumed: false, retryable: true, dispatchId,
+        proof: { worker: workerProof, report: false, checks: false, workerQuestions: 0, riskHints: hints, paths: pathProof,
+          priorRequeues: priorDeaths, ...(cleanup ? { cleanup } : {}) }, at: now };
+      db.prepare("UPDATE jobs SET status='queued',worker_id=NULL,payload_json=?,result_json=?,lease_token=NULL,deadline=NULL,updated_at=? WHERE job_id=?")
+        .run(JSON.stringify(next), JSON.stringify(result), now, jobId);
+    } else {
+      result = { reason: 'dead-worker-fenced', effectState: effectEvidence ? 'partial' : 'unknown', attemptConsumed: false, retryable: false,
+        dispatchId, evidence: recorded, worker: workerProof, paths: pathProof, at: now };
+      db.prepare("UPDATE jobs SET status='effect_unknown',payload_json=?,result_json=?,updated_at=? WHERE job_id=?")
+        .run(JSON.stringify(next), JSON.stringify(result), now, jobId);
+    }
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: recovery === 'requeued' ? 'dead-worker-requeued' : 'dead-worker-fenced',
+      payload: { opId: op, attempt: job.attempt, dispatchId, worker: workerProof, attemptConsumed: false,
+        ...(recovery === 'requeued' ? { leasesReleased, machineRefs } : { evidence: recorded, effectState: result.effectState }) },
+    });
+  });
+  let machineRefsReleased = 0;
+  if (machineRefs.length) {
+    try {
+      const machine = openMachine({ file: machineFileFor() });
+      try { machineRefsReleased = machine.release(machineRefs).released; } finally { machine.close(); }
+    } catch { /* ledger proof stands; machine TTLs expire independently */ }
+  }
+  const out = recovery === 'requeued'
+    ? { ok: true, jobId, recovery, status: 'queued', attempt: job.attempt, attemptConsumed: false, effectState: 'none', dispatchId,
+      leasesReleased, machineRefsReleased, worker, proof: result.proof }
+    : { ok: true, jobId, recovery, status: 'effect_unknown', attempt: job.attempt, effectState: result.effectState, dispatchId,
+      evidence: recorded, worker, paths: pathProof };
+  emit(out, recovery === 'requeued'
+    ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${job.attempt} queued (leases released: ${leasesReleased}) - route and dispatch it again`
+    : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and api settle it (fail or blocked), then retry as a new attempt`, args.json);
+}
+
 // Re-open an effect_unknown dispatch only when the host can now prove that
 // the exact managed worker never crossed the operation boundary.  This is an
 // infrastructure retry, so it preserves the same job id and attempt number.
 // Ambiguous state remains fenced and requires owner/runtime intervention.
-function cmdReconcile(ledger, args) {
+function cmdReconcile(ledger, args, repo = path.resolve(args.repo ?? process.cwd())) {
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (args['retry-lineage']) return reconcileRetryLineage(ledger, args, job);
   if (args.drop) return reconcileDrop(ledger, args, job);
   if (args.reap) return reconcileReap(ledger, args, job);
+  if (args['dead-worker']) return reconcileDeadWorker(ledger, args, job, repo);
+  if (job.status === 'effect_unknown' && parseJson(job.result_json ?? '', {})?.reason === 'dead-worker-fenced') {
+    throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and api settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
+  }
   const payload = jobPayloadOf(job);
   if (job.status === 'queued') {
     const worker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
@@ -4277,7 +4462,7 @@ async function main() {
       case 'estimate': return cmdEstimate(ledger, args);
       case 'route': return await cmdRoute(ledger, args);
       case 'dispatch': return cmdDispatch(ledger, args, repo);
-      case 'reconcile': return cmdReconcile(ledger, args);
+      case 'reconcile': return cmdReconcile(ledger, args, repo);
       case 'nudge': return cmdNudge(ledger, args);
       case 'observe': return cmdObserve(ledger, args);
       case 'questions': return cmdQuestions(ledger, args);

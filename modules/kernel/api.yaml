@@ -198,7 +198,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -272,7 +272,7 @@ commands:
         unchanged full gates over the whole set before that settle. Ordinals settle out of order, so the
         closing ordinal is whichever is left, not the highest (inc-751dd1ac4492)
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
-      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready'
+      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|gone|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,errorCode?,observedAt}] — gone is a running Orca''s typed refusal of the handle (errorCode terminal_handle_stale: it names no terminal, as every handle after a host reboot); an unreachable Orca reads unknown and never proves a worker dead. connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready'
     refuses:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
@@ -631,7 +631,45 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap]'
+    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker]'
+    deadWorker: >-
+      `--dead-worker` is the saga recovery of a RUNNING (or answering) job whose
+      exact worker terminal is gone: status worker liveness disconnected, or
+      gone (a running Orca answered terminal_handle_stale - every op terminal
+      after a host shutdown), frontier `worker-dead`. An unreachable Orca
+      (liveness unknown) refuses worker-liveness-unproven and a live terminal
+      refuses worker-alive; both write nothing. Three routes. (1) A report is
+      filed for the attempt: nothing is written and the answer is
+      {recovery:'settle', route:'settle', report:{dispatchId,outcome,consumed},
+      next} - consume-report, check and settle it as usual. (2) Provably no
+      effect: no report, no checks row, no worker-question inbox row, the op
+      manifest's route.riskHints name none of external-effects,
+      runtime-effects, live-provider, destructive-gate, and git shows not one
+      uncommitted change nor one commit on any ref since the dispatch
+      contract's created_at under the owned paths (resolved per repository
+      like settle's landed proof; an unreadable tree is evidence, never
+      proof). The contract row alone is dispatch's delivery, not effect. The
+      SAME job and attempt return to queued: leases deleted (machine refs
+      released best-effort), managed/orca/runtime dispatch and terminal
+      bindings cleared, a managed Dispatch stopped and released best-effort,
+      payload.deadWorkers[] gains {attempt,dispatchId,terminal,liveness,
+      recovery,at}, result {reason:'dead-worker-requeued',effectState:'none',
+      attemptConsumed:false,retryable:true,proof} and one event
+      'dead-worker-requeued'. It is an infrastructure retry that spends no
+      business attempt; route and dispatch it again. The same attempt is
+      requeued at most 3 times (DEAD_WORKER_REQUEUE_LIMIT); the next death
+      is fenced with evidence infra-retries-exhausted:<n>. (3) Otherwise the
+      job is fenced effect_unknown (effectState partial on effect evidence,
+      unknown when only the budget ran out), leases and bindings kept, result
+      {reason:'dead-worker-fenced',evidence[],worker,paths} and one event
+      'dead-worker-fenced'. The Kernel inspects the evidence (dirty:<path>,
+      commit:<sha>, checks, worker-question:<key>, risk:<hint>,
+      owned-paths-unverifiable:<why>, op-manifest-unreadable) and settles it
+      fail or blocked, then retries as a new attempt whose contract names the
+      partial state; a plain reconcile of that job refuses dead-worker-fenced.
+      Repeating --dead-worker on a recovered job is idempotent
+      (alreadyRecovered:true). Returns
+      '{ok:true,jobId,recovery:requeued|fenced|settle,status,attempt,effectState,attemptConsumed,evidence?,worker,proof?|paths?}'.
     reap: >-
       `--reap` cleans a SETTLED op's terminal that is still live (one settled
       before settle closed tabs and stopped leftover agent processes, or a
@@ -700,7 +738,12 @@ commands:
       - worker-report-exists: 'worker evidence exists; use ordinary consume/check/settle'
       - 'incomplete proof (UNTYPED): cleanup reports effectState other than none — the refusal prints {ok:false, jobId, reconciled:false, dispatchId, effectState, cleanup} and exits 1; status and lease stay unchanged'
       - live-worker-lease-conflict: 'the exact live worker exists but its owned paths cannot be re-fenced; do not duplicate or continue unfenced'
-    usedBy: 'drive.reconcile before route; infrastructure retry reuses the same logical attempt and does not consume business route budget'
+      - dead-worker-not-running: '--dead-worker on a job that is neither running nor answering (nor already recovered by it)'
+      - 'worker-liveness-unproven (UNTYPED exit 1): --dead-worker while the exact terminal reads unknown (Orca unreachable or no handle); nothing written'
+      - 'worker-alive (UNTYPED exit 1): --dead-worker while the exact terminal is live; nothing written'
+      - dead-worker-raced: 'the job changed status between the observation and the recovery transaction; re-read status'
+      - dead-worker-fenced: 'a plain reconcile of a job --dead-worker fenced on effect evidence; inspect and settle it'
+    usedBy: 'drive.reconcile before route; drive.status worker-dead (--dead-worker); infrastructure retry reuses the same logical attempt and does not consume business route budget'
 
   nudge:
     args: '--job <job_id>'
@@ -1217,11 +1260,11 @@ tableMap:
   workflows:  {read: [survey, status, hierarchy, plan, enqueue, peers, notify, inbox, incident, finish], write: [dispatch, finish]}
   goals:      {read: [survey, plan, route], write: [plan]}
   jobs:       {read: [survey, status, hierarchy, enqueue, peers, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, finish], write: [enqueue, route, dispatch, reconcile, settle]}
-  inbox:      {read: [survey, status, peers, notify, inbox, questions, reply, enqueue], write: [enqueue, notify, inbox, questions, reply, finish]}
+  inbox:      {read: [survey, status, peers, notify, inbox, questions, reply, enqueue, reconcile], write: [enqueue, notify, inbox, questions, reply, finish]}
   signals:    {read: [survey], write: [finish]}
   leases:     {read: [status, dispatch, reconcile, settle], write: [dispatch, reconcile, settle]}
   incidents:  {read: [survey, route], write: [dispatch, incident]}
   events:     {read: [survey], write: [plan, enqueue, route, dispatch, reconcile, observe, questions, reply, notify, inbox, report, consume-report, check, settle, incident, finish]}
   reports:    {read: [survey, status, reconcile, consume-report, settle], write: [report, consume-report, settle]}
   contracts:  {read: [survey, status, reconcile, op-contract], write: [dispatch]}
-  checks:     {read: [settle], write: [check]}
+  checks:     {read: [settle, reconcile], write: [check]}

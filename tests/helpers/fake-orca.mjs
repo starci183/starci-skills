@@ -95,6 +95,8 @@
 // prompt, command, model, title, worktree, closed}. A spec may write
 // connected:false onto one terminal record between runs; `terminal show`/
 // `read` then report that exact terminal dead while the others stay live.
+// stale:true instead makes `terminal show` refuse the handle with Orca's typed
+// terminal_handle_stale, the answer a live Orca gives after a host reboot.
 // `terminal list` answers with every terminal that is not closed — the
 // listing scripts/checks/check-orca-tree.mjs projects.
 import path from 'node:path';
@@ -260,6 +262,10 @@ else if (verb === 'terminal list') {
       tabs: open.map(t => ({ tabId: 'tab-' + t.handle, title: t.tabTitle ?? t.title ?? null,
         panes: { type: 'terminal', handle: t.handle, tabId: 'tab-' + t.handle, title: t.title ?? null, connected: t.connected !== false } })) } }] } : {}) } });
 }
+// A record marked stale:true is a handle a live Orca no longer knows (every
+// terminal after a host reboot): show answers the typed terminal_handle_stale.
+else if (verb === 'terminal show' && record(arg('terminal'))?.stale === true)
+  fail({ ok: false, error: { code: 'terminal_handle_stale', message: 'terminal_handle_stale' } });
 else if (verb === 'terminal show')
   isDead(arg('terminal'))
     ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })

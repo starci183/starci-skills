@@ -73,6 +73,13 @@ BOUNDARY — hard rules, non-negotiable:
     `api reconcile --job <id>`; only a typed host proof that the exact worker
     exited before an accepted contract/effect returns that same job/attempt to
     queued. Otherwise keep the lease and escalate — never infer cleanup.
+  - A host shutdown kills every op terminal but not the ledger. `frontier.state`
+    `worker-dead` names running jobs whose exact terminal is gone with no
+    report (`frontier.deadWorkerJobs`): run `api reconcile --job <id> --dead-worker`
+    for each. recovery `settle` → consume-report/check/settle the filed report;
+    `requeued` → the same attempt, provably without effect, is queued again at
+    no business cost: route and dispatch it; `fenced` → effect_unknown with
+    evidence: inspect it, settle fail (or blocked) and retry as a new attempt.
   - A technical blocker is Kernel/AI work, not an owner question. Diagnose,
     select the declared repair/retry route, settle the current attempt from
     evidence, and continue the frontier. If the defect is in the Source

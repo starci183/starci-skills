@@ -115,7 +115,7 @@ tick:
     - survey    # api survey --workflow — the tick opens on the ledger, never on memory; then api inbox (peer messages)
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
-    - drive     # loop{ status -> reconcile effect_unknown -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
+    - drive     # loop{ status -> reconcile effect_unknown and worker-dead (--dead-worker) -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
     - finish    # api finish --workflow — every job settled AND the owner approved the handover (handoverLoop)
   citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, inbox, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, finish"
 
@@ -270,6 +270,11 @@ tick:
       `worker-wedged` is not a wait either: api observe each id in
       `frontier.wedgedJobs` once, then api nudge it to interrupt the stuck
       command, or reconcile and re-dispatch the attempt.
+      `worker-dead` is not a wait either: a running job's exact terminal is
+      gone (disconnected, or unknown to a running Orca - every op terminal
+      after a host shutdown) and no report is filed, so nothing will ever
+      arrive. Run `api reconcile --job <id> --dead-worker` for each id in
+      `frontier.deadWorkerJobs` (reconcile.deadWorker below).
       `peer-message` (`frontier.peerMessageKeys`) is not a wait either: read
       `api inbox`, act on each message and ack it (§ peers below).
       `frontier.askReserveDispatches` (an unanswered ask whose serve-ask form
@@ -291,6 +296,25 @@ tick:
       only as `identity_unproven`. Any weaker observation leaves the lease and
       effect_unknown status intact; the kernel records/relays that blocker and
       never creates a successor attempt from a guess.
+    deadWorker: >-
+      A workflow survives a host shutdown like a saga: the ledger is the
+      whole state, so a restarted Kernel (the watchdog relaunches it through
+      start-workflow) re-reads status and recovers each
+      `worker-dead` job with `api reconcile --job <id> --dead-worker`
+      (modules/kernel/api.yaml commands.reconcile.deadWorker). The answer
+      names one route. recovery `settle`: the worker filed its report before
+      it died - consume-report, check and settle as usual. recovery
+      `requeued`: the attempt provably had no effect (no report, checks or
+      worker question, no effect outside its owned paths, no change or
+      commit under them since dispatch), so the SAME job and attempt are
+      queued again - route and dispatch it; this infrastructure retry spends
+      no business attempt. recovery `fenced`: the job is effect_unknown with
+      evidence (dirty:<path>, commit:<sha>, checks, worker-question, risk,
+      unverifiable paths, or infra-retries-exhausted) - read it, inspect the
+      owned paths, settle it `fail` (or `blocked` when only the owner can
+      decide) and enqueue a new attempt whose contract states what already
+      landed. Never requeue a fenced attempt by hand and never dispatch a
+      duplicate over a running row.
     dispatch:
       rule: >-
         For each ELIGIBLE queued job — normalized concrete owned_paths disjoint
