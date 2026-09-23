@@ -1006,6 +1006,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   ước tính thuế Accounting (a12) và ask WSPV checkout A/B/C (VNPAY/SePay; audit a28 đã chỉ ra đúng câu trả lời A trước đây của
   trò chạm vào nhóm payment-provider bị loại). Merge lane P6 `505fc60d2` (brand.decide có điều kiện cho spec-foundation).
 
+- 07:45 (giờ thật) Sửa nhãn giờ: các dòng ghi 08:00 đến 09:45 ở trên thực ra chạy trong khoảng 07:05 đến 07:30 +07; trò đã
+  ghi sai giờ. Vòng này: Collab work.author a5/a6 blocked vì owned_paths chỉ có features/collab/uat, planned mode chưa có slot
+  environment/fixture, và a5 lại hỏi qua Orca ask thread. Vá `a9d886062`: _common.yaml một kênh hỏi owner cho mọi op; work.author
+  thêm slot environment/fixture, kernel cấp thư mục slot. Modules chờ "ba ask" dù hai đã trả lời: wake lúc nộp gặp kernel active
+  nên bị bỏ, và status awaitingOwner chỉ hiện attempt mới nhất của op. Vá `9945ae813` (theo subject/cut). Đã đánh thức Modules,
+  báo Collab thư mục slot.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
