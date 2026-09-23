@@ -272,7 +272,23 @@ else if (verb === 'orchestration worker-stop')
 else if (verb === 'orchestration worker-release') {
   if (mode === 'prompt-stalled')
     fail({ ok: false, result: { dispatchId: arg('dispatch'), state: 'retained', reason: 'identity_unproven' } });
-  out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
+  // STARCI_FAKE_ORCA_RELEASE_UNKNOWN=<n>: the first n releases answer
+  // release_unknown and leave the agent terminal (fake-terminal-1) connected,
+  // as Orca did for settled nivo Claude ops; a later release disconnects it.
+  const unknownReleases = Number(process.env.STARCI_FAKE_ORCA_RELEASE_UNKNOWN || 0);
+  if (unknownReleases > 0) {
+    state.releases = (state.releases || 0) + 1;
+    state.terminals = state.terminals || {};
+    const agent = state.terminals['fake-terminal-1'] || { handle: 'fake-terminal-1' };
+    if (state.releases > unknownReleases) state.terminals['fake-terminal-1'] = { ...agent, connected: false, writable: false };
+    else state.terminals['fake-terminal-1'] = { ...agent, connected: true };
+    save();
+    if (state.releases <= unknownReleases)
+      out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'release_unknown', processAction: 'closed_agent_terminal',
+        lastError: 'The agent terminal was closed but its process could not be confirmed stopped' } });
+  }
+  if (!(unknownReleases > 0 && state.releases <= unknownReleases))
+    out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
 }
 else if (verb === 'orchestration worker-abandon')
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'abandoned' } });

@@ -656,7 +656,10 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
  * `api route` and `api dispatch` run, in their own order (workflow ceiling, provider circuit, path
  * fence, pool saturation); `ready` means nothing blocks it and the Kernel is the only thing left.
  */
-const QUEUED_BECAUSE = ['owner-gate', 'dependency', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+// 'dependency-failed' is a dependency that can no longer succeed on its own: the
+// seam or --after job it waits on settled failed (not an owner wait), so only
+// the Kernel can move it - retry the blocker, re-point the dependant, or drop it.
+const QUEUED_BECAUSE = ['owner-gate', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
@@ -769,14 +772,19 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
   for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...(recordDeps.get(job.job_id) ?? [])]) {
     const prior = heldByJob(priorId);
     if (prior) {
+      // A StarCi Next and a MiaMia workspace.manage sat queued behind a seam
+      // and an --after job that had settled failed; the frontier read engaged,
+      // the watchdog never woke the Kernel, and both workflows stalled.
+      const dead = FINAL_SETTLED.includes(prior.status) && !isAwaitingOwner(db, db.prepare('SELECT * FROM jobs WHERE job_id=?').get(prior.job_id));
       return {
-        queuedBecause: 'dependency',
+        queuedBecause: dead ? 'dependency-failed' : 'dependency',
         blockedBy: { op: prior.op_id, job: prior.job_id },
-        detail: priorId === seam
+        detail: (priorId === seam
           ? `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`
           : (recordDeps.get(job.job_id) ?? []).includes(priorId)
             ? `a Work record this job owns dependsOn a record owned by ${prior.job_id}, which is ${prior.status}`
-            : `declared --after job ${prior.job_id} is ${prior.status}`,
+            : `declared --after job ${prior.job_id} is ${prior.status}`)
+          + (dead ? '; it will not succeed on its own, so the Kernel retries it, re-points this job, or drops it' : ''),
       };
     }
   }
@@ -900,7 +908,7 @@ function cmdStatus(ledger, args) {
   // Ready means the Kernel can move it now: a queued job nothing holds, or a
   // fenced launch to reconcile. A queued job waiting on a leg, a slot or a
   // circuit is not work the Kernel can do this turn.
-  const readyOperations = fencedOperations + queued.filter((item) => item.queuedBecause === 'ready').length;
+  const readyOperations = fencedOperations + queued.filter((item) => ['ready', 'dependency-failed'].includes(item.queuedBecause)).length;
   const queuedCauses = Object.fromEntries(QUEUED_BECAUSE
     .map((cause) => [cause, queued.filter((item) => item.queuedBecause === cause).length])
     .filter(([, n]) => n > 0));
@@ -2936,11 +2944,33 @@ function cmdSettle(ledger, args, repo) {
     }
     try { release = workerRelease({ dispatch: managed.dispatchId }); }
     catch (e) { release = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
+    // Orca answers release_unknown ("the agent terminal was closed but its
+    // process could not be confirmed stopped") while the Claude terminal is
+    // still connected; two settled nivo business.decide ops sat live as
+    // ORPHAN_TERMINAL until a second release closed them. Its own recovery is
+    // to repeat worker-release, so a release that is not ok is repeated once
+    // and the exact agent terminal is read back; a terminal still connected
+    // after that is closed by its exact handle and the receipt says so.
+    let agentTerminal = null;
+    const agentHandle = managed.agentTerminalHandle ?? null;
+    if (release?.ok !== true && agentHandle) {
+      const connectedNow = () => { try { const s = terminalShow({ terminal: agentHandle }); return s?.ok === true ? s.connected === true : null; } catch { return null; } };
+      let retry = null;
+      try { retry = workerRelease({ dispatch: managed.dispatchId }); }
+      catch (e) { retry = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
+      agentTerminal = { handle: agentHandle, retryRelease: { ok: retry?.ok === true, state: retry?.state ?? null }, connected: connectedNow() };
+      if (agentTerminal.connected === true) {
+        const closed = terminalClose({ terminal: agentHandle });
+        agentTerminal.closed = closed.ok === true;
+        agentTerminal.connected = connectedNow();
+      }
+    }
     managedWorker = {
       dispatchId: managed.dispatchId,
       stop: { ok: stop?.ok === true, outcome: stop?.outcome ?? null, state: stop?.state ?? null, ...(stop?.error ? { error: stop.error } : {}) },
       release: { ok: release?.ok === true, outcome: release?.outcome ?? null, state: release?.state ?? null, ...(release?.error ? { error: release.error } : {}) },
       ...(residual ? { residual } : {}),
+      ...(agentTerminal ? { agentTerminal } : {}),
     };
   }
 
@@ -2950,10 +2980,12 @@ function cmdSettle(ledger, args, repo) {
   // (fable.md orca-hierarchy, row 3). A close failure never un-settles the
   // job; the ledger row is already the record.
   const taskClosed = closeOperationTask(db, job, settledPayload);
-  if (taskClosed) {
+  // The worker receipt is kept with the Task proof: settle's stdout is the
+  // only other place it lived, and an orphaned op terminal left no trace.
+  if (taskClosed || managedWorker) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...stored, taskClosed }), Date.now(), jobId);
+      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}) }), Date.now(), jobId);
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';

@@ -217,6 +217,39 @@ test('managed dispatch: route persists the decision, spawn marks the job running
     'and the job payload keeps the proof, so finish does not close it twice');
 });
 
+// Two settled nivo business.decide ops kept their Claude terminals live:
+// worker-release answered release_unknown ("the agent terminal was closed but
+// its process could not be confirmed stopped") and settle recorded nothing.
+for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x repeats the release and never leaves the agent terminal live`,t=>{
+  const fx=fixture(t);fx.env.STARCI_FAKE_ORCA_RELEASE_UNKNOWN=String(unknown);
+  const jobId='job-managed-release';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    ledger.enqueueJob({jobId:'kernel-wf-release',workflowId:'wf-release',kind:'kernel',role:'kernel',
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-release',parentNodeId:'workflow:wf-release',role:'kernel'}}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-release'").run();
+    ledger.enqueueJob({jobId,workflowId:'wf-release',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+  }finally{ledger.close();}
+  const d=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managed?.agentTerminalHandle,'fake-terminal-1');
+  const report=path.join(fx.repo,'report.json');fs.writeFileSync(report,JSON.stringify({
+    schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md'],checks:[{name:'self',command:'true',exitCode:0}]}));
+  assert.equal(fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json').status,0);
+  assert.equal(fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json').status,0);
+  const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
+  assert.equal(s.status,0,s.stderr||s.stdout);
+  const releases=fx.calls().filter(c=>c==='orchestration worker-release').length;
+  assert.equal(releases,2,'an unknown release is repeated once, as Orca\'s recovery says');
+  const worker=json(s.stdout)?.managedWorker;
+  assert.equal(worker?.agentTerminal?.handle,'fake-terminal-1');
+  assert.equal(worker?.agentTerminal?.connected,false,'the settled op leaves no connected agent terminal');
+  const closes=fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close');
+  if(unknown===1) assert.equal(closes.length,0,'a repeated release that disconnects the terminal needs no close');
+  else assert.deepEqual(closes.map(a=>a[a.indexOf('--terminal')+1]),['fake-terminal-1'],'only the exact agent terminal is closed');
+  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.agentTerminal?.connected,false,'the ledger keeps the worker receipt');
+});
+
 test('finish closes the kernel terminal and every Task the Run still holds open',t=>{
   const fx=fixture(t);
   const workflowId='wf-finish-tree';

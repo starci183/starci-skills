@@ -351,7 +351,20 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(because(second).queuedBecause,'dependency');
   assert.match(because(second).detail,/seam/);
 
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id IN (?,?)").run(composition,seam));
+  // A StarCi Next and a MiaMia workflow stalled behind a seam / --after job
+  // that had settled failed: status read engaged and nothing woke the Kernel.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id IN (?,?)").run(JSON.stringify({verdict:'blocked'}),composition,seam));
+  const frontierNow=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier;};
+  let frontier=frontierNow();
+  assert.equal(frontier.queued.find(q=>q.jobId===member).queuedBecause,'dependency-failed');
+  assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'dependency-failed');
+  assert.match(frontier.queued.find(q=>q.jobId===second).detail,/seam .* is failed.*will not succeed on its own/);
+  assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');
+  // A retried seam (a later ordinal-1 attempt) is a live wait again.
+  enq('--op','docs.author','--paths','docs/cut-1b','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
+  assert.equal(frontierNow().queued.find(q=>q.jobId===second).queuedBecause,'dependency');
+
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=? OR json_extract(payload_json,'$.cut.ordinal')=1").run(composition));
   assert.equal(because(member).queuedBecause,'ready');
   assert.equal(because(second).queuedBecause,'ready');
 });
