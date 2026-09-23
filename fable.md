@@ -1032,6 +1032,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   chối). Luật legacy: phần chỉ nằm trong work/node cũ được sửa ở bản ghi flat tương ứng (rev 1 = chép lại, rev 2 = sửa,
   change.reason nêu bản legacy bị thay). Check xanh, spec 104/104. Đã báo kernel Modules chạy lại a8.
 
+- 08:15 Không vá. WSPV audit a29/a31 failed vì lỗi thật (loading co/nhảy kích thước; 21 trạng thái thiếu dải chu kỳ
+  thanh toán và gia hạn), a30 blocked vì route ma trận (/purchases/:id vs /provisioning) mâu thuẫn trong bản ghi: op-defect,
+  kernel lo qua vòng sửa implement. Modules đang chạy lại a8 (leased). Collab chờ composition. AUTH chờ owner-gate.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
