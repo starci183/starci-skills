@@ -13,8 +13,8 @@
 //                      the listing — the ledger holds a handle Orca has lost
 //   STRAY_TERMINAL     a live terminal in the project worktree that is no live
 //                      kernel or op worker (settled worker, leftover shell)
-//   TITLE_DRIFT        a live kernel or op terminal whose title is not its
-//                      [Kernel] <workflow> / [Op] <op> name (agent CLIs rename)
+//   TITLE_DRIFT        a live managed op worker whose [Op] tab-title rename did
+//                      not apply (the unnamed worker-task_<id> sidebar row)
 //   TASK_OUTSIDE_RUN   a job whose Orca Run is not the workflow's current Run,
 //                      so its Task hangs outside the workflow's tree
 //
@@ -157,7 +157,12 @@ export function orcaTreeFindings(db, terminals, { repo = null } = {}) {
     // A [Kernel]/[Op] title that names a workflow this ledger does not hold is
     // another project's terminal: several ledgers share one Orca host.
     const titledWorkflow = /\bwf-[a-z0-9-]+/i.exec(terminal.title ?? '')?.[0] ?? null;
-    const foreign = titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow);
+    // A managed [Op] tab title names no workflow, so a terminal sitting in
+    // another project's worktree is that project's too: nivo's two live
+    // architecture.decide workers read as orphans on the StarCi Next and Mia
+    // Mia polls.
+    const foreign = (titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow))
+      || (repo != null && terminal.worktreePath != null && !underRepo(terminal.worktreePath, repo));
     const ours = knownHandles.has(terminal.handle) || (STARCI_TITLE.test(terminal.title ?? '') && !foreign);
     if (!ours || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;
     const owner = jobs.find((job) => handlesOf(job).includes(terminal.handle)) ?? null;
@@ -168,22 +173,22 @@ export function orcaTreeFindings(db, terminals, { repo = null } = {}) {
         : `terminal ${terminal.handle} (${terminal.title ?? 'untitled'}) is live and belongs to no job` });
   }
 
-  // Names: the kernel terminal of a live workflow reads [Kernel] <workflow>,
-  // and a live job's worker reads [Op] ....
+  // Names: the sidebar shows the tab title Orca set at creation (--title) or
+  // by terminal rename; `terminal list`'s `title` is the pane title the agent
+  // CLI rewrites on every turn, so it is never compared. A managed worker gets
+  // its [Op] tab title only through the rename after dispatch-show, whose
+  // receipt the job keeps (payload.managed.terminalTitle): a live job whose
+  // rename did not apply is the unnamed worker-task_<id> row the owner saw.
   const liveJobHandles = new Set(jobs.filter((job) => job.kind !== 'kernel' && ['running', 'answering', 'leased'].includes(job.status)).flatMap(handlesOf));
-  for (const wf of workflows) {
-    if (wf.finished || !wf.signalTerminal) continue;
-    const t = byHandle.get(wf.signalTerminal);
-    if (t?.live && !String(t.title ?? '').startsWith(`[Kernel] ${wf.workflowId}`)) {
-      findings.push({ code: 'TITLE_DRIFT', workflowId: wf.workflowId, terminal: t.handle, expected: `[Kernel] ${wf.workflowId}`,
-        detail: `kernel terminal ${t.handle} is titled "${t.title ?? ''}", not [Kernel] ${wf.workflowId}` });
-    }
-  }
-  for (const t of live) {
-    if (!liveJobHandles.has(t.handle) || String(t.title ?? '').startsWith('[Op] ')) continue;
-    const owner = jobs.find((job) => handlesOf(job).includes(t.handle));
-    findings.push({ code: 'TITLE_DRIFT', workflowId: owner?.workflow_id ?? null, terminal: t.handle, jobId: owner?.job_id ?? null,
-      expected: `[Op] ${owner?.op_id ?? ''}`, detail: `op worker ${t.handle} of ${owner?.job_id} is titled "${t.title ?? ''}", not [Op] ${owner?.op_id}` });
+  for (const job of jobs) {
+    if (job.kind === 'kernel' || !['running', 'answering'].includes(job.status)) continue;
+    const rename = payloadOf(job)?.managed?.terminalTitle;
+    if (!rename || rename.ok === true) continue;
+    const handle = payloadOf(job)?.managed?.assignee ?? handlesOf(job)[0] ?? null;
+    if (handle && !byHandle.get(handle)?.live) continue;
+    findings.push({ code: 'TITLE_DRIFT', workflowId: job.workflow_id, terminal: handle, jobId: job.job_id,
+      expected: rename.title ?? `[Op] ${job.op_id}`,
+      detail: `op worker ${handle} of ${job.job_id} never got its tab title "${rename.title ?? ''}"${rename.error ? ` (${String(rename.error).slice(0, 120)})` : ''}` });
   }
   // Placement: a live terminal in this project's worktree that is neither a
   // live kernel nor a live job's worker is stray (a settled worker, a leftover

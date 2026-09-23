@@ -42,6 +42,7 @@ names:
   workflowKernel: "[Kernel] <Workflow>"
   operationAgent: "[Op] <operation> - <scope>"
   rule: A worktree carries its workflow name; the one kernel process that owns the loop inside that worktree is its Kernel; every operation agent is an Op. There is no supervisor layer between a Kernel and an Op.
+launchTrust: "Owner instruction 2026-09-23: the runtime, never the owner, approves Claude/Codex launch prompts. Every launch (kernel start, command-terminal and managed op dispatch) first runs scripts/agent/trust.mjs for its cwd (Claude ~/.claude.json hasTrustDialogAccepted; Codex trust_level in ~/.codex and Orca's codex-runtime-home config.toml) and records trust in the launch event; a launch gate the agent card's gateAutoAnswer allowlists is answered once from the screen (gate-auto-approved), anything else is refused."
 workflowKernel:
   role: one-dedicated-agent-terminal-per-workflow
   note: |-

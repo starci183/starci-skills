@@ -187,11 +187,14 @@ test('a [Kernel] terminal naming a workflow from another ledger is not an orphan
 
 // The owner's sidebar: agent CLIs overwrote every [Kernel]/[Op] title, and
 // settled workers, old kernels and bare shells stayed live in the project.
-test('TITLE_DRIFT names a kernel or live op whose title an agent CLI overwrote',t=>{
+test('TITLE_DRIFT names a live managed worker whose [Op] tab rename did not apply, never a pane title',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
-    const f=orcaTreeFindings(ledger.db,seen(term(KERNEL,'devin.exe: Kernel orchestration for nivo'),term('term-op-1','Report task outcome | nivo-backend')));
-    assert.deepEqual(f.filter(x=>x.code==='TITLE_DRIFT').map(x=>x.terminal).sort(),[KERNEL,'term-op-1'].sort());
+    const rows=seen(term(KERNEL,'devin.exe: Kernel orchestration for nivo'),term('term-op-1','Report task outcome | nivo-backend'));
+    assert.deepEqual(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='TITLE_DRIFT'),[],'the pane title an agent CLI writes is not the sidebar tab title');
+    ledger.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-op-1'").run(JSON.stringify({orca:{runId:'run-1',taskId:'task-1',agentTerminalHandle:'term-op-1'},managed:{assignee:'term-op-1',terminalTitle:{ok:false,title:'[Op] code.refactor a1 · wf-tree',error:'rename refused'}}}));
+    const f=orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='TITLE_DRIFT');
+    assert.deepEqual(f.map(x=>[x.terminal,x.jobId]),[['term-op-1','job-op-1']]);
   });
 });
 
@@ -208,5 +211,9 @@ test('STRAY_TERMINAL names a live terminal in the project worktree that is no li
     const f=orcaTreeFindings(ledger.db,rows,{repo:'D:/Repositories/nivo-backend'});
     assert.deepEqual(f.filter(x=>x.code==='STRAY_TERMINAL').map(x=>x.terminal).sort(),['term-old','term-shell']);
     assert.equal(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='STRAY_TERMINAL').length,0,'without a repo the placement check is off');
+    // A managed [Op] tab title names no workflow: in another project's worktree it is that project's worker.
+    const other=readTerminals([...healthyTerminals().map(at('D:/Repositories/nivo-backend')),at('D:/Repositories/nivo-backend')(term('term-nivo-op','[Op] architecture.decide'))]);
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/starci-next'}).some(x=>x.terminal==='term-nivo-op'),false,'another project [Op] worker is not this ledger orphan');
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/nivo-backend'}).find(x=>x.terminal==='term-nivo-op')?.code,'ORPHAN_TERMINAL','in its own project it still is');
   });
 });

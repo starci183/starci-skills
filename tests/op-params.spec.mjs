@@ -207,3 +207,23 @@ test('enqueue refuses provision.ask without params.subject and says how to re-en
   assert.equal(body?.packet?.params?.subject, subject, 'the packet carries the question');
   assert.match(body.prompt, /params: .*subject="Which payment provider/, 'the op prompt shows what it asks');
 });
+
+// A StarCi Next brand.decide read only the empty bound frontend repository and
+// reported no owner ruling, while the ruling ("Core grammar, brand like the
+// StarCi Academy dashboard and subscriptions") sat in an incident the worker
+// cannot open. The Kernel now hands the ruling and the sources it names over.
+test('brand.decide takes the owner ruling and the reference sources it names from the Kernel', () => {
+  const brief = parseYaml(fs.readFileSync(path.join(OPS, 'brand.decide.yaml'), 'utf8'));
+  for (const name of ['ownerRulings', 'referenceSources']) {
+    assert.equal(brief.params?.[name]?.setBy, 'kernel');
+    assert.equal(brief.params?.[name]?.type, 'string');
+  }
+  const ruled = resolveOpParams(brief, { flag: { ownerRulings: 'Core grammar; identity as the Academy dashboard', referenceSources: 'D:/x/globals.css' }, enforceRequired: true });
+  assert.equal(ruled.ok, true, ruled.detail);
+  assert.equal(ruled.params.ownerRulings, 'Core grammar; identity as the Academy dashboard');
+  assert.equal(resolveOpParams(brief, { enforceRequired: true }).ok, true, 'a brand op with no ruling to pass still enqueues');
+  const reads = Object.fromEntries(brief.reads.map((r) => [r.id, r.path]));
+  assert.match(reads.owner, /params\.ownerRulings/);
+  assert.match(reads.sources, /params\.referenceSources/);
+  assert.match(reads.grammar, /before the app is scaffolded/);
+});

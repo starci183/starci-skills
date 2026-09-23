@@ -118,6 +118,26 @@ layoutPolicy:
   checks: [starci-validate, starci-stacks-check]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
 policy:
+  cutSetAuthority:
+    scope: workspace-manage-prepare-import
+    appliesWhen: The dispatch packet carries context.cut {id, ordinal, total} with total >= 2 for the
+      prepare or import mode, every cut job uses this same approved workspace.manage leg, mode and
+      goal binding, and the complete pairwise-disjoint path union (the root catalog .starciwork/index.yaml
+      in exactly one ordinal) was preflighted before the first slice launched.
+    permits: "The unchanged full `starci validate` over .starciwork may remain nonzero after a
+      NON-FINAL ordinal only for findings whose paths belong exclusively to not-yet-passed sibling
+      ordinals of the same cut set - typically CATALOG_DIRTY on the root catalog an unsettled later
+      ordinal owns. The current slice must pass an exact-slice validation of its own owned records
+      (`starci validate` scoped to them), the full command and its finding inventory stay unchanged
+      except for sibling-owned paths, and a finding a passed ordinal resolved may not reappear. The
+      raw nonzero full result is recorded as integration evidence, not as the slice's red verdict.
+      The Kernel records `cut-slice-postcondition` and `cut-regression-inventory` green for a
+      non-final pass; the FINAL ordinal must additionally record `full-regression-final` green from
+      the unchanged full validation before the leg advances."
+    forbids:
+      - declaring a non-final slice done without an exact-slice validation of its own records
+      - accepting a full-validation finding on a path this slice or a passed ordinal owns
+      - advancing the leg before the final ordinal records full-regression-final green
   modePolicy:
     selection: required-exactly-one
     implicitChain: false
@@ -135,7 +155,8 @@ policy:
         - .starciwork/index.yaml (the catalog and its import setup entry), the exact
           .starciwork/evidence/<workflow>.import/ migration evidence bundle and the exact selected
           .starciwork/features/<feature>/ migration record paths
-        - exact selected repository/import resource paths and retained asset paths
+        - .starciwork/workspace.yaml repositories[] when a selected repository is bound, the exact
+          selected import resource paths and retained asset paths
         - exact selected .starcistacks migration/deployment declaration paths when stack material is
           in scope
         - exact cleanup target only when cleanup is explicitly authorized
@@ -171,19 +192,32 @@ policy:
               assertions and validator freshness; on a new project both are absent. Preserve unaffected
               accepted content.
         - id: declaration
-          path: current explicit repository scope +
-            .starciwork/_resources/repositories/<resource>/resource.yaml
+          path: current explicit repository scope + .starciwork/workspace.yaml repositories[] + the
+            selected project binding .workspaces/projects/<project>/work.json
           purpose:
-            en: Read explicit task location/repository selection and existing portable identity. A directory
-              name, cwd or similar remote is only a hint when identity is unresolved.
+            en: Read explicit task location/repository selection, the portable repository identities
+              workspace.yaml repositories[] already lists ({role, name}), and the project binding
+              (starci/workspace-binding@1, modules/schemas/workspace-routing.yaml bindingShape) that
+              maps each role to its checkout (pathFromSource) and declared remote (gitRepository).
+              These two are the one source of repository identity; a directory name, cwd or similar
+              remote is only a hint when identity is unresolved.
       writes:
         - id: workspace
           path: .starciwork/workspace.yaml
-          fields: [schema, id, extensions]
+          fields: [schema, id, project, description, repositories]
           content:
-            en: Initialize only an explicitly new canonical workspace (schema work/workspace@1); reuse an
-              existing workspace unchanged. Never invent repository/environment resources merely to
-              satisfy setup.
+            en: "Initialize only an explicitly new canonical workspace (schema work/workspace@1: id,
+              project, description and repositories[]); reuse an existing workspace unchanged except
+              to append a selected verified repository its repositories[] does not list yet.
+              repositories[] is the tree's repository binding: one {role, name} per selected
+              repository, role as the project binding keys it (be, fe) and name as the repository's
+              directory name, the name implementation records, `repository:<name>/` paths and
+              evidence servedVersions resolve against. The Work owner repository is always listed,
+              so a source-free purpose lists only it. No _resources repository record exists
+              (work-layout.yaml shape.resources admits environments, identities and fixtures only);
+              remote, HEAD, default ref and dirty state are observations for
+              E/repository-observation.yaml. Never invent repository/environment resources merely
+              to satisfy setup."
         - id: node
           path: .starciwork/index.yaml (catalog + extensions.work3.setup.<workflow>.prepare) +
             .starciwork/features/<feature>/index.yaml +
@@ -233,23 +267,6 @@ policy:
             en: Retain source-intent citations and actual scope/coverage review in the setup entry's own
               bundle E only. The entry's review reaches pass only after real review evidence and
               validation; initial scaffolding has no review. No code/UAT pass.
-        - id: resource
-          path: .starciwork/_resources/repositories/<resource>/resource.yaml
-          fields:
-            - schema
-            - id
-            - kind
-            - owner
-            - revision
-            - details.identity
-            - details.remote
-            - details.defaultRef
-            - details.sourceRoots
-            - details.workRootRef
-          content:
-            en: Create/repair only the explicitly selected repository declaration (schema work/resource@1) from
-              verified Git metadata; machine-specific checkout paths stay local or observations, not
-              portable identity.
       steps:
         - reads:
             - intent
@@ -262,13 +279,15 @@ policy:
         - reads:
             - target
             - declaration
-          writes: [resource, evidence]
+          writes: [workspace, evidence]
           action:
             en: Inspect exact Git root/common-dir, remote identity, full HEAD, worktree registration, links and
-              dirty paths with read-only commands. Bind only selected verified repository resources
-              to the existing canonical .starciwork root. Do not reset, clean, stash, switch or
-              create another canonical tree. Retain sanitized repository-observation.yaml;
-              source-free setup explicitly records no repository yet.
+              dirty paths with read-only commands, and verify each actual remote against the project
+              binding's gitRepository. Bind only selected verified repositories, by listing them in
+              workspace.yaml repositories[] of the existing canonical .starciwork root. Do not
+              reset, clean, stash, switch or create another canonical tree. Retain sanitized
+              repository-observation.yaml (remote, full HEAD, default ref, dirty state per
+              repository); source-free setup explicitly records no source repository yet.
         - reads:
             - intent
             - target
@@ -315,8 +334,9 @@ policy:
               non-applicability; setup completion never rolls implementation forward.
         - id: identity
           requirement:
-            en: Selected repositories have verified identities and one canonical Work root; an explicitly
-              source-free purpose may have no repository resource.
+            en: Selected repositories have verified identities, each listed once in workspace.yaml
+              repositories[] under the role and name the project binding resolves, and one canonical
+              Work root; an explicitly source-free purpose lists only the Work owner repository.
       blockers:
         - code: PURPOSE_AMBIGUOUS
           condition:
@@ -329,7 +349,8 @@ policy:
       placeholders:
         feature: Selected feature slug
         workflow: The running workflow id the setup entry is keyed by
-        repo-id: Resolved repository resource ID
+        repo-id: Repository name from workspace.yaml repositories[] (or its project binding role)
+        project: Selected project id in the host .workspaces/projects registry
         bound-paths: Inspected source read set
         write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
@@ -368,8 +389,8 @@ policy:
         - id: repo
           path: repository:<repo-id>/<bound-paths>
           purpose:
-            en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
-              state; read applicable instructions, manifests, owning code, callers and relevant
+            en: When source exists/is selected, resolve the repository through workspace.yaml
+              repositories[] and the project binding, actual checkout/root/HEAD and dirty state; read applicable instructions, manifests, owning code, callers and relevant
               tests. Greenfield/spec-only work records source not-yet-created and grounds intent in
               the user request; no invented repository or fact citation. Source implementation still
               needs an actual selected writable repository.
@@ -411,11 +432,13 @@ policy:
       writes:
         - id: workspace
           path: .starciwork/workspace.yaml
-          fields: [schema, id, extensions]
+          fields: [schema, id, project, description, repositories]
           content:
             en: Initialize only the explicitly selected new canonical workspace (schema work/workspace@1);
-              preserve an existing identity. Never put the canonical root inside the selected
-              disposable target.
+              preserve an existing identity, appending only a selected verified source repository its
+              repositories[] does not list yet ({role, name}, as prepare's writes.workspace
+              describes; no _resources repository record). Never put the canonical root inside the
+              selected disposable target.
         - id: node
           path: .starciwork/index.yaml (catalog + extensions.work3.setup.<workflow>.import) +
             .starciwork/features/<feature>/index.yaml + selected imported
@@ -449,8 +472,7 @@ policy:
               cleanupTarget and the exact cleanupAssertions, and migration.cleanup stays blocked
               until they pass; no separate cleanup record is authored.
         - id: resources
-          path: .starciwork/_resources/repositories/<resource>/resource.yaml +
-            .starciwork/_resources/imports/<resource>/resource.yaml +
+          path: .starciwork/_resources/imports/<resource>/resource.yaml +
             .starciwork/_resources/imports/<resource>/assets/<asset>
           fields:
             - schema
@@ -461,8 +483,10 @@ policy:
             - details
             - files:[{path}]
           content:
-            en: Record inspected repository root/identity/full commits and source mappings in details on
-              work/resource@1 records; keep observed versus inferred facts explicit. Preserve
+            en: Record source mappings in details on the import work/resource@1 record, naming the source
+              repository by its workspace.yaml repositories[] name; inspected repository
+              root/identity/full commits stay in E/inventory.yaml. Keep observed versus inferred
+              facts explicit. Preserve
               selected nonsecret source/design documents and images in imports assets with files
               relative paths. A source image is not product screenshot evidence. Preserve original
               artifact names, actual hashes and origin in the inventory report; register only
@@ -613,7 +637,8 @@ policy:
       placeholders:
         feature: Selected feature slug
         workflow: The running workflow id the setup entry is keyed by
-        repo-id: Resolved repository resource ID
+        repo-id: Repository name from workspace.yaml repositories[] (or its project binding role)
+        project: Selected project id in the host .workspaces/projects registry
         bound-paths: Inspected source read set
         write-ceiling: Explicit owned source paths
         environment: Resolved environment resource slug
@@ -755,7 +780,7 @@ policy:
         workflow: The running workflow id the setup entry is keyed by
         feature: Feature folder holding the settled design records
         environment: An environment the declaration admits
-        repo-id: Resolved owner repository resource ID
+        repo-id: Owner repository name from workspace.yaml repositories[] (or its project binding role)
         bound-paths: Inspected source read set
 route:
   nodeKinds: [operations]

@@ -44,6 +44,30 @@
 //                          fake-terminal-1 — the kernel-restart spec proves the
 //                          replacement terminal is a different one.
 //
+//   STARCI_FAKE_ORCA_CREATE_TIMEOUT 'live' | 'dead': `terminal create` makes the
+//                          terminal but answers Orca's renderer-path error
+//                          "Timed out waiting for terminal handle after
+//                          creation" with no handle — the created terminal is
+//                          only visible through `terminal list`, where its pane
+//                          title is the cwd name (as Codex rewrites it) and its
+//                          tab title is the --title. 'dead': that terminal has
+//                          already disconnected.
+//   STARCI_FAKE_ORCA_STUCK_PASTE 'enter' | 'never': a non-empty `terminal send`
+//                          leaves the text staged in the input row
+//                          ("› [Pasted Content N chars]"). 'enter': one
+//                          Enter-only send submits it; 'never': it stays.
+//
+//   STARCI_FAKE_ORCA_GATE_SCREEN 'claude-trust' | 'claude-bypass' | 'codex-trust' |
+//                          'claude-onboarding': every created terminal first shows
+//                          that multi-line launch menu with its cursor on the
+//                          first option (Claude 2.1.280 puts 'No, exit' first).
+//                          A raw terminal-send key drives it: ESC[B / ESC[A move
+//                          the cursor, '\r' picks the option. Picking the accept
+//                          option clears the gate (the agent prompt follows);
+//                          picking any other exits the terminal. Keys land in
+//                          terminals[h].gateKeys and never count as a prompt.
+//   STARCI_FAKE_ORCA_GATE_STICKY='1' the gate ignores every key (it persists).
+//
 //   STARCI_FAKE_ORCA_CLOSE_FAILS comma-separated terminal handles whose
 //                          `terminal close` is refused ('*' refuses every
 //                          close) — drives the unclosed-stale-kernel spec.
@@ -85,6 +109,21 @@ const gateScreens = {
   claude: "Let's get started. Choose the text style that looks best with your terminal To change this later, run /theme 1. Auto (match terminal) ❯ 2. Dark mode ✔",
   codex: 'Do you trust the contents of this directory? › 1. Yes, continue 2. No, quit  Press enter to continue',
 };
+// Multi-line launch menus (STARCI_FAKE_ORCA_GATE_SCREEN): [lead text, options, accept index].
+const menuGates = {
+  'claude-trust': ['Accessing workspace:\n\n' + 'D:/fake/repo' + "\n\nQuick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source\nproject, or work from your team). If not, take a moment to review what's in this folder first.\n\nClaude Code'll be able to read, edit, and execute files here.\n\nSecurity guide\n",
+    ['No, exit', 'Yes, I trust this folder'], 1, 'Enter to confirm · Esc to cancel', '❯'],
+  'claude-bypass': ['WARNING: Claude Code running in Bypass Permissions mode\n\nIn Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous commands.\n\nBy proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.\n',
+    ['No, exit', 'Yes, I accept'], 1, 'Enter to confirm · Esc to cancel', '❯'],
+  'codex-trust': ['> You are in D:/fake/repo\n\n  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection.\n',
+    ['1. Yes, continue', '2. No, quit'], 0, '  Press enter to continue', '›'],
+  'claude-onboarding': ["Let's get started.\n\nChoose the text style that looks best with your terminal\nTo change this later, run /theme\n",
+    ['1. Dark mode ✔', '2. Light mode'], 0, '', '❯'],
+};
+const menuGate = process.env.STARCI_FAKE_ORCA_GATE_SCREEN || '';
+const menuSticky = process.env.STARCI_FAKE_ORCA_GATE_STICKY === '1';
+const MENU = r => { const [lead, options, , foot, mark] = menuGates[r.gate.kind];
+  return lead + '\n' + options.map((o, i) => (i === r.gate.cursor ? mark + ' ' : '  ') + o).join('\n') + '\n\n' + foot; };
 const gatedProviders = new Set((process.env.STARCI_FAKE_ORCA_GATE || '').split(',').map(s => s.trim()).filter(Boolean));
 const effectiveModelOverride = process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || null;
 if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
@@ -111,6 +150,9 @@ const isDead = handle => mode === 'dead-terminal' || record(handle)?.connected =
 const commandProvider = handle => (String(record(handle)?.command ?? state.terminalCommand ?? '').match(/(?:^|[\s"'\\/])(claude|codex|qwen|devin)(?:\.exe|\.cmd)?(?=[\s"']|$)/i)?.[1] ?? '').toLowerCase();
 const gatedProviderOf = handle => { const p = commandProvider(handle); return p && gatedProviders.has(p) && gateScreens[p] ? p : null; };
 const hasSent = handle => { const r = record(handle); return r ? !!r.sent : state.sends > 0; };
+const createTimeout = process.env.STARCI_FAKE_ORCA_CREATE_TIMEOUT || '';
+const stuckPaste = process.env.STARCI_FAKE_ORCA_STUCK_PASTE || '';
+const STAGED = h => 'Codex\nmodel: ' + renderedModel(h) + '\n\n› [Pasted Content ' + String(record(h)?.prompt ?? '').length + ' chars]\n  gpt-6-sol high · repo\n';
 const verb = argv.slice(0, 2).join(' ');
 // The live-schema listing scripts/api/orca/lib.mjs compares against, derived
 // from calls.yaml so the stub can never disagree with the contract by accident.
@@ -137,12 +179,18 @@ if (verb === 'terminal create') {
   state.counter = (state.counter || 0) + 1;
   state.commands = [...(state.commands || []), state.terminalCommand];
   const handle = uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1';
-  state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: true, writable: true,
+  const timedOut = createTimeout === 'live' || createTimeout === 'dead';
+  const paneTitle = timedOut ? String(arg('worktree') || '').replaceAll('\\', '/').split('/').filter(Boolean).pop() || null : arg('title');
+  state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: createTimeout !== 'dead', writable: createTimeout !== 'dead',
     sent: false, prompt: null, command: state.terminalCommand, model: state.terminalModel,
-    title: arg('title'), worktree: arg('worktree'), closed: false } };
+    title: paneTitle, tabTitle: arg('title'), worktree: arg('worktree'), closed: false,
+    ...(menuGates[menuGate] ? { gate: { kind: menuGate, cursor: 0, cleared: false }, gateKeys: [] } : {}) } };
   save();
+  if (timedOut) fail({ ok: false, error: { code: 'runtime_error', message: 'Timed out waiting for terminal handle after creation' } });
   out({ ok: true, result: { terminal: { handle, title: arg('title'), connected: true, writable: true } } });
 }
+else if (verb === 'terminal read' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared && !isDead(arg('terminal')))
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: MENU(record(arg('terminal'))) } } });
 else if (verb === 'terminal read' && gatedProviderOf(arg('terminal')))
   out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
     screen: gateScreens[gatedProviderOf(arg('terminal'))] } } });
@@ -150,10 +198,32 @@ else if (verb === 'terminal read')
   isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-      screen: mode === 'auth' ? DEAD(arg('terminal')) : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal'))) } } });
+      screen: mode === 'auth' ? DEAD(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
+        : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal')))) } } });
+else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared) {
+  const r = record(arg('terminal'));
+  const key = (arg('text') ?? '') + (argv.includes('--enter') ? '\r' : '');
+  r.gateKeys.push(key);
+  const [, options, accept] = menuGates[r.gate.kind];
+  if (!menuSticky) {
+    if (key === '\x1b[B') r.gate.cursor = Math.min(options.length - 1, r.gate.cursor + 1);
+    else if (key === '\x1b[A') r.gate.cursor = Math.max(0, r.gate.cursor - 1);
+    else if (key === '\r') {
+      if (r.gate.cursor === accept) r.gate.cleared = true;
+      else { r.connected = false; r.writable = false; }
+    }
+  }
+  save(); out({ ok: true, result: { send: { accepted: true, bytesWritten: key.length } } });
+}
 else if (verb === 'terminal send') {
   const r = record(arg('terminal'));
-  if (r) { r.sent = true; r.prompt = arg('text'); }
+  const text = arg('text') ?? '';
+  if (r && text) { r.sent = true; r.prompt = text; if (stuckPaste) r.staged = true; }
+  else if (r && !text && argv.includes('--enter')) {
+    r.enters = (r.enters || 0) + 1;
+    if (stuckPaste === 'enter') r.staged = false;
+    if (!r.sent) r.sent = true;
+  }
   state.sends += 1; save(); out({ ok: true, result: { sent: true } });
 }
 else if (verb === 'terminal close') {
@@ -168,11 +238,15 @@ else if (verb === 'terminal close') {
 }
 // terminal list is the listing scripts/checks/check-orca-tree.mjs reads:
 // every terminal this stub created and has not closed.
-else if (verb === 'terminal list')
-  out({ ok: true, result: { terminals: Object.values(state.terminals || {})
-    .filter(t => !t.closed)
+else if (verb === 'terminal list') {
+  const open = Object.values(state.terminals || {}).filter(t => !t.closed);
+  out({ ok: true, result: { terminals: open
     .map(t => ({ handle: t.handle, title: t.title ?? null, worktree: t.worktree ?? null,
-      connected: t.connected !== false, writable: t.writable !== false })) } });
+      connected: t.connected !== false, writable: t.writable !== false })),
+    ...(argv.includes('--include-visual-layouts') ? { visualLayouts: [{ worktreeId: 'fake-worktree', root: { type: 'group',
+      tabs: open.map(t => ({ tabId: 'tab-' + t.handle, title: t.tabTitle ?? t.title ?? null,
+        panes: { type: 'terminal', handle: t.handle, tabId: 'tab-' + t.handle, title: t.title ?? null, connected: t.connected !== false } })) } }] } : {}) } });
+}
 else if (verb === 'terminal show')
   isDead(arg('terminal'))
     ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })
@@ -242,7 +316,23 @@ else if (verb === 'orchestration worker-stop')
 else if (verb === 'orchestration worker-release') {
   if (mode === 'prompt-stalled')
     fail({ ok: false, result: { dispatchId: arg('dispatch'), state: 'retained', reason: 'identity_unproven' } });
-  out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
+  // STARCI_FAKE_ORCA_RELEASE_UNKNOWN=<n>: the first n releases answer
+  // release_unknown and leave the agent terminal (fake-terminal-1) connected,
+  // as Orca did for settled nivo Claude ops; a later release disconnects it.
+  const unknownReleases = Number(process.env.STARCI_FAKE_ORCA_RELEASE_UNKNOWN || 0);
+  if (unknownReleases > 0) {
+    state.releases = (state.releases || 0) + 1;
+    state.terminals = state.terminals || {};
+    const agent = state.terminals['fake-terminal-1'] || { handle: 'fake-terminal-1' };
+    if (state.releases > unknownReleases) state.terminals['fake-terminal-1'] = { ...agent, connected: false, writable: false };
+    else state.terminals['fake-terminal-1'] = { ...agent, connected: true };
+    save();
+    if (state.releases <= unknownReleases)
+      out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'release_unknown', processAction: 'closed_agent_terminal',
+        lastError: 'The agent terminal was closed but its process could not be confirmed stopped' } });
+  }
+  if (!(unknownReleases > 0 && state.releases <= unknownReleases))
+    out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
 }
 else if (verb === 'orchestration worker-abandon')
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'abandoned' } });

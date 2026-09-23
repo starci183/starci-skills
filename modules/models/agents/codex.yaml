@@ -12,6 +12,15 @@ name:
   api: terminal.rename
 release:
   api: orchestration.worker-release
+hostLaunchPrefix:
+  win32: '&'
+  posix: 'command'
+  reason: >-
+    Orca's CLI sends a terminal-create command whose first word is `codex` down its renderer-backed tab path, which
+    waits at most 10s for the UI to publish a handle and otherwise fails with "Timed out waiting for terminal handle after
+    creation" while the tab still spawns later, untracked (starci-next op-workspace.manage-55001e2623, 2026-09-23). A
+    leading shell call operator runs the same binary on the runtime-owned PTY path qwen and devin already use; reproduced
+    against Orca: bare `codex` timed out at 10.4s, `& codex` returned its handle in 0.5s.
 terminalFallback:
   when: every unattended Codex launch — the Kernel terminal and every operation agent (the codex profiles are command-terminal, card-composed); worker-start carries no approval/sandbox flag
   command: codex
@@ -20,6 +29,16 @@ terminalFallback:
   bypassArgs: ['--ask-for-approval', 'never', '--sandbox', 'danger-full-access']
   bypassReason: An unattended agent stalls on per-tool permission menus; use the current explicit approval and sandbox flags declared by bypassArgs.
   note: 'codex self-update can leave the binary broken (TUI missing dist files; a reinstall fixes it). Probe `codex --version` before relying on it.'
+launchTrust: >-
+  Owner instruction 2026-09-23: the runtime, never the owner, approves launch prompts. Before every launch
+  scripts/agent/trust.mjs appends [projects."<path>"] trust_level = "trusted" for the cwd and its git root to
+  ~/.codex/config.toml and Orca's CODEX_HOME config.toml; a trust prompt that still appears is answered once, else refused.
+gateAutoAnswer:
+  delayMs: 500
+  settleMs: 6000
+  gates:
+    codex-directory-trust:
+      select: 'Yes, continue'
 verifiedAt: 2026-09-20
 verifiedAgainst: 'codex v0.155.1'
 forbidden:

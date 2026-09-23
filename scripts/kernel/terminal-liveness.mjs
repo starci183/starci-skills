@@ -5,17 +5,51 @@
 
 // Screens that wait for a human answer before any turn can run. The runtime
 // names the gate and stops; answering it (directory trust, first-run setup,
-// a tool approval) is the owner's decision.
+// a tool approval) is the owner's decision. `remedy` is the exact one-time
+// action that clears the gate (<cwd> = the directory the refused terminal was
+// launched in); a refusal quotes it so the owner never guesses what to run.
 const INTERACTIVE_GATES = [
-  { gate: 'codex-directory-trust', pattern: /do you trust the contents of this directory/i },
-  { gate: 'claude-first-run-onboarding', pattern: /let's get started|choose the text style/i },
-  { gate: 'workspace-trust', pattern: /trust the authors/i },
+  { gate: 'codex-directory-trust', pattern: /do you trust the contents of this directory/i,
+    remedy: "open a terminal in <cwd>, run `codex`, pick '1. Yes, continue' at the trust prompt, then type /quit" },
+  { gate: 'claude-first-run-onboarding', pattern: /let's get started|choose the text style/i,
+    remedy: 'open a terminal, run `claude`, finish the first-run setup (text style, sign-in, notices) until its input box shows, then type /exit; that writes hasCompletedOnboarding to ~/.claude.json' },
+  // Observed 2026-09-23 on a fresh worktree: "Quick safety check: Is this a
+  // project you created or one you trust? … ❯ No, exit" (before tool-approval,
+  // whose confirm pattern would otherwise claim it under the wrong name).
+  { gate: 'claude-workspace-trust', pattern: /is this a project you created or one you trust/i,
+    remedy: "open a terminal in <cwd>, run `claude`, pick 'Yes, I trust this folder', then type /exit" },
+  { gate: 'claude-bypass-permissions-consent', pattern: /bypass permissions mode[\s\S]*yes, i accept/i,
+    remedy: "open a terminal, run `claude --dangerously-skip-permissions`, pick 'Yes, I accept', then type /exit" },
+  { gate: 'workspace-trust', pattern: /trust the authors/i,
+    remedy: 'open a terminal in <cwd>, start the same agent CLI once, answer its workspace-trust prompt, then quit it' },
   // An agent CLI's own multiple-choice question (Devin's ask dialog, Claude's
   // AskUserQuestion). Its selection cursor looks like an input prompt, and a
   // wake typed into it lands in the "Other" answer field.
-  { gate: 'agent-question-dialog', pattern: /(?:↑↓|arrow keys)(?: to)? navigate[^\n]*(?:↵|enter)(?: to)? select|(?:↵|enter) to select[^\n]*navigate|not ready to answer|type your own/i },
-  { gate: 'tool-approval', pattern: /approve once|permission (?:required|request)|allow `[^`]+` commands|confirm\s*[·•]/i },
+  { gate: 'agent-question-dialog', pattern: /(?:↑↓|arrow keys)(?: to)? navigate[^\n]*(?:↵|enter)(?: to)? select|(?:↵|enter) to select[^\n]*navigate|not ready to answer|type your own/i,
+    remedy: 'answer the question shown in that terminal' },
+  { gate: 'tool-approval', pattern: /approve once|permission (?:required|request)|allow `[^`]+` commands|confirm\s*[·•]/i,
+    remedy: 'answer the approval prompt in that terminal; a launch that still asks lost its card bypassArgs, so compare its command with the agent card' },
 ];
+
+/** The one-time action that clears `gate`, with <cwd> filled in, or null. */
+export function gateRemedy(gate, { cwd = null } = {}) {
+  const remedy = INTERACTIVE_GATES.find((g) => g.gate === gate)?.remedy;
+  return remedy ? remedy.replaceAll('<cwd>', cwd ? String(cwd) : 'the launch directory') : null;
+}
+
+// A dispatch paste that is still sitting in the provider's input row was never
+// submitted (Codex renders it as "› [Pasted Content 5012 chars]"). Only the
+// LAST prompt row counts: a transcript row that quotes an earlier paste is not
+// the input box. Returns the staged input row, or null.
+export function stagedInputRow(screen, stagedPattern = /Pasted Content|\[Pasted text/i) {
+  // A boxed input row (`│ > text │`) is still the input row: strip the rail.
+  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14)
+    .map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (/^\s*[>›❯❭]\s*/u.test(rows[i])) return stagedPattern.test(rows[i]) ? rows[i].trim() : null;
+  }
+  return null;
+}
 
 export const WEDGE_MINUTES = 30;
 
@@ -45,7 +79,11 @@ export function classifyAgentScreen(screen) {
   // "Thinking", "Running"; a wrapped prose line that starts with "running."
   // (a Collab Kernel yield summary) is not one.
   const statusWord = /(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)\b(?!\s*:|\s+now\b|[^\n]*:[ \t]*(?:\n|$))/;
-  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
+  // Claude Code 2.1.280 spins with a star glyph and a random gerund plus a
+  // timer ("✶ Osmosing… (1m 0s · ↓ 2.7k tokens)") and no "esc to interrupt";
+  // without this marker a working Claude kernel read turn-idle and every
+  // watchdog wake landed in its queued-message box.
+  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d|(?:^|\n)\s*[✶✻✳✢✽✺·*]\s+\S+…\s*\(\s*\d+(?:h|m|s)/i;
   const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) };
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty

@@ -559,7 +559,17 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id> [--retry-lineage]'
+    args: '--job <job_id> [--retry-lineage | --drop --reason <text>]'
+    drop: >-
+      `--drop --reason <text>` retires a QUEUED job that never crossed the
+      dispatch boundary (the same evidence test as --retry-lineage): the row
+      settles `cancelled` with result {verdict:'dropped', reason, at} and one
+      event 'job-dropped' {op, attempt, reason, cut, waiting}. `waiting` names
+      every queued job whose --after or cut seam is this job; they read
+      dependency-failed in status until the Kernel re-points or drops them. It
+      is how a Kernel clears a cut whose grants are wrong before it re-plans
+      it. Refuses drop-not-queued, drop-needs-reason and drop-dispatched
+      (with `evidence`).
     retryLineage: >-
       `--retry-lineage` is a separate repair, not a launch reconcile: for a
       QUEUED job that never crossed the dispatch boundary it re-derives

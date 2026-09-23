@@ -575,14 +575,32 @@ try {
   for (const [index, member] of members.entries()) {
     spawned = spawnAgent({ provider: member.agent, model: member.model, effort: member.effort,
       worktree: repo, title, prompt, kernel: true, dispatchId: `kernel-${workflowId}` });
+    // gate-auto-approved: each launch gate the runtime answered for this member.
+    const answered = (spawned.gateAnswers ?? []).filter((a) => a?.keystroke);
+    if (answered.length) {
+      const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
+      ledger.transaction(() => {
+        for (const a of answered) ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId,
+          generation: workflow?.generation ?? 0, kind: 'gate-auto-approved',
+          payload: { gate: a.gate, keystroke: a.keystroke, answered: a.answered === true, cleared: a.cleared === true,
+            provider: member.agent, terminal: spawned.terminal ?? null, ...(a.reason ? { reason: a.reason } : {}) } });
+      });
+    }
     if (spawned.ok) { route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough }; break; }
     const failure = { agent: member.agent, requestedModel: member.model, ...(spawned.signal ? { signal: spawned.signal } : {}),
-      ...(spawned.state ? { state: spawned.state } : {}), ...(spawned.gate ? { gate: spawned.gate } : {}),
+      ...(spawned.state ? { state: spawned.state } : {}), ...(spawned.gate ? { gate: spawned.gate, remedy: spawned.remedy ?? null } : {}),
+      ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}),
+      ...(spawned.trust ? { trust: spawned.trust } : {}),
       ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}),
       ...(spawned.terminalClosed ? { terminalClosed: spawned.terminalClosed } : {}) };
     const next = members[index + 1] ?? null;
     const noEffect = FALL_THROUGH_STEPS.has(spawned.step);
-    const closed = !spawned.terminal || spawned.terminalClosed?.ok === true;
+    // A create whose effect was unknown is closed only when its reconciliation
+    // closed every terminal it found and no handle-less tab is still pending.
+    const recovery = spawned.createRecovery;
+    const recoveryClosed = !recovery || (recovery.closed.every((c) => c.ok) && !recovery.pendingTabs?.length
+      && !recovery.unowned?.length);
+    const closed = (!spawned.terminal || spawned.terminalClosed?.ok === true) && recoveryClosed;
     if (!route.fallThrough || !next || !noEffect || !closed)
       failStart(spawned.step, spawned.error, spawned.terminal ?? null,
         { ...failure, ...(fellThrough.length ? { fellThrough } : {}),
@@ -674,6 +692,8 @@ try {
         inboxId: claim.inbox_id, attempt,
         nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`,
         sourceHost: sourceRoot, projectBinding: context?.file ?? null, ...(staleKernel ? { replacedKernel: staleKernel } : {}),
+        ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}),
+        ...(spawned.trust ? { trust: spawned.trust } : {}),
         ...(fellThrough.length ? { fellThrough } : {}) },
       createdAt: now });
   });

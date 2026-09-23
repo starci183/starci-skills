@@ -13,27 +13,49 @@ graphPolicy:
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
   prerequisiteState: done
   dispatch: never
+params:
+  ownerRulings:
+    type: string
+    default: ''
+    setBy: kernel
+    doc:
+      en: The owner's identity rulings, verbatim, each with where it was recorded (an owner-gate
+        incident answer, a serve-ask answer). A StarCi Next brand op read only the empty bound
+        frontend repository and reported no ruling while the owner's answer sat in an incident the
+        worker cannot open.
+  referenceSources:
+    type: string
+    default: ''
+    setBy: kernel
+    doc:
+      en: Comma-separated read-only paths the owner's ruling names as the identity to follow, for
+        example another product's global CSS and the dashboard and subscription pages it styles.
+        Values traced to a declaration in these files are traced to a real file.
 reads:
   - id: target
     path: .starciwork/brand/index.yaml
     purpose:
       en: "Read the existing product brand record, its declared refs, its current `rev` and validator
         freshness. There is exactly one brand record per product: this op revises that record rather
-        than adding a second identity."
+        than adding a second identity. When the product has no brand record yet, this path is absent
+        and this op creates it at rev 1 as the record's first owner, not a second one."
   - id: owner
     path: .starciwork/features/*/{br,fr,decision}/**/index.yaml + the selected request and the owner's
-      recorded rulings
+      recorded rulings + params.ownerRulings
     purpose:
       en: Inferring identity from a competitor, a template or a screenshot is not a ruling.
   - id: grammar
     path: consuming app manifest/lockfile + resolved component package exports/types/renderers/CSS + app
-      family root/style imports
+      family root/style imports; before the app is scaffolded, the grammar package and family the
+      owner's ruling names
     purpose:
       en: Resolve the installed design grammar from the actual consuming app, honoring workspace aliases
         and bundler resolution, and record package identity, version, resolved path and inspected
-        file hashes. A similarly named family variable is not proof it is wired.
+        file hashes. A similarly named family variable is not proof it is wired. A frontend that is not
+        scaffolded yet has no manifest; then the family the owner ruled is read from the grammar
+        package itself and recorded as the family the scaffold installs.
   - id: sources
-    path: repository:<repo-id>/<bound-paths>
+    path: repository:<repo-id>/<bound-paths> + params.referenceSources
     purpose:
       en: Read the real token and style files of the frontend repository - the app's global CSS, the
         family root, the theme and token files the owner named or that this repository actually
@@ -124,8 +146,9 @@ steps:
         decisions as closed options with the ruling that selected them; an unruled taste decision is
         a question with the options, never a preference this op supplies. Resolve the execution
         profile and whether an image generator is actually available before planning any asset work;
-        this selects no model and spawns no worker. An absent target is a scope/graph gap: report it
-        and propose a separately selected scope op; never create a second brand owner here. Read the
+        this selects no model and spawns no worker. An absent brand record is not a gap: this op writes
+        the product's first one at .starciwork/brand/index.yaml. A brand record that exists anywhere
+        else, or a second one, is the scope/graph gap to report; never create a second brand owner. Read the
         accepted requirement and decision records plus the owner's actual rulings about identity -
         the name, the primary hue, whether danger may match primary, the mascot and what it may
         never appear in, the voice. A taste decision belongs to the owner: an unanswered one is a

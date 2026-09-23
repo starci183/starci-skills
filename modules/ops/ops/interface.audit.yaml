@@ -34,7 +34,7 @@ reads:
         dependencies, attempt number and evidence lineage. An absent target or audit-expanded matrix
         is a scope gap, not permission to invent coverage.
   - id: intent
-    path: .starciwork/features/<feature>/{business,architecture,ui}/**/index.yaml + accepted direction
+    path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision,sds,ui}/**/index.yaml + accepted direction
       assets
     purpose:
       en: Read accepted content, states, SDS behavior, UI coverage/component/state mapping, brand

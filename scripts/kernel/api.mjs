@@ -54,6 +54,7 @@ import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
   awaitSubmission, awaitAttestation,
 } from '../agent/lib.mjs';
+import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
@@ -163,7 +164,7 @@ const usage = (code) => {
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id> [--retry-lineage]
+  reconcile --job <job_id> [--retry-lineage | --drop --reason <text>]
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
@@ -184,7 +185,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -656,7 +657,10 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
  * `api route` and `api dispatch` run, in their own order (workflow ceiling, provider circuit, path
  * fence, pool saturation); `ready` means nothing blocks it and the Kernel is the only thing left.
  */
-const QUEUED_BECAUSE = ['owner-gate', 'dependency', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+// 'dependency-failed' is a dependency that can no longer succeed on its own: the
+// seam or --after job it waits on settled failed (not an owner wait), so only
+// the Kernel can move it - retry the blocker, re-point the dependant, or drop it.
+const QUEUED_BECAUSE = ['owner-gate', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
@@ -769,14 +773,19 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
   for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...(recordDeps.get(job.job_id) ?? [])]) {
     const prior = heldByJob(priorId);
     if (prior) {
+      // A StarCi Next and a MiaMia workspace.manage sat queued behind a seam
+      // and an --after job that had settled failed; the frontier read engaged,
+      // the watchdog never woke the Kernel, and both workflows stalled.
+      const dead = FINAL_SETTLED.includes(prior.status) && !isAwaitingOwner(db, db.prepare('SELECT * FROM jobs WHERE job_id=?').get(prior.job_id));
       return {
-        queuedBecause: 'dependency',
+        queuedBecause: dead ? 'dependency-failed' : 'dependency',
         blockedBy: { op: prior.op_id, job: prior.job_id },
-        detail: priorId === seam
+        detail: (priorId === seam
           ? `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`
           : (recordDeps.get(job.job_id) ?? []).includes(priorId)
             ? `a Work record this job owns dependsOn a record owned by ${prior.job_id}, which is ${prior.status}`
-            : `declared --after job ${prior.job_id} is ${prior.status}`,
+            : `declared --after job ${prior.job_id} is ${prior.status}`)
+          + (dead ? '; it will not succeed on its own, so the Kernel retries it, re-points this job, or drops it' : ''),
       };
     }
   }
@@ -900,7 +909,7 @@ function cmdStatus(ledger, args) {
   // Ready means the Kernel can move it now: a queued job nothing holds, or a
   // fenced launch to reconcile. A queued job waiting on a leg, a slot or a
   // circuit is not work the Kernel can do this turn.
-  const readyOperations = fencedOperations + queued.filter((item) => item.queuedBecause === 'ready').length;
+  const readyOperations = fencedOperations + queued.filter((item) => ['ready', 'dependency-failed'].includes(item.queuedBecause)).length;
   const queuedCauses = Object.fromEntries(QUEUED_BECAUSE
     .map((cause) => [cause, queued.filter((item) => item.queuedBecause === cause).length])
     .filter(([, n]) => n > 0));
@@ -983,7 +992,10 @@ function cmdStatus(ledger, args) {
     // Nothing open, but a question is with the owner: the workflow waits on
     // them, not on the Kernel, so nothing should wake it until the answer.
     : wf.phase === 'running' && askReserve.length > 0 ? 'ask-reserve'
-    : wf.phase === 'running' && pendingOwner.length > 0 ? 'awaiting-owner'
+    // An open owner-gate incident waits on the owner too, even with no job to
+    // hold yet (a leg whose first job cannot be enqueued before the owner
+    // decides - a StarCi Next frontend waiting on brand, inc-103f2028ba77).
+    : wf.phase === 'running' && (pendingOwner.length > 0 || ownerGates.length > 0) ? 'awaiting-owner'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
   // A settled result whose law inputs changed is work the Kernel owes now: it
@@ -1012,7 +1024,7 @@ function cmdStatus(ledger, args) {
       : frontierState === 'worker-wedged'
       ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
       : frontierState === 'awaiting-owner'
-      ? `no operation is open and the owner holds ${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')}); the answer wakes the Kernel`
+      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}; the answer or api incident --resolve wakes the Kernel`
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
@@ -1778,7 +1790,7 @@ const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, se
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false,
   effectState = 'none', details = null, providerHealthEvidence = null,
-  closeTerminal = null, alreadyClosed = false, settled = null,
+  closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null, trust = null,
 }) => {
   const authFailure = Boolean(providerHealthEvidence) || confirmedAuthFailure({ step, signal, error, details });
   const { terminalClosed, closed } = closeRejectedLaunch({ model, terminal, closeTerminal, alreadyClosed, settled, effectState });
@@ -1849,7 +1861,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth,
-        terminalClosed, ...(closed ? { closed } : {}) },
+        terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}) },
     });
     if (providerHealth) {
       ledger.appendEvent({
@@ -1870,6 +1882,18 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
   return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth,
     terminalClosed, ...(closed ? { closed } : {}) };
 };
+
+// gate-auto-approved: one event per launch gate the runtime answered
+// (scripts/agent/lib.mjs awaitReadiness), whether or not the gate then cleared.
+function recordGateAnswers(ledger, { workflowId, entityType, entityId, provider, terminal, answers }) {
+  const sent = (Array.isArray(answers) ? answers : []).filter((a) => a?.keystroke);
+  if (!sent.length) return;
+  ledger.transaction(() => {
+    for (const a of sent) ledger.appendEvent({ workflowId, entityType, entityId, kind: 'gate-auto-approved',
+      payload: { gate: a.gate, keystroke: a.keystroke, answered: a.answered === true, cleared: a.cleared === true,
+        provider, terminal, ...(a.reason ? { reason: a.reason } : {}) } });
+  });
+}
 
 /* ------------------------------------------------------ op IPC helpers */
 // §6 admission for an op dispatch. The durable fence is taken BEFORE anything
@@ -2169,18 +2193,24 @@ function cmdDispatch(ledger, args, repo) {
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
   });
   const handle = spawned.terminal ?? null;
-  const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle };
+  recordGateAnswers(ledger, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+    provider: model.provider, terminal: handle, answers: spawned.gateAnswers });
+  const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle,
+    ...(spawned.trust ? { trust: spawned.trust } : {}), ...(spawned.gateAnswers ? { gateAnswers: spawned.gateAnswers } : {}),
+    ...(spawned.gate ? { gate: spawned.gate, remedy: spawned.remedy ?? null } : {}),
+    ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}) };
   spawn.ok = spawned.ok === true;
   if (!spawn.ok) {
     // dispatch-rejected: the job must NEVER sit 'running' on a dead spawn.
     // Job → failed with a typed result, lease rows released, one event — and
     // for attestation rejections a typed infra-provider incident so survey
     // sees it without parsing events. Terminal is already closed by spawnAgent.
-    const reason = spawned.signal ?? spawned.error ?? `spawn failed at ${spawned.step}`;
+    const reason = (spawned.gate ? spawned.error : null) ?? spawned.signal ?? spawned.error ?? `spawn failed at ${spawned.step}`;
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step: spawned.step, signal: spawned.signal ?? null, error: spawned.error ?? null,
       terminal: handle, closeTerminal: handle, alreadyClosed: true,
       incident: spawned.step === 'attestation', details: spawned,
+      createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null,
     });
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, spawn: { ...spawn, reason } };
     emit(out, `dispatch REJECTED for ${jobId} (${spawned.step}): ${reason} — job status=${rejection.status}, terminal closed`, args.json);
@@ -2195,7 +2225,7 @@ function cmdDispatch(ledger, args, repo) {
     // the sidebar (fable.md orca-hierarchy: [Op] interface.audit "Idle").
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId ?? handle, closeTerminal: handle,
-      incident, effectState: 'none', details,
+      incident, effectState: 'none', details, createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null,
     });
     const reason = signal ?? error ?? `command-terminal dispatch failed at ${step}`;
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, step, dispatchId, terminal: handle, error: reason },
@@ -2258,7 +2288,7 @@ function cmdDispatch(ledger, args, repo) {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}), ...(spawned.trust ? { trust: spawned.trust } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
@@ -2403,12 +2433,13 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     return { effectState: cleanup.effectState, observation: null, cleanup };
   };
 
+  let trust = null;
   const reject = ({ step, signal = null, error = null, dispatchId = null, incident = false,
     effectState = 'none', details = null }) => {
     const reconciliation = reconcileFailure(effectState, dispatchId);
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId, incident,
-      effectState: reconciliation.effectState, details, settled: reconciliation.cleanup,
+      effectState: reconciliation.effectState, details, settled: reconciliation.cleanup, trust,
     });
     const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
@@ -2444,6 +2475,11 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     return reject({ step: 'task-create', error: task?.error ?? 'task-create returned no taskId' });
   }
   const taskId = task.taskId;
+
+  // 4a. Pre-trust the worktree the managed worker launches in (trust.mjs):
+  // the owner never answers a Claude/Codex launch prompt.
+  try { trust = ensureLaunchTrust({ agent: model.provider, cwd: worktree }); }
+  catch (e) { trust = { agent: model.provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
 
   // 4. worker-start — outcome ok means a ready worker (calls.yaml classify:
   // exit 0 + result.state 'ready'). Anything else, including a receipt with no
@@ -2529,7 +2565,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, ...(trust ? { trust } : {}), parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = {
@@ -2596,6 +2632,43 @@ function reconcileRetryLineage(ledger, args, job) {
   emit(out, `reconciled ${jobId}: retry lineage ${before?.retryOf ?? 'none'} -> ${after?.retryOf ?? after?.resumeOf ?? 'none'} (businessAttempt ${before?.businessAttempt ?? '-'} -> ${after?.businessAttempt ?? '-'})`, args.json);
 }
 
+// `reconcile --drop --reason <text>`: retire a QUEUED job that never crossed
+// the dispatch boundary. A StarCi Next Kernel held two cut ordinals behind a
+// failed seam whose grants broke the Work layout; the api had no way to drop
+// them, so the cut could not be re-planned and the workflow sat still. The row
+// settles `cancelled` with the reason, and every queued job that waits on it
+// is named so the Kernel re-points or drops those too.
+function reconcileDrop(ledger, args, job) {
+  const db = ledger.db, jobId = job.job_id;
+  if (job.status !== 'queued') {
+    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --drop retires only a queued job that was never dispatched`), { code: 'drop-not-queued' });
+  }
+  const reason = String(args.reason ?? '').trim();
+  if (!reason) throw Object.assign(new Error('--drop needs --reason <text>: a dropped job keeps why it was retired'), { code: 'drop-needs-reason' });
+  const payload = jobPayloadOf(job);
+  const evidence = dispatchEvidenceOf(db, job, payload);
+  if (evidence.length) {
+    throw Object.assign(new Error(`job ${jobId} was dispatched (${evidence.join(', ')}); a dispatched attempt settles through settle, never --drop`), { code: 'drop-dispatched', evidence });
+  }
+  const waiting = db.prepare("SELECT job_id,op_id,payload_json FROM jobs WHERE workflow_id=? AND status='queued' AND job_id<>?").all(job.workflow_id, jobId)
+    .filter((row) => {
+      const p = jobPayloadOf(row);
+      const seamOf = p.cut && payload.cut && p.cut.id === payload.cut.id && Number(payload.cut.ordinal) === 1 && Number(p.cut.ordinal) > 1;
+      return (Array.isArray(p.after) && p.after.includes(jobId)) || seamOf;
+    }).map((row) => row.job_id);
+  ledger.transaction(() => {
+    const now = Date.now();
+    db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
+      .run(JSON.stringify({ verdict: 'dropped', reason, at: now }), now, jobId);
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'job-dropped', payload: { op: job.op_id, attempt: job.attempt, reason, cut: payload.cut ?? null, waiting },
+    });
+  });
+  const out = { ok: true, jobId, dropped: true, status: 'cancelled', reason, waiting };
+  emit(out, `dropped ${jobId} (cancelled: ${reason})${waiting.length ? `; still waiting on it: ${waiting.join(', ')}` : ''}`, args.json);
+}
+
 // Re-open an effect_unknown dispatch only when the host can now prove that
 // the exact managed worker never crossed the operation boundary.  This is an
 // infrastructure retry, so it preserves the same job id and attempt number.
@@ -2605,6 +2678,7 @@ function cmdReconcile(ledger, args) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (args['retry-lineage']) return reconcileRetryLineage(ledger, args, job);
+  if (args.drop) return reconcileDrop(ledger, args, job);
   const payload = jobPayloadOf(job);
   if (job.status === 'queued') {
     const worker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
@@ -2930,11 +3004,33 @@ function cmdSettle(ledger, args, repo) {
     }
     try { release = workerRelease({ dispatch: managed.dispatchId }); }
     catch (e) { release = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
+    // Orca answers release_unknown ("the agent terminal was closed but its
+    // process could not be confirmed stopped") while the Claude terminal is
+    // still connected; two settled nivo business.decide ops sat live as
+    // ORPHAN_TERMINAL until a second release closed them. Its own recovery is
+    // to repeat worker-release, so a release that is not ok is repeated once
+    // and the exact agent terminal is read back; a terminal still connected
+    // after that is closed by its exact handle and the receipt says so.
+    let agentTerminal = null;
+    const agentHandle = managed.agentTerminalHandle ?? null;
+    if (release?.ok !== true && agentHandle) {
+      const connectedNow = () => { try { const s = terminalShow({ terminal: agentHandle }); return s?.ok === true ? s.connected === true : null; } catch { return null; } };
+      let retry = null;
+      try { retry = workerRelease({ dispatch: managed.dispatchId }); }
+      catch (e) { retry = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
+      agentTerminal = { handle: agentHandle, retryRelease: { ok: retry?.ok === true, state: retry?.state ?? null }, connected: connectedNow() };
+      if (agentTerminal.connected === true) {
+        const closed = terminalClose({ terminal: agentHandle });
+        agentTerminal.closed = closed.ok === true;
+        agentTerminal.connected = connectedNow();
+      }
+    }
     managedWorker = {
       dispatchId: managed.dispatchId,
       stop: { ok: stop?.ok === true, outcome: stop?.outcome ?? null, state: stop?.state ?? null, ...(stop?.error ? { error: stop.error } : {}) },
       release: { ok: release?.ok === true, outcome: release?.outcome ?? null, state: release?.state ?? null, ...(release?.error ? { error: release.error } : {}) },
       ...(residual ? { residual } : {}),
+      ...(agentTerminal ? { agentTerminal } : {}),
     };
   }
 
@@ -2944,10 +3040,12 @@ function cmdSettle(ledger, args, repo) {
   // (fable.md orca-hierarchy, row 3). A close failure never un-settles the
   // job; the ledger row is already the record.
   const taskClosed = closeOperationTask(db, job, settledPayload);
-  if (taskClosed) {
+  // The worker receipt is kept with the Task proof: settle's stdout is the
+  // only other place it lived, and an orphaned op terminal left no trace.
+  if (taskClosed || managedWorker) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...stored, taskClosed }), Date.now(), jobId);
+      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}) }), Date.now(), jobId);
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';

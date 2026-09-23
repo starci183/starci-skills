@@ -351,9 +351,47 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(because(second).queuedBecause,'dependency');
   assert.match(because(second).detail,/seam/);
 
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id IN (?,?)").run(composition,seam));
+  // A StarCi Next and a MiaMia workflow stalled behind a seam / --after job
+  // that had settled failed: status read engaged and nothing woke the Kernel.
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id IN (?,?)").run(JSON.stringify({verdict:'blocked'}),composition,seam));
+  const frontierNow=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier;};
+  let frontier=frontierNow();
+  assert.equal(frontier.queued.find(q=>q.jobId===member).queuedBecause,'dependency-failed');
+  assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'dependency-failed');
+  assert.match(frontier.queued.find(q=>q.jobId===second).detail,/seam .* is failed.*will not succeed on its own/);
+  assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');
+  // A retried seam (a later ordinal-1 attempt) is a live wait again.
+  enq('--op','docs.author','--paths','docs/cut-1b','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
+  assert.equal(frontierNow().queued.find(q=>q.jobId===second).queuedBecause,'dependency');
+
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=? OR json_extract(payload_json,'$.cut.ordinal')=1").run(composition));
   assert.equal(because(member).queuedBecause,'ready');
   assert.equal(because(second).queuedBecause,'ready');
+});
+
+// A StarCi Next Kernel held two cut ordinals behind a failed seam whose grants
+// broke the Work layout and had no verb to retire them, so it could not re-plan.
+test('reconcile --drop retires a never-dispatched queued job and names what waits on it',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-drop';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
+  const enq=(...extra)=>{const r=api('enqueue','--workflow',wf,...extra);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).job_id;};
+  const seam=enq('--op','docs.author','--paths','docs/cut-1','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
+  const second=enq('--op','docs.author','--paths','docs/cut-2','--cut-id','c1','--cut-ordinal','2','--cut-total','2');
+  const third=enq('--op','docs.author','--paths','docs/after','--after',second);
+  assert.notEqual(api('reconcile','--job',second,'--drop').status,0,'a drop keeps its reason');
+  const dropped=api('reconcile','--job',second,'--drop','--reason','cut grants break the Work layout');
+  assert.equal(dropped.status,0,dropped.stderr);
+  assert.deepEqual([out(dropped).status,out(dropped).waiting],['cancelled',[third]]);
+  const s=api('status','--workflow',wf);
+  const q=out(s).frontier.queued;
+  assert.equal(q.find(x=>x.jobId===third).queuedBecause,'dependency-failed','its dependant is the Kernel\'s to move now');
+  assert.equal(q.some(x=>x.jobId===second),false);
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running',worker_id='w-1' WHERE job_id=?").run(seam));
+  const refused=api('reconcile','--job',seam,'--drop','--reason','x');
+  assert.notEqual(refused.status,0,'a dispatched job settles through settle');
+  assert.match(refused.stderr,/drop-not-queued/);
 });
 
 // Live Modules had nothing open but one unanswered tax ask whose job lineage
@@ -451,6 +489,25 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   assert.deepEqual(f.askReserveDispatches,['ctx_tax']);
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-y'}}));
   assert.equal(frontier().state,'awaiting-owner','re-served, it waits on the owner again');
+});
+
+// StarCi Next base-repos recorded an owner-gate for a missing brand before any
+// frontend job could be enqueued; the frontier stayed orphaned/actionable
+// (inc-103f2028ba77) and the watchdog woke a kernel that could only wait.
+test('no open operation plus an open owner-gate incident is awaiting-owner',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-gate-no-job';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf));
+  const status=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r).frontier;};
+  assert.equal(status().state,'orphaned-frontier');
+  const raised=runApi('incident','--repo',repo,'--workflow',wf,'--kind','owner-gate','--op','interface.scaffold','--detail','brand missing','--json');
+  assert.equal(raised.status,0,raised.stderr);
+  let f=status();
+  assert.equal(f.state,'awaiting-owner');
+  assert.equal(f.actionable,false);
+  assert.match(f.reason,/owner-gate incident/);
+  runApi('incident','--repo',repo,'--workflow',wf,'--resolve',out(raised).incidentId,'--json');
+  assert.equal(status().state,'orphaned-frontier','resolved, the Kernel owes the next transition again');
 });
 
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
