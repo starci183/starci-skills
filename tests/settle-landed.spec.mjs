@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {landedProof,policyCommits,policyPushes} from '../scripts/kernel/settle-landed.mjs';
+import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 
 // settle's landed proof (modules/kernel/api.yaml commands.settle refuses
 // not-landed / landed-unverifiable). A tmp clone of a local bare origin is the
@@ -48,7 +49,7 @@ const checkout=t=>{
 // A running job of `op` owning src/, with a bound contract, a filed done
 // report naming `head`, and green recorded checks — everything a pass needs
 // except the landed proof.
-const seedJob=(repo,{op,head,jobId='op-landed-1',wf='wf-landed'})=>{
+const seedJob=(repo,{op,head,jobId='op-landed-1',wf='wf-landed',filed=true})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const at=Date.now();
@@ -59,7 +60,7 @@ const seedJob=(repo,{op,head,jobId='op-landed-1',wf='wf-landed'})=>{
     ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
     ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
       .run(wf,op,1,`ctx-${jobId}`,'# contract',json({worktree:repo}),at);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
+    if(filed)ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
       .run(wf,`ctx-${jobId}`,op,1,0,'done',json({outcome:'done',summary:'landed',...(head?{head,branch:'main'}:{})}),null,at);
     ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
       .run(wf,op,1,json({checks:[{name:'unit',exitCode:0}]}),at);
@@ -107,6 +108,7 @@ test('push:false op committed locally while the checkout is ahead of origin sett
   assert.equal(r.status,0,r.stderr||r.stdout);
   assert.equal(body.ok,true);
   assert.equal(body.landed.head,head);
+  assert.equal(body.landed.headCheck,'verified');
   assert.equal(body.landed.originHead,undefined,'push:false never reads origin');
   assert.equal(statusOf(repo,jobId),'succeeded');
 });
@@ -121,12 +123,57 @@ test('push:false op whose report head is not in local history is refused not-lan
   assert.deepEqual(body.detail.missing,[`commit:${head}`]);
 });
 
-test('push:false op whose done report names no head is refused not-landed',t=>{
+test('a legacy headless done report with clean owned paths settles pass, head check skipped',t=>{
+  const {repo,commit}=checkout(t);
+  commit('src/a.ts','export const a = 2;\n');
+  const jobId=seedJob(repo,{op:'backend.implement',head:null});
+  const {r,body}=settlePass(repo,jobId);
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  assert.equal(body.landed.headCheck,'skipped-legacy-report');
+  assert.equal(statusOf(repo,jobId),'succeeded');
+});
+
+test('a legacy headless done report with dirty owned paths is refused not-landed',t=>{
   const {repo}=checkout(t);
+  fs.writeFileSync(path.join(repo,'src','a.ts'),'export const a = 9;\n');
   const jobId=seedJob(repo,{op:'backend.implement',head:null});
   const {r,body}=settlePass(repo,jobId);
   assert.equal(r.status,1,r.stderr||r.stdout);
-  assert.deepEqual(body.detail.missing,['head']);
+  assert.equal(body.reason,'not-landed');
+  assert.deepEqual(body.detail.dirty,['src/a.ts']);
+  assert.equal(body.detail.headCheck,'skipped-legacy-report');
+});
+
+test('validateOpReport: a committing op owes head on done|partial; others and ask/blocked do not',()=>{
+  const policy={mode:'scoped-local-commit',push:false};
+  const done={outcome:'done',summary:'shipped'};
+  const refused=validateOpReport(done,{commitPolicy:policy});
+  assert.equal(refused.ok,false);
+  assert.match(refused.reasons.join(';'),/put `git rev-parse HEAD` of the checkout holding your owned paths into `head` and re-file/);
+  assert.equal(validateOpReport({outcome:'partial',summary:'half',open:['rest']},{commitPolicy:policy}).ok,false);
+  assert.equal(validateOpReport({...done,head:'not-a-sha'},{commitPolicy:policy}).ok,false);
+  assert.equal(validateOpReport({...done,head:'abc1234'},{commitPolicy:policy}).ok,true);
+  assert.equal(validateOpReport({...done,head:'0123456789abcdef0123456789abcdef01234567'},{commitPolicy:policy}).ok,true);
+  assert.equal(validateOpReport({outcome:'ask',summary:'which',question:{text:'which?'}},{commitPolicy:policy}).ok,true);
+  assert.equal(validateOpReport(done,{commitPolicy:null}).ok,true,'a non-committing op files without head');
+  assert.equal(validateOpReport(done).ok,true,'the two-option call stays valid');
+});
+
+test('api report resolves the op commitPolicy: headless done refused for backend.implement, accepted for docs.author',t=>{
+  const {repo,commit}=checkout(t);
+  const head=commit('src/a.ts','export const a = 2;\n');
+  const file=path.join(repo,'..','report.json');
+  const fileReport=(jobId,body)=>{fs.writeFileSync(file,json(body));return runApi('report','--repo',repo,'--job',jobId,'--report',file,'--json');};
+  const implement=seedJob(repo,{op:'backend.implement',head:null,filed:false,jobId:'op-landed-impl'});
+  const refused=fileReport(implement,{outcome:'done',summary:'shipped'});
+  assert.equal(refused.status,1,refused.stdout);
+  assert.match(refused.stderr,/report-invalid/);
+  assert.match(refused.stderr,/git rev-parse HEAD/);
+  const accepted=fileReport(implement,{outcome:'done',summary:'shipped',head,branch:'main'});
+  assert.equal(accepted.status,0,accepted.stderr);
+  const docs=seedJob(repo,{op:'docs.author',head:null,filed:false,jobId:'op-landed-docs',wf:'wf-landed-docs'});
+  const plain=fileReport(docs,{outcome:'done',summary:'written'});
+  assert.equal(plain.status,0,plain.stderr);
 });
 
 test('op without a commitPolicy settles pass over a dirty tree unchanged',t=>{

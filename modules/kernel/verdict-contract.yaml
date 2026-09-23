@@ -159,7 +159,7 @@ envelope:
     open: "unfinished items a `partial` carries to its next attempt"
     question: "ask only: {text, options[]}; typed record bound to the current goalRev"
     blocker: "blocked only: {kind <- BLOCKER_KINDS, detail}"
-    branch/head: "workflow reports: required on done|partial"
+    branch/head: "workflow reports: required on done|partial; `api report` refuses a done|partial report without head (a 7-40 hex sha) when the op's commitPolicy commits"
     signal: "the Orca wake-up type must match the outcome (SIGNALS: done/partial->worker_done, failed->worker_done(failed), ask->question, blocked->escalation)"
   binding: >-
     Identity fields (run, task, dispatch, from) bind the report to the exact

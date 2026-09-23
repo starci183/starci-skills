@@ -77,8 +77,14 @@ export function landedProof({ base, ownedPaths, head, branch, pushes }) {
   }
   const claimed = typeof head === 'string' && head.trim() ? head.trim() : null;
   let repo = [...repos.keys()][0];
-  if (!claimed) missing.push('head');
-  else {
+  // api report requires head from committing ops; a done report filed before
+  // that rule carries none, and settles on the clean-paths half alone.
+  // A pushing policy has no such legacy and still owes head.
+  let headCheck = 'verified';
+  if (!claimed) {
+    if (pushes) missing.push('head');
+    else headCheck = 'skipped-legacy-report';
+  } else {
     const holder = [...repos.keys()].find((root) => git(root, ['cat-file', '-e', `${claimed}^{commit}`], timeoutMs).ok);
     if (!holder) missing.push(`commit:${claimed}`);
     else {
@@ -87,7 +93,7 @@ export function landedProof({ base, ownedPaths, head, branch, pushes }) {
     }
   }
   const localHead = git(repo, ['rev-parse', 'HEAD'], timeoutMs);
-  const detail = { repo, dirty, head: claimed, localHead: localHead.ok ? localHead.stdout.trim() : null, missing };
+  const detail = { repo, dirty, head: claimed, headCheck, localHead: localHead.ok ? localHead.stdout.trim() : null, missing };
   if (dirty.length || missing.length || !pushes) {
     return dirty.length || missing.length
       ? { checked: true, ok: false, reason: 'not-landed', detail }
