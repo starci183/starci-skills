@@ -1077,6 +1077,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   dependsOn, watchdog idle-waiting (vá 3b2767b26 chạy đúng). Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00;
   hai ask còn mở (WSPV thanh toán, Modules thuế) đều thuộc nhóm để thầy quyết.
 
+- 09:50 WSPV yield dưới tiêu đề " Running (codex):" bị đọc thành spinner, 2 report audit chờ 20 phút. Vá `36be1bf2c` (dòng có từ
+  trạng thái kết thúc bằng ":" là văn xuôi); đã đánh thức WSPV. Phát hiện: kernel WSPV sửa owned_paths trong payload job (ghi thẳng
+  ledger, tự khai trong inc-f3f8d80df3dc) vì landed-check của P7 tìm đường dẫn frontend trong nivo-backend; giao fork P7b (resolve
+  theo repo đích). Kernel cũng commit 94MB evidence vào nivo-backend với ALLOW_SECRET_SCAN=1: đưa vào danh sách buổi sáng.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
