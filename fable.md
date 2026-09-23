@@ -1102,6 +1102,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   hoa thường. Vá `ddda061f1`: từ trạng thái phân biệt hoa thường. Live: cả 4 kernel turn-idle đúng. Collab 3/8
   slice backend.implement pass, routing đang chạy.
 
+- 10:58 Phát hiện gốc: watchdog là tiến trình chạy lâu, nạp terminal-liveness một lần lúc khởi động (03:37-05:18), nên mọi
+  vá classifier trong đêm không tới watchdog (Collab bị báo active). Vá `9270d970e`: vòng lặp chạy mỗi nhịp bằng một tiến trình con
+  --once mới. Đã dừng và khởi động lại 4 watchdog nivo (log nối tiếp), cả 4 báo idle-waiting đúng. Báo fork khởi động lại 4 watchdog
+  starci-next và mia-mia.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
