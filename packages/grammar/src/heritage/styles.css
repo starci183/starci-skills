@@ -11,11 +11,16 @@
         --heritage-ivory: oklch(97.5% 0.014 96);
         --heritage-paper: oklch(99.3% 0.005 96);
         --heritage-line: oklch(88% 0.012 110);
+        --heritage-danger: oklch(53% 0.18 28);
+        /* Text on a fill: white on the deep light-theme fills, the night ink on the pale dark-theme ones. */
+        --heritage-on-accent: white;
+        --heritage-on-danger: white;
+        --heritage-on-pale: oklch(18% 0.018 145);
         --heritage-display: Georgia, "Times New Roman", serif;
         --heritage-sans: "Segoe UI", Arial, ui-sans-serif, system-ui, sans-serif;
 
         --accent: var(--heritage-green-700);
-        --accent-foreground: white;
+        --accent-foreground: var(--heritage-on-accent);
         --focus: var(--heritage-green-700);
         --background: var(--heritage-ivory);
         --foreground: var(--heritage-ink);
@@ -27,13 +32,13 @@
         --border: var(--heritage-line);
         --separator: var(--heritage-line);
         --success: var(--heritage-green-700);
-        --success-foreground: white;
+        --success-foreground: var(--heritage-on-accent);
         --warning: oklch(76% 0.13 82);
-        --warning-foreground: var(--heritage-ink);
-        --danger: oklch(55% 0.18 28);
-        --danger-foreground: white;
+        --warning-foreground: var(--heritage-on-pale);
+        --danger: var(--heritage-danger);
+        --danger-foreground: var(--heritage-on-danger);
         --info: oklch(70% 0.09 235);
-        --info-foreground: var(--heritage-ink);
+        --info-foreground: var(--heritage-on-pale);
         --field-background: var(--heritage-paper);
         --field-border: var(--heritage-line);
         --field-foreground: var(--heritage-ink);
@@ -57,6 +62,9 @@
         --heritage-ivory: oklch(16% 0.018 145);
         --heritage-paper: oklch(21% 0.018 145);
         --heritage-line: oklch(38% 0.025 145);
+        --heritage-danger: oklch(72% 0.15 28);
+        --heritage-on-accent: oklch(16% 0.018 145);
+        --heritage-on-danger: oklch(16% 0.018 145);
     }
 
     .grammar-common-root[data-grammar-family="heritage"] [data-grammar-surface-card][data-slot="card"] {
@@ -142,6 +150,9 @@
             --heritage-ivory: oklch(16% 0.018 145);
             --heritage-paper: oklch(21% 0.018 145);
             --heritage-line: oklch(38% 0.025 145);
+            --heritage-danger: oklch(72% 0.15 28);
+            --heritage-on-accent: oklch(16% 0.018 145);
+            --heritage-on-danger: oklch(16% 0.018 145);
         }
     }
 
@@ -154,6 +165,10 @@
             --heritage-ivory: Canvas;
             --heritage-paper: Canvas;
             --heritage-line: CanvasText;
+            --heritage-danger: CanvasText;
+            --heritage-on-accent: HighlightText;
+            --heritage-on-danger: Canvas;
+            --heritage-on-pale: Canvas;
             --shadow-surface: none;
         }
 

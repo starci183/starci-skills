@@ -14,6 +14,7 @@ import {
     OFFSET_POP_TOKEN_DEFAULTS,
     OFFSET_POP_TOKEN_NAMES,
 } from "./dna.js"
+import { contrastSuite } from "../__test__/contrastSuite.js"
 
 const css = readFileSync(resolve(process.cwd(), "src/offset-pop/styles.css"), "utf8")
 const coreCss = readFileSync(resolve(process.cwd(), "src/core/styles.css"), "utf8")
@@ -178,8 +179,10 @@ describe("Offset Pop DNA and token parity with Core", () => {
         expect(Object.isFrozen(OFFSET_POP_DNA)).toBe(true)
         expect(Object.keys(OFFSET_POP_DNA.color.light)).toEqual(Object.keys(OFFSET_POP_DNA.color.dark))
         const coreColourKeys = Object.keys(STARCI_CORE_DARK_TOKEN_DEFAULTS).map((name) => coreKeyOf.get(name))
-        expect(coreColourKeys).toHaveLength(15)
-        expect(Object.keys(OFFSET_POP_DNA.color.light)).toEqual([...coreColourKeys, "accentText"])
+        // Core's fifteen plus its themed accent text and soft tint, which Offset Pop mirrors by name.
+        expect(coreColourKeys).toHaveLength(17)
+        expect(coreColourKeys.slice(-2)).toEqual(["accentText", "accentSoft"])
+        expect(Object.keys(OFFSET_POP_DNA.color.light)).toEqual(coreColourKeys)
         expect(Object.keys(OFFSET_POP_TOKEN_NAMES)).toEqual(expect.arrayContaining(Object.keys(STARCI_CORE_TOKEN_NAMES)))
         expect(OFFSET_POP_SPACING_SCALE).toEqual(STARCI_CORE_SPACING_SCALE)
         for (const name of Object.values(OFFSET_POP_TOKEN_NAMES)) expect(name).toMatch(/^--offset-pop-[a-z-]+$/)
@@ -301,7 +304,9 @@ describe("Offset Pop DNA and token parity with Core", () => {
         expect(offsetPop.root.get("--focus")).toBe("var(--offset-pop-focus)")
         expect(offsetPop.root.get("--accent-soft-foreground")).toBe("var(--offset-pop-accent-text)")
         expect(offsetPop.root.get("--link")).toBe("var(--offset-pop-accent-text)")
-        expect(offsetPop.root.get("--accent-soft")).toBe("var(--offset-pop-surface-secondary)")
+        expect(offsetPop.root.get("--accent-soft")).toBe("var(--offset-pop-accent-soft)")
+        expect(OFFSET_POP_DNA.color.light.accentSoft).toBe(OFFSET_POP_DNA.color.light.surfaceSecondary)
+        expect(OFFSET_POP_DNA.color.dark.accentSoft).toBe(OFFSET_POP_DNA.color.dark.surfaceSecondary)
         expect(css, "no family rule paints text with the fill accent").not.toMatch(/(?<![-\w])color:\s*var\(--(?:accent|offset-pop-accent|offset-pop-pink)\)/)
         for (const hook of [
             "[data-component=\"Text\"][data-tone=\"accent\"]",
@@ -368,4 +373,11 @@ describe("Offset Pop DNA and token parity with Core", () => {
             }
         })
     }
+})
+
+/* Pink and critical are fills: their text reads the raspberry accent text and the ink-mixed error colour. */
+const OFFSET_POP_SHEETS = ["styles.css", "components-forms.css", "components-overlays.css", "components-navigation.css"].map((sheet) => `src/offset-pop/${sheet}`)
+contrastSuite("offset-pop", {
+    accent: { text: "var(--offset-pop-accent-text)", routes: { sheets: OFFSET_POP_SHEETS, properties: ["--accent"] } },
+    danger: { text: "color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink))", routes: { sheets: OFFSET_POP_SHEETS, properties: ["--danger"] } },
 })

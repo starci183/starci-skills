@@ -193,7 +193,7 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
     "ACCENT-1": () => {
         expect(rootTokens.get("--accent")).toBe("var(--offset-pop-accent)")
         expect(OFFSET_POP_DNA.color.accent).toBe(OFFSET_POP_DNA.palette.pink)
-        const DECISION = /overlay-action="confirm"|toast-action|alert-actions|data-selected|data-grammar-selected|data-indeterminate|data-grammar-current|data-grammar-step-state="current"|aria-expanded="true"|disclosure-state="open"|data-grammar-drag="over"|slider-fill|meter-fill|rating-fill|"Spinner"|"ProgressCircle"|"Link"|overlay-backdrop/
+        const DECISION = /overlay-action="confirm"|toast-action|alert-actions|data-selected|data-grammar-selected|data-indeterminate|data-grammar-current|data-current="true"|data-grammar-step-state="current"|aria-expanded="true"|disclosure-state="open"|data-grammar-drag="over"|slider-fill|meter-fill|rating-fill|"Spinner"|"ProgressCircle"|"Link"|overlay-backdrop/
         const accentPaint = painted.filter((d) => FILL_ACCENT.test(d.value))
         expect(accentPaint.length).toBeGreaterThan(10)
         expect(accentPaint.filter((d) => !DECISION.test(d.selector)).map((d) => `${d.property} in ${short(d.selector)}`)).toEqual([])
@@ -265,7 +265,8 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
     "CONTROL-STATE-2": () => {
         const unavailable = declared("[data-grammar-state=\"unavailable\"]")
         const pending = declared("[data-grammar-state=\"pending\"]")
-        expect(Object.fromEntries(unavailable)).toEqual({ "box-shadow": "none", opacity: ".56", transform: "none", cursor: "not-allowed" })
+        // Unavailable is not disabled: its copy reads in the muted ink (AA) instead of fading to ~2.3:1.
+        expect(Object.fromEntries(unavailable)).toEqual({ "box-shadow": "none", color: "var(--muted)", transform: "none", cursor: "not-allowed" })
         expect(Object.fromEntries(pending)).toEqual({ "pointer-events": "none" })
     },
     // styles.spec "targets only hooks emitted by Common public renderers"; shipped-claims "reaches a rendered Common node with every family selector".
@@ -452,7 +453,7 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
     },
     // styles.spec "paints the accent as text only through the text-safe accent" and "meets WCAG AA contrast" (accentTextOnSurfaceSecondary).
     "SURFACE-4": () => {
-        expect(rootTokens.get("--accent-soft")).toBe("var(--offset-pop-surface-secondary)")
+        expect(rootTokens.get("--accent-soft")).toBe("var(--offset-pop-accent-soft)")
         expect(rootTokens.get("--accent-soft-foreground")).toBe("var(--offset-pop-accent-text)")
     },
     // styles.spec "meets WCAG AA contrast" (mutedOnCanvas/Surface/SurfaceSecondary >= 4.5).

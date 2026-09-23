@@ -14,6 +14,204 @@
         min-width: 0;
     }
 
+    /*
+     * THE ROOT OWNS EVERY VENDOR THEME VARIABLE.
+     *
+     * HeroUI declares its theme on `:root`, where each `color-mix()` is substituted against HeroUI's
+     * own light values, and a descendant inherits the RESULT. A family that re-declares `--accent`
+     * on its root therefore still received HeroUI's blue `--accent-soft`, and a dark scope still
+     * received HeroUI's light `--default`, `--field-background`, `--segment` and `--overlay`. So
+     * this root declares every HeroUI theme variable itself: the semantic ones get neutral,
+     * AA-safe defaults (bare Common is a real theme, light and dark), and every derived one is
+     * written in terms of the semantic ones, so it re-resolves on whichever family and theme scope
+     * it lands on. A family supplies its semantic values; the rest follows.
+     */
+    .grammar-common-root {
+        color-scheme: light;
+
+        --background: oklch(97.02% 0 0);
+        --foreground: oklch(21.03% 0.0059 285.89);
+        --surface: oklch(100% 0 0);
+        --surface-secondary: oklch(95.24% 0.0013 286.37);
+        --muted: oklch(49.5% 0.0138 285.94);
+        --border: oklch(90% 0.004 286.32);
+        --separator: oklch(92% 0.004 286.32);
+        --accent: oklch(53% 0.2 256);
+        --accent-foreground: oklch(99.11% 0 0);
+        --success: oklch(73.29% 0.1935 150.81);
+        --success-foreground: oklch(21.03% 0.0059 285.89);
+        --warning: oklch(78.19% 0.1585 72.33);
+        --warning-foreground: oklch(21.03% 0.0059 285.89);
+        --danger: oklch(55% 0.215 26);
+        --danger-foreground: oklch(99.11% 0 0);
+        --info: var(--accent);
+        --info-foreground: var(--accent-foreground);
+        --backdrop: rgb(0 0 0 / 50%);
+        --surface-shadow: 0 2px 4px 0 rgb(0 0 0 / 4%), 0 1px 2px 0 rgb(0 0 0 / 6%), 0 0 1px 0 rgb(0 0 0 / 6%);
+        --overlay-shadow: 0 2px 8px 0 rgb(0 0 0 / 6%), 0 -6px 12px 0 rgb(0 0 0 / 3%), 0 14px 28px 0 rgb(0 0 0 / 8%);
+        --field-shadow: 0 2px 4px 0 rgb(0 0 0 / 4%), 0 1px 2px 0 rgb(0 0 0 / 6%), 0 0 1px 0 rgb(0 0 0 / 6%);
+
+        /* Derived from the semantic set above, so they follow the family and theme in scope. */
+        --focus: var(--accent);
+        --link: var(--foreground);
+        --surface-foreground: var(--foreground);
+        --surface-secondary-foreground: var(--foreground);
+        --surface-tertiary: color-mix(in oklab, var(--surface-secondary) 98%, var(--foreground));
+        --surface-tertiary-foreground: var(--foreground);
+        --overlay: var(--surface);
+        --overlay-foreground: var(--foreground);
+        --default: color-mix(in oklab, var(--surface-secondary) 98%, var(--foreground));
+        --default-foreground: var(--foreground);
+        --segment: var(--surface);
+        --segment-foreground: var(--foreground);
+        --field-background: var(--surface);
+        --field-foreground: var(--foreground);
+        --field-placeholder: var(--muted);
+        --field-border: transparent;
+        --scrollbar-thumb: color-mix(in oklch, var(--foreground) 15%, transparent);
+        --scrollbar-track: transparent;
+        --scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+        --surface-hover: color-mix(in oklab, var(--surface) 92%, var(--surface-foreground) 8%);
+        --default-hover: color-mix(in oklab, var(--default) 96%, var(--default-foreground) 4%);
+        --accent-hover: color-mix(in oklab, var(--accent) 90%, var(--accent-foreground) 10%);
+        --success-hover: color-mix(in oklab, var(--success) 90%, var(--success-foreground) 10%);
+        --warning-hover: color-mix(in oklab, var(--warning) 90%, var(--warning-foreground) 10%);
+        --danger-hover: color-mix(in oklab, var(--danger) 90%, var(--danger-foreground) 10%);
+        --field-hover: color-mix(in oklab, var(--field-background) 98%, var(--field-foreground) 2%);
+        --field-focus: var(--field-background);
+        --field-border-hover: color-mix(in oklab, var(--field-border, var(--border)) 88%, var(--field-foreground) 10%);
+        --field-border-focus: color-mix(in oklab, var(--field-border, var(--border)) 74%, var(--field-foreground) 22%);
+        --default-soft: color-mix(in oklab, var(--default) 50%, transparent);
+        --default-soft-foreground: var(--default-foreground);
+        --default-soft-hover: color-mix(in oklab, var(--default) 60%, transparent);
+        --accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
+        --accent-soft-foreground: color-mix(in oklab, var(--accent) 70%, var(--foreground) 30%);
+        --accent-soft-hover: color-mix(in oklab, var(--accent-soft) 94%, var(--accent));
+        --success-soft: color-mix(in oklab, var(--success) 15%, transparent);
+        --success-soft-foreground: color-mix(in oklab, var(--success) 50%, var(--foreground) 50%);
+        --success-soft-hover: color-mix(in oklab, var(--success) 20%, transparent);
+        --warning-soft: color-mix(in oklab, var(--warning) 15%, transparent);
+        --warning-soft-foreground: color-mix(in oklab, var(--warning) 45%, var(--foreground) 55%);
+        --warning-soft-hover: color-mix(in oklab, var(--warning) 20%, transparent);
+        --danger-soft: color-mix(in oklab, var(--danger) 15%, transparent);
+        --danger-soft-foreground: color-mix(in oklab, var(--danger) 65%, var(--foreground) 35%);
+        --danger-soft-hover: color-mix(in oklab, var(--danger) 20%, transparent);
+        --background-secondary: color-mix(in oklab, var(--background) 96%, var(--foreground) 4%);
+        --background-tertiary: color-mix(in oklab, var(--background) 92%, var(--foreground) 8%);
+        --background-inverse: var(--foreground);
+        --separator-secondary: color-mix(in oklab, var(--surface) 85%, var(--surface-foreground) 15%);
+        --separator-tertiary: color-mix(in oklab, var(--surface) 81%, var(--surface-foreground) 19%);
+        --border-secondary: color-mix(in oklab, var(--surface) 78%, var(--surface-foreground) 22%);
+        --border-tertiary: color-mix(in oklab, var(--surface) 66%, var(--surface-foreground) 34%);
+
+        color: var(--foreground);
+        background-color: var(--background);
+    }
+
+    /*
+     * A hover fill moves AWAY from its foreground, so the pair keeps (and gains) contrast instead
+     * of HeroUI's mix toward the foreground, which takes a 5:1 button under AA on hover. Relative
+     * colour inverts the foreground's lightness; without it the fill keeps the gentler vendor mix.
+     */
+    @supports (color: oklch(from white l c h)) {
+        .grammar-common-root {
+            --accent-hover: color-mix(in oklab, var(--accent) 90%, oklch(from var(--accent-foreground) calc(1 - l) 0 0));
+            --success-hover: color-mix(in oklab, var(--success) 90%, oklch(from var(--success-foreground) calc(1 - l) 0 0));
+            --warning-hover: color-mix(in oklab, var(--warning) 90%, oklch(from var(--warning-foreground) calc(1 - l) 0 0));
+            --danger-hover: color-mix(in oklab, var(--danger) 90%, oklch(from var(--danger-foreground) calc(1 - l) 0 0));
+        }
+    }
+
+    /* A real dark theme for bare Common; families override the semantic set, the mixes follow. */
+    .grammar-common-root[data-grammar-theme="dark"] {
+        color-scheme: dark;
+
+        --background: oklch(12% 0.005 285.82);
+        --foreground: oklch(99.11% 0 0);
+        --surface: oklch(21.03% 0.0059 285.89);
+        --surface-secondary: oklch(25.7% 0.0037 286.14);
+        --muted: oklch(72% 0.015 286.07);
+        --border: oklch(28% 0.006 286.03);
+        --separator: oklch(25% 0.006 286.03);
+        --accent: oklch(72% 0.14 250);
+        --accent-foreground: oklch(21.03% 0.0059 285.89);
+        --success: oklch(73.29% 0.1935 150.81);
+        --success-foreground: oklch(21.03% 0.0059 285.89);
+        --warning: oklch(82.03% 0.1388 76.34);
+        --warning-foreground: oklch(21.03% 0.0059 285.89);
+        --danger: oklch(70% 0.17 24);
+        --danger-foreground: oklch(21.03% 0.0059 285.89);
+        --backdrop: rgb(0 0 0 / 60%);
+        --surface-shadow: 0 0 0 0 transparent inset;
+        --overlay-shadow: 0 0 1px 0 rgb(255 255 255 / 30%) inset;
+        --field-shadow: 0 0 0 0 transparent inset;
+        --segment: color-mix(in oklab, var(--surface) 76%, var(--foreground));
+        --accent-soft: color-mix(in oklab, var(--accent) 16%, transparent);
+        --accent-soft-foreground: color-mix(in oklab, var(--accent) 70%, var(--foreground) 30%);
+        --success-soft: color-mix(in oklab, var(--success) 14%, transparent);
+        --success-soft-foreground: color-mix(in oklab, var(--success) 70%, var(--foreground) 30%);
+        --warning-soft: color-mix(in oklab, var(--warning) 14%, transparent);
+        --warning-soft-foreground: color-mix(in oklab, var(--warning) 70%, var(--foreground) 30%);
+        --danger-soft: color-mix(in oklab, var(--danger) 16%, transparent);
+        --danger-soft-foreground: color-mix(in oklab, var(--danger) 70%, var(--foreground) 30%);
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .grammar-common-root[data-grammar-theme="system"] {
+            color-scheme: dark;
+
+            --background: oklch(12% 0.005 285.82);
+            --foreground: oklch(99.11% 0 0);
+            --surface: oklch(21.03% 0.0059 285.89);
+            --surface-secondary: oklch(25.7% 0.0037 286.14);
+            --muted: oklch(72% 0.015 286.07);
+            --border: oklch(28% 0.006 286.03);
+            --separator: oklch(25% 0.006 286.03);
+            --accent: oklch(72% 0.14 250);
+            --accent-foreground: oklch(21.03% 0.0059 285.89);
+            --success: oklch(73.29% 0.1935 150.81);
+            --success-foreground: oklch(21.03% 0.0059 285.89);
+            --warning: oklch(82.03% 0.1388 76.34);
+            --warning-foreground: oklch(21.03% 0.0059 285.89);
+            --danger: oklch(70% 0.17 24);
+            --danger-foreground: oklch(21.03% 0.0059 285.89);
+            --backdrop: rgb(0 0 0 / 60%);
+            --surface-shadow: 0 0 0 0 transparent inset;
+            --overlay-shadow: 0 0 1px 0 rgb(255 255 255 / 30%) inset;
+            --field-shadow: 0 0 0 0 transparent inset;
+            --segment: color-mix(in oklab, var(--surface) 76%, var(--foreground));
+            --accent-soft: color-mix(in oklab, var(--accent) 16%, transparent);
+            --accent-soft-foreground: color-mix(in oklab, var(--accent) 70%, var(--foreground) 30%);
+            --success-soft: color-mix(in oklab, var(--success) 14%, transparent);
+            --success-soft-foreground: color-mix(in oklab, var(--success) 70%, var(--foreground) 30%);
+            --warning-soft: color-mix(in oklab, var(--warning) 14%, transparent);
+            --warning-soft-foreground: color-mix(in oklab, var(--warning) 70%, var(--foreground) 30%);
+            --danger-soft: color-mix(in oklab, var(--danger) 16%, transparent);
+            --danger-soft-foreground: color-mix(in oklab, var(--danger) 70%, var(--foreground) 30%);
+        }
+    }
+
+    @media (forced-colors: active) {
+        .grammar-common-root,
+        .grammar-common-root[data-grammar-theme] {
+            --background: Canvas;
+            --foreground: CanvasText;
+            --surface: Canvas;
+            --surface-secondary: Canvas;
+            --muted: GrayText;
+            --border: CanvasText;
+            --separator: CanvasText;
+            --accent: Highlight;
+            --accent-foreground: HighlightText;
+            --success: CanvasText;
+            --success-foreground: Canvas;
+            --warning: CanvasText;
+            --warning-foreground: Canvas;
+            --danger: CanvasText;
+            --danger-foreground: Canvas;
+        }
+    }
+
     .grammar-common-root,
     .grammar-common-root::before,
     .grammar-common-root::after,
@@ -671,7 +869,17 @@
         cursor: not-allowed;
     }
 
-    [data-grammar-state="unavailable"] {
+    /*
+     * Unavailable is not disabled: the row or surface is still content a reader needs, so its copy
+     * reads in the muted ink (AA on every family ground) rather than fading the whole element to
+     * ~2.3:1. Only the non-text state mark keeps the disabled fade as the visual cue.
+     */
+    [data-grammar-state="unavailable"],
+    [data-grammar-state="unavailable"] .starci-core-static-row-copy > * {
+        color: var(--muted, GrayText);
+    }
+
+    [data-grammar-state="unavailable"] [data-grammar-state-mark] {
         opacity: var(--starci-core-disabled-opacity, 0.55);
     }
 
