@@ -57,6 +57,23 @@ test('a submitted prompt, a live turn above a queued paste and an idle prompt ke
   assert.equal(classifyAgentScreen('Codex\nmodel: gpt-6-sol\n› Ask Codex to do anything',{sentText:PREAMBLE}).state,'turn-idle');
 });
 
+test('qwen: the transcript echo of an @file delivery above a live spinner is a running turn, not a stuck paste',()=>{
+  // Qwen Code 0.24.4 frame from a scratch dispatch (2026-09-24): the sent @file prompt is echoed as "> ..."
+  // in the transcript, the spinner runs under it, and the input row is "*   Type your message ...".
+  // Reading the echo as the input row closed a working worker as prompt-stuck.
+  const sent='@C:/Users/x/AppData/Local/Temp/starci-dispatch-q/orca-dispatch-d1.md This file is your dispatched Task preamble and operation contract. Read it completely and follow every instruction in it exactly; report worker_done exactly once as it says.';
+  const working=['  > @C:/Users/x/AppData/Local/Temp/starci-dispatch-q/orca-dispatch-d1.md This file is your dispatched',
+    '    Task preamble and operation contract. Read it completely and follow every instruction in it exactly; report',
+    '    worker_done exactly once as it says.','  ✓ Read C:\\Users\\...\\orca-dispatch-d1.md',
+    "  ⠦ Pressing 'A' to continue... (7s · ↑ 568 tokens · esc to cancel)",'─'.repeat(40),
+    '*   Type your message or @path/to/file','─'.repeat(40),'  ➜ repo · deepseek-v4.1-flash','  YOLO mode (tab to cycle)'].join('\n');
+  assert.equal(stagedInputRegion(working,{stagedPattern:/Pasted Content|orca-dispatch-/,sentText:sent}),null);
+  assert.equal(classifyAgentScreen(working,{sentText:sent}).state,'active');
+  // The same prompt still sitting in Qwen's own input row is staged.
+  const staged=['  Tips: Try /insight.','─'.repeat(40),`*   ${sent.slice(0,100)}`,'─'.repeat(40),'  YOLO mode (tab to cycle)'].join('\n');
+  assert.match(stagedInputRegion(staged,{stagedPattern:/Pasted Content|orca-dispatch-/,sentText:sent})?.row??'',/^\*\s+@C:/);
+});
+
 /* ------------------------------------------------------------ fake Orca */
 
 const opFixture=(t,extra={})=>{

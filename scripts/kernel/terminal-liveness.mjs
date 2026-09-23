@@ -47,7 +47,10 @@ export function gateRemedy(gate, { cwd = null } = {}) {
 // LAST prompt row counts: a transcript row that quotes an earlier paste is not
 // the input box. Returns the staged input row, or null.
 export const DEFAULT_STAGED_PATTERN = /Pasted Content|\[Pasted text/i;
-const INPUT_GLYPH = /^\s*[>›❯❭]\s*/u;
+// Qwen Code 0.24.4 draws its input row as "*   Type your message or @path/to/file" and echoes each sent
+// message into the transcript as "> <text>"; without `*` that echo became the last glyph row, the spinner
+// under it was not "above" the input, and awaitSubmission closed a working worker as prompt-stuck.
+const INPUT_GLYPH = /^\s*[>›❯❭*]\s*/u;
 const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 // A row shorter than this is too generic to call an echo of the sent text.
 const MIN_ECHO_CHARS = 12;
