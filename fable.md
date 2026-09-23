@@ -978,6 +978,12 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 08:35 Yên. Collab sang interface.draw (worker active). Modules 7 op chạy, scope.define a2 done (dọn scope lạc).
   WSPV kernel active, 1 job leased đang dispatch. AUTH chờ owner-gate. Watchdog: 3 idle-waiting, 1 active. Không vá gì.
 
+- 08:50 Fork báo work-record-schemas đỏ trên main: lỗi của trò ở b3469b05d (object scope mở). Vá `2e6a0630e`: đóng
+  request/nodes/deps/exclusions/openQuestions theo shape Collab+Login (cả hai validate), scope.define nêu đúng tên trường;
+  project-overview (Modules) và public-website còn shape tự chế, không bị gate chặn. Merge lane P5 `5da28577c`
+  (stale-input: digest input luật ghi trong contracts.context_json, không DDL; dòng cũ không bao giờ stale). Check xanh,
+  82/82 spec; status live trên ledger nivo chạy, staleInput rỗng.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
