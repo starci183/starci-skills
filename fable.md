@@ -1126,6 +1126,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   askReserveDispatches. Vá `e4faf58ff`: text in reason và dòng ask-reserve kèm lệnh serve-ask; driver-loop nói link chết là việc, không
   phải chờ owner. Đã báo WSPV phục vụ lại. Collab tasks done (a5), approval và notification chạy song song, còn gateway.
 
+- 11:53 WSPV đã phục vụ lại ask thanh toán: http://127.0.0.1:6969/a-a5b6a272f6c5354503 (vá e4faf58ff có tác dụng). Hai ask sống,
+  không còn reserve. Collab approval và notification chạy song song, còn gateway. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
