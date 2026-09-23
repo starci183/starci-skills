@@ -104,6 +104,8 @@ properties:
     $ref: "#/$defs/because"
   change:
     $ref: "#/$defs/change"
+  extensions:
+    $ref: "#/$defs/extensions"
 dependentRequired:
   because:
     - verificationSource
@@ -632,6 +634,46 @@ $defs:
               description: What passes, and how it could be observed - the request and the word http, the
                 write and the word write. Naming the observation is what keeps the sequence checkable
                 against a real run.
+  decisionLog:
+    type: array
+    minItems: 1
+    description: The append-only log a revise operation (business.revise, architecture.revise) writes, one
+      entry per revision it made to this record, so the owner can read what the runtime decided for them and
+      overturn it. An entry is never rewritten and never deleted; the entry a revision appends carries the
+      change.rev that revision produced.
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - rev
+        - at
+        - gap
+        - chosen
+        - why
+      properties:
+        rev:
+          type: integer
+          minimum: 1
+          description: The change.rev this entry settled.
+        at:
+          $ref: "#/$defs/timestamp"
+        gap:
+          $ref: "#/$defs/prose"
+          description: The reported gap that opened the revision - the section a builder found silent,
+            confusing or self-contradictory.
+        chosen:
+          $ref: "#/$defs/prose"
+          description: The reading that was written into the record.
+        why:
+          $ref: "#/$defs/prose"
+          description: Why that reading is the most reasonable one by the accepted records, the other
+            features' decided records and the product's own conventions.
+        alternatives:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/$defs/prose"
+          description: The other readings the record admitted, one line each.
   extensions:
     type: object
     additionalProperties: false
@@ -643,8 +685,10 @@ $defs:
         type: object
         additionalProperties: false
         description: The third Work extension, which is where a record declares the external systems it
-          talks to.
+          talks to and keeps the log of every revision a revise operation made to it.
         properties:
+          decisionLog:
+            $ref: "#/$defs/decisionLog"
           integrations:
             type: array
             minItems: 1

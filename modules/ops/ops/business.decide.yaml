@@ -81,11 +81,8 @@ writes:
         question as work/policy-decision@1 under decision/<name>/, each data definition as
         work/data@1 under data/<name>/ and each customer journey as work/customer-journey@1 under
         journey/<name>/. Keep each FR's main, alternative and exception flows, branch review,
-        postconditions and acceptance together in its own record. When a legacy work/node@N tree
-        under business/ already states the requirement, restate it faithfully in the flat records -
-        the job is not done until the selected slice exists as flat records; the legacy tree stays
-        untouched for the canonicalization sweep to retire. For a not-yet-implemented slice, author
-        the smallest decision-complete contract covering actor goal, observable outcome, material
+        postconditions and acceptance together in its own record. For a not-yet-implemented slice,
+        author the smallest decision-complete contract covering actor goal, observable outcome, material
         invariants and permissions, relevant branches, acceptance and consequential open decisions.
         Do not pre-author hypothetical future capabilities or source-local mechanics merely to make
         the document look comprehensive. Keep the selected spec records at state todo while
@@ -111,11 +108,16 @@ steps:
         possibilities and source-local implementation choices; record only consequential unknowns.
         Resolve the execution profile and actual tool availability before selecting instruments;
         this does not switch the model/runtime or spawn workers. Pre-existing work/node@N records
-        under business/ or architecture/ are read-only legacy inputs: they carry the accepted
-        requirement content this op refines into flat records, they never satisfy the flat writes
-        below, and they are never edited or extended. For an explicitly new target, absence is
-        expected: inspect the nearest existing ancestor/workspace, then create only that selected
-        scope."
+        under business/ or architecture/ are read-only legacy inputs the canonicalization sweep
+        retires: this op restates their accepted requirement content faithfully in flat records, the
+        job is not done until the selected slice exists as flat records, and a legacy record is
+        never edited, extended or counted as a flat write. A requirement a revision must change
+        that lives only in a legacy record is revised in the flat fr, nfr, br, decision, data or
+        journey record that restates it; when no flat record restates it yet, this op writes one
+        whose restated legacy content is rev 1 and whose revision is rev 2, and names the
+        superseded legacy record's id and path in change.reason. For an explicitly new target,
+        absence is expected: inspect the nearest existing ancestor/workspace, then create only that
+        selected scope."
   - reads:
       - intent
       - target
@@ -185,8 +187,8 @@ steps:
         every reading the recorded requirement actually admits, up to `params.readingsStated`, and
         choose the most reasonable one from the accepted records of this feature, the decided
         records of the other features and the product's own conventions. Write that reading into the
-        requirement, rule or journey with the acceptance an implementer derives code from, bump the
-        record's change.rev, and append EXACTLY ONE extensions.work3.decisionLog entry {rev, at,
+        flat requirement, rule or journey record with the acceptance an implementer derives code
+        from, bump its change.rev, and append EXACTLY ONE extensions.work3.decisionLog entry {rev, at,
         gap, chosen, why, alternatives}, never rewriting or deleting an earlier one. One exception:
         when the readings differ in an observable outcome about money, authority or customer data,
         do not choose silently - report ask with question.kind decision, one numbered option per
@@ -235,12 +237,13 @@ proofs:
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
-        record changed, its change.rev higher than it was, and exactly one new
+        flat record changed, its change.rev higher than it was, and exactly one new
         extensions.work3.decisionLog entry naming the gap, the chosen reading, why it is the most
         reasonable one by the records it was read from, and the alternatives that were not taken. A
-        changed record with no entry is a defect. A reading that changes an observable outcome about
-        money, authority or customer data and was taken without a decision record with numbered
-        options and one recommendation is a defect, whatever else the revision gets right."
+        changed record with no entry is a defect, and so is an edited legacy work/node record. A
+        reading that changes an observable outcome about money, authority or customer data and was
+        taken without a decision record with numbered options and one recommendation is a defect,
+        whatever else the revision gets right."
 blockers:
   - code: BUSINESS_UNKNOWN
     condition:
