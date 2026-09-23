@@ -1174,6 +1174,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 
 - 13:53 Vẫn chờ: thầy chưa onboarding Claude Code, R2 chưa về. 4 workflow nivo queued, không terminal nivo nào. Không vá.
 
+- 14:05 Thầy chỉnh: supervisor là poll trong chat, chế độ debug, không có thân xác trong Orca. Trò đã sai khi tạo terminal
+  [Supervisor] cleanup/probe; đã đóng, ghi luật chat-only-debug-mode vào supervise.yaml (`0c9f04b3c`); fork đã theo. Reset --tasks
+  theo lệnh thầy: Orca về 0 task, 0 worker. Merge lane S `6b9d6d565` (repository ở workspace.yaml, không ở _resources); kernel Mia
+  Mia chạy lại prepare. Còn chờ: thầy hoàn tất bước chọn giao diện của Claude Code, và lane R2.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
