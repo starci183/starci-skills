@@ -111,6 +111,10 @@ BOUNDARY — hard rules, non-negotiable:
     pairwise-disjoint jobs using api enqueue
     `--cut-id/--cut-ordinal/--cut-total` with N as the total, sized so each
     slice holds roughly the returned `perSliceMinutes` of the measured work.
+    An order among jobs of one leg (a composition or seam job ahead of its
+    record-level siblings) is written into the ledger with enqueue
+    `--after <jobId>`, never held in your head: status then reports the
+    siblings as dependency, not ready, and nothing wakes you for them.
     Never inject another op such
     as work.author, never launch a mega-op, and do not advance the semantic
     leg until every slice passes. This decomposition is Kernel/AI technical

@@ -329,6 +329,33 @@ test('status lists every concurrent owner wait of one op by subject, and a later
     'every subject still waiting is listed; the re-enqueued Shell ask replaced its older attempt');
 });
 
+// A Collab kernel held seven record-level backend.implement jobs behind a
+// composition job in its head; status called them ready and the watchdog woke
+// the idle kernel every five minutes for nothing.
+test('enqueue --after and a cut seam hold siblings as dependency until the prior job succeeds',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-after';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
+  const enq=(...extra)=>{const r=api('enqueue','--workflow',wf,...extra);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).job_id;};
+  const because=(jobId)=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier.queued.find(q=>q.jobId===jobId);};
+  const composition=enq('--op','docs.author','--paths','docs/composition');
+  const member=enq('--op','docs.author','--paths','docs/membership','--after',composition);
+  assert.equal(because(member).queuedBecause,'dependency');
+  assert.deepEqual(because(member).blockedBy,{op:'docs.author',job:composition});
+  assert.equal(because(composition).queuedBecause,'ready','the job it waits on is itself ready');
+  assert.notEqual(api('enqueue','--workflow',wf,'--op','docs.author','--paths','docs/x','--after','op-nope').status,0,'an unknown --after job is refused');
+
+  const seam=enq('--op','docs.author','--paths','docs/cut-1','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
+  const second=enq('--op','docs.author','--paths','docs/cut-2','--cut-id','c1','--cut-ordinal','2','--cut-total','2');
+  assert.equal(because(second).queuedBecause,'dependency');
+  assert.match(because(second).detail,/seam/);
+
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id IN (?,?)").run(composition,seam));
+  assert.equal(because(member).queuedBecause,'ready');
+  assert.equal(because(second).queuedBecause,'ready');
+});
+
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);

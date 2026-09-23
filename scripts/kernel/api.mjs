@@ -23,6 +23,7 @@
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
 //   check    --repo <path> --job <job_id> (--checks '<json>' | --checks-file <path>)
 //   consume-report --repo <path> --job <job_id>
+//   (enqueue also takes [--after <jobId>,...]: jobs that must settle succeeded first)
 //   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
 //   incident --repo <path> --workflow <id> --resolve <incidentId> [--detail <s>]
 //   finish   --repo <path> --workflow <id>
@@ -680,6 +681,29 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
     }
   }
 
+  // A declared --after job, or the seam (ordinal 1) of this job's cut, that
+  // has not settled succeeded holds it like an earlier leg does.
+  const heldByJob = (priorId) => {
+    const prior = db.prepare('SELECT job_id,op_id,status FROM jobs WHERE job_id=?').get(priorId);
+    return prior && prior.status !== 'succeeded' ? prior : null;
+  };
+  const seam = payload.cut && Number(payload.cut.ordinal) > 1
+    ? db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY attempt DESC LIMIT 1")
+      .get(job.workflow_id ?? payload.hierarchy?.workflowId, opId, payload.cut.id)?.job_id ?? null
+    : null;
+  for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : [])]) {
+    const prior = heldByJob(priorId);
+    if (prior) {
+      return {
+        queuedBecause: 'dependency',
+        blockedBy: { op: prior.op_id, job: prior.job_id },
+        detail: priorId === seam
+          ? `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`
+          : `declared --after job ${prior.job_id} is ${prior.status}`,
+      };
+    }
+  }
+
   if (!slots.ok) {
     return {
       queuedBecause: 'max-ops',
@@ -1147,6 +1171,14 @@ function cmdEnqueue(ledger, args) {
     throw Object.assign(new Error('cut enqueue requires a non-empty id and integers 1 <= ordinal <= total with total >= 2'), { code: 'cut-invalid' });
   }
   const cut = hasCut ? { id: String(args['cut-id']).trim(), ordinal: cutOrdinal, total: cutTotal } : null;
+  // --after: jobs of this workflow that must settle succeeded before this one
+  // may run (a seam/composition job ahead of its record-level siblings). The
+  // order lives in the ledger, so status never calls a held sibling ready.
+  const after = [...new Set(String(args.after ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+  for (const prior of after) {
+    if (!db.prepare('SELECT 1 FROM jobs WHERE job_id=? AND workflow_id=?').get(prior, workflowId))
+      throw Object.assign(new Error(`--after names ${prior}, which is not a job of ${workflowId}`), { code: 'after-unknown' });
+  }
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
 
@@ -1164,6 +1196,7 @@ function cmdEnqueue(ledger, args) {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
       ...(cut ? { cut } : {}),
+      ...(after.length ? { after } : {}),
       ...(retry ? { retry } : {}),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {

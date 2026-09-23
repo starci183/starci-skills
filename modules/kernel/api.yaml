@@ -188,7 +188,10 @@ commands:
         maxParallel} for a full pool, and null for `ready`. `ready` means nothing blocks it and the
         Kernel is the only thing left to move it
       'frontier.queuedBecause precedence': >-
-        first cause that bites, in this order. `owner-gate` — an open incident of kind
+        first cause that bites, in this order. A job whose payload.after names a job, or whose cut seam
+        (the same cut id at ordinal 1) has not settled succeeded, is `dependency` with blockedBy {op, job}:
+        the kernel records a composition-first order with enqueue --after instead of holding siblings in
+        its head, and an unsettled seam holds the other ordinals. `owner-gate` — an open incident of kind
         owner-gate names this job or its op in --holds (or, without --holds, as its --op): a step
         only the owner drives holds it, and no admission check can clear that. Then `dependency` — an approved leg that precedes this
         op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
@@ -321,7 +324,7 @@ commands:
   enqueue:
     args: >-
       --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
-      [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>]
+      [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
     reads: >-
       workflows.phase; existing jobs for {workflow_id, op_id}; the brief
       modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
