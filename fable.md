@@ -1145,6 +1145,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 
 - 12:53 Yên. Collab gateway và WSPV worker F3 chạy khoảng 40 phút, vẫn có output, không wedged. Modules, AUTH chờ thầy. Không vá.
 
+- 12:55 Fork: đã chuyển bước 3edefde1b cho kernel Mia Mia; thầy đã chọn offset-pop trước cho Mia Mia base-repos; 4 watchdog
+  starci-next và mia-mia đã khởi động lại trên main (re-exec mỗi nhịp). P8 xanh nhưng đang merge main (giữ các hành vi liveness đêm
+  qua), thêm api reconcile --retry-lineage cho job queued chưa dispatch. P7b đang làm (landed-check theo repo đích).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
