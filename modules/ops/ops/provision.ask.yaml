@@ -85,8 +85,12 @@ steps:
         `image` (the accepted draw, the current implementation render, the proposed direction), every
         path also listed in question.assets; a choice whose outcome has no artifact yet says so in its
         label. The owner compares the artifacts themselves, never a text description or a bare hash;
-        a free-text \"type your picks in the note\" instruction is not an answer schema. Wait as long as the
-        contract lets you."
+        a free-text \"type your picks in the note\" instruction is not an answer schema. The ask is
+        delivered by filing this operation's report with outcome ask and that question (api report),
+        then ending the turn: the kernel serves it through serve-ask, which records the answer with
+        a receipt, and re-enqueues this operation with the answer bound. Never ask through an Orca
+        orchestration message, a terminal prompt or a chat, and never wait in-turn for a reply -
+        nothing answers those channels and nothing records what they say."
   - reads:
       - question
       - environment
@@ -95,10 +99,10 @@ steps:
       en: "For a credential the kernel verifies encrypted-custody presence through the canonical verifier
         and settles the waiting ask itself; this operation runs no credential probe and reports no
         credential success. Stored presence does not establish provider validity. For anything else,
-        when the owner replies verify PRESENCE alone and report done with \"provided: <what the
-        owner provided, in a few words>\". If the wait ends with no answer, report blocked with
-        blocker kind authority naming the provision; the kernel keeps it on the owner's list and
-        nothing else waits for it."
+        the attempt that runs with an answer receipt bound verifies PRESENCE alone and reports done
+        with \"provided: <what the owner provided, in a few words>\". An unanswered ask is the
+        kernel's awaitingOwner wait (verdict-contract.yaml retryAccounting.ownerWait), never a
+        blocked report from this operation; nothing else waits for it."
 proofs:
   - id: named-exactly
     requirement:
