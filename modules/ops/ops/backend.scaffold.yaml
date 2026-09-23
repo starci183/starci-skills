@@ -191,6 +191,25 @@ layoutPolicy:
   artifacts: every-structured-write-carries-its-declared-schema-const
   checks: [starci-validate]
   wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+policy:
+  cutSetAuthority:
+    scope: backend.scaffold-cut-sets
+    appliesWhen: The dispatch packet carries context.cut {id, ordinal, total} with total >= 2, every cut
+      job uses this same approved backend.scaffold leg and goal binding, and the complete pairwise-disjoint path
+      union (shared root config - package.json, lockfile, tsconfig, eslint config, architecture.json -
+      in exactly one ordinal, normally the seam) was preflighted before the first slice launched.
+    permits: "A repository-wide gate (install, typecheck, lint:check, check-scoped-lint, test, build)
+      may remain nonzero after a NON-FINAL ordinal only for findings whose paths belong exclusively to
+      not-yet-passed sibling ordinals of the same cut set. The current slice must pass the same gates
+      scoped to its own owned paths, recorded as check cut-slice-postcondition; the full gate commands
+      and their finding inventory stay unchanged except for sibling-owned paths, recorded as
+      cut-regression-inventory; a finding a passed ordinal resolved may not reappear. The raw nonzero
+      full result is integration evidence, not the slice's red verdict. The FINAL ordinal must record
+      full-regression-final green from the unchanged full gates before the leg advances."
+    forbids:
+      - declaring a non-final slice done without the scoped gates on its own paths
+      - accepting a full-gate finding on a path this slice or a passed ordinal owns
+      - advancing the leg before the final ordinal records full-regression-final green
 route:
   nodeKinds: [implementation]
   phase: [implement]

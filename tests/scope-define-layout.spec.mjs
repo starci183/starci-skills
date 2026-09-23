@@ -139,3 +139,12 @@ test('workspace.manage declares cutSetAuthority for prepare/import cut sets', ()
   assert.match(authority.permits, /cut-slice-postcondition/);
   assert.match(authority.permits, /full-regression-final/);
 });
+
+// StarCi Next backend.scaffold cut ordinals were refused on a repository-wide
+// lint red that only a later sibling could fix (inc-751dd1ac4492).
+test('the scaffold ops declare cutSetAuthority for their cut sets', () => {
+  for (const op of ['backend.scaffold', 'interface.scaffold', 'package.scaffold']) {
+    const doc = parseYaml(fs.readFileSync(path.join(root, `modules/ops/ops/${op}.yaml`), 'utf8'));
+    assert.match(doc.policy?.cutSetAuthority?.permits ?? '', /full-regression-final/, `${op} declares cutSetAuthority`);
+  }
+});
