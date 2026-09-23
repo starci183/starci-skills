@@ -76,7 +76,7 @@ packet:
       goal_revision: <revision>
       goal_identity: <identity>
     owner_language: <lang>              # config.yaml language; every owner-facing string is written in it
-    owner_delegation: {asks, until, excludes} | null  # config.yaml delegation while active
+    owner_delegation: '{asks, until, excludes} | null'  # config.yaml delegation while active
     records: [...]                      # .starciwork records it touches (the read set)
     owned_paths: [...]                  # what it may modify — boundary enforcement
   constraints:
