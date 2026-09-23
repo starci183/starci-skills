@@ -3,6 +3,7 @@
 // It never opens runtime.sqlite and never decides Work state. The surrounding
 // dispatched operation cites the write-once receipt in its ordinary api report.
 
+import '../lib/hide-child-windows.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';

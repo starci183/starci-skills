@@ -23,7 +23,7 @@ test('windowsHide lands in the options slot of every call shape', () => {
 });
 
 test('every detached runtime entry point imports the patch first', () => {
-  for (const file of ['scripts/kernel/watchdog.mjs', 'scripts/connectors/ask-gateway.mjs', 'scripts/connectors/tunnel.mjs', 'scripts/kernel/serve-ask.mjs', 'scripts/connectors/telegram-bridge.mjs']) {
+  for (const file of ['scripts/kernel/watchdog.mjs', 'scripts/connectors/ask-gateway.mjs', 'scripts/connectors/tunnel.mjs', 'scripts/kernel/serve-ask.mjs', 'scripts/connectors/telegram-bridge.mjs', 'scripts/uat/assisted-runner.mjs']) {
     const first = fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').split('\n').find((l) => l.startsWith('import '));
     assert.equal(first?.trim(), "import '../lib/hide-child-windows.mjs';", file);
   }
