@@ -77,6 +77,9 @@ const rendererSource = [
     "src/core/composite/StaticStateRow/index.tsx",
     "src/core/composition/NavigationFeatureNav/index.tsx",
     "src/core/StateMark.tsx",
+    "src/core/primitive/SectionHeader/index.tsx",
+    "src/core/primitive/TextAction/index.tsx",
+    "src/core/composite/VerticalScrollRegion/index.tsx",
 ].map((path) => readFileSync(resolve(process.cwd(), path), "utf8")).join("\n")
 
 describe("Offset Pop family CSS", () => {
@@ -174,7 +177,9 @@ describe("Offset Pop DNA and token parity with Core", () => {
         expect(OFFSET_POP_DNA.version).toBe(1)
         expect(Object.isFrozen(OFFSET_POP_DNA)).toBe(true)
         expect(Object.keys(OFFSET_POP_DNA.color.light)).toEqual(Object.keys(OFFSET_POP_DNA.color.dark))
-        expect(Object.keys(OFFSET_POP_DNA.color.light)).toHaveLength(15)
+        const coreColourKeys = Object.keys(STARCI_CORE_DARK_TOKEN_DEFAULTS).map((name) => coreKeyOf.get(name))
+        expect(coreColourKeys).toHaveLength(15)
+        expect(Object.keys(OFFSET_POP_DNA.color.light)).toEqual([...coreColourKeys, "accentText"])
         expect(Object.keys(OFFSET_POP_TOKEN_NAMES)).toEqual(expect.arrayContaining(Object.keys(STARCI_CORE_TOKEN_NAMES)))
         expect(OFFSET_POP_SPACING_SCALE).toEqual(STARCI_CORE_SPACING_SCALE)
         for (const name of Object.values(OFFSET_POP_TOKEN_NAMES)) expect(name).toMatch(/^--offset-pop-[a-z-]+$/)
@@ -266,6 +271,47 @@ describe("Offset Pop DNA and token parity with Core", () => {
         for (const name of Object.values(OFFSET_POP_BAND_TOKEN_NAMES)) expect(css).not.toContain(`${name}:`)
     })
 
+    it("clips only a list that does not scroll, so Common's scroll region keeps overflow-y: auto", () => {
+        const overflowRules = Array.from(css.matchAll(/([^{}]*\[data-grammar-list\][^{}]*)\{([^}]*)\}/g))
+            .filter((match) => /(?:^|;)\s*overflow/.test(match[2] ?? ""))
+        expect(overflowRules.length).toBeGreaterThan(0)
+        for (const [, selector] of overflowRules) {
+            expect(selector?.trim()).toMatch(/\[data-grammar-list\]:not\(\[data-grammar-scroll-region\]\)$/)
+        }
+        expect(commonCss).toMatch(/\[data-grammar-scroll-region="vertical"\]\s*\{[^}]*overflow-y: auto;/)
+        expect(rendererSource).toContain("data-grammar-scroll-region=\"vertical\"")
+    })
+
+    it("keeps the interactive-row treatments, documented for actionable and selectable rows", () => {
+        expect(css).toContain("[data-grammar-row]:focus-within")
+        expect(css).toContain("[data-grammar-row]:has(:is(a, button):hover)")
+        expect(css).toMatch(/Interactive-row treatments[\s\S]*?selectable List\/ListBox rows/)
+    })
+
+    it("paints the accent as text only through the text-safe accent, keeping pink the fill and ring", () => {
+        expect(offsetPop.root.get("--accent")).toBe("var(--offset-pop-accent)")
+        expect(offsetPop.root.get("--focus")).toBe("var(--offset-pop-focus)")
+        expect(offsetPop.root.get("--accent-soft-foreground")).toBe("var(--offset-pop-accent-text)")
+        expect(offsetPop.root.get("--link")).toBe("var(--offset-pop-accent-text)")
+        expect(offsetPop.root.get("--accent-soft")).toBe("var(--offset-pop-surface-secondary)")
+        expect(css, "no family rule paints text with the fill accent").not.toMatch(/(?<![-\w])color:\s*var\(--(?:accent|offset-pop-accent|offset-pop-pink)\)/)
+        for (const hook of [
+            "[data-component=\"Text\"][data-tone=\"accent\"]",
+            "[data-grammar-section-header] .starci-core-section-eyebrow",
+            "[data-component=\"TextAction\"][data-appearance=\"tab\"][data-current=\"true\"]",
+        ]) {
+            const at = css.indexOf(`${hook} {`)
+            expect(at, `${hook} is not routed`).toBeGreaterThan(-1)
+            const rule = css.slice(at, css.indexOf("}", at))
+            expect(rule, hook).toContain("color: var(--offset-pop-accent-text);")
+        }
+        // Common still paints these with the fill accent, which is why the family routes them.
+        expect(commonCss).toMatch(/\.starci-core-section-eyebrow\s*\{\s*color: var\(--starci-core-accent, var\(--accent,/)
+        expect(commonCss).toMatch(/\.starci-core-text-action\[data-appearance="tab"\]\[data-current="true"\]\s*\{[^}]*\n\s*color: var\(--accent,/)
+        expect(rendererSource).toContain("\"starci-core-section-eyebrow\"")
+        expect(offsetPop.forced.get("--offset-pop-accent-text")).toBe("CanvasText")
+    })
+
     /** The ratios recorded in `dna.ts`; AA text needs 4.5, a focus ring (WCAG 1.4.11) needs 3. */
     const RECORDED_CONTRAST = {
         light: {
@@ -273,12 +319,14 @@ describe("Offset Pop DNA and token parity with Core", () => {
             mutedOnCanvas: 5.81, mutedOnSurface: 6.03, mutedOnSurfaceSecondary: 4.75,
             accentForegroundOnAccent: 5.23, successForegroundOnSuccess: 11.97, warningForegroundOnWarning: 12.49,
             dangerForegroundOnDanger: 4.72, infoForegroundOnInfo: 13.5, focusOnCanvas: 3.22, focusOnSurface: 3.34,
+            accentTextOnCanvas: 6.22, accentTextOnSurface: 6.45, accentTextOnSurfaceSecondary: 5.09, accentTextOnBlush: 4.98,
         },
         dark: {
             foregroundOnCanvas: 17.47, foregroundOnSurface: 15.44, foregroundOnSurfaceSecondary: 12.8,
             mutedOnCanvas: 10.16, mutedOnSurface: 8.98, mutedOnSurfaceSecondary: 7.45,
             accentForegroundOnAccent: 5.23, successForegroundOnSuccess: 11.97, warningForegroundOnWarning: 12.49,
             dangerForegroundOnDanger: 4.72, infoForegroundOnInfo: 13.5, focusOnCanvas: 5.42, focusOnSurface: 4.79,
+            accentTextOnCanvas: 7.65, accentTextOnSurface: 6.76, accentTextOnSurfaceSecondary: 5.61,
         },
     } as const
 
@@ -300,6 +348,11 @@ describe("Offset Pop DNA and token parity with Core", () => {
                 infoForegroundOnInfo: contrast(m.infoForeground, m.info),
                 focusOnCanvas: contrast(c.focus, m.canvas),
                 focusOnSurface: contrast(c.focus, m.surface),
+                accentTextOnCanvas: contrast(m.accentText, m.canvas),
+                accentTextOnSurface: contrast(m.accentText, m.surface),
+                accentTextOnSurfaceSecondary: contrast(m.accentText, m.surfaceSecondary),
+                // Blush is a light-mode surface tone only; dark never sets text on it.
+                ...(mode === "light" ? { accentTextOnBlush: contrast(m.accentText, OFFSET_POP_DNA.palette.blush) } : {}),
             }
             expect(measured).toEqual(RECORDED_CONTRAST[mode])
             for (const [pair, ratio] of Object.entries(measured)) {
