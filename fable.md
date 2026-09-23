@@ -1117,6 +1117,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   vụ lại. Vá `b2c0ce8ab`: ask chờ mà không có form sống = askReserveDispatches, frontier ask-reserve actionable. Đã báo kernel
   Modules phục vụ lại ctx_596b59ca7bd4. Form thanh toán WSPV vẫn sống (phục vụ ~07:26, hết ~11:26); bản vá sẽ bắt khi nó hết hạn.
 
+- 11:35 ask-reserve chạy đúng: Modules đã phục vụ lại ask thuế (http://127.0.0.1:6970/a-2e190e5a4ba7e57e62, ttl mới 4 giờ),
+  quay về awaiting-owner. Form thanh toán WSPV hết hạn đúng dự đoán, frontier liệt kê ctx_b77ce6a3b9a7, watchdog đã đánh thức
+  kernel WSPV. WSPV audit a34 failed (kernel lo). Nhiễu: watchdog Modules một lần kernel-failed-screen thoáng qua, màn hình hiện
+  không khớp mẫu lỗi, không restart.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
