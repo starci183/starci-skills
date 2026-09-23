@@ -105,7 +105,7 @@ test('dispatch records the op input digests; a changed knowledge file makes the 
   assert.match(recorded['modules/models/code-patterns.yaml'],/^[0-9a-f]{64}$/);
 
   const report=path.join(fx.repo,'report.json');
-  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',files:['src/refactor/a.ts'],checks:[{name:'self',command:'true',exitCode:0}]}));
+  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts'],checks:[{name:'self',command:'true',exitCode:0}]}));
   assert.equal(fx.run('report','--job','job-refactor','--report',report).status,0);
   assert.equal(fx.run('check','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]})).status,0);
   const settled=fx.run('settle','--job','job-refactor','--verdict','pass');
