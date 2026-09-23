@@ -1053,6 +1053,12 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   dispatch lại composition. Merge P7 `71853d655` (report op commit phải có head; settle pass đòi owned paths sạch; report cũ thiếu
   head chỉ kiểm owned paths). Check xanh, 86/86. Báo kernel WSPV và Collab nhắc hai worker đang chạy ghi head.
 
+- 09:05 WSPV kẹt: tin nhắn head của trò tới giữa lượt, Devin xếp hàng đợi và prompt idle chờ Enter; kernel đã consume report
+  implement a35 (có head) nhưng chưa settle, frontier báo engaged nên không ai đánh thức. Trò bấm Enter, kernel chạy lại. Vá
+  `febe53d87`: frontier settle-ready (report đã consume, job còn running) actionable + settleReadyJobs; liveness queued-input
+  (chỉ khi idle), watchdog và wake của api/serve-ask bấm Enter. Live: WSPV settle-ready đúng a35. Collab backend.implement a1
+  partial (composition), kernel đang xử lý.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
