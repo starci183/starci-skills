@@ -36,8 +36,8 @@ const healthy=(ledger,{workflowId='wf-tree',runId='run-1'}={})=>seedWorkflow(led
 });
 const healthyTerminals=()=>[term(KERNEL,'[Kernel] wf-tree'),term('term-op-1','[Op] code.refactor a1 · wf-tree')];
 
-test('the codes are the four the contract names, and a matching tree is clean',t=>{
-  assert.deepEqual(FINDING_CODES,['DUPLICATE_KERNEL','ORPHAN_TERMINAL','DEAD_KERNEL','TASK_OUTSIDE_RUN']);
+test('the codes are the six the contract names, and a matching tree is clean',t=>{
+  assert.deepEqual(FINDING_CODES,['DUPLICATE_KERNEL','ORPHAN_TERMINAL','STRAY_TERMINAL','DEAD_KERNEL','TITLE_DRIFT','TASK_OUTSIDE_RUN']);
   withLedger(t,({ledger})=>{
     healthy(ledger);
     assert.deepEqual(orcaTreeFindings(ledger.db,seen(...healthyTerminals())),[]);
@@ -182,5 +182,31 @@ test('a [Kernel] terminal naming a workflow from another ledger is not an orphan
     healthy(ledger);
     const findings=orcaTreeFindings(ledger.db,seen(...healthyTerminals(),term('term-foreign','[Kernel] wf-elsewhere-bbbb2222')));
     assert.equal(findings.some(f=>f.terminal==='term-foreign'),false,'another project kernel sharing the Orca host is not this ledger orphan');
+  });
+});
+
+// The owner's sidebar: agent CLIs overwrote every [Kernel]/[Op] title, and
+// settled workers, old kernels and bare shells stayed live in the project.
+test('TITLE_DRIFT names a kernel or live op whose title an agent CLI overwrote',t=>{
+  withLedger(t,({ledger})=>{
+    healthy(ledger);
+    const f=orcaTreeFindings(ledger.db,seen(term(KERNEL,'devin.exe: Kernel orchestration for nivo'),term('term-op-1','Report task outcome | nivo-backend')));
+    assert.deepEqual(f.filter(x=>x.code==='TITLE_DRIFT').map(x=>x.terminal).sort(),[KERNEL,'term-op-1'].sort());
+  });
+});
+
+test('STRAY_TERMINAL names a live terminal in the project worktree that is no live kernel or op',t=>{
+  withLedger(t,({ledger})=>{
+    healthy(ledger);
+    const at=p=>x=>({...x,worktreePath:p});
+    const rows=readTerminals([
+      ...healthyTerminals().map(at('D:/Repositories/nivo-backend')),
+      at(String.raw`D:\Repositories\nivo-backend`)(term('term-shell','nivo-backend')),
+      at('D:/Repositories/nivo-backend')(term('term-old','worker-task_9572ffbea332')),
+      at('D:/Repositories/mia-mia-backend')(term('term-other','x')),
+    ]);
+    const f=orcaTreeFindings(ledger.db,rows,{repo:'D:/Repositories/nivo-backend'});
+    assert.deepEqual(f.filter(x=>x.code==='STRAY_TERMINAL').map(x=>x.terminal).sort(),['term-old','term-shell']);
+    assert.equal(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='STRAY_TERMINAL').length,0,'without a repo the placement check is off');
   });
 });

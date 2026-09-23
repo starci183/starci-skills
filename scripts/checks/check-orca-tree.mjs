@@ -11,10 +11,14 @@
 //                      and not the kernel signal of a non-finished workflow
 //   DEAD_KERNEL        a non-finished workflow whose signal terminal is not in
 //                      the listing — the ledger holds a handle Orca has lost
+//   STRAY_TERMINAL     a live terminal in the project worktree that is no live
+//                      kernel or op worker (settled worker, leftover shell)
+//   TITLE_DRIFT        a live kernel or op terminal whose title is not its
+//                      [Kernel] <workflow> / [Op] <op> name (agent CLIs rename)
 //   TASK_OUTSIDE_RUN   a job whose Orca Run is not the workflow's current Run,
 //                      so its Task hangs outside the workflow's tree
 //
-// Only StarCi's own terminals are in scope: a handle the ledger names, or a
+// ORPHAN_TERMINAL covers only StarCi's own terminals: a handle the ledger names, or a
 // title the kernel wrote ([Kernel] … / [Op] …). An owner's own terminals are
 // never findings.
 //
@@ -31,7 +35,7 @@ import { inspectLedger, ledgerFileFor, JOB_STATUSES } from '../../engine/ledger-
 import { terminalList } from '../api/orca/terminal-list.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
-export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'DEAD_KERNEL', 'TASK_OUTSIDE_RUN'];
+export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
 
 // A job holding a worker: the dispatchable states minus the ones that hold no
 // agent yet (queued) or hold only a fence (leased).
@@ -55,6 +59,7 @@ export function readTerminals(source) {
     handle: t?.handle ?? t?.id ?? t?.terminal ?? null,
     title: t?.title ?? t?.displayName ?? t?.display_name ?? t?.name ?? null,
     live: t?.connected !== false && t?.closed !== true && t?.status !== 'exited',
+    ...((t?.worktreePath ?? t?.worktree_path ?? t?.cwd) ? { worktreePath: t.worktreePath ?? t.worktree_path ?? t.cwd } : {}),
   })).filter((t) => t.handle);
 }
 
@@ -104,7 +109,17 @@ export function projectLedger(db) {
 }
 
 /** Every finding the ledger and the listing disagree on, in code order. */
-export function orcaTreeFindings(db, terminals) {
+// The owner reads the Orca sidebar: every live terminal in a project must be
+// a [Kernel] or an [Op] of a live job, named so. Agent CLIs overwrite titles
+// and settled workers linger; TITLE_DRIFT and STRAY_TERMINAL make both visible
+// to the supervisor (modules/supervisor/supervise.yaml form checks).
+const underRepo = (worktreePath, repo) => {
+  if (!worktreePath || !repo) return false;
+  const norm = (p) => String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const w = norm(worktreePath), r = norm(repo);
+  return w === r || w.startsWith(r + '/');
+};
+export function orcaTreeFindings(db, terminals, { repo = null } = {}) {
   const listing = terminals ?? [];
   const live = listing.filter((t) => t.live);
   const byHandle = new Map(listing.map((t) => [t.handle, t]));
@@ -151,6 +166,35 @@ export function orcaTreeFindings(db, terminals) {
       detail: owner
         ? `terminal ${terminal.handle} is live but its job ${owner.job_id} is ${owner.status}`
         : `terminal ${terminal.handle} (${terminal.title ?? 'untitled'}) is live and belongs to no job` });
+  }
+
+  // Names: the kernel terminal of a live workflow reads [Kernel] <workflow>,
+  // and a live job's worker reads [Op] ....
+  const liveJobHandles = new Set(jobs.filter((job) => job.kind !== 'kernel' && ['running', 'answering', 'leased'].includes(job.status)).flatMap(handlesOf));
+  for (const wf of workflows) {
+    if (wf.finished || !wf.signalTerminal) continue;
+    const t = byHandle.get(wf.signalTerminal);
+    if (t?.live && !String(t.title ?? '').startsWith(`[Kernel] ${wf.workflowId}`)) {
+      findings.push({ code: 'TITLE_DRIFT', workflowId: wf.workflowId, terminal: t.handle, expected: `[Kernel] ${wf.workflowId}`,
+        detail: `kernel terminal ${t.handle} is titled "${t.title ?? ''}", not [Kernel] ${wf.workflowId}` });
+    }
+  }
+  for (const t of live) {
+    if (!liveJobHandles.has(t.handle) || String(t.title ?? '').startsWith('[Op] ')) continue;
+    const owner = jobs.find((job) => handlesOf(job).includes(t.handle));
+    findings.push({ code: 'TITLE_DRIFT', workflowId: owner?.workflow_id ?? null, terminal: t.handle, jobId: owner?.job_id ?? null,
+      expected: `[Op] ${owner?.op_id ?? ''}`, detail: `op worker ${t.handle} of ${owner?.job_id} is titled "${t.title ?? ''}", not [Op] ${owner?.op_id}` });
+  }
+  // Placement: a live terminal in this project's worktree that is neither a
+  // live kernel nor a live job's worker is stray (a settled worker, a leftover
+  // shell, an old kernel) and does not belong in the sidebar.
+  const reported = new Set(findings.map((f) => f.terminal).filter(Boolean));
+  const kernelsLive = new Set(workflows.filter((w) => !w.finished).flatMap((w) => [w.signalTerminal, w.kernelTerminal]).filter(Boolean));
+  for (const t of live) {
+    if (!underRepo(t.worktreePath, repo) || kernelsLive.has(t.handle) || liveJobHandles.has(t.handle)) continue;
+    if (reported.has(t.handle) && findings.some((f) => f.terminal === t.handle && f.code === 'ORPHAN_TERMINAL')) continue;
+    findings.push({ code: 'STRAY_TERMINAL', workflowId: null, terminal: t.handle,
+      detail: `terminal ${t.handle} ("${t.title ?? 'untitled'}") is live in this project but is no live kernel or op worker` });
   }
 
   const currentRun = new Map(workflows.map((w) => [w.workflowId, w.runId]));
@@ -202,7 +246,7 @@ function main(argv) {
   if (!fs.existsSync(ledgerFile)) usage(`check-orca-tree: no ledger at ${ledgerFile}`);
   const ledger = inspectLedger({ file: ledgerFile });
   let findings;
-  try { findings = orcaTreeFindings(ledger.db, terminals); } finally { ledger.close(); }
+  try { findings = orcaTreeFindings(ledger.db, terminals, { repo: path.resolve(repo) }); } finally { ledger.close(); }
 
   if (has('json')) console.log(JSON.stringify({ schema: SCHEMA, ok: findings.length === 0, terminals: terminals.length, findings }, null, 2));
   else if (findings.length) console.log(findings.map(formatFinding).join('\n'));

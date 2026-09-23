@@ -51,8 +51,25 @@ loop:
         `unserved` is an ask no form was ever started for — each needs a re-serve before it can
         reach the owner; open new direction images and check them against the current
         contracts (concepts.yaml rules, full-page chrome, concrete data, ui.flow coverage)
+    - step: form
+      do: |
+        The owner reads the Orca sidebar, so the form of the tree is checked every cycle, not
+        only its content. The digest's ORCA-TREE lines (scripts/checks/check-orca-tree.mjs) name:
+          names      TITLE_DRIFT - a kernel terminal not titled [Kernel] <workflow>, or a live op
+                     worker not titled [Op] <op> (agent CLIs overwrite titles; the --repair
+                     watchdog renames them back, so a drift that survives a watchdog tick means
+                     the watchdog is down)
+          placement  every op is a Task in its kernel's Run (TASK_OUTSIDE_RUN) and every live
+                     terminal in the project worktree is a live kernel or a live op worker
+                     (STRAY_TERMINAL); DUPLICATE_KERNEL / DEAD_KERNEL as before
+          cleanup    a settled op leaves no live terminal (ORPHAN_TERMINAL), no open Task
+                     (settle closes it as 'completed') and no unreleased worker record
+        A form finding is fixed in the same cycle: rename a drifted title, terminal-close a
+        stray or orphan terminal that belongs to no live job, and treat a recurring one as a
+        contract-gap (the runtime that should have named or cleaned it is patched).
     - step: classify
       do: |
+        form            → a TITLE_DRIFT/STRAY/ORPHAN/TASK finding → fix it now (step form)
         contract-gap    → the contract allowed or caused the defect → patch .claude
         op-defect       → contract is right, the op just failed → let the kernel retry/escalate
         owner-gate      → ask/ask-review pending → surface to the owner verbatim, never answer it
