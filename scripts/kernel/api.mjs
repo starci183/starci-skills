@@ -74,6 +74,7 @@ import { quitAgent } from './quit-agent.mjs';
 import { markAskClosed } from '../connectors/telegram.mjs';
 import { autoAcceptAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { sendWakeWithProof, sendEnterWithProof } from './wake-delivery.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -510,18 +511,21 @@ function cmdNudge(ledger, args) {
   // it would bury it. One Enter-only send submits exactly what is there
   // (inc-06aeecf432f1; the dispatch-time twin is scripts/agent/lib.mjs
   // awaitSubmission).
+  // A stalled/blocked receipt is not a failure when the next frame no longer
+  // reads staged-input (scripts/kernel/wake-delivery.mjs).
   if (worker.liveness === 'staged-input') {
-    const sent = terminalSend({ terminal: worker.terminalHandle, text: '', enter: true });
-    if (!sent.ok) {
-      const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', worker, error: sent.error };
-      emit(out, `nudge FAILED for ${jobId}: ${sent.error ?? 'terminal send failed'}`, args.json);
+    const proof = sendEnterWithProof({ terminal: worker.terminalHandle, ...stagedInputEvidenceOf(db, job) });
+    const sent = proof.sent ?? {};
+    if (!proof.ok) {
+      const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', delivery: 'failed', evidence: proof.evidence, sendErrorCode: proof.sendErrorCode, worker, error: sent.error };
+      emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen still shows the staged input`, args.json);
       process.exit(1);
     }
     ledger.transaction(() => ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, action: 'submit-staged-input' },
+      kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, action: 'submit-staged-input', delivery: proof.delivery, evidence: proof.evidence, ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}) },
     }));
-    const out = { ok: true, jobId, nudged: true, action: 'submit-staged-input', worker, receipt: sent.receipt ?? null };
+    const out = { ok: true, jobId, nudged: true, action: 'submit-staged-input', delivery: proof.delivery, evidence: proof.evidence, ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), worker, receipt: sent.receipt ?? null };
     emit(out, `nudged ${jobId}: submitted the staged input on exact worker ${worker.terminalHandle} with one Enter`, args.json);
     return;
   }
@@ -541,18 +545,24 @@ function cmdNudge(ledger, args) {
     'Re-read the exact contract with api op-contract, continue only inside its existing authority, and file exactly one api report.',
     'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
   ].join(' ');
-  const sent = terminalSend({ terminal: worker.terminalHandle, text: prompt, enter: true });
-  if (!sent.ok) {
-    const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', worker, error: sent.error };
-    emit(out, `nudge FAILED for ${jobId}: ${sent.error ?? 'terminal send failed'}`, args.json);
+  // Delivery is proven from the screen, not Orca's receipt: agent_prompt_stalled
+  // (text queued behind a running turn) and agent_prompt_blocked (Enter refused,
+  // then retried) left wakes on the worker's screen while nudge reported
+  // terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f).
+  const proof = sendWakeWithProof({ terminal: worker.terminalHandle, text: prompt, stagedPattern: stagedInputEvidenceOf(db, job).stagedPattern });
+  const sent = proof.sent ?? {};
+  const delivered = { delivery: proof.delivery, evidence: proof.evidence, ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), ...(proof.enterRetried ? { enterRetried: true } : {}) };
+  if (!proof.ok) {
+    const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', ...delivered, worker, error: sent.error };
+    emit(out, `nudge FAILED for ${jobId}: ${sent.error || proof.sendErrorCode || 'terminal send failed'}; the screen shows no wake (${proof.evidence})`, args.json);
     process.exit(1);
   }
   ledger.transaction(() => ledger.appendEvent({
     workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}) },
+    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}), ...delivered },
   }));
-  const out = { ok: true, jobId, nudged: true, action: 'wake', worker, receipt: sent.receipt ?? null };
-  emit(out, `nudged ${jobId}: resumed exact worker ${worker.terminalHandle} to file its durable report`, args.json);
+  const out = { ok: true, jobId, nudged: true, action: 'wake', ...delivered, worker, receipt: sent.receipt ?? null };
+  emit(out, `nudged ${jobId}: ${proof.delivery === 'queued' ? 'queued the wake behind the running turn of' : 'resumed'} exact worker ${worker.terminalHandle} to file its durable report (${proof.evidence})`, args.json);
 }
 
 /* --------------------------------------------------------------- observe */

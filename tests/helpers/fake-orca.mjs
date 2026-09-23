@@ -163,6 +163,22 @@ const stuckPaste = process.env.STARCI_FAKE_ORCA_STUCK_PASTE || '';
 const INLINE_STAGED = h => 'Codex\nmodel: ' + renderedModel(h) + '\n\n' + String(record(h)?.prompt ?? '').split(/\r?\n/).filter(Boolean).slice(-8)
   .map((line, i) => (i === 0 ? '› ' : '  ') + line).join('\n') + '\n';
 const STAGED = h => stuckPaste.startsWith('inline') ? INLINE_STAGED(h) : 'Codex\nmodel: ' + renderedModel(h) + '\n\n› [Pasted Content ' + String(record(h)?.prompt ?? '').length + ' chars]\n  gpt-6-sol high · repo\n';
+// STARCI_FAKE_ORCA_SEND_STALLED 'queued' | 'landed' | 'lost': a non-empty send
+// with --enter answers agent_prompt_stalled. 'queued': a Claude frame holds the
+// text behind a running hook spinner with "Press up to edit queued messages";
+// 'landed': the text is echoed and a turn runs; 'lost': the screen is unchanged.
+// A spec seeds terminals[h].screen (the frame shown until then).
+const sendStalled = process.env.STARCI_FAKE_ORCA_SEND_STALLED || '';
+const wrapRows = (text, width) => { const rows = []; let row = '';
+  for (const word of String(text).split(' ')) { if (row && (row + ' ' + word).length > width) { rows.push(row); row = word; } else row = row ? row + ' ' + word : word; }
+  if (row) rows.push(row); return rows; };
+const CLAUDE_CHROME = ['─────', '❯', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
+const SCREEN_OF = r => r.stalledWake === 'queued'
+  ? ['● Bash(node scripts/kernel/api.mjs op-contract)', '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)', '─────',
+    ...wrapRows(r.prompt, 76).map((row, i) => (i === 0 ? '❯ ' : '  ') + row), '─────', '  Press up to edit queued messages, Enter to send them immediately'].join('\n')
+  : r.stalledWake === 'landed'
+    ? [String(r.screen), ...wrapRows(r.prompt, 76).map((row, i) => (i === 0 ? '❯ ' : '  ') + row), '✻ Pondering… (2s · ↓ 12 tokens)', ...CLAUDE_CHROME].join('\n')
+    : String(r.screen);
 const verb = argv.slice(0, 2).join(' ');
 // The live-schema listing scripts/api/orca/lib.mjs compares against, derived
 // from calls.yaml so the stub can never disagree with the contract by accident.
@@ -204,6 +220,8 @@ else if (verb === 'terminal read' && record(arg('terminal'))?.gate && !record(ar
 else if (verb === 'terminal read' && gatedProviderOf(arg('terminal')))
   out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
     screen: gateScreens[gatedProviderOf(arg('terminal'))] } } });
+else if (verb === 'terminal read' && !isDead(arg('terminal')) && typeof record(arg('terminal'))?.screen === 'string')
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: SCREEN_OF(record(arg('terminal'))) } } });
 else if (verb === 'terminal read')
   isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
@@ -245,6 +263,10 @@ else if (verb === 'terminal send') {
   // STARCI_FAKE_ORCA_STUCK_PASTE=blocked: Orca types the text but refuses the
   // Enter that came with it (agent_prompt_blocked); an Enter-only send submits.
   if (stuckPaste === 'blocked' && text && argv.includes('--enter')) fail({ ok: false, error: { code: 'agent_prompt_blocked', message: 'agent_prompt_blocked' } });
+  if (sendStalled && text && argv.includes('--enter')) {
+    if (r) { r.stalledWake = sendStalled; save(); }
+    fail({ ok: false, error: { code: 'agent_prompt_stalled', message: 'agent_prompt_stalled' } });
+  }
   out({ ok: true, result: { sent: true } });
 }
 else if (verb === 'terminal close') {

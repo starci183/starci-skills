@@ -763,13 +763,20 @@ commands:
       appends op-worker-nudged. It creates no job, contract, lease, retry,
       verdict or authority.
     returns: >-
-      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,reason?,worker,receipt?}
+      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,delivery?:delivered|queued,evidence?:wake-text|queued-marker|screen|receipt,sendErrorCode?,enterRetried?,reason?,worker,receipt?}
       — nudged:false with ok:true and exit 0 is a SKIP, not a refusal: reason
       'report-filed' (the durable answer already exists) or 'worker-active'
       (the turn is running). A worker whose liveness is `staged-input` (its
       paste never left the input row) gets ONE Enter-only send and no wake
       text, action submit-staged-input: typing a wake on top of the paste
-      would bury it (inc-06aeecf432f1). Every other nudge is action wake
+      would bury it (inc-06aeecf432f1). Every other nudge is action wake.
+      Delivery is proven from the screen (scripts/kernel/wake-delivery.mjs),
+      not Orca's receipt alone: the frame is read before and after the send,
+      and the wake text appearing (delivered) or a queued-message marker such
+      as Claude's "Press up to edit queued messages" (queued) proves it, so
+      agent_prompt_stalled / agent_prompt_blocked with the wake on screen is a
+      nudge (op-worker-nudged carries delivery and sendErrorCode), never
+      terminal-send-failed (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f)
     refuses:
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'
@@ -778,7 +785,7 @@ commands:
       - worker-unavailable: 'exact terminal is disconnected/unwritable'
       - interactive-gate: 'permission/trust input is a typed environment problem, not a wake (liveness `failed` refuses under its own name the same way)'
       - worker-state-unknown: 'liveness is neither turn-idle nor live-idle — weak observation never authorizes input'
-      - terminal-send-failed: 'the wake did not land on the exact terminal; no op-worker-nudged event is appended'
+      - terminal-send-failed: 'neither the receipt nor the screen shows the wake on the exact terminal (delivery failed, evidence names what the screen showed); no op-worker-nudged event is appended'
     usedBy: 'drive.wait on the first turn-idle observation with no durable report'
 
   # --------------------------------------------------------------------------

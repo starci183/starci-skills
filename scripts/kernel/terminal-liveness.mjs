@@ -194,3 +194,41 @@ export function staleAwareState(state, outputAgeMs, activeStaleMs) {
   const stale = state === 'active' && outputAgeMs != null && Number.isFinite(age) && Number.isFinite(limit) && limit > 0 && age > limit;
   return stale ? { state: 'turn-idle', staleActive: true, reason: 'stale-active' } : { state, staleActive: false, reason: null };
 }
+
+// A provider that holds typed text behind a running turn says so: Claude Code
+// "Press up to edit queued messages" / "Press up to select a queued message",
+// Devin "Press Enter to send queued messages".
+export const QUEUED_MESSAGE_MARKER = /press up to (?:edit|select) (?:a )?queued messages?|press enter to send queued messages|\bmessages? queued\b/i;
+// The wake is found by its opening words; a TUI wraps and indents the rest.
+const WAKE_PROBE_CHARS = 60;
+const screenProse = (screen) => collapse(String(screen ?? '').split(/\r?\n/)
+  .map((row) => row.replace(/^[\s│┃┆┊>›❯❭⎿↳●•]*/u, '')).join(' '));
+const occurrences = (haystack, needle) => {
+  let n = 0;
+  for (let i = needle ? haystack.indexOf(needle) : -1; i >= 0; i = haystack.indexOf(needle, i + needle.length)) n += 1;
+  return n;
+};
+
+/**
+ * What the screen proves about a wake just typed into a provider terminal. Orca answers
+ * agent_prompt_stalled when the agent queued the text behind a running turn, and nudge used to
+ * call that terminal-send-failed while the wake sat on the worker's screen (inc-b87a42ec8690,
+ * inc-e4f69f9ef061, inc-13ab4be5059f). `before`/`after` are the frames read around the send.
+ * Returns {delivery, wakeVisible, queuedMarker, screenState}; delivery is
+ *  - 'staged': the frame is staged-input (the wake sits unsubmitted in the input row);
+ *  - 'queued': a queued-message marker the frame before did not show, or one beside the wake text;
+ *  - 'delivered': the wake's opening words appear more often than before the send;
+ *  - 'unproven': the screen shows neither.
+ */
+export function wakeDeliveryOf({ before = '', after = '', text = '', stagedPattern = DEFAULT_STAGED_PATTERN } = {}) {
+  const probe = collapse(text).slice(0, WAKE_PROBE_CHARS);
+  const wakeVisible = probe.length >= MIN_ECHO_CHARS
+    && occurrences(screenProse(after), probe) > occurrences(screenProse(before), probe);
+  const queuedMarker = QUEUED_MESSAGE_MARKER.test(String(after ?? ''));
+  const screenState = classifyAgentScreen(after, { stagedPattern, sentText: text || null }).state;
+  const delivery = screenState === 'staged-input' ? 'staged'
+    : queuedMarker && (wakeVisible || !QUEUED_MESSAGE_MARKER.test(String(before ?? ''))) ? 'queued'
+    : wakeVisible ? 'delivered'
+    : 'unproven';
+  return { delivery, wakeVisible, queuedMarker, screenState };
+}
