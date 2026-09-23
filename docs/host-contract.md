@@ -143,8 +143,11 @@ report row (`reports.consumed_at`) as part of recording the verdict.
 
 ## Managed-agent dispatch (`kind: native-managed-agent`)
 
-Claude and Codex are **native managed agents**: the host starts a supervised
-worker — no terminal is created and no agent command is assembled. The
+Claude operations are **native managed agents**: the host starts a supervised
+worker — no terminal is created and no agent command is assembled. Codex
+operations are not: `worker-start` has no approval/sandbox flag, so the codex
+profiles are card-composed command terminals that launch with the codex card's
+`bypassArgs`, the same command the Kernel terminal boots with. The
 launch sequence (typed calls from `calls.yaml`, wrappers under
 `scripts/api/orca/`):
 

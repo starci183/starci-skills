@@ -19,7 +19,13 @@ identity:
     this target adds no headroom to the codex-agent window.
 
 launch:
-  orca: {kind: managed-agent, agent: codex}
+  orca:
+    kind: command-terminal
+    adapter: codex
+    dispatch: return-preamble-and-send
+    composition: card-terminal-fallback   # no static command: modules/models/agents/codex.yaml terminalFallback command + modelArgs/effortArgs (routed model + effort) + bypassArgs
+    unattended: card-bypassArgs   # --ask-for-approval never --sandbox danger-full-access, exactly as the Kernel terminal boots
+  note: Same card-composed unattended command terminal as codex-agent (see its launch.whyCommandTerminal).
 
 business:
   question: >-
