@@ -1068,6 +1068,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   layout cấm, nên dự án mới (Mia Mia) không bắt đầu được spec-foundation; giao lane nền (đích hợp lệ, schema đóng, spec bắt ghi
   gốc). (2) lineage retry của cut sai và (3) kernel báo active 3.7 giờ vì dòng spinner cũ: fork làm lane P8. Nivo không dính (3).
 
+- 09:40 Lane xong `3edefde1b`: workspace.manage prepare/import/stacks ghi setup lên catalog gốc .starciwork/index.yaml tại
+  extensions.work3.setup.<workflow>.<mode> (schema đóng, dùng lại các trường của scope); evidence ở .starciwork/evidence/<wf>.<mode>/;
+  spec từ chối mọi manifest ghi bản ghi gốc ngoài layout. Check xanh, 46/46 (lane: 155 pass). Đã gửi fork các bước cho kernel Mia
+  Mia. Còn mở: node fields của scope.finish vẫn liệt kê state/blocker/completion.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
