@@ -200,6 +200,11 @@ tick:
       seam ordinal (the lowest, owning the root configs) alone before the
       rest — a passed slice whose inputs are unchanged is never rerun, and a
       stale job never counts toward its leg until its redo passes.
+      An op `ask` or `blocked` that names another slice's owned paths (files
+      it may not commit), and an `api settle` refused `not-landed`, is
+      resolved by re-dispatching the owning slice to commit its own paths
+      (and push, when its policy pushes) as a new attempt of that op and cut
+      ordinal, never by leaving the asker waiting.
       When the operation contract declares cut-set-aware integration proof,
       each non-final slice reruns the unchanged full regression but may retain
       only failures mapped to unsettled sibling ordinals; its independent
