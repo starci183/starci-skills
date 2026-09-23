@@ -35,7 +35,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import {
   DRAWER_DIRECTIONS, LEGACY_SHELL_SCHEMA, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
   directionAt, isLayoutTree, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
-  nodeById, nodesOf, readShellRecord as readShell, resolveNavRoute, scanAppDir, surfaceAt, surfaceValues,
+  nodeById, nodesOf, readShellRecord as readShell, requiredMatrixOf, resolveNavRoute, scanAppDir, surfaceAt, surfaceValues,
 } from '../work/layout-tree.mjs';
 import { decodePng } from '../work/png.mjs';
 import { pixelSha256, recompose, resolveHost } from '../work/compose-direction.mjs';
@@ -110,6 +110,10 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
     if (!image.path || !fs.existsSync(file)) out.push(finding('refuse', 'SHELL_CAPTURE_MISSING', at, `lockup ${image.path ?? '(no path)'} is not on disk`));
     else if (image.sha256 && sha256Of(file) !== image.sha256) out.push(finding('refuse', 'SHELL_CAPTURE_DIGEST', at, `lockup ${image.path} no longer hashes to its recorded sha256`));
   }
+  // Every drawing set is desktop and mobile in the light theme (owner ruling 2026-09-24); dark is optional.
+  const declared = matrixOf(r), required = requiredMatrixOf(r);
+  for (const bp of required.breakpoints) if (!declared.breakpoints.includes(bp)) out.push(finding('refuse', 'SHELL_BREAKPOINT_MISSING', at, `the tree declares no ${bp} breakpoint - every drawing set covers ${required.breakpoints.join(' and ')}`));
+  for (const theme of required.themes) if (!declared.themes.includes(theme)) out.push(finding('refuse', 'SHELL_THEME_MISSING', at, `the tree declares no ${theme} theme - every drawing set covers ${required.themes.join(', ')} (dark is optional)`));
   const personas = list(r.personas);
   if (!personas.length) out.push(finding('refuse', 'SHELL_PERSONA_INVALID', at, 'no demo persona - a drawing may not invent a tenant'));
   const roles = personas.map((p) => p?.role);
@@ -318,6 +322,20 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
       if (!again.ok) out.push(finding('refuse', 'COMPOSITE_NOT_REPRODUCIBLE', at, `${where} cannot be re-derived: ${again.error}`));
       else if (stored && (again.pixelSha256 !== stored || c.pixelSha256 !== stored)) out.push(finding('refuse', 'COMPOSITE_NOT_REPRODUCIBLE', at, `${where}: its pixels are not the recorded content placed into the recorded base - the image was edited or composed from other inputs`));
     }
+  }
+  // Every drawn state is drawn at desktop AND mobile in the light theme, in each presentation it has (owner
+  // ruling 2026-09-24); dark and any other breakpoint are optional extras, never demanded.
+  const required = requiredMatrixOf(tree);
+  const cells = new Map();
+  for (const a of composites) {
+    const k = `${a.composite.flowState ?? 'default'} ${a.composite.presentation}`;
+    if (!cells.has(k)) cells.set(k, new Set());
+    cells.get(k).add(`${a.composite.breakpoint}/${a.composite.theme}`);
+  }
+  for (const [k, have] of cells) {
+    const [state, presentation] = k.split(' ');
+    const missing = required.breakpoints.flatMap((bp) => required.themes.map((th) => `${bp}/${th}`)).filter((cell) => !have.has(cell));
+    if (missing.length) out.push(finding(mode === 'op' ? 'refuse' : 'suspect', 'DRAW_MATRIX_INCOMPLETE', at, `state ${state} (${presentation}) is drawn at ${[...have].sort().join(', ')} but not at ${missing.join(', ')} - every drawn state has its part at desktop and mobile in the light theme`));
   }
   // A routed overlay is drawn both ways - over its dimmed host and as the full page inside its layout chain.
   if (overlay && record.routed === true && composites.length) {

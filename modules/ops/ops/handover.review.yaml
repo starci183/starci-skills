@@ -92,8 +92,9 @@ steps:
         approve - the workflow is done; feedback or bug - the reviewer describes it in the note;
         question - the reviewer asks it in the note (for vi: \"Duyệt - workflow hoàn tất\", \"Góp ý / báo
         lỗi - mô tả trong ghi chú\", \"Đặt câu hỏi - ghi trong ghi chú\"). No picks. question.refs names
-        the package paths, question.assets any evidence image the test steps point at, and files lists
-        the package. api report refuses a handover ask of any other shape. The kernel serves it through
+        the package paths, question.assets any evidence image the test steps point at - a drawing as its
+        drawn part (page content, overlay panel alone, layout drawing; desktop and mobile), never its
+        composite, which serve-ask would swap for the part anyway - and files lists the package. api report refuses a handover ask of any other shape. The kernel serves it through
         serve-ask and parks this attempt awaiting the owner; nothing in this turn waits for the answer."
   - reads:
       - deliveries

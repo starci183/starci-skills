@@ -242,3 +242,61 @@ test('the CLI exits 2 on a bad argument', () => {
   assert.equal(shellConformanceMain(['a', 'b']).exitCode, 2);
   assert.equal(shellConformanceMain([path.join(os.tmpdir(), 'no-such-starci-dir-xyz')]).exitCode, 2);
 });
+
+// Owner ruling 2026-09-24: every drawing set covers desktop AND mobile in the LIGHT theme. Dark is optional -
+// never demanded of a layout capture or a draw, kept when present.
+test('draw matrix: desktop and mobile light are required per drawn state; dark is optional everywhere', async (t) => {
+  const { layoutSettlement, addCapture } = await import('../scripts/work/layout-tree.mjs');
+  const p = await settledProduct(t);
+  // A tree that declares dark but captured only light is settled: dark is never demanded.
+  const withDark = structuredClone(p.tree);
+  withDark.themes = ['light', 'dark'];
+  p.save(withDark);
+  assert.deepEqual(layoutSettlement(withDark, nodeById(withDark, CONSOLE), { shellDir: p.shellDir }), { settled: true, reasons: [] });
+  const board = await drawUi(p, 'reports/ui/board', uiSkeleton('ui.reports.board', { route: `${CONSOLE}/reports`, surface: 'page', shell: bound(p) }), both);
+  assert.deepEqual(checkShellConformance(board.dir).refused, [], 'desktop + mobile light is a complete drawing set');
+  // Only desktop drawn: refused by the op proof, a suspect for validate.
+  const desktopOnly = await drawUi(p, 'reports/ui/summary', uiSkeleton('ui.reports.summary', { route: `${CONSOLE}/reports`, surface: 'page', shell: bound(p) }), [both[0]]);
+  const refused = checkShellConformance(desktopOnly.dir);
+  assert.ok(codes(refused).includes('DRAW_MATRIX_INCOMPLETE'));
+  assert.match(refused.refused.join('\n'), /state default \(page\) is drawn at desktop\/light but not at mobile\/light/);
+  assert.ok(shellBindingFindings(desktopOnly.dir).some((f) => f.level === 'suspect' && f.code === 'DRAW_MATRIX_INCOMPLETE'), 'validate lists it, never refuses it');
+  // A mobile light capture missing leaves the layout unsettled; a missing dark capture never does.
+  const noMobile = structuredClone(withDark);
+  nodeById(noMobile, CONSOLE).layout.captures = nodeById(noMobile, CONSOLE).layout.captures.filter((c) => c.breakpoint !== 'mobile');
+  assert.match(layoutSettlement(noMobile, nodeById(noMobile, CONSOLE), { shellDir: p.shellDir }).reasons.join(';'), /no capture at mobile\/light/);
+  // A dark capture may still be added to a light-only tree: the theme joins, it does not become required.
+  const lightOnly = structuredClone(p.tree);
+  const { layoutCapture } = await import('./fixtures/layout-tree.mjs');
+  addCapture(lightOnly, p.shellDir, { node: CONSOLE, breakpoint: 'desktop', theme: 'dark', file: p.put('cap-d-dark.png', encodePng(layoutCapture(40, 30, { x: 10, y: 5, width: 28, height: 22 }, [5, 5, 5, 255]))) });
+  assert.deepEqual(lightOnly.themes, ['light', 'dark']);
+  assert.equal(layoutSettlement(lightOnly, nodeById(lightOnly, CONSOLE), { shellDir: p.shellDir }).settled, true, 'no mobile dark capture is demanded');
+  // The tree itself must declare desktop, mobile and light.
+  const noMobileBp = structuredClone(p.tree);
+  noMobileBp.breakpoints = noMobileBp.breakpoints.filter((b) => b.name !== 'mobile');
+  noMobileBp.themes = ['dark'];
+  p.save(noMobileBp);
+  const shellCodes = codes(checkShellConformance(path.join(p.work, 'shell')));
+  assert.ok(shellCodes.includes('SHELL_BREAKPOINT_MISSING') && shellCodes.includes('SHELL_THEME_MISSING'));
+});
+
+test('the contracts say it: owner reviews parts, composites are implement/audit evidence; desktop + mobile light, dark optional', () => {
+  const draw = readYaml('modules/ops/ops/interface.draw.yaml');
+  const draws = draw.writes.find((w) => w.id === 'draws').content.en;
+  assert.match(draws, /`part` \{path, sha256\} \(the drawn part the owner reviews\)/);
+  assert.match(draws, /evidence for implement and audit only/);
+  assert.match(draw.writes.find((w) => w.id === 'designSource').content.en, /desktop AND\s+mobile in the light theme; dark is optional/);
+  assert.match(draw.steps[0].action.en, /question\.assets list each candidate's PARTS, desktop\s+and mobile, never a composite/);
+  assert.match(draw.steps[1].action.en, /once per required breakpoint - desktop and mobile, light theme/);
+  assert.match(draw.steps[3].action.en, /names the drawn\s+parts \(desktop and mobile\), never a composite/);
+  assert.ok(draw.proofs.some((p) => p.id === 'owner-sees-parts'));
+  assert.match(draw.proofs.find((p) => p.id === 'shell-conformance').requirement.en, /DRAW_MATRIX_INCOMPLETE/);
+  const common = readYaml('modules/ops/_common.yaml').sections.find((s) => /productLocale/.test(s.title)).blocks;
+  assert.ok(common.some((b) => /owner reviews the drawn PART, never the composite/.test(b) && /overlay panel|panel alone/.test(b)));
+  assert.ok(common.some((b) => /desktop AND mobile in the light theme/.test(b) && /Dark is optional/.test(b)));
+  assert.match(readYaml('modules/ops/ops/interface.implement.yaml').reads.find((r) => r.id === 'draws').purpose.en, /build reference is the composite/);
+  assert.match(JSON.stringify(readYaml('modules/ops/ops/interface.audit.yaml').steps), /direction image the owner is shown is the drawn part/);
+  assert.match(JSON.stringify(readYaml('modules/ops/ops/handover.review.yaml').steps), /a drawing as its\s+drawn part/);
+  assert.match(read('modules/schemas/work-ui-screen.schema.yaml'), /`direction-content` is the\s+drawn PART/);
+  assert.match(read('modules/ops/ops/brand.decide.yaml'), /desktop and mobile in the light theme \(dark\s+optional\)/);
+});

@@ -78,7 +78,9 @@ reads:
       en: "Resolve each supplied image from its attachment, local asset or existing design resource
         without requiring the user to author metadata. Open and visually inspect every image. The
         selected array is not an alternatives vote: unclear alternatives, approval or contradictory
-        images require a scoped decision."
+        images require a scoped decision. For a composited direction the build reference is the composite
+        (role direction, <state>--<presentation>--<bp>--<theme>.png - the part placed into the real layout
+        chain), at desktop and mobile light; its part (role direction-content) is what the owner accepted."
   - id: design
     path: selected UI node index.yaml + its owned assets/*
     purpose:
@@ -237,8 +239,9 @@ steps:
     action:
       en: "Collect the selected scope, business ACs, architecture/API contracts, current source and
         applicable knowledge. Validate draws as an array and open every image; index each by actual
-        screen/state/viewport and source identity in draws-review and the input map. Resolve shared
-        layouts, responsive variants, sequential states and ambiguous alternatives explicitly. For
+        screen/state/viewport and source identity in draws-review and the input map. Build against a
+        composited direction's composite; composites are implement and audit evidence only, and any
+        direction image this op shows the owner is the drawn part. Resolve shared layouts, responsive variants, sequential states and ambiguous alternatives explicitly. For
         repairs reproduce the original defect and preserve its evidence. Own preparation through
         delivery: inspect readiness and reproduce the requested defect when applicable, partition
         the selected work into cohesive changes and check callers before editing. Resolve

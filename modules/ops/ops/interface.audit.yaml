@@ -348,7 +348,10 @@ steps:
         `no-actionable-drift`, validate, report and stop without dispatch. A pending
         intentional-deviation case is actionable drift: report `OWNER_DEVIATION_DECISION_REQUIRED`
         with its digest and requested decision, retain the evidence for later owner inspection, and
-        stop. review.verify and uat.verify remain independent."
+        stop. The side-by-side pairs compare the composite (the part placed into the real layout) with
+        the capture, but a direction image the owner is shown is the drawn part - page content, overlay
+        panel alone, layout drawing - never the composite. review.verify and uat.verify remain
+        independent."
 proofs:
   - id: accepted-draw-lineage
     requirement:

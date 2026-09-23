@@ -4,8 +4,8 @@ goal:
   en: Settle one product's visual identity in the single brand record - colour tokens traced to the
     real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - and
     own the product's layout tree in the single shell record - scanned from the frontend's app/
-    directory (or planned before one exists), each visible layout captured per breakpoint and theme
-    with its page slot measured, navigation labels out of the i18n catalogs, product locale, demo
+    directory (or planned before one exists), each visible layout captured at desktop and mobile in the
+    light theme (dark optional) with its page slot measured, navigation labels out of the i18n catalogs, product locale, demo
     personas by role and the brand lockup - so every later drawing is composited into the real chrome
     and every build lands at the real route instead of inventing either.
 nodeKinds: [brand]
@@ -290,8 +290,8 @@ steps:
         destination reaches. Report each finding as it is; never edit the navigation to hide one, and never
         type a label the catalogs do not hold. Decide every layout whose chrome is unknown: visible when it
         draws a rail, bar or frame around its children, passthrough when it renders only document,
-        providers or a guard. Serve the app locally and, for every visible layout at every breakpoint and
-        theme of the tree, render a route directly under it in a real browser with the whole chain above,
+        providers or a guard. Serve the app locally and, for every visible layout at desktop and mobile in
+        the light theme (dark only where the tree already carries it - never demanded), render a route directly under it in a real browser with the whole chain above,
         hide the slot's children and fill the slot element #FF00FF, capture the viewport, and record it
         with `node scripts/work/layout-tree.mjs capture --work .starciwork --node <id> --breakpoint <bp>
         --theme <theme> --file <png> --url <url> --provenance <how> --write`; crop the brand lockup from
@@ -345,7 +345,8 @@ proofs:
     requirement:
       en: "`node scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` exits 0 on the written layout
         tree: it is a work/layout-tree@1 record and done, a re-scan of app/ still matches its source digest,
-        every visible layout has a slot-measured capture at every breakpoint and theme on disk with its
+        every visible layout has a slot-measured capture at desktop and mobile in the light theme (dark
+        optional) on disk with its
         recorded hash, the brand lockup and at least one persona are recorded, every nav item has a
         productLocale default label and a route that lands on a page (a null route is a disabled
         destination). `starci validate --strict` compiles it against work/layout-tree@1."

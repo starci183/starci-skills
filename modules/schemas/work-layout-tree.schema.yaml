@@ -492,7 +492,7 @@ $defs:
           - passthrough
           - unknown
         description: "`visible` - the layout draws chrome (a rail, a top bar) around its children and is
-          captured at every breakpoint and theme. `passthrough` - it renders only document, providers or a
+          captured at desktop and mobile in the light theme (dark optional). `passthrough` - it renders only document, providers or a
           guard, so a page under it is composited as if the layout were not there. `unknown` - scanned and
           not yet decided; never settled."
       state:

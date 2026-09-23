@@ -65,8 +65,9 @@ reads:
         app/ segment - route groups, parallel slots @x, intercepting routes (.)x, loading/error/not-found
         files - each layout with its chrome (visible or passthrough), rev, navigation with labels per
         locale out of the i18n catalogs, and real captures per breakpoint and theme with the page slot
-        rectangle measured; the breakpoints and themes; productLocale; the demo personas by role; the brand
-        lockups; its origin (repository scanned from app/, or planned)."
+        rectangle measured (desktop and mobile in the light theme are required; dark is optional); the
+        breakpoints and themes; productLocale; the demo personas by role; the brand lockups; its origin
+        (repository scanned from app/, or planned)."
   - id: knowledge
     path: knowledge/index.yaml with the applicable UI composition, presentation, proof and family topics
     purpose:
@@ -165,14 +166,19 @@ writes:
       - ui.assets:[{path,role,provenance,generation?,composite?,breakpoint,theme}]
       - assets:[{path}]
     content:
-      en: "Under the owning UI node's assets/directions/: each generated slot-content (or overlay panel)
-        image with its exact sibling prompt, role direction-content, `generation.tool:
-        image_gen.imagegen` and promptPath; and each composite
-        <state>--<presentation>--<breakpoint>--<theme>.png that scripts/work/compose-direction.mjs made from
-        it, role direction, with the `composite` block the script prints - route, surface, presentation
-        (page or overlay), breakpoint, theme, flow state, drawer direction, the exact layout capture or
-        host composite by path and sha256, the rectangle, and the pixel digest. Reference inputs stay under
-        their existing owner and are cited rather than copied."
+      en: "Under the owning UI node's assets/directions/: each generated PART - the page slot content
+        (page, loading, error, not-found), the overlay panel alone (modal, drawer) or the layout's own
+        drawing (layout) - as <state>--<presentation>--<breakpoint>--<theme>.content.png with its exact
+        sibling prompt, role direction-content, `generation.tool: image_gen.imagegen` and promptPath; and
+        each composite <state>--<presentation>--<breakpoint>--<theme>.png that
+        scripts/work/compose-direction.mjs made from it, role direction, with the `composite` block the
+        script prints - route, surface, presentation (page or overlay), breakpoint, theme, flow state,
+        drawer direction, the exact layout capture or host composite by path and sha256, the content part,
+        the rectangle, and the pixel digest. Every drawn state has its part and composite at desktop AND
+        mobile in the light theme; dark is optional. The part is what the owner reviews; the composite is
+        evidence and the reference interface.implement builds and interface.audit compares against, never
+        an owner review image. Reference inputs stay under their existing owner and are cited rather than
+        copied."
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -192,10 +198,13 @@ writes:
     fields: [draws, coverage]
     content:
       en: "The readable mapping of representative directions, prompt artifacts and complete remaining
-        coverage. Each draw binds its image artifact, prompt artifact, screen/state/viewport and
-        `provenance.tool: image_gen.imagegen`. The UI node owns the image and prompt bytes; this
-        file indexes them, and scripts/kernel/serve-ask.mjs reads it when it serves the owner's
-        pick."
+        coverage. Each draw is one state at one breakpoint and theme - desktop and mobile, light, for
+        every drawn state - and binds `part` {path, sha256} (the drawn part the owner reviews), `composite`
+        {path, sha256} (the part placed into the layout chain - evidence for implement and audit only),
+        its prompt artifact, screen/state/breakpoint/viewport/theme and `provenance.tool:
+        image_gen.imagegen`. The UI node owns the image and prompt bytes; this file indexes them.
+        scripts/kernel/serve-ask.mjs and scripts/connectors/telegram-media.mjs read it and show the owner
+        each draw's part (then `content`, then `image` on an older draws.yaml), never the composite."
 steps:
   - reads:
       - target
@@ -226,8 +235,11 @@ steps:
         representative set of critical screens covering the highest-risk layouts, interactions,
         brand moments and component anatomy, never exceeding `params.representativeScreensMax`, and
         derive every remaining screen in the coverage map rather than generating an image for it.
+        Every representative state is drawn at desktop AND mobile in the light theme - a drawer's
+        direction per breakpoint as the record declares it; dark is optional and never demanded.
         Generate `params.candidatesPerScreen` directions per screen; when that is more than one,
-        park an owner ask so the owner picks, keep every candidate as direction and retain the
+        park an owner ask so the owner picks - its question.assets list each candidate's PARTS, desktop
+        and mobile, never a composite - keep every candidate as direction and retain the
         unchosen ones as evidence. Before generation, classify every visible region by realization:
         use `raster-asset` for authored imagery whose identity depends on rich texture,
         illustration, photography or a declared mascot/media master; use `code-native` for layout,
@@ -261,8 +273,10 @@ steps:
         <default>`, writes every UI string in that product locale (never owner_language), and shows the
         data of one persona role the tree records. Invoke built-in `image_gen.imagegen`; a browser
         capture, hand-painted boxes, mockup export or prose-only substitute does not satisfy this
-        operation. Save the returned image as assets/directions/<state>--<presentation>--<breakpoint>--<theme>.content.png
-        beside its exact prompt, then composite it: `node scripts/work/compose-direction.mjs --ui
+        operation. Generate each state once per required breakpoint - desktop and mobile, light theme - at
+        that breakpoint's slot aspect (or panel shape), never one image stretched to both. Save the returned
+        image as assets/directions/<state>--<presentation>--<breakpoint>--<theme>.content.png
+        beside its exact prompt - this part is what the owner reviews - then composite it: `node scripts/work/compose-direction.mjs --ui
         <ui-record-dir> --content <png> --breakpoint <bp> --theme <theme> --state <flow-state>
         [--presentation page|overlay]` places it into the real layout capture (or, for an overlay, over
         the host's page composite at the same breakpoint and theme, dimmed, the panel centred for a
@@ -309,7 +323,10 @@ steps:
     action:
       en: "Validate Work and every artifact hash, run `node scripts/checks/shell-conformance.mjs` on every
         ui record directory written, then report the representative images, prompt artifacts,
-        actual tool provenance and complete coverage map. State the truth boundary: the generated
+        actual tool provenance and complete coverage map. Everything shown to the owner - an ask's
+        question.assets and picks, the report summary's images, the drawing notice - names the drawn
+        parts (desktop and mobile), never a composite; the composites go in files and evidence for
+        interface.implement and interface.audit. State the truth boundary: the generated
         direction is a design input, not exact component/render/API evidence. `interface.implement`
         produces the actual Grammar implementation captures and code checks, and `uat.verify`
         independently exercises the running product in a browser. Stop without frontend code and
@@ -357,9 +374,17 @@ proofs:
         surface, direction, routed and host agree per breakpoint; every layout above the route is settled
         and bound at its current rev; every direction is a composite whose recorded layout capture (or
         host composite) is exactly the current one for its breakpoint and theme and whose pixels re-derive
-        from its recorded inputs; a routed overlay has both presentations; and every content prompt states
-        `Product locale: <default>`. Its output is retained in evidence."
+        from its recorded inputs; a routed overlay has both presentations; every drawn state has composites
+        at desktop and mobile in the light theme (DRAW_MATRIX_INCOMPLETE; dark is optional); and every
+        content prompt states `Product locale: <default>`. Its output is retained in evidence."
     check: scripts/checks/shell-conformance.mjs
+  - id: owner-sees-parts
+    requirement:
+      en: "What the owner reviews for a drawing is the drawn part only - the page slot content, the overlay
+        panel alone (not dimmed over its host), the layout's own drawing - at desktop and mobile. Every
+        owner-facing list (ask question.assets and picks, draws.yaml `part`) names parts; a composite is
+        evidence and the implement/audit reference. scripts/work/direction-part.mjs is the selection
+        serve-ask and telegram-media apply, so an older record naming a composite still shows its part."
   - id: binding
     requirement:
       en: "`starci validate` passes, and `starci validate --strict` passes on the ui record directory

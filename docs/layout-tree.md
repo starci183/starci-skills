@@ -39,7 +39,8 @@ parallel workers from inventing chrome. Its work:
 
 1. Scan (or `convert` a `work/app-shell@1` record).
 2. Decide each `chrome: unknown`.
-3. Capture every visible layout at every breakpoint and theme. For each capture it renders a route under the
+3. Capture every visible layout at desktop and mobile in the light theme (dark is optional - kept where the
+   tree already has it, never demanded). For each capture it renders a route under the
    layout with the whole chain above it, hides the slot's children, fills the slot element with `#FF00FF`, and
    records the capture with `layout-tree.mjs capture`, which measures the slot and bumps the layout rev when the
    capture changed.
@@ -85,6 +86,12 @@ A popover, dropdown, toast or tooltip is not a surface. It is a state in the `ui
   exact layout capture or host composite by path and sha256, the rectangle and the pixel digest).
 - A routed overlay is composed in both presentations: over its dimmed host, and as its full page inside its
   layout chain. A non-routed overlay is composed only over its host.
+- Every drawn state is drawn at desktop and mobile in the light theme (`DRAW_MATRIX_INCOMPLETE`); dark is
+  optional.
+- The owner reviews the part, never the composite (owner ruling 2026-09-24): a page's content, an overlay's
+  panel alone, a layout's own drawing. The composite is evidence and the reference `interface.implement` builds
+  and `interface.audit` compares against. `scripts/work/direction-part.mjs` is the selection `serve-ask` and
+  `telegram-media` apply; it swaps a composite an older record still names for its `.content` part.
 
 ## Checks
 
@@ -94,7 +101,8 @@ prompt text it reads is the `Product locale: <default>` line.
 - **Tree:**
   - the record is a layout tree (a `work/app-shell@1` record is refused as `SHELL_RECORD_LEGACY`);
   - nodes are consistent; lockups and personas are present;
-  - every visible layout is captured with its slot at every breakpoint and theme;
+  - the tree declares desktop, mobile and light (`SHELL_BREAKPOINT_MISSING`, `SHELL_THEME_MISSING`);
+  - every visible layout is captured with its slot at desktop and mobile, light (dark optional);
   - a re-scan of `app/` still matches `source.digest` (`LAYOUT_TREE_STALE`);
   - navigation mismatches are listed as suspects.
 - **ui record:**
@@ -103,7 +111,8 @@ prompt text it reads is the `Product locale: <default>` line.
   - every ancestor layout is settled and bound at its current rev;
   - every composite references the exact current capture for its breakpoint and theme, and re-derives to the
     same pixels (`COMPOSITE_NOT_REPRODUCIBLE`);
-  - a routed overlay has both presentations; a non-routed overlay has no page presentation.
+  - a routed overlay has both presentations; a non-routed overlay has no page presentation;
+  - every drawn state has its composites at desktop and mobile, light (`DRAW_MATRIX_INCOMPLETE`).
 - **implementation:** checked by re-scanning the real `app/`. Every routed ui record it builds has its
   `layout.tsx`, `page.tsx`, loading/error/not-found and, for a routed overlay, the `@slot/(.)segment`
   intercept.

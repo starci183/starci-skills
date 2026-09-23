@@ -34,6 +34,12 @@ export const LEGACY_SHELL_SCHEMA = 'work/app-shell@1';
 export const SCANNER = 'scripts/work/layout-tree.mjs';
 export const SPECIAL_FILES = ['layout', 'template', 'page', 'loading', 'error', 'not-found', 'default', 'route'];
 export const DEFAULT_BREAKPOINTS = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
+// Owner ruling 2026-09-24: every drawing set covers desktop AND mobile in the LIGHT theme, so those are the
+// captures a layout needs to be settled and the draws a drawn state needs. Dark is optional - kept and
+// composed when a tree already captures it, never demanded; another breakpoint the tree declares is optional too.
+export const REQUIRED_BREAKPOINTS = ['desktop', 'mobile'];
+export const REQUIRED_THEMES = ['light'];
+export const THEMES = ['light', 'dark'];
 export const SLOT_KEY = [255, 0, 255];
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage', 'storybook-static', '.turbo']);
@@ -494,11 +500,14 @@ export function loadUiRecords(workRoot) {
   return found;
 }
 
-/** Breakpoint names and themes every visible layout is captured at. */
+/** Breakpoint names and themes the tree declares (what a layout may be captured and a draw composed at). */
 export const matrixOf = (record) => ({
   breakpoints: list(record?.breakpoints).map((b) => b?.name).filter(Boolean),
   themes: list(record?.themes).filter(Boolean),
 });
+
+/** The cells that are required, not just allowed: desktop and mobile, light (REQUIRED_BREAKPOINTS/THEMES). */
+export const requiredMatrixOf = () => ({ breakpoints: [...REQUIRED_BREAKPOINTS], themes: [...REQUIRED_THEMES] });
 
 /**
  * Whether one layout node is settled for drawing under it, with the reasons it is not.
@@ -511,7 +520,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
   if (layout.chrome === 'unknown') reasons.push(`${node.id} chrome is unknown - brand.decide decides visible or passthrough`);
   if (layout.state !== 'done') reasons.push(`${node.id} layout is ${layout.state ?? 'stateless'}, not done`);
   if (layout.chrome === 'visible') {
-    const { breakpoints, themes } = matrixOf(record);
+    const { breakpoints, themes } = requiredMatrixOf(record);
     if (node.origin === 'planned' || (!list(layout.captures).length && layout.design)) {
       if (!layout.design) reasons.push(`${node.id} is planned with no design ui record to draw it`);
       else {
@@ -663,7 +672,7 @@ export function mergeScan(existing, scan, { at = now() } = {}) {
     ...(base?.brand ? { brand: base.brand } : {}),
     ...(base?.personas ? { personas: base.personas } : {}),
     breakpoints: base?.breakpoints ?? DEFAULT_BREAKPOINTS,
-    themes: base?.themes ?? ['light', 'dark'],
+    themes: base?.themes ?? [...REQUIRED_THEMES],
     nodes: ordered,
     ...(base?.review ? { review: base.review } : {}),
     ...(base?.refs ? { refs: base.refs } : {}),
@@ -711,7 +720,7 @@ export function convertAppShell(legacy, scan, { at = now() } = {}) {
   const bps = [];
   for (const s of shots) { const bp = breakpointOfViewport(s.viewport); if (bp && !bps.some((b) => b.name === bp.name)) bps.push(bp); }
   if (bps.length) record.breakpoints = bps;
-  const themes = [...new Set(shots.map((s) => s.theme).filter((t) => t === 'light' || t === 'dark'))];
+  const themes = [...new Set([...REQUIRED_THEMES, ...shots.map((s) => s.theme).filter((t) => THEMES.includes(t))])];
   if (themes.length) record.themes = themes;
   // The layout the legacy record named is the visible chrome: by its route-layout file, else by component.
   const legacyFiles = [legacy?.source?.layout, ...list(legacy?.source?.files)].filter(Boolean);
@@ -724,7 +733,7 @@ export function convertAppShell(legacy, scan, { at = now() } = {}) {
     shellNode.layout.blockers = [
       ...shots.map((s) => `Legacy capture ${s.path} (${s.viewport ?? 'viewport unrecorded'}, ${s.theme ?? 'theme unrecorded'}) has no measured page slot; re-capture with the slot keyed #FF00FF and record it with \`node scripts/work/layout-tree.mjs capture\`.`),
     ];
-    if (!shellNode.layout.blockers.length) shellNode.layout.blockers = ['No capture yet; brand.decide captures this layout at every breakpoint and theme.'];
+    if (!shellNode.layout.blockers.length) shellNode.layout.blockers = ['No capture yet; brand.decide captures this layout at desktop and mobile in the light theme (dark optional).'];
     notes.push(`${shellNode.id}: the legacy shell's layout; chrome visible, awaiting slot-keyed captures`);
     const legacyNav = list(legacy?.nav?.items).map((i) => i?.key).join(',');
     const derived = list(shellNode.layout.nav?.items).map((i) => i.key).join(',');
@@ -734,7 +743,7 @@ export function convertAppShell(legacy, scan, { at = now() } = {}) {
   record.rev = (legacy?.rev ?? 0) + 1;
   record.refs = list(legacy?.refs).length ? legacy.refs : undefined;
   if (!record.refs) delete record.refs;
-  record.blockers = ['Converted from work/app-shell@1: every visible layout needs slot-keyed captures at each breakpoint and theme, and every layout with chrome unknown needs brand.decide to decide it, before anything draws under it.'];
+  record.blockers = ['Converted from work/app-shell@1: every visible layout needs slot-keyed captures at desktop and mobile in the light theme (dark optional), and every layout with chrome unknown needs brand.decide to decide it, before anything draws under it.'];
   record.change = { rev: record.rev, kind: 'breaking', at, reason: `Converted from work/app-shell@1 rev ${legacy?.rev ?? '?'} into the layout tree scanned from ${record.app.appDir}.` };
   return { record, notes };
 }
@@ -744,7 +753,11 @@ export function addCapture(record, shellDir, { node: id, breakpoint, theme, file
   const node = nodeById(record, id);
   if (!node?.layout) throw new Error(`${id}: not a layout node of the tree`);
   if (!matrixOf(record).breakpoints.includes(breakpoint)) throw new Error(`${breakpoint}: not one of the tree's breakpoints`);
-  if (!matrixOf(record).themes.includes(theme)) throw new Error(`${theme}: not one of the tree's themes`);
+  // An optional theme (dark) joins the tree's themes with its first capture; it is never required.
+  if (!matrixOf(record).themes.includes(theme)) {
+    if (!THEMES.includes(theme)) throw new Error(`${theme}: not a theme (${THEMES.join(', ')})`);
+    record.themes = [...matrixOf(record).themes, theme];
+  }
   const bytes = fs.readFileSync(file);
   const image = decodePng(bytes);
   const key = keyRect(image, SLOT_KEY);
@@ -845,7 +858,7 @@ export function layoutTreeMain(argv = []) {
     const save = (record) => { fs.mkdirSync(shellDir, { recursive: true }); fs.writeFileSync(shellFileOf(workRoot), stringifyYaml(record, { lineWidth: 110 })); };
     if (command === 'capture' || command === 'plan') {
       if (!isLayoutTree(existing) && command === 'capture') return { exitCode: 1, text: 'capture needs a work/layout-tree@1 record - scan or convert first\n' };
-      const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', app: { root: '.', appDir: 'app', framework: 'next-app-router' }, productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: ['light', 'dark'], nodes: [] };
+      const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', app: { root: '.', appDir: 'app', framework: 'next-app-router' }, productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: [...REQUIRED_THEMES], nodes: [] };
       let result;
       if (command === 'capture') {
         result = addCapture(record, shellDir, { node: flag(args, '--node'), breakpoint: flag(args, '--breakpoint'), theme: flag(args, '--theme'), file: flag(args, '--file'), url: flag(args, '--url'), provenance: flag(args, '--provenance'), locale: flag(args, '--locale') });

@@ -39,6 +39,18 @@ sections:
         label or a persona the tree does not have reports APP_SHELL_UNSETTLED or LAYOUT_ANCESTOR_UNSETTLED as
         a brand-gap; it does not invent one, because parallel workers inventing independently is how one
         product ends up with three logos."
+      - "Every drawing set covers desktop AND mobile in the light theme - each drawn state has its part at
+        both, a drawer anchored per breakpoint as its record declares. Dark is optional: never demanded of a
+        layout capture or a draw, kept when a tree already has it. Layouts are captured at the same
+        required matrix."
+      - "The owner reviews the drawn PART, never the composite: a page, loading, error or not-found surface
+        shows its page slot content (<state>--page--<bp>--<theme>.content.png, role direction-content); a
+        modal or drawer shows the panel alone, not dimmed over its host; a planned layout shows its own
+        drawing and a repository layout its own capture. The composite
+        (<state>--<presentation>--<bp>--<theme>.png) stays evidence and the reference interface.implement
+        builds and interface.audit compares against. Every owner ask, handover package and drawing notice
+        lists parts; scripts/work/direction-part.mjs swaps a composite an older record still names for its
+        part."
   - title: Expandable business tree and local workflow tracking
     blocks:
       - Each record folder has one index.yaml record; index is the record, not an extra directory

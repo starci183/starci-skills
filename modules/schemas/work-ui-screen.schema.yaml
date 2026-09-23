@@ -282,9 +282,9 @@ properties:
             uniqueItems: true
             items:
               $ref: "#/$defs/theme"
-            description: The themes this screen claims to cover. A product with a dark theme whose every
-              direction is light has designed half of itself, and the absence is only visible if the claim
-              is written down.
+            description: The themes this screen claims to cover. Light is required of every drawing set
+              (owner ruling 2026-09-24, beside desktop and mobile); dark is optional, and a claimed theme
+              with no shot bound to it is only visible as an absence if the claim is written down.
           map:
             type: array
             minItems: 1
@@ -1516,9 +1516,13 @@ $defs:
           description: The file's path relative to this record's own directory.
         role:
           $ref: "#/$defs/slug"
-          description: What the file is - a direction, the exact prompt beside it, an input a later
+          description: "What the file is - a direction, the exact prompt beside it, an input a later
             iteration referenced. The role is what a checker pairs files by, rather than a filename
-            convention nobody enforces.
+            convention nobody enforces. Two roles split a composited direction: `direction-content` is the
+            drawn PART - the page slot content, the overlay panel alone, a layout's own drawing - and is
+            what the owner reviews; `direction` with a `composite` block is that part placed into the
+            real layout chain, evidence and the implement/audit reference, never an owner review image. A
+            `direction` without a composite (a record drawn before the compositor) is shown as it is."
         sha256:
           $ref: "#/$defs/sha256"
           description: The file's digest, so the record is a statement about specific bytes and a replaced
