@@ -300,6 +300,7 @@ const observeOperationWorker = (job, now = Date.now()) => {
     }
     const liveness = !shown?.ok ? 'unknown'
       : !connected || !writable ? 'disconnected'
+      : screenState === 'wedged' ? 'wedged'
       : screenState === 'active' ? 'active'
       : screenState === 'turn-idle' ? 'turn-idle'
       : screenState === 'interactive-gate' ? 'interactive-gate'
@@ -424,7 +425,7 @@ function cmdNudge(ledger, args) {
 // 'op-observed' event (handle, turnState, screen byte length — the screen
 // itself stays out of the ledger).
 const OBSERVE_SCREEN_LINES = 80;
-const OBSERVE_TURN_STATES = { active: 'active', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle' };
+const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle' };
 function cmdObserve(ledger, args) {
   const db = ledger.db, jobId = args.job, now = Date.now();
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
@@ -610,7 +611,7 @@ function cmdSurvey(ledger, args) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'worker-wedged', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -875,9 +876,13 @@ function cmdStatus(ledger, args) {
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
+  // A worker whose turn has run past WEDGE_MINUTES on one shell command that
+  // still shows no output (terminal-liveness.mjs) is stuck, not busy.
+  const wedgedWorkers = workers.filter((worker) => worker.liveness === 'wedged');
   const frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
+    : wedgedWorkers.length > 0 ? 'worker-wedged'
     : openOperations > 0 ? 'engaged'
     // Nothing open, but a question is with the owner: the workflow waits on
     // them, not on the Kernel, so nothing should wake it until the answer.
@@ -898,9 +903,12 @@ function cmdStatus(ledger, args) {
     staleOperations,
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
+    wedgedJobs: wedgedWorkers.map((worker) => worker.jobId),
     queued,
     queuedCauses,
-    reason: frontierState === 'awaiting-owner'
+    reason: frontierState === 'worker-wedged'
+      ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
+      : frontierState === 'awaiting-owner'
       ? `no operation is open and the owner holds ${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')}); the answer wakes the Kernel`
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'

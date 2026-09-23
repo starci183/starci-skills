@@ -73,6 +73,24 @@ test('a Kernel yield summary that says "Running now:" is turn-idle, not active',
   assert.equal(classifyAgentScreen('• Running canonical status\n› Ask Codex to do anything').state,'active');
 });
 
+// A Collab worker sat 60 minutes on `... | xargs grep` reading stdin; the
+// moving spinner read as active and nothing flagged it.
+test('a turn past the wedge threshold on a command with no output is wedged, a long busy turn is not',()=>{
+  const wedged=[
+    ' ○ Running command',
+    ' │ $ grep -rln "work/implementation@1" .starciwork/ | head -10 | xargs grep -l "state:"',
+    ' │ No output yet (still running)',
+    '⠙⠀ Thinking · 60m 34s (esc twice to interrupt)',
+    '❭ Guide Devin while it works',
+  ].join('\n');
+  const v=classifyAgentScreen(wedged);
+  assert.equal(v.state,'wedged');
+  assert.equal(v.minutes,60);
+  assert.equal(classifyAgentScreen(wedged.replace('60m 34s','12m 3s')).state,'active','a young turn is still working');
+  assert.equal(classifyAgentScreen(wedged.replace(' │ No output yet (still running)\n','')).state,'active','a long turn that produces output is working');
+  assert.equal(classifyAgentScreen('• Working (1h 5m · esc to interrupt)\n│ No output yet\n› Ask Codex').state,'wedged','hours count too');
+});
+
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
   assert.match(prompt,/external watchdog owns the 5-minute cadence/i);

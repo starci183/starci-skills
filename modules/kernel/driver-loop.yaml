@@ -241,6 +241,9 @@ tick:
       call `api nudge` for each exact id in `frontier.nudgeReadyJobs` before
       applying any age/wedge threshold. `orphaned-frontier` is likewise an
       immediate technical plan/repair transition, not a reason to yield.
+      `worker-wedged` is not a wait either: api observe each id in
+      `frontier.wedgedJobs` once, then api nudge it to interrupt the stuck
+      command, or reconcile and re-dispatch the attempt.
       `awaiting-owner` (no open operation, at least one unanswered ask) is a
       legitimate wait: yield naming the pending ask dispatch ids; the
       answer's ask-answered wake brings you back.

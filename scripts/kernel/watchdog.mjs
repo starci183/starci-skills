@@ -162,7 +162,7 @@ export async function watchdogTick() {
   };
   return {
     ok: true, workflowId, phase, terminal,
-    action: classified.state === 'active' ? 'active' : 'observed',
+    action: classified.state === 'active' ? 'active' : classified.state === 'wedged' ? 'kernel-wedged' : 'observed',
     state: classified.state, outputAgeMs,
   };
 }

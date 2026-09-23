@@ -17,6 +17,8 @@ const INTERACTIVE_GATES = [
   { gate: 'tool-approval', pattern: /approve once|permission (?:required|request)|allow `[^`]+` commands|confirm\s*[·•]/i },
 ];
 
+export const WEDGE_MINUTES = 30;
+
 export function classifyAgentScreen(screen) {
   const lines = String(screen ?? '').split(/\r?\n/).filter(Boolean);
   const recentLines = lines.slice(-14);
@@ -44,7 +46,15 @@ export function classifyAgentScreen(screen) {
   const gate = INTERACTIVE_GATES.find(({ pattern }) => pattern.test(topLevelRecent));
   if (gate) return { state: 'interactive-gate', gate: gate.gate, recent };
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
-  if (active.test(topLevelRecent)) return { state: 'active', recent };
+  if (active.test(topLevelRecent)) {
+    // A turn whose spinner has run past WEDGE_MINUTES while its one shell
+    // command still shows no output is stuck, not working: a Collab worker sat
+    // 60 minutes on `... | xargs grep` reading stdin, and "active" hid it.
+    const spinner = /(?:Working|Thinking|Running tools)\b[^\n]*/.exec(topLevelRecent)?.[0] ?? '';
+    const minutes = Number(/(\d+)h/.exec(spinner)?.[1] ?? 0) * 60 + Number(/(\d+)m\b/.exec(spinner)?.[1] ?? 0);
+    if (minutes >= WEDGE_MINUTES && /No output yet/i.test(recent)) return { state: 'wedged', minutes, recent };
+    return { state: 'active', recent };
+  }
   if (readyPrompt.test(topLevelRecent)) return { state: 'turn-idle', recent };
   return { state: 'unknown', recent };
 }
