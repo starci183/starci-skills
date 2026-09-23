@@ -35,7 +35,7 @@ reads:
       en: The settled design for business-specific layout and the dependencies it owns (database, cache,
         vector store, auth) beyond the baseline health surface. A baseline-only scaffold reads none.
   - id: business
-    path: .starciwork/features/<feature>/{br,ac,fr,nfr}/**/index.yaml
+    path: .starciwork/features/<feature>/{br,fr,nfr}/**/index.yaml
     purpose:
       en: Intent governs what the skeleton proves.
   - id: repo

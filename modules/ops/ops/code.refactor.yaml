@@ -28,7 +28,7 @@ reads:
         file and source paths match the selected proposal. Do not scan .starciwork for alternatives.
         When any binding is absent or ambiguous, report DECLARED_DEPENDENCY_UNMET."
   - id: business
-    path: .starciwork/features/<feature>/{br,ac,fr,nfr,data,journey,decision}/**/index.yaml
+    path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
       en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
         inputs in the selected .starciwork graph.

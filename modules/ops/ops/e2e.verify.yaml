@@ -23,7 +23,7 @@ reads:
         and validator freshness. This consumer op requires its target node to exist. An absent
         target is a scope/graph gap; report it and propose a separately selected scope op.
   - id: business
-    path: .starciwork/features/<feature>/{br,ac,fr,nfr,data,journey,decision}/**/index.yaml
+    path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
       en: Read the accepted requirements, rules, denials and acceptance IDs declared as relevant inputs in
         the selected .starciwork graph. Intent governs the expected observable effect; current

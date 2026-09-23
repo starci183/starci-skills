@@ -137,7 +137,12 @@ shape:
     disposability and a custody ref into the repository's sealed secrets (never a secret value
     itself); a fixture resource names its schema/seed files, preconditions and run-owned namespace.
     A uat-flow's environment and fixtures[] fields, and its accounts.yaml's accounts[].identity
-    field, are edges into this family and must resolve to a resource.yaml of the matching kind."
+    field, are edges into this family and must resolve to a resource.yaml of the matching kind.
+    A repository is not a resource: its portable identity is workspace.yaml repositories[] ({role,
+    name}) and its checkout and remote are the host project binding (starci/workspace-binding@1),
+    so there is no _resources/repositories/ record; workspace.manage lists a bound repository there
+    and keeps observed remote/HEAD/dirty state in its evidence bundle.
+    tests/op-work-paths.spec.mjs holds every op manifest's .starciwork paths to this shape."
 rules:
   - SRS and SDS are the upstream source of truth for every feature and are independent of source
     code. SRS owns required behavior and SDS owns target technical design. UI, implementation and
