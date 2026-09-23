@@ -17,7 +17,8 @@ purpose: |
   The live workflows are trials that exercise the runtime toward .claude 1.0.0, not work the
   supervisor exists to keep running; a one-off manual repair that the next workflow would need
   again is not a fix. Defects are raised the moment the ledger or the host shows them (every
-  cycle reads WATCHDOG-DEAD, RUNTIME and LAUNCH-FAIL from scripts/supervisor/poll.mjs, the Orca
+  cycle reads WATCHDOG-DEAD, RUNTIME, LAUNCH-FAIL, STALLED, STALE-GATE and STALE-WAIT from
+  scripts/supervisor/poll.mjs, the Orca
   tree and repeated verdict patterns), never when the owner asks, and aspects nothing has flagged
   yet are audited on purpose. Exit criterion: workflows that finish on their own, with no
   supervisor instruction, are the evidence that retires the supervisor.
@@ -74,6 +75,48 @@ loop:
         (its `health` names the manager, cloudflared, gateway reachability, extra managers and `problems`);
         open new direction images and check them against the current
         contracts (concepts.yaml rules, full-page chrome, concrete data, ui.flow coverage)
+    - step: stall
+      do: |
+        Liveness is not progress. A live kernel with a live watchdog idle-waiting every tick can
+        still sit for hours behind a gate whose reason is gone (2026-09-24: nivo Collab idle ~2 h
+        behind owner-gate inc-48bc556d89a6 after the shell record it waited for had landed and the
+        peer's ask had closed; no heads-up reached it). scripts/supervisor/stall.mjs classifies
+        progress from the ledger and the digest prints one line per finding:
+          STALLED <wf> idle <min>m: <reason>   no progress event (dispatch, report, check, settle,
+                     plan, enqueue, incident-resolve, ask-answered) for more than
+                     config.yaml supervisor.stallMinutes (default 30), no worker mid-turn, and the
+                     frontier (api status) gives the Kernel nothing to do - or it is actionable
+                     and the Kernel still did not move (a wake that is not landing). The reason
+                     names the frontier state, the queued causes and the gates holding them.
+          STALE-GATE <wf> <incident> [<kind>]   an open owner-gate / owner-gate-pending incident
+                     past a 10-minute grace whose reason is gone: a .starciwork/... record it
+                     names now exists in a landed state and was written after the gate, a peer it
+                     names sent a message after it, every job it names settled, and/or no owner
+                     ask is open in its workflow or the peer it names (while no record it names
+                     is still absent or unsettled).
+          GATE <wf> <incident> ... justified    the gate still has its reason (an open ask it
+                     names, a record still absent): printed, never alerted.
+          STALE-WAIT <wf> <job> ...             a queued job past stallMinutes whose blocker
+                     (dependency-failed seam, --after job, earlier leg) already settled.
+        Rules:
+          - A STALE-GATE is resolved by its owning Kernel, never by the supervisor: tell that
+            Kernel, with the evidence from the line (the landed record and its state, the peer
+            message, the closed ask), to resolve its incident (api incident --resolve) and
+            release the held jobs. Typing into a kernel follows guardrail notice-delivery-proven.
+          - STALLED with a justified owner gate is the owner's: surface the gate and its ask to
+            the owner verbatim (owner-word), never answer it.
+          - STALLED with an actionable frontier is a runtime defect (the wake did not land):
+            wake the kernel once, then treat a repeat as a contract-gap.
+          - STALE-WAIT goes to its Kernel: retry the blocker, re-point or drop the job.
+        This check does not depend on the chat: scripts/kernel/resume-all.mjs (the
+        StarCi-Resume-Every10m task) launches scripts/supervisor/stall-alert.mjs detached every
+        pass, which runs the same classification over config.yaml supervisor.repos and, for each
+        NEW STALLED / STALE-GATE / STALE-WAIT (deduped by key in <state>/stall-alerts.json, at most
+        once per finding per hour per channel), appends one "STALL-ALERT ..." message to the
+        supervisor channel inbox (id 'main') - so the Monitor on `channel.mjs wait --id main`
+        wakes the supervisor even while its own cron ticks starve - and sends the owner one short
+        Telegram message in config.yaml language. An inbox STALL-ALERT is handled like any
+        finding: act by the rules above, then report.
     - step: form
       do: |
         The owner reads the Orca sidebar, so the form of the tree is checked every cycle, not
@@ -95,6 +138,10 @@ loop:
         contract-gap    → the contract allowed or caused the defect → patch .claude
         op-defect       → contract is right, the op just failed → let the kernel retry/escalate
         owner-gate      → ask/ask-review pending → surface to the owner verbatim, never answer it
+        stale-gate      → STALE-GATE / STALE-WAIT → tell the owning kernel, with the evidence, to
+                          resolve its incident or move the job (step stall)
+        stalled         → STALLED → by its reason: a justified owner gate goes to the owner, an
+                          actionable frontier is a wake defect (step stall)
         kernel-dead     → terminal unreachable → start-workflow --goal replaces it (attempt+1)
         noise           → nothing actionable → report briefly and sleep
     - step: patch

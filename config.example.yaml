@@ -38,7 +38,9 @@ parallel: {gear: 1}
 # resumes after a reboot (one watchdog per running workflow), relative to the
 # source root (the directory holding this skill) or absolute. Only these are
 # resumed - nothing is discovered - and [] resumes none; --repo on the command
-# line adds more.
+# line adds more. stallMinutes (optional, integer >= 5, default 30): a running
+# workflow with no progress for this long is STALLED (scripts/supervisor/stall.mjs);
+# the same repos are checked every 10 minutes by scripts/supervisor/stall-alert.mjs.
 supervisor:
   pollIntervalMs: null
   repos: []

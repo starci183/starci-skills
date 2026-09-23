@@ -1,0 +1,321 @@
+// stall.mjs — progress, not liveness: which running workflow has stopped
+// moving, and whether the gate holding it still has a reason to hold.
+//
+// Incident (2026-09-24): nivo Collab sat idle ~2 hours. Its three queued
+// interface.implement jobs were held by owner-gate inc-48bc556d89a6 ("resolve
+// when the shell record .starciwork/shell/index.yaml exists (peer heads-up)").
+// The record was written done at ~02:20 and the peer's ask had closed, but no
+// heads-up reached Collab. Kernel alive, watchdog alive (idle-waiting every
+// tick), and the supervisor digest printed nothing: it checked liveness only.
+//
+// This module is a read-only projection over one or more ledgers (every read
+// goes through the handle it is given; open it with inspectLedger). The
+// frontier (actionable, queuedBecause, worker liveness) is `api status --json`,
+// the same projection the watchdog reads each tick; it is asked for only when a
+// workflow has been idle past the threshold or holds a queued job that old.
+//
+// Findings, one line each:
+//   STALLED <wf> idle <min>m: <reason>             no progress for > stallMinutes and the frontier
+//                                                  gives the Kernel nothing to do (or it is actionable
+//                                                  and the Kernel still did not move)
+//   STALE-GATE <wf> <incident> [<kind>] ...        an owner gate whose reason is gone: no owner ask
+//                                                  open here or in the peer it names, a path it waits
+//                                                  for now exists, a peer message arrived after it,
+//                                                  or the jobs it names settled
+//   GATE <wf> <incident> [<kind>] ... justified    the gate still has its reason (not alerted)
+//   STALE-WAIT <wf> <job> (<op>) <cause>: ...      a queued job waiting on a blocker that settled
+//
+// modules/supervisor/supervise.yaml (step stall) is the contract for what the
+// supervisor does with each.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { loadConfig } from '../../engine/config.mjs';
+
+const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
+
+export const DEFAULT_STALL_MINUTES = 30;
+/** A gate younger than this is not judged: the Kernel may still be parking the ask that justifies it. */
+export const GATE_GRACE_MS = 10 * 60_000;
+/** Ledger events that are the workflow moving (not the Kernel or the watchdog merely looking at it). */
+export const PROGRESS_KINDS = ['op-dispatched', 'report-filed', 'report-consumed', 'checks-recorded', 'op-settled', 'plan-derived',
+  'job-enqueued', 'incident-resolved', 'ask-answered', 'dispatch-reconciled', 'phase-transition', 'run-created', 'goal-defined'];
+/** Incident kinds that hold queued jobs (scripts/kernel/api.mjs OWNER_GATE_KINDS). */
+export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending'];
+/** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
+export const WORKING_LIVENESS = ['active', 'active-unclassified'];
+const SETTLED = ['succeeded', 'failed', 'cancelled'];
+
+/** The owner's threshold: config.yaml supervisor.stallMinutes, else DEFAULT_STALL_MINUTES. */
+export function stallMinutesOf(config = undefined) {
+  let cfg = config;
+  if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
+  const n = Number(cfg?.supervisor?.stallMinutes);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_STALL_MINUTES;
+}
+
+const parse = (text, fallback = {}) => { try { return JSON.parse(text) ?? fallback; } catch { return fallback; } };
+const clip = (text, n) => { const s = String(text ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
+const minutes = (ms) => Math.max(0, Math.round(ms / 60_000));
+export const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+/* ------------------------------------------------------------ ledger projections */
+
+export const runningWorkflows = (db) => db.prepare(
+  "SELECT workflow_id, created_at, updated_at FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY workflow_id").all();
+
+/** The workflow's last progress: {at, kind}. Falls back to the workflow row when nothing moved yet. */
+export function lastProgress(db, workflowId) {
+  const marks = PROGRESS_KINDS.map(() => '?').join(',');
+  const event = db.prepare(`SELECT kind, created_at FROM events WHERE workflow_id=? AND kind IN (${marks}) ORDER BY created_at DESC, seq DESC LIMIT 1`)
+    .get(workflowId, ...PROGRESS_KINDS);
+  const report = db.prepare('SELECT MAX(created_at) at FROM reports WHERE workflow_id=?').get(workflowId)?.at ?? null;
+  const row = db.prepare('SELECT created_at FROM workflows WHERE workflow_id=?').get(workflowId);
+  const candidates = [
+    event ? { at: event.created_at, kind: event.kind } : null,
+    report ? { at: report, kind: 'report' } : null,
+    row ? { at: row.created_at, kind: 'workflow-created' } : null,
+  ].filter(Boolean);
+  return candidates.sort((a, b) => b.at - a.at)[0] ?? { at: 0, kind: 'none' };
+}
+
+/** Open owner-gate incidents with the jobs/ops they hold and when they were raised. */
+export function ownerGates(db, workflowId) {
+  return db.prepare("SELECT incident_id, op_id, last_progress, updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
+    .map((row) => {
+      const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
+      if (!OWNER_GATE_KINDS.includes(kind)) return null;
+      const raised = db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1")
+        .get(workflowId, row.incident_id);
+      const payload = parse(raised?.payload_json);
+      const holds = Array.isArray(payload.holds) && payload.holds.length ? payload.holds : [row.op_id].filter(Boolean);
+      return { incidentId: row.incident_id, kind, text: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), raisedAt: raised?.created_at ?? row.updated_at, holds };
+    })
+    .filter(Boolean);
+}
+
+/** Queued jobs of one workflow. */
+export const queuedJobs = (db, workflowId) => db.prepare(
+  "SELECT job_id, op_id, status, payload_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='queued' ORDER BY created_at, job_id").all(workflowId);
+
+export const heldBy = (gate, job) => gate.holds.includes(job.job_id) || (job.op_id && gate.holds.includes(job.op_id));
+
+/**
+ * Owner asks still open in one workflow: an `ask` report nobody answered, and not retired (a
+ * supersede closes it unless the ask was served or notified again afterwards) — the same rule
+ * poll.mjs openAsks applies, without the URL probe.
+ */
+export const openAskDispatches = (db, workflowId) => db.prepare(
+  `SELECT r.dispatch_id, r.created_at FROM reports r
+    WHERE r.workflow_id=? AND r.outcome='ask' AND NOT EXISTS (
+      SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id AND e.kind='ask-answered'
+        AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
+    AND NOT EXISTS (
+      SELECT 1 FROM events s WHERE s.workflow_id=r.workflow_id AND s.kind='ask-superseded'
+        AND json_extract(s.payload_json,'$.dispatchId')=r.dispatch_id
+        AND NOT EXISTS (SELECT 1 FROM events v WHERE v.workflow_id=r.workflow_id AND v.kind IN ('ask-serving','ask-notified')
+          AND json_extract(v.payload_json,'$.dispatchId')=r.dispatch_id AND v.seq > s.seq))
+    ORDER BY r.report_id`).all(workflowId);
+
+/* ------------------------------------------------------------ what a gate's text names */
+
+/** `.starciwork/...` paths an incident names, trailing punctuation dropped. */
+export const namedPaths = (text) => [...new Set((String(text ?? '').match(/\.starciwork\/[A-Za-z0-9._@\-/]+/g) ?? [])
+  .map((p) => p.replace(/[./-]+$/, '')).filter((p) => p.length > '.starciwork/'.length))];
+/** A gate that waits on an owner ask or decision (only such a gate is released by the ask closing). */
+export const ASK_GATE = /\bask\b|\bowner(?:'s)? (?:decision|answer|choice|approval|ruling)\b|\bdecision pending\b/i;
+/** Workflow ids an incident names. */
+export const namedWorkflows = (text) => [...new Set(String(text ?? '').match(/\bwf-[a-z0-9][a-z0-9-]*[a-z0-9]\b/gi) ?? [])];
+/** Job ids an incident names (op-<op>-<10 hex>). */
+export const namedJobs = (text) => [...new Set(String(text ?? '').match(/\bop-[a-z0-9.-]+-[0-9a-f]{10}\b/gi) ?? [])];
+
+/** Record states that mean the thing a gate waited for has landed. */
+export const LANDED_STATES = ['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready'];
+
+/**
+ * What a path an incident names looks like now, against the time the gate was raised:
+ * {path, exists, landed, waiting, at, created, state}. `landed`: it exists, was created or written
+ * after the gate, and its record state (a yaml `state:`/`status:` line, when it has one) is a
+ * landed state - the condition the gate waited for may be met. `waiting`: it is absent, or its
+ * record state is not landed yet - the gate still has something to wait for. A path that already
+ * existed unchanged is neither.
+ */
+export function pathEvidence(repo, rel, raisedAt) {
+  const none = { path: rel, exists: false, landed: false, waiting: true, at: null, born: null, written: null, created: false, state: null };
+  if (!repo) return { ...none, waiting: false };
+  let file = path.join(repo, rel);
+  let st;
+  try { st = fs.statSync(file); } catch { return none; }
+  if (st.isDirectory()) {
+    const index = path.join(file, 'index.yaml');
+    try { st = fs.statSync(index); file = index; } catch { /* a bare directory */ }
+  }
+  let state = null;
+  if (st.isFile() && /\.ya?ml$/i.test(file) && st.size < 2_000_000) {
+    try { state = /^(?:state|status):\s*['"]?([A-Za-z0-9_-]+)/m.exec(fs.readFileSync(file, 'utf8'))?.[1] ?? null; } catch { /* unreadable */ }
+  }
+  const born = Number.isFinite(st.birthtimeMs) && st.birthtimeMs > 0 ? st.birthtimeMs : st.mtimeMs;
+  const at = Math.max(born, st.mtimeMs);
+  const settledState = !state || LANDED_STATES.includes(state.toLowerCase());
+  return { path: rel, exists: true, landed: at > raisedAt && settledState, waiting: !settledState, at, born, written: st.mtimeMs, created: born > raisedAt, state };
+}
+
+/** Peer messages delivered to `workflowId` after `since`, from one of `peers` (ledger inbox rows). */
+export const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? db.prepare(
+  "SELECT key, payload_json, status, created_at, applied_at FROM inbox WHERE workflow_id=? AND kind='peer-message' AND created_at>? ORDER BY inbox_id").all(workflowId, since)
+  .map((row) => ({ key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, ...(({ from, kind, subject }) => ({ from, kind, subject }))(parse(row.payload_json)) }))
+  .filter((m) => peers.includes(m.from)) : []);
+
+/**
+ * Is one owner gate still justified? {stale, young, reasons, asks, waits, peers}. Past the grace
+ * window a gate is stale when
+ *   (b) its condition shows up: a path it names landed after it (pathEvidence), a named peer's
+ *       message reached this workflow after it, or every job it names (outside what it holds)
+ *       settled after it (a job that settled before the gate is its cause, not its release); and/or
+ *   (a) it waits on an owner ask (its text names an ask or an owner decision) and no owner ask is
+ *       open in its workflow or any peer workflow it names, while no path it names is still
+ *       absent or unsettled (a gate that waits for a record nobody wrote yet is waiting on that
+ *       record, not on an ask). A peer dependency or a supervisor hold names no ask, so a closed
+ *       ask is no evidence against it.
+ */
+export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now = Date.now(), graceMs = GATE_GRACE_MS }) {
+  const peers = namedWorkflows(gate.text).filter((id) => id !== workflowId);
+  const asks = [];
+  for (const wf of [workflowId, ...peers]) {
+    const peerDb = wf === workflowId ? db : dbOf(wf);
+    if (!peerDb) continue;
+    try { for (const a of openAskDispatches(peerDb, wf)) asks.push({ workflowId: wf, dispatchId: a.dispatch_id }); } catch { /* not in that ledger */ }
+  }
+  const reasons = [], waits = [];
+  for (const rel of namedPaths(gate.text)) {
+    const ev = pathEvidence(repo, rel, gate.raisedAt);
+    if (ev.landed) reasons.push(`${ev.path} exists${ev.state ? ` (${ev.state})` : ''}, ${ev.created ? `created ${clock(ev.born)}${ev.written - ev.born > 60_000 ? `, written ${clock(ev.written)}` : ''}` : `written ${clock(ev.written)}`} after the gate (${clock(gate.raisedAt)})`);
+    else if (ev.waiting) waits.push(`${ev.path} ${ev.exists ? `is ${ev.state}` : 'is absent'}`);
+  }
+  for (const m of peerDeliveries(db, workflowId, peers, gate.raisedAt)) {
+    reasons.push(`peer ${m.kind ?? 'message'} ${m.key} from ${m.from} arrived ${clock(m.at)}${m.status === 'applied' ? ' and was acked' : ' (pending)'}: ${clip(m.subject, 60)}`);
+  }
+  const jobs = namedJobs(gate.text).filter((id) => !gate.holds.includes(id))
+    .map((id) => { for (const wf of [workflowId, ...peers]) { const j = (wf === workflowId ? db : dbOf(wf))?.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(id); if (j) return j; } return null; })
+    .filter(Boolean);
+  if (jobs.length && jobs.every((j) => SETTLED.includes(j.status) && j.updated_at > gate.raisedAt)) {
+    reasons.push(`named job(s) settled after the gate: ${jobs.map((j) => `${j.job_id} ${j.status} ${clock(j.updated_at)}`).join(', ')}`);
+  }
+  if (ASK_GATE.test(gate.text) && !asks.length && (reasons.length || !waits.length)) reasons.unshift(`no owner ask open in ${[workflowId, ...peers].join(', ')}`);
+  const young = now - gate.raisedAt < graceMs;
+  return { stale: !young && reasons.length > 0, young, reasons, asks, waits, peers };
+}
+
+/* ------------------------------------------------------------ the frontier */
+
+const jsonFrom = (stdout) => {
+  const text = String(stdout ?? '').trim();
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { /* fall through */ }
+  const first = text.indexOf('{'), last = text.lastIndexOf('}');
+  if (first >= 0 && last > first) { try { return JSON.parse(text.slice(first, last + 1)); } catch { /* not json */ } }
+  return null;
+};
+
+/**
+ * `api status --json` for one workflow — the frontier the watchdog reads every tick (a read
+ * projection: it writes nothing). {ok, frontier, workers} or {ok:false, error}.
+ */
+export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
+  const env = { ...process.env };
+  delete env.ORCA_TERMINAL_HANDLE; delete env.STARCI_ROLE; delete env.STARCI_OP_JOB;
+  const r = spawnSync(process.execPath, [API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
+    { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env });
+  const value = jsonFrom(r.stdout);
+  if (r.status !== 0 || !value?.ok) return { ok: false, error: clip(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
+  return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null };
+}
+
+/* ------------------------------------------------------------ the classification */
+
+const gateLabel = (gate, held) => `${gate.incidentId} [${gate.kind}] holds ${held} queued job(s)`;
+
+/**
+ * Every stall finding of one ledger. `ledgers` is every ledger in view ([{repo, db}], this one
+ * included) so a gate that names a peer in another ledger can see that peer's asks. `frontierOf`
+ * is injectable (specs); it is called only for a workflow idle past the threshold or holding a
+ * queued job that old. Returns [{type, key, workflowId, repo, line, alert, ...}].
+ */
+export function stallFindings(db, {
+  repo = null, ledgers = [], now = Date.now(), stallMinutes = stallMinutesOf(), frontierOf = apiFrontier,
+  wanted = new Set(), graceMs = GATE_GRACE_MS,
+} = {}) {
+  const thresholdMs = stallMinutes * 60_000;
+  const dbOf = (wf) => {
+    for (const l of [{ repo, db }, ...ledgers]) {
+      try { if (l.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)) return l.db; } catch { /* closed */ }
+    }
+    return null;
+  };
+  const out = [];
+  for (const w of runningWorkflows(db)) {
+    const wf = w.workflow_id;
+    if (wanted.size && !wanted.has(wf)) continue;
+    const progress = lastProgress(db, wf);
+    const idleMs = now - progress.at;
+    const queued = queuedJobs(db, wf);
+    const gates = ownerGates(db, wf).map((gate) => ({ gate, held: queued.filter((j) => heldBy(gate, j)), verdict: judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }) }));
+
+    for (const { gate, held, verdict } of gates) {
+      const label = gateLabel(gate, held.length);
+      if (verdict.stale) {
+        out.push({ type: 'STALE-GATE', key: `STALE-GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, alert: true,
+          reasons: verdict.reasons, line: `STALE-GATE ${wf} ${label} for ${minutes(now - gate.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to resolve it (api incident --resolve) with this evidence` });
+      } else {
+        const why = verdict.young ? `raised ${minutes(now - gate.raisedAt)}m ago (inside the grace window)`
+          : `justified: ${[...verdict.asks.map((a) => `ask ${a.dispatchId} open in ${a.workflowId}`), ...verdict.waits.map((w) => `waits: ${w}`)].join(', ')
+            || `no checkable condition, waits on: ${clip(gate.text, 120)}`}`;
+        out.push({ type: 'GATE', key: `GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, alert: false,
+          line: `GATE ${wf} ${label}: ${why}` });
+      }
+    }
+
+    const oldQueued = queued.filter((j) => now - (j.updated_at ?? j.created_at) > thresholdMs);
+    if (idleMs <= thresholdMs && !oldQueued.length) continue;
+    const status = frontierOf(repo, wf);
+    const frontier = status?.ok ? status.frontier ?? {} : null;
+
+    if (frontier) {
+      for (const item of frontier.queued ?? []) {
+        const job = oldQueued.find((j) => j.job_id === item.jobId);
+        if (!job || !['dependency-failed', 'dependency'].includes(item.queuedBecause) || !item.blockedBy?.job) continue;
+        const blocker = db.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(item.blockedBy.job);
+        if (!blocker || !SETTLED.includes(blocker.status)) continue;
+        out.push({ type: 'STALE-WAIT', key: `STALE-WAIT|${wf}|${job.job_id}`, workflowId: wf, repo, jobId: job.job_id, alert: true,
+          line: `STALE-WAIT ${wf} ${job.job_id} (${job.op_id ?? '-'}) ${item.queuedBecause} for ${minutes(now - (job.updated_at ?? job.created_at))}m: blocker ${blocker.job_id} settled ${blocker.status} ${minutes(now - blocker.updated_at)}m ago; the Kernel retries the blocker, re-points or drops this job` });
+      }
+    }
+
+    if (idleMs <= thresholdMs) continue;
+    const working = (status?.workers ?? []).filter((wk) => WORKING_LIVENESS.includes(wk.liveness));
+    if (working.length) continue;
+    const since = `idle ${minutes(idleMs)}m`;
+    const gateBits = gates.filter((g) => g.held.length || !queued.length)
+      .map(({ gate, held, verdict }) => `${gate.incidentId} ${verdict.stale ? 'STALE' : verdict.young ? 'new' : 'justified'}${held.length ? ` holds ${held.length}` : ''}`);
+    let reason;
+    if (!frontier) reason = `frontier unreadable (${status?.error ?? 'no status'}); last progress ${progress.kind} ${clock(progress.at)}`;
+    else {
+      const causes = Object.entries(frontier.queuedCauses ?? {}).map(([c, n]) => `${c} ${n}`).join(', ');
+      reason = [
+        `frontier ${frontier.state ?? '?'}${frontier.actionable ? ' ACTIONABLE but the Kernel has not moved' : ''}`,
+        causes ? `queued: ${causes}` : null,
+        gateBits.length ? `gates: ${gateBits.join(', ')}` : null,
+        `last progress ${progress.kind} ${clock(progress.at)}`,
+        frontier.reason ? clip(frontier.reason, 140) : null,
+      ].filter(Boolean).join('; ');
+    }
+    out.push({ type: 'STALLED', key: `STALLED|${wf}`, workflowId: wf, repo, idleMinutes: minutes(idleMs), actionable: frontier?.actionable ?? null,
+      justifiedGate: gates.some((g) => !g.verdict.stale && !g.verdict.young), alert: true, line: `STALLED ${wf} ${since}: ${reason}` });
+  }
+  // Stalls first, then the gates and waits that explain them.
+  const order = { STALLED: 0, 'STALE-GATE': 1, 'STALE-WAIT': 2, GATE: 3 };
+  return out.sort((a, b) => order[a.type] - order[b.type] || a.key.localeCompare(b.key));
+}

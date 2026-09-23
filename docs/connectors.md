@@ -142,6 +142,11 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
 - **Lifecycle.** `channel.mjs register` / `heartbeat` start the bridge when none runs
   (`ensureTelegramBridge`); `resume-all.mjs` (the every-10-minutes task) does the same once any
   supervisor has registered, so the bridge survives a reboot. Telegram off or a spec run is a no-op.
+- **Stall alerts.** `resume-all.mjs` also launches `scripts/supervisor/stall-alert.mjs` detached each
+  pass: a NEW STALLED / STALE-GATE / STALE-WAIT finding (`scripts/supervisor/stall.mjs`) is appended to
+  supervisor `main`'s inbox as `STALL-ALERT <n> finding(s): <lines>` (chatId and messageId null, so
+  `wait` fires with no owner message behind it) and sent to the owner as one short message in
+  `language`; deduped per finding in `<state>/stall-alerts.json`, at most once an hour per channel.
 
 ```
 node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>]

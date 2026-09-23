@@ -25,6 +25,10 @@
 // It also makes sure the Telegram command bridge (connectors/telegram-bridge.mjs)
 // runs when connectors.telegram is ready and a supervisor has registered
 // (scripts/supervisor/channel.mjs register) — best effort, never fails the pass.
+// And it launches scripts/supervisor/stall-alert.mjs detached for the same
+// ledgers (unless one is still running): the progress check that tells the
+// supervisor's channel inbox and the owner on Telegram about a STALLED
+// workflow or a STALE-GATE with no chat involved — best effort as well.
 //
 // Idempotent: safe to run every few minutes. Watchdogs start only once Orca
 // answers a terminal listing — a watchdog that finds Orca down would try to
@@ -48,7 +52,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isRuntimeRoot, ledgerFileFor, machineFileFor } from '../../engine/ledger-db.mjs';
 import { connectorsConfig, loadConfig } from '../../engine/config.mjs';
-import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
+import { lockHolder, sourceRootOf, spawnDetached, withLedgerRead } from '../connectors/lib.mjs';
 import { gatewayAlive } from '../connectors/ask-gateway.mjs';
 import { managerAlive } from '../connectors/tunnel.mjs';
 import { ensureTelegramBridge } from '../connectors/telegram-bridge.mjs';
@@ -58,6 +62,7 @@ const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
 const watchdogFile = path.join(skillRoot, 'scripts', 'kernel', 'watchdog.mjs');
 const connectorScripts = ['ask-gateway.mjs', 'tunnel.mjs'].map((name) => path.join(skillRoot, 'scripts', 'connectors', name));
+const stallAlertFile = path.join(skillRoot, 'scripts', 'supervisor', 'stall-alert.mjs');
 
 export const DEFAULT_WAIT_ORCA_MS = 600_000;
 const LOG_CAP_BYTES = 5 * 1024 * 1024;
@@ -191,6 +196,22 @@ export function startConnector(script, { env = process.env } = {}) {
 }
 
 /**
+ * Launch the headless stall check (scripts/supervisor/stall-alert.mjs) detached over `repos`,
+ * unless a run still holds its lock. Never throws; a spec run (NODE_TEST_CONTEXT) is a no-op.
+ */
+export function ensureStallAlert({ repos = [], env = process.env, spawn: spawnOne = spawnDetached, dryRun = false } = {}) {
+  try {
+    if (env.NODE_TEST_CONTEXT) return { ok: true, skipped: 'test context' };
+    const live = lockHolder('stall-alert', env);
+    if (live) return { ok: true, already: true, pid: live.pid };
+    if (dryRun) return { ok: true, wouldStart: true };
+    return { ok: true, launched: spawnOne(stallAlertFile, repos.flatMap((repo) => ['--repo', repo]), { env }) };
+  } catch (error) {
+    return { ok: false, error: String(error?.message ?? error) };
+  }
+}
+
+/**
  * One resume pass. Every seam is injectable for the specs: the ledgers, the
  * process table, the spawner, the Orca probe and the connector starter.
  */
@@ -201,11 +222,13 @@ export function resumeAll({
   repos, missing = [], workflowsOf = runningWorkflows, watchdogs = listWatchdogs, spawn: spawnOne = spawnWatchdog,
   probe = orcaReady, waitMs = 0, sleep = sleepSync, connectors = null, startOne = startConnector,
   connectorAlive = (script) => CONNECTOR_ALIVE[path.basename(script)]?.() === true, dryRun = false,
-  ensureBridge = ensureTelegramBridge,
+  ensureBridge = ensureTelegramBridge, stallAlert = ensureStallAlert,
 } = {}) {
-  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, orca: null, skipped: null };
+  const result = { ok: true, dryRun, repos, missing, workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, stallAlert: null, orca: null, skipped: null };
   // The Telegram command bridge is best effort: its failure is reported, never fatal to the pass.
   try { result.telegramBridge = ensureBridge({ dryRun, requireRegistered: true }); } catch (error) { result.telegramBridge = { ok: false, error: String(error?.message ?? error) }; }
+  // The stall check is best effort too: it never fails the pass.
+  try { result.stallAlert = stallAlert({ repos, dryRun }); } catch (error) { result.stallAlert = { ok: false, error: String(error?.message ?? error) }; }
   const cf = connectors ?? (() => { try { return connectorsConfig(); } catch { return null; } })();
   if (cf && cf.cloudflare?.mode && cf.cloudflare.mode !== 'off') {
     result.connectors = connectorScripts.map((script) => {
@@ -288,6 +311,7 @@ const describe = (result) => [
   ...(result.pending ?? []).map((w) => `  pending   ${w.workflowId} (${w.repo}): Orca did not answer`),
   ...result.connectors.map((c) => `  connector ${c.script} ${c.wouldStart ? 'would start' : c.already ? 'already running' : c.ok ? 'started' : `FAILED ${c.error ?? c.stderr ?? ''}`}`),
   ...(result.telegramBridge ? [`  connector telegram-bridge.mjs ${(({ wouldStart, already, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? 'already running' : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.telegramBridge)}`] : []),
+  ...(result.stallAlert ? [`  stall-alert ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? `already running pid ${pid}` : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.stallAlert)}`] : []),
   ...(result.skipped ? [`  skipped watchdogs: ${result.skipped}${result.orca ? ` after ${result.orca.attempts} Orca probe(s)` : ''}`] : []),
 ].join('\n');
 

@@ -7,7 +7,7 @@
 //
 //   node scripts/supervisor/poll.mjs --repo <ledger-owner>
 //       [--workflow <id>]...   default: every non-finished workflow
-//       [--interval-ms <ms>] [--once] [--json]
+//       [--interval-ms <ms>] [--stall-minutes <n>] [--once] [--json]
 //
 // DEFAULT_INTERVAL_MS is the supervisor cadence's one authority;
 // modules/supervisor/supervise.yaml cites this file instead of restating it.
@@ -16,8 +16,10 @@
 // their serving URLs, direction artifacts newer than the last cycle, kernel
 // terminal liveness, and the Orca tree findings
 // scripts/checks/check-orca-tree.mjs projects from the same ledger plus a
-// terminal listing (ORCA-TREE lines). First cycle prints the current state as
-// baseline.
+// terminal listing (ORCA-TREE lines), and progress: STALLED / STALE-GATE /
+// GATE / STALE-WAIT lines from scripts/supervisor/stall.mjs (threshold
+// config.yaml supervisor.stallMinutes, or --stall-minutes). First cycle prints
+// the current state as baseline.
 
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -30,6 +32,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
+import { stallFindings, stallMinutesOf } from './stall.mjs';
 
 export const DEFAULT_INTERVAL_MS = 180000;
 
@@ -211,7 +214,7 @@ export const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {})
 };
 
 // --- the cycle ---------------------------------------------------------------
-export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, watchdogs = liveWatchdogs }) => {
+export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, watchdogs = liveWatchdogs, stall = stallFindings, stallMinutes = stallMinutesOf() }) => {
   const lines = [`===== poll ${ts(Date.now())} =====`];
   const wfs = workflows(db, wanted);
   const dogs = watchdogs();
@@ -223,6 +226,11 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   const running = new Set(wfs.filter((w) => w.phase === 'running').map((w) => w.workflow_id));
   for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${short(i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);
   for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
+  // Progress, not liveness (scripts/supervisor/stall.mjs): a live kernel and a
+  // live watchdog idle-waiting on a gate whose reason is gone read healthy above.
+  let stalls = [];
+  try { stalls = stall(db, { repo, wanted, stallMinutes }); } catch (e) { lines.push(`  stall check failed: ${String(e?.message ?? e).slice(0, 160)}`); }
+  for (const f of stalls) lines.push(`  ${f.line}`);
   const tree = orcaTree(db, { repo });
   // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
   // workflow; workflows that already finished are summarized, not listed.
@@ -249,7 +257,7 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   for (const a of arts) lines.push(`  artifact+ ${path.relative(repo, a.path)}`);
   if (arts.length) state.lastArtifacts = Date.now();
   state.first = false;
-  return { text: lines.join('\n'), workflows: wfs, asks, reports: reps, tree };
+  return { text: lines.join('\n'), workflows: wfs, asks, reports: reps, tree, stalls };
 };
 
 const main = () => {
@@ -263,6 +271,7 @@ const main = () => {
   const once = has('once');
   const asJson = has('json');
   const wanted = new Set(valuesOf('workflow'));
+  const stallMinutes = Number(valueOf('stall-minutes', null)) || stallMinutesOf();
 
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   const db = ledger.db;
@@ -272,8 +281,8 @@ const main = () => {
     first: true,
   };
   const run = async () => {
-    const out = await cycle(db, { repo, wanted, state });
-    if (asJson) console.log(JSON.stringify({ at: Date.now(), workflows: out.workflows.map((w) => w.workflow_id), asks: out.asks, orcaTree: out.tree }, null, 0));
+    const out = await cycle(db, { repo, wanted, state, stallMinutes });
+    if (asJson) console.log(JSON.stringify({ at: Date.now(), workflows: out.workflows.map((w) => w.workflow_id), asks: out.asks, orcaTree: out.tree, stalls: out.stalls }, null, 0));
     console.log(out.text);
   };
   return run().then(() => {

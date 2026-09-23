@@ -304,9 +304,12 @@ export function validateConfig(config){
       throw Error(`Invalid config.yaml: parallel.gear ${parallel.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')}).`);
   }
   if(config?.supervisor!==undefined){
-    const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos;
-    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
-      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?} with an integer of at least 60000 ms, or null.');
+    const supervisor=config.supervisor,interval=supervisor?.pollIntervalMs,repos=supervisor?.repos,stall=supervisor?.stallMinutes;
+    if(!plain(supervisor)||Object.keys(supervisor).some(key=>!['pollIntervalMs','repos','stallMinutes'].includes(key))||!(interval===null||interval===undefined||(Number.isInteger(interval)&&interval>=60000)))
+      throw Error('Invalid config.yaml: supervisor must be {pollIntervalMs?, repos?, stallMinutes?} with an integer of at least 60000 ms, or null.');
+    // stallMinutes: scripts/supervisor/stall.mjs calls a running workflow STALLED after this many minutes with no progress.
+    if(!(stall===undefined||stall===null||(Number.isInteger(stall)&&stall>=5)))
+      throw Error('Invalid config.yaml: supervisor.stallMinutes must be an integer of at least 5, or null.');
     if(!(repos===undefined||repos===null||(Array.isArray(repos)&&repos.every(repo=>typeof repo==='string'&&repo.trim()))))
       throw Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
   }
