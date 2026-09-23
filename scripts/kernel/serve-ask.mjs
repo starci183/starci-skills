@@ -308,7 +308,13 @@ export const reportImages = (files, repo) => {
       }
     }
   }
-  return out.sort((a, b) => b.mtime - a.mtime).slice(0, 8);
+  // An evidence bundle's direction.png is a copy of a record asset (on
+  // records drawn before the part rule, of the composite): when the report
+  // also names images outside evidence/, those are the ones served — the
+  // same rule telegram-media applies.
+  const sorted = out.sort((a, b) => b.mtime - a.mtime);
+  const outside = sorted.filter((img) => !/(^|\/)evidence\//.test(path.relative(repo, img.abs).replace(/\\/g, '/')));
+  return (outside.length ? outside : sorted).slice(0, 8);
 };
 
 const custodyDirs = (repo) => ['.starcistacks', '.stacks']

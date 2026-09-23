@@ -72,3 +72,25 @@ test('an ask serves each draw\'s part, not its composite; a declared pick on the
     assert.equal(picks[0].choices[0].image?.idx, 0, 'a pick declared on the composite path shows the part');
   } finally { fs.rmSync(repo, { recursive: true, force: true }); }
 });
+
+// WSPV's interface.draw ask (ctx_885b2c88287d) listed each state's .content.png, its composite and the
+// evidence bundle's direction.png copy in report files; the owner saw composites.
+test('an ask built from report files shows each part once: composites collapse, evidence copies drop', () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'serve-ask-files-'));
+  const put = (rel) => { const abs = path.join(repo, rel); fs.mkdirSync(path.dirname(abs), { recursive: true }); fs.writeFileSync(abs, rel); return rel; };
+  const UI = '.starciwork/features/wspv/ui/purchase-flow';
+  try {
+    const files = [
+      put(`${UI}/assets/directions/offer--page--desktop--light.content.png`),
+      put(`${UI}/assets/directions/offer--page--desktop--light.png`),
+      put(`${UI}/checkout/assets/directions/review--page--mobile--light.png`),
+      put(`${UI}/checkout/assets/directions/review--page--mobile--light.content.png`),
+      put(`${UI}/evidence/round-6/direction.png`),
+    ];
+    const shown = toOwnerImages(reportImages(files, repo), repo);
+    assert.deepEqual(shown.map((i) => path.relative(repo, i.abs).split(path.sep).join('/')).sort(), [
+      `${UI}/assets/directions/offer--page--desktop--light.content.png`,
+      `${UI}/checkout/assets/directions/review--page--mobile--light.content.png`,
+    ]);
+  } finally { fs.rmSync(repo, { recursive: true, force: true }); }
+});
