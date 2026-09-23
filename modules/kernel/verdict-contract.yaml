@@ -282,6 +282,14 @@ rejects:
       tail read via `api observe` is the same class — read-observe via the api
       only, reasoning context never proof; the mutation surfaces are
       unchanged (send is `api nudge`, close is `api settle`).
+  - id: done-not-landed
+    rule: >-
+      A pass for an op whose commitPolicy commits is refused not-landed while
+      an owned path is dirty or the report's head is not in the target
+      checkout's history (nor, for a pushing policy, in origin/<branch>);
+      landed-unverifiable when git cannot answer. Delivered-but-uncommitted
+      is never done.
+    citation: "scripts/kernel/settle-landed.mjs landedProof, run by api settle (modules/kernel/api.yaml commands.settle landed)"
   - id: out-of-scope-files
     rule: "report.files outside the allowlist -> rejected, per-file named"
     citation: "validateOpReport ownedPaths check (scripts/kernel/report-envelope.mjs), run at api report and when settle files a --report"
