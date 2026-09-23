@@ -171,7 +171,7 @@ const usage = (code) => {
            deterministic size class + agent count from runtimes.yaml allocation.slicing
   route    --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
-  reconcile --job <job_id> [--retry-lineage | --drop --reason <text>]
+  reconcile --job <job_id> [--retry-lineage | --drop --reason <text> | --reap]
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
   questions --workflow <id>
@@ -196,7 +196,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -2930,6 +2930,36 @@ function reconcileRetryLineage(ledger, args, job) {
 // them, so the cut could not be re-planned and the workflow sat still. The row
 // settles `cancelled` with the reason, and every queued job that waits on it
 // is named so the Kernel re-points or drops those too.
+// `reconcile --job <id> --reap`: a settled op whose terminal is still live -
+// settled before settle closed tabs and stopped leftover processes - is the
+// Kernel's to clean, not the supervisor's. Closes the terminal with its tab,
+// then stops the agent process when the close did not (reapIfStillLive).
+function reconcileReap(ledger, args, job) {
+  const db = ledger.db, jobId = job.job_id;
+  if (!FINAL_SETTLED.includes(job.status)) {
+    throw Object.assign(new Error(`job ${jobId} is ${job.status}; --reap cleans only a settled job's leftover terminal`), { code: 'reap-not-settled' });
+  }
+  const payload = jobPayloadOf(job);
+  const handle = payload.managed?.agentTerminalHandle ?? payload.orca?.agentTerminalHandle ?? payload.hierarchy?.runtime?.terminalHandle
+    ?? (String(job.worker_id ?? '').startsWith('term_') ? job.worker_id : null);
+  if (!handle) throw Object.assign(new Error(`job ${jobId} names no op terminal`), { code: 'reap-no-terminal' });
+  let before = null;
+  try { before = terminalShow({ terminal: handle }); } catch { /* unreadable reads as not live */ }
+  if (!before?.ok || before.connected !== true) {
+    const out = { ok: true, jobId, handle, live: false };
+    emit(out, `reap ${jobId}: terminal ${handle} is not live; nothing to clean`, args.json);
+    return;
+  }
+  const closed = closeOperationTerminal(handle);
+  const reaped = reapIfStillLive(db, job, payload, handle);
+  let after = null;
+  try { after = terminalShow({ terminal: handle }); } catch { /* reported as unknown */ }
+  const result = { handle, closed: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(reaped ? { reaped } : {}), connected: after?.ok ? after.connected === true : null };
+  ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'terminal-reaped', payload: result });
+  const out = { ok: true, jobId, live: true, ...result };
+  emit(out, `reap ${jobId}: terminal ${handle} closed=${result.closed}${reaped ? ` reaped=${reaped.reaped}${reaped.pid ? ` pid ${reaped.pid}` : ''}` : ''} connected=${result.connected}`, args.json);
+}
+
 function reconcileDrop(ledger, args, job) {
   const db = ledger.db, jobId = job.job_id;
   if (job.status !== 'queued') {
@@ -2971,6 +3001,7 @@ function cmdReconcile(ledger, args) {
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (args['retry-lineage']) return reconcileRetryLineage(ledger, args, job);
   if (args.drop) return reconcileDrop(ledger, args, job);
+  if (args.reap) return reconcileReap(ledger, args, job);
   const payload = jobPayloadOf(job);
   if (job.status === 'queued') {
     const worker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;

@@ -592,7 +592,16 @@ commands:
   # --------------------------------------------------------------------------
 
   reconcile:
-    args: '--job <job_id> [--retry-lineage | --drop --reason <text>]'
+    args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap]'
+    reap: >-
+      `--reap` cleans a SETTLED op's terminal that is still live (one settled
+      before settle closed tabs and stopped leftover agent processes, or a
+      supervisor ORPHAN/STRAY finding): it closes the terminal with its tab,
+      stops the agent process when the close did not (only an unambiguous
+      match, scripts/kernel/reap-agent-process.mjs), and appends
+      'terminal-reaped' {handle, closed, tab, reaped, connected}. A terminal
+      that is not live writes nothing. Refuses reap-not-settled and
+      reap-no-terminal. Leftover op terminals are the Kernel's to clean.
     drop: >-
       `--drop --reason <text>` retires a QUEUED job that never crossed the
       dispatch boundary (the same evidence test as --retry-lineage): the row

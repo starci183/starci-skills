@@ -966,3 +966,22 @@ test('enqueue refuses an unbounded grant, an op with no brief, and a finished wo
   assert.deepEqual([refusal(finished).ok,refusal(finished).code],[false,'workflow-finished']);
   assert.equal(rows(),0);
 });
+
+// Leftover op terminals are the Kernel's to clean: reconcile --reap refuses a
+// job that has not settled and writes nothing for a terminal that is not live.
+test('reconcile --reap cleans only a settled job and is a no-op on a dead terminal',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-reap';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
+  const r=api('enqueue','--workflow',wf,'--op','docs.author','--paths','docs/reap');assert.equal(r.status,0,r.stderr);
+  const jobId=out(r).job_id;
+  const refused=api('reconcile','--job',jobId,'--reap');
+  assert.notEqual(refused.status,0);
+  assert.match(refused.stderr,/reap-not-settled/);
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded',worker_id='term_gone' WHERE job_id=?").run(jobId));
+  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify(['-e','console.log(JSON.stringify({ok:false,error:{code:"terminal_not_found"}}));process.exit(1)'])};
+  const dead=spawnSync(process.execPath,[API,'reconcile','--job',jobId,'--reap','--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,STARCI_OWNER_ROOT:owner}});
+  assert.equal(dead.status,0,dead.stderr);
+  assert.equal(JSON.parse(dead.stdout).live,false,'a terminal Orca no longer knows is not live');
+});
