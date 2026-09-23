@@ -308,7 +308,11 @@ sections:
         watch Git HEAD or live deployment drift."
       - Every changed code piece has a scoped local commit when the user's task includes committing.
         Stage exact files, inspect staged diff, run applicable checks and record the real SHA; no
-        blanket `git add .`, amend, force or unrelated changes. A logical piece can require multiple
+        blanket `git add .`, amend, force or unrelated changes. A branch other workflows and ops
+        commit on (main of a product repo) is append-only: never `git reset`, rebase, amend, drop or
+        force it - a Collab op ran `git reset HEAD~1` on nivo-backend main and silently removed its
+        own filed-report commit while three peer workflows were committing there. A wrong commit is
+        undone with a new revert commit. A logical piece can require multiple
         commits or repositories; record them all rather than inventing one universal SHA. When
         committing is not authorized, report an uncommitted source delivery and do not forge code
         completion. An unchanged implementation can bind an existing inspected commit and prove it

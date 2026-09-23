@@ -18,3 +18,11 @@ test('a missing credential parks only live proof; build ops code on a placeholde
   assert.doesNotMatch(loop, /A credential ask parks its requesters/);
   assert.match(read('modules/models/kinds.yaml'), /missing credential is not such a blocker for a build op/);
 });
+
+// A Collab op ran `git reset HEAD~1` on nivo-backend main while three peer
+// workflows committed there; shared branches are append-only.
+test('a shared branch is append-only: no reset, rebase, amend or force; revert instead', () => {
+  const common = read('modules/ops/_common.yaml');
+  assert.match(common, /is append-only: never `git reset`, rebase, amend, drop or\s+force it/);
+  assert.match(common, /undone with a new revert commit/);
+});
