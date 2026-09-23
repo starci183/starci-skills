@@ -69,6 +69,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
+import { quitAgent } from './quit-agent.mjs';
 import { markAskClosed } from '../connectors/telegram.mjs';
 import { autoAcceptAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
@@ -3841,8 +3842,9 @@ function cmdSettle(ledger, args, repo) {
   const managed = settledPayload?.managed ?? null;
   let terminalClosed = null;
   if (job.worker_id && !managed) {
+    const quit = quitAgent({ handle: job.worker_id, agent: agentOfJob(settledPayload) });
     const closed = closeOperationTerminal(job.worker_id);
-    terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(closed.error ? { error: closed.error } : {}) };
+    terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(quit ? { quit } : {}), ...(closed.error ? { error: closed.error } : {}) };
     const reaped = reapIfStillLive(db, job, settledPayload, job.worker_id);
     if (reaped) terminalClosed.reaped = reaped;
   }
@@ -3856,6 +3858,8 @@ function cmdSettle(ledger, args, repo) {
   let managedWorker = null;
   if (managed?.dispatchId) {
     let stop = null, release = null, residual = null;
+    // The agent quits itself first, so worker-stop/release find nothing running.
+    const managedQuit = quitAgent({ handle: managed.agentTerminalHandle ?? null, agent: 'claude' });
     try { stop = workerStop({ dispatch: managed.dispatchId }); }
     catch (e) { stop = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
     if (stop?.ok !== true || stop?.outcome === 'unknown') {
@@ -3900,6 +3904,7 @@ function cmdSettle(ledger, args, repo) {
       ...(residual ? { residual } : {}),
       ...(agentTerminal ? { agentTerminal } : {}),
       ...(agentTab ? { agentTab: { tab: agentTab.tab ?? null, ok: agentTab.ok === true } } : {}),
+      ...(managedQuit ? { quit: managedQuit } : {}),
     };
   }
 

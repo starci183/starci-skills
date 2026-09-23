@@ -225,6 +225,13 @@ else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(ar
   }
   save(); out({ ok: true, result: { send: { accepted: true, bytesWritten: key.length } } });
 }
+else if (verb === 'terminal send' && ['/exit', '/quit'].includes(arg('text') ?? '') && argv.includes('--enter')) {
+  // An agent CLI's own quit command ends its process: the terminal disconnects.
+  const r = record(arg('terminal'));
+  if (r) { r.quit = arg('text'); r.connected = false; r.writable = false; }
+  state.quits = [...(state.quits || []), { handle: arg('terminal'), text: arg('text') }];
+  save(); out({ ok: true, result: { sent: true } });
+}
 else if (verb === 'terminal send') {
   const r = record(arg('terminal'));
   const text = arg('text') ?? '';
