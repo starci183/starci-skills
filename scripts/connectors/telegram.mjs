@@ -42,8 +42,8 @@ const TEXT = {
   en: {
     ask: '[StarCi] A question for you', reserve: '[StarCi] New link (replaces the earlier one)',
     workflow: 'Workflow', question: 'Question', options: 'Options', link: 'Answer here', expires: 'Link expires',
-    credential: 'This question asks for secrets (keys, secret files), so its form is not published; answer it on the machine, or set connectors.telegram.exposeCredentialAsks: true to answer it remotely.',
-    localOnly: 'No public tunnel is running, so this form is open only on the machine.',
+    credential: 'This question asks for secrets (keys, secret files), so it is NOT exposed. Answer it ON THE MACHINE by opening this localhost link there:',
+    localOnly: 'No public tunnel is running, so this form opens only on the machine, at this localhost link:',
     replaced: 'This link was replaced by a new one (see the newer message).',
     test: '[StarCi] Telegram connector test: this chat will receive owner questions.',
     answered: '[StarCi] Answered', retired: '[StarCi] No longer needs an answer', at: 'at',
@@ -51,8 +51,8 @@ const TEXT = {
   vi: {
     ask: '[StarCi] Có câu hỏi cần thầy trả lời', reserve: '[StarCi] Link mới (thay link cũ)',
     workflow: 'Workflow', question: 'Câu hỏi', options: 'Lựa chọn', link: 'Trả lời tại', expires: 'Link hết hạn lúc',
-    credential: 'Câu hỏi này cần nhập thông tin bí mật (key, file secret) nên form không được đưa ra ngoài; trả lời trên máy, hoặc bật connectors.telegram.exposeCredentialAsks: true để trả lời từ xa.',
-    localOnly: 'Chưa có tunnel công khai đang chạy nên form chỉ mở được trên máy.',
+    credential: 'Câu hỏi này cần nhập thông tin bí mật (key, file secret) nên KHÔNG đưa ra ngoài. Thầy trả lời TRÊN MÁY, mở link localhost này tại máy:',
+    localOnly: 'Chưa có tunnel công khai đang chạy nên form chỉ mở được trên máy, tại link localhost này:',
     replaced: 'Link này đã được thay bằng link mới (xem tin nhắn mới hơn).',
     test: '[StarCi] Kiểm tra kết nối Telegram: chat này sẽ nhận câu hỏi của workflow.',
     answered: '[StarCi] Đã trả lời', retired: '[StarCi] Câu hỏi này không cần trả lời nữa', at: 'lúc',
@@ -92,11 +92,12 @@ export function askMessage({ workflow, question, link, expiresAt = null, reserve
   const lines = [reserve ? t.reserve : t.ask, workflowLine(t, workflow), '', `${t.question}:`, clip(String(question.text ?? '').trim(), 2500)];
   if (options.length) lines.push('', `${t.options}:`, ...options.map((o, i) => (/^\s*\d+[.)]\s/.test(o) ? clip(o.trim(), 300) : `${i + 1}. ${clip(o, 300)}`)));
   lines.push('');
-  // A 127.0.0.1 link is useless to an owner reading Telegram away from the
-  // machine (the owner asked why localhost links were sent), so a link that is
-  // not public is never put in the message - only why it is missing.
-  if (link.reason === 'credential') lines.push(t.credential);
-  else if (link.reason === 'no-tunnel') lines.push(t.localOnly);
+  // A form that is not public carries its localhost link with the plain reason
+  // it only opens on the machine (owner, 2026-09-23: credential asks stay on
+  // localhost, never exposed; the message gives the localhost link and says to
+  // answer it at the machine).
+  if (link.reason === 'credential') lines.push(t.credential, link.href);
+  else if (link.reason === 'no-tunnel') lines.push(t.localOnly, link.href);
   else lines.push(`${t.link}: ${link.href}`);
   if (expiresAt) lines.push(`${t.expires}: ${when(expiresAt, language)}`);
   return clip(lines.join('\n'), MAX_TEXT);

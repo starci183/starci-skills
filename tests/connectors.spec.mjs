@@ -309,8 +309,8 @@ test('a credential ask says to answer on the machine and gets the public link on
     await notifyAsk({ledgerFile,workflowId:'wf-nivo-pay-x2',dispatchId:'ctx_vnpay'},deps(machineHome,{fetchImpl:local.fetchImpl}));
     const text=local.calls[0].body.text;
     assert.match(text,/Nhập VNPAY_TMN_CODE/,'the question is still sent');
-    assert.match(text,/nên form không được đưa ra ngoài; trả lời trên máy/);
-    assert.ok(!text.includes('127.0.0.1'),'a localhost link is useless off the machine and is never sent');
+    assert.match(text,/KHÔNG đưa ra ngoài. Thầy trả lời TRÊN MÁY, mở link localhost này tại máy:/);
+    assert.ok(text.includes('http://127.0.0.1:6974/'),'owner 2026-09-23: the credential ask carries its localhost link, answered at the machine');
     assert.ok(!text.includes('response.example.org'),'no public link for a credential ask by default');
     const exposed=fakeBot();
     await notifyAsk({ledgerFile,workflowId:'wf-nivo-pay-x2',dispatchId:'ctx_vnpay'},
