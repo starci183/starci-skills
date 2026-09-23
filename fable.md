@@ -1122,6 +1122,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   kernel WSPV. WSPV audit a34 failed (kernel lo). Nhiễu: watchdog Modules một lần kernel-failed-screen thoáng qua, màn hình hiện
   không khớp mẫu lỗi, không restart.
 
+- 11:45 Kernel WSPV bị đánh thức 2 lần vì form thanh toán hết hạn nhưng vẫn dẫn link chết: status dạng text không in reason hay
+  askReserveDispatches. Vá `e4faf58ff`: text in reason và dòng ask-reserve kèm lệnh serve-ask; driver-loop nói link chết là việc, không
+  phải chờ owner. Đã báo WSPV phục vụ lại. Collab tasks done (a5), approval và notification chạy song song, còn gateway.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
