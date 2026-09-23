@@ -231,13 +231,13 @@ schemas:
     file: modules/schemas/work-ui-screen.schema.yaml
     dialect: json-schema
     subsystem: work-tree
-    governs: "One screen and EVERY state it can be in — the state list is the point; a screen specified only happy-path gets built only happy-path."
+    governs: "One screen and EVERY state it can be in — the state list is the point; a screen specified only happy-path gets built only happy-path. `ui.flow` carries the screen's own interaction-flow map (transitions with trigger and landing state, named edge cases) that interface.draw's coverage proof requires."
     binds: .starciwork/features/<feature>/ui/<name>/index.yaml + <name>/assets/** (design PNGs)
     usedBy: [work-layout rule IMPL_BEFORE_DIRECTION — done impl proving FE work is refused while relevant ui-screen is not done]
     business:
       question: "What does the user see, in every state, before anyone builds it?"
       whenNeeded: design-interface / draw lanes; direction precedes implementation by lane order.
-      whenNot: Not for interaction flows (journey/uat) — this is per-screen states.
+      whenNot: Not for cross-screen journeys or walked flows (journey/uat) — this is per-screen states and the screen's own ui.flow edges.
       selectedBy: UI design ops; implementation reads it as binding direction.
 
   - id: work/implementation@1

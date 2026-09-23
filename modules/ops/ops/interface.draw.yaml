@@ -125,7 +125,10 @@ writes:
         derived from accepted journeys/SDS: every transition with its trigger and landing state,
         every screen's reachable loading/empty/error/success states, and the explicitly named edge
         cases — refresh mid-flow, external redirect return, double-submit, tab close, failure/retry
-        and dead-end paths. Accessibility, responsive rules, copy, interactions and artwork slots
+        and dead-end paths. Its shape is the work/ui-screen@1 `ui.flow` block: route or routes,
+        optional scope and states, `transitions` of {from, trigger, to} with optional id, guard,
+        rule and effect, and `edgeCases` as sentences or {name, handling}; the map lives in the
+        record itself, never only in an asset file. Accessibility, responsive rules, copy, interactions and artwork slots
         are described alongside them, and every generated image and prompt appears in both ui.assets
         and the node assets list."
   - id: designSource

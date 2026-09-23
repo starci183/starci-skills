@@ -388,3 +388,36 @@ test('every family schema that carries change.rev also accepts the decisionLog a
     .map(([family]) => family);
   assert.deepEqual(missing, [], 'a revise op bumps change.rev and appends a decisionLog entry; a family refusing the entry makes every correct revision invalid');
 });
+
+// inc-eb76d3be0a2b: interface.draw writes `ui.flow` and its coverage proof requires it, while the closed `ui`
+// block declared no such key, so every draw failed either the schema or the op. The flow map is a declared,
+// closed shape; a screen drawn before the op demanded it stays valid without one.
+test('a ui-screen carries the interaction-flow map interface.draw writes, and the map is closed', () => {
+  const screen = () => parseYaml(fs.readFileSync(path.join(root, 'examples', 'ecommerce-app-be', '.starciwork', 'features', 'identity', 'ui', 'sign-in', 'index.yaml'), 'utf8'));
+  const validate = validatorFor('work/ui-screen@1');
+  assert.equal(validate(screen()), true, `a ui record without ui.flow stays valid: ${errorText(validate)}`);
+  const flow = () => ({
+    route: '/sign-in',
+    transitions: [
+      {from: 'entry', trigger: 'open sign-in', to: 'sign-in-ready', rule: 'withhold protected content'},
+      {id: 'submit-refused', from: ['sign-in-ready', 'sign-in-refused'], trigger: 'submit wrong password', to: 'sign-in-refused', guard: 'the form is valid', effect: 'no session'}
+    ],
+    edgeCases: [
+      'Refresh mid-flow restores only server-held custody.',
+      {name: 'double-submit', handling: 'one pending request; the second press is disabled'}
+    ]
+  });
+  const drawn = screen();
+  drawn.ui.flow = flow();
+  assert.equal(validate(drawn), true, `the flow map interface.draw writes must validate: ${errorText(validate)}`);
+  const holed = screen();
+  holed.ui.flow = flow();
+  delete holed.ui.flow.transitions[0].to;
+  refuses('work/ui-screen@1', holed, 'a transition with no landing state is a hole in the map, not an edge');
+  const extra = screen();
+  extra.ui.flow = {...flow(), matrix: []};
+  refuses('work/ui-screen@1', extra, 'the flow map is closed; a key nobody declared is refused');
+  const empty = screen();
+  empty.ui.flow = {route: '/sign-in'};
+  refuses('work/ui-screen@1', empty, 'a flow map with no transitions accounts for nothing');
+});

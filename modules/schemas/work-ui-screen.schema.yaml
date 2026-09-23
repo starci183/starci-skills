@@ -332,6 +332,103 @@ properties:
           $ref: "#/$defs/prose"
         description: What the person can do on this screen beyond reading it, where the states list does not
           already carry it.
+      flow:
+        type: object
+        additionalProperties: false
+        required:
+          - transitions
+        description: "The durable interaction-flow map interface.draw derives from the accepted journeys and
+          SDS - every transition with its trigger and landing state, and the explicitly named edge cases
+          (refresh mid-flow, external redirect return, double-submit, tab close, failure/retry, dead ends).
+          It is the machine half of `interactions`: that list says in prose what a person can do, this map
+          says where each action lands, so an implementation and a UAT walk read the same edges instead of
+          re-deriving them. It is optional on the schema because screens drawn before the op demanded it
+          stay valid; interface.draw's coverage proof is what requires it, and an unaccounted edge is a
+          typed gap rather than an invented one."
+        properties:
+          route:
+            $ref: "#/$defs/prose"
+            description: The one route the flow runs on, when the screen has a single address.
+          routes:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/prose"
+            description: Every route the flow runs on, when the screen is reached at more than one address.
+          scope:
+            $ref: "#/$defs/prose"
+            description: What the map covers, in words - the surfaces or the slice of the journey it is of.
+          states:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              $ref: "#/$defs/slug"
+            description: The states the flow moves between, when the map names them apart from the state
+              list above - an entry or external state such as a redirect origin is a flow state without
+              being a drawn screen state.
+          transitions:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            description: Every accepted transition, each naming where it starts, what triggers it and where
+              it lands. A transition with no landing state is a hole in the map, and holes are gaps.
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - from
+                - trigger
+                - to
+              properties:
+                id:
+                  $ref: "#/$defs/slug"
+                  description: The transition's own name, when the map addresses transitions individually.
+                from:
+                  oneOf:
+                    - $ref: "#/$defs/slug"
+                    - type: array
+                      minItems: 1
+                      uniqueItems: true
+                      items:
+                        $ref: "#/$defs/slug"
+                  description: The state or states the transition leaves - a list when the same trigger lands
+                    the same way from several states.
+                trigger:
+                  $ref: "#/$defs/prose"
+                  description: What the person or the system does that moves the screen.
+                to:
+                  $ref: "#/$defs/slug"
+                  description: The landing state.
+                guard:
+                  $ref: "#/$defs/prose"
+                  description: The condition that must hold for the transition to fire.
+                rule:
+                  $ref: "#/$defs/prose"
+                  description: The accepted rule the landing honours - what is withheld, kept or shown.
+                effect:
+                  $ref: "#/$defs/prose"
+                  description: What the transition changes beyond the state it lands in.
+          edgeCases:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            description: The reachable edge cases named explicitly, each with how the screen handles it -
+              either a sentence, or a name and its handling so the same edge across screens is countable.
+            items:
+              oneOf:
+                - $ref: "#/$defs/prose"
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - name
+                    - handling
+                  properties:
+                    name:
+                      $ref: "#/$defs/slug"
+                    handling:
+                      $ref: "#/$defs/prose"
       links:
         type: array
         minItems: 1
