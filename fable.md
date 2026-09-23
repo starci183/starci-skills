@@ -1167,6 +1167,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   Hai worker cũ nộp report muộn (Collab backend.implement a8 done 05:59, WSPV interface.implement a39 done 06:01) vào workflow đã finish:
   code của chúng đã commit trong repo, workflow mới sẽ khảo sát lại.
 
+- 14:00 Fork báo lane R lỗi: terminal create hết giờ chờ handle nhưng terminal vẫn được tạo và bị bỏ lại (R2 đang sửa: adopt-or-close,
+  paste kẹt). Nivo dính y hệt: 3 terminal claude mồ côi đứng ở màn onboarding; đã đóng. Giữ nivo tới khi R2 xong và thầy onboarding.
+  TITLE_DRIFT: tên bị CLI ghi đè liên tục (OSC mỗi lượt), đổi tên 5 phút không thắng; đề xuất CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+  trong card claude, Codex/Devin đổi tên sau attest và mỗi lần wake. Lane S (fork) sửa bản ghi repository resource cho Mia Mia.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
