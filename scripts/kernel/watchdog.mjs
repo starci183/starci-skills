@@ -16,6 +16,7 @@
 // only after the owner has authorized unattended continuation of the already
 // approved workflow; it does not create a new workflow or widen its authority.
 
+import '../lib/hide-child-windows.mjs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

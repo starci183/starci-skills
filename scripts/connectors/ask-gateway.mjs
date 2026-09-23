@@ -15,6 +15,7 @@
 // values) is refused with 403 unless connectors.telegram.exposeCredentialAsks
 // is true: the owner answers those on the machine through the localhost link.
 // Binds 127.0.0.1 only; cloudflared connects from this host.
+import '../lib/hide-child-windows.mjs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

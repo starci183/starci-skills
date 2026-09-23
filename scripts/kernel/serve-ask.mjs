@@ -37,6 +37,7 @@
 // event; it wakes the Kernel and sends the owner one plain Telegram message.
 // `api serve-ask` runs the same function before it would launch the form.
 
+import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';

@@ -30,6 +30,7 @@
 // ONLINE_MS (STARCI_SUPERVISOR_ONLINE_MS overrides it). Logs go to
 // <state>/telegram-bridge.log. STARCI_TELEGRAM_API_BASE replaces the Bot API
 // host for tests. The token is never printed and is scrubbed from every error.
+import '../lib/hide-child-windows.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -26,6 +26,7 @@
 // STARCI_CLOUDFLARED_ARGS (a JSON list of prefix args) replace the binary for
 // tests, the way STARCI_ORCA_COMMAND does for Orca; STARCI_TUNNEL_BACKOFF_MS
 // sets the first restart delay.
+import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
