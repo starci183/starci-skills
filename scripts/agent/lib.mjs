@@ -208,7 +208,13 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
     return { ok: true, screen: initialScreen ?? '', model: expectedModel, mode: 'launch-flag' };
   const timeoutMs = Number(spec.timeoutMs) || 15000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
-  const expected = modelPattern(expectedModel);
+  // A TUI that renders the model's display name instead of its id (Claude
+  // Code shows "Opus 5.5 with high effort" for claude-opus-5-5) declares that
+  // name per id in the card's modelAttestation.displayNames.
+  const displayName = spec.displayNames?.[expectedModel] ?? null;
+  const byId = modelPattern(expectedModel);
+  const byName = displayName ? modelPattern(displayName) : null;
+  const expected = { test: (text) => byId.test(text) || Boolean(byName?.test(text)) };
   let screen = initialScreen ?? '';
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
     const failure = failureOnScreen(adapter, screen);

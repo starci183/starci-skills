@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { DEFAULT_READY_PATTERN } from '../scripts/agent/lib.mjs';
+import { parseYaml } from '../engine/yaml.mjs';
+
+// Claude Code renders "Opus 5.5 with high effort", never the id claude-opus-5-5;
+// the kernel boot failed at model-attestation until the card declared the name.
+test('every Claude model id the runtimes route to has a display name the claude card attests', () => {
+  const card = parseYaml(fs.readFileSync(new URL('../modules/models/agents/claude.yaml', import.meta.url), 'utf8'));
+  const runtimes = fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8');
+  const ids = [...new Set(runtimes.match(/claude-(?:opus|sonnet|haiku|fable)-[0-9]+(?:-[0-9]+)?/g) ?? [])];
+  assert.ok(ids.length > 0);
+  for (const id of ids) assert.ok(card.modelAttestation?.displayNames?.[id], `claude card declares a display name for ${id}`);
+});
 
 // Claude Code 2.1.280 draws a rule and a status row below its `❯` prompt; the
 // readiness pattern anchored at end-of-screen never matched a ready kernel, so
