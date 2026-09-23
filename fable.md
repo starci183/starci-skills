@@ -1073,6 +1073,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   spec từ chối mọi manifest ghi bản ghi gốc ngoài layout. Check xanh, 46/46 (lane: 155 pass). Đã gửi fork các bước cho kernel Mia
   Mia. Còn mở: node fields của scope.finish vẫn liệt kê state/blocker/completion.
 
+- 09:40 Không vá. WSPV audit a32 done, a33 failed, kernel đang xử lý (transition-ready). Collab 6 slice dependency theo
+  dependsOn, watchdog idle-waiting (vá 3b2767b26 chạy đúng). Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00;
+  hai ask còn mở (WSPV thanh toán, Modules thuế) đều thuộc nhóm để thầy quyết.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
