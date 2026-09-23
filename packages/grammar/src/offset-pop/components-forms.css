@@ -25,12 +25,12 @@
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-field="true"] [data-grammar-field-error] {
-        color: var(--offset-pop-critical);
+        color: color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink));
         font-weight: 800;
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-field-count][data-grammar-invalid="true"] {
-        color: var(--offset-pop-critical);
+        color: color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink));
         font-weight: 800;
     }
 
@@ -324,7 +324,7 @@
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Fieldset"][data-grammar-invalid="true"] [data-grammar-field-error] {
-        color: var(--offset-pop-critical);
+        color: color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink));
         font-weight: 800;
     }
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { DescriptionList } from "./index.js"
 
 afterEach(cleanup)
@@ -11,7 +11,7 @@ const items = [
     { id: "seats", term: "Seats", description: "12" },
 ]
 
-describe.each(FAMILY_ROOTS)("DescriptionList under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("DescriptionList under %s", (family, wrap) => {
     it("renders term/value pairs as a real description list", () => {
         const { container } = render(wrap(<DescriptionList items={items} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

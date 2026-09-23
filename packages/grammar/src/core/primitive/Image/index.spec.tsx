@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Image } from "./index.js"
 
 afterEach(cleanup)
 
-describe.each(FAMILY_ROOTS)("Image under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Image under %s", (family, wrap) => {
     it("reserves its aspect ratio and defers loading by default", () => {
         const { container } = render(wrap(<Image src="/hero.png" alt="Mountain lake" aspect="wide" />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

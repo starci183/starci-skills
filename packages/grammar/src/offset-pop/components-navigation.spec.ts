@@ -92,8 +92,11 @@ describe("Offset Pop navigation-group treatment", () => {
 })
 
 describe("Common navigation-group anatomy", () => {
-    it("is imported first by the Common entry and lives in the Common layer", () => {
-        expect(commonEntry.split("\n")[0]).toBe("@import \"./components-navigation.css\";")
+    it("is imported by the Common entry and lives in the Common layer", () => {
+        // Every component sheet is imported right after the layer-order statement, before any rule.
+        const entryHead = commonEntry.slice(0, commonEntry.indexOf("@layer starci-grammar-common {")).replace(/\/\*[\s\S]*?\*\//g, "").trim()
+        expect(entryHead).toMatch(/^@layer [^;{]+;(?:\s*@import "[^"]+";)+$/)
+        expect(entryHead).toContain("@import \"./components-navigation.css\";")
         expect(commonCss).toContain("@layer starci-grammar-common {")
         expect(commonCss).not.toMatch(/#[0-9a-f]{3,8}\b/i)
     })

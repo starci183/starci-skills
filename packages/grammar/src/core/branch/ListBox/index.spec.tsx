@@ -2,10 +2,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope, installVendorDomStubs } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope, installDomShims } from "../../../__test__/grammarRoots.js"
 import { ListBox } from "./index.js"
 
-beforeAll(installVendorDomStubs)
+beforeAll(installDomShims)
 afterEach(cleanup)
 
 const items = [
@@ -16,7 +16,7 @@ const items = [
 
 const selectedHooks = () => [...document.querySelectorAll(".starci-core-list-box-row")].map((node) => node.getAttribute("data-grammar-selected"))
 
-describe.each(FAMILY_ROOTS)("ListBox under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("ListBox under %s", (family, wrap) => {
     it("renders a named listbox of options", () => {
         render(wrap(<ListBox label="Members" items={items} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

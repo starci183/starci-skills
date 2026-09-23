@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import { GRAMMAR_ROOT_CASES, expectInFamilyScope } from "../../../__test__/overlayRoots.js"
+import { GRAMMAR_ROOT_CASES, expectInFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Spinner } from "./index.js"
 
 afterEach(cleanup)

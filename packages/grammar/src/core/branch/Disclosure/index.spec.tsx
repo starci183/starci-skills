@@ -2,15 +2,15 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope, installVendorDomStubs } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope, installDomShims } from "../../../__test__/grammarRoots.js"
 import { Disclosure } from "./index.js"
 
-beforeAll(installVendorDomStubs)
+beforeAll(installDomShims)
 afterEach(cleanup)
 
 const frame = () => document.querySelector("[data-component='Disclosure']")
 
-describe.each(FAMILY_ROOTS)("Disclosure under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Disclosure under %s", (family, wrap) => {
     it("puts a button with aria-expanded inside a heading and toggles uncontrolled", () => {
         const onExpandedChange = vi.fn()
         render(wrap(<Disclosure title="Shipping" headingLevel={2} onExpandedChange={onExpandedChange}>Ships in 2 days</Disclosure>))

@@ -4,17 +4,17 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { DateValue } from "@heroui/react"
-import { FAMILY_ROOTS, expectedFamilyScope, installVendorDomStubs } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope, installDomShims } from "../../../__test__/grammarRoots.js"
 import { Calendar } from "./index.js"
 
-beforeAll(installVendorDomStubs)
+beforeAll(installDomShims)
 afterEach(cleanup)
 
 const navLabels = { previousLabel: "Previous month", nextLabel: "Next month" }
 
 const selectedDay = () => document.querySelector("[aria-selected='true']")
 
-describe.each(FAMILY_ROOTS)("Calendar under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Calendar under %s", (family, wrap) => {
     it("renders a named month grid with navigation buttons", () => {
         render(wrap(<Calendar label="Delivery date" defaultValue={new CalendarDate(2026, 3, 10)} {...navLabels} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

@@ -2,10 +2,10 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, describedTexts, familyOf, installOverlayShims } from "../../../__test__/familyRoots.js"
+import { FAMILY_ROOTS, describedTexts, familyOf, installDomShims } from "../../../__test__/grammarRoots.js"
 import { Slider, type SliderValue } from "./index.js"
 
-installOverlayShims()
+installDomShims()
 afterEach(cleanup)
 
 describe.each(FAMILY_ROOTS)("Slider under %s", (family, Root) => {

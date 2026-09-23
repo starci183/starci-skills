@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { FAMILY_ROOTS, describedTexts, familyOf } from "../../../__test__/familyRoots.js"
+import { FAMILY_ROOTS, describedTexts, familyOf } from "../../../__test__/grammarRoots.js"
 import { Field, fieldPresentationState } from "./index.js"
 
 afterEach(cleanup)

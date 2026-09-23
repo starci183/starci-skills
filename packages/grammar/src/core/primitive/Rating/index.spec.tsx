@@ -2,14 +2,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Rating } from "./index.js"
 
 afterEach(cleanup)
 
 const valueLabel = (value: number, max: number) => `${value} of ${max}`
 
-describe.each(FAMILY_ROOTS)("Rating under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Rating under %s", (family, wrap) => {
     it("is a native radio group with one named option per position", () => {
         render(wrap(<Rating label="Quality" defaultValue={3} valueLabel={valueLabel} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

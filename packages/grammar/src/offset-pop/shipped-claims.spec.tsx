@@ -234,6 +234,11 @@ describe("Shipped Offset Pop rules land on rendered Common hooks", () => {
      * Common row can contain an `a` or `button`. The family keeps these selectors intentionally for
      * the interactive rows the navigation lane's List/ListBox will render; flip this to `it` when that
      * renderer lands and add one of its rows to HOOK_GALLERY.
+     *
+     * Still pinned after the navigation merge (0.5.0): `ListBox` landed, but its rows emit
+     * `data-grammar-list-item` (a `role="option"`, which may not hold a link or button) and take their
+     * own family treatment from `components-navigation.css`; no new renderer emits `data-grammar-row`,
+     * so these two selectors still reach nothing.
      */
     it.fails("reaches a rendered Common row with the family's row-action treatment", () => {
         mountGallery(HOOK_GALLERY)

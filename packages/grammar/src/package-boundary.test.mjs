@@ -56,10 +56,12 @@ test("every export target is a built dist file", async () => {
 })
 
 test("each family ships its runtime modules and stylesheet, and no specs", async () => {
+    const groups = ["forms", "overlays", "navigation"].map((group) => `components-${group}.css`)
     const shipped = {
+        common: ["index.js", "index.d.ts", "styles.css", ...groups],
         core: ["index.js", "index.d.ts", "dna.js", "dna.d.ts", "styles.css"],
         heritage: ["index.js", "index.d.ts", "styles.css"],
-        "offset-pop": ["index.js", "index.d.ts", "dna.js", "dna.d.ts", "conformance.js", "conformance.d.ts", "styles.css"],
+        "offset-pop": ["index.js", "index.d.ts", "dna.js", "dna.d.ts", "conformance.js", "conformance.d.ts", "styles.css", ...groups],
     }
     for (const [family, files] of Object.entries(shipped)) {
         for (const file of files) assert.equal(await exists(`dist/${family}/${file}`), true, `missing dist/${family}/${file}`)
@@ -104,6 +106,10 @@ test("Offset Pop's stylesheet layers over Common alone", async () => {
     const css = await readFile(new URL("dist/offset-pop/styles.css", packageRoot), "utf8")
     const imports = [...css.matchAll(/@import\s+"([^"]+)"/g)].map((match) => match[1])
     assert.equal(imports[0], "../common/styles.css")
+    for (const local of imports.slice(1)) {
+        assert.match(local, /^\.\/components-[a-z]+\.css$/)
+        assert.equal(await exists(`dist/offset-pop/${local.slice(2)}`), true, `dist/offset-pop misses ${local}`)
+    }
     assert.equal(imports.some((specifier) => /core|heritage/.test(specifier)), false)
     assert.match(css, /@layer starci-grammar-offset-pop\s*\{/)
 })

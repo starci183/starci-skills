@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope, installVendorDomStubs } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope, installDomShims } from "../../../__test__/grammarRoots.js"
 import { Breadcrumbs } from "./index.js"
 
-beforeAll(installVendorDomStubs)
+beforeAll(installDomShims)
 afterEach(cleanup)
 
 const trail = [
@@ -13,7 +13,7 @@ const trail = [
     { id: "atlas", label: "Atlas", href: "/projects/atlas" },
 ]
 
-describe.each(FAMILY_ROOTS)("Breadcrumbs under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Breadcrumbs under %s", (family, wrap) => {
     it("renders a named navigation landmark with an ordered trail", () => {
         render(wrap(<Breadcrumbs label="Breadcrumb" items={trail} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

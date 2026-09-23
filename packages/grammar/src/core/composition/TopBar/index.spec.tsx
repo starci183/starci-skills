@@ -2,14 +2,14 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { TopBar } from "./index.js"
 
 afterEach(cleanup)
 
 const navigation = <nav aria-label="Primary"><a href="/a">A</a><a href="/b" aria-current="page">B</a></nav>
 
-describe.each(FAMILY_ROOTS)("TopBar under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("TopBar under %s", (family, wrap) => {
     it("is the banner landmark with brand, navigation and action slots", () => {
         render(wrap(<TopBar brand={<a href="/">Brand</a>} navigation={navigation} actions={<button type="button">Search</button>} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

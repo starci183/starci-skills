@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Avatar, avatarInitials } from "./index.js"
 
 afterEach(cleanup)
@@ -14,7 +14,7 @@ describe("avatarInitials", () => {
     })
 })
 
-describe.each(FAMILY_ROOTS)("Avatar under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Avatar under %s", (family, wrap) => {
     it("is a named image with an initials fallback while the image is unavailable", () => {
         render(wrap(<Avatar name="Ada Lovelace" src="/ada.png" size="lg" />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

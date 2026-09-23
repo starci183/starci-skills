@@ -2,10 +2,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope, installVendorDomStubs } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope, installDomShims } from "../../../__test__/grammarRoots.js"
 import { Accordion } from "./index.js"
 
-beforeAll(installVendorDomStubs)
+beforeAll(installDomShims)
 afterEach(cleanup)
 
 const items = [
@@ -16,7 +16,7 @@ const items = [
 
 const states = () => [...document.querySelectorAll(".starci-core-generic-accordion-item")].map((node) => node.getAttribute("data-grammar-disclosure-state"))
 
-describe.each(FAMILY_ROOTS)("Accordion under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Accordion under %s", (family, wrap) => {
     it("renders a named group of heading-wrapped triggers", () => {
         render(wrap(<Accordion label="Settings" items={items} defaultExpandedIds={["access"]} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

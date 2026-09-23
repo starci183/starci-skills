@@ -119,11 +119,11 @@
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item][data-selected] {
-        color: var(--accent);
+        color: var(--offset-pop-accent-text);
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item][data-grammar-tone="negative"] {
-        color: var(--offset-pop-critical);
+        color: color-mix(in srgb, var(--offset-pop-critical) 65%, var(--offset-pop-ink));
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-section] + [data-grammar-menu-section],

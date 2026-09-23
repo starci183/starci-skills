@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { BottomNav } from "./index.js"
 
 afterEach(cleanup)
@@ -15,7 +15,7 @@ const items = [
     { id: "me", label: "Me", icon: glyph, href: "/me", isDisabled: true },
 ]
 
-describe.each(FAMILY_ROOTS)("BottomNav under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("BottomNav under %s", (family, wrap) => {
     it("is a named navigation landmark whose current destination carries aria-current", () => {
         render(wrap(<BottomNav label="Primary" items={items} currentId="search" />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

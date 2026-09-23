@@ -2,10 +2,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope, installVendorDomStubs } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope, installDomShims } from "../../../__test__/grammarRoots.js"
 import { Pagination, paginationTokens } from "./index.js"
 
-beforeAll(installVendorDomStubs)
+beforeAll(installDomShims)
 afterEach(cleanup)
 
 const labels = { previousLabel: "Previous", nextLabel: "Next", pageLabel: (page: number) => `Page ${page}` }
@@ -20,7 +20,7 @@ describe("paginationTokens", () => {
     })
 })
 
-describe.each(FAMILY_ROOTS)("Pagination under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Pagination under %s", (family, wrap) => {
     it("is a named navigation landmark whose current page carries aria-current", () => {
         render(wrap(<Pagination label="Results pages" page={5} pageCount={10} onPageChange={() => {}} {...labels} summary="41-50 of 94" />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

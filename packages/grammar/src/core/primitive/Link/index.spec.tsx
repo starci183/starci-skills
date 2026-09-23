@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Link } from "./index.js"
 
 afterEach(cleanup)
 
-describe.each(FAMILY_ROOTS)("Link under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Link under %s", (family, wrap) => {
     it("renders a real internal anchor with kind, visited and current hooks", () => {
         render(wrap(<Link href="/docs">Docs</Link>))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

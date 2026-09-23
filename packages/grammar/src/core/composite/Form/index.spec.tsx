@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, describedTexts, familyOf } from "../../../__test__/familyRoots.js"
+import { FAMILY_ROOTS, describedTexts, familyOf } from "../../../__test__/grammarRoots.js"
 import { Button } from "../../primitive/Button/index.js"
 import { Textarea } from "../../primitive/Textarea/index.js"
 import { SearchField } from "../../primitive/SearchField/index.js"

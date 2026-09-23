@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Stepper, stepStateFor } from "./index.js"
 
 afterEach(cleanup)
@@ -21,7 +21,7 @@ describe("stepStateFor", () => {
     })
 })
 
-describe.each(FAMILY_ROOTS)("Stepper under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Stepper under %s", (family, wrap) => {
     it("renders an ordered, named progress list with one current step", () => {
         render(wrap(<Stepper label="Sign-up progress" steps={steps} currentStepId="details" stateLabel={(state) => state === "complete" ? "completed" : undefined} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

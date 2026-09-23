@@ -40,7 +40,10 @@ describe("Form components registry", () => {
 
 describe("Common form anatomy CSS", () => {
     it("is imported by the Common entry and stays inside the Common layer", () => {
-        expect(commonEntry.split("\n")[0]).toBe("@import \"./components-forms.css\";")
+        // Every component sheet is imported right after the layer-order statement, before any rule.
+        const entryHead = commonEntry.slice(0, commonEntry.indexOf("@layer starci-grammar-common {")).replace(/\/\*[\s\S]*?\*\//g, "").trim()
+        expect(entryHead).toMatch(/^@layer [^;{]+;(?:\s*@import "[^"]+";)+$/)
+        expect(entryHead).toContain("@import \"./components-forms.css\";")
         const css = withoutComments(commonCss)
         expect(css.trim().startsWith("@layer starci-grammar-common {")).toBe(true)
         expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i)

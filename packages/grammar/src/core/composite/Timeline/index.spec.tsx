@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import type { PresentationState } from "../../../common/state.js"
 import { Timeline } from "./index.js"
 
@@ -13,7 +13,7 @@ const events = [
     { id: "delivered", title: "Delivered", state: "pending" as const },
 ]
 
-describe.each(FAMILY_ROOTS)("Timeline under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Timeline under %s", (family, wrap) => {
     it("renders a named ordered history with state and current hooks", () => {
         render(wrap(<Timeline label="Order history" items={events} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

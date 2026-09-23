@@ -2,10 +2,10 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope, installVendorDomStubs } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope, installDomShims } from "../../../__test__/grammarRoots.js"
 import { DataTable, type DataTableSort } from "./index.js"
 
-beforeAll(installVendorDomStubs)
+beforeAll(installDomShims)
 afterEach(cleanup)
 
 type Invoice = { readonly id: string; readonly customer: string; readonly amount: number }
@@ -25,7 +25,7 @@ const cell = (row: Invoice, columnId: string) => columnId === "customer" ? row.c
 
 const tableFrame = () => document.querySelector("[data-component='DataTable']")
 
-describe.each(FAMILY_ROOTS)("DataTable under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("DataTable under %s", (family, wrap) => {
     it("renders a named table with header, row headers and its own scroll owner", () => {
         render(wrap(<DataTable label="Invoices" columns={columns} rows={rows} renderCell={cell} emptyContent="None" stickyHeader maxBlockSize="20rem" />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

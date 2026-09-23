@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { FAMILY_ROOTS, describedTexts, familyOf, installOverlayShims } from "../../../__test__/familyRoots.js"
+import { FAMILY_ROOTS, describedTexts, familyOf, installDomShims } from "../../../__test__/grammarRoots.js"
 import type { ListOption } from "../Select/index.js"
 import { ComboBox } from "./index.js"
 
-installOverlayShims()
+installDomShims()
 afterEach(cleanup)
 
 const OPTIONS: ReadonlyArray<ListOption> = [

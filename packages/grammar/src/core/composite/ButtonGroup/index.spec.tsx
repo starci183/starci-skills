@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { FAMILY_ROOTS, familyOf } from "../../../__test__/familyRoots.js"
+import { FAMILY_ROOTS, familyOf } from "../../../__test__/grammarRoots.js"
 import { Button } from "../../primitive/Button/index.js"
 import { ButtonGroup } from "./index.js"
 

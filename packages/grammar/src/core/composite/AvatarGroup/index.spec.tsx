@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { AvatarGroup } from "./index.js"
 
 afterEach(cleanup)
@@ -9,7 +9,7 @@ afterEach(cleanup)
 const people = ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Katherine Johnson", "Edsger Dijkstra"]
     .map((name, index) => ({ id: `p${index}`, name }))
 
-describe.each(FAMILY_ROOTS)("AvatarGroup under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("AvatarGroup under %s", (family, wrap) => {
     it("names the group, draws the first `max` avatars and announces the overflow", () => {
         render(wrap(<AvatarGroup label="Members" items={people} max={3} overflowLabel={(count) => `${count} more`} />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))

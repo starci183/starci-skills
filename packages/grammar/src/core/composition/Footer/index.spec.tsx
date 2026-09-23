@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { FAMILY_ROOTS, expectedFamilyScope } from "../../../__test__/navigationFamilies.js"
+import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
 import { Footer } from "./index.js"
 
 afterEach(cleanup)
@@ -11,7 +11,7 @@ const groups = [
     { id: "company", label: "Company", links: [{ id: "blog", label: "Blog", href: "https://example.com/blog", kind: "external" as const }] },
 ]
 
-describe.each(FAMILY_ROOTS)("Footer under %s", (family, wrap) => {
+describe.each(FAMILY_WRAPS)("Footer under %s", (family, wrap) => {
     it("is the contentinfo landmark with a named link directory of labelled groups", () => {
         render(wrap(<Footer label="Footer" brand={<span>Brand</span>} groups={groups} legal={<small>Legal</small>} externalHint="opens a new tab" />))
         expect(screen.getByTestId("grammar-root").getAttribute("data-grammar-family")).toBe(expectedFamilyScope(family))
