@@ -38,7 +38,7 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    Eighteen verbs. Pure reads return projections and touch no row (survey,
+    Twenty verbs. Pure reads return projections and touch no row (survey,
     status, hierarchy, op-contract) and `estimate` computes slice sizing from
     modules/models/runtimes.yaml without reading the ledger at all; `observe`
     is the kernel's window onto its own job's exact op terminal screen —
@@ -47,7 +47,7 @@ about:
     writes contracts, report files reports, consume-report integrates, check
     records re-runs); the rest are
     single ledger transactions that each append one hash-chained event (plan,
-    enqueue, route, dispatch, reconcile, nudge, observe, settle, incident, finish). Every command prints
+    enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, settle, incident, finish). Every command prints
     one JSON object to stdout; a refusal exits non-zero with {ok:false,
     reason} — a refusal is a fact for the driver loop, never a crash to route
     around. The op lifecycle is fixed: enqueue -> route (model decision
@@ -171,7 +171,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-nudge-ready|worker-wedged|engaged|ask-reserve|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-question|worker-nudge-ready|worker-wedged|engaged|ask-reserve|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.staleOperations': >-
         [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
         whose law inputs changed since dispatch, which the Kernel re-dispatches as a new attempt
@@ -211,6 +211,14 @@ commands:
       awaitingOwner: '[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means the Kernel re-enqueues the op now, `pending` means the owner has not answered'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
+      workerQuestions: >-
+        [{messageId, jobId, opId, attempt, question, options[], askedAt, bridged}] — pending
+        `question` messages a running worker sent its coordinator with an Orca orchestration ask
+        (Orca's preamble tells it to), read through the non-consuming host inbox
+        (scripts/api/orca/orch-inbox.mjs) whenever a live operation terminal exists, plus rows `api
+        questions` already bridged. Any entry makes the frontier `worker-question` (actionable): the
+        worker is blocked until `api reply` answers (inc-b944cbaef24b, inc-20449a260df8).
+        workerQuestionsError names an unreadable host inbox; status never writes the bridge itself
       cutSets: >-
         [{op, id, total, passed[], open[], jobs:{<ordinal>:{jobId,status}}, closingOrdinal?, closingJob?,
         closingCheck?}] — every cut set of the workflow with an ordinal whose latest job has not settled
@@ -686,6 +694,56 @@ commands:
       observation cadence on a running op keeps
       reasoning context alive before nudge/settle-fail decisions;
       observation never substitutes for report/checks
+
+  # --------------------------------------------------------------------------
+  # WORKER QUESTIONS — the bridge for a worker that asked through Orca instead
+  # of filing `api report --outcome ask`. Orca's preamble tells every worker to
+  # reach its coordinator with an Orca orchestration ask; the coordinator is the
+  # Kernel terminal, which never calls Orca. Without these verbs the questions
+  # sat unanswered while the workers waited (inc-b944cbaef24b,
+  # inc-20449a260df8). The op contract is unchanged - an owner question is an
+  # outcome ask carried by serve-ask - and the runtime still never strands a
+  # worker that asked the other way.
+  # --------------------------------------------------------------------------
+
+  questions:
+    args: '--workflow <id>'
+    reads: >-
+      the workflow's Orca Runs (payload orca/managed/hierarchy runId of its jobs); the host inbox
+      through scripts/api/orca/orch-inbox.mjs (calls.yaml `inbox`, a read that acknowledges and marks
+      nothing); every `question` row of those Runs, joined to the job whose dispatch
+      (from_handle dispatch:<id> or payload.dispatchId) or terminal handle asked it; inbox rows of
+      kind worker-question
+    writes: >-
+      one inbox row per new pending question {kind: worker-question, key: <message id>,
+      payload {messageId, runId, jobId, opId, attempt, dispatchId, taskId, question, options[],
+      subject, askedAt}, status pending} and event 'worker-question-bridged'; a bridged row whose job
+      settled or that got a reply in Orca directly is closed status done {reason}
+    returns: '{ok:true, workflowId, bridged, closed, pending:[{messageId, jobId, opId, attempt, question, options[], state:pending, bridged}], error?}'
+    refuses:
+      - workflow-unknown
+    usedBy: 'drive.wait when status frontier is worker-question: bridge, read each question, then answer with api reply'
+
+  reply:
+    args: '--workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])'
+    reads: 'the pending worker question (questions above), the job it belongs to'
+    writes: >-
+      Orca `reply` to the exact question message through scripts/api/orca/orch-reply.mjs (calls.yaml
+      `reply`; --run is the question's Run and Orca resolves --from to the calling Kernel terminal), then
+      the worker-question inbox row -> status applied {reply, toOwner, at} (inserted applied when it
+      was never bridged) and event 'worker-question-answered'. A reply is technical guidance inside the
+      job's existing contract and authority - never new scope, paths, retry or owner intent (the api
+      never answers an owner's decision). --to-owner sends the fixed routing reply instead: the worker
+      files the question as `api report --outcome ask` and ends its turn, so askLifecycle and serve-ask
+      carry it to the owner exactly like any other ask.
+    returns: '{ok:true, workflowId, messageId, jobId, toOwner, body}'
+    refuses:
+      - workflow-unknown
+      - reply-body-missing: 'neither --body nor --to-owner'
+      - question-unknown: 'no question message with that id in the workflow''s Runs'
+      - 'question-answered / question-replied-elsewhere / question-job-settled / question-unmatched: the question no longer waits on this Kernel (already answered, answered in Orca, its job settled, or no job of this workflow asked it)'
+      - 'reply-failed (field `reason`): the Orca reply did not land; nothing is written and the question stays pending'
+    usedBy: 'drive.wait — answer every pending worker question before yielding'
 
   # --------------------------------------------------------------------------
   # OP IPC — the durable worker<->kernel channel. contracts out, reports in,

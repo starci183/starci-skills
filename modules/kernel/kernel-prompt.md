@@ -194,7 +194,10 @@ LOOP:
     poll/wake a running op may be observed at the allocation.observeCadenceMs
     cadence via
     `api observe --job <id>` (read-only context before nudge/settle, never
-    evidence) → `turn-idle` worker with no report gets exactly `api nudge --job <id>` → worker files
+    evidence) → `turn-idle` or `staged-input` worker with no report gets exactly `api nudge --job <id>`
+    (a staged paste gets one Enter) → a worker question (status `workerQuestions`, frontier
+    `worker-question`) gets `api questions` then `api reply --message <id>` with `--body` for technical
+    guidance inside its contract or `--to-owner` for an owner decision → worker files
     api report → api consume-report (integrated) → re-run the op's checks →
     api check (results recorded) → api settle (enforces the consumed report,
     releases the worker; verify evidence BYTES — an op's last words are never

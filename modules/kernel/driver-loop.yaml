@@ -251,7 +251,16 @@ tick:
       detector, not free capacity (the api keeps unproved leases held).
       `frontier.state=worker-nudge-ready` is never a wait reason: immediately
       call `api nudge` for each exact id in `frontier.nudgeReadyJobs` before
-      applying any age/wedge threshold. `orphaned-frontier` is likewise an
+      applying any age/wedge threshold. A worker with `staged-input` liveness
+      holds an unsubmitted paste: api nudge submits it with one Enter.
+      `frontier.state=worker-question` is not a wait either: a worker asked its
+      coordinator through an Orca orchestration ask and blocks until answered
+      (inc-b944cbaef24b). Run `api questions --workflow <id>`, then for each
+      pending question `api reply --message <id> --body <answer>` when it is
+      technical guidance inside the job's contract and authority, or
+      `api reply --message <id> --to-owner` when only the owner can decide -
+      the worker then files it as an outcome ask and serve-ask carries it. A
+      reply never grants scope, paths, retries or owner intent. `orphaned-frontier` is likewise an
       immediate technical plan/repair transition, not a reason to yield.
       `worker-wedged` is not a wait either: api observe each id in
       `frontier.wedgedJobs` once, then api nudge it to interrupt the stuck

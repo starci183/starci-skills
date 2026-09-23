@@ -356,8 +356,21 @@ else if (verb === 'orchestration check')
   out({ ok: true, result: { deliveries: [] } });
 else if (verb === 'orchestration send')
   out({ ok: true, result: { sent: true } });
-else if (verb === 'orchestration reply')
-  out({ ok: true, result: { replied: arg('id') } });
+// state.messages seeds the orchestration inbox (newest first, Orca's row shape);
+// a reply is recorded in state.replies and threaded onto the inbox like Orca does.
+else if (verb === 'orchestration inbox')
+  out({ ok: true, result: { messages: (state.messages || []).slice(0, Number(arg('limit')) || undefined), count: (state.messages || []).length } });
+else if (verb === 'orchestration reply') {
+  if (process.env.STARCI_FAKE_ORCA_REPLY_FAILS === '1')
+    fail({ ok: false, error: { code: 'message_not_found', message: 'no such question' } });
+  const question = (state.messages || []).find(m => m.id === arg('id'));
+  state.replies = [...(state.replies || []), { id: arg('id'), body: arg('body'), run: arg('run') }];
+  state.messages = [{ id: 'msg_reply_' + state.replies.length, run_id: question?.run_id ?? arg('run'), from_handle: 'run:' + (question?.run_id ?? arg('run')),
+    to_handle: question?.from_handle ?? null, subject: 'Re: Question', body: arg('body'), type: 'status', thread_id: arg('id'), payload: null,
+    read: 0, created_at: new Date().toISOString() }, ...(state.messages || [])];
+  save();
+  out({ ok: true, result: { message: { id: 'msg_reply_' + state.replies.length, thread_id: arg('id') } } });
+}
 // ---- misc reads ----
 else if (verb === 'worktree show')
   out({ ok: true, result: { worktree: { id: arg('worktree'), path: arg('worktree') } } });

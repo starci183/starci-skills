@@ -203,7 +203,32 @@ calls:
     timeoutMs: 960000
     flags: [terminal, run, ack, unread, peek, all, types, wait, timeout-ms]
     receipt: [result]
-    note: --ack acknowledges the prior Delivery; a wait timeout is outcome ok with an empty batch. recipes.yaml accept-operation and wait-operation-boundary name this call; scripts/api/orca/ has no wrapper for it, so StarCi does not issue it yet.
+    note: --ack acknowledges the prior Delivery; a wait timeout is outcome ok with an empty batch. recipes.yaml accept-operation and wait-operation-boundary name this call; scripts/api/orca/ has no wrapper for it, so StarCi does not issue it yet. A check is fenced to the caller's bound Run (consumer_fenced), which is why worker questions are read through `inbox` instead.
+  inbox:
+    command: orchestration inbox
+    kind: read
+    flags: [limit, terminal, full]
+    receipt: [result.messages]
+    note: >-
+      Non-consuming read across recipients, newest first: no Delivery is acknowledged and no message is
+      marked read, and unlike `check` it is not fenced to the caller's bound Run. scripts/kernel/api.mjs
+      reads worker `question` messages of the workflow's Runs through scripts/api/orca/orch-inbox.mjs, so a
+      worker that used `orca orchestration ask` is never stranded behind a Kernel that may not call Orca
+      (inc-b944cbaef24b, inc-20449a260df8). Rows carry {id, run_id, from_handle (dispatch:<id> or a
+      terminal handle), type, subject, body, thread_id, payload JSON text {taskId, dispatchId, question,
+      options}, created_at}; a reply is a later row whose thread_id is the question's id.
+  reply:
+    command: orchestration reply
+    kind: mutation
+    replay: none
+    flags: [id, body, run, from]
+    required: [id, body]
+    receipt: [result]
+    note: >-
+      Answers one worker `question` message; the worker's blocking ask returns with the body. Issued only by
+      `api reply` (scripts/api/orca/orch-reply.mjs) from the Kernel's own terminal, so Orca resolves --from to
+      the Run's coordinator. No retry-request replay: a duplicate reply is a second message, so an unknown
+      result is re-read with `inbox` (a row whose thread_id is the question id) before any retry.
   send:
     command: orchestration send
     kind: mutation
