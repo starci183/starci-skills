@@ -1163,6 +1163,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   chưa onboarding (~/.claude.json thiếu hasCompletedOnboarding); cần thầy chạy claude một lần. 242 bản ghi worker Orca giữ
   lại (identity_unproven) không giải phóng được bằng CLI; chỉ orchestration reset (toàn cục) xóa được.
 
+- 13:44 Chờ thầy onboarding Claude Code (hasCompletedOnboarding vẫn chưa có). 4 workflow mới queued, chưa kernel, chưa watchdog.
+  Hai worker cũ nộp report muộn (Collab backend.implement a8 done 05:59, WSPV interface.implement a39 done 06:01) vào workflow đã finish:
+  code của chúng đã commit trong repo, workflow mới sẽ khảo sát lại.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
