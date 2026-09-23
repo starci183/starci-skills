@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
+import {withLedger,seedWorkflow,awaitExit} from './_ledger-fixture.mjs';
 import {openAsks} from '../scripts/supervisor/poll.mjs';
 
 // The ask-report lifecycle in the ledger: modules/kernel/api.yaml askLifecycle.
@@ -124,16 +124,18 @@ test('api serve-ask launches the form for a filed ask and refuses one that was n
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
     seedAskReport(ledger,{dispatchId:'ctx_api'});
     const API=path.join(ROOT,'scripts','kernel','api.mjs');
-    const api=(...a)=>spawnSync(process.execPath,[API,'serve-ask','--repo',repoRoot,'--workflow',WORKFLOW,...a,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
+    const api=(...a)=>spawnSync(process.execPath,[API,'serve-ask','--repo',repoRoot,'--workflow',WORKFLOW,...a,'--json'],
+      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000,env:{...process.env,STARCI_CONNECTORS_OFF:'1'}});
     const refused=api('--dispatch','ctx_nope');
     assert.notEqual(refused.status,0);
     assert.match(refused.stderr,/ask-unknown/);
     const r=api('--dispatch','ctx_api','--ttl','400');
     assert.equal(r.status,0,r.stderr||r.stdout);
-    assert.equal(JSON.parse(r.stdout).dispatchId,'ctx_api');
-    // The detached form binds, records ask-serving, and expires on its ttl.
-    const until=Date.now()+20000;
-    while(Date.now()<until&&askEvents(ledger,'ask-serving-expired').length===0) await new Promise(res=>setTimeout(res,250));
+    const out=JSON.parse(r.stdout);
+    assert.equal(out.dispatchId,'ctx_api');
+    // The detached form binds, records ask-serving, and expires on its ttl. It holds the ledger open
+    // until it exits, and writes ask-serving-expired just before that, so await the pid, not the event.
+    assert.equal(await awaitExit(out.pid),true,`serve-ask pid ${out.pid} exits on its ttl`);
     assert.deepEqual(askEvents(ledger,'ask-serving').map(p=>p.dispatchId),['ctx_api']);
     assert.deepEqual(askEvents(ledger,'ask-serving-expired').map(p=>p.dispatchId),['ctx_api']);
   });

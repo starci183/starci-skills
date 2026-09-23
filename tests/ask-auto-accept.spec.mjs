@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
+import {withLedger,seedWorkflow,awaitExit} from './_ledger-fixture.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {recommendationOf,textRecommendation,askExclusionOf,autoAcceptDecision,AUTO_ACCEPTED_BY} from '../scripts/kernel/ask-recommendation.mjs';
 import {validateConfig,askAutoAcceptPolicy,ASKS_DEFAULTS} from '../engine/config.mjs';
@@ -257,8 +257,8 @@ test('api serve-ask launches the form for a handover ask even when it carries a 
     const out=JSON.parse(r.stdout);
     assert.equal(out.servedBy,'scripts/kernel/serve-ask.mjs');
     assert.equal(out.autoAccepted,undefined);
-    const until=Date.now()+20000;
-    while(Date.now()<until&&events(ledger,'ask-serving-expired').length===0)await new Promise(res=>setTimeout(res,250));
+    // The detached form holds the ledger open until it exits; its expired event lands just before that.
+    assert.equal(await awaitExit(out.pid),true,`serve-ask pid ${out.pid} exits on its ttl`);
     assert.deepEqual(events(ledger,'ask-serving').map(p=>p.dispatchId),['ctx_handover']);
     assert.deepEqual(events(ledger,'ask-auto-accepted'),[]);
   });

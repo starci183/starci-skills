@@ -46,7 +46,7 @@ emit({type:'postcondition',id:'signed-in',expected:'Account home',observed:'Acco
     humanGates:[{id:'gate.otp',flowId:'flow.login',afterStepId:'open',class:'secret-entry',reason:'OTP stays in browser',prompt:'Enter the OTP in the visible browser, then reply ok, fail, or cancel.',responseSchema:{type:'string',enum:['ok','fail','cancel']},evidenceRequired:['post-login screenshot']}],
     scripts:[{flowId:'flow.login',path:'playwright/flow-login.spec.ts',sha256:digestFile(scriptFile),command:['playwright','test'],cwd:temp}],
     sessionManifest:{path:'session-manifest.yaml'},redaction:{path:'redaction.yaml',sha256:digestFile(redactionFile)},cleanup:{path:'cleanup.yaml',sha256:digestFile(cleanupFile)},
-    receipt:{schema:'starci/assisted-uat-receipt@1',pathTemplate:'receipts/{runId}.yaml',immutable:true},limits:{timeoutMs:10000,retries:0}};
+    receipt:{schema:'starci/assisted-uat-receipt@1',pathTemplate:'receipts/{runId}.yaml',immutable:true},limits:{timeoutMs:30000,retries:0}};
   request.bindings=computeRequestBindings(request);
   write(requestFile,request);
   const requestDigest=digestFile(requestFile),scripts=request.scripts.map(({flowId,path,sha256})=>({flowId,path,sha256}));

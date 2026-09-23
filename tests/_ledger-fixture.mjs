@@ -54,6 +54,19 @@ export function trackHandles(t){
  */
 export const sameDriveTmp=()=>path.join(path.parse(process.cwd()).root,'starci-tmp');
 
+/**
+ * Resolve once `pid` has exited (true) or `timeoutMs` passed (false). A detached child a spec launched
+ * through `api serve-ask` holds the fixture's ledger open until it exits, and it writes its last event
+ * (`ask-serving-expired`) *before* `process.exit`: a spec that stops at that event lets `t.after`'s
+ * `rmSync` race the child's handle and EPERM on Windows under full-suite load. Await the pid, not the event.
+ */
+export async function awaitExit(pid,{timeoutMs=30000}={}){
+  const alive=()=>{try{process.kill(pid,0);return true;}catch(error){return error.code==='EPERM';}};
+  const until=Date.now()+timeoutMs;
+  while(alive()){if(Date.now()>=until)return false;await new Promise(res=>setTimeout(res,100));}
+  return true;
+}
+
 export function withLedger(t,fn,{parentDir=os.tmpdir()}={}){
   fs.mkdirSync(parentDir,{recursive:true});
   const root=fs.mkdtempSync(path.join(parentDir,'starci-ledger-'));

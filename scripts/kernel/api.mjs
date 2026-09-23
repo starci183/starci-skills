@@ -4297,6 +4297,7 @@ function reapIfStillLive(db, job, payload, handle) {
 
 /* ------------------------------------------------------------- serve-ask */
 function ensureAskConnectors() {
+  if (process.env.STARCI_CONNECTORS_OFF === '1') return null;
   let cf = null;
   try { cf = connectorsConfig()?.cloudflare ?? null; } catch { return null; }
   if (!cf || cf.mode === 'off') return null;

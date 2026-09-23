@@ -193,7 +193,12 @@ const signalFileOf=(runDir,gateId)=>path.join(signalsDirOf(runDir),`${sha256(gat
 const writeAtomic=(file,value)=>{
   fs.mkdirSync(path.dirname(file),{recursive:true});
   const tmp=`${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
-  fs.writeFileSync(tmp,stringifyYaml(value),{flag:'wx'});fs.renameSync(tmp,file);
+  fs.writeFileSync(tmp,stringifyYaml(value),{flag:'wx'});
+  // Windows refuses a rename over a file another process holds open (a waiter's readState, the other writer).
+  for(let i=0;;i++){try{fs.renameSync(tmp,file);return;}catch(error){
+    if(i>=20||!['EPERM','EBUSY','EACCES'].includes(error.code)){try{fs.rmSync(tmp,{force:true});}catch{}throw error;}
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25*(i+1));
+  }}
 };
 const readState=runDir=>readYaml(stateFileOf(runDir));
 const writeState=(prepared,state)=>writeAtomic(stateFileOf(prepared.runDir),state);
@@ -210,20 +215,23 @@ const pidAlive=pid=>{if(!Number.isInteger(pid)||pid<1)return false;try{process.k
 const waitForChange=(prepared,after,timeoutMs)=>new Promise((resolve,reject)=>{
   const current=()=>{try{return readState(prepared.runDir);}catch{return null;}};
   const ready=state=>state&&((state.revision??0)>after||TERMINAL_PHASES.has(state.phase));
-  let state=current();if(ready(state)){resolve(state);return;}
   const control=path.dirname(stateFileOf(prepared.runDir));
   let done=false,watcher,timer;
   const finish=(error,value)=>{if(done)return;done=true;try{watcher?.close();}catch{}clearTimeout(timer);error?reject(error):resolve(value);};
-  watcher=fs.watch(control,()=>{const next=current();if(ready(next))finish(null,next);});
+  const check=()=>{const next=current();if(ready(next))finish(null,next);};
+  // Watch before the first read: a write landing between a read and the watch is otherwise lost until the timeout.
+  watcher=fs.watch(control,check);
   timer=setTimeout(()=>finish(Object.assign(new Error('event wait timed out'),{code:'assisted-uat-timeout'})),timeoutMs);
+  check();
 });
 const waitForSignal=(prepared,gateId,timeoutMs)=>new Promise((resolve,reject)=>{
   const file=signalFileOf(prepared.runDir,gateId),read=()=>fs.existsSync(file)?readYaml(file):null;
-  const first=read();if(first){resolve(first);return;}
   let done=false,watcher,timer;
   const finish=(error,value)=>{if(done)return;done=true;try{watcher?.close();}catch{}clearTimeout(timer);error?reject(error):resolve(value);};
-  watcher=fs.watch(signalsDirOf(prepared.runDir),()=>{const signal=read();if(signal)finish(null,signal);});
+  const check=()=>{const signal=read();if(signal)finish(null,signal);};
+  watcher=fs.watch(signalsDirOf(prepared.runDir),check);
   timer=setTimeout(()=>finish(Object.assign(new Error(`gate ${gateId} timed out`),{code:'assisted-uat-timeout'})),timeoutMs);
+  check();
 });
 
 const redactionPolicy=prepared=>{
@@ -317,7 +325,10 @@ const workerMain=async prepared=>{
   const env=Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames].filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
   Object.assign(env,{STARCI_ASSISTED_UAT_REQUEST:prepared.requestFile,STARCI_ASSISTED_UAT_RUN_DIR:prepared.runDir,STARCI_ASSISTED_UAT_PROTOCOL:PROTOCOL_PREFIX});
   const command=prepared.session.launch.command,launch=launchFor(command);
-  const child=spawn(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:false});
+  // The owner's headed session keeps its console. Under node --test that console is a Windows Terminal
+  // default-terminal handoff per run: a tab left open, and a handoff WT stalls under suite load, so the
+  // driver never starts and the run times out.
+  const child=spawn(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:Boolean(process.env.NODE_TEST_CONTEXT)});
   const childExit=new Promise(resolve=>{
     child.once('exit',code=>resolve(Number.isInteger(code)?code:1));
     child.once('error',error=>{protocolError=error;resolve(1);});
