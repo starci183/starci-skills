@@ -1107,6 +1107,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   --once mới. Đã dừng và khởi động lại 4 watchdog nivo (log nối tiếp), cả 4 báo idle-waiting đúng. Báo fork khởi động lại 4 watchdog
   starci-next và mia-mia.
 
+- 11:03 Yên. 4 watchdog mới chạy đúng (idle-waiting, không lỗi). Collab backend.implement a4 (routing) done, 4/8 pass, tasks
+  đang chạy, còn 3 dependency. WSPV worker implement active. Modules, AUTH chờ thầy. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
