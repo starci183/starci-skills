@@ -268,12 +268,30 @@
         box-shadow: var(--shadow-surface);
     }
 
-    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-option][data-focused="true"] {
+    /*
+     * Select and ComboBox options are interactive rows: the vendor moves focus onto the option under
+     * the pointer, so `data-focused` is the hover wash too, and a keyboard-focused option adds the
+     * family ring on its own edge. The selected option is the pink soft fill with the pink leading
+     * edge and the text-safe accent label, the same selected row a ListBox draws.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-option] {
+        transition: background-color var(--offset-pop-transition);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-option][data-focused="true"]:not([data-selected="true"]) {
         background: color-mix(in srgb, var(--offset-pop-yellow) 32%, transparent);
     }
 
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-option][data-focus-visible="true"] {
+        outline: 2px solid var(--focus);
+        outline-offset: 0;
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-option][data-selected="true"] {
+        background: var(--accent-soft);
+        color: var(--offset-pop-accent-text);
         font-weight: 800;
+        box-shadow: inset 0.25rem 0 0 var(--offset-pop-pink);
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-calendar-cell][data-selected="true"] {
@@ -345,6 +363,11 @@
             translate: none;
             transition: none;
         }
+
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-option] {
+            transform: none;
+            transition: none;
+        }
     }
 
     @media (forced-colors: active) {
@@ -362,6 +385,7 @@
         }
 
         .grammar-common-root[data-grammar-family="offset-pop"] [data-component="SegmentedControl"] [data-grammar-option][data-selected="true"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-option][data-selected="true"],
         .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-popover] [data-grammar-calendar-cell][data-selected="true"] {
             color: HighlightText;
             background: Highlight;

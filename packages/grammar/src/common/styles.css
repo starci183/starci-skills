@@ -1500,6 +1500,18 @@
         background: transparent !important;
     }
 
+    /*
+     * THE 44px TOUCH FLOOR, as the form controls spell it: on a touch pointer or a narrow viewport
+     * the menu target is at least 44px in both axes even where a consumer resizes the toggle. It is
+     * a MINIMUM, which the vendor never sets, so it owes no `!important`.
+     */
+    @media (pointer: coarse), (max-width: 40rem) {
+        .starci-core-subnav-toggle {
+            min-inline-size: var(--starci-core-control-min-size, 2.75rem);
+            min-block-size: var(--starci-core-control-min-size, 2.75rem);
+        }
+    }
+
     @media (min-width: 48rem) {
         .starci-core-navigation-feature-nav[data-grammar-navigation-feature-nav-destinations="absent"] .starci-core-navigation-feature-nav-primary {
             grid-template-columns: auto minmax(0, 1fr) !important;

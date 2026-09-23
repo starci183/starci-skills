@@ -1,19 +1,22 @@
 /** @vitest-environment jsdom */
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import type { ReactElement, ReactNode, SVGProps } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { installDomShims } from "../__test__/grammarRoots.js"
 import { cssRules } from "../__test__/styleClaims.js"
 import {
     Badge,
     Button,
+    DataTable,
     Divider,
     EmptyNotice,
     Heading,
     HorizontalScrollRegion,
     Input,
+    ListBox,
     NavigationFeatureNav,
     PageContainer,
     PRESENTATION_STATES,
@@ -21,6 +24,7 @@ import {
     Progress,
     Rail,
     SectionHeader,
+    Select,
     Sidebar,
     StaticStateRow,
     SurfaceAccordionCard,
@@ -177,10 +181,15 @@ const GEOMETRY_GALLERY = (
 const rulesReaching = (element: Element) => familyRules.filter((rule) => element.matches(reach(rule.selector)))
 
 /**
- * The family's row-action treatment (`:has(:is(a, button):hover)` wash and `:focus-within` ring)
- * names a row that holds an action. See the `it.fails` below for why no Common row does yet.
+ * The family's interactive-row treatment: a ListBox option, a Select/ComboBox option and a selectable
+ * DataTable row are each the pointer and focus target themselves, so their hover, focus and selected
+ * paint is keyed on the vendor's own state attributes on the row, in the component sheets.
  */
-const ROW_ACTION = /\[data-grammar-row\](?::focus-within|:has\()/
+const componentRules = (name: string) => cssRules(sheet(`src/offset-pop/${name}`)).flatMap((rule) => selectorList(rule.selector))
+const INTERACTIVE_ROW = /\[data-component="ListBox"\] \[data-grammar-list-item\]|\[data-grammar-popover\] \[data-grammar-option\]|\[data-component="DataTable"\] \[data-grammar-table-row\]/
+const interactiveRowSelectors = ["components-navigation.css", "components-forms.css"]
+    .flatMap(componentRules)
+    .filter((selector) => INTERACTIVE_ROW.test(selector))
 
 describe("Shipped Offset Pop stylesheet structure", () => {
     it("reads both packaged stylesheets", () => {
@@ -214,7 +223,6 @@ describe("Shipped Offset Pop rules land on rendered Common hooks", () => {
     it("reaches a rendered Common node with every family selector", () => {
         mountGallery(HOOK_GALLERY)
         const unreached = familyRules
-            .filter((rule) => !ROW_ACTION.test(rule.selector))
             .filter((rule) => document.querySelector(reach(rule.selector)) === null)
             .map((rule) => rule.selector)
         expect(unreached).toEqual([])
@@ -226,25 +234,73 @@ describe("Shipped Offset Pop rules land on rendered Common hooks", () => {
     })
 
     /*
-     * KNOWN GAP, kept on purpose: the row-action treatment has no Common row to land on yet.
-     *
-     * `[data-grammar-row]:has(:is(a, button):hover)` and `[data-grammar-row]:focus-within` give a
-     * hover wash and a focus ring to a row that holds an action. Today the only Common renderer that
-     * emits `data-grammar-row` is `StaticStateRow`, whose label and description are strings, so no
-     * Common row can contain an `a` or `button`. The family keeps these selectors intentionally for
-     * the interactive rows the navigation lane's List/ListBox will render; flip this to `it` when that
-     * renderer lands and add one of its rows to HOOK_GALLERY.
-     *
-     * Still pinned after the navigation merge (0.5.0): `ListBox` landed, but its rows emit
-     * `data-grammar-list-item` (a `role="option"`, which may not hold a link or button) and take their
-     * own family treatment from `components-navigation.css`; no new renderer emits `data-grammar-row`,
-     * so these two selectors still reach nothing.
+     * The row treatment used to be `[data-grammar-row]:has(:is(a, button):hover)` and
+     * `[data-grammar-row]:focus-within`, which no Common row could reach: StaticStateRow (the only
+     * `data-grammar-row` emitter) renders strings, and a ListBox option (`role="option"`) may not hold
+     * a link or button. Both were deleted; the rows that ARE interactive carry the treatment below.
+     * This renders them, drives each state for real (select, pointer hover, keyboard focus) and
+     * proves every interactive-row selector the family ships lands on a live row.
      */
-    it.fails("reaches a rendered Common row with the family's row-action treatment", () => {
-        mountGallery(HOOK_GALLERY)
-        const rowAction = familyRules.filter((rule) => ROW_ACTION.test(rule.selector))
-        expect(rowAction.length).toBeGreaterThan(0)
-        for (const rule of rowAction) expect(document.querySelector(reach(rule.selector)), rule.selector).not.toBeNull()
+    it("reaches a rendered Common row with the family's interactive-row treatment", async () => {
+        installDomShims()
+        expect(familyRules.some((rule) => /\[data-grammar-row\](?::focus-within|:has\()/.test(rule.selector))).toBe(false)
+        expect(interactiveRowSelectors.length).toBeGreaterThan(8)
+
+        render(
+            <OffsetPopGrammarRoot>
+                <ListBox label="Members" items={[{ id: "ada", label: "Ada" }, { id: "grace", label: "Grace" }, { id: "alan", label: "Alan" }]} />
+                <DataTable
+                    label="People"
+                    columns={[{ id: "name", label: "Name", isRowHeader: true }]}
+                    rows={[{ id: "ada" }, { id: "grace" }]}
+                    renderCell={(row) => row.id}
+                    selectionMode="single"
+                    defaultSelectedIds={["ada"]}
+                    emptyContent="Nobody"
+                />
+                <Select label="Size" defaultValue="two" options={[{ id: "one", label: "One" }, { id: "two", label: "Two" }, { id: "three", label: "Three" }]} />
+            </OffsetPopGrammarRoot>,
+        )
+        // Each state is read while it holds: the vendor ends one row's hover when the pointer enters another.
+        const reached = new Set<string>()
+        const record = () => {
+            for (const selector of interactiveRowSelectors) if (document.querySelector(reach(selector)) !== null) reached.add(selector)
+        }
+        const hover = (target: Element) => {
+            fireEvent.pointerOver(target, { pointerType: "mouse" })
+            fireEvent.pointerEnter(target, { pointerType: "mouse" })
+        }
+
+        // ListBox: a press selects Ada, the arrow key moves a focus-visible ring to Grace, the pointer rests on Alan.
+        const members = within(screen.getByRole("listbox", { name: "Members" }))
+        const ada = members.getByRole("option", { name: "Ada" })
+        act(() => ada.focus())
+        fireEvent.click(ada)
+        fireEvent.keyDown(ada, { key: "ArrowDown" })
+        fireEvent.keyUp(ada, { key: "ArrowDown" })
+        expect(document.activeElement).toBe(members.getByRole("option", { name: "Grace" }))
+        hover(members.getByRole("option", { name: "Alan" }))
+        record()
+
+        // DataTable: the pointer rests on an unselected row of a selectable table.
+        hover(screen.getByRole("row", { name: /grace/ }))
+        record()
+
+        // Select: open from the keyboard onto the selected option, then move focus to the next one.
+        const trigger = screen.getByRole("button", { name: /Size/ })
+        await act(async () => {
+            fireEvent.keyDown(trigger, { key: "ArrowDown" })
+            fireEvent.keyUp(trigger, { key: "ArrowDown" })
+        })
+        const sizes = await screen.findByRole("listbox", { name: /Size/ })
+        record()
+        const current = sizes.querySelector("[data-focused=\"true\"]")
+        expect(current).not.toBeNull()
+        if (current !== null) fireEvent.keyDown(current, { key: "ArrowDown" })
+        record()
+
+        const unreached = interactiveRowSelectors.filter((selector) => !reached.has(selector))
+        expect(unreached).toEqual([])
     })
 })
 

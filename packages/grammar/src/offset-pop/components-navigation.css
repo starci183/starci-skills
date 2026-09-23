@@ -33,8 +33,8 @@
         padding-inline: 0.5rem;
         border: var(--offset-pop-outline-width) solid var(--offset-pop-ink);
         border-radius: 999px;
-        background: var(--offset-pop-blush);
-        color: var(--offset-pop-ink);
+        background: var(--accent-soft);
+        color: var(--foreground);
     }
 
     /* Pagination: outlined pills; the current page is pink and raised. */
@@ -187,9 +187,23 @@
         font-weight: 900;
     }
 
+    /*
+     * A selectable or actionable table row is itself the pointer target (the vendor stamps
+     * `data-hovered` only on such rows), so it takes the family's yellow row wash; keyboard focus
+     * keeps Common's inset pink ring. A selected row is the pink soft fill with the pink leading edge
+     * and the text-safe accent, readable in light and dark alike.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DataTable"] [data-grammar-table-row] {
+        transition: background-color var(--offset-pop-transition);
+    }
+
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DataTable"] [data-grammar-table-row][data-hovered="true"]:not([data-grammar-selected="true"]) {
+        background: color-mix(in srgb, var(--offset-pop-yellow) 32%, transparent);
+    }
+
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="DataTable"] [data-grammar-table-row][data-grammar-selected="true"] {
-        background: var(--offset-pop-blush);
-        color: var(--offset-pop-ink);
+        background: var(--accent-soft);
+        color: var(--offset-pop-accent-text);
         box-shadow: inset 0.25rem 0 0 var(--offset-pop-pink);
     }
 
@@ -203,18 +217,43 @@
         font-weight: 800;
     }
 
-    /* ListBox: outlined rows; the selected row is pink-edged blush. */
+    /*
+     * ListBox: every option (role="option") is an interactive row - it is the pointer and focus
+     * target itself, so its states come from the vendor's attributes on the row, never from an
+     * inner link or button (an option may not hold one). At rest the row keeps a transparent 2px
+     * edge so selecting it never shifts the layout.
+     */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item] {
         border: var(--offset-pop-outline-width) solid transparent;
         border-radius: var(--offset-pop-control-radius);
         font-weight: 700;
+        transition:
+            background-color var(--offset-pop-transition),
+            border-color var(--offset-pop-transition),
+            box-shadow var(--offset-pop-transition);
     }
 
+    /* Hover: the family's yellow row wash, on an enabled row that is not already selected. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item][data-hovered="true"]:not([data-disabled="true"], [data-selected="true"]) {
+        background: color-mix(in srgb, var(--offset-pop-yellow) 32%, transparent);
+    }
+
+    /* Keyboard focus: the family's 2px pink ring, drawn on the row edge so the list's own clip never cuts it. */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item][data-focus-visible="true"] {
+        outline: 2px solid var(--focus);
+        outline-offset: 0;
+    }
+
+    /*
+     * Selected: the pink soft fill with the pink leading edge, the ink outline and its small hard
+     * shadow, and the label in the text-safe accent (it clears AA on the soft fill in both themes).
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item][data-selected="true"],
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item]:has(> [data-grammar-selected="true"]) {
         border-color: var(--offset-pop-ink);
-        background: var(--offset-pop-blush);
-        color: var(--offset-pop-ink);
-        box-shadow: 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
+        background: var(--accent-soft);
+        color: var(--offset-pop-accent-text);
+        box-shadow: inset 0.25rem 0 0 var(--offset-pop-pink), 0.125rem 0.1875rem 0 var(--offset-pop-shadow-ink);
     }
 
     /* Disclosure / Accordion: ink-outlined sections; the open trigger is pink-marked. */
@@ -320,6 +359,12 @@
         .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] * {
             transition-duration: 0s !important;
         }
+
+        /* An interactive row does not move: the vendor's press scale is dropped with the transitions. */
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item] {
+            transform: none;
+            transition: none;
+        }
     }
 
     /* Forced colours: the current/selected decision stays visible without the pink fill. */
@@ -327,6 +372,13 @@
         .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] [data-grammar-current="true"] > [aria-hidden="true"],
         .grammar-common-root[data-grammar-family="offset-pop"] [data-component="Pagination"] [data-grammar-current="true"],
         .grammar-common-root[data-grammar-family="offset-pop"] [data-component="TagGroup"] [data-grammar-tag]:has(> [data-grammar-selected="true"]) {
+            border-color: Highlight;
+            box-shadow: none;
+        }
+
+        /* A selected option keeps a Highlight edge; the pink soft fill has collapsed to Canvas. */
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item][data-selected="true"],
+        .grammar-common-root[data-grammar-family="offset-pop"] [data-component="ListBox"] [data-grammar-list-item]:has(> [data-grammar-selected="true"]) {
             border-color: Highlight;
             box-shadow: none;
         }

@@ -79,6 +79,29 @@ describe("Offset Pop navigation-group treatment", () => {
         expect(familyCss).toMatch(/\[data-component="BottomNav"\] \{[^}]*calc\(var\(--offset-pop-outline-width\) \* 1\.5\)/)
     })
 
+    it("treats a ListBox option as an interactive row: hover wash, focus ring, pink selected fill, still under reduced motion", () => {
+        const item = "[data-component=\"ListBox\"] [data-grammar-list-item]"
+        /** The body of the first rule (from `from` on) whose selector list ends with `${item}${state}`. */
+        const body = (state: string, from = familyCss) => {
+            const at = from.indexOf(`${item}${state} {`)
+            expect(at, `no rule for ${state || "the row"}`).toBeGreaterThanOrEqual(0)
+            return from.slice(at, from.indexOf("}", at))
+        }
+        expect(body("[data-hovered=\"true\"]:not([data-disabled=\"true\"], [data-selected=\"true\"])")).toContain("var(--offset-pop-yellow) 32%")
+        const ring = body("[data-focus-visible=\"true\"]")
+        expect(ring).toContain("outline: 2px solid var(--focus);")
+        expect(ring).toContain("outline-offset: 0;")
+        const selected = body(":has(> [data-grammar-selected=\"true\"])")
+        expect(selected).toContain("background: var(--accent-soft);")
+        expect(selected).toContain("color: var(--offset-pop-accent-text);")
+        expect(selected).toContain("inset 0.25rem 0 0 var(--offset-pop-pink)")
+        expect(familyCss).toContain(`${item}[data-selected="true"],\n`)
+        const reduced = body("", familyCss.slice(familyCss.indexOf("@media (prefers-reduced-motion: reduce)")))
+        expect(reduced).toContain("transform: none;")
+        expect(reduced).toContain("transition: none;")
+        expect(body(":has(> [data-grammar-selected=\"true\"])", familyCss.slice(familyCss.indexOf("@media (forced-colors: active)")))).toContain("border-color: Highlight;")
+    })
+
     it("uses only family and semantic variables for colour", () => {
         expect(familyCss).not.toMatch(/#[0-9a-f]{3,8}\b/i)
         expect(familyCss).not.toMatch(/\b(?:rgb|hsl|oklch)a?\(/)

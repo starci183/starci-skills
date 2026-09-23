@@ -282,10 +282,18 @@ describe("Offset Pop DNA and token parity with Core", () => {
         expect(rendererSource).toContain("data-grammar-scroll-region=\"vertical\"")
     })
 
-    it("keeps the interactive-row treatments, documented for actionable and selectable rows", () => {
-        expect(css).toContain("[data-grammar-row]:focus-within")
-        expect(css).toContain("[data-grammar-row]:has(:is(a, button):hover)")
-        expect(css).toMatch(/Interactive-row treatments[\s\S]*?selectable List\/ListBox rows/)
+    /*
+     * The old `[data-grammar-row]:has(:is(a, button):hover)` wash and `[data-grammar-row]:focus-within`
+     * ring reached nothing: StaticStateRow is the only renderer that emits `data-grammar-row`, and its
+     * label and description are strings. The interactive rows (ListBox options, Select/ComboBox
+     * options, selectable DataTable rows) are the pointer and focus target themselves and carry the
+     * treatment in their component sheets; shipped-claims renders them and drives each state.
+     */
+    it("gives no hover or focus treatment to the non-interactive StaticStateRow", () => {
+        const body = css.replace(/\/\*[\s\S]*?\*\//g, "")
+        expect(body).not.toMatch(/\[data-grammar-row\][^{,]*:(?:hover|focus|focus-within|focus-visible|active)/)
+        expect(body).not.toMatch(/\[data-grammar-row\]:has\(/)
+        expect(readFileSync(resolve(process.cwd(), "src/core/composite/StaticStateRow/index.tsx"), "utf8")).toMatch(/readonly label: string;?\s+readonly description\?: string/)
     })
 
     it("paints the accent as text only through the text-safe accent, keeping pink the fill and ring", () => {

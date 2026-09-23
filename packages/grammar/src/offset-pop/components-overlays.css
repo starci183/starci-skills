@@ -108,13 +108,9 @@
         font-weight: 700;
     }
 
+    /* The soft pink fill is theme-aware (blush-pink in light, plum in dark), so one rule reads in every theme. */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-menu-item]:is([data-focused], [data-hovered], [data-open]) {
-        background: var(--offset-pop-blush);
-        color: var(--offset-pop-ink);
-    }
-
-    .grammar-common-root[data-grammar-family="offset-pop"][data-grammar-theme="dark"] [data-grammar-menu-item]:is([data-focused], [data-hovered], [data-open]) {
-        background: var(--surface-secondary);
+        background: var(--accent-soft);
         color: var(--foreground);
     }
 
@@ -236,11 +232,6 @@
     @media (prefers-color-scheme: dark) {
         .grammar-common-root[data-grammar-family="offset-pop"][data-grammar-theme="system"] [data-grammar-overlay-backdrop] {
             background: color-mix(in srgb, var(--offset-pop-shadow-ink) 72%, var(--offset-pop-pink) 8%);
-        }
-
-        .grammar-common-root[data-grammar-family="offset-pop"][data-grammar-theme="system"] [data-grammar-menu-item]:is([data-focused], [data-hovered], [data-open]) {
-            background: var(--surface-secondary);
-            color: var(--foreground);
         }
     }
 

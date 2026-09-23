@@ -216,12 +216,16 @@
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row] {
-        border-block-end: var(--offset-pop-outline-width) solid var(--separator);
         background: transparent;
     }
 
-    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row]:last-child {
-        border-block-end: 0;
+    /*
+     * One seam per pair of rows (BOUNDARY-3). Common draws it as the between-rows top edge; the
+     * family repaints that SAME edge at its outline width instead of adding a second one below each
+     * row, so a seam is exactly one 2px line and the first and last rows have no outer edge.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row] + [data-grammar-row] {
+        border-block-start: var(--offset-pop-outline-width) solid var(--separator);
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state-mark] {
@@ -259,16 +263,12 @@
     }
 
     /*
-     * Interactive-row treatments (this rule's :focus-within and the :has(:is(a, button):hover) wash
-     * below) are kept deliberately although no Common row holds an action today: StaticStateRow
-     * renders strings only. They are for the actionable and selectable List/ListBox rows the
-     * navigation work is adding, and they are correct for them: :focus-within also matches a row
-     * that takes focus itself, so a focused option or a row holding a focused link/button gets the
-     * family ring. A row that is itself the pointer target without an inner a/button will need its
-     * own hover hook when it lands.
+     * `[data-grammar-row]` is StaticStateRow's hook, a non-interactive row whose label and
+     * description are strings, so it carries no hover or focus treatment. Rows that ARE interactive
+     * (ListBox options, Select/ComboBox options, selectable DataTable rows) are the pointer and focus
+     * target themselves and take theirs from the vendor state attributes in the component sheets.
      */
-    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"]:has([data-grammar-whole-action]:focus-visible),
-    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row]:focus-within {
+    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"]:has([data-grammar-whole-action]:focus-visible) {
         outline: 2px solid var(--focus);
         outline-offset: 0.25rem;
     }
@@ -280,10 +280,6 @@
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-surface-card][data-slot="card"] [data-grammar-frame="bounded"][data-slot="card-content"][data-grammar-surface-depth="nested"]:has([data-grammar-whole-action]:active) {
         transform: translateY(0.25rem);
-    }
-
-    .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-row]:has(:is(a, button):hover) {
-        background: color-mix(in srgb, var(--offset-pop-yellow) 32%, transparent);
     }
 
     .grammar-common-root[data-grammar-family="offset-pop"] [data-grammar-state="affirmative"] {

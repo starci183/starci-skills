@@ -230,6 +230,8 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
         expect(rootTokens.get("--offset-pop-outline-width")).toBe("2px")
         const joined = painted.filter((d) => d.property.startsWith("margin") && d.selector.includes("\"ButtonGroup\""))
         expect(joined.map((d) => d.value)).toEqual(["calc(-1 * var(--offset-pop-outline-width))", "calc(-1 * var(--offset-pop-outline-width))"])
+        // A row seam is Common's single between-rows edge, repainted at the outline width.
+        expect(declared("[data-grammar-row] + [data-grammar-row]").get("border-block-start")).toBe("var(--offset-pop-outline-width) solid var(--separator)")
     },
     // styles.spec "binds semantic Common variables and preserves hard family surface geometry" and the forced-colour token test.
     "BOUNDARY-6": () => {
@@ -318,10 +320,17 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
         expect(rootTokens.get("--focus")).toBe("var(--offset-pop-focus)")
         expect(forcedTokens.get("--offset-pop-focus")).toBe("Highlight")
         const rings = painted.filter((d) => d.property === "outline" && d.value === "2px solid var(--focus)")
-        for (const target of [":has([data-grammar-whole-action]:focus-visible)", "[data-grammar-row]:focus-within", "[data-grammar-choice-control]", "[data-grammar-slider-thumb][data-focus-visible=\"true\"]"]) {
+        const ROW_RINGS = ["[data-component=\"ListBox\"] [data-grammar-list-item][data-focus-visible=\"true\"]", "[data-grammar-popover] [data-grammar-option][data-focus-visible=\"true\"]"]
+        for (const target of [":has([data-grammar-whole-action]:focus-visible)", ...ROW_RINGS, "[data-grammar-choice-control]", "[data-grammar-slider-thumb][data-focus-visible=\"true\"]"]) {
             expect(rings.some((d) => d.selector.includes(target)), target).toBe(true)
         }
-        for (const ring of rings) expect(painted.some((d) => d.selector === ring.selector && d.property === "outline-offset" && d.value === "0.25rem"), short(ring.selector)).toBe(true)
+        // StaticStateRow is not interactive, so no ring may target it.
+        expect(rings.filter((d) => d.selector.includes("[data-grammar-row]")).map((d) => short(d.selector))).toEqual([])
+        // An interactive row sits inside a clipping list with a 0.25rem inset, so its ring hugs the row edge (offset 0).
+        for (const ring of rings) {
+            const offset = ROW_RINGS.some((row) => ring.selector.endsWith(row)) ? "0" : "0.25rem"
+            expect(painted.some((d) => d.selector === ring.selector && d.property === "outline-offset" && d.value === offset), short(ring.selector)).toBe(true)
+        }
         // A field's ring is the hard offset shadow over a transparent outline, which forced colours make Highlight.
         const fieldFocus = painted.filter((d) => d.media.length === 0 && d.property === "outline" && d.value === "2px solid transparent")
         expect(fieldFocus.length).toBeGreaterThan(0)
@@ -456,6 +465,19 @@ const PROOF: Readonly<Record<keyof typeof OFFSET_POP_FAMILY_EVIDENCE, () => void
     "TONE-3": () => {
         expect(declared("[data-component=\"Text\"][data-tone=\"accent\"]").get("color")).toBe("var(--offset-pop-accent-text)")
         expect(declared("[data-grammar-menu-item][data-selected]").get("color")).toBe("var(--offset-pop-accent-text)")
+        // A selected interactive row reads the text-safe accent on the soft pink fill, in light and dark alike.
+        for (const row of [
+            "[data-component=\"ListBox\"] [data-grammar-list-item][data-selected=\"true\"]",
+            "[data-component=\"ListBox\"] [data-grammar-list-item]:has(> [data-grammar-selected=\"true\"])",
+            "[data-grammar-popover] [data-grammar-option][data-selected=\"true\"]",
+            "[data-component=\"DataTable\"] [data-grammar-table-row][data-grammar-selected=\"true\"]",
+        ]) {
+            const paint = declared(row)
+            expect([paint.get("color"), paint.get("background")], row).toEqual(["var(--offset-pop-accent-text)", "var(--accent-soft)"])
+        }
+        // Blush is a light-only tone: no family rule sets text on it, so no pair can fail in dark.
+        expect(painted.filter((d) => d.property === "background" && d.value === "var(--offset-pop-blush)")
+            .filter((d) => painted.some((other) => other.selector === d.selector && other.property === "color")).map((d) => short(d.selector))).toEqual([])
     },
     // shipped-claims mounts a StaticStateRow in every PresentationState, so "reaches a rendered Common node" proves the stripe selector lands.
     "TRUTH-1": () => {
@@ -526,18 +548,18 @@ describe("Offset Pop rule conformance: inherited rules really are Common's", () 
     })
 
     /*
-     * KNOWN GAP (BOUNDARY-3), kept inherited on purpose and flagged for the styles.css owner.
-     *
-     * StaticStateRow claims BOUNDARY-3 ("one line between consecutive rows"), which Common pays with
+     * BOUNDARY-3 ("one line between consecutive rows"). Common pays it with
      * `.starci-core-static-row + .starci-core-static-row { border-top: 1px solid var(--separator) }`.
-     * The family adds `[data-grammar-row] { border-block-end: 2px solid var(--separator) }` (last row
-     * cleared) without clearing Common's `border-top`, so each seam has two owners and draws 3px.
-     * Flip to `it` when the family either drops its own row edge or neutralises Common's seam.
+     * The family must not add a second edge (a block-end border on every row once drew 1px + 2px =
+     * 3px per seam): it repaints that one between-rows edge at its outline width instead, which the
+     * family layer (ordered after Common) wins, so each seam is exactly one 2px family edge.
      */
-    it.fails("gives every row seam exactly one owner", () => {
-        const familyRowEdge = painted.some((d) => d.selector === `${SCOPE} [data-grammar-row]` && d.property.startsWith("border-block-end") && d.value !== "0")
-        const commonSeam = /\.starci-core-static-row \+ \.starci-core-static-row\s*\{[^}]*border-top:/.test(commonCss)
-        const familyClearsSeam = painted.some((d) => d.selector.includes("[data-grammar-row]") && /^border-(?:top|block-start)/.test(d.property))
-        expect(familyRowEdge && commonSeam && !familyClearsSeam).toBe(false)
+    it("gives every row seam exactly one owner", () => {
+        expect(commonCss).toMatch(/\.starci-core-static-row \+ \.starci-core-static-row\s*\{[^}]*border-top:/)
+        const rowEdges = painted.filter((d) => d.selector.includes("[data-grammar-row]") && /^border(?:-|$)/.test(d.property))
+        expect(rowEdges.map((d) => `${d.property}: ${d.value} in ${short(d.selector)}`)).toEqual([
+            "border-block-start: var(--offset-pop-outline-width) solid var(--separator) in § [data-grammar-row] + [data-grammar-row]",
+        ])
+        expect(rowEdges.every((d) => d.media.length === 0)).toBe(true)
     })
 })
