@@ -37,7 +37,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   openLedger, ledgerFileFor, machineFileFor, openMachine,
   newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
@@ -880,6 +880,24 @@ function cmdSurvey(ledger, args) {
 }
 
 /* ---------------------------------------------------------------- status */
+/**
+ * Whether the serve-ask form an ask-serving event names still answers: its
+ * recorded pid is alive, or (an event from before pids were recorded) its
+ * localhost port still accepts a connection. Returns null when neither can be
+ * told, which keeps the ask counted as served.
+ */
+function askFormAlive(payload, { probeMs = 1500 } = {}) {
+  const pid = Number(payload?.pid);
+  if (Number.isInteger(pid) && pid > 0) {
+    try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; }
+  }
+  const port = Number(/^https?:\/\/(?:127\.0\.0\.1|localhost):(\d+)\//.exec(String(payload?.url ?? ''))?.[1]);
+  if (!Number.isInteger(port)) return null;
+  const probe = spawnSync(process.execPath, ['-e', `const s=require('net').connect(${port},'127.0.0.1');s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),${probeMs})`],
+    { windowsHide: true, timeout: probeMs + 2000 });
+  return probe.status === 0;
+}
+
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
@@ -1195,11 +1213,17 @@ function cmdStatus(ledger, args) {
   // while the Kernel waits on them: a Modules tax ask sat unanswerable that
   // way. Such an ask is the Kernel's to re-serve, so it is actionable.
   const lastLifecycle = (dispatchId, kind) => db.prepare("SELECT seq FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(workflowId, kind, dispatchId)?.seq ?? null;
+  // A form that died without expiring is dead too: a nivo Modules Kernel
+  // served its scope ask as its own Claude Code background shell, Claude Code
+  // reaped it under memory pressure, and status kept calling the ask served,
+  // so nothing woke the Kernel while the owner's link returned nothing.
   const askReserve = pendingOwner.filter((item) => {
     if (!item.dispatchId) return false;
     const served = lastLifecycle(item.dispatchId, 'ask-serving');
     const expired = lastLifecycle(item.dispatchId, 'ask-serving-expired');
-    return served == null || (expired != null && expired > served);
+    if (served == null || (expired != null && expired > served)) return true;
+    const payload = parseJson(db.prepare('SELECT payload_json FROM events WHERE seq=?').get(served)?.payload_json, {}) ?? {};
+    return askFormAlive(payload) === false;
   }).map((item) => item.dispatchId);
   const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
 

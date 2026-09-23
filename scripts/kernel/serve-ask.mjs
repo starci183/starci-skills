@@ -656,7 +656,7 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
     const url = `http://127.0.0.1:${bound}/${nonce}`;
     ledger.appendEvent({
       workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
-      kind: 'ask-serving', payload: { dispatchId: report.dispatch_id, url, fields: { files: fields.files, vars: fields.vars }, ttlMs: ttl },
+      kind: 'ask-serving', payload: { dispatchId: report.dispatch_id, url, pid: process.pid, fields: { files: fields.files, vars: fields.vars }, ttlMs: ttl },
     });
     console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, url, port: bound, ttlMs: ttl }));
   });

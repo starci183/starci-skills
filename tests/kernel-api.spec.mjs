@@ -409,7 +409,7 @@ test('no open operation plus an unanswered ask is awaiting-owner, not actionable
     job('bd-record',13,'succeeded',{verdict:'pass'});
     ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'ask',?,?,?)`)
       .run(wf,'ctx_tax','business.decide',12,json({outcome:'ask',summary:'tax',question:{text:'tax?'}}),at,at);
-    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x'}});
+    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x',pid:process.pid}});
   });
   const status=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r);};
   let s=status();
@@ -487,8 +487,17 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   assert.equal(f.state,'ask-reserve');
   assert.equal(f.actionable,true);
   assert.deepEqual(f.askReserveDispatches,['ctx_tax']);
-  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-y'}}));
+  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-y',pid:process.pid}}));
   assert.equal(frontier().state,'awaiting-owner','re-served, it waits on the owner again');
+  // A nivo Modules form died with its Kernel's Claude Code background shell
+  // (reaped under memory pressure) and never expired: a dead pid is a dead link.
+  const gone=spawnSync(process.execPath,['-e','0'],{windowsHide:true}).pid;
+  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-z',pid:gone}}));
+  f=frontier();
+  assert.deepEqual([f.state,f.actionable,f.askReserveDispatches],['ask-reserve',true,['ctx_tax']]);
+  // An older event with no pid is judged by its port: nothing listens on port 9.
+  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:9/a-w'}}));
+  assert.equal(frontier().state,'ask-reserve','a closed port is a dead link');
 });
 
 // StarCi Next base-repos recorded an owner-gate for a missing brand before any
