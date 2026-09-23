@@ -57,6 +57,17 @@
 //                          ("› [Pasted Content N chars]"). 'enter': one
 //                          Enter-only send submits it; 'never': it stays.
 //
+//   STARCI_FAKE_ORCA_GATE_SCREEN 'claude-trust' | 'claude-bypass' | 'codex-trust' |
+//                          'claude-onboarding': every created terminal first shows
+//                          that multi-line launch menu with its cursor on the
+//                          first option (Claude 2.1.280 puts 'No, exit' first).
+//                          A raw terminal-send key drives it: ESC[B / ESC[A move
+//                          the cursor, '\r' picks the option. Picking the accept
+//                          option clears the gate (the agent prompt follows);
+//                          picking any other exits the terminal. Keys land in
+//                          terminals[h].gateKeys and never count as a prompt.
+//   STARCI_FAKE_ORCA_GATE_STICKY='1' the gate ignores every key (it persists).
+//
 //   STARCI_FAKE_ORCA_CLOSE_FAILS comma-separated terminal handles whose
 //                          `terminal close` is refused ('*' refuses every
 //                          close) — drives the unclosed-stale-kernel spec.
@@ -98,6 +109,21 @@ const gateScreens = {
   claude: "Let's get started. Choose the text style that looks best with your terminal To change this later, run /theme 1. Auto (match terminal) ❯ 2. Dark mode ✔",
   codex: 'Do you trust the contents of this directory? › 1. Yes, continue 2. No, quit  Press enter to continue',
 };
+// Multi-line launch menus (STARCI_FAKE_ORCA_GATE_SCREEN): [lead text, options, accept index].
+const menuGates = {
+  'claude-trust': ['Accessing workspace:\n\n' + 'D:/fake/repo' + "\n\nQuick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source\nproject, or work from your team). If not, take a moment to review what's in this folder first.\n\nClaude Code'll be able to read, edit, and execute files here.\n\nSecurity guide\n",
+    ['No, exit', 'Yes, I trust this folder'], 1, 'Enter to confirm · Esc to cancel', '❯'],
+  'claude-bypass': ['WARNING: Claude Code running in Bypass Permissions mode\n\nIn Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous commands.\n\nBy proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.\n',
+    ['No, exit', 'Yes, I accept'], 1, 'Enter to confirm · Esc to cancel', '❯'],
+  'codex-trust': ['> You are in D:/fake/repo\n\n  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection.\n',
+    ['1. Yes, continue', '2. No, quit'], 0, '  Press enter to continue', '›'],
+  'claude-onboarding': ["Let's get started.\n\nChoose the text style that looks best with your terminal\nTo change this later, run /theme\n",
+    ['1. Dark mode ✔', '2. Light mode'], 0, '', '❯'],
+};
+const menuGate = process.env.STARCI_FAKE_ORCA_GATE_SCREEN || '';
+const menuSticky = process.env.STARCI_FAKE_ORCA_GATE_STICKY === '1';
+const MENU = r => { const [lead, options, , foot, mark] = menuGates[r.gate.kind];
+  return lead + '\n' + options.map((o, i) => (i === r.gate.cursor ? mark + ' ' : '  ') + o).join('\n') + '\n\n' + foot; };
 const gatedProviders = new Set((process.env.STARCI_FAKE_ORCA_GATE || '').split(',').map(s => s.trim()).filter(Boolean));
 const effectiveModelOverride = process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || null;
 if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
@@ -157,11 +183,14 @@ if (verb === 'terminal create') {
   const paneTitle = timedOut ? String(arg('worktree') || '').replaceAll('\\', '/').split('/').filter(Boolean).pop() || null : arg('title');
   state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: createTimeout !== 'dead', writable: createTimeout !== 'dead',
     sent: false, prompt: null, command: state.terminalCommand, model: state.terminalModel,
-    title: paneTitle, tabTitle: arg('title'), worktree: arg('worktree'), closed: false } };
+    title: paneTitle, tabTitle: arg('title'), worktree: arg('worktree'), closed: false,
+    ...(menuGates[menuGate] ? { gate: { kind: menuGate, cursor: 0, cleared: false }, gateKeys: [] } : {}) } };
   save();
   if (timedOut) fail({ ok: false, error: { code: 'runtime_error', message: 'Timed out waiting for terminal handle after creation' } });
   out({ ok: true, result: { terminal: { handle, title: arg('title'), connected: true, writable: true } } });
 }
+else if (verb === 'terminal read' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared && !isDead(arg('terminal')))
+  out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true, screen: MENU(record(arg('terminal'))) } } });
 else if (verb === 'terminal read' && gatedProviderOf(arg('terminal')))
   out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
     screen: gateScreens[gatedProviderOf(arg('terminal'))] } } });
@@ -171,6 +200,21 @@ else if (verb === 'terminal read')
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
       screen: mode === 'auth' ? DEAD(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
         : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal')))) } } });
+else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(arg('terminal')).gate.cleared) {
+  const r = record(arg('terminal'));
+  const key = (arg('text') ?? '') + (argv.includes('--enter') ? '\r' : '');
+  r.gateKeys.push(key);
+  const [, options, accept] = menuGates[r.gate.kind];
+  if (!menuSticky) {
+    if (key === '\x1b[B') r.gate.cursor = Math.min(options.length - 1, r.gate.cursor + 1);
+    else if (key === '\x1b[A') r.gate.cursor = Math.max(0, r.gate.cursor - 1);
+    else if (key === '\r') {
+      if (r.gate.cursor === accept) r.gate.cleared = true;
+      else { r.connected = false; r.writable = false; }
+    }
+  }
+  save(); out({ ok: true, result: { send: { accepted: true, bytesWritten: key.length } } });
+}
 else if (verb === 'terminal send') {
   const r = record(arg('terminal'));
   const text = arg('text') ?? '';
