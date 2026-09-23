@@ -272,6 +272,15 @@ export const Slider: Story = {
       <State label="Range" direction="column">
         <G.Slider label="Price" defaultValue={[20, 80]} thumbLabels={['Minimum', 'Maximum']} formatOptions={{ style: 'currency', currency: 'USD' }} />
       </State>
+    </Matrix>
+  ),
+};
+
+// Disabled on its own: WCAG 1.4.3 exempts inactive controls, so the a11y allowlist waives
+// color-contrast for this story id only and the enabled Slider story stays fully gated.
+export const SliderDisabled: Story = {
+  render: () => (
+    <Matrix maxWidth={formColumn}>
       <State label="Disabled" direction="column">
         <G.Slider label="Locked" defaultValue={60} isDisabled />
       </State>
@@ -478,6 +487,15 @@ export const FileDropzone: Story = {
       <State label="Invalid" direction="column">
         <G.FileDropzone label="Avatar" prompt="Drop an image" isRequired isInvalid errorMessage="An image is required." />
       </State>
+    </Matrix>
+  ),
+};
+
+// Disabled on its own: WCAG 1.4.3 exempts inactive controls, so the a11y allowlist waives
+// color-contrast for this story id only and the enabled FileDropzone story stays fully gated.
+export const FileDropzoneDisabled: Story = {
+  render: () => (
+    <Matrix maxWidth={formColumn}>
       <State label="Disabled" direction="column">
         <G.FileDropzone label="Attachments" prompt="Uploads are paused" isDisabled />
       </State>

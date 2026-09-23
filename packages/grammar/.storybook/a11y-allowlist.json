@@ -2,13 +2,13 @@
   "_readme": "Reviewed exceptions to the Storybook a11y gate (npm run test:a11y). Each entry waives one axe rule for one story id, in every family and theme. Every field is required and non-empty: storyId (e.g. forms--select), rule (the axe rule id, e.g. color-contrast), reason (why it is acceptable or where it is tracked), owner (who removes it). Adding an entry needs review, the same as a code change.",
   "entries": [
     {
-      "storyId": "forms--slider",
+      "storyId": "forms--slider-disabled",
       "rule": "color-contrast",
       "reason": "WCAG 1.4.3 exempts disabled/inactive controls",
       "owner": "grammar"
     },
     {
-      "storyId": "forms--file-dropzone",
+      "storyId": "forms--file-dropzone-disabled",
       "rule": "color-contrast",
       "reason": "WCAG 1.4.3 exempts disabled/inactive controls",
       "owner": "grammar"
