@@ -1022,6 +1022,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   dependency; kernel-prompt dặn dùng. 7 job hiện tại đã enqueue trước vá nên vẫn bị đánh thức tới khi composition xong. WSPV
   implement a34 done. Fork báo gap: settle cho pass khi owned paths chưa commit/push dù commitPolicy đòi main-line; giao fork làm P7.
 
+- 08:05 Modules architecture.decide a8 blocked: hợp đồng revise đòi extensions.work3.decisionLog nhưng 16 schema flat đóng
+  work3 chỉ cho integrations; thêm mâu thuẫn "sửa deployment record" với "cấm sửa bản ghi legacy". Giao lane nền; báo kernel
+  Modules giữ slice. Sửa phạm vi P7 của fork: ops nivo khai báo push:false (nivo-backend đi trước origin 198 commit), nên
+  landed-check chỉ đòi owned paths sạch và commit có trong HEAD local; origin chỉ khi push:true.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
