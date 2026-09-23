@@ -1132,6 +1132,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 12:03 Yên. WSPV interface.implement a38 done và đã settle (rail height), 1 job ready kernel đang dispatch. Collab approval
   và notification chạy, còn gateway. Modules, AUTH chờ thầy; hai ask sống. Không vá.
 
+- 12:13 Collab approval (a6) done, 6/8 pass; gateway ready (dependsOn không gồm notification), watchdog đã đánh thức kernel để
+  dispatch song song với notification: record-deps (3b2767b26) chỉ ra song song đúng. WSPV audit chạy lại đang chạy. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
