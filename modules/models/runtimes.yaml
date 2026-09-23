@@ -123,6 +123,9 @@ allocation:
   observeCadenceMs: 180000
   stallAfterMs: 600000
   liveness: {activeUnclassifiedMs: 120000}
+  # settle's landed proof (scripts/kernel/settle-landed.mjs): one local git read, and the fetch a pushing
+  # commitPolicy needs before origin/<branch> can be read.
+  settleGit: {commandMs: 15000, fetchMs: 60000}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin

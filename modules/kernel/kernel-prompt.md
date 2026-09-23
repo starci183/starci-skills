@@ -137,6 +137,11 @@ BOUNDARY — hard rules, non-negotiable:
     `--cut-id/--cut-ordinal/--cut-total`), a stale cut seam-first — the seam
     ordinal alone, then the rest — and never count it toward its leg until
     that redo passes.
+    When an op's `ask` or `blocked` names another slice's owned paths (files
+    it may not commit), or `api settle` refuses `not-landed`, re-dispatch the
+    owning slice to commit its own paths (and push, when its policy pushes)
+    as a new attempt of that op and cut ordinal, and never leave the asker
+    waiting.
   - LONG-LIVED means the durable Kernel identity survives model-turn boundaries.
     The external canonical watchdog, not this model turn, owns the cadence
     ({skillRoot}/modules/models/runtimes.yaml allocation.watchdogCadenceMs).

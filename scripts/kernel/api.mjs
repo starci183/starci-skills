@@ -48,6 +48,7 @@ import {
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
+import { commitPolicyOf, landedProof, policyCommits, policyPushes } from './settle-landed.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
   awaitSubmission, awaitAttestation,
@@ -1588,6 +1589,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
   `  {"outcome":"${REPORT_OUTCOMES.join("|")}","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
   `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
+  ...(policyCommits(opCommitPolicy(packet.op)) ? [`  your op commits (commitPolicy): on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it.`] : []),
   `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
   `  read your contract the same way: node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} op-contract --repo ${repo} --job ${jobId}`,
@@ -2498,12 +2500,52 @@ function cmdReconcile(ledger, args) {
 }
 
 /* ---------------------------------------------------------------- settle */
+// The op manifest's policy.commitPolicy — null for an unknown op or one that
+// declares none. api report and api settle read it the same way.
+const opCommitPolicy = (op) => {
+  try { return commitPolicyOf(parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))); } catch { return null; }
+};
+
+// The landed proof a pass owes when the op's commitPolicy commits
+// (scripts/kernel/settle-landed.mjs). Null — settle as before — when there is
+// nothing to prove yet: an unknown or inactive job and a pass without a filed
+// done report are refused by the settle transaction itself, and an op without
+// a committing commitPolicy never commits. The target checkout is the
+// dispatch contract's worktree when that is a directory, else the ledger repo;
+// a job whose owned paths sit in no git checkout returns {checked:false}.
+function settleLanding(db, jobId, repo, reportAbs) {
+  const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
+  const op = jobOpOf(job);
+  const policy = opCommitPolicy(op);
+  if (!policyCommits(policy)) return null;
+  const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, reportDispatchIdOf(db, job));
+  const envelope = row ? parseJson(row.report_json) : (reportAbs ? parseJson(fs.readFileSync(reportAbs, 'utf8')) : null);
+  if (envelope?.outcome !== 'done') return null;
+  const payload = jobPayloadOf(job);
+  const ownedPaths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+  const context = parseJson(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+    .get(job.workflow_id, op, job.attempt)?.context_json);
+  const worktree = typeof context?.worktree === 'string' ? path.resolve(repo, context.worktree) : null;
+  const base = worktree && fs.existsSync(worktree) && fs.statSync(worktree).isDirectory() ? worktree : repo;
+  const pushes = policyPushes(policy);
+  const proof = landedProof({ base, ownedPaths, head: envelope.head, branch: envelope.branch, pushes });
+  return { ...proof, op, status: job.status, pushes };
+}
+
 function cmdSettle(ledger, args, repo) {
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   const reportAbs = args.report
     ? [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p))
     : null;
   if (args.report && !reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
+
+  const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs) : null;
+  if (landed?.checked && !landed.ok) {
+    const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail };
+    emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} — ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}, then settle again`, args.json);
+    process.exit(1);
+  }
 
   let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
@@ -2525,7 +2567,7 @@ function cmdSettle(ledger, args, repo) {
     const checksEnvelope = parseJson(checkRow?.checks_json);
     const recordedChecks = Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : [];
     checkEvidence = summarizeCheckEvidence(checksEnvelope);
-    const result = { verdict, report: reportAbs, at: payload.settledAt, checkEvidence };
+    const result = { verdict, report: reportAbs, at: payload.settledAt, checkEvidence, ...(landed?.checked ? { landed: landed.detail } : {}) };
     // The worker's claim is the reports row keyed by its dispatch. No row yet:
     // a --report file that is itself a valid op-report@1 envelope is filed on
     // the job's behalf first; anything else (markdown, absent — a dead worker)
@@ -2661,7 +2703,7 @@ function cmdSettle(ledger, args, repo) {
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
 }
 
@@ -2886,7 +2928,7 @@ function cmdReport(ledger, args, repo) {
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
   const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
   const ownedPaths = (jobPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(db, job) });
+  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(db, job), commitPolicy: opCommitPolicy(jobOpOf(job)) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)

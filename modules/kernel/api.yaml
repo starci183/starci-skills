@@ -668,7 +668,7 @@ commands:
       - report-dispatch-unbound: 'the job binds no operation dispatch at all: never dispatched, or every dispatch it carries was rejected'
       - report-contract-unbound: 'the job binds a dispatch that no contracts row for this attempt was written for'
       - report-missing: 'report file unreadable'
-      - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here), prose that lost its non-ASCII letters to a legacy code page (a question mark inside words, U+FFFD) — the file must be written as UTF-8 (scripts/kernel/report-envelope.mjs lossyTextFields)'
+      - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here), a done|partial report of an op whose manifest commitPolicy commits without `head` = a 7-40 character hex sha (the api resolves the op''s commitPolicy exactly as settle does; the worker puts `git rev-parse HEAD` of the checkout holding its owned paths into `head` and re-files), prose that lost its non-ASCII letters to a legacy code page (a question mark inside words, U+FFFD) — the file must be written as UTF-8 (scripts/kernel/report-envelope.mjs lossyTextFields)'
       - outcome-mismatch: '--outcome flag contradicts the envelope outcome'
       - job-unknown / job-settled
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
@@ -761,7 +761,28 @@ commands:
       verdict, recorded reportFiled:false. A --report file with no reports
       row is validated and filed on the job's behalf first — an invalid one
       is simply not filed (the settle stands on the kernel's verdict).
-    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?}'
+    landed: >-
+      A `pass` for an op whose manifest policy.commitPolicy commits (a mode
+      other than none — scoped-local-commit today) owes a landed proof, run
+      before anything is written (scripts/kernel/settle-landed.mjs). The
+      target checkout is the git checkout holding each owned path, resolved
+      from the dispatch contract's worktree when that is a directory, else
+      from --repo. `git status --porcelain -- <owned_paths>` must be empty,
+      and the filed done report's `head` must name a commit that exists and
+      is HEAD or an ancestor of it — a checkout ahead of origin passes. A done
+      report filed before `api report` required `head` carries none: on a
+      non-pushing policy settle skips the head half, still requires clean
+      owned paths, and records landed.headCheck `skipped-legacy-report`
+      (else `verified`). Only
+      when commitPolicy.push is true does settle also run `git fetch origin
+      <branch>` (report `branch`, else the checkout's current branch) and
+      require origin/<branch> to contain `head`. Git reads use the
+      allocation.settleGit timeouts in modules/models/runtimes.yaml. A job
+      whose owned paths sit in no git checkout (jobs dispatched against a
+      plain directory) settles without the proof, as does every fail or
+      blocked verdict and every op without a committing commitPolicy. A
+      proof that ran is recorded as `landed` on the receipt and result_json.
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
@@ -770,6 +791,8 @@ commands:
       - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
+      - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes>], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution)'
+      - 'landed-unverifiable (field `reason`): the landed proof could not read git — a status that failed, a detached HEAD with no report branch, or a fetch of origin/<branch> that failed on a pushing policy. Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:status|branch|fetch, error, ...}} and exits 1; never a silent pass'
       # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
     usedBy: 'drive.settle — last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 

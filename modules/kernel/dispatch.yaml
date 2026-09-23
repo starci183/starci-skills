@@ -264,7 +264,9 @@ fields:
       starci/op-report@1 JSON envelope and the reports row
       (UNIQUE(workflow_id, dispatch_id)) is the durable verdict, the file is
       the bound artifact, the Orca message only the wake-up
-      (verdict-contract.yaml envelope). The kernel then consumes the row
+      (verdict-contract.yaml envelope). An op whose commitPolicy commits puts
+      `git rev-parse HEAD` of the checkout holding its owned paths into the
+      envelope's `head` on done|partial. The kernel then consumes the row
       (`api consume-report`),
       re-runs the checks (`api check`) and settles. The op's terminal dies
       when its verdict settles — `api settle` closes the worker terminal

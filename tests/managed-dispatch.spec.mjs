@@ -185,7 +185,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   // green Kernel check. Settle then closes the managed worker through the
   // contract's two-step worker-stop/worker-release lifecycle.
   const report=path.join(fx.repo,'report.json');fs.writeFileSync(report,JSON.stringify({
-    schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',
+    schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
     files:['docs/managed-result.md'],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
   const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');

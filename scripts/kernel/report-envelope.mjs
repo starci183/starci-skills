@@ -5,6 +5,7 @@
 // verdict-contract.yaml §2.
 
 import { readDistJson } from '../../engine/runtime-root.mjs';
+import { policyCommits } from './settle-landed.mjs';
 
 export const OP_REPORT_SCHEMA = 'starci/op-report@1';
 export const OP_REPORT_OUTCOMES = ['done', 'partial', 'failed', 'ask', 'blocked'];
@@ -51,11 +52,13 @@ export function lossyTextFields(value) {
   return total >= 3 || fields.some(([, text]) => text.includes("\uFFFD")) ? marks.map(([label]) => label) : [];
 }
 
-// validateOpReport(value, {ownedPaths, identity}) — identity fields present in
-// the file must match the job's truth (identity = {run, task, dispatch, from});
-// absent ones are stamped by the caller. Returns {ok:true, report} or
-// {ok:false, reasons[]}.
-export function validateOpReport(value, { ownedPaths = [], identity = {} } = {}) {
+// validateOpReport(value, {ownedPaths, identity, commitPolicy?}) — identity
+// fields present in the file must match the job's truth (identity = {run,
+// task, dispatch, from}); absent ones are stamped by the caller. A committing
+// commitPolicy (the op manifest's policy.commitPolicy) makes `head` required
+// on done|partial. Returns {ok:true, report} or {ok:false, reasons[]}.
+const SHA = /^[0-9a-f]{7,40}$/i;
+export function validateOpReport(value, { ownedPaths = [], identity = {}, commitPolicy = null } = {}) {
   const reasons = [];
   const fail = (r) => { reasons.push(r); };
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { ok: false, reasons: ['report is not a JSON object'] };
@@ -81,6 +84,11 @@ export function validateOpReport(value, { ownedPaths = [], identity = {} } = {})
   if (value.outcome === 'partial' && (!Array.isArray(value.open) || !value.open.length || value.open.some((o) => !text(o)))) fail("outcome 'partial' requires a nonempty open[] of unfinished items");
   if (value.outcome === 'ask' && (!value.question || !text(value.question.text))) fail("outcome 'ask' requires question.text");
   if (value.outcome === 'blocked' && (!value.blocker || !BLOCKER_KINDS.includes(value.blocker.kind) || !text(value.blocker.detail))) fail(`outcome 'blocked' requires blocker {kind <- ${BLOCKER_KINDS.join('|')}, detail}`);
+
+  if (policyCommits(commitPolicy) && ['done', 'partial'].includes(value.outcome)) {
+    if (value.head === undefined) fail(`outcome '${value.outcome}' of a committing op requires head: put \`git rev-parse HEAD\` of the checkout holding your owned paths into \`head\` and re-file`);
+    else if (typeof value.head !== 'string' || !SHA.test(value.head.trim())) fail(`head must be a 7-40 character hex commit sha, got '${value.head}': put \`git rev-parse HEAD\` of the checkout holding your owned paths into \`head\` and re-file`);
+  }
 
   const lossy = lossyTextFields(value);
   if (lossy.length) fail(`text in ${lossy.join(', ')} lost its non-ASCII characters ('?' inside words): write the report file as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8 / [IO.File]::WriteAllText) and file it again`);
