@@ -22,8 +22,13 @@ export const ORCA_PREFIX_ARGS = (() => {
   try { return JSON.parse(process.env.STARCI_ORCA_ARGS || '[]'); } catch { return []; }
 })();
 
-export function orcaRun(args, { timeout = 120000 } = {}) {
-  const r = spawnSync(ORCA, [...ORCA_PREFIX_ARGS, ...args], { encoding: 'utf8', timeout, windowsHide: true });
+// A read answers with the host's whole listing: the orchestration inbox of a
+// run with many worker heartbeats passed spawnSync's 1 MB default and every
+// `api questions` failed with ENOBUFS (inc-13ab4be5059f). Reads get 64 MB.
+export const READ_MAX_BUFFER = 64 * 1024 * 1024;
+
+export function orcaRun(args, { timeout = 120000, maxBuffer } = {}) {
+  const r = spawnSync(ORCA, [...ORCA_PREFIX_ARGS, ...args], { encoding: 'utf8', timeout, windowsHide: true, ...(maxBuffer ? { maxBuffer } : {}) });
   return { status: r.status, error: r.error?.message, stdout: r.stdout?.trim(), stderr: r.stderr?.trim() };
 }
 
@@ -193,7 +198,8 @@ export function orcaCall(verb, params = {}, { timeout } = {}) {
     const missing = liveDrift(entry);
     if (missing) return driftEnvelope(verb, entry, missing);
   }
-  const r = orcaRun(argv, { timeout: timeout ?? entry.timeoutMs ?? CALLS.defaults?.timeoutMs ?? 30000 });
+  const r = orcaRun(argv, { timeout: timeout ?? entry.timeoutMs ?? CALLS.defaults?.timeoutMs ?? 30000,
+    ...(entry.kind === 'read' ? { maxBuffer: READ_MAX_BUFFER } : {}) });
   const receipt = jsonOf(r.stdout);
   const { outcome, effectState, reason } = classify(entry, r.status, receipt);
   return {

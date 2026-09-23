@@ -216,7 +216,11 @@ calls:
       worker that used `orca orchestration ask` is never stranded behind a Kernel that may not call Orca
       (inc-b944cbaef24b, inc-20449a260df8). Rows carry {id, run_id, from_handle (dispatch:<id> or a
       terminal handle), type, subject, body, thread_id, payload JSON text {taskId, dispatchId, question,
-      options}, created_at}; a reply is a later row whose thread_id is the question's id.
+      options}, created_at}; a reply is a later row whose thread_id is the question's id. The listing of a
+      run with many workers is megabytes (a nivo inbox of 1000 rows was 1.4 MB), so scripts/api/orca/lib.mjs
+      gives every read call a 64 MB spawnSync buffer instead of the 1 MB default that failed `api questions`
+      with ENOBUFS (inc-13ab4be5059f), and the wrapper drops heartbeat and progress rows before any caller
+      bridges the rest (status rows stay: Orca threads replies as status messages).
   reply:
     command: orchestration reply
     kind: mutation

@@ -124,6 +124,49 @@ test('a worker orchestration ask is surfaced, bridged into the ledger and answer
   assert.equal(json(late.stderr.trim().split('\n').at(-1)).code,'question-answered');
 });
 
+// inc-13ab4be5059f: a nivo run's inbox (thousands of worker heartbeats) passed spawnSync's 1 MB default and
+// every `api questions` failed with `spawnSync orca.exe ENOBUFS`, so Codex ops blocked in `orca orchestration
+// ask` (inc-884fc91be4bc, inc-ee62686a70a3) never reached the Kernel. Reads get a 64 MB buffer and the inbox
+// wrapper drops heartbeat/progress rows before anything is bridged.
+test('a multi-megabyte inbox of heartbeats still bridges the Codex worker asks inside it',t=>{
+  const fx=fixture(t);
+  const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  const dispatchId=json(d.stdout).dispatchId;
+  const handle=fx.read(db=>{const p=json(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(fx.jobId).payload_json);
+    return p.managed?.agentTerminalHandle??p.orca?.agentTerminalHandle??p.hierarchy?.runtime?.terminalHandle;});
+  assert.ok(handle,'the dispatched op has an exact terminal');
+  const pad='x'.repeat(900);
+  const beat=i=>({id:`msg_hb_${i}`,run_id:'run-fake-1',delivery_contract:'current_delivery',from_handle:handle,to_handle:'run:run-fake-1',
+    subject:'alive',body:'',type:i%7?'heartbeat':'progress',priority:'normal',thread_id:null,
+    payload:JSON.stringify({taskId:'task-fake-1',dispatchId,phase:`verifying ${pad}`}),read:0,sequence:i,created_at:new Date().toISOString()});
+  // The shape a Codex op's `orca orchestration ask --from term_…` left in the nivo inbox: sent from its
+  // terminal handle, the question only in the body, a payload without a question field.
+  const codexAsk={...question('msg_codex_ask',{dispatch:dispatchId,text:'Reissue contract, continue per source contract, or report blocked?'}),
+    from_handle:handle,payload:JSON.stringify({taskId:'task-fake-1'})};
+  fx.writeState(s=>{s.messages=[...Array.from({length:400},(_,i)=>beat(i)),codexAsk,...Array.from({length:1200},(_,i)=>beat(400+i))];});
+  assert.ok(fs.statSync(path.join(path.dirname(fx.repo),'state.json')).size>1.5*1024*1024,'the inbox read is well past the 1 MB default buffer');
+
+  const status=json(fx.api(['status','--workflow',fx.workflowId]).stdout);
+  assert.equal(status.frontier.state,'worker-question');
+  const bridged=fx.api(['questions','--workflow',fx.workflowId]);
+  assert.equal(bridged.status,0,bridged.stderr);
+  const out=json(bridged.stdout);
+  assert.equal(out.error,undefined,'the host inbox was readable');
+  assert.equal(out.bridged,1);
+  assert.deepEqual(out.pending.map(q=>[q.messageId,q.jobId,q.question]),[['msg_codex_ask',fx.jobId,codexAsk.body]]);
+
+  // The wrapper itself: heartbeat and progress rows never leave it; --all keeps them.
+  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([path.join(path.dirname(fx.repo),'fake-orca.mjs')]),
+    STARCI_FAKE_ORCA_STATE:path.join(path.dirname(fx.repo),'state.json')};
+  const inbox=args=>json(spawnSync(process.execPath,[path.join(ROOT,'scripts','api','orca','orch-inbox.mjs'),...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env,maxBuffer:64*1024*1024}).stdout);
+  const filtered=inbox(['--limit','5000']);
+  assert.equal(filtered.ok,true);
+  assert.deepEqual(filtered.messages.map(m=>m.id),['msg_codex_ask']);
+  assert.equal(filtered.dropped,1600);
+  assert.equal(inbox(['--limit','5000','--all']).messages.length,1601);
+});
+
 test('reply refuses an unknown question and a missing body before any host call',t=>{
   const fx=fixture(t);
   const noBody=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_x']);
