@@ -1110,6 +1110,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 11:03 Yên. 4 watchdog mới chạy đúng (idle-waiting, không lỗi). Collab backend.implement a4 (routing) done, 4/8 pass, tasks
   đang chạy, còn 3 dependency. WSPV worker implement active. Modules, AUTH chờ thầy. Không vá.
 
+- 11:13 Yên. WSPV interface.implement a37 done, kernel active đang settle (settle-ready đúng). Collab tasks đang chạy (4/8
+  pass). Modules, AUTH chờ thầy. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
