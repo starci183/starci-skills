@@ -69,6 +69,10 @@ test('a Kernel yield summary that says "Running now:" is turn-idle, not active',
   ].join('\n');
   assert.equal(classifyAgentScreen(screen).state,'turn-idle');
   assert.equal(classifyAgentScreen('Running: provisioning r3\n❭ Ask Devin to build features').state,'turn-idle');
+  // Any line that ends in a colon is a heading of the Kernel's own prose (WSPV
+  // later yielded under " Running (codex):" and sat 20 minutes unwoken).
+  assert.equal(classifyAgentScreen(' Running (codex):\n   •  ctx_f38 — payment-pending audit\n Yielding — wait reason: audit reports.\n❭ Ask Devin to build features').state,'turn-idle');
+  assert.equal(classifyAgentScreen('• Working (4m 36s · esc to interrupt) · 1 background terminal running\n› Ask Codex').state,'active');
   assert.equal(classifyAgentScreen('○ Running command\n│ $ node api.mjs status\n❭ Guide Devin while it works').state,'active','a real status line still wins');
   assert.equal(classifyAgentScreen('• Running canonical status\n› Ask Codex to do anything').state,'active');
 });
