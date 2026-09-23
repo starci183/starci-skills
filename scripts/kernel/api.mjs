@@ -2789,9 +2789,12 @@ const operationTaskOf = (payload) => {
   return { taskId, runId: payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null };
 };
 
-// 'done' is Task closure, not a verdict: the verdict lives in the ledger. An
-// op that fails still leaves no open Task.
-const TASK_CLOSED_STATUS = 'done';
+// 'completed' is Task closure, not a verdict: the verdict lives in the ledger.
+// An op that fails still leaves no open Task. Orca accepts only pending,
+// ready, dispatched, completed, failed or blocked; the former 'done' was
+// refused on every call, so no settle or finish ever closed a Task and 133
+// settled operations piled up as open worker-task entries in the sidebar.
+export const TASK_CLOSED_STATUS = 'completed';
 
 function closeOperationTask(db, job, payload, kernelHandle) {
   const task = operationTaskOf(payload);

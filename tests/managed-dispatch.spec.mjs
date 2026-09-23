@@ -207,7 +207,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.ok(after.includes('orchestration task-update'),`settle must close the operation Task — log: ${after.join(', ')}`);
   const update=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration task-update');
   assert.equal(update?.[update.indexOf('--id')+1],'task-fake-1');
-  assert.equal(update?.[update.indexOf('--status')+1],'done');
+  assert.equal(update?.[update.indexOf('--status')+1],'completed','Orca accepts completed, never done');
   assert.equal(update?.[update.indexOf('--run')+1],'run-fake-1');
   assert.equal(update?.[update.indexOf('--from')+1],'fake-kernel-terminal');
   assert.equal(json(s.stdout)?.taskClosed?.ok,true,'the settle receipt records the Task it closed');
@@ -234,7 +234,7 @@ test('finish closes the kernel terminal and every Task the Run still holds open'
   const out=json(finished.stdout);
   assert.equal(out?.phase,'finished');
   assert.deepEqual(out?.tasksClosed?.map(entry=>[entry.jobId,entry.taskId,entry.status,entry.ok]),
-    [[jobId,'task-orphan-1','done',true]],'a finish leaves no open Task in the Run');
+    [[jobId,'task-orphan-1','completed',true]],'a finish leaves no open Task in the Run');
   assert.equal(out?.kernelTerminal,'fake-kernel-terminal');
 
   const argv=fx.callArgv();

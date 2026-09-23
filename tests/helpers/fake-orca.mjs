@@ -193,6 +193,8 @@ else if (verb === 'orchestration task-create' && arg('parent') != null && !/^tas
   fail({ ok: false, error: { code: 'invalid_parent', message: '--parent takes a task id' } });
 else if (verb === 'orchestration task-create')
   out({ ok: true, result: { task: { id: 'task-fake-1', display_name: arg('display-name'), run: arg('run') } } });
+else if (verb === 'orchestration task-update' && !['pending', 'ready', 'dispatched', 'completed', 'failed', 'blocked'].includes(arg('status')))
+  fail({ ok: false, error: { code: 'invalid_argument', message: 'invalid status ' + arg('status') + ', expected one of: pending, ready, dispatched, completed, failed, blocked' } });
 else if (verb === 'orchestration task-update')
   out({ ok: true, result: { task: { id: arg('id') } } });
 else if (verb === 'orchestration task-list')

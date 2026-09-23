@@ -81,6 +81,8 @@ calls:
     kind: mutation
     flags: [id, status, result, run, from]
     required: [id, status]
+    allowedValues:
+      status: [pending, ready, dispatched, completed, failed, blocked]
     receipt: [result.task.id]
     note: >-
       How an operation Task is closed. scripts/kernel/api.mjs settles a job by writing the verdict, closing the
