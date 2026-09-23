@@ -14,6 +14,7 @@ import { leadingNumberClassName } from "./classNames.js"
 export const LeadingNumber = (props: LeadingNumberProps) => (
     <span
         className={leadingNumberClassName}
+        data-contract="FONT-2 TONE-2"
     >
         {props.position}.
     </span>

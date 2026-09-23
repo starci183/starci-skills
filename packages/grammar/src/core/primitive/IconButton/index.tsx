@@ -17,7 +17,7 @@ export type IconButtonProps = {
  */
 const SKELETON_CLASS_NAME = skeletonVariants({ animationType: "shimmer" }).base()
 
-/** Circular glyph-only action with a mandatory accessible name. */
+/** Circular glyph-only action with a mandatory accessible name (A11Y-2, ICON-5). */
 export const IconButton = ({
     source,
     label,
@@ -29,6 +29,7 @@ export const IconButton = ({
     <HeroButton
         data-tier="atom"
         data-component="IconButton"
+        data-contract="A11Y-2 ICON-5"
         data-active={isActive ? "true" : "false"}
         data-loading={isSkeleton ? "true" : "false"}
         type="button"

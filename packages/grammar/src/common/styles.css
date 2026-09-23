@@ -123,6 +123,13 @@
         gap: 0.5rem;
     }
 
+    /* The drawn label is one block in that stack; a long name wraps instead of widening the field. */
+    .starci-core-otp-label {
+        display: block;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
     .starci-core-visually-hidden {
         position: absolute;
         width: 1px;
@@ -2217,6 +2224,11 @@
 
     /* --- Icon: an app-owned SVG has no intrinsic box, so usage sizing must ship. --- */
     .starci-core-icon {
+        flex: none;
+    }
+
+    /* RankArtwork is a glyph too: a flex row never squeezes it. Its size stays the consumer's. */
+    .starci-core-rank-artwork {
         flex: none;
     }
 

@@ -112,7 +112,8 @@ describe("scrollable Core surfaces", () => {
         expect(markup).toContain("starci-core-form-surface")
         expect(markup).toContain("starci-core-form-surface--compact")
         expect(markup).toContain("starci-core-form-scroll-viewport")
-        expect(markup).toContain("starci-core-surface-card--fill")
+        // Fill height is the data attribute alone; the unpainted modifier class is no longer emitted.
+        expect(markup).not.toContain("starci-core-surface-card--fill")
         expect(markup).toContain("<h3")
         expect(markup).toContain("data-grammar-surface-composition=\"joined\"")
         expect(markup).toContain("data-grammar-surface-height=\"fill\"")

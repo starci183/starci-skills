@@ -25,6 +25,12 @@ export type SliderProps = FieldControlProps & {
 
 const toVendor = (value: SliderValue): number | Array<number> => (typeof value === "number" ? value : [...value])
 
+/*
+ * Consumer hooks: `starci-core-slider-track`, `starci-core-slider-fill` name HeroUI parts whose
+ * vendor paint Common leaves as it is. No shipped sheet paints them; the Grammar name lets a
+ * consumer or family select those parts without reaching for vendor class names.
+ */
+
 /**
  * A value on a continuous or stepped scale. Each thumb is a native range input under the hood, so
  * arrow keys, Page Up/Down, Home/End and screen-reader value announcements are the vendor's. The
@@ -67,6 +73,7 @@ export const Slider = ({
         <HeroSlider
             data-tier="atom"
             data-component="Slider"
+            data-contract="A11Y-1 A11Y-3 FIELD-3"
             data-grammar-orientation={orientation}
             className="starci-core-field starci-core-slider"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}
@@ -111,7 +118,7 @@ export const Slider = ({
                 <span id={descriptionId} className="starci-core-field-description" data-grammar-field-description="true">{description}</span>
             )}
             {errorId === undefined ? null : (
-                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true">{errorMessage}</span>
+                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true" data-contract="FEEDBACK-1">{errorMessage}</span>
             )}
         </HeroSlider>
     )

@@ -173,7 +173,7 @@ export const SurfaceCard = (props: SurfaceCardProps) => {
 
     return (
         <Card.Root
-            className={getSurfaceCardClassName(measure, height) ?? ""}
+            className={getSurfaceCardClassName(measure) ?? ""}
             data-contract={rootContract}
             data-grammar-frame={frame}
             data-grammar-surface-composition={composition}

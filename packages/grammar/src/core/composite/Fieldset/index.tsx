@@ -29,6 +29,7 @@ export const Fieldset = ({ legend, isLegendHidden = false, description, errorMes
         <HeroFieldset
             data-tier="composite"
             data-component="Fieldset"
+            data-contract="A11Y-1 FIELD-2"
             className="starci-core-fieldset"
             disabled={isDisabled}
             {...(describedBy === "" ? {} : { "aria-describedby": describedBy })}
@@ -45,7 +46,7 @@ export const Fieldset = ({ legend, isLegendHidden = false, description, errorMes
             )}
             <HeroFieldset.Group className="starci-core-fieldset-fields" data-grammar-fieldset-fields="true">{children}</HeroFieldset.Group>
             {errorId === undefined ? null : (
-                <p id={errorId} className="starci-core-field-error" data-grammar-field-error="true">{errorMessage}</p>
+                <p id={errorId} className="starci-core-field-error" data-grammar-field-error="true" data-contract="FEEDBACK-1">{errorMessage}</p>
             )}
             {actions == null ? null : (
                 <HeroFieldset.Actions className="starci-core-fieldset-actions" data-grammar-fieldset-actions="true">{actions}</HeroFieldset.Actions>

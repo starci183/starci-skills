@@ -101,6 +101,21 @@
         text-overflow: ellipsis;
     }
 
+    /* A leading glyph slot (breadcrumb or tag): never squeezed, centred on the label's line, and an
+       unsized app SVG takes the label's em box. A Grammar Icon keeps its own usage size. */
+    .starci-core-breadcrumb-leading,
+    .starci-core-tag-leading {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+    }
+
+    .starci-core-breadcrumb-leading > svg,
+    .starci-core-tag-leading > svg {
+        width: 1em;
+        height: 1em;
+    }
+
     .starci-core-breadcrumb-label[data-grammar-current="true"] {
         max-width: none;
         color: var(--foreground, var(--starci-core-foreground, CanvasText));
@@ -560,6 +575,14 @@
         .starci-core-footer-main {
             grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr);
         }
+    }
+
+    /* The brand column stacks whatever identity the app passes, like a directory group. */
+    .starci-core-footer-brand {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: var(--grammar-inline-gap, 0.5rem);
     }
 
     .starci-core-footer-directory {

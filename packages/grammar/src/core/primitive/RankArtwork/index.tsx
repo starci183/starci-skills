@@ -50,7 +50,8 @@ const artworkByKind: Record<RankArtworkKind, ReactNode> = {
 
 /**
  * Semantic ranking artwork shared by every Core consumer. Consumers choose
- * the ranking meaning; the Grammar owns the official Fluent Emoji Flat art.
+ * the ranking meaning; the Grammar owns the official Fluent Emoji Flat art. Named only when given a
+ * label, silent otherwise (ICON-6).
  */
 export const RankArtwork = ({ className, kind, label, ...props }: RankArtworkProps) => (
     <svg
@@ -58,6 +59,7 @@ export const RankArtwork = ({ className, kind, label, ...props }: RankArtworkPro
         aria-hidden={label === undefined ? "true" : undefined}
         aria-label={label}
         className={cn("starci-core-rank-artwork", className)}
+        data-contract="ICON-6"
         data-grammar-rank-artwork={kind}
         fill="none"
         focusable="false"

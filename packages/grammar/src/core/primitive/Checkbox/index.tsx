@@ -40,6 +40,12 @@ export const CheckboxItem = ({ label, description, errorMessage, isStandalone }:
     </>
 )
 
+/*
+ * Consumer hook: `starci-core-checkbox` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-choice`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
 /**
  * One on/off choice with its label as part of the hit area. Space toggles; the vendor supplies the
  * native checkbox input, `aria-checked="mixed"` for indeterminate, and required/invalid wiring.
@@ -55,6 +61,7 @@ export const Checkbox = ({
     <HeroCheckbox
         data-tier="atom"
         data-component="Checkbox"
+        data-contract="A11Y-1 FIELD-1 CONTROL-STATE-3"
         className="starci-core-choice starci-core-checkbox"
         {...vendorFieldProps(field)}
         isReadOnly={field.isReadOnly === true}

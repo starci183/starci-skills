@@ -60,6 +60,7 @@ export const SegmentedControl = ({
         <div
             data-tier="composite"
             data-component="SegmentedControl"
+            data-contract="A11Y-1 FIELD-2"
             data-width={width}
             className="starci-core-field starci-core-segmented-control"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}
@@ -87,6 +88,7 @@ export const SegmentedControl = ({
                 }}
                 className="starci-core-segmented-control-group"
                 data-grammar-field-control="true"
+                data-contract="STATE-6 FOCUS-2"
             >
                 {options.map((option) => (
                     <HeroToggleButton
@@ -106,7 +108,7 @@ export const SegmentedControl = ({
                 <span id={descriptionId} className="starci-core-field-description" data-grammar-field-description="true">{description}</span>
             )}
             {errorId === undefined ? null : (
-                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true">{errorMessage}</span>
+                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true" data-contract="FEEDBACK-1">{errorMessage}</span>
             )}
         </div>
     )

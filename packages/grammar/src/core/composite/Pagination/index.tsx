@@ -41,12 +41,19 @@ export const paginationTokens = (page: number, pageCount: number, siblingCount =
     return [1, "start-ellipsis", ...range(left, right), "end-ellipsis", count]
 }
 
+/*
+ * Consumer hooks: `starci-core-pagination-summary` names a HeroUI part whose vendor paint Common
+ * leaves as it is. No shipped sheet paints it; the Grammar name lets a consumer or family select
+ * that part without reaching for vendor class names.
+ */
+
 /**
  * Page-by-page navigation over one ordered result set.
  *
  * The current page carries `aria-current="page"`. Below 30rem the previous/next labels and the
  * non-adjacent page numbers leave the paint (the first, last and current page stay), so the strip
  * fits a 360px viewport without horizontal scroll.
+ * Contract: list FOCUS-2 (tab order = page order), steps A11Y-2 FOCUS-1, pages FOCUS-1 CONTROL-STATE-3.
  */
 export const Pagination = ({
     label,
@@ -70,11 +77,12 @@ export const Pagination = ({
             data-tier="composite"
         >
             {summary === undefined ? null : <HeroPagination.Summary className="starci-core-pagination-summary" data-grammar-pagination-summary="true">{summary}</HeroPagination.Summary>}
-            <HeroPagination.Content className="starci-core-pagination-list">
+            <HeroPagination.Content className="starci-core-pagination-list" data-contract="FOCUS-2">
                 <HeroPagination.Item className="starci-core-pagination-item" data-grammar-pagination-step="previous">
                     <HeroPagination.Previous
                         aria-label={previousLabel}
                         className="starci-core-pagination-step"
+                        data-contract="A11Y-2 FOCUS-1"
                         isDisabled={page <= 1}
                         onPress={() => onPageChange(page - 1)}
                     >
@@ -92,6 +100,7 @@ export const Pagination = ({
                         <HeroPagination.Link
                             aria-label={pageLabel(token)}
                             className="starci-core-pagination-page"
+                            data-contract="FOCUS-1 CONTROL-STATE-3"
                             data-grammar-current={token === page ? "true" : "false"}
                             isActive={token === page}
                             onPress={() => { if (token !== page) onPageChange(token) }}
@@ -108,6 +117,7 @@ export const Pagination = ({
                     <HeroPagination.Next
                         aria-label={nextLabel}
                         className="starci-core-pagination-step"
+                        data-contract="A11Y-2 FOCUS-1"
                         isDisabled={page >= last}
                         onPress={() => onPageChange(page + 1)}
                     >

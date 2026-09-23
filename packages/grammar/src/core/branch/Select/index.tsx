@@ -60,6 +60,19 @@ export const ListOptions = ({ options }: { readonly options: ReadonlyArray<ListO
     </>
 )
 
+/*
+ * Consumer hook: `starci-core-select` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
+/*
+ * Consumer hooks: `starci-core-select-indicator`, `starci-core-list-popover`, `starci-core-list`
+ * name HeroUI parts whose vendor paint Common leaves as it is. No shipped sheet paints them; the
+ * Grammar name lets a consumer or family select those parts without reaching for vendor class
+ * names.
+ */
+
 /**
  * A single choice from a closed list, opened from a field-shaped trigger.
  *
@@ -87,6 +100,7 @@ export const Select = ({
         <HeroSelect
             data-tier="branch"
             data-component="Select"
+            data-contract="A11Y-1 FIELD-3 STATE-6 CONTROL-STATE-2"
             className="starci-core-field starci-core-select"
             fullWidth
             {...vendorFieldProps({ ...field, isPending })}
@@ -111,7 +125,7 @@ export const Select = ({
             </HeroSelect.Trigger>
             <FieldDescription>{field.description}</FieldDescription>
             <FieldErrorText>{field.errorMessage}</FieldErrorText>
-            <HeroSelect.Popover className="starci-core-list-popover" data-grammar-popover="Select" {...portalProps}>
+            <HeroSelect.Popover className="starci-core-list-popover" data-grammar-popover="Select" data-contract="LAYOUT-4" {...portalProps}>
                 <HeroListBox className="starci-core-list">
                     <ListOptions options={options} />
                 </HeroListBox>

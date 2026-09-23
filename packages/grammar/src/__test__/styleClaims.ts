@@ -115,15 +115,30 @@ export const backsClaim = (claim: string, declarations: ReadonlyArray<Declaratio
     }
 }
 
+/**
+ * The rule families whose ids promise PAINT, and so are kept (or broken) by the sheet.
+ *
+ * Every other catalogue family - A11Y, FOCUS, STATE, CONTROL-STATE, FIELD, ICON, TRUTH and the rest -
+ * promises behaviour: ARIA wiring, focus order, which state owns which hook. Those ids are proved by
+ * the renderer's render specs, not by a declaration, so the claims-versus-CSS check leaves them alone.
+ */
+export const PAINT_RULE_FAMILIES: ReadonlySet<string> = new Set([
+    "PADDING", "GAP", "MARGIN", "FONT", "TONE", "SURFACE", "BOUNDARY", "MEASURE", "OVERFLOW", "FLOW",
+])
+
+/** Whether one `data-contract` id is a paint promise (see `PAINT_RULE_FAMILIES`). */
+export const isPaintClaim = (claim: string): boolean => PAINT_RULE_FAMILIES.has(claim.split(/-(?=\d+$|AUTO$)/)[0] ?? "")
+
 /** Every Grammar class an element carries; a claim may be backed by any one of them. */
 export const grammarClassNames = (element: Element): ReadonlyArray<string> =>
     [...element.classList].filter((token) => token.startsWith("starci-core-"))
 
-/** Report the ids one claimed element emits that the sheet does not keep. */
+/** Report the paint ids one claimed element emits that the sheet does not keep. */
 export const unbackedClaims = (css: string, element: Element): ReadonlyArray<string> => {
     const declarations = grammarClassNames(element).flatMap((className) => declarationsFor(css, className))
     return (element.getAttribute("data-contract") ?? "")
         .split(" ")
         .filter(Boolean)
+        .filter(isPaintClaim)
         .filter((claim) => !backsClaim(claim, declarations))
 }

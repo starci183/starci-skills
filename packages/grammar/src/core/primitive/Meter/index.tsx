@@ -45,6 +45,7 @@ export const Meter = ({
             data-tier="atom"
             data-component="Meter"
             data-grammar-tone={tone}
+            data-contract="A11Y-3 ACCENT-4"
             value={value}
             minValue={minValue}
             maxValue={maxValue}
@@ -62,7 +63,7 @@ export const Meter = ({
                 </span>
             )}
             <HeroMeter.Track className="starci-core-meter-track">
-                <HeroMeter.Fill className="starci-core-meter-fill" />
+                <HeroMeter.Fill className="starci-core-meter-fill" data-contract="MOTION-2" />
             </HeroMeter.Track>
         </HeroMeter>
     )

@@ -35,6 +35,7 @@ export type TopBarProps = Omit<ComponentPropsWithoutRef<"header">, "children" | 
  *
  * Landmark rule: a page has ONE banner, and the app bar owns it. Hosted in `WorkspaceShell`'s
  * `header` slot, the shell yields (its wrapper becomes a plain `div`) so the banner is never nested.
+ * Contract: menu trigger A11Y-2 ICON-5 STATE-7 (named glyph button, app-owned aria-expanded).
  */
 export const TopBar = ({ brand, navigation, actions, menu, position = "sticky", className, ...headerProps }: TopBarProps) => (
     <header
@@ -50,6 +51,7 @@ export const TopBar = ({ brand, navigation, actions, menu, position = "sticky", 
                 aria-expanded={menu.isOpen}
                 aria-label={menu.isOpen ? menu.closeLabel : menu.openLabel}
                 className="starci-core-top-bar-menu-trigger"
+                data-contract="A11Y-2 ICON-5 STATE-7"
                 data-grammar-top-bar-trigger="true"
                 isIconOnly
                 onPress={() => menu.onOpenChange(!menu.isOpen)}

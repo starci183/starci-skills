@@ -19,11 +19,15 @@ export type DescriptionListProps = {
     readonly className?: string
 }
 
-/** Term/value pairs (details, metadata, settings summaries) as a real `<dl>`. */
+/**
+ * Term/value pairs (details, metadata, settings summaries) as a real `<dl>`.
+ * Contract: HIERARCHY-3 (term precedes value in source and paint), TRUTH-1 (no tone carrier on facts).
+ */
 export const DescriptionList = ({ items, layout = "columns", isDivided = true, className }: DescriptionListProps) => (
     <dl
         className={navigationClassName("starci-core-description-list", className)}
         data-component="DescriptionList"
+        data-contract="HIERARCHY-3 TRUTH-1"
         data-tier="composite"
         data-grammar-description-layout={layout}
         data-grammar-description-divided={isDivided ? "true" : "false"}

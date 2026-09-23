@@ -31,6 +31,7 @@ export type ListBoxProps = {
  * A list of selectable or actionable rows (`role="listbox"`). Arrow keys, Home/End and typeahead
  * move between rows; Space/Enter select. Each row exposes `data-grammar-selected` and the
  * vendor `aria-selected`; long labels truncate and descriptions wrap at narrow widths.
+ * Contract: list FOCUS-2 CONTROL-STATE-3, empty STATE-3, leading glyph ICON-6.
  */
 export const ListBox = ({
     label,
@@ -47,6 +48,7 @@ export const ListBox = ({
         aria-label={label}
         className={navigationClassName("starci-core-list-box", className)}
         data-component="ListBox"
+        data-contract="FOCUS-2 CONTROL-STATE-3"
         data-tier="branch"
         data-grammar-list-selection={selectionMode}
         selectionMode={selectionMode}
@@ -56,7 +58,7 @@ export const ListBox = ({
             onSelectionChange: (selection: Selection) => onSelectionChange(selection === "all" ? items.map((item) => item.id) : [...selection].map(String)),
         })}
         {...(onAction === undefined ? {} : { onAction: (key: string | number) => onAction(String(key)) })}
-        {...(emptyContent === undefined ? {} : { renderEmptyState: () => <div className="starci-core-list-box-empty" data-grammar-list-empty="true">{emptyContent}</div> })}
+        {...(emptyContent === undefined ? {} : { renderEmptyState: () => <div className="starci-core-list-box-empty" data-contract="STATE-3" data-grammar-list-empty="true">{emptyContent}</div> })}
     >
         {items.map((item) => (
             <HeroListBox.Item
@@ -69,7 +71,7 @@ export const ListBox = ({
             >
                 {({ isSelected }: { readonly isSelected: boolean }) => (
                     <span className="starci-core-list-box-row" data-grammar-selected={isSelected ? "true" : "false"}>
-                        {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-list-box-leading">{item.leading}</span>}
+                        {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-list-box-leading" data-contract="ICON-6">{item.leading}</span>}
                         <span className="starci-core-list-box-copy">
                             <span className="starci-core-list-box-label">{item.label}</span>
                             {item.description === undefined ? null : <span className="starci-core-list-box-description">{item.description}</span>}

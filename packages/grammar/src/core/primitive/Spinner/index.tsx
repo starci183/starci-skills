@@ -26,6 +26,7 @@ export const Spinner = ({ label, size = "md", tone = "accent" }: SpinnerProps) =
         data-tone={tone}
         role="status"
         aria-label={label}
+        data-contract="MOTION-1 MOTION-2"
         size={size}
         color={tone}
         className="starci-core-spinner"

@@ -57,6 +57,7 @@ export const FileDropzone = ({
         <div
             data-tier="atom"
             data-component="FileDropzone"
+            data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
             className="starci-core-field starci-core-file-dropzone"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}
         >
@@ -76,6 +77,7 @@ export const FileDropzone = ({
                 className="starci-core-file-dropzone-target"
                 data-grammar-field-control="true"
                 data-grammar-drag={isDragging ? "over" : "idle"}
+                data-contract="FOCUS-5"
                 onDragEnter={() => { if (!blocked) setIsDragging(true) }}
                 onDragOver={(event) => { if (blocked) event.preventDefault() }}
                 onDragLeave={() => setIsDragging(false)}
@@ -104,7 +106,7 @@ export const FileDropzone = ({
                     }}
                 />
                 <span className="starci-core-file-dropzone-prompt">
-                    {icon == null ? null : <span aria-hidden="true" className="starci-core-file-dropzone-icon">{icon}</span>}
+                    {icon == null ? null : <span aria-hidden="true" className="starci-core-file-dropzone-icon" data-contract="ICON-6">{icon}</span>}
                     <span>{prompt}</span>
                 </span>
             </div>
@@ -114,7 +116,7 @@ export const FileDropzone = ({
                 </ul>
             )}
             {errorId === undefined ? null : (
-                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true">{errorMessage}</span>
+                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true" data-contract="FEEDBACK-1">{errorMessage}</span>
             )}
         </div>
     )

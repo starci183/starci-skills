@@ -25,6 +25,12 @@ export type SearchFieldProps = FieldControlProps & {
     readonly clearLabel?: string
 }
 
+/*
+ * Consumer hook: `starci-core-search-field` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
 /**
  * A text field whose job is a query: `type="search"`, a clear button, Escape to clear, Enter to
  * submit - all the vendor's. The leading glyph is decoration; the label is the name.
@@ -44,6 +50,7 @@ export const SearchField = ({
     <HeroSearchField
         data-tier="atom"
         data-component="SearchField"
+        data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-2"
         className="starci-core-field starci-core-search-field"
         fullWidth
         {...vendorFieldProps({ ...field, isPending })}

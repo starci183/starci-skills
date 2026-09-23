@@ -93,7 +93,7 @@ provenance:
     - path: "packages/grammar/src/common/index.ts"
       sha256: "962c84f025a4cd7d53d27424c434b1b7d00d6ca82c3335c894c963ba498eb5a1"
     - path: "packages/grammar/src/common/renderers.ts"
-      sha256: "f8f91703c01761ad6c67dd4c6d7b3cb4ee1fb9b0dc246b710d692794b4aadfe4"
+      sha256: "6f18658fe84c1868046103ecce7d617a491c7f78a2cd94708a4db0558a9c6a81"
     - path: "packages/grammar/src/common/renderers-forms.ts"
       sha256: "00b544cf32d561c5fb83a6e08f70b534f6a10a7d3c4bde98fe750068c81b051b"
     - path: "packages/grammar/src/common/renderers-overlays.ts"
@@ -103,13 +103,13 @@ provenance:
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
     - path: "packages/grammar/src/common/styles.css"
-      sha256: "08fc5da368735375cb597f00b5ecdb9daa6bf4867faf3e3ac94eab49686d89ef"
+      sha256: "e30ab2a87590cc3b57b8cdaeff513c22a86ba1a9d5c44b0051be38aad3d72767"
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
-      sha256: "c71b89037b22406f45f41e41dc691aa781aabe24676d5856cefae71b95610e3a"
+      sha256: "667c44d7a06e7c1ad07cc0b82c621b3a53c6345d9d91e7417abcc9ec012a1cf7"
     - path: "packages/grammar/src/common/components-navigation.css"
-      sha256: "e860abfedb24cf32d718c19aaa4089704e23d8ada9c0882b4310bcf312d96727"
+      sha256: "b7fef3fcbeada174ffd06abaf485f812bace9e9be6261a264457913f2d6fe88c"
     - path: "packages/grammar/src/common/spacing.ts"
       sha256: "f0cbd5f51ef0aaf3db529c349489021c009c88d3187ae0946c24bd3be3168f5d"
     - path: "packages/grammar/src/common/state.ts"
@@ -180,16 +180,16 @@ identity:
     navigation: "19 renderers, COMMON_NAVIGATION_COMPONENTS in src/common/renderers-navigation.ts"
   counts:
     renderers: 95
-    tokens: 118
-    tokensAssignedByCommon: 14
-    tokensAssignedAndAlsoReadByCommon: 13
+    tokens: 119
+    tokensAssignedByCommon: 15
+    tokensAssignedAndAlsoReadByCommon: 15
     tokensWrittenByRenderers: 2
     tokensReadOnlyByCommon: 104
-    tokensReadByCommon: 117
-    claimEntries: 174
-    distinctClaimIds: 47
-    emittedClasses: 383
-    classesWithARuleInAShippedSheet: 345
+    tokensReadByCommon: 119
+    claimEntries: 402
+    distinctClaimIds: 90
+    emittedClasses: 384
+    classesWithARuleInAShippedSheet: 352
     gaps: 10
 observations:
   - id: common-supplies-no-colour
@@ -252,13 +252,16 @@ observations:
       `components` layer, the Common sheets re-state the box in their own `@layer` with `!important`
       rather than relying on a consumer's Tailwind scan — the debt `src/shipped-geometry.spec.ts` and
       `src/common/styles.spec.ts` refuse.
-  - id: the-new-renderers-stamp-no-rule-id
+  - id: every-renderer-stamps-rule-ids
     observation: |
-      The 53 renderers added in 0.5.0 carry no `data-contract` attribute: every one of the 174 claim
-      entries (47 distinct rule ids) belongs to the 42 base renderers, exactly as at 0.4.13. The new
-      renderers are addressed by `data-component`, `data-tier` and `data-grammar-*` state hooks
-      (`data-grammar-field`, `data-grammar-field-state`, `data-grammar-invalid`, `data-grammar-current`,
-      `data-grammar-overlay-surface`, `data-placement`, …), which is what the family sheets select on.
+      Every one of the 95 renderers stamps at least one `data-contract` rule id (`claims` /
+      `computedClaims` per renderer above; `tests/grammar-contracts.spec.mjs` holds it). The base
+      renderers mostly claim paint - spacing, font, tone, surface, boundary, overflow ids that
+      `src/__test__/styleClaims.ts` checks against the shipped declaration. The 53 renderers added in
+      0.5.0 claim behaviour instead: A11Y, FOCUS, FIELD, CONTROL-STATE, STATE, FEEDBACK, ICON, MEDIA,
+      MOTION, LAYOUT-4 and CORE-BOUNDARY-4 on the node that implements each (a field root, a roving
+      list, a modal surface), proved by their render specs rather than by a declaration. Families still
+      select them through `data-component`, `data-tier` and the `data-grammar-*` state hooks.
 guidance:
   - id: common-is-not-a-family
     requirement: |
@@ -300,133 +303,133 @@ tokens:
     readBy: "common"
     commonFallback: "HighlightText"
     uses: 2
-    source: "packages/grammar/src/common/components-navigation.css:264"
+    source: "packages/grammar/src/common/components-navigation.css:279"
   - name: "--accent-soft"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--starci-core-surface-secondary, var(--surface-secondary, Canvas))"
     uses: 9
-    source: "packages/grammar/src/common/styles.css:633"
+    source: "packages/grammar/src/common/styles.css:662"
   - name: "--accent-soft-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--starci-core-accent, HighlightText)"
     uses: 11
-    source: "packages/grammar/src/common/styles.css:1842"
+    source: "packages/grammar/src/common/styles.css:1878"
   - name: "--background"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "Canvas"
     uses: 10
-    source: "packages/grammar/src/common/styles.css:460"
+    source: "packages/grammar/src/common/styles.css:489"
   - name: "--border"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "GrayText"
     uses: 25
-    source: "packages/grammar/src/common/styles.css:148"
+    source: "packages/grammar/src/common/styles.css:177"
   - name: "--code-surface"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "color-mix(in srgb, CanvasText 6%, Canvas)"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:985"
+    source: "packages/grammar/src/common/styles.css:1021"
   - name: "--danger"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--starci-core-danger, #b91c1c)"
     uses: 14
-    source: "packages/grammar/src/common/styles.css:713"
+    source: "packages/grammar/src/common/styles.css:749"
   - name: "--danger-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "CanvasText"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:2266"
+    source: "packages/grammar/src/common/styles.css:2307"
   - name: "--danger-soft"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--danger, Canvas)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2265"
+    source: "packages/grammar/src/common/styles.css:2306"
   - name: "--danger-soft-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--danger-foreground, CanvasText)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2266"
+    source: "packages/grammar/src/common/styles.css:2307"
   - name: "--default"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--starci-core-surface-secondary, Canvas)"
     uses: 4
-    source: "packages/grammar/src/common/styles.css:1837"
+    source: "packages/grammar/src/common/styles.css:1873"
   - name: "--field-background"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--surface, Canvas)"
     uses: 6
-    source: "packages/grammar/src/common/styles.css:292"
+    source: "packages/grammar/src/common/styles.css:321"
   - name: "--field-border"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--border, ButtonBorder)"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:289"
+    source: "packages/grammar/src/common/styles.css:318"
   - name: "--field-border-hover"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--field-border, var(--border, ButtonBorder))"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:306"
+    source: "packages/grammar/src/common/styles.css:335"
   - name: "--field-border-width"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "1px"
     uses: 2
-    source: "packages/grammar/src/common/styles.css:289"
+    source: "packages/grammar/src/common/styles.css:318"
   - name: "--field-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--foreground, CanvasText)"
     uses: 2
-    source: "packages/grammar/src/common/styles.css:293"
+    source: "packages/grammar/src/common/styles.css:322"
   - name: "--field-hover"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--field-background, var(--surface, Canvas))"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:307"
+    source: "packages/grammar/src/common/styles.css:336"
   - name: "--field-placeholder"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--muted, GrayText)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:332"
+    source: "packages/grammar/src/common/styles.css:361"
   - name: "--field-radius"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 1.5)"
     uses: 4
-    source: "packages/grammar/src/common/styles.css:290"
+    source: "packages/grammar/src/common/styles.css:319"
   - name: "--field-shadow"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "none"
     uses: 2
-    source: "packages/grammar/src/common/styles.css:294"
+    source: "packages/grammar/src/common/styles.css:323"
   - name: "--focus"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--starci-core-focus, Highlight)"
-    uses: 16
-    source: "packages/grammar/src/common/styles.css:311"
+    uses: 17
+    source: "packages/grammar/src/common/styles.css:114"
   - name: "--font-mono"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:656"
+    source: "packages/grammar/src/common/styles.css:685"
   - name: "--foreground"
     assignedBy: "host"
     readBy: "common"
@@ -436,12 +439,12 @@ tokens:
   - name: "--grammar-inline-gap"
     value: "0.5rem"
     assignedBy: "common"
-    alsoReadBy: 16
+    alsoReadBy: 17
     source: "packages/grammar/src/common/styles.css:9"
   - name: "--grammar-page-inset"
     value: "clamp(1rem, 3vw, 2rem)"
     assignedBy: "common"
-    alsoReadBy: 12
+    alsoReadBy: 14
     source: "packages/grammar/src/common/styles.css:13"
   - name: "--grammar-region-gap"
     value: "1.5rem"
@@ -456,7 +459,7 @@ tokens:
   - name: "--grammar-section-gap"
     value: "1rem"
     assignedBy: "common"
-    alsoReadBy: 7
+    alsoReadBy: 8
     source: "packages/grammar/src/common/styles.css:11"
   - name: "--info"
     assignedBy: "host"
@@ -469,7 +472,7 @@ tokens:
     readBy: "common"
     commonFallback: "LinkText"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1088"
+    source: "packages/grammar/src/common/styles.css:1124"
   - name: "--muted"
     assignedBy: "host"
     readBy: "common"
@@ -481,49 +484,49 @@ tokens:
     readBy: "common"
     commonFallback: "color-mix(in srgb, CanvasText 7%, Canvas)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:971"
+    source: "packages/grammar/src/common/styles.css:1007"
   - name: "--radius"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "0.5rem"
     uses: 16
-    source: "packages/grammar/src/common/styles.css:290"
+    source: "packages/grammar/src/common/styles.css:319"
   - name: "--radius-lg"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--radius, 0.5rem)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2234"
+    source: "packages/grammar/src/common/styles.css:2275"
   - name: "--radius-md"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 0.75)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2335"
+    source: "packages/grammar/src/common/styles.css:2376"
   - name: "--radius-sm"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 0.75)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:340"
+    source: "packages/grammar/src/common/styles.css:369"
   - name: "--radius-xl"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 1.5)"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:1820"
+    source: "packages/grammar/src/common/styles.css:1856"
   - name: "--separator"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--border, GrayText)"
     uses: 20
-    source: "packages/grammar/src/common/styles.css:814"
+    source: "packages/grammar/src/common/styles.css:850"
   - name: "--shadow-surface"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "0 1px 3px rgb(0 0 0 / 0.16)"
     uses: 4
-    source: "packages/grammar/src/common/styles.css:556"
+    source: "packages/grammar/src/common/styles.css:585"
   - name: "--starci-core-accent"
     assignedBy: "family"
     readBy: "common"
@@ -535,102 +538,109 @@ tokens:
     valueRules: 2
     assignedBy: "common"
     alsoReadBy: 2
-    source: "packages/grammar/src/common/styles.css:1294"
+    source: "packages/grammar/src/common/styles.css:1330"
   - name: "--starci-core-band-offset"
     value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
     assignedBy: "common"
     alsoReadBy: 2
-    source: "packages/grammar/src/common/styles.css:1290"
+    source: "packages/grammar/src/common/styles.css:1326"
   - name: "--starci-core-band-subnav-height"
     value: "calc(3.25rem + 1px)"
     valueRules: 2
     assignedBy: "common"
     alsoReadBy: 1
-    source: "packages/grammar/src/common/styles.css:1303"
+    source: "packages/grammar/src/common/styles.css:1339"
   - name: "--starci-core-border"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "var(--border, GrayText)"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:148"
+    source: "packages/grammar/src/common/styles.css:177"
+  - name: "--starci-core-bottom-nav-block-size"
+    value: "calc(4rem + 1px)"
+    assignedBy: "common"
+    alsoReadBy: 2
+    source: "packages/grammar/src/common/components-navigation.css:429"
   - name: "--starci-core-bottom-nav-count"
     assignedBy: "renderer"
     writtenBy: ["BottomNav"]
     readBy: "common"
     commonFallback: "4"
     uses: 1
-    source: "packages/grammar/src/common/components-navigation.css:405"
+    source: "packages/grammar/src/common/components-navigation.css:460"
   - name: "--starci-core-bottom-nav-offset"
-    value: "calc(4rem + env(safe-area-inset-bottom, 0px))"
+    value: "0px"
+    valueRules: 2
     assignedBy: "common"
-    source: "packages/grammar/src/common/components-navigation.css:400"
+    alsoReadBy: 3
+    source: "packages/grammar/src/common/components-navigation.css:433"
   - name: "--starci-core-bottom-nav-z"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "40"
     uses: 1
-    source: "packages/grammar/src/common/components-navigation.css:394"
+    source: "packages/grammar/src/common/components-navigation.css:409"
   - name: "--starci-core-canvas"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "var(--background, Canvas)"
     uses: 7
-    source: "packages/grammar/src/common/styles.css:460"
+    source: "packages/grammar/src/common/styles.css:489"
   - name: "--starci-core-contained-max-height"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "calc(100dvh - 3rem)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:600"
+    source: "packages/grammar/src/common/styles.css:629"
   - name: "--starci-core-control-min-size"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "2.75rem"
     uses: 14
-    source: "packages/grammar/src/common/styles.css:1388"
+    source: "packages/grammar/src/common/styles.css:1424"
   - name: "--starci-core-control-radius"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.75rem"
     uses: 5
-    source: "packages/grammar/src/common/styles.css:458"
+    source: "packages/grammar/src/common/styles.css:487"
   - name: "--starci-core-copy-gap"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.25rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1098"
+    source: "packages/grammar/src/common/styles.css:1134"
   - name: "--starci-core-danger"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "#b91c1c"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:713"
+    source: "packages/grammar/src/common/styles.css:749"
   - name: "--starci-core-data-table-max-block-size"
     assignedBy: "renderer"
     writtenBy: ["DataTable"]
     readBy: "common"
     commonFallback: "24rem"
     uses: 1
-    source: "packages/grammar/src/common/components-navigation.css:652"
+    source: "packages/grammar/src/common/components-navigation.css:715"
   - name: "--starci-core-disabled-opacity"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.55"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:646"
+    source: "packages/grammar/src/common/styles.css:675"
   - name: "--starci-core-field-gap"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.5rem"
     uses: 2
-    source: "packages/grammar/src/common/styles.css:257"
+    source: "packages/grammar/src/common/styles.css:286"
   - name: "--starci-core-focus"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "Highlight"
-    uses: 2
-    source: "packages/grammar/src/common/styles.css:311"
+    uses: 3
+    source: "packages/grammar/src/common/styles.css:114"
   - name: "--starci-core-foreground"
     assignedBy: "family"
     readBy: "common"
@@ -642,42 +652,42 @@ tokens:
     readBy: "common"
     commonFallback: "28rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:238"
+    source: "packages/grammar/src/common/styles.css:267"
   - name: "--starci-core-form-measure"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "30rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:231"
+    source: "packages/grammar/src/common/styles.css:260"
   - name: "--starci-core-highlight-angle"
     value: "360deg"
     assignedBy: "common"
     alsoReadBy: 1
-    source: "packages/grammar/src/common/styles.css:513"
+    source: "packages/grammar/src/common/styles.css:542"
   - name: "--starci-core-highlight-inset"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:525"
+    source: "packages/grammar/src/common/styles.css:554"
   - name: "--starci-core-inline-gap"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.5rem"
     uses: 6
-    source: "packages/grammar/src/common/styles.css:427"
+    source: "packages/grammar/src/common/styles.css:456"
   - name: "--starci-core-motion-duration"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "180ms"
     uses: 22
-    source: "packages/grammar/src/common/styles.css:299"
+    source: "packages/grammar/src/common/styles.css:328"
   - name: "--starci-core-motion-easing"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "cubic-bezier(0.2, 0, 0, 1)"
     uses: 20
-    source: "packages/grammar/src/common/styles.css:299"
+    source: "packages/grammar/src/common/styles.css:328"
   - name: "--starci-core-muted"
     assignedBy: "family"
     readBy: "common"
@@ -689,7 +699,7 @@ tokens:
     readBy: "common"
     commonFallback: "50"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1268"
+    source: "packages/grammar/src/common/styles.css:1304"
   - name: "--starci-core-overlay-tone"
     value: "var(--muted, GrayText)"
     valueRules: 6
@@ -713,49 +723,49 @@ tokens:
     readBy: "common"
     commonFallback: "999px"
     uses: 5
-    source: "packages/grammar/src/common/styles.css:1832"
+    source: "packages/grammar/src/common/styles.css:1868"
   - name: "--starci-core-rail-collapsed"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "4rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1124"
+    source: "packages/grammar/src/common/styles.css:1160"
   - name: "--starci-core-rail-compact"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "16rem"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:1120"
+    source: "packages/grammar/src/common/styles.css:1156"
   - name: "--starci-core-rail-gap"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "1rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1148"
+    source: "packages/grammar/src/common/styles.css:1184"
   - name: "--starci-core-rail-gap-compact"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.75rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1210"
+    source: "packages/grammar/src/common/styles.css:1246"
   - name: "--starci-core-rail-offset"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "var(--starci-core-band-offset, 5.5rem)"
     uses: 2
-    source: "packages/grammar/src/common/styles.css:1146"
+    source: "packages/grammar/src/common/styles.css:1182"
   - name: "--starci-core-rail-standard"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "20rem"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:1128"
+    source: "packages/grammar/src/common/styles.css:1164"
   - name: "--starci-core-rail-wide"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "24rem"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:1132"
+    source: "packages/grammar/src/common/styles.css:1168"
   - name: "--starci-core-reading-measure"
     assignedBy: "family"
     readBy: "common"
@@ -773,223 +783,223 @@ tokens:
     readBy: "common"
     commonFallback: "0.75rem"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:809"
+    source: "packages/grammar/src/common/styles.css:845"
   - name: "--starci-core-row-gap-compact"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.5rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1204"
+    source: "packages/grammar/src/common/styles.css:1240"
   - name: "--starci-core-row-inset"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "1rem"
     uses: 2
-    source: "packages/grammar/src/common/styles.css:810"
+    source: "packages/grammar/src/common/styles.css:846"
   - name: "--starci-core-section-gap"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "0.75rem"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:234"
+    source: "packages/grammar/src/common/styles.css:263"
   - name: "--starci-core-separator"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "GrayText"
     uses: 10
-    source: "packages/grammar/src/common/styles.css:1261"
+    source: "packages/grammar/src/common/styles.css:1297"
   - name: "--starci-core-sidebar-collapsed-width"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "4rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1748"
+    source: "packages/grammar/src/common/styles.css:1784"
   - name: "--starci-core-sidebar-width"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "16rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1741"
+    source: "packages/grammar/src/common/styles.css:1777"
   - name: "--starci-core-subnav-offset"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "var(--starci-core-band-height, 4rem)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1450"
+    source: "packages/grammar/src/common/styles.css:1486"
   - name: "--starci-core-subnav-z"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "40"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1448"
+    source: "packages/grammar/src/common/styles.css:1484"
   - name: "--starci-core-success"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "#15803d"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:708"
+    source: "packages/grammar/src/common/styles.css:744"
   - name: "--starci-core-surface"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "Canvas"
     uses: 3
-    source: "packages/grammar/src/common/styles.css:637"
+    source: "packages/grammar/src/common/styles.css:666"
   - name: "--starci-core-surface-inset"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "1rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:566"
+    source: "packages/grammar/src/common/styles.css:595"
   - name: "--starci-core-surface-radius"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "1rem"
     uses: 14
-    source: "packages/grammar/src/common/styles.css:149"
+    source: "packages/grammar/src/common/styles.css:178"
   - name: "--starci-core-surface-secondary"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "var(--surface-secondary, Canvas)"
     uses: 7
-    source: "packages/grammar/src/common/styles.css:150"
+    source: "packages/grammar/src/common/styles.css:179"
   - name: "--starci-core-surface-shadow"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "var(--shadow-surface, 0 1px 3px rgb(0 0 0 / 0.16))"
     uses: 4
-    source: "packages/grammar/src/common/styles.css:556"
+    source: "packages/grammar/src/common/styles.css:585"
   - name: "--starci-core-top-bar-z"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "40"
     uses: 1
-    source: "packages/grammar/src/common/components-navigation.css:334"
+    source: "packages/grammar/src/common/components-navigation.css:349"
   - name: "--starci-core-verdict-edge"
     value: "inset 2px 0 0 0 var(--success, var(--starci-core-success, #15803d))"
     valueRules: 2
     assignedBy: "common"
     alsoReadBy: 1
-    source: "packages/grammar/src/common/styles.css:708"
+    source: "packages/grammar/src/common/styles.css:744"
   - name: "--starci-core-workspace-floating-inset"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "1rem"
     uses: 4
-    source: "packages/grammar/src/common/styles.css:1702"
+    source: "packages/grammar/src/common/styles.css:1738"
   - name: "--starci-core-workspace-floating-max"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "22rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1704"
+    source: "packages/grammar/src/common/styles.css:1740"
   - name: "--starci-core-workspace-floating-z"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "40"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1701"
+    source: "packages/grammar/src/common/styles.css:1737"
   - name: "--starci-core-workspace-leading-seam"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "2rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1657"
+    source: "packages/grammar/src/common/styles.css:1693"
   - name: "--starci-core-workspace-navigation-track"
     value: "minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem))"
     valueRules: 2
     assignedBy: "common"
     alsoReadBy: 4
-    source: "packages/grammar/src/common/styles.css:1574"
+    source: "packages/grammar/src/common/styles.css:1610"
   - name: "--starci-core-workspace-navigation-width"
     assignedBy: "family"
     readBy: "common"
     commonFallback: "18rem"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:1574"
+    source: "packages/grammar/src/common/styles.css:1610"
   - name: "--starci-core-workspace-rail-track"
     value: "minmax(16rem, var(--starci-core-rail-standard, 20rem))"
     valueRules: 3
     assignedBy: "common"
     alsoReadBy: 4
-    source: "packages/grammar/src/common/styles.css:1575"
+    source: "packages/grammar/src/common/styles.css:1611"
   - name: "--starci-font-mono"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "ui-monospace, SFMono-Regular, Menlo, monospace"
     uses: 1
-    source: "packages/grammar/src/common/components-overlays.css:698"
+    source: "packages/grammar/src/common/components-overlays.css:704"
   - name: "--success"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--starci-core-success, #15803d)"
     uses: 5
-    source: "packages/grammar/src/common/styles.css:708"
+    source: "packages/grammar/src/common/styles.css:744"
   - name: "--success-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "CanvasText"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2256"
+    source: "packages/grammar/src/common/styles.css:2297"
   - name: "--success-soft"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--success, Canvas)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2255"
+    source: "packages/grammar/src/common/styles.css:2296"
   - name: "--success-soft-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--success-foreground, CanvasText)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2256"
+    source: "packages/grammar/src/common/styles.css:2297"
   - name: "--surface"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "Canvas"
     uses: 17
-    source: "packages/grammar/src/common/styles.css:292"
+    source: "packages/grammar/src/common/styles.css:321"
   - name: "--surface-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "CanvasText"
     uses: 9
-    source: "packages/grammar/src/common/styles.css:502"
+    source: "packages/grammar/src/common/styles.css:531"
   - name: "--surface-secondary"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "Canvas"
     uses: 8
-    source: "packages/grammar/src/common/styles.css:150"
+    source: "packages/grammar/src/common/styles.css:179"
   - name: "--trigger-width"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "0px"
     uses: 1
-    source: "packages/grammar/src/common/components-overlays.css:371"
+    source: "packages/grammar/src/common/components-overlays.css:377"
   - name: "--warning"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "Canvas"
     uses: 4
-    source: "packages/grammar/src/common/styles.css:2260"
+    source: "packages/grammar/src/common/styles.css:2301"
   - name: "--warning-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "CanvasText"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2261"
+    source: "packages/grammar/src/common/styles.css:2302"
   - name: "--warning-soft"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--warning, Canvas)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2260"
+    source: "packages/grammar/src/common/styles.css:2301"
   - name: "--warning-soft-foreground"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "var(--warning-foreground, CanvasText)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2261"
+    source: "packages/grammar/src/common/styles.css:2302"
 
 renderers:
   - component: "Accordion"
@@ -997,7 +1007,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/Accordion/index.tsx"
-    claims: []
+    claims: ["FOCUS-1", "FOCUS-2", "MOTION-2", "STATE-7"]
     computedClaims: []
     classes:
       - "starci-core-generic-accordion"
@@ -1014,7 +1024,7 @@ renderers:
     kind: "composite"
     group: "overlays"
     source: "packages/grammar/src/core/composite/Alert/index.tsx"
-    claims: []
+    claims: ["FEEDBACK-2", "FEEDBACK-3"]
     computedClaims: []
     classes:
       - "starci-core-alert"
@@ -1028,7 +1038,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/AlertDialog/index.tsx"
-    claims: []
+    claims: ["ACTION-2", "CORE-BOUNDARY-4", "CTA-4", "FEEDBACK-3", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-alert-dialog"
@@ -1047,7 +1057,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Avatar/index.tsx"
-    claims: []
+    claims: ["ICON-6", "MEDIA-5"]
     computedClaims: []
     classes:
       - "starci-core-avatar"
@@ -1056,7 +1066,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/AvatarGroup/index.tsx"
-    claims: []
+    claims: ["ICON-6", "MEDIA-5"]
     computedClaims: []
     classes:
       - "starci-core-avatar"
@@ -1066,7 +1076,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/Badge/index.tsx"
-    claims: []
+    claims: ["ICON-2", "TRUTH-1"]
     computedClaims: []
     classes: []
   - component: "BottomNav"
@@ -1074,7 +1084,7 @@ renderers:
     kind: "composition"
     group: "navigation"
     source: "packages/grammar/src/core/composition/BottomNav/index.tsx"
-    claims: []
+    claims: ["ACTION-3", "FOCUS-1", "FOCUS-2", "ICON-6", "LAYOUT-4"]
     computedClaims: []
     classes:
       - "starci-core-bottom-nav"
@@ -1090,7 +1100,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Breadcrumbs/index.tsx"
-    claims: []
+    claims: ["ACTION-3", "ICON-6", "LAYOUT-3", "OVERFLOW-3"]
     computedClaims: []
     classes:
       - "starci-core-breadcrumb"
@@ -1112,7 +1122,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/ButtonGroup/index.tsx"
-    claims: []
+    claims: ["FOCUS-2", "TRUTH-2"]
     computedClaims: []
     classes:
       - "starci-core-button-group"
@@ -1121,7 +1131,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/Calendar/index.tsx"
-    claims: []
+    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-2", "ICON-5", "TRUTH-2"]
     computedClaims: []
     classes:
       - "starci-core-calendar"
@@ -1159,7 +1169,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Checkbox/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1"]
     computedClaims: []
     classes:
       - "starci-core-checkbox"
@@ -1173,7 +1183,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/CheckboxGroup/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1", "FIELD-2"]
     computedClaims: []
     classes:
       - "starci-core-checkbox"
@@ -1190,7 +1200,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/CloseButton/index.tsx"
-    claims: []
+    claims: ["A11Y-2", "FOCUS-1", "ICON-5"]
     computedClaims: []
     classes:
       - "starci-core-close-button"
@@ -1199,7 +1209,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/ComboBox/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2", "LAYOUT-4", "STATE-3"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1223,7 +1233,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/DataTable/index.tsx"
-    claims: []
+    claims: ["CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "LAYOUT-3", "STATE-3"]
     computedClaims: []
     classes:
       - "starci-core-data-table"
@@ -1242,7 +1252,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/DateField/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
       - "starci-core-date-field"
@@ -1259,7 +1269,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/DatePicker/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1282,7 +1292,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/DateRangePicker/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FOCUS-3", "LAYOUT-4"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1306,7 +1316,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/DescriptionList/index.tsx"
-    claims: []
+    claims: ["HIERARCHY-3", "TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-description-list"
@@ -1318,7 +1328,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Dialog/index.tsx"
-    claims: []
+    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-dialog"
@@ -1335,7 +1345,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/Disclosure/index.tsx"
-    claims: []
+    claims: ["FOCUS-1", "MOTION-2", "STATE-7"]
     computedClaims: []
     classes:
       - "starci-core-disclosure"
@@ -1360,7 +1370,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Drawer/index.tsx"
-    claims: []
+    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-drawer"
@@ -1379,8 +1389,8 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/DropdownMenu/index.tsx"
-    claims: []
-    computedClaims: []
+    claims: ["CORE-BOUNDARY-4", "CTA-2", "FOCUS-1", "FOCUS-2", "FOCUS-5", "LAYOUT-4", "MOTION-2"]
+    computedClaims: ["CONTROL-STATE-3"]
     classes:
       - "starci-core-menu"
       - "starci-core-menu-indicator"
@@ -1419,7 +1429,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Field/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1435,7 +1445,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/Fieldset/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-2"]
     computedClaims: []
     classes:
       - "starci-core-field-description"
@@ -1450,7 +1460,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/FileDropzone/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-1", "FIELD-2", "FIELD-3", "FOCUS-5", "ICON-6"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -1470,7 +1480,7 @@ renderers:
     kind: "composition"
     group: "navigation"
     source: "packages/grammar/src/core/composition/Footer/index.tsx"
-    claims: []
+    claims: ["A11Y-4", "CTA-2", "HIERARCHY-3"]
     computedClaims: []
     classes:
       - "starci-core-footer"
@@ -1486,7 +1496,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/Form/index.tsx"
-    claims: []
+    claims: ["ACTION-1", "ACTION-2", "FEEDBACK-1"]
     computedClaims: []
     classes:
       - "starci-core-form"
@@ -1495,7 +1505,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/GrammarRoot/index.tsx"
-    claims: []
+    claims: ["COLOR-5"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1521,7 +1531,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/Icon/index.tsx"
-    claims: []
+    claims: ["ICON-1", "ICON-6"]
     computedClaims: []
     classes:
       - "starci-core-icon"
@@ -1531,7 +1541,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/IconButton/index.tsx"
-    claims: []
+    claims: ["A11Y-2", "ICON-5"]
     computedClaims: []
     classes:
       - "starci-core-icon-button"
@@ -1549,7 +1559,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Image/index.tsx"
-    claims: []
+    claims: ["MEDIA-2", "MEDIA-4", "MEDIA-5", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-image"
@@ -1560,7 +1570,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/IncludedMark/index.tsx"
-    claims: []
+    claims: ["ICON-6", "TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-included-mark"
@@ -1585,7 +1595,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/Kbd/index.tsx"
-    claims: []
+    claims: ["ICON-6"]
     computedClaims: []
     classes:
       - "starci-core-kbd"
@@ -1603,7 +1613,7 @@ renderers:
     kind: "core"
     group: "base"
     source: "packages/grammar/src/core/LeadingNumber.tsx"
-    claims: []
+    claims: ["FONT-2", "TONE-2"]
     computedClaims: []
     classes:
       - "starci-core-leading-number"
@@ -1612,7 +1622,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Link/index.tsx"
-    claims: []
+    claims: ["ACTION-3", "FOCUS-1", "ICON-6"]
     computedClaims: []
     classes:
       - "starci-core-link"
@@ -1623,7 +1633,7 @@ renderers:
     kind: "branch"
     group: "navigation"
     source: "packages/grammar/src/core/branch/ListBox/index.tsx"
-    claims: []
+    claims: ["CONTROL-STATE-3", "FOCUS-2", "ICON-6", "STATE-3"]
     computedClaims: []
     classes:
       - "starci-core-list-box"
@@ -1676,7 +1686,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/Meter/index.tsx"
-    claims: []
+    claims: ["A11Y-3", "ACCENT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-meter"
@@ -1705,7 +1715,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/NumberField/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -1724,6 +1734,9 @@ renderers:
     computedClaims: []
     classes:
       - "starci-core-horizontal-scroll-region"
+      - "starci-core-otp-field"
+      - "starci-core-otp-label"
+      - "starci-core-visually-hidden"
   - component: "PageContainer"
     propsType: "PageContainerProps"
     kind: "primitive"
@@ -1738,7 +1751,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Pagination/index.tsx"
-    claims: []
+    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2"]
     computedClaims: []
     classes:
       - "starci-core-pagination"
@@ -1753,7 +1766,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Popover/index.tsx"
-    claims: []
+    claims: ["CORE-BOUNDARY-4", "FOCUS-3", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-overlay-title"
@@ -1799,7 +1812,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/ProgressCircle/index.tsx"
-    claims: []
+    claims: ["A11Y-3", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-progress-circle"
@@ -1808,7 +1821,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/RadioGroup/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FIELD-1", "FOCUS-2", "STATE-6"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -1838,7 +1851,7 @@ renderers:
     kind: "primitive"
     group: "base"
     source: "packages/grammar/src/core/primitive/RankArtwork/index.tsx"
-    claims: []
+    claims: ["ICON-6"]
     computedClaims: []
     classes:
       - "starci-core-rank-artwork"
@@ -1847,7 +1860,7 @@ renderers:
     kind: "primitive"
     group: "navigation"
     source: "packages/grammar/src/core/primitive/Rating/index.tsx"
-    claims: []
+    claims: ["A11Y-3", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "ICON-6"]
     computedClaims: []
     classes:
       - "starci-core-rating"
@@ -1859,7 +1872,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/SearchField/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-1", "FIELD-2"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -1889,7 +1902,7 @@ renderers:
     kind: "composite"
     group: "forms"
     source: "packages/grammar/src/core/composite/SegmentedControl/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FEEDBACK-1", "FIELD-2", "FOCUS-2", "STATE-6"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -1905,7 +1918,7 @@ renderers:
     kind: "branch"
     group: "forms"
     source: "packages/grammar/src/core/branch/Select/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "CONTROL-STATE-2", "FIELD-3", "LAYOUT-4", "STATE-6"]
     computedClaims: []
     classes:
       - "grammar-common-root"
@@ -1946,7 +1959,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/Skeleton/index.tsx"
-    claims: []
+    claims: ["MEDIA-5", "MOTION-2", "STATE-2"]
     computedClaims: []
     classes:
       - "starci-core-skeleton"
@@ -1956,7 +1969,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Slider/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "A11Y-3", "FEEDBACK-1", "FIELD-3"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -1975,7 +1988,7 @@ renderers:
     kind: "primitive"
     group: "overlays"
     source: "packages/grammar/src/core/primitive/Spinner/index.tsx"
-    claims: []
+    claims: ["MOTION-1", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-spinner"
@@ -1984,7 +1997,7 @@ renderers:
     kind: "core"
     group: "base"
     source: "packages/grammar/src/core/StateMark.tsx"
-    claims: []
+    claims: ["ICON-6", "STATE-1"]
     computedClaims: []
     classes: []
   - component: "StaticStateRow"
@@ -2002,8 +2015,8 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Stepper/index.tsx"
-    claims: []
-    computedClaims: []
+    claims: ["FOCUS-1", "ICON-6", "STATE-1"]
+    computedClaims: ["FOCUS-2", "HIERARCHY-3"]
     classes:
       - "starci-core-nav-visually-hidden"
       - "starci-core-step"
@@ -2060,7 +2073,6 @@ renderers:
       - "starci-core-frameless-surface"
       - "starci-core-surface"
       - "starci-core-surface-card"
-      - "starci-core-surface-card--fill"
       - "starci-core-surface-content"
       - "starci-core-surface-highlight"
       - "starci-core-surface-highlight-sweep"
@@ -2094,7 +2106,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Switch/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "CONTROL-STATE-3", "FIELD-1"]
     computedClaims: []
     classes:
       - "starci-core-choice"
@@ -2122,7 +2134,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/TagGroup/index.tsx"
-    claims: []
+    claims: ["A11Y-2", "CONTROL-STATE-3", "FOCUS-1", "FOCUS-2", "ICON-5", "ICON-6", "STATE-3"]
     computedClaims: []
     classes:
       - "starci-core-tag"
@@ -2156,7 +2168,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/Textarea/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -2173,7 +2185,7 @@ renderers:
     kind: "primitive"
     group: "forms"
     source: "packages/grammar/src/core/primitive/TimeField/index.tsx"
-    claims: []
+    claims: ["A11Y-1", "FIELD-1", "FIELD-2", "FIELD-3"]
     computedClaims: []
     classes:
       - "starci-core-field"
@@ -2187,7 +2199,7 @@ renderers:
     kind: "composite"
     group: "navigation"
     source: "packages/grammar/src/core/composite/Timeline/index.tsx"
-    claims: []
+    claims: ["HIERARCHY-3", "ICON-6", "STATE-1", "TRUTH-1"]
     computedClaims: []
     classes:
       - "starci-core-timeline"
@@ -2202,7 +2214,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Toast/index.tsx"
-    claims: []
+    claims: ["A11Y-4", "CORE-BOUNDARY-4", "FEEDBACK-3", "FOCUS-5", "ICON-6", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-toast"
@@ -2220,7 +2232,7 @@ renderers:
     kind: "branch"
     group: "overlays"
     source: "packages/grammar/src/core/branch/Toast/index.tsx"
-    claims: []
+    claims: ["A11Y-4", "CORE-BOUNDARY-4", "FEEDBACK-3", "FOCUS-5", "ICON-6", "LAYOUT-4", "MOTION-2"]
     computedClaims: []
     classes:
       - "starci-core-toast"
@@ -2248,7 +2260,7 @@ renderers:
     kind: "composition"
     group: "navigation"
     source: "packages/grammar/src/core/composition/TopBar/index.tsx"
-    claims: []
+    claims: ["A11Y-2", "ICON-5", "STATE-7"]
     computedClaims: []
     classes:
       - "starci-core-top-bar"
@@ -2320,9 +2332,6 @@ gaps:
       - packages/grammar/src/common/conformance.ts
       - knowledge/ui/presentation/margin.yaml
   - components:
-      - RankArtwork
-      - SurfaceCard
-      - Breadcrumbs
       - Calendar
       - Checkbox
       - CheckboxGroup
@@ -2334,33 +2343,28 @@ gaps:
       - DateRangePicker
       - Disclosure
       - Accordion
-      - Footer
-      - ListBox
       - NumberField
       - Pagination
-      - Popover
       - SearchField
       - Select
       - Slider
       - Switch
-      - TagGroup
       - Textarea
       - TimeField
     missing: |
-      38 of the 383 grammar classes the renderers emit have no selector in any shipped sheet (Common,
-      Core, Heritage, Offset Pop): `starci-core-rank-artwork` and `starci-core-surface-card--fill`
-      (whose fill form is drawn by `[data-grammar-surface-height="fill"]` on the same element) as at
-      0.4.13, plus 36 class hooks of the 0.5.0 renderers — among them the control roots
-      `starci-core-select`, `-combo-box`, `-search-field`, `-number-field`, `-textarea`, `-checkbox`,
-      `-radio`, `-switch`, `-date-field`, `-time-field`, `-date-picker`, and `-list`,
-      `-list-popover`, `-popover-body`, `-calendar-grid`, `-slider-track`, `-slider-fill`. Those
-      renderers are painted through `data-component`/`data-grammar-*` hooks and vendor slots instead,
-      so the classes are stable names with no paint; a stylesheet that selects on them styles nothing
-      the package already styles. The full list is re-derived by the census (`unpaintedClasses`)
+      32 of the 384 grammar classes the renderers emit have no selector in any shipped sheet (Common,
+      Core, Heritage, Offset Pop), and every one is a documented consumer hook, not a gap in the
+      anatomy: 12 control-identity names on a root the shared `.starci-core-field` /
+      `.starci-core-choice` rule already draws (`starci-core-select`, `-combo-box`, `-search-field`,
+      `-number-field`, `-textarea`, `-checkbox`, `-radio`, `-switch`, `-choice-group`, `-date-field`,
+      `-time-field`, `-date-picker`) and 20 names on HeroUI parts whose vendor paint Common leaves as it
+      is (`-list`, `-list-popover`, `-calendar-grid`, `-slider-track`, `-slider-fill`, …). A stylesheet
+      that selects on them adds to the anatomy; it styles nothing the package already styles. The list
+      is `CONSUMER_HOOK_CLASSES` in `tests/grammar-contracts.spec.mjs`, which fails on any other
+      unpainted class and on a hook the emitting renderer's docs do not name
     evidence:
       - scripts/checks/grammar-knowledge.mjs
-      - packages/grammar/src/core/primitive/RankArtwork/index.tsx
-      - packages/grammar/src/core/branch/SurfaceCard/classNames.ts
+      - tests/grammar-contracts.spec.mjs
       - packages/grammar/src/common/components-forms.css
       - packages/grammar/src/common/components-navigation.css
       - packages/grammar/src/common/components-overlays.css

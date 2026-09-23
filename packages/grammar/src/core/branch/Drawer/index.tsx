@@ -34,6 +34,7 @@ export type DrawerProps = OverlayOpenState & {
  * Same modal rules as `Dialog` (focus trap and return, Escape/outside dismiss, scroll lock, inert
  * page, scoped portal). Placement is echoed on `data-placement` so anatomy and families can shape the
  * sheet edge; the slide motion is removed under reduced motion.
+ * Contract: surface FOCUS-3 LAYOUT-4 CORE-BOUNDARY-4 (as `Dialog`); sliding content MOTION-2.
  */
 export const Drawer = ({
     title,
@@ -64,12 +65,13 @@ export const Drawer = ({
                     data-grammar-overlay-backdrop="Drawer"
                     className="starci-core-overlay-backdrop starci-core-drawer-backdrop"
                 >
-                    <HeroDrawer.Content placement={placement} className="starci-core-drawer-content">
+                    <HeroDrawer.Content placement={placement} data-contract="MOTION-2" className="starci-core-drawer-content">
                         <HeroDrawer.Dialog
                             data-tier="branch"
                             data-component="Drawer"
                             data-placement={placement}
                             data-grammar-overlay-surface="drawer"
+                            data-contract="FOCUS-3 LAYOUT-4 CORE-BOUNDARY-4"
                             {...(description === undefined ? {} : { "aria-describedby": descriptionId })}
                             className="starci-core-drawer"
                         >

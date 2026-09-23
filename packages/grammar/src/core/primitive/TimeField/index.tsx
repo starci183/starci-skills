@@ -22,6 +22,12 @@ export type TimeFieldProps = FieldControlProps & {
     readonly hourCycle?: 12 | 24
 }
 
+/*
+ * Consumer hook: `starci-core-time-field` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
 /** A typed time of day in locale-ordered spinbutton segments. */
 export const TimeField = ({
     value,
@@ -36,6 +42,7 @@ export const TimeField = ({
     <HeroTimeField
         data-tier="atom"
         data-component="TimeField"
+        data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
         className="starci-core-field starci-core-time-field"
         fullWidth
         {...vendorFieldProps(field)}

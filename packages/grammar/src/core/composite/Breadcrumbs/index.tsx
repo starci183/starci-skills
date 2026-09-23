@@ -28,12 +28,14 @@ export type BreadcrumbsProps = {
  *
  * The last item is the current page (`aria-current="page"`, not a link). At narrow widths the trail
  * keeps one line and scrolls instead of wrapping, and long ancestor labels truncate.
+ * Contract: nav LAYOUT-3 OVERFLOW-3 (owns its inline scroll), item ACTION-3 (link vs current), leading ICON-6.
  */
 export const Breadcrumbs = ({ label, items, separator, onAction, className }: BreadcrumbsProps) => (
     <nav
         aria-label={label}
         className={navigationClassName("starci-core-breadcrumbs", className)}
         data-component="Breadcrumbs"
+        data-contract="LAYOUT-3 OVERFLOW-3"
         data-tier="composite"
     >
         <HeroBreadcrumbs
@@ -48,6 +50,7 @@ export const Breadcrumbs = ({ label, items, separator, onAction, className }: Br
                         key={item.id}
                         id={item.id}
                         className="starci-core-breadcrumb"
+                        data-contract="ACTION-3"
                         {...(item.href === undefined || isCurrent ? {} : { href: item.href })}
                     >
                         <span
@@ -55,7 +58,7 @@ export const Breadcrumbs = ({ label, items, separator, onAction, className }: Br
                             data-grammar-breadcrumb="true"
                             data-grammar-current={isCurrent ? "true" : "false"}
                         >
-                            {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading">{item.leading}</span>}
+                            {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-breadcrumb-leading" data-contract="ICON-6">{item.leading}</span>}
                             {item.label}
                         </span>
                     </HeroBreadcrumbs.Item>

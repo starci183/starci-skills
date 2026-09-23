@@ -19,9 +19,9 @@ export type KbdProps = {
 const namedKeys: ReadonlySet<string> = new Set(KBD_NAMED_KEYS)
 const isNamedKey = (key: string): key is KbdNamedKey => namedKeys.has(key)
 
-/** ATOM - `Kbd`: one keyboard shortcut chord as a single `<kbd>` element. */
+/** ATOM - `Kbd`: one keyboard shortcut chord as a single `<kbd>` element. Contract: ICON-6 (key glyphs named once via `<abbr title>`). */
 export const Kbd = ({ keys }: KbdProps) => (
-    <HeroKbd data-tier="atom" data-component="Kbd" className="starci-core-kbd">
+    <HeroKbd data-tier="atom" data-component="Kbd" data-contract="ICON-6" className="starci-core-kbd">
         {keys.map((key, index) => isNamedKey(key)
             ? <HeroKbd.Abbr key={`${key}-${index}`} keyValue={key} />
             : <HeroKbd.Content key={`${key}-${index}`}>{key}</HeroKbd.Content>)}

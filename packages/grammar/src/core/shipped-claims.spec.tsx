@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 import { createElement, type ReactElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import { cssRules, unbackedClaims } from "../__test__/styleClaims.js"
+import { cssRules, isPaintClaim, unbackedClaims } from "../__test__/styleClaims.js"
 import { MarkdownArticle, FencedCodeBlock, MarkdownTableFrame } from "./branch/MarkdownArticle/index.js"
 import { Rail } from "./branch/Rail/index.js"
 import { Subnav } from "./branch/Subnav/index.js"
@@ -116,7 +116,8 @@ describe("Shipped Core geometry keeps its data-contract claims", () => {
     })
 
     it.each(CONVERTED_OBJECTS)("backs every claim %s emits with a shipped rule", (_name, render) => {
-        for (const claimed of claimedElements(render)) {
+        // A behavioural id (A11Y-2, ICON-6, ...) is proved by the render specs; only paint needs a class.
+        for (const claimed of claimedElements(render).filter((element) => (element.getAttribute("data-contract") ?? "").split(" ").some(isPaintClaim))) {
             const classes = [...claimed.classList].filter((token) => token.startsWith("starci-core-"))
             expect(classes, `claimed element without a Grammar class: ${claimed.outerHTML.slice(0, 140)}`).not.toEqual([])
             expect(

@@ -24,6 +24,12 @@ export type NumberFieldProps = FieldControlProps & {
     readonly hideSteppers?: boolean
 }
 
+/*
+ * Consumer hook: `starci-core-number-field` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
 /**
  * A number with stepping. The vendor owns `role="spinbutton"`-equivalent semantics on the input,
  * locale parsing, arrow-key and wheel stepping, clamping to min/max and the localized stepper names.
@@ -44,6 +50,7 @@ export const NumberField = ({
     <HeroNumberField
         data-tier="atom"
         data-component="NumberField"
+        data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
         className="starci-core-field starci-core-number-field"
         fullWidth
         {...vendorFieldProps(field)}

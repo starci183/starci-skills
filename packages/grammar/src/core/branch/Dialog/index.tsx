@@ -36,6 +36,7 @@ export type DialogProps = OverlayOpenState & {
  * outside press dismiss it (each can be turned off), page scroll is locked, everything outside is
  * hidden from assistive tech, and focus returns to the trigger on close. The portal lands inside the
  * nearest `.grammar-common-root` (see `useOverlayContainer`), so the family scope still applies.
+ * Contract: surface FOCUS-3 (modal trap/return) LAYOUT-4 (portalled) CORE-BOUNDARY-4 (shadow); container MOTION-2.
  */
 export const Dialog = ({
     title,
@@ -64,12 +65,13 @@ export const Dialog = ({
                     data-grammar-overlay-backdrop="Dialog"
                     className="starci-core-overlay-backdrop"
                 >
-                    <HeroModal.Container placement="center" size={size} scroll="inside" data-size={size} className="starci-core-dialog-container">
+                    <HeroModal.Container placement="center" size={size} scroll="inside" data-size={size} data-contract="MOTION-2" className="starci-core-dialog-container">
                         <HeroModal.Dialog
                             data-tier="branch"
                             data-component="Dialog"
                             data-size={size}
                             data-grammar-overlay-surface="dialog"
+                            data-contract="FOCUS-3 LAYOUT-4 CORE-BOUNDARY-4"
                             {...(description === undefined ? {} : { "aria-describedby": descriptionId })}
                             className="starci-core-dialog"
                         >

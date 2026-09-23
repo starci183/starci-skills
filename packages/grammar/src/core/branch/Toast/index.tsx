@@ -101,6 +101,7 @@ export type ToastProps = {
  *
  * Escape dismisses a focused toast. The timer counts only while not paused, and restarts when the
  * toast is updated. Tone is echoed on `data-grammar-tone`.
+ * Contract: A11Y-4 (decisions never time out) FOCUS-5 (Escape = close button) CORE-BOUNDARY-4 MOTION-2.
  */
 export const Toast = ({ toast, dismissLabel, onDismiss, isPaused = false }: ToastProps) => {
     const tone = toast.tone ?? "neutral"
@@ -137,14 +138,15 @@ export const Toast = ({ toast, dismissLabel, onDismiss, isPaused = false }: Toas
             data-grammar-tone={tone}
             data-grammar-overlay-surface="toast"
             data-persistent={timeout <= 0 ? "true" : "false"}
+            data-contract="A11Y-4 FOCUS-5 CORE-BOUNDARY-4 MOTION-2"
             className="starci-core-toast"
             onKeyDown={onKeyDown}
         >
             {tone === "pending" ? (
-                <span className="starci-core-toast-indicator" aria-hidden="true">
+                <span className="starci-core-toast-indicator" aria-hidden="true" data-contract="ICON-6">
                     <HeroSpinner role="presentation" aria-hidden="true" size="sm" color="current" />
                 </span>
-            ) : <span className="starci-core-toast-indicator" data-grammar-toast-indicator={tone} aria-hidden="true" />}
+            ) : <span className="starci-core-toast-indicator" data-grammar-toast-indicator={tone} aria-hidden="true" data-contract="ICON-6" />}
             <div className="starci-core-toast-copy">
                 <p className="starci-core-toast-title">{toast.title}</p>
                 {toast.description === undefined ? null : <p className="starci-core-toast-description">{toast.description}</p>}
@@ -203,6 +205,7 @@ const usePageHidden = () => {
  * inside the family scope that mounted it. Announcements go through two persistent, visually hidden
  * live regions (polite `role="status"`, assertive `role="alert"`) that exist before any toast
  * arrives; the visible toasts are a labelled region of ordinary, keyboard-reachable content.
+ * Contract: region LAYOUT-4 (fixed); each live region FEEDBACK-3 (one announcement owner per urgency).
  */
 export const Toaster = ({ label, dismissLabel, queue = toastQueue, placement = "bottom-end", maxVisible = 3 }: ToasterProps) => {
     const toasts = useSyncExternalStore(queue.subscribe, queue.getSnapshot, queue.getSnapshot)
@@ -232,6 +235,7 @@ export const Toaster = ({ label, dismissLabel, queue = toastQueue, placement = "
             data-component="Toaster"
             data-placement={placement}
             data-paused={isPaused ? "true" : "false"}
+            data-contract="LAYOUT-4"
             aria-label={label}
             className="starci-core-toaster"
             onPointerEnter={() => setIsHovered(true)}
@@ -241,8 +245,8 @@ export const Toaster = ({ label, dismissLabel, queue = toastQueue, placement = "
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHasFocus(false)
             }}
         >
-            <span role="status" aria-live="polite" aria-atomic="true" className="starci-core-visually-hidden" data-grammar-toaster-live="polite">{polite}</span>
-            <span role="alert" aria-live="assertive" aria-atomic="true" className="starci-core-visually-hidden" data-grammar-toaster-live="assertive">{assertive}</span>
+            <span role="status" aria-live="polite" aria-atomic="true" className="starci-core-visually-hidden" data-grammar-toaster-live="polite" data-contract="FEEDBACK-3">{polite}</span>
+            <span role="alert" aria-live="assertive" aria-atomic="true" className="starci-core-visually-hidden" data-grammar-toaster-live="assertive" data-contract="FEEDBACK-3">{assertive}</span>
             <ol className="starci-core-toaster-list">
                 {visible.map((toast) => (
                     <li key={toast.id} className="starci-core-toaster-item">

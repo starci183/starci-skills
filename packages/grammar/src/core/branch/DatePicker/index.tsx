@@ -58,6 +58,19 @@ export const PickerRangeCalendar = () => (
     </HeroRangeCalendar>
 )
 
+/*
+ * Consumer hook: `starci-core-date-picker` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
+/*
+ * Consumer hooks: `starci-core-date-popover`, `starci-core-date-suffix`,
+ * `starci-core-calendar-heading`, `starci-core-calendar-grid` name HeroUI parts whose vendor paint
+ * Common leaves as it is. No shipped sheet paints them; the Grammar name lets a consumer or family
+ * select those parts without reaching for vendor class names.
+ */
+
 /**
  * A date typed in segments or picked from a month grid in a popover. The trigger is a named button,
  * the popover is a dialog that traps and returns focus, and the grid is the vendor's.
@@ -77,6 +90,7 @@ export const DatePicker = ({
         <HeroDatePicker
             data-tier="branch"
             data-component="DatePicker"
+            data-contract="A11Y-1 FIELD-1 FIELD-2"
             className="starci-core-field starci-core-date-picker"
             {...vendorFieldProps(field)}
             isReadOnly={field.isReadOnly === true}
@@ -99,7 +113,7 @@ export const DatePicker = ({
             </HeroDateField.Group>
             <FieldDescription>{field.description}</FieldDescription>
             <FieldErrorText>{field.errorMessage}</FieldErrorText>
-            <HeroDatePicker.Popover className="starci-core-date-popover" data-grammar-popover="DatePicker" {...portalProps}>
+            <HeroDatePicker.Popover className="starci-core-date-popover" data-grammar-popover="DatePicker" data-contract="LAYOUT-4 FOCUS-3" {...portalProps}>
                 <PickerCalendar />
             </HeroDatePicker.Popover>
         </HeroDatePicker>

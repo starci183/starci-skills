@@ -101,7 +101,7 @@ export const FieldDescription = ({ children }: { readonly children?: ReactNode }
  * and is referenced by the control's `aria-describedby` only while the control is invalid.
  */
 export const FieldErrorText = ({ children }: { readonly children?: ReactNode }) => (
-    <HeroFieldError className="starci-core-field-error" data-grammar-field-error="true">
+    <HeroFieldError className="starci-core-field-error" data-grammar-field-error="true" data-contract="FEEDBACK-1">
         {(validation) => children ?? validation.validationErrors.join(" ")}
     </HeroFieldError>
 )
@@ -195,6 +195,7 @@ export const Field = ({
         <div
             data-tier="atom"
             data-component="Field"
+            data-contract="A11Y-1 FIELD-1 FIELD-2"
             className="starci-core-field"
             {...fieldStateAttributes({ isInvalid: invalid, isDisabled, isReadOnly, isRequired })}
         >
@@ -224,7 +225,7 @@ export const Field = ({
                 })}
             </div>
             {errorId === undefined ? null : (
-                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true">
+                <span id={errorId} className="starci-core-field-error" data-grammar-field-error="true" data-contract="FEEDBACK-1">
                     {errorMessage}
                 </span>
             )}

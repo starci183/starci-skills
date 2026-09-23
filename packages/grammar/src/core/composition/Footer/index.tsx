@@ -36,6 +36,7 @@ export type FooterProps = {
  * The page footer (`<footer>`, the contentinfo landmark at page level): brand, grouped link
  * directories that reflow from columns to one column at narrow widths, free content and a legal
  * row. Links are Common `Link`s, so the current page keeps `aria-current="page"`.
+ * Contract: directory HIERARCHY-3 (reflow keeps source order), link list A11Y-4 CTA-2 (named list of destinations).
  */
 export const Footer = ({ label, brand, groups = [], legal, externalHint, children, className }: FooterProps) => {
     const idPrefix = useId()
@@ -49,13 +50,13 @@ export const Footer = ({ label, brand, groups = [], legal, externalHint, childre
                 <div className="starci-core-footer-main">
                     {brand === undefined ? null : <div className="starci-core-footer-brand" data-grammar-footer-brand="true">{brand}</div>}
                     {groups.length === 0 ? null : (
-                        <nav aria-label={label} className="starci-core-footer-directory" data-grammar-footer-directory="true">
+                        <nav aria-label={label} className="starci-core-footer-directory" data-contract="HIERARCHY-3" data-grammar-footer-directory="true">
                             {groups.map((group) => {
                                 const headingId = `${idPrefix}-${group.id}`
                                 return (
                                     <div key={group.id} className="starci-core-footer-group" data-grammar-footer-group="true">
                                         <p className="starci-core-footer-group-label" id={headingId}>{group.label}</p>
-                                        <ul aria-labelledby={headingId} className="starci-core-footer-links">
+                                        <ul aria-labelledby={headingId} className="starci-core-footer-links" data-contract="A11Y-4 CTA-2">
                                             {group.links.map((link) => (
                                                 <li key={link.id}>
                                                     <Link

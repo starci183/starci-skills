@@ -26,12 +26,14 @@ export type TimelineProps = {
 /**
  * An ordered history of events. Each entry exposes `data-grammar-timeline-state` from the Common
  * presentation states and `data-grammar-current`; the connector line is drawn by the stylesheet.
+ * Contract: list HIERARCHY-3, entry STATE-1 TRUTH-1 (closed presentation states, neutral default), marker ICON-6.
  */
 export const Timeline = ({ label, items, className }: TimelineProps) => (
     <ol
         aria-label={label}
         className={navigationClassName("starci-core-timeline", className)}
         data-component="Timeline"
+        data-contract="HIERARCHY-3"
         data-tier="composite"
     >
         {items.map((item) => {
@@ -42,10 +44,11 @@ export const Timeline = ({ label, items, className }: TimelineProps) => (
                     key={item.id}
                     aria-current={item.isCurrent ? "step" : undefined}
                     className="starci-core-timeline-item"
+                    data-contract="STATE-1 TRUTH-1"
                     data-grammar-timeline-state={state}
                     data-grammar-current={item.isCurrent ? "true" : "false"}
                 >
-                    <span aria-hidden="true" className="starci-core-timeline-marker" data-grammar-timeline-marker="true">{item.marker}</span>
+                    <span aria-hidden="true" className="starci-core-timeline-marker" data-contract="ICON-6" data-grammar-timeline-marker="true">{item.marker}</span>
                     <div className="starci-core-timeline-copy">
                         <p className="starci-core-timeline-title">{item.title}</p>
                         {item.timeLabel === undefined ? null : (

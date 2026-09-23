@@ -29,6 +29,18 @@ export type CheckboxGroupProps = FieldControlProps & {
     readonly orientation?: ChoiceOrientation
 }
 
+/*
+ * Consumer hook: `starci-core-choice-group` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
+/*
+ * Consumer hook: `starci-core-checkbox` names each option's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-choice`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
 /**
  * Several independent choices under one group name (`role="group"`, labelled by the group label).
  * Required means "at least one", validated by the vendor; the group owns the one error slot.
@@ -44,6 +56,7 @@ export const CheckboxGroup = ({
     <HeroCheckboxGroup
         data-tier="composite"
         data-component="CheckboxGroup"
+        data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-3"
         data-grammar-orientation={orientation}
         className="starci-core-field starci-core-choice-group"
         {...vendorFieldProps(field)}

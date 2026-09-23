@@ -30,6 +30,7 @@ export type ImageProps = {
  *
  * The box claims its aspect ratio before the bytes arrive, so lazy images never shift the page.
  * `MediaFrame` frames approved art with a caption; `Image` is the element inside or outside it.
+ * Contract: box MEDIA-2 MEDIA-5 (reserved ratio, load states), img MEDIA-4 MOTION-2, fallback MEDIA-4 MEDIA-5.
  */
 export const Image = ({
     src,
@@ -63,6 +64,7 @@ export const Image = ({
         <span
             className={navigationClassName("starci-core-image", className)}
             data-component="Image"
+            data-contract="MEDIA-2 MEDIA-5"
             data-tier="atom"
             data-grammar-image-aspect={aspect}
             data-grammar-image-fit={fit}
@@ -71,6 +73,7 @@ export const Image = ({
             {showFallback ? (
                 <span
                     className="starci-core-image-fallback"
+                    data-contract="MEDIA-4 MEDIA-5"
                     data-grammar-image-fallback="true"
                     {...(alt === "" ? { "aria-hidden": true } : { role: "img", "aria-label": alt })}
                 >{fallback}</span>
@@ -79,6 +82,7 @@ export const Image = ({
                     ref={imageRef}
                     alt={alt}
                     className="starci-core-image-element"
+                    data-contract="MEDIA-4 MOTION-2"
                     decoding="async"
                     loading={loading}
                     src={src}

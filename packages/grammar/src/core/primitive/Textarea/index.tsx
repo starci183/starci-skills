@@ -24,6 +24,12 @@ export type TextareaProps = FieldControlProps & {
     readonly onValueChange?: (value: string) => void
 }
 
+/*
+ * Consumer hook: `starci-core-textarea` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
 /** Multi-line text with the shared field anatomy. */
 export const Textarea = ({
     id,
@@ -43,6 +49,7 @@ export const Textarea = ({
         <HeroTextField
             data-tier="atom"
             data-component="Textarea"
+            data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
             className="starci-core-field starci-core-textarea"
             fullWidth
             {...vendorFieldProps(field)}

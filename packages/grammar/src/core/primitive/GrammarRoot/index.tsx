@@ -8,11 +8,17 @@ export type GrammarRootProps = Omit<ComponentPropsWithoutRef<"div">, "color"> & 
     readonly "data-grammar-family"?: string
 }
 
-/** Neutral Common boundary. Select a visual family with its `scopeProps`. */
+/**
+ * Neutral Common boundary. Select a visual family with its `scopeProps`.
+ *
+ * Contract: COLOR-5 - the root publishes the theme scope (`data-grammar-theme`) every family keys its
+ * light, dark and system token blocks on.
+ */
 export const GrammarRoot = ({ className, theme = "system", ...props }: GrammarRootProps) => (
     <div
         {...props}
         className={cn("grammar-common-root", className)}
+        data-contract="COLOR-5"
         data-grammar="common"
         data-grammar-theme={theme}
     />

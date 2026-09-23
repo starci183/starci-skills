@@ -20,6 +20,7 @@ export const ProgressCircle = ({ label, value = 0, isIndeterminate = false, size
         data-size={size}
         data-indeterminate={isIndeterminate ? "true" : "false"}
         aria-label={label}
+        data-contract="A11Y-3 MOTION-2"
         minValue={0}
         maxValue={100}
         {...(isIndeterminate ? { isIndeterminate: true } : { value })}

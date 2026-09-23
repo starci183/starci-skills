@@ -18,6 +18,18 @@ export type RadioGroupProps = FieldControlProps & {
     readonly orientation?: ChoiceOrientation
 }
 
+/*
+ * Consumer hook: `starci-core-choice-group` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
+/*
+ * Consumer hook: `starci-core-radio` names each option's root for a consumer or family stylesheet.
+ * No shipped sheet paints it: the root is drawn as a whole by `.starci-core-choice`, so a rule on
+ * the hook adds to the shared anatomy and never has to replace it.
+ */
+
 /**
  * Exactly one of a few visible choices (`role="radiogroup"`). Arrow keys move and select within the
  * group, Tab leaves it - roving focus is the vendor's.
@@ -33,6 +45,7 @@ export const RadioGroup = ({
     <HeroRadioGroup
         data-tier="composite"
         data-component="RadioGroup"
+        data-contract="A11Y-1 FIELD-1 STATE-6 FOCUS-2"
         data-grammar-orientation={orientation}
         className="starci-core-field starci-core-choice-group"
         orientation={orientation}

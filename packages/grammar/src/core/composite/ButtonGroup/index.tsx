@@ -32,6 +32,7 @@ export const ButtonGroup = ({ label, children, orientation = "horizontal", isDis
     <HeroButtonGroup
         data-tier="composite"
         data-component="ButtonGroup"
+        data-contract="FOCUS-2 TRUTH-2"
         data-grammar-orientation={orientation}
         data-grammar-disabled={isDisabled ? "true" : "false"}
         data-width={width}

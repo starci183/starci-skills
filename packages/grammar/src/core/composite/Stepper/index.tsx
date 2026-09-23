@@ -43,6 +43,7 @@ export const stepStateFor = (steps: ReadonlyArray<StepperStep>, currentStepId: s
  * A multi-step flow's progress. The current step carries `aria-current="step"`; each step exposes
  * `data-grammar-step-state`. With `onStepSelect` the steps are buttons and the arrow keys move
  * between them. Below 30rem a horizontal stepper keeps only the current step's label in the paint.
+ * Contract: list HIERARCHY-3 (+FOCUS-2 when interactive), step STATE-1, marker ICON-6, control FOCUS-1.
  */
 export const Stepper = ({
     label,
@@ -64,13 +65,14 @@ export const Stepper = ({
     >
         <ol
             className="starci-core-stepper-list"
+            data-contract={onStepSelect === undefined ? "HIERARCHY-3" : "HIERARCHY-3 FOCUS-2"}
             onKeyDown={onStepSelect === undefined ? undefined : (event) => { moveFocusBetweenPeers(event, "[data-grammar-step-control]", orientation === "vertical" ? "vertical" : "horizontal") }}
         >
             {steps.map((step, index) => {
                 const state = stepStateFor(steps, currentStepId, index)
                 const announcement = stateLabel?.(state)
                 const content = <>
-                    <span aria-hidden="true" className="starci-core-step-marker" data-grammar-step-marker="true">
+                    <span aria-hidden="true" className="starci-core-step-marker" data-contract="ICON-6" data-grammar-step-marker="true">
                         {renderMarker === undefined ? index + 1 : renderMarker(step, index, state)}
                     </span>
                     <span className="starci-core-step-copy">
@@ -84,6 +86,7 @@ export const Stepper = ({
                         key={step.id}
                         aria-current={state === "current" ? "step" : undefined}
                         className="starci-core-step"
+                        data-contract="STATE-1"
                         data-grammar-step-state={state}
                         data-grammar-current={state === "current" ? "true" : "false"}
                     >
@@ -92,6 +95,7 @@ export const Stepper = ({
                         ) : (
                             <button
                                 className="starci-core-step-body starci-core-step-control"
+                                data-contract="FOCUS-1"
                                 data-grammar-step-control="true"
                                 disabled={step.isDisabled === true}
                                 onClick={() => onStepSelect(step.id)}

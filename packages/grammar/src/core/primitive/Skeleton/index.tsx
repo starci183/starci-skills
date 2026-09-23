@@ -33,6 +33,7 @@ export const Skeleton = ({ shape = "text", lines = 1, ratio = "landscape", size 
                 data-shape="text"
                 data-lines={count}
                 aria-hidden="true"
+                data-contract="STATE-2"
                 className="starci-core-skeleton-group"
             >
                 {Array.from({ length: count }, (_, index) => (
@@ -40,6 +41,7 @@ export const Skeleton = ({ shape = "text", lines = 1, ratio = "landscape", size 
                         key={index}
                         animationType="shimmer"
                         className="starci-core-skeleton"
+                        data-contract="MOTION-2"
                         data-grammar-skeleton-line={index === count - 1 && count > 1 ? "last" : "line"}
                     />
                 ))}
@@ -55,6 +57,7 @@ export const Skeleton = ({ shape = "text", lines = 1, ratio = "landscape", size 
             data-shape={shape}
             {...(shape === "rect" ? { "data-ratio": ratio } : { "data-size": size })}
             aria-hidden="true"
+            data-contract="STATE-2 MEDIA-5 MOTION-2"
             className="starci-core-skeleton"
         />
     )

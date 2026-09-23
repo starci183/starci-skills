@@ -46,6 +46,7 @@ const toIds = (selection: Selection, items: ReadonlyArray<TagGroupItem>): Readon
  * Built on the vendor TagGroup, so arrow keys move between chips, Space/Enter toggle selection
  * and Delete/Backspace remove. Each chip exposes `data-grammar-selected`; chips wrap onto new lines
  * at narrow widths instead of overflowing.
+ * Contract: root CONTROL-STATE-3, list FOCUS-2, chip FOCUS-1, remove A11Y-2 ICON-5, empty STATE-3.
  */
 export const TagGroup = ({
     label,
@@ -64,6 +65,7 @@ export const TagGroup = ({
         aria-label={label}
         className={navigationClassName("starci-core-tag-group", className)}
         data-component="TagGroup"
+        data-contract="CONTROL-STATE-3"
         data-tier="composite"
         data-grammar-tag-selection={selectionMode}
         data-grammar-tag-removable={onRemove === undefined ? "false" : "true"}
@@ -76,23 +78,25 @@ export const TagGroup = ({
     >
         <HeroTagGroup.List
             className="starci-core-tag-list"
-            {...(emptyContent === undefined ? {} : { renderEmptyState: () => <span className="starci-core-tag-empty" data-grammar-tag-empty="true">{emptyContent}</span> })}
+            data-contract="FOCUS-2"
+            {...(emptyContent === undefined ? {} : { renderEmptyState: () => <span className="starci-core-tag-empty" data-contract="STATE-3" data-grammar-tag-empty="true">{emptyContent}</span> })}
         >
             {items.map((item) => (
                 <HeroTag
                     key={item.id}
                     id={item.id}
                     className="starci-core-tag"
+                    data-contract="FOCUS-1"
                     data-grammar-tag="true"
                     textValue={item.label}
                     {...(item.isDisabled === undefined ? {} : { isDisabled: item.isDisabled })}
                 >
                     {({ isSelected, allowsRemoving }) => <>
                         <span className="starci-core-tag-label" data-grammar-tag-label="true" data-grammar-selected={isSelected ? "true" : "false"}>
-                            {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-tag-leading">{item.leading}</span>}
+                            {item.leading === undefined ? null : <span aria-hidden="true" className="starci-core-tag-leading" data-contract="ICON-6">{item.leading}</span>}
                             {item.label}
                         </span>
-                        {allowsRemoving ? <HeroTag.RemoveButton aria-label={removeLabel?.(item.label) ?? item.label} className="starci-core-tag-remove" data-grammar-tag-remove="true" /> : null}
+                        {allowsRemoving ? <HeroTag.RemoveButton aria-label={removeLabel?.(item.label) ?? item.label} className="starci-core-tag-remove" data-contract="A11Y-2 ICON-5" data-grammar-tag-remove="true" /> : null}
                     </>}
                 </HeroTag>
             ))}

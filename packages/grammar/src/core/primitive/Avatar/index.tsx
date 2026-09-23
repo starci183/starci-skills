@@ -40,12 +40,16 @@ export const avatarA11yProps = (name: string, isDecorative: boolean) => isDecora
     ? { "aria-hidden": true as const }
     : { role: "img" as const, "aria-label": name }
 
-/** A person or entity mark with image, initials fallback and an explicit accessible name. */
+/**
+ * A person or entity mark with image, initials fallback and an explicit accessible name.
+ * Contract: ICON-6 (named once or aria-hidden when decorative), MEDIA-5 (initials while loading/failed).
+ */
 export const Avatar = ({ name, src, fallback, size = "md", isDecorative = false, isCurrent = false, className }: AvatarProps) => (
     <HeroAvatar
         {...avatarA11yProps(name, isDecorative)}
         className={navigationClassName("starci-core-avatar", className)}
         data-component="Avatar"
+        data-contract="ICON-6 MEDIA-5"
         data-tier="atom"
         data-grammar-avatar-size={size}
         data-grammar-current={isCurrent ? "true" : "false"}

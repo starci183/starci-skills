@@ -26,10 +26,18 @@ export type AccordionProps = {
     readonly className?: string
 }
 
+/*
+ * Consumer hooks: `starci-core-generic-accordion-root`, `starci-core-generic-accordion-panel`,
+ * `starci-core-generic-accordion-body` name HeroUI parts whose vendor paint Common leaves as it is.
+ * No shipped sheet paints them; the Grammar name lets a consumer or family select those parts
+ * without reaching for vendor class names.
+ */
+
 /**
  * A generic, unframed stack of disclosures (FAQ, settings groups). `SurfaceAccordionCard` stays
  * the framed card form. Up/Down/Home/End move between section triggers; each section exposes
  * `data-grammar-disclosure-state`.
+ * Contract: group FOCUS-2 (peer keys), item STATE-7 (controlled open set), trigger FOCUS-1, indicator MOTION-2.
  */
 export const Accordion = ({
     label,
@@ -50,6 +58,7 @@ export const Accordion = ({
             className={navigationClassName("starci-core-generic-accordion", className)}
             data-component="Accordion"
             data-tier="branch"
+            data-contract="FOCUS-2"
             onKeyDown={(event) => { moveFocusBetweenPeers(event, "[data-grammar-accordion-trigger]", "vertical") }}
             role="group"
         >
@@ -68,13 +77,14 @@ export const Accordion = ({
                         key={item.id}
                         id={item.id}
                         className="starci-core-generic-accordion-item"
+                        data-contract="STATE-7"
                         data-grammar-disclosure-state={expandedSet.has(item.id) ? "open" : "closed"}
                         {...(item.isDisabled === undefined ? {} : { isDisabled: item.isDisabled })}
                     >
                         <HeroAccordion.Heading className="starci-core-generic-accordion-heading" level={headingLevel}>
-                            <HeroAccordion.Trigger className="starci-core-generic-accordion-trigger" data-grammar-accordion-trigger="true">
+                            <HeroAccordion.Trigger className="starci-core-generic-accordion-trigger" data-contract="FOCUS-1" data-grammar-accordion-trigger="true">
                                 <span className="starci-core-generic-accordion-title">{item.title}</span>
-                                <HeroAccordion.Indicator className="starci-core-generic-accordion-indicator" />
+                                <HeroAccordion.Indicator className="starci-core-generic-accordion-indicator" data-contract="MOTION-2" />
                             </HeroAccordion.Trigger>
                         </HeroAccordion.Heading>
                         <HeroAccordion.Panel className="starci-core-generic-accordion-panel">

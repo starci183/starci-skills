@@ -23,6 +23,7 @@ export const CloseButton = ({ label, onPress, isDisabled = false, size = "md" }:
         data-component="CloseButton"
         data-size={size}
         aria-label={label}
+        data-contract="A11Y-2 ICON-5 FOCUS-1"
         isDisabled={isDisabled}
         className="starci-core-close-button"
         {...(isDisabled || onPress === undefined ? {} : { onPress })}

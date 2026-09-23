@@ -40,6 +40,18 @@ export type ComboBoxProps = FieldControlProps & {
     readonly menuTrigger?: "input" | "focus" | "manual"
 }
 
+/*
+ * Consumer hook: `starci-core-combo-box` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
+/*
+ * Consumer hooks: `starci-core-list-popover`, `starci-core-list` name HeroUI parts whose vendor
+ * paint Common leaves as it is. No shipped sheet paints them; the Grammar name lets a consumer or
+ * family select those parts without reaching for vendor class names.
+ */
+
 /**
  * Type to filter a list, then pick (combobox / autocomplete).
  *
@@ -67,6 +79,7 @@ export const ComboBox = ({
         <HeroComboBox
             data-tier="branch"
             data-component="ComboBox"
+            data-contract="A11Y-1 FIELD-1 FIELD-2 CONTROL-STATE-2"
             className="starci-core-field starci-core-combo-box"
             fullWidth
             {...vendorFieldProps({ ...field, isPending })}
@@ -93,12 +106,12 @@ export const ComboBox = ({
             </HeroComboBox.InputGroup>
             <FieldDescription>{field.description}</FieldDescription>
             <FieldErrorText>{field.errorMessage}</FieldErrorText>
-            <HeroComboBox.Popover className="starci-core-list-popover" data-grammar-popover="ComboBox" {...portalProps}>
+            <HeroComboBox.Popover className="starci-core-list-popover" data-grammar-popover="ComboBox" data-contract="LAYOUT-4" {...portalProps}>
                 <HeroListBox
                     className="starci-core-list"
                     {...(isPending ? { "aria-busy": true } : {})}
                     {...(emptyState == null ? {} : {
-                        renderEmptyState: () => <div className="starci-core-list-empty" data-grammar-list-empty="true">{emptyState}</div>,
+                        renderEmptyState: () => <div className="starci-core-list-empty" data-grammar-list-empty="true" data-contract="STATE-3">{emptyState}</div>,
                     })}
                 >
                     <ListOptions options={options} />

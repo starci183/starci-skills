@@ -67,10 +67,18 @@ const SelectionCheckbox = ({ label }: { readonly label: string | undefined }) =>
     </HeroCheckbox>
 )
 
+/*
+ * Consumer hooks: `starci-core-data-table-sort`, `starci-core-data-table-body`,
+ * `starci-core-data-table-checkbox` name HeroUI parts whose vendor paint Common leaves as it is. No
+ * shipped sheet paints them; the Grammar name lets a consumer or family select those parts without
+ * reaching for vendor class names.
+ */
+
 /**
  * Tabular data with sortable columns (`aria-sort`), row selection (`aria-selected`,
  * `data-grammar-selected`), empty and loading states, an optional sticky header, and its own
  * horizontal scroll so a wide table never widens a 360px page.
+ * Contract: scroll LAYOUT-3, grid FOCUS-2 CONTROL-STATE-3, row FOCUS-1, empty STATE-3.
  */
 export const DataTable = <Row extends DataTableRow>({
     label,
@@ -112,10 +120,11 @@ export const DataTable = <Row extends DataTableRow>({
             data-grammar-table-sticky={stickyHeader ? "true" : "false"}
             data-grammar-table-bounded={maxBlockSize === undefined ? "false" : "true"}
         >
-            <HeroTable.ScrollContainer className="starci-core-data-table-scroll" data-grammar-table-scroll="true" style={scrollStyle}>
+            <HeroTable.ScrollContainer className="starci-core-data-table-scroll" data-contract="LAYOUT-3" data-grammar-table-scroll="true" style={scrollStyle}>
                 <HeroTable.Content
                     aria-label={label}
                     className="starci-core-data-table-content"
+                    data-contract="FOCUS-2 CONTROL-STATE-3"
                     selectionMode={selectionMode}
                     {...(sort === undefined ? {} : { sortDescriptor: toSortDescriptor(sort) })}
                     {...(onSortChange === undefined ? {} : {
@@ -155,13 +164,14 @@ export const DataTable = <Row extends DataTableRow>({
                         className="starci-core-data-table-body"
                         renderEmptyState={() => isLoading
                             ? <div className="starci-core-data-table-placeholder" data-grammar-table-loading="true" role="status">{loadingContent}</div>
-                            : <div className="starci-core-data-table-placeholder" data-grammar-table-empty="true">{emptyContent}</div>}
+                            : <div className="starci-core-data-table-placeholder" data-contract="STATE-3" data-grammar-table-empty="true">{emptyContent}</div>}
                     >
                         {visibleRows.map((row) => (
                             <HeroTable.Row
                                 key={row.id}
                                 id={row.id}
                                 className="starci-core-data-table-row"
+                                data-contract="FOCUS-1"
                                 data-grammar-table-row="true"
                                 data-grammar-selected={selectionMode !== "none" && isRowSelected(row.id) ? "true" : "false"}
                             >

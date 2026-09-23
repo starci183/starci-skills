@@ -18,6 +18,7 @@ export type IconSourceProps = {
     readonly "data-tier"?: string
     readonly "data-component"?: string
     readonly "data-usage"?: string
+    readonly "data-contract"?: string
 }
 
 /** Function or class SVG glyph selected by the consuming app's icon registry. */
@@ -45,7 +46,12 @@ const SKELETON_CLASS_NAME = skeletonVariants({ animationType: "shimmer" }).base(
     className: "starci-core-icon-skeleton",
 })
 
-/** Product-neutral icon carrier; semantic glyph names and libraries remain app authority. */
+/**
+ * Product-neutral icon carrier; semantic glyph names and libraries remain app authority.
+ *
+ * Contract: ICON-1 (the app resolves the glyph, Common owns its box) and ICON-6 (named once when it
+ * carries meaning, `aria-hidden` when it does not).
+ */
 export const Icon = ({ source: Source, usage = "chip", ariaLabel, isSkeleton = false }: IconProps) => {
     if (isSkeleton) {
         return <span data-tier="atom" data-component="Icon" data-loading="true" aria-hidden className={SKELETON_CLASS_NAME} />
@@ -59,6 +65,7 @@ export const Icon = ({ source: Source, usage = "chip", ariaLabel, isSkeleton = f
             data-tier="atom"
             data-component="Icon"
             data-usage={usage}
+            data-contract="ICON-1 ICON-6"
             focusable="false"
             className={ICON_CLASS_NAME}
             {...(ariaLabel === undefined

@@ -44,6 +44,7 @@ export type AlertProps = AlertBase & (Dismissible | Permanent)
  * It is not an overlay: it takes layout space and stays until resolved or dismissed. Dismissal is
  * uncontrolled (the banner removes itself) and `onDismiss` reports it. Tone is echoed on
  * `data-grammar-tone`; the vendor status supplies the default glyph, `pending` swaps it for a spinner.
+ * Contract: root FEEDBACK-3 (status/alert urgency on the owner); actions FEEDBACK-2 (recovery in place).
  */
 export const Alert = (props: AlertProps) => {
     const { title, description, tone = "informative", action, urgency } = props
@@ -62,6 +63,7 @@ export const Alert = (props: AlertProps) => {
             data-component="Alert"
             data-grammar-tone={tone}
             data-urgency={resolvedUrgency}
+            data-contract="FEEDBACK-3"
             role={resolvedUrgency === "assertive" ? "alert" : "status"}
             status={vendorStatusFor(tone)}
             className="starci-core-alert"
@@ -76,7 +78,7 @@ export const Alert = (props: AlertProps) => {
                 )}
             </HeroAlert.Content>
             {action === undefined && props.dismissLabel === undefined ? null : (
-                <span className="starci-core-alert-actions" data-grammar-alert-actions="true">
+                <span className="starci-core-alert-actions" data-grammar-alert-actions="true" data-contract="FEEDBACK-2">
                     {action === undefined ? null : (
                         <Button size="sm" variant="secondary" onPress={action.onAction}>{action.label}</Button>
                     )}

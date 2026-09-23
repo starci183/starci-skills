@@ -50,6 +50,8 @@ const isPromiseLike = (value: unknown): value is PromiseLike<unknown> => (
  * Dismiss rules differ from `Dialog` on purpose: an outside press never dismisses (the decision must
  * be explicit), Escape cancels, and the cancel action is first in focus order so initial focus lands
  * on the safe choice. Focus trap/return, scroll lock and the scoped portal are the `Dialog` rules.
+ * Contract: confirm CTA-4 ACTION-2 FEEDBACK-3 (explicit destructive authority, pending on the initiator,
+ * closes only on settlement); surface and container as `Dialog`.
  */
 export const AlertDialog = ({
     title,
@@ -89,12 +91,13 @@ export const AlertDialog = ({
                     data-grammar-overlay-backdrop="AlertDialog"
                     className="starci-core-overlay-backdrop"
                 >
-                    <HeroAlertDialog.Container placement="center" size="sm" data-size="sm" className="starci-core-dialog-container">
+                    <HeroAlertDialog.Container placement="center" size="sm" data-size="sm" data-contract="MOTION-2" className="starci-core-dialog-container">
                         <HeroAlertDialog.Dialog
                             data-tier="branch"
                             data-component="AlertDialog"
                             data-grammar-tone={tone}
                             data-grammar-overlay-surface="dialog"
+                            data-contract="FOCUS-3 LAYOUT-4 CORE-BOUNDARY-4"
                             {...(description === undefined ? {} : { "aria-describedby": descriptionId })}
                             className="starci-core-dialog starci-core-alert-dialog"
                         >
@@ -136,7 +139,7 @@ export const AlertDialog = ({
                                             <SafeAction>
                                                 <Button variant="secondary" isDisabled={pending} onPress={close}>{cancelLabel}</Button>
                                             </SafeAction>
-                                            <span data-grammar-overlay-action="confirm" data-grammar-tone={tone}>
+                                            <span data-grammar-overlay-action="confirm" data-grammar-tone={tone} data-contract="CTA-4 ACTION-2 FEEDBACK-3">
                                                 <Button variant="primary" isPending={pending} onPress={confirm}>{confirmLabel}</Button>
                                             </span>
                                         </HeroAlertDialog.Footer>

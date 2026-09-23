@@ -57,6 +57,18 @@ export const DateFieldBox = ({ children, isInvalid, isDisabled }: {
     </div>
 )
 
+/*
+ * Consumer hook: `starci-core-date-field` names this control's root for a consumer or family
+ * stylesheet. No shipped sheet paints it: the root is drawn as a whole by `.starci-core-field`, so
+ * a rule on the hook adds to the shared anatomy and never has to replace it.
+ */
+
+/*
+ * Consumer hooks: `starci-core-date-segment` names a HeroUI part whose vendor paint Common leaves
+ * as it is. No shipped sheet paints it; the Grammar name lets a consumer or family select that part
+ * without reaching for vendor class names.
+ */
+
 /**
  * A typed date: locale-ordered segments that each take digits and arrow keys, the vendor's. Values
  * are `@internationalized/date` objects (the vendor's `DateValue`), never ambiguous strings.
@@ -73,6 +85,7 @@ export const DateField = ({
     <HeroDateField
         data-tier="atom"
         data-component="DateField"
+        data-contract="A11Y-1 FIELD-1 FIELD-2 FIELD-3"
         className="starci-core-field starci-core-date-field"
         fullWidth
         {...vendorFieldProps(field)}

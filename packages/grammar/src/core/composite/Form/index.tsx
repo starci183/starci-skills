@@ -55,6 +55,7 @@ export const Form = ({
         <HeroForm
             data-tier="composite"
             data-component="Form"
+            data-contract="FEEDBACK-1 ACTION-1 ACTION-2"
             data-grammar-pending={isPending ? "true" : "false"}
             data-grammar-field-state={fieldPresentationState({ isPending })}
             className="starci-core-form"

@@ -353,6 +353,12 @@
         line-height: 1.5;
     }
 
+    /* The body is one flex item of the dialog stack; long content wraps inside the 20rem surface. */
+    .starci-core-popover-body {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
     .starci-core-popover-dialog > .starci-core-overlay-title {
         font-size: 1rem;
     }

@@ -31,6 +31,7 @@ export type LinkProps = {
  * It is always a real anchor (middle-click, copy-link and the `link` role come from the platform).
  * `TextAction` owns action-shaped links; `Link` owns prose and directory links, including the
  * visited and current destination states that action chrome does not draw.
+ * Contract: anchor ACTION-3 (always a destination) FOCUS-1, external glyph ICON-6.
  */
 export const Link = ({
     children,
@@ -50,6 +51,7 @@ export const Link = ({
             aria-current={isCurrent ? "page" : undefined}
             className={navigationClassName("starci-core-link", className)}
             data-component="Link"
+            data-contract="ACTION-3 FOCUS-1"
             data-tier="atom"
             data-grammar-link-kind={kind}
             data-grammar-link-visited={visited}
@@ -60,7 +62,7 @@ export const Link = ({
             {...(onFollow === undefined ? {} : { onPress: () => onFollow() })}
         >
             {children}
-            {external && externalIcon !== undefined ? <span aria-hidden="true" className="starci-core-link-external-icon" data-grammar-link-external-icon="true">{externalIcon}</span> : null}
+            {external && externalIcon !== undefined ? <span aria-hidden="true" className="starci-core-link-external-icon" data-contract="ICON-6" data-grammar-link-external-icon="true">{externalIcon}</span> : null}
             {external && externalHint !== undefined ? <span className="starci-core-nav-visually-hidden">{` ${externalHint}`}</span> : null}
         </HeroLink>
     )
