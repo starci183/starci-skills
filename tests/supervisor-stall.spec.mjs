@@ -145,6 +145,11 @@ test('STALE-WAIT: a queued job waiting past stallMinutes on a blocker that settl
   const [wait]=byType(found,'STALE-WAIT');
   assert.match(wait.line,/^STALE-WAIT wf-next op-workspace\.manage-aaaaaaaaaa \(workspace\.manage\) dependency-failed for 90m: blocker op-workspace\.manage-bbbbbbbbbb settled failed 70m ago/);
   assert.equal(wait.alert,true);
+
+  // A blocker that settled moments ago leaves the Kernel its turn to re-enqueue or re-point:
+  // nivo Modules re-enqueued 9 s after the settle, yet the alert fired at "0m ago".
+  ledger.db.prepare('UPDATE jobs SET updated_at=? WHERE job_id=?').run(NOW-2*MIN,'op-workspace.manage-bbbbbbbbbb');
+  assert.equal(byType(stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf}),'STALE-WAIT').length,0);
 }));
 
 test('dedupe and rate limit: a finding alerts once per channel per window, a resolved one is forgotten, a GATE line never alerts',()=>{

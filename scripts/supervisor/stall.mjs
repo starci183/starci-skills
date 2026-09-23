@@ -397,6 +397,9 @@ export function stallFindings(db, {
         if (!job || !['dependency-failed', 'dependency'].includes(item.queuedBecause) || !item.blockedBy?.job) continue;
         const blocker = db.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(item.blockedBy.job);
         if (!blocker || !SETTLED.includes(blocker.status)) continue;
+        // The Kernel needs a turn to react to a blocker that just settled (nivo Modules re-enqueued
+        // the failed blocker 9 s after it settled, yet the alert fired at "0m ago"): same grace as gates.
+        if (now - blocker.updated_at < graceMs) continue;
         out.push({ type: 'STALE-WAIT', key: `STALE-WAIT|${wf}|${job.job_id}`, workflowId: wf, repo, jobId: job.job_id, alert: true,
           line: `STALE-WAIT ${wf} ${job.job_id} (${job.op_id ?? '-'}) ${item.queuedBecause} for ${minutes(now - (job.updated_at ?? job.created_at))}m: blocker ${blocker.job_id} settled ${blocker.status} ${minutes(now - blocker.updated_at)}m ago; the Kernel retries the blocker, re-points or drops this job` });
       }
