@@ -380,8 +380,8 @@ proofs:
         independent."
   - id: binding
     requirement:
-      en: "`starci validate` passes and evidence hashes, served versions, Grammar, codeRefs and lineage
-        agree."
+      en: "`starci validate` passes, `starci validate --strict` passes on every record directory it
+        writes, and evidence hashes, served versions, Grammar, codeRefs and lineage agree."
 blockers:
   - code: ACCEPTED_DRAW_LINEAGE_MISSING
     condition:

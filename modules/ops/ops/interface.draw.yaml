@@ -296,7 +296,9 @@ proofs:
         not pass merely because its label explains it.
   - id: binding
     requirement:
-      en: "`starci validate` passes; every cited ID/path and asset byte exists, required assertions are
+      en: "`starci validate` passes, and `starci validate --strict` passes on the ui record directory
+        it writes (the record, ui.flow included, compiles against work/ui-screen@1); every cited
+        ID/path and asset byte exists, required assertions are
         covered, input bindings are current, and an honest not-run/fail cannot earn done."
     check: bin/starci.mjs
 blockers:

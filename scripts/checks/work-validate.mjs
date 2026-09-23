@@ -2,19 +2,24 @@
 // Canonical `starci validate <work-root-or-record-dir>` entry.
 // Composes the runtime's structural, consistency, and artifact machines into
 // one read-only verdict so operation contracts never depend on a prose alias.
+// `--strict` (validateWork(target, {strict: true})) also compiles every record
+// against the JSON schema its `schema:` const names (check-work-schemas.mjs);
+// the default stays lenient because live trees still carry records written
+// before that enforcement, and ops scope the strict run to what they write.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkFamiliesDrift, checkWorkTree, walk } from './check-example-work.mjs';
 import { checkWorkConsistencyTree } from './check-work-consistency.mjs';
 import { checkWorkArtifacts } from './check-work-artifacts.mjs';
+import { checkWorkSchemas } from './check-work-schemas.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const uniqueSorted = (items) => [...new Set(items.map((item) => String(item)))].sort();
 
-export function validateWork(target) {
+export function validateWork(target, { strict = false } = {}) {
   const requested = path.resolve(target ?? '.');
   if (!fs.existsSync(requested)) {
     return {
@@ -83,30 +88,41 @@ export function validateWork(target) {
     info.push(`${root}: standalone record validation; whole-tree artifact reconciliation is deferred to the owning catalog [RECORD_MODE]`);
   }
 
+  let schemaCounts = null;
+  if (strict) {
+    try {
+      schemaCounts = checkWorkSchemas(root, refused, info, { workRoot: enclosingWorkRoot });
+    } catch (error) {
+      refused.push(`${root}: strict schema validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+    }
+  }
+
   const result = {
     schema: 'starci/work-validate-report@1',
     ok: refused.length === 0,
     target: root,
     mode,
+    strict,
     refused: uniqueSorted(refused),
     suspect: uniqueSorted(suspect),
     info: uniqueSorted(info),
-    counts: { ...counts, yamlFiles: yamlFiles.length },
+    counts: { ...counts, yamlFiles: yamlFiles.length, ...(schemaCounts ?? {}) },
   };
   return result;
 }
 
 function usage(code = 0) {
   const stream = code === 0 ? process.stdout : process.stderr;
-  stream.write('Usage: starci validate <work-root-or-record-dir> [--json]\n');
+  stream.write('Usage: starci validate <work-root-or-record-dir> [--strict] [--json]\n');
   process.exit(code);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const args = process.argv.slice(2).filter((arg) => arg !== '--json');
+  const strict = process.argv.slice(2).includes('--strict');
+  const args = process.argv.slice(2).filter((arg) => arg !== '--json' && arg !== '--strict');
   if (!args.length || args.includes('--help') || args.includes('-h')) usage(args.length ? 0 : 2);
   if (args.length !== 1) usage(2);
-  const result = validateWork(args[0]);
+  const result = validateWork(args[0], { strict });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   process.exitCode = result.ok ? 0 : 1;
 }

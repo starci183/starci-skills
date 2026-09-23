@@ -232,7 +232,8 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: "`starci validate` ran; every cited ID and path exists or is explicitly proposed, the input
+      en: "`starci validate` ran, and `starci validate --strict` ran on every record directory it
+        writes; every cited ID and path exists or is explicitly proposed, the input
         bindings are current, and an honest not-run or fail cannot earn done."
   - id: declaration
     requirement:

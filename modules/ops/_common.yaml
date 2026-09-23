@@ -241,7 +241,12 @@ sections:
         `starci/staged-op-response@1`. Repository-side artifacts (source, tests, documents)
         carry no YAML const of their own but land exactly at the declared ceiling path."
       - "Every operation's checks include the record-class validator `starci validate` for the
-        .starciwork artifacts it writes; operations that materialize or verify .starcistacks deployments
+        .starciwork artifacts it writes, and `starci validate --strict <record-dir>` on every record
+        directory it writes: strict mode compiles each record against the JSON schema its `schema:`
+        const names (closed objects, slug/timestamp patterns) and refuses every violation. Strict is
+        scoped to what the op wrote because live trees still carry older records the schemas now
+        refuse; a strict refusal inside the op's own records is its failure, one outside them is
+        not its to repair. Operations that materialize or verify .starcistacks deployments
         also run `starci stacks check`. An op that authors `extensions.work3.checks` on a node
         includes the validator there. Layout, name and schema violations are operator failures,
         not content to repair silently."

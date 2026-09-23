@@ -147,7 +147,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly
+      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
         proposed, required assertions are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
   - id: measured

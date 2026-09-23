@@ -23,6 +23,7 @@ const HELP = `starci — kernel-agent workflow runtime
   starci start [args]                 claim a queued goal and boot its kernel agent
   starci goal [args]                  define a goal: assess, plan table, persist to the ledger
   starci validate <work-root>         read-only Work record/layout validation
+                  [--strict]          also compile every record against its named JSON schema
   starci help                         this text
 `;
 

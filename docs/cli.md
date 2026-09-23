@@ -45,6 +45,10 @@ node scripts/kernel/api.mjs <verb> --repo <path> [...]
 
 # Read-only Work record/layout validation
 node scripts/checks/work-validate.mjs <work-root>
+# ...plus every record compiled against the JSON schema its `schema:` const names
+# (closed objects, slug/timestamp patterns); each violation is a [SCHEMA_VIOLATION]
+# refusal. Ops run it on the record directories they write.
+node scripts/checks/work-validate.mjs <work-root-or-record-dir> --strict
 ```
 
 See [workflow-kernel](workflow-kernel.md) for the loop these calls serve.
