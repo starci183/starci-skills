@@ -1112,7 +1112,11 @@ routes:
     to: {needUser: true}
     limit: 1
     then: needUser
-    purpose: A runtime that cannot start is not an operation's to fix; the workflow says so and stops.
+    purpose: >-
+      A runtime that cannot start is not an operation's to fix; the workflow says so and stops. A
+      missing credential is not such a blocker for a build op: it builds on a placeholder and lists
+      credentialPending (modules/ops/_common.yaml), so only a live-proof leg reaches this route for
+      a credential.
   - id: authority-needs-the-user
     on: {blocker: authority}
     from: any

@@ -20,7 +20,7 @@ export const BLOCKER_KINDS = (() => {
   return blockers;
 })();
 
-const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head']);
+const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending']);
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
 const normalizePath = (p) => String(p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
 
@@ -69,6 +69,13 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
   if (!OP_REPORT_OUTCOMES.includes(value.outcome)) fail(`outcome must be one of ${OP_REPORT_OUTCOMES.join('|')}, got '${value.outcome}'`);
   if (!text(value.summary)) fail('summary is required');
   else if (value.summary.replace(/\s+/g, ' ').length > 600) fail('summary exceeds 600 chars');
+
+  // A build op codes on a placeholder when a credential is missing and names the
+  // variables here; only the live-proof leg waits for the real values
+  // (modules/ops/_common.yaml "Bounded finish and blockers").
+  if (value.credentialPending !== undefined && (!Array.isArray(value.credentialPending)
+    || value.credentialPending.some((v) => typeof v !== 'string' || !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(v))))
+    fail('credentialPending must be an array of env var or custody key names');
 
   if (value.files !== undefined) {
     if (!Array.isArray(value.files) || value.files.some((f) => !text(f)) || new Set(value.files).size !== value.files.length) fail('files must be an array of unique path strings');

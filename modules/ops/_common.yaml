@@ -372,6 +372,16 @@ sections:
         and hash the delivered masked bytes.
   - title: Bounded finish and blockers
     blocks:
+      - "A missing credential never stops building (owner ruling 2026-09-23: \"creds không có thì
+        vẫn code, để dumb string vào, uat không làm thôi\" - asking for a credential does not mean
+        not doing the work). Code reads the value from its declared env var or custody key exactly
+        as it will in production; where the build, unit tests or a local run need a value, the op
+        writes an obviously fake placeholder (`placeholder-<VAR_NAME>`, never a plausible-looking
+        key) into the example/local env file it owns, and lists every such variable in its report
+        as `credentialPending: [VAR_NAME, ...]`. Only the live proof against the real provider
+        (integration.verify, e2e.verify, uat.verify, uat.assisted.*) waits for the real value and
+        reports `blocked` `environment` naming the variable; a build op never reports
+        `blocked` `environment` for a credential it can stand in with a placeholder."
       - Reuse matching current resources; inspect before changing uncertain state. Stop after
         repeated identical failure when no new diagnosis or authorized alternative remains. An
         uncertain external mutation is reconciled read-only before any retry. Do not weaken expected
