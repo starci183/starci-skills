@@ -116,6 +116,44 @@ test('a Claude Code star spinner with a timer is active; its idle prompt is not'
   assert.equal(classifyAgentScreen(idle).state,'turn-idle');
 });
 
+// nivo claude-agent ops read turn-idle while their spinner ran a hook
+// ("(running PreToolUse hook …)", "(running PostToolUse hook …)") or a todo
+// activeForm, and while a tool call was still executing; status called them
+// worker-nudge-ready and the nudges landed as queued messages
+// (inc-dd8b95e58762, inc-a579fa590ed8, inc-786c9372e7a2, inc-dbdb4244ee2a, inc-5d6556105a98).
+test('any Claude spinner row and a still-executing tool call are active; finished scrollback is not',()=>{
+  const chrome=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
+  const pre=['● Bash(node scripts/kernel/api.mjs op-contract --job op-provision.ask-9a2c8f0c8d)',
+    '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)',
+    "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome].join('\n');
+  assert.equal(classifyAgentScreen(pre).state,'active','PreToolUse hook spinner');
+  const post=['❯ Read D:/Repositories/nivo-backend/.orca/orca-dispatch-ctx_3dedd02ae7c5.md completely and follow it exactly.',
+    '✻ Moseying… (running PostToolUse hook · 3s)',...chrome].join('\n');
+  assert.equal(classifyAgentScreen(post).state,'active','PostToolUse hook spinner right after launch');
+  assert.equal(classifyAgentScreen(['✳ Moseying… (running SessionStart hook)',...chrome].join('\n')).state,'active','a hook spinner with no timer yet');
+  assert.equal(classifyAgentScreen(['✽ Reading owned records… (45s · ↓ 1.2k tokens)','  ⎿  ☐ Reading owned records',...chrome].join('\n')).state,'active','a todo activeForm spinner');
+  assert.equal(classifyAgentScreen(['· Reading owned records… (running PreToolUse hook)',...chrome].join('\n')).state,'active','the dim first spinner frame');
+  const tool=['● Reading owned records','  ⎿  Running…',...chrome].join('\n');
+  assert.equal(classifyAgentScreen(tool).state,'active','a tool call still executing');
+  assert.equal(classifyAgentScreen(['● Bash(node api.mjs status)','  ⎿  Running PreToolUse hook…',...chrome].join('\n')).state,'active');
+  // Captured from a running nivo claude-agent op (op-backend.implement-c8cae00a7d) on 2026-09-23.
+  const live=['  ⎿  $ cd /d/Repositories/nivo-backend;',
+    '     E=.starciwork/features/workspace-provision/impl/nivo-backend/purchase-orchestrator/E; npx jest --config',
+    '     src/tests/e2e/jest-e2e.js --runInBand --testMatch',
+    '     "<rootDir>/src/tests/e2e/nivo/workspace-provision/purchase-orchestrator/*.e2e-spec.ts" > $E/r7/e2e-output.txt …',
+    '     (32s · 11 lines)','     (ctrl+b to run in background)',
+    '· Newspapering… (5m 7s · ↓ 20.8k tokens)',
+    "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome];
+  assert.equal(classifyAgentScreen(live.join('\n')).state,'active');
+  assert.equal(classifyAgentScreen(live.map(row=>row.replace('(5m 7s · ↓ 20.8k tokens)','(running PostToolUse hook · 5m 7s)')).join('\n')).state,'active');
+  assert.equal(classifyAgentScreen(live.filter(row=>!row.startsWith('· ')).join('\n')).state,'active','the running Bash row alone');
+  // A finished turn stays turn-idle: its summary has no ellipsis, and an old
+  // hook spinner followed by the answer is scrollback.
+  assert.equal(classifyAgentScreen(['● Report filed; yielding.','✻ Brewed for 1m 3s',...chrome].join('\n')).state,'turn-idle');
+  assert.equal(classifyAgentScreen(['✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)','● Report filed with outcome done.',...chrome].join('\n')).state,'turn-idle');
+  assert.equal(classifyAgentScreen(['● Reading owned records','  ⎿  Read 3 files','● Done: report filed.',...chrome].join('\n')).state,'turn-idle');
+});
+
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
   assert.match(prompt,/external watchdog owns the 5-minute cadence/i);

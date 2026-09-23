@@ -136,7 +136,15 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // timer ("✶ Osmosing… (1m 0s · ↓ 2.7k tokens)") and no "esc to interrupt";
   // without this marker a working Claude kernel read turn-idle and every
   // watchdog wake landed in its queued-message box.
-  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d|(?:^|\n)\s*[✶✻✳✢✽✺·*]\s+\S+…\s*\(\s*\d+(?:h|m|s)/i;
+  // Any Claude spinner row counts, not only the timed one: a hook spinner
+  // ("✢ Transmuting… (running PreToolUse hook · 1m 26s · …)") and a todo
+  // activeForm spinner ("✽ Reading owned records… (…)") read turn-idle, so
+  // status called working ops nudge-ready (inc-dd8b95e58762, inc-5d6556105a98).
+  // The star glyphs need only the ellipsis ("✻ Brewed for 1m 3s", a finished
+  // turn, has none); "·" and "*" double as bullets, so they also need "(".
+  // A tool call still executing ("⎿  Running…", a Bash row offering
+  // "(ctrl+b to run in background)") is active too (inc-a579fa590ed8).
+  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|\(ctrl\+b to run in background\)|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d|(?:^|\n)\s*[✶✻✳✢✽✺]\s+\S[^\n]*?…|(?:^|\n)\s*[·*]\s+\S[^\n]*?…\s*\(|(?:^|\n)\s*⎿\s+Running\b[^\n]*…/i;
   const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) };
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
