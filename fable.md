@@ -1044,6 +1044,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 08:25 Không vá. Modules architecture.decide a9 (Shell, chạy lại sau 09c3af799) done: vá decisionLog chạy đúng trên việc thật.
   WSPV kernel đang sửa theo audit. Collab composition vẫn active (worker còn output). AUTH chờ owner-gate. P7 chờ fork bổ sung.
 
+- 08:35 Modules chỉ còn S1 Accounting chờ ask thuế của thầy, nhưng status báo orphaned-frontier (ask a12 mất lineage vì a13
+  sau đó) nên watchdog đánh thức mỗi 5 phút. Vá `0213b58fb`: ask chưa trả lời luôn nằm trong awaitingOwner; không còn op mở +
+  có ask chờ = frontier awaiting-owner, không actionable. Live: Modules awaiting-owner, liệt kê ctx_596b59ca7bd4.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
