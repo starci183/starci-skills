@@ -1017,6 +1017,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   ba câu trả lời, architecture.decide a7 done, kernel active. WSPV implement repair-round5 đang chụp lại ảnh; ask thanh toán chờ
   thầy. AUTH chờ owner-gate. Status Modules hiện đủ 3 provision.ask answered (vá 9945ae813 chạy đúng trên ledger thật).
 
+- 07:55 Collab giữ 7 job backend.implement sau job composition "trong đầu" kernel; status báo ready nên watchdog đánh thức
+  mỗi 5 phút vô ích. Vá `d5218813a`: enqueue --after ghi thứ tự vào ledger, status coi job có --after hoặc seam cut chưa xong là
+  dependency; kernel-prompt dặn dùng. 7 job hiện tại đã enqueue trước vá nên vẫn bị đánh thức tới khi composition xong. WSPV
+  implement a34 done. Fork báo gap: settle cho pass khi owned paths chưa commit/push dù commitPolicy đòi main-line; giao fork làm P7.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
