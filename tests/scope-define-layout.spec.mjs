@@ -127,3 +127,24 @@ test('work/catalog@1 types the setup entry with the scope field names and refuse
   assert.equal(validate(withSetup({ 'import-cv-seam': { import: entry } })), false, 'entries are keyed by workflow id');
   assert.equal(validate(withSetup({ 'wf-x': { cleanup: entry } })), false, 'one entry per workspace.manage mode');
 });
+
+// A Mia Mia prepare cut set was structurally blocked after ordinal 1: full
+// validation failed CATALOG_DIRTY on the catalog the final ordinal owned, and
+// workspace.manage declared no cutSetAuthority to read that as sibling-owned.
+test('workspace.manage declares cutSetAuthority for prepare/import cut sets', () => {
+  const doc = parseYaml(fs.readFileSync(path.join(root, 'modules/ops/ops/workspace.manage.yaml'), 'utf8'));
+  const authority = doc.policy?.cutSetAuthority;
+  assert.ok(authority, 'workspace.manage has policy.cutSetAuthority');
+  assert.match(authority.scope, /prepare/);
+  assert.match(authority.permits, /cut-slice-postcondition/);
+  assert.match(authority.permits, /full-regression-final/);
+});
+
+// StarCi Next backend.scaffold cut ordinals were refused on a repository-wide
+// lint red that only a later sibling could fix (inc-751dd1ac4492).
+test('the scaffold ops declare cutSetAuthority for their cut sets', () => {
+  for (const op of ['backend.scaffold', 'interface.scaffold', 'package.scaffold']) {
+    const doc = parseYaml(fs.readFileSync(path.join(root, `modules/ops/ops/${op}.yaml`), 'utf8'));
+    assert.match(doc.policy?.cutSetAuthority?.permits ?? '', /full-regression-final/, `${op} declares cutSetAuthority`);
+  }
+});

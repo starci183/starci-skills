@@ -453,6 +453,25 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   assert.equal(frontier().state,'awaiting-owner','re-served, it waits on the owner again');
 });
 
+// StarCi Next base-repos recorded an owner-gate for a missing brand before any
+// frontend job could be enqueued; the frontier stayed orphaned/actionable
+// (inc-103f2028ba77) and the watchdog woke a kernel that could only wait.
+test('no open operation plus an open owner-gate incident is awaiting-owner',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-gate-no-job';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf));
+  const status=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r).frontier;};
+  assert.equal(status().state,'orphaned-frontier');
+  const raised=runApi('incident','--repo',repo,'--workflow',wf,'--kind','owner-gate','--op','interface.scaffold','--detail','brand missing','--json');
+  assert.equal(raised.status,0,raised.stderr);
+  let f=status();
+  assert.equal(f.state,'awaiting-owner');
+  assert.equal(f.actionable,false);
+  assert.match(f.reason,/owner-gate incident/);
+  runApi('incident','--repo',repo,'--workflow',wf,'--resolve',out(raised).incidentId,'--json');
+  assert.equal(status().state,'orphaned-frontier','resolved, the Kernel owes the next transition again');
+});
+
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);

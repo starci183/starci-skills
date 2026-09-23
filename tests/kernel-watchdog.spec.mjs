@@ -106,6 +106,16 @@ test('an idle prompt holding queued messages is queued-input; a running turn is 
   assert.equal(classifyAgentScreen(busy).state,'active','Enter during a running turn would cut into it');
 });
 
+// Claude Code 2.1.280 spins with "✶ Osmosing… (1m 0s · ↓ 2.7k tokens)" and no
+// "esc to interrupt"; a working nivo Claude kernel read turn-idle.
+test('a Claude Code star spinner with a timer is active; its idle prompt is not',()=>{
+  const busy=['  keep the model turn alive.','✶ Osmosing… (1m 0s · ↓ 2.7k tokens)','  ⎿  Tip: Use /btw to ask a quick side question','─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+  assert.equal(classifyAgentScreen(busy).state,'active');
+  assert.equal(classifyAgentScreen('✻ Cogitating… (12s · ↑ 300 tokens)\n❯').state,'active');
+  const idle=[' Yielding — waiting on the scope.define report.','─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+  assert.equal(classifyAgentScreen(idle).state,'turn-idle');
+});
+
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
   assert.match(prompt,/external watchdog owns the 5-minute cadence/i);
@@ -145,17 +155,10 @@ test('the watchdog loop runs each tick in a fresh child and stops on a finished 
   assert.match(source, /spawnSync\(process\.execPath, \[self, \.\.\.argv, '--once'/, 'the loop re-executes itself per tick');
 });
 
-// Devin and Codex overwrite terminal titles with their own session summaries;
-// the nivo sidebar showed no [Kernel]/[Op] name at all. The repair tick puts
-// the semantic titles back when they drift.
-test('a kernel or op title an agent CLI overwrote counts as drifted', async () => {
-  const { kernelTitleOf, opTitleOf, titleDrifted } = await import('../scripts/kernel/watchdog.mjs');
-  assert.equal(kernelTitleOf('wf-a'), '[Kernel] wf-a');
-  assert.equal(opTitleOf('interface.audit', 'wf-a'), '[Op] interface.audit · wf-a');
-  assert.equal(titleDrifted('devin.exe: Kernel orchestration for nivo', kernelTitleOf('wf-a')), true);
-  assert.equal(titleDrifted('⠸ Report dispatched task status | nivo-backend', opTitleOf('interface.audit', 'wf-a')), true);
-  assert.equal(titleDrifted('[Kernel] wf-a', kernelTitleOf('wf-a')), false);
-  assert.equal(titleDrifted('[Op] interface.audit a3 · wf-a', opTitleOf('interface.audit', 'wf-a')), false, 'the dispatch-time title with its attempt stays');
+// Orca's sidebar shows the tab title set at creation or by rename, while the
+// listed `title` is the pane title the agent CLI rewrites every turn; a
+// per-tick rename chased the wrong field, so the watchdog renames nothing.
+test('the watchdog never renames terminals', () => {
   const src = fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs', import.meta.url), 'utf8');
-  assert.match(src, /repair \? keepTitles\(/, 'only a repair watchdog renames');
+  assert.doesNotMatch(src, /terminalRename|keepTitles/);
 });

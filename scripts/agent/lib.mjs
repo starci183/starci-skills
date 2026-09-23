@@ -209,11 +209,17 @@ function answerGate(handle, rule, screen) {
   }
 }
 
+export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t ]*[>❯❭][ \t ]*(\r?\n|$))`;
+
 // Card-driven readiness: screen must show the provider's prompt pattern
 // (and identity when declared) before anything is sent.
 function awaitReadiness(handle, adapter, { cwd = null } = {}) {
   const spec = adapter?.readiness && typeof adapter.readiness === 'object' ? adapter.readiness : {};
-  const ready = regexp(spec.screenPattern, '(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*[>❯❭]\\s*$)');
+  // A bare prompt glyph on its own line, wherever that line sits: Claude Code
+  // 2.1.280 draws a rule and a status row BELOW its `❯` prompt, so the former
+  // end-of-screen anchor never matched and every Claude kernel timed out at
+  // readiness while it sat ready at its prompt.
+  const ready = regexp(spec.screenPattern, DEFAULT_READY_PATTERN);
   const identity = spec.identityPattern ? regexp(spec.identityPattern, spec.identityPattern) : null;
   const timeoutMs = Number(spec.timeoutMs) || 120000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
@@ -282,7 +288,13 @@ function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '
     return { ok: true, screen: initialScreen ?? '', model: expectedModel, mode: 'launch-flag' };
   const timeoutMs = Number(spec.timeoutMs) || 15000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
-  const expected = modelPattern(expectedModel);
+  // A TUI that renders the model's display name instead of its id (Claude
+  // Code shows "Opus 5.5 with high effort" for claude-opus-5-5) declares that
+  // name per id in the card's modelAttestation.displayNames.
+  const displayName = spec.displayNames?.[expectedModel] ?? null;
+  const byId = modelPattern(expectedModel);
+  const byName = displayName ? modelPattern(displayName) : null;
+  const expected = { test: (text) => byId.test(text) || Boolean(byName?.test(text)) };
   let screen = initialScreen ?? '';
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
     const failure = failureOnScreen(adapter, screen);

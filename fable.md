@@ -1167,6 +1167,40 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   Hai worker cũ nộp report muộn (Collab backend.implement a8 done 05:59, WSPV interface.implement a39 done 06:01) vào workflow đã finish:
   code của chúng đã commit trong repo, workflow mới sẽ khảo sát lại.
 
+- 14:00 Fork báo lane R lỗi: terminal create hết giờ chờ handle nhưng terminal vẫn được tạo và bị bỏ lại (R2 đang sửa: adopt-or-close,
+  paste kẹt). Nivo dính y hệt: 3 terminal claude mồ côi đứng ở màn onboarding; đã đóng. Giữ nivo tới khi R2 xong và thầy onboarding.
+  TITLE_DRIFT: tên bị CLI ghi đè liên tục (OSC mỗi lượt), đổi tên 5 phút không thắng; đề xuất CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+  trong card claude, Codex/Devin đổi tên sau attest và mỗi lần wake. Lane S (fork) sửa bản ghi repository resource cho Mia Mia.
+
+- 13:53 Vẫn chờ: thầy chưa onboarding Claude Code, R2 chưa về. 4 workflow nivo queued, không terminal nivo nào. Không vá.
+
+- 14:05 Thầy chỉnh: supervisor là poll trong chat, chế độ debug, không có thân xác trong Orca. Trò đã sai khi tạo terminal
+  [Supervisor] cleanup/probe; đã đóng, ghi luật chat-only-debug-mode vào supervise.yaml (`0c9f04b3c`); fork đã theo. Reset --tasks
+  theo lệnh thầy: Orca về 0 task, 0 worker. Merge lane S `6b9d6d565` (repository ở workspace.yaml, không ở _resources); kernel Mia
+  Mia chạy lại prepare. Còn chờ: thầy hoàn tất bước chọn giao diện của Claude Code, và lane R2.
+
+- 14:15 Thầy hoàn tất onboarding Claude Code (hasCompletedOnboarding=true). Khởi động kernel Collab vẫn lỗi create: Orca hết giờ
+  chờ handle, lần này không để lại terminal. Lane R không đổi phần tạo terminal, nên lỗi ở phía Orca với TUI agent tương tác
+  (cmd và claude --version tạo được; claude --model ... thì không), cùng dấu hiệu sự cố Codex 21:45 tối qua. Đã gửi dữ kiện
+  cho R2 (fork). 4 workflow nivo chờ R2.
+
+- 14:03 Vẫn chờ R2 (nhánh chưa có commit mới). 4 workflow nivo queued, không kernel. Không vá.
+
+- 14:13 Vẫn chờ R2. 4 workflow nivo queued. Không vá.
+
+- 14:45 Thầy restart Orca, khoán 8 workflow (nivo 4, miamia 2, starci-next 2). Merge R2 `f24853dd4` (Orca đẩy lệnh claude/codex qua
+  đường UI chờ 10s; thêm tiền tố launch). Vá khởi động Claude: readiness tìm ❯ ở mọi dòng `25f74a785`; attestation theo tên
+  hiển thị "Opus 5.5" `5d110d360`; spinner ✶ của Claude là active `58fc42a60`. 4 kernel nivo lên Opus 5.5 + 4 watchdog. Nhận bàn
+  giao 4 workflow của fork (watchdog của trò, fork đã tắt của họ); đóng 6 terminal lạc. Vá: workspace.manage cutSetAuthority
+  `c3ae4687a` (Mia Mia prepare kẹt CATALOG_DIRTY); owner-gate không job = awaiting-owner `680d1c0b0`; scaffold cutSetAuthority.
+  Chờ thầy: brand + grammar cho StarCi Next FE (inc-d456b748085a); brand Mia Mia đi theo mm-work.
+
+- 14:40 Yên, 8 workflow: 4 nivo worker đầu tiên đang chạy; sn-work và mm-work worker chạy lại sau vá; sn-base chờ thầy (brand,
+  grammar); mm-base giữ 2 job frontend sau owner-gate chờ brand. Không vá.
+
+- 14:45 Tiến triển: nivo AUTH, WSPV, Modules xong scope.define, kernel đang dispatch bước kế; sn-work workspace.manage done (vá R2
+  có tác dụng), chờ settle; mm-work prepare qua slice 1 (cutSetAuthority có tác dụng). Đóng lại terminal nền lạc term_6e3ea4dd (orphaned).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |

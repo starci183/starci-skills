@@ -23,7 +23,6 @@ import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -91,28 +90,6 @@ export const buildWakePrompt = workflow => [
 
 const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(repo), '--workflow', workflowId, '--json']);
 
-// The semantic titles: `[Kernel] <workflow>` and `[Op] <op> · <workflow>`.
-export const kernelTitleOf = workflow => `[Kernel] ${workflow}`;
-export const opTitleOf = (opId, workflow) => `[Op] ${opId} · ${workflow}`;
-export const titleDrifted = (current, expected) => !String(current ?? '').startsWith(expected.split(' · ')[0]);
-function keepTitles(statusValue, kernelTerminal, kernelShown) {
-  const out = [];
-  const fix = (handle, current, expected) => {
-    if (!handle || !titleDrifted(current, expected)) return;
-    const r = terminalRename({ terminal: handle, title: expected });
-    out.push({ terminal: handle, title: expected, ok: r.ok });
-  };
-  try { fix(kernelTerminal, kernelShown?.terminal?.title, kernelTitleOf(workflowId)); } catch { /* presentation only */ }
-  for (const worker of statusValue?.workers ?? []) {
-    if (!worker?.terminalHandle || !worker.opId) continue;
-    try {
-      const shownWorker = terminalShow({ terminal: worker.terminalHandle });
-      if (shownWorker.ok && shownWorker.connected) fix(worker.terminalHandle, shownWorker.terminal?.title, opTitleOf(worker.opId, workflowId));
-    } catch { /* presentation only */ }
-  }
-  return out;
-}
-
 export async function watchdogTick() {
   const status = api('status');
   if (!status.ok || !status.value?.ok) return {
@@ -157,11 +134,6 @@ export async function watchdogTick() {
     };
   }
 
-  // Agent CLIs (Devin, Codex) overwrite the terminal title with their own
-  // session summary ("devin.exe: Kernel orchestration...", "Report task
-  // outcome | nivo-backend"), so the sidebar lost every [Kernel]/[Op] name.
-  // Each repair tick puts the semantic titles back.
-  const titles = repair ? keepTitles(status.value, terminal, shown) : [];
   const read = terminalRead({ terminal, screen: true });
   if (!read.ok) return { ok: false, workflowId, phase, terminal, action: 'terminal-unreadable', error: read.error };
   const screen = classifyKernelScreen(read.screen);

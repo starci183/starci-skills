@@ -984,7 +984,10 @@ function cmdStatus(ledger, args) {
     // Nothing open, but a question is with the owner: the workflow waits on
     // them, not on the Kernel, so nothing should wake it until the answer.
     : wf.phase === 'running' && askReserve.length > 0 ? 'ask-reserve'
-    : wf.phase === 'running' && pendingOwner.length > 0 ? 'awaiting-owner'
+    // An open owner-gate incident waits on the owner too, even with no job to
+    // hold yet (a leg whose first job cannot be enqueued before the owner
+    // decides - a StarCi Next frontend waiting on brand, inc-103f2028ba77).
+    : wf.phase === 'running' && (pendingOwner.length > 0 || ownerGates.length > 0) ? 'awaiting-owner'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
   // A settled result whose law inputs changed is work the Kernel owes now: it
@@ -1013,7 +1016,7 @@ function cmdStatus(ledger, args) {
       : frontierState === 'worker-wedged'
       ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
       : frontierState === 'awaiting-owner'
-      ? `no operation is open and the owner holds ${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')}); the answer wakes the Kernel`
+      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}; the answer or api incident --resolve wakes the Kernel`
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
