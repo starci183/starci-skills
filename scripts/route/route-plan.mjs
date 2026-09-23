@@ -176,7 +176,7 @@ const ARCHETYPE_STAR = {
     },
   },
   // Specification only: canonical Work from its source, SRS, SDS, stacks. The
-  // workspace.manage setup record is the scope and the reconstructed roots are
+  // workspace.manage setup entry on the catalog is the scope and the reconstructed roots are
   // the delivery review.verify reads. A brand-intent prompt adds brand.decide
   // (archetypes.yaml conditionalLegs); a settled brand record drops it again.
   'spec-foundation': {
@@ -591,7 +591,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
     if (hints.scopeProducer && v.family === 'scope') {
       const producer = ensureLeg(hints.scopeProducer);
       edges.push([producer.legId, consumerLeg.legId]);
-      consumerLeg.needsSatisfiedBy.push(`${producer.legId} (its setup scope record bounds the goal)`);
+      consumerLeg.needsSatisfiedBy.push(`${producer.legId} (its setup entry on the catalog bounds the goal)`);
       return true;
     }
     if (hints.scopeProvided && v.family === 'scope') {

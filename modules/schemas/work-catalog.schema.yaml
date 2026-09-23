@@ -52,7 +52,153 @@ properties:
           $ref: "#/$defs/prose"
           description: What the feature is about, in one sentence. It is the entry a person scanning the
             catalog reads; the feature record repeats nothing it does not own.
+  extensions:
+    type: object
+    additionalProperties: false
+    description: Declarations that belong to a numbered extension of the Work model rather than to this
+      family's own vocabulary.
+    properties:
+      work3:
+        type: object
+        additionalProperties: false
+        properties:
+          setup:
+            type: object
+            description: The workspace.manage setup records, keyed by the workflow id that ran them. Each value
+              holds one entry per mode that workflow ran, so a workflow that imports and later declares
+              stacks keeps both entries side by side.
+            propertyNames:
+              pattern: ^wf-[a-z0-9]+(?:-[a-z0-9]+)*$
+            additionalProperties:
+              $ref: "#/$defs/workflowSetup"
 $defs:
+  workflowSetup:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: One workflow's setup entries, one per workspace.manage mode it ran.
+    properties:
+      prepare:
+        $ref: "#/$defs/setup"
+      import:
+        $ref: "#/$defs/setup"
+      stacks:
+        $ref: "#/$defs/setup"
+  setup:
+    type: object
+    additionalProperties: false
+    required: [request, assertions]
+    description: "The setup record one workspace.manage mode writes for one workflow - the scope it bounds
+      and the review that settled it. The workflow id is the key above it, so request carries no workflow
+      field. request, nodes, deps, exclusions and openQuestions use the field names and shapes of
+      work-feature.schema.yaml $defs.scope (tests/scope-define-layout.spec.mjs keeps them identical).
+      There is no state: a catalog is never done or todo, and the mode's completion is the kernel's
+      settled verdict on its job; review records the outcome and the checks that verdict rests on."
+    properties:
+      request:
+        type: object
+        additionalProperties: false
+        required: [goalIdentity, goalRevision, outcome]
+        description: The approved goal identity and revision this setup bounds, with its outcome and effect
+          ceiling.
+        properties:
+          goalIdentity: {type: string, minLength: 1}
+          goalRevision: {type: integer, minimum: 0}
+          source: {type: string, minLength: 1}
+          outcome: {$ref: "#/$defs/prose"}
+          effectCeiling:
+            anyOf:
+              - {$ref: "#/$defs/prose"}
+              - {type: array, minItems: 1, items: {$ref: "#/$defs/prose"}}
+          completionCriteria: {type: array, items: {$ref: "#/$defs/prose"}}
+      description:
+        $ref: "#/$defs/prose"
+        description: The readable setup statement; an import states its pilot boundary, observed source
+          mapping, approved intent, candidate scope and unknowns here.
+      refs:
+        type: array
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+        description: Resource and record ids the setup binds, such as repository:<id> and import:<id>.
+      assertions:
+        type: array
+        minItems: 1
+        items: {$ref: "#/$defs/prose"}
+        description: The scope-review, migration or stacks assertions the mode's review proves.
+      nodes:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [id]
+          properties:
+            id: {type: string, minLength: 1}
+            kind: {type: string, minLength: 1}
+            path: {type: string, minLength: 1}
+            purpose: {$ref: "#/$defs/prose"}
+            grounding: {type: array, items: {type: string, minLength: 1}}
+            dependsOn: {type: array, items: {type: string}}
+      deps:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [from, to]
+          properties:
+            from: {type: string, minLength: 1}
+            to: {type: string, minLength: 1}
+            reason: {$ref: "#/$defs/prose"}
+      exclusions:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [reason]
+          properties:
+            subject: {type: string, minLength: 1}
+            path: {type: string, minLength: 1}
+            reason: {$ref: "#/$defs/prose"}
+      openQuestions:
+        type: array
+        items:
+          anyOf:
+            - {$ref: "#/$defs/prose"}
+            - type: object
+              additionalProperties: false
+              required: [question]
+              properties:
+                id: {type: string, minLength: 1}
+                question: {$ref: "#/$defs/prose"}
+                status: {type: string, minLength: 1}
+                resolution: {$ref: "#/$defs/prose"}
+      nativeGoal:
+        type: string
+        minLength: 1
+        description: The goal reference an actual host goal tool returned, only when the owner asked for one.
+      migration:
+        type: object
+        additionalProperties: false
+        required: [pilot, cleanup]
+        description: Import only - the pilot feature and what happened to the old artifact directory.
+        properties:
+          pilot: {$ref: "#/$defs/slug"}
+          cleanup:
+            enum: [not-requested, removed, blocked]
+          cleanupTarget: {type: string, minLength: 1}
+          cleanupAssertions: {type: array, items: {$ref: "#/$defs/prose"}}
+      review:
+        type: object
+        additionalProperties: false
+        required: [outcome, checks]
+        description: The mode's review outcome and the check names its report carried; the evidence bundle
+          is evidence/<workflow>.<mode>/ beside the catalog.
+        properties:
+          outcome:
+            enum: [pass, fail, not-run, inconclusive]
+          checks:
+            type: array
+            minItems: 1
+            items: {type: string, minLength: 1}
   prose:
     type: string
     minLength: 1

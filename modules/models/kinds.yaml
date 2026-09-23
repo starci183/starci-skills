@@ -801,8 +801,8 @@ kinds:
     writes: [record]
     knowledge: []
     checks: [scripts/checks/check-scoped-lint.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/node@1]
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-feature.schema.yaml, modules/schemas/work-catalog.schema.yaml, modules/schemas/work-layout.yaml]
+    carries: [work/feature@1, work/catalog@1]
     purpose: Retire exactly the selected scope - a scoped metadata decision that preserves live consumers and required evidence, with destructive effects only where separately authorised.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -818,8 +818,8 @@ kinds:
     writes: [record]
     knowledge: [application-stacks]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
-    carries: [work/workspace@1, work/catalog@1, work/feature@1, work/resource@1, work/node@1, starci/source-identity@1]
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-catalog.schema.yaml, modules/schemas/work-layout.yaml]
+    carries: [work/workspace@1, work/catalog@1, work/feature@1, work/resource@1, starci/source-identity@1]
     purpose: Create or reconstruct one canonical workspace from a purpose or a selected existing source - verified bindings, preserved provenance, validated scope.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
