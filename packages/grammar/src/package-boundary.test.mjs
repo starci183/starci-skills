@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
+import { execSync } from "node:child_process"
 import { readdir, readFile, stat } from "node:fs/promises"
 import test from "node:test"
+import { fileURLToPath } from "node:url"
 
 const packageUrl = new URL("../package.json", import.meta.url)
 
@@ -112,4 +114,32 @@ test("Offset Pop's stylesheet layers over Common alone", async () => {
     }
     assert.equal(imports.some((specifier) => /core|heritage/.test(specifier)), false)
     assert.match(css, /@layer starci-grammar-offset-pop\s*\{/)
+})
+
+/** Storybook stories, test helpers, specs and tests are development-only; none of them may ship. */
+const DEV_ONLY = /(?:^|\/)(?:stories|__test__)\/|\.(?:stories|spec|test)\./
+
+test("dist holds no stories, test helpers, specs or tests", async () => {
+    const files = await walk(new URL("dist/", packageRoot))
+    assert.deepEqual(files.filter((file) => DEV_ONLY.test(file)), [])
+    assert.deepEqual((await readdir(new URL("dist/", packageRoot))).sort(), ["common", "core", "heritage", "offset-pop"])
+})
+
+/** The published file list: package.json, README, LICENSE, and each family's compiled modules and CSS. */
+const INTENDED = /^(?:package\.json|README\.md|LICENSE|dist\/(?:common|core|heritage|offset-pop)\/(?:[\w-]+\/)*[\w-]+(?:\.[\w-]+)*(?:\.js|\.js\.map|\.d\.ts|\.d\.ts\.map|\.css))$/
+
+test("npm pack ships only the intended files, and all of dist", async (t) => {
+    const output = execSync("npm pack --dry-run --json --ignore-scripts", {
+        cwd: fileURLToPath(packageRoot),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    })
+    const [pack] = JSON.parse(output)
+    const packed = pack.files.map((file) => file.path.replaceAll("\\", "/")).sort()
+    t.diagnostic(`${pack.entryCount} files, ${pack.size} B packed, ${pack.unpackedSize} B unpacked`)
+    assert.deepEqual(packed.filter((file) => !INTENDED.test(file)), [], "unintended files in the tarball")
+    assert.deepEqual(packed.filter((file) => DEV_ONLY.test(file)), [], "development-only files in the tarball")
+    for (const file of ["package.json", "README.md", "LICENSE"]) assert.ok(packed.includes(file), `tarball misses ${file}`)
+    const dist = (await walk(new URL("dist/", packageRoot))).map((file) => `dist/${file}`)
+    assert.deepEqual(dist.filter((file) => !packed.includes(file)), [], "built files missing from the tarball")
 })
