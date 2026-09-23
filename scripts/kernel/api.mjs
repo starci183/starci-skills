@@ -47,7 +47,7 @@ import {
   AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
 } from '../../engine/admission.mjs';
 import {
-  activeDelegation, allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
+  activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
@@ -3745,6 +3745,18 @@ function reapIfStillLive(db, job, payload, handle) {
 }
 
 /* ------------------------------------------------------------- serve-ask */
+function ensureAskConnectors() {
+  let cf = null;
+  try { cf = connectorsConfig()?.cloudflare ?? null; } catch { return null; }
+  if (!cf || cf.mode === 'off') return null;
+  const start = (name) => {
+    const r = spawnSync(process.execPath, [path.join(skillRoot, 'scripts', 'connectors', name), 'start'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+    try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, status: r.status }; }
+  };
+  const gateway = start('ask-gateway.mjs'), tunnel = start('tunnel.mjs');
+  return { gateway: gateway?.ok === true, tunnel: tunnel?.ok === true, publicBase: tunnel?.publicBase ?? null };
+}
+
 // `serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>]`: launch the
 // owner-facing ask form (scripts/kernel/serve-ask.mjs) detached. A StarCi
 // Next Kernel held an ask-reserve for an hour (inc-2558dd227dfd): status told
@@ -3758,11 +3770,15 @@ function cmdServeAsk(ledger, args, repo) {
   if (dispatchId && !db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId)) {
     throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
   }
+  // With a tunnel configured, the owner answers through response.<domain>:
+  // the Kernel keeps the gateway and tunnel up itself (both starts are
+  // idempotent) instead of waiting for someone to launch them.
+  const connectors = ensureAskConnectors();
   const script = path.join(skillRoot, 'scripts', 'kernel', 'serve-ask.mjs');
   const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
   const child = spawn(process.execPath, argv, { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot });
   child.unref();
-  const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/serve-ask.mjs' };
+  const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/serve-ask.mjs', ...(connectors ? { connectors } : {}) };
   emit(out, `serve-ask launched for ${workflowId}${dispatchId ? ` dispatch ${dispatchId}` : ''} (pid ${out.pid}); status shows ask-serving once the form binds`, args.json);
 }
 
