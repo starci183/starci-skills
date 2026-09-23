@@ -18,6 +18,8 @@
 //   reconcile --repo <path> --job <job_id> [--retry-lineage]
 //   nudge    --repo <path> --job <job_id>
 //   observe  --repo <path> --job <job_id> [--lines <n>]
+//   questions --repo <path> --workflow <id>
+//   reply    --repo <path> --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
 //   settle   --repo <path> --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
 //   report   --repo <path> --job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]
 //   op-contract --repo <path> --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
@@ -53,7 +55,7 @@ import { commitPolicyOf, landedProof, policyCommits, policyPushes } from './sett
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
-  awaitSubmission, awaitAttestation,
+  awaitSubmission, awaitAttestation, loadAdapter,
 } from '../agent/lib.mjs';
 import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
@@ -61,7 +63,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
-import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -81,6 +83,8 @@ import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
+import { orchInbox } from '../api/orca/orch-inbox.mjs';
+import { orchReply } from '../api/orca/orch-reply.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -169,6 +173,8 @@ const usage = (code) => {
   reconcile --job <job_id> [--retry-lineage | --drop --reason <text>]
   nudge    --job <job_id>
   observe  --job <job_id> [--lines <n>]
+  questions --workflow <id>
+  reply    --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
   settle   --job <job_id> --verdict <pass|fail|blocked> [--report <path>]
   report   --job <job_id> --report <file> [--outcome <${REPORT_OUTCOMES.join("|")}>]
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
@@ -188,7 +194,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -308,12 +314,57 @@ const retryLineageFor = (db, { workflowId, op, cut, attempt }) => {
     .get(workflowId, op, attempt);
   return priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob)) : null;
 };
+/**
+ * The cut set {workflowId, op, cut.id} as the ledger holds it now: the latest job (highest attempt) of each
+ * ordinal 1..cut.total and the ordinals whose latest job has not settled succeeded. `ownJobId` counts as
+ * passed for its own ordinal - it is the job being settled. Ordinals settle in any order once the seam
+ * passed, so "final" is not ordinal === total: the pass that leaves no other ordinal open is the one that
+ * CLOSES the set, whichever ordinal it is (inc-751dd1ac4492: ordinal total could pass while a lower sibling
+ * was still running, and the last sibling to settle then passed on slice checks alone, so no ordinal ever
+ * ran the whole-set integration gate).
+ */
+const cutSetStateOf = (db, { workflowId, op, cut, ownJobId = null }) => {
+  const rows = db.prepare(`SELECT job_id,status,attempt,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY attempt`).all(workflowId, op, String(cut.id));
+  const latest = new Map();
+  for (const row of rows) latest.set(Number(row.ordinal), row);
+  const own = rows.find((row) => row.job_id === ownJobId);
+  const ordinals = Array.from({ length: Math.max(0, Number(cut.total) || 0) }, (_, i) => i + 1);
+  const open = ordinals.filter((n) => !(own && Number(own.ordinal) === n) && latest.get(n)?.status !== 'succeeded');
+  return {
+    id: String(cut.id), op, total: Number(cut.total),
+    passed: ordinals.filter((n) => !open.includes(n)),
+    open,
+    jobs: Object.fromEntries(ordinals.filter((n) => latest.has(n)).map((n) => [n, { jobId: latest.get(n).job_id, status: latest.get(n).status }])),
+  };
+};
+const CUT_SLICE_CHECKS = ['cut-slice-postcondition', 'cut-regression-inventory'];
+const CUT_SET_CLOSING_CHECK = 'full-regression-final';
 const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?.managed?.agentTerminalHandle
   ?? payload?.orca?.agentTerminalHandle
   ?? payload?.hierarchy?.runtime?.terminalHandle
   ?? (payload?.managed ? null : row?.worker_id)
   ?? null;
-const observeOperationWorker = (job, now = Date.now()) => {
+// What the runtime typed into an operation's terminal (the contract row, plus
+// the exact delivered text dispatch recorded) and how the worker's provider
+// renders a staged paste (its card's submission.stagedPattern). The classifier
+// needs both to tell an unsubmitted paste from a running turn: a Devin worker's
+// inline contract sat in its input box for 13 minutes and read `active` from
+// the words it contains (inc-06aeecf432f1).
+const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
+  const row = db?.prepare('SELECT markdown,context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+    .get(job.workflow_id, job.op_id ?? payload.opId ?? null, job.attempt) ?? null;
+  const context = parseJson(row?.context_json ?? '', {}) ?? {};
+  const sentText = [context.delivery?.text, row?.markdown].filter((text) => typeof text === 'string' && text).join('\n') || null;
+  const provider = payload.provider ?? payload.agent ?? null;
+  const cardPattern = provider ? loadAdapter(provider)?.card?.submission?.stagedPattern : null;
+  let stagedPattern = DEFAULT_STAGED_PATTERN;
+  if (typeof cardPattern === 'string' && cardPattern.trim()) {
+    try { stagedPattern = new RegExp(`${DEFAULT_STAGED_PATTERN.source}|${cardPattern}`, 'i'); } catch { /* the default still holds */ }
+  }
+  return { sentText, stagedPattern };
+};
+const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
   if (!terminalHandle) return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null, liveness: 'unknown', reason: 'operation terminal handle unavailable', observedAt: now };
   try {
@@ -325,12 +376,13 @@ const observeOperationWorker = (job, now = Date.now()) => {
     if (shown?.ok && connected && writable) {
       try {
         const read = terminalRead({ terminal: terminalHandle, screen: true });
-        if (read?.ok) screenState = classifyAgentScreen(read.screen).state;
+        if (read?.ok) screenState = classifyAgentScreen(read.screen, db ? stagedInputEvidenceOf(db, job) : {}).state;
       } catch { /* terminal-show fallback below remains conservative */ }
     }
     const stale = staleAwareState(screenState, outputAgeMs, ACTIVE_STALE_MS);
     const liveness = !shown?.ok ? 'unknown'
       : !connected || !writable ? 'disconnected'
+      : screenState === 'staged-input' ? 'staged-input'
       : screenState === 'wedged' ? 'wedged'
       : stale.staleActive ? 'turn-idle'
       : screenState === 'active' ? 'active'
@@ -368,10 +420,11 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
     const state = staleAwareState(classifyAgentScreen(read.screen).state, outputAgeMs, ACTIVE_STALE_MS).state;
     // A queued message waits for Enter: deliver it; it already asks the
-    // Kernel to act, and it reads status first.
-    if (state === 'queued-input') {
+    // Kernel to act, and it reads status first. A staged paste is submitted
+    // the same way, never buried under a second wake (inc-06aeecf432f1).
+    if (state === 'queued-input' || state === 'staged-input') {
       const sent = terminalSend({ terminal, text: '', enter: true });
-      return { action: sent?.ok ? 'kernel-queued-input-sent' : 'kernel-wake-failed', terminal, state };
+      return { action: sent?.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state };
     }
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
     const prompt = [
@@ -414,7 +467,7 @@ function cmdNudge(ledger, args) {
     emit(out, `nudge skipped for ${jobId}: report already filed (${report.outcome})`, args.json);
     return;
   }
-  const worker = observeOperationWorker(job);
+  const worker = observeOperationWorker(job, Date.now(), db);
   if (!worker.terminalHandle || !worker.connected || !worker.writable) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker };
     emit(out, `nudge REFUSED for ${jobId}: exact worker is unavailable`, args.json);
@@ -423,6 +476,26 @@ function cmdNudge(ledger, args) {
   if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') {
     const out = { ok: true, jobId, nudged: false, reason: 'worker-active', worker };
     emit(out, `nudge skipped for ${jobId}: exact worker is active`, args.json);
+    return;
+  }
+  // A staged, unsubmitted paste (the dispatch contract still in the input
+  // row) is not started work and not an idle prompt: typing a wake on top of
+  // it would bury it. One Enter-only send submits exactly what is there
+  // (inc-06aeecf432f1; the dispatch-time twin is scripts/agent/lib.mjs
+  // awaitSubmission).
+  if (worker.liveness === 'staged-input') {
+    const sent = terminalSend({ terminal: worker.terminalHandle, text: '', enter: true });
+    if (!sent.ok) {
+      const out = { ok: false, jobId, nudged: false, reason: 'terminal-send-failed', worker, error: sent.error };
+      emit(out, `nudge FAILED for ${jobId}: ${sent.error ?? 'terminal send failed'}`, args.json);
+      process.exit(1);
+    }
+    ledger.transaction(() => ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, action: 'submit-staged-input' },
+    }));
+    const out = { ok: true, jobId, nudged: true, action: 'submit-staged-input', worker, receipt: sent.receipt ?? null };
+    emit(out, `nudged ${jobId}: submitted the staged input on exact worker ${worker.terminalHandle} with one Enter`, args.json);
     return;
   }
   if (worker.liveness === 'interactive-gate' || worker.liveness === 'failed') {
@@ -451,7 +524,7 @@ function cmdNudge(ledger, args) {
     workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
     kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}) },
   }));
-  const out = { ok: true, jobId, nudged: true, worker, receipt: sent.receipt ?? null };
+  const out = { ok: true, jobId, nudged: true, action: 'wake', worker, receipt: sent.receipt ?? null };
   emit(out, `nudged ${jobId}: resumed exact worker ${worker.terminalHandle} to file its durable report`, args.json);
 }
 
@@ -465,7 +538,7 @@ function cmdNudge(ledger, args) {
 // 'op-observed' event (handle, turnState, screen byte length — the screen
 // itself stays out of the ledger).
 const OBSERVE_SCREEN_LINES = 80;
-const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle' };
+const OBSERVE_TURN_STATES = { active: 'active', wedged: 'wedged', 'turn-idle': 'turn-idle', 'interactive-gate': 'turn-idle', 'staged-input': 'staged-input' };
 function cmdObserve(ledger, args) {
   const db = ledger.db, jobId = args.job, now = Date.now();
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
@@ -504,7 +577,7 @@ function cmdObserve(ledger, args) {
     catch (error) { read = { ok: false, error: String(error?.message ?? error) }; }
     if (!read?.ok) turnState = 'unreadable';
     else {
-      screenState = classifyAgentScreen(read.screen).state;
+      screenState = classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
       const stale = staleAwareState(screenState, terminal.idleMs, ACTIVE_STALE_MS);
       turnState = OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
       if (stale.staleActive) terminal.livenessReason = 'stale-active';
@@ -523,6 +596,162 @@ function cmdObserve(ledger, args) {
     ...(screen == null ? [] : [screen]),
   ].join('\n'), args.json);
 }
+/* ------------------------------------------------------ worker questions */
+// Orca's managed preamble tells every worker to reach its coordinator with
+// `orca orchestration ask`, and the coordinator of a workflow Run is the
+// Kernel terminal - which may not call Orca. With no api verb to read or
+// answer those messages, a StarCi Next backend.scaffold cut sat waiting on an
+// ESLint question and a seam retry waited on a background ask, both
+// unanswered while status said engaged (inc-b944cbaef24b, inc-20449a260df8);
+// 83 of 87 question messages in the host inbox had no reply. The op contract
+// still says an op files `api report --outcome ask` (modules/ops/_common.yaml),
+// but the runtime never strands a worker that asked through Orca instead:
+// status projects its question as actionable, `api questions` bridges it into
+// the ledger inbox (kind worker-question), and `api reply` answers it through
+// scripts/api/orca/orch-reply.mjs - a technical answer inside the job's
+// authority, or --to-owner, which tells the worker to file the question as an
+// outcome ask so serve-ask carries it to the owner.
+const ORCHESTRATION_INBOX_LIMIT = 1000;
+const WORKER_QUESTION = 'worker-question';
+const OWNER_ROUTED_REPLY = [
+  'This question needs the owner, and an Orca ask never reaches them.',
+  'Do not wait for a reply here: write your report.json with outcome ask and question {text, options},',
+  'file it with api report exactly as your contract says, and end your turn.',
+  'The Kernel serves the question to the owner (serve-ask) and re-enqueues this operation with the answer bound.',
+].join(' ');
+const workflowRunIdsOf = (db, workflowId) => {
+  const ids = new Set();
+  for (const row of db.prepare('SELECT payload_json FROM jobs WHERE workflow_id=?').all(workflowId)) {
+    const payload = jobPayloadOf(row);
+    for (const id of [payload.orca?.runId, payload.managed?.runId, payload.hierarchy?.runtime?.runId]) if (id) ids.add(String(id));
+  }
+  return ids;
+};
+const jobDispatchIdsOf = (db, job) => {
+  const payload = jobPayloadOf(job);
+  return new Set([payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, contractDispatchIdOf(db, job)].filter(Boolean));
+};
+/**
+ * The workflow's worker questions: Orca `question` rows of its Runs (read through the non-consuming
+ * inbox wrapper) joined to the job that asked, plus the worker-question rows already bridged into the
+ * ledger inbox. A question is pending while its job is open, no reply is threaded onto it in Orca and
+ * its ledger row (if any) is still pending. Reads only; `api questions` is the writer.
+ */
+const workerQuestionsOf = (db, workflowId) => {
+  const rows = db.prepare('SELECT inbox_id,key,payload_json,status FROM inbox WHERE workflow_id=? AND kind=? ORDER BY inbox_id').all(workflowId, WORKER_QUESTION);
+  const ledgerRow = new Map(rows.map((row) => [row.key, row]));
+  const jobs = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
+  const runIds = workflowRunIdsOf(db, workflowId);
+  const seen = new Map();
+  let error = null;
+  if (runIds.size) {
+    let listed;
+    try { listed = orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT }); }
+    catch (e) { listed = { ok: false, error: String(e?.message ?? e), messages: [] }; }
+    if (!listed.ok) error = listed.error ?? 'orchestration inbox unreadable';
+    const messages = listed.messages.filter((message) => runIds.has(String(message.run_id)));
+    const repliedTo = new Set(messages.filter((message) => message.thread_id && message.thread_id !== message.id).map((message) => message.thread_id));
+    for (const message of messages.filter((item) => item.type === 'question')) {
+      const body = parseJson(message.payload ?? '', {}) ?? {};
+      const from = String(message.from_handle ?? '');
+      const dispatchId = body.dispatchId ?? (from.startsWith('dispatch:') ? from.slice('dispatch:'.length) : null);
+      const job = jobs.find((row) => (dispatchId && jobDispatchIdsOf(db, row).has(dispatchId))
+        || (from && operationTerminalHandleOf(row) === from)) ?? null;
+      seen.set(message.id, {
+        messageId: message.id, runId: message.run_id ?? null, jobId: job?.job_id ?? null, opId: job?.op_id ?? null,
+        attempt: job?.attempt ?? null, jobStatus: job?.status ?? null, dispatchId, taskId: body.taskId ?? null,
+        question: String(body.question ?? message.body ?? ''), options: Array.isArray(body.options) ? body.options : [],
+        subject: message.subject ?? null, askedAt: message.created_at ?? null, repliedInOrca: repliedTo.has(message.id),
+      });
+    }
+  }
+  // A bridged question the host inbox no longer lists (it scrolled past the
+  // read limit) is still the ledger's to answer.
+  for (const row of rows) {
+    if (seen.has(row.key)) continue;
+    const stored = parseJson(row.payload_json, {}) ?? {};
+    const job = stored.jobId ? jobs.find((item) => item.job_id === stored.jobId) : null;
+    seen.set(row.key, { ...stored, jobStatus: job?.status ?? null, repliedInOrca: false });
+  }
+  const questions = [...seen.values()].map((item) => {
+    const row = ledgerRow.get(item.messageId) ?? null;
+    const open = Boolean(item.jobId) && !FINAL_SETTLED.includes(item.jobStatus);
+    const state = row && row.status !== 'pending' ? 'answered'
+      : item.repliedInOrca ? 'replied-elsewhere'
+      : !item.jobId ? 'unmatched'
+      : !open ? 'job-settled'
+      : 'pending';
+    return { ...item, bridged: Boolean(row), state };
+  });
+  return { questions, pending: questions.filter((item) => item.state === 'pending'), error };
+};
+
+function cmdQuestions(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow;
+  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const { questions, pending, error } = workerQuestionsOf(db, workflowId);
+  let bridged = 0, closed = 0;
+  ledger.transaction(() => {
+    const now = Date.now();
+    for (const item of pending.filter((q) => !q.bridged)) {
+      const { state, bridged: _b, jobStatus, repliedInOrca, ...stored } = item;
+      db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?, 'pending',?)")
+        .run(workflowId, WORKER_QUESTION, item.messageId, JSON.stringify(stored), now);
+      ledger.appendEvent({ workflowId, entityType: 'job', entityId: item.jobId, kind: 'worker-question-bridged',
+        payload: { messageId: item.messageId, dispatchId: item.dispatchId, runId: item.runId } });
+      bridged += 1;
+    }
+    // A bridged question whose worker is gone, or that someone answered in
+    // Orca directly, no longer waits on the Kernel.
+    for (const item of questions.filter((q) => q.bridged && ['job-settled', 'replied-elsewhere'].includes(q.state))) {
+      closed += db.prepare("UPDATE inbox SET status='done', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND key=? AND status='pending'")
+        .run(JSON.stringify({ reason: item.state }), now, workflowId, WORKER_QUESTION, item.messageId).changes;
+    }
+  });
+  const out = { ok: true, workflowId, bridged, closed, pending: workerQuestionsOf(db, workflowId).pending, ...(error ? { error } : {}) };
+  emit(out, [
+    `questions ${workflowId}: ${out.pending.length} pending worker question(s) (bridged ${bridged}, closed ${closed})${error ? ` — host inbox unreadable: ${error}` : ''}`,
+    ...out.pending.map((q) => `  ${q.messageId} ${q.jobId} (${q.opId} a${q.attempt}): ${q.question}${q.options.length ? ` [${q.options.join(' | ')}]` : ''}`),
+  ].join('\n'), args.json);
+}
+
+function cmdReply(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow, messageId = args.message;
+  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const toOwner = Boolean(args['to-owner']);
+  if (!toOwner && !(typeof args.body === 'string' && args.body.trim())) {
+    throw Object.assign(new Error('reply needs --body <answer> or --to-owner'), { code: 'reply-body-missing' });
+  }
+  const item = workerQuestionsOf(db, workflowId).questions.find((q) => q.messageId === messageId);
+  if (!item) throw Object.assign(new Error(`no worker question ${messageId} in ${workflowId}'s Runs`), { code: 'question-unknown' });
+  if (item.state !== 'pending') {
+    throw Object.assign(new Error(`worker question ${messageId} is ${item.state}; nothing waits on this reply`), { code: `question-${item.state}` });
+  }
+  const body = toOwner ? `${OWNER_ROUTED_REPLY}${args.body ? ` Kernel note: ${args.body}` : ''}` : String(args.body);
+  const sent = orchReply({ id: messageId, body, run: item.runId });
+  if (!sent.ok) {
+    const out = { ok: false, workflowId, messageId, jobId: item.jobId, reason: 'reply-failed', error: sent.error ?? sent.outcome };
+    emit(out, `reply FAILED for ${messageId}: ${out.error}`, args.json);
+    process.exit(1);
+  }
+  ledger.transaction(() => {
+    const now = Date.now();
+    const disposition = JSON.stringify({ reply: body, toOwner, at: now });
+    const { state, bridged, jobStatus, repliedInOrca, ...stored } = item;
+    if (bridged) {
+      db.prepare('UPDATE inbox SET status=\'applied\', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND key=?')
+        .run(disposition, now, workflowId, WORKER_QUESTION, messageId);
+    } else {
+      db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,disposition_json,created_at,applied_at) VALUES(?,?,?,?, 'applied',?,?,?)")
+        .run(workflowId, WORKER_QUESTION, messageId, JSON.stringify(stored), disposition, now, now);
+    }
+    ledger.appendEvent({ workflowId, entityType: 'job', entityId: item.jobId, kind: 'worker-question-answered',
+      payload: { messageId, dispatchId: item.dispatchId, runId: item.runId, toOwner } });
+  });
+  const out = { ok: true, workflowId, messageId, jobId: item.jobId, toOwner, body };
+  emit(out, `replied to ${messageId} (${item.jobId})${toOwner ? ': routed to the owner through outcome ask' : ''}`, args.json);
+}
+
 const AGENT_HIERARCHY_SCHEMA = 'starci/agent-hierarchy@1';
 const workflowNodeId = (workflowId) => `workflow:${workflowId}`;
 const kernelNodeId = (workflowId) => `agent:kernel:${workflowId}`;
@@ -653,7 +882,7 @@ function cmdSurvey(ledger, args) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'ask-reserve', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'ask-reserve', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -875,7 +1104,7 @@ function cmdStatus(ledger, args) {
       AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
     .all(workflowId, ...FINAL_SETTLED)
     .filter((job) => job.status === 'running' || operationTerminalHandleOf(job))
-    .map((job) => observeOperationWorker(job, now));
+    .map((job) => observeOperationWorker(job, now, db));
   const openOperations = db.prepare(`SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel'
       AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')})`).get(workflowId, ...FINAL_SETTLED).n;
   // Operations the Kernel can move right now with no wait at all: a queued job
@@ -981,14 +1210,25 @@ function cmdStatus(ledger, args) {
     const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(report.job_id);
     return row && ['running', 'answering'].includes(row.status);
   }).map((report) => report.job_id);
-  const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
+  const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker whose turn has run past WEDGE_MINUTES on one shell command that
   // still shows no output (terminal-liveness.mjs) is stuck, not busy.
   const wedgedWorkers = workers.filter((worker) => worker.liveness === 'wedged');
+  // A worker that asked its coordinator through `orca orchestration ask` waits
+  // on the Kernel until `api reply` answers (inc-b944cbaef24b). The host inbox
+  // is read only when a live operation terminal exists - the same condition
+  // under which the worker projection above already reads the host.
+  const workerAsks = workers.some((worker) => worker.terminalHandle)
+    ? workerQuestionsOf(db, workflowId)
+    : { pending: db.prepare("SELECT key,payload_json FROM inbox WHERE workflow_id=? AND kind=? AND status='pending'").all(workflowId, WORKER_QUESTION)
+      .map((row) => ({ ...(parseJson(row.payload_json, {}) ?? {}), messageId: row.key, bridged: true, state: 'pending' }))
+      .filter((item) => item.jobId && workers.some((worker) => worker.jobId === item.jobId)), error: null };
+  const workerQuestions = workerAsks.pending.map(({ messageId, jobId, opId, attempt, question, options, askedAt, bridged }) => ({ messageId, jobId, opId, attempt, question, options, askedAt, bridged }));
   const frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
     : settleReady.length > 0 ? 'settle-ready'
+    : workerQuestions.length > 0 ? 'worker-question'
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : wedgedWorkers.length > 0 ? 'worker-wedged'
     : openOperations > 0 ? 'engaged'
@@ -1015,13 +1255,16 @@ function cmdStatus(ledger, args) {
     staleOperations,
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
+    workerQuestionJobs: [...new Set(workerQuestions.map((item) => item.jobId))],
     wedgedJobs: wedgedWorkers.map((worker) => worker.jobId),
     settleReadyJobs: settleReady,
     askReserveDispatches: askReserve,
     queued,
     queuedCauses,
     reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged'].includes(frontierState))
-      ? `unanswered ask(s) ${askReserve.join(', ')} have no live form (never served or the serve-ask ttl expired); re-serve each with scripts/kernel/serve-ask.mjs --dispatch <id> before yielding`
+      ? `unanswered ask(s) ${askReserve.join(', ')} have no live form (never served or the serve-ask ttl expired); re-serve each with api serve-ask --workflow <id> --dispatch <id> before yielding`
+      : frontierState === 'worker-question'
+      ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked the coordinator through orca orchestration ask and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
       : frontierState === 'settle-ready'
       ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
       : frontierState === 'worker-wedged'
@@ -1031,23 +1274,38 @@ function cmdStatus(ledger, args) {
       : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
-        ? 'one or more exact running workers are at an idle provider prompt without a report; Kernel must call api nudge for each listed job now'
+        ? 'one or more exact running workers are at an idle provider prompt, or hold an unsubmitted paste in their input row, without a report; Kernel must call api nudge for each listed job now (a staged paste gets one Enter)'
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : staleReady.length > 0
         ? `settled ${staleReady.map(staleLabel).join(', ')} read inputs that changed since dispatch; re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding`
       : null,
   };
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, ...stale };
+  // Open cut sets and which ordinal's pass closes each: that pass is the one
+  // `api settle` holds to full-regression-final, so the Kernel runs the whole-set
+  // integration gate before it (inc-751dd1ac4492). A set with one open ordinal
+  // names it; ordinals settle out of order, so it need not be the highest.
+  const cutSets = [];
+  for (const row of workflowJobs) {
+    const cut = jobPayloadOf(row).cut;
+    if (!cut?.id || !row.op_id || cutSets.some((set) => set.op === row.op_id && set.id === String(cut.id))) continue;
+    const set = cutSetStateOf(db, { workflowId, op: row.op_id, cut });
+    if (!set.open.length) continue;
+    cutSets.push({ op: row.op_id, id: set.id, total: set.total, passed: set.passed, open: set.open, jobs: set.jobs,
+      ...(set.open.length === 1 ? { closingOrdinal: set.open[0], closingJob: set.jobs[set.open[0]]?.jobId ?? null, closingCheck: CUT_SET_CLOSING_CHECK } : {}) });
+  }
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, ...stale };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
-      ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} has no live form; re-serve: node ${path.join(skillRoot, 'scripts', 'kernel', 'serve-ask.mjs')} --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
+      ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
+      ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} has no live form; re-serve: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
       ...staleOperations.map((item) => `  stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
+      ...cutSets.map((set) => `  cut-set: ${set.op} ${set.id} passed ${set.passed.length}/${set.total}, open ${set.open.join(',')}${set.closingOrdinal ? ` — the pass of ordinal ${set.closingOrdinal}${set.closingJob ? ` (${set.closingJob})` : ''} closes it and records ${set.closingCheck}` : ''}`),
     ].join('\n'),
     args.json);
 }
@@ -1734,11 +1992,12 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
   `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> (--all|-- <files>)`,
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
-  `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory.`,
+  `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Your own state lives in files under owned_paths, never in your memory.`,
   `reporting: your answer is a starci/op-report@1 JSON envelope — report.json on disk (the artifact) filed into the ledger (the durable signal):`,
   `  {"outcome":"${REPORT_OUTCOMES.join("|")}","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
   `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
   `  run/task/dispatch/from are stamped by the api — never write another job's identity.`,
+  `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
   ...(policyCommits(opCommitPolicy(packet.op)) ? [`  your op commits (commitPolicy): on done|partial add "head": the output of \`git rev-parse HEAD\` in the checkout holding your owned paths, after your commit — api report refuses a done|partial report without it.`] : []),
   `  Write report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'api.mjs')} report --repo ${repo} --job ${jobId} --report <path-to-report.json>`,
@@ -2055,7 +2314,7 @@ function cmdDispatch(ledger, args, repo) {
     ? (cardLaunch?.error
       ? { error: `${model.target} has no launch model: ${cardLaunch.error}` }
       : buildSpawnCommand({ provider: model.provider, command: model.command,
-        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null }))
+        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null, env: opLaunchEnv(jobId) }))
     : null;
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
@@ -2194,6 +2453,7 @@ function cmdDispatch(ledger, args, repo) {
     provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
+    env: opLaunchEnv(jobId),
   });
   const handle = spawned.terminal ?? null;
   recordGateAnswers(ledger, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -2245,7 +2505,7 @@ function cmdDispatch(ledger, args, repo) {
   const sent = deliverPrompt({ handle, adapter, prompt: dispatched.preamble, worktree, dispatchId });
   artifact = sent.artifact ?? null;
   if (!sent.ok) return rejectCommand({ step: 'send', dispatchId, error: sent.error ?? 'terminal send failed' });
-  const submitted = awaitSubmission(handle, adapter);
+  const submitted = awaitSubmission(handle, adapter, { sentText: sent.sentText ?? dispatched.preamble });
   if (!submitted.ok) return rejectCommand({ step: 'submission', dispatchId, signal: submitted.signal ?? null,
     error: submitted.reason, details: submitted });
   const attested = awaitAttestation(handle, adapter);
@@ -2283,7 +2543,10 @@ function cmdDispatch(ledger, args, repo) {
     const now = Date.now();
     fileContract(db, {
       job, op, dispatchId, markdown: contractMarkdown, now,
-      context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
+      // delivery.text is exactly what the terminal was given (Orca preamble +
+      // Task spec, or the file-reference line): status/nudge/observe find an
+      // unsubmitted paste by it (inc-06aeecf432f1).
+      context: { packet, worktree, model: model.target, orca: payload.orca, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs, delivery: { text: sent.sentText ?? dispatched.preamble } },
     });
     db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
       .run(handle, JSON.stringify(payload), now, jobId);
@@ -2875,7 +3138,7 @@ function cmdSettle(ledger, args, repo) {
 
   let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
-  let awaitingOwner = false;
+  let awaitingOwner = false, cutSet = null;
   ledger.transaction(() => {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -2938,15 +3201,25 @@ function cmdSettle(ledger, args, repo) {
         throw Object.assign(new Error(`pass requires independently recorded green checks for ${jobId}`), { code: 'checks-not-green' });
       }
       if (payload.cut) {
-        const requiredNames = payload.cut.ordinal < payload.cut.total
-          ? ['cut-slice-postcondition', 'cut-regression-inventory']
-          : ['cut-slice-postcondition', 'cut-regression-inventory', 'full-regression-final'];
+        // Every slice pass records its scoped postcondition and the unchanged
+        // inventory. The pass that CLOSES the set - every other ordinal's
+        // latest job already settled succeeded, whichever ordinal settles last
+        // - additionally records full-regression-final: the unchanged full
+        // gates run once over the whole cut set before it counts done
+        // (inc-751dd1ac4492; verdict-contract.yaml cutSetAuthority).
+        cutSet = cutSetStateOf(db, { workflowId: job.workflow_id, op: jobOpOf(job), cut: payload.cut, ownJobId: jobId });
+        const closesSet = cutSet.open.length === 0;
+        const requiredNames = closesSet ? [...CUT_SLICE_CHECKS, CUT_SET_CLOSING_CHECK] : CUT_SLICE_CHECKS;
         const missing = requiredNames.filter((name) => !recordedChecks.some((check) => check?.name === name && check.exitCode === 0));
         if (missing.length) {
-          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')}`), {
+          const why = closesSet
+            ? `this pass closes cut set ${cutSet.id} (every other ordinal of ${cutSet.total} settled succeeded), so the unchanged full gates run over the whole set and record ${CUT_SET_CLOSING_CHECK}`
+            : `ordinal(s) ${cutSet.open.join(',')} of cut set ${cutSet.id} are still open, so this slice records its scoped checks and the set's last pass records ${CUT_SET_CLOSING_CHECK}`;
+          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')} — ${why}`), {
             code: 'cut-checks-missing', cut: payload.cut, missing,
           });
         }
+        result.cutSet = { id: cutSet.id, total: cutSet.total, closesSet, open: cutSet.open };
       }
     }
     machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
@@ -2958,10 +3231,20 @@ function cmdSettle(ledger, args, repo) {
     // handle, falling back to the job id when none was ever bound).
     reportsConsumed = db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL')
       .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(db, job)).changes > 0;
+    // A question the settled worker asked through Orca has no one left to answer.
+    db.prepare("UPDATE inbox SET status='done', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND status='pending' AND json_extract(payload_json,'$.jobId')=?")
+      .run(JSON.stringify({ reason: 'job-settled' }), payload.settledAt, job.workflow_id, WORKER_QUESTION, jobId);
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed },
+      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed, ...(result.cutSet ? { cutSet: result.cutSet } : {}) },
     });
+    // The set is done only here: its last pass recorded the whole-set gate.
+    if (result.cutSet?.closesSet) {
+      ledger.appendEvent({
+        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+        kind: 'cut-set-closed', payload: { op: jobOpOf(job), cut: payload.cut, closedBy: jobId, ordinal: payload.cut.ordinal, check: CUT_SET_CLOSING_CHECK },
+      });
+    }
   });
 
   // Mirror of releaseTwoPhase's machine half: lease rows are gone; now release
@@ -3057,8 +3340,8 @@ function cmdSettle(ledger, args, repo) {
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
 // The operation Task an op holds, whichever launch kind opened it, and the
@@ -3426,6 +3709,47 @@ function cmdConsumeReport(ledger, args) {
   emit(out, `consume-report ${job.job_id} (dispatch ${dispatchId}): ${consumed ? 'report consumed' : 'no unconsumed report row'}`, args.json);
 }
 
+/* ------------------------------------------------------ caller boundary */
+// An op worker ran node:sqlite against .starciwork/runtime.sqlite to inspect
+// jobs (inc-360891316369). The op contract already forbade it; the owner wants
+// the boundary enforced, not instructed. What the api can enforce:
+//  - the op launch carries no ledger path (the packet and prompt name only the
+//    api verbs) and a role marker: a command-terminal op starts with
+//    STARCI_ROLE=op and STARCI_OP_JOB=<job> in its own shell (opLaunchEnv);
+//  - Orca exports ORCA_TERMINAL_HANDLE into every terminal it owns, including
+//    a managed worker-start agent whose env StarCi cannot set, so a caller
+//    whose handle is the bound terminal of an op job IS that op;
+//  - from an op caller the api refuses every kernel verb, and `report` only
+//    files for the caller's own job (whose dispatch/contract binding
+//    requireDispatchedReportBinding already proves).
+// Residual (modules/kernel/api.yaml conventions.callerBoundary): a worker
+// running with unattended permissions can still read the ledger file or unset
+// the marker; the api cannot stop raw file access, only refuse its verbs.
+const OP_ROLE = 'op';
+const opLaunchEnv = (jobId) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId });
+const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
+  'questions', 'reply', 'settle', 'check', 'consume-report', 'serve-ask', 'incident', 'finish']);
+const callerOf = (db, env = process.env) => {
+  const handle = env.ORCA_TERMINAL_HANDLE || null;
+  const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
+      OR json_extract(payload_json,'$.managed.agentTerminalHandle')=? OR json_extract(payload_json,'$.orca.agentTerminalHandle')=?
+      OR json_extract(payload_json,'$.hierarchy.runtime.terminalHandle')=?) ORDER BY updated_at DESC LIMIT 1`).get(handle, handle, handle, handle) : null;
+  if (env.STARCI_ROLE === OP_ROLE) return { role: OP_ROLE, jobId: env.STARCI_OP_JOB || byHandle?.job_id || null, via: 'env-role', handle };
+  if (byHandle) return { role: OP_ROLE, jobId: byHandle.job_id, via: 'terminal-handle', handle };
+  return { role: 'kernel', jobId: null, via: null, handle };
+};
+const refuseOpCaller = (ledger, { cmd, caller, code, detail }) => {
+  const job = caller.jobId ? ledger.db.prepare('SELECT job_id,workflow_id FROM jobs WHERE job_id=?').get(caller.jobId) : null;
+  if (job) {
+    try {
+      ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
+        kind: 'op-caller-refused', payload: { verb: cmd, code, via: caller.via, terminal: caller.handle } }));
+    } catch { /* the refusal stands without its receipt */ }
+  }
+  console.error(JSON.stringify({ ok: false, error: detail, code, verb: cmd, caller: { role: caller.role, jobId: caller.jobId, via: caller.via } }));
+  process.exit(1);
+};
+
 /* ------------------------------------------------------------------ main */
 async function main() {
   const argv = process.argv.slice(2);
@@ -3438,6 +3762,7 @@ async function main() {
     survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
     enqueue: ['workflow', 'op', 'paths'], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: ['job'], nudge: ['job'], observe: ['job'],
+    questions: ['workflow'], reply: ['workflow', 'message'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
     'consume-report': ['job'], 'serve-ask': ['workflow'],
@@ -3462,6 +3787,17 @@ async function main() {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
     process.exit(1);
   }
+  // An op terminal reaches the ledger only through its own report and the
+  // read projections (inc-360891316369).
+  const caller = callerOf(ledger.db);
+  if (caller.role === OP_ROLE && KERNEL_ONLY_VERBS.has(cmd)) {
+    refuseOpCaller(ledger, { cmd, caller, code: 'op-context-refused',
+      detail: `'${cmd}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own api report and nothing else` });
+  }
+  if (caller.role === OP_ROLE && cmd === 'report' && caller.jobId !== args.job) {
+    refuseOpCaller(ledger, { cmd, caller, code: 'report-identity-mismatch',
+      detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may file a report only for its own job, not ${args.job}` });
+  }
   try {
     switch (cmd) {
       case 'survey': return cmdSurvey(ledger, args);
@@ -3475,6 +3811,8 @@ async function main() {
       case 'reconcile': return cmdReconcile(ledger, args);
       case 'nudge': return cmdNudge(ledger, args);
       case 'observe': return cmdObserve(ledger, args);
+      case 'questions': return cmdQuestions(ledger, args);
+      case 'reply': return cmdReply(ledger, args);
       case 'settle': return cmdSettle(ledger, args, repo);
       case 'report': return cmdReport(ledger, args, repo);
       case 'op-contract': return cmdOpContract(ledger, args);

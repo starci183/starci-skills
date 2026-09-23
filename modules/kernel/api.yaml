@@ -38,7 +38,7 @@ about:
     the exact command surface it reasons through — what does each call read,
     what does each call write, and when does it refuse?"
   businessAnswer: >-
-    Eighteen verbs. Pure reads return projections and touch no row (survey,
+    Twenty verbs. Pure reads return projections and touch no row (survey,
     status, hierarchy, op-contract) and `estimate` computes slice sizing from
     modules/models/runtimes.yaml without reading the ledger at all; `observe`
     is the kernel's window onto its own job's exact op terminal screen —
@@ -47,7 +47,7 @@ about:
     writes contracts, report files reports, consume-report integrates, check
     records re-runs); the rest are
     single ledger transactions that each append one hash-chained event (plan,
-    enqueue, route, dispatch, reconcile, nudge, observe, settle, incident, finish). Every command prints
+    enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, settle, incident, finish). Every command prints
     one JSON object to stdout; a refusal exits non-zero with {ok:false,
     reason} — a refusal is a fact for the driver loop, never a crash to route
     around. The op lifecycle is fixed: enqueue -> route (model decision
@@ -93,6 +93,24 @@ conventions:
     RAISE(ABORT,'lease-identity-drift')); a report whose identity fields
     contradict the job's bound {run, task, dispatch, from} fails
     starci/op-report@1 at filing (report-invalid)
+  callerBoundary: >-
+    The ledger is the Kernel's through these verbs; an op reaches it only through its own `report`
+    and the read projections (status, survey, hierarchy, estimate, op-contract). An op worker ran
+    node:sqlite against .starciwork/runtime.sqlite (inc-360891316369), so this is enforced, not only
+    instructed. ENFORCED: (1) the op packet and prompt name no ledger file - only the api verbs;
+    (2) a command-terminal op launches with STARCI_ROLE=op and STARCI_OP_JOB=<job> set in its own
+    shell (scripts/agent/lib.mjs envPrefix), and Orca exports ORCA_TERMINAL_HANDLE into every
+    terminal it owns, so a caller whose handle is the bound terminal of an op job (worker_id,
+    payload managed/orca agentTerminalHandle, hierarchy runtime terminalHandle) is that op even as a
+    managed worker-start agent whose env StarCi cannot set; (3) from an op caller every kernel verb
+    (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, settle, check,
+    consume-report, serve-ask, incident, finish) refuses `op-context-refused` before it runs, and `report`
+    refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
+    binding the report binding then proves); each refusal appends 'op-caller-refused' on the op's
+    job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
+    shell permissions can still open the ledger file or unset the marker and call from a terminal
+    Orca does not attribute to it. Nothing it reads that way is authority: only a filed report plus
+    the Kernel's own `api check` settles, and a ledger claim quoted from a screen is never evidence
   hierarchy: >-
     `hierarchy` projects starci/agent-hierarchy@1 from durable workflow/job
     identity. Stable nodes are workflow:<workflow>, agent:kernel:<workflow>
@@ -171,7 +189,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-nudge-ready|worker-wedged|engaged|ask-reserve|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-question|worker-nudge-ready|worker-wedged|engaged|ask-reserve|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.staleOperations': >-
         [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
         whose law inputs changed since dispatch, which the Kernel re-dispatches as a new attempt
@@ -211,8 +229,23 @@ commands:
       awaitingOwner: '[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means the Kernel re-enqueues the op now, `pending` means the owner has not answered'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
+      workerQuestions: >-
+        [{messageId, jobId, opId, attempt, question, options[], askedAt, bridged}] — pending
+        `question` messages a running worker sent its coordinator with an Orca orchestration ask
+        (Orca's preamble tells it to), read through the non-consuming host inbox
+        (scripts/api/orca/orch-inbox.mjs) whenever a live operation terminal exists, plus rows `api
+        questions` already bridged. Any entry makes the frontier `worker-question` (actionable): the
+        worker is blocked until `api reply` answers (inc-b944cbaef24b, inc-20449a260df8).
+        workerQuestionsError names an unreadable host inbox; status never writes the bridge itself
+      cutSets: >-
+        [{op, id, total, passed[], open[], jobs:{<ordinal>:{jobId,status}}, closingOrdinal?, closingJob?,
+        closingCheck?}] — every cut set of the workflow with an ordinal whose latest job has not settled
+        succeeded. With exactly one open ordinal it names that ordinal as the closing pass: its settle
+        requires `full-regression-final` besides the slice checks (settle.cutSet), so the Kernel runs the
+        unchanged full gates over the whole set before that settle. Ordinals settle out of order, so the
+        closing ordinal is whichever is left, not the highest (inc-751dd1ac4492)
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
-      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it'
+      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready'
     refuses:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
@@ -629,10 +662,13 @@ commands:
       appends op-worker-nudged. It creates no job, contract, lease, retry,
       verdict or authority.
     returns: >-
-      {ok:true,jobId,nudged:true|false,reason?,worker,receipt?} — nudged:false
-      with ok:true and exit 0 is a SKIP, not a refusal: reason 'report-filed'
-      (the durable answer already exists) or 'worker-active' (the turn is
-      running)
+      {ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input,reason?,worker,receipt?}
+      — nudged:false with ok:true and exit 0 is a SKIP, not a refusal: reason
+      'report-filed' (the durable answer already exists) or 'worker-active'
+      (the turn is running). A worker whose liveness is `staged-input` (its
+      paste never left the input row) gets ONE Enter-only send and no wake
+      text, action submit-staged-input: typing a wake on top of the paste
+      would bury it (inc-06aeecf432f1). Every other nudge is action wake
     refuses:
       - job-unknown: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has a worker terminal to wake'
@@ -666,7 +702,7 @@ commands:
       observation is READ-ONLY reasoning context, never evidence — an op's
       screen is never proof; only `api report` plus kernel-run `api check`
       rows settle a verdict
-    returns: '{ok:true, job, jobId, opId, attempt, ledgerStatus, terminal:{handle,connected,writable,status,idleMs,screenState?}, screen:<tail of last --lines lines, default 80, null when unreadable>, turnState:active|turn-idle|disconnected|unreadable|unknown, observedAt}'
+    returns: '{ok:true, job, jobId, opId, attempt, ledgerStatus, terminal:{handle,connected,writable,status,idleMs,screenState?}, screen:<tail of last --lines lines, default 80, null when unreadable>, turnState:active|staged-input|turn-idle|disconnected|unreadable|unknown, observedAt} — staged-input is an unsubmitted paste (status workers.liveness); api nudge submits it'
     refuses:
       - job-not-found: 'no jobs row for --job'
       - job-not-operation: 'only an operation job has an observable worker terminal'
@@ -676,6 +712,56 @@ commands:
       observation cadence on a running op keeps
       reasoning context alive before nudge/settle-fail decisions;
       observation never substitutes for report/checks
+
+  # --------------------------------------------------------------------------
+  # WORKER QUESTIONS — the bridge for a worker that asked through Orca instead
+  # of filing `api report --outcome ask`. Orca's preamble tells every worker to
+  # reach its coordinator with an Orca orchestration ask; the coordinator is the
+  # Kernel terminal, which never calls Orca. Without these verbs the questions
+  # sat unanswered while the workers waited (inc-b944cbaef24b,
+  # inc-20449a260df8). The op contract is unchanged - an owner question is an
+  # outcome ask carried by serve-ask - and the runtime still never strands a
+  # worker that asked the other way.
+  # --------------------------------------------------------------------------
+
+  questions:
+    args: '--workflow <id>'
+    reads: >-
+      the workflow's Orca Runs (payload orca/managed/hierarchy runId of its jobs); the host inbox
+      through scripts/api/orca/orch-inbox.mjs (calls.yaml `inbox`, a read that acknowledges and marks
+      nothing); every `question` row of those Runs, joined to the job whose dispatch
+      (from_handle dispatch:<id> or payload.dispatchId) or terminal handle asked it; inbox rows of
+      kind worker-question
+    writes: >-
+      one inbox row per new pending question {kind: worker-question, key: <message id>,
+      payload {messageId, runId, jobId, opId, attempt, dispatchId, taskId, question, options[],
+      subject, askedAt}, status pending} and event 'worker-question-bridged'; a bridged row whose job
+      settled or that got a reply in Orca directly is closed status done {reason}
+    returns: '{ok:true, workflowId, bridged, closed, pending:[{messageId, jobId, opId, attempt, question, options[], state:pending, bridged}], error?}'
+    refuses:
+      - workflow-unknown
+    usedBy: 'drive.wait when status frontier is worker-question: bridge, read each question, then answer with api reply'
+
+  reply:
+    args: '--workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])'
+    reads: 'the pending worker question (questions above), the job it belongs to'
+    writes: >-
+      Orca `reply` to the exact question message through scripts/api/orca/orch-reply.mjs (calls.yaml
+      `reply`; --run is the question's Run and Orca resolves --from to the calling Kernel terminal), then
+      the worker-question inbox row -> status applied {reply, toOwner, at} (inserted applied when it
+      was never bridged) and event 'worker-question-answered'. A reply is technical guidance inside the
+      job's existing contract and authority - never new scope, paths, retry or owner intent (the api
+      never answers an owner's decision). --to-owner sends the fixed routing reply instead: the worker
+      files the question as `api report --outcome ask` and ends its turn, so askLifecycle and serve-ask
+      carry it to the owner exactly like any other ask.
+    returns: '{ok:true, workflowId, messageId, jobId, toOwner, body}'
+    refuses:
+      - workflow-unknown
+      - reply-body-missing: 'neither --body nor --to-owner'
+      - question-unknown: 'no question message with that id in the workflow''s Runs'
+      - 'question-answered / question-replied-elsewhere / question-job-settled / question-unmatched: the question no longer waits on this Kernel (already answered, answered in Orca, its job settled, or no job of this workflow asked it)'
+      - 'reply-failed (field `reason`): the Orca reply did not land; nothing is written and the question stays pending'
+    usedBy: 'drive.wait — answer every pending worker question before yielding'
 
   # --------------------------------------------------------------------------
   # OP IPC — the durable worker<->kernel channel. contracts out, reports in,
@@ -728,6 +814,7 @@ commands:
       - report-missing: 'report file unreadable'
       - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here), a done|partial report of an op whose manifest commitPolicy commits without `head` = a 7-40 character hex sha (the api resolves the op''s commitPolicy exactly as settle does; the worker puts `git rev-parse HEAD` of the checkout holding its owned paths into `head` and re-files), prose that lost its non-ASCII letters to a legacy code page (a question mark inside words, U+FFFD) — the file must be written as UTF-8 (scripts/kernel/report-envelope.mjs lossyTextFields)'
       - outcome-mismatch: '--outcome flag contradicts the envelope outcome'
+      - report-identity-mismatch: 'the caller is an op (conventions.callerBoundary) and --job is not its own job'
       - job-unknown / job-settled
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
 
@@ -860,12 +947,18 @@ commands:
       plain directory) settles without the proof, as does every fail or
       blocked verdict and every op without a committing commitPolicy. A
       proof that ran is recorded as `landed` on the receipt and result_json.
-    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
+    cutSet: >-
+      A cut pass records result.cutSet {id, total, closesSet, open[]} on the job and the op-settled
+      event. The closing pass (closesSet true) also appends `cut-set-closed` {op, cut, closedBy,
+      ordinal, check: full-regression-final}: the set counts done only there, after the unchanged full
+      gates ran green over every ordinal. `api status` cutSets names the pass that will close each
+      open set before it happens.
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
       - checks-not-green: 'pass requires at least one independently recorded green check and zero red checks'
-      - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the final ordinal additionally lacks full-regression-final'
+      - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the pass that CLOSES its cut set additionally lacks full-regression-final. The closing pass is the one that leaves no other ordinal of {op, cut id} open - every other ordinal''s latest job already settled succeeded - whichever ordinal settles last; ordinal === total is not the rule (inc-751dd1ac4492: ordinals settle out of order once the seam passes). The error names which case applies'
       - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
