@@ -83,6 +83,7 @@ import {
   HANDOVER_APPROVED, HANDOVER_OP, deliveriesOf, handoverApprovalOf, handoverAskProblem, handoverGateOf, handoverProjection, handoverReason,
 } from './handover.mjs';
 import { opInputPaths, recordInputs, staleInputs, staleOperationsOf } from './input-digests.mjs';
+import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { taskCreate } from '../api/orca/task-create.mjs';
@@ -3915,6 +3916,11 @@ function cmdSettle(ledger, args, repo) {
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
       .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) }), Date.now(), jobId);
   }
+
+  // The owner sees on Telegram what a draw or UAT op produced (the drawn
+  // screens, the UAT videos): a detached sender, so Telegram never slows or
+  // fails the settle (scripts/connectors/telegram-media.mjs).
+  try { queueSettleMedia({ repo, ledgerFile: ledgerFileFor(repo), workflowId: job.workflow_id, jobId, attempt: job.attempt, op: jobOpOf(job), verdict, dispatchId: reportDispatchIdOf(db, job) }); } catch { /* never un-settles */ }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
   const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };

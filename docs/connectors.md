@@ -2,7 +2,8 @@
 
 An owner ask is a `serve-ask` form (`scripts/kernel/serve-ask.mjs`) on a random loopback port
 `6969..7069` behind a bearer nonce path `/a-<hex>`. The connectors make that form reachable from the
-owner's phone and tell the owner it exists. Telegram carries owner asks only: no op progress, no
+owner's phone and tell the owner it exists. Telegram carries owner asks, plus the media a settled
+design or UAT op produced (drawings, UAT videos; the Media row below): no op progress, no
 incidents, no finish messages, and the supervisor never sends. They are configured by `config.yaml`
 `connectors` (documented in `config.example.yaml`, validated fail-closed by `engine/config.mjs`) and
 are all off by default.
@@ -20,13 +21,15 @@ Cloudflare edge -> cloudflared (tunnel.mjs) -> 127.0.0.1:<gateway.port> ask-gate
 | Gateway | `scripts/connectors/ask-gateway.mjs` | One fixed local port. Proxies `/a-<nonce>` and `/a-<nonce>/...` (GET, HEAD, POST, redirects rewritten to paths) to the loopback form whose latest open `ask-serving` event carries that nonce, in the configured repos' ledgers. Everything else is 404 and never forwarded; dot segments are refused; a non-loopback form URL is never a target. Adds `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, `X-Robots-Tag: noindex`. |
 | Tunnel | `scripts/connectors/tunnel.mjs` | Runs cloudflared at the gateway and restarts it when it dies (1 s doubling to 60 s). Always passes its own `--config` (written under the state dir), so `~/.cloudflared/config.yml` is never read. Records the public base URL in `tunnel.json`. |
 | Notifier | `scripts/connectors/telegram.mjs` | Called once by `serve-ask.mjs` when a form binds (the kernel's `api serve-ask` path): one message with the workflow, the question, its numbered options, the link `https://<hostname>/a-<nonce>` and the expiry, in config `language`. Deduped per `ask-serving` event; a re-served ask sends its new link ("link mới") and edits the earlier message to point at it. A missing token or chat id is a no-op with one stderr line; it never throws into serve-ask. Also `discover-chat` and `test`. |
+| Media | `scripts/connectors/telegram-media.mjs` | Queued by the kernel's `api settle` (`cmdSettle` calls `queueSettleMedia`, which launches this file detached, so Telegram never slows or fails a settle; its stderr goes to `telegram-media.log`). An `interface.draw` / `interface.asset` settled pass sends its drawings as albums of up to 10 (the `draws[]` of the draws.yaml the report names, else the report's final images, else the ui record's `directionAsset`s) with one caption: what was drawn, screens, variants, states, the summary, "review at handover". A `uat.verify` / `uat.assisted.*` / `e2e.verify` settle sends every recorded video (any verdict) captioned with the verdict (ĐẠT / KHÔNG ĐẠT) and the flow's steps from its uat record; a pass with no video sends its screenshots. Images over 10 MB and videos over 50 MB are named by local path instead. Deduped per workflow, job and attempt. |
 
 Repositories read: `connectors.repos`, or by default the source root plus every
 `.workspaces/projects/*/work.json` Work owner that holds `.starciwork/runtime.sqlite`. The connectors
 open ledgers with `inspectLedger` (read-only) and never write one.
 
 State lives beside the machine arbiter: `%LOCALAPPDATA%/StarCi/runtime/connectors/`
-(`gateway.json`, `tunnel.json`, `cloudflared.yml`, `cloudflared.log`, `telegram-sent.json`).
+(`gateway.json`, `tunnel.json`, `cloudflared.yml`, `cloudflared.log`, `telegram-sent.json`,
+`telegram-media-sent.json`, `telegram-media.log`).
 
 The gateway and the tunnel manager are single-instance per host. `start` is called by every
 serve-ask, often at once, so each `run` first claims `gateway.lock` / `tunnel.lock` in that
@@ -44,6 +47,8 @@ node scripts/connectors/telegram.mjs discover-chat   # after sending the bot /st
 node scripts/connectors/telegram.mjs test            # one test message to connectors.telegram.chatId
 node scripts/connectors/telegram.mjs notify --ledger <repo>/.starciwork/runtime.sqlite --workflow <id> --dispatch <id>
                                                      # re-send one served ask (deduped)
+node scripts/connectors/telegram-media.mjs settle --ledger <file> --repo <repo> --workflow <id> --job <id> --attempt <n> --op <op> --verdict <v> [--dispatch <id>]
+                                                     # send one settled op's media (deduped; what settle launches)
 ```
 
 ## Where secrets live
