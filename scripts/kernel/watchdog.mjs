@@ -21,9 +21,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
+import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -151,8 +151,11 @@ export async function watchdogTick() {
     // staged paste (a wake typed but never submitted) is the same: Enter only,
     // never a second wake on top of it (inc-06aeecf432f1).
     if (!repair) return { ok: true, workflowId, phase, terminal, action: classified.state, outputAgeMs };
-    const sent = terminalSend({ terminal, text: '', enter: true });
-    return { ok: sent.ok, workflowId, phase, terminal, action: sent.ok ? `${classified.state}-sent` : 'wake-failed', outputAgeMs, error: sent.error ?? null };
+    // Delivery is proven from the screen, not Orca's receipt: a stalled Enter
+    // whose frame left the input row submitted it (scripts/kernel/wake-delivery.mjs).
+    const proof = sendEnterWithProof({ terminal });
+    return { ok: proof.ok, workflowId, phase, terminal, action: proof.ok ? `${classified.state}-sent` : 'wake-failed', outputAgeMs,
+      ...deliveryFieldsOf(proof), error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null) };
   }
   if (classified.state === 'turn-idle') {
     // A kernel waiting on the owner or on a running op has nothing to do; waking
@@ -161,11 +164,14 @@ export async function watchdogTick() {
     const actionable = status.value?.frontier?.actionable;
     if (actionable === false) return { ok: true, workflowId, phase, terminal, action: 'idle-waiting', ...stale, reason: status.value?.frontier?.reason ?? 'frontier not actionable', outputAgeMs };
     if (!repair) return { ok: true, workflowId, phase, terminal, action: 'wake-needed', ...stale, outputAgeMs };
-    const sent = terminalSend({ terminal, text: buildWakePrompt(workflowId), enter: true });
+    // Orca's agent_prompt_stalled/agent_prompt_blocked receipt is inconclusive:
+    // a wake the screen shows landed or queued is woken (no retry, no failed
+    // tick); only a screen-proven miss is wake-failed.
+    const proof = sendWakeWithProof({ terminal, text: buildWakePrompt(workflowId), before: String(read.screen ?? '') });
     return {
-      ok: sent.ok, workflowId, phase, terminal,
-      action: sent.ok ? 'woken' : 'wake-failed', ...stale, outputAgeMs,
-      receipt: sent.receipt ?? null, error: sent.error ?? null,
+      ok: proof.ok, workflowId, phase, terminal,
+      action: proof.ok ? 'woken' : 'wake-failed', ...stale, outputAgeMs, ...deliveryFieldsOf(proof),
+      receipt: proof.sent?.receipt ?? null, error: proof.ok ? null : (proof.sent?.error || proof.sendErrorCode || null),
     };
   }
 

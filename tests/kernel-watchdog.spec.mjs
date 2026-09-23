@@ -165,7 +165,7 @@ test('watchdog wake transfers cadence ownership outside the Kernel model turn',(
 
 test('watchdog wakes a turn-idle Kernel only when status says the frontier is actionable',()=>{
   const src=fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs',import.meta.url),'utf8');
-  const idle=src.indexOf("classified.state === 'turn-idle'"),gate=src.indexOf('frontier?.actionable',idle),send=src.indexOf('terminalSend(',idle);
+  const idle=src.indexOf("classified.state === 'turn-idle'"),gate=src.indexOf('frontier?.actionable',idle),send=src.indexOf('sendWakeWithProof(',idle);
   assert.ok(idle>0&&gate>idle&&send>gate,'the actionable gate sits between the turn-idle branch and the wake send');
   assert.match(src,/action: 'idle-waiting'/);
   const supervise=fs.readFileSync(new URL('../modules/supervisor/supervise.yaml',import.meta.url),'utf8');

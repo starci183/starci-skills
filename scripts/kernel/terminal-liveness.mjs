@@ -96,6 +96,10 @@ export const WEDGE_MINUTES = 30;
 // meaning the turn ended: blank/rule chrome, Claude's todo list under its
 // spinner (⎿ ☐ ☒ ...), Codex queued-message rows (↳), and a status/footer row.
 const SPINNER_COMPANION = /^\s*$|^\s*[─━═╌┄_-]{3,}|^\s*[⎿↳☐☒◻◼□■✓✔]|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b|^\s*(?:tip|hint)\b/iu;
+// Claude Code shows this hint only while a running turn holds typed text as a
+// queued follow-up. A long Kernel wake fills the 14-row window and pushes the
+// spinner out of it, so below the input region the hint alone says `active`.
+const QUEUED_BEHIND_TURN = /press up to (?:edit|select) (?:a )?queued messages?/i;
 
 export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null } = {}) {
   // An unsubmitted paste in the input row is never a running turn, whatever
@@ -105,10 +109,11 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // else is `staged-input` - the one Enter-only send submits it.
   const staged = stagedInputRegion(screen, { stagedPattern, sentText });
   if (staged) {
+    const recent = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14).join('\n');
+    if (staged.rows.slice(staged.start).some((row) => QUEUED_BEHIND_TURN.test(row))) return { state: 'active', recent };
     // The input region stands in as the prompt row, so a spinner followed by
     // a finished answer reads finished exactly as it would above an empty row.
     const above = classifyAgentScreen([...staged.above, '> '].join('\n'), { stagedPattern: /(?!)/ });
-    const recent = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-14).join('\n');
     if (['active', 'wedged', 'interactive-gate', 'failed'].includes(above.state)) return { ...above, recent };
     return { state: 'staged-input', row: staged.row, recent };
   }

@@ -46,9 +46,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
+import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, askAutoAcceptPolicy } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
@@ -451,9 +451,12 @@ export const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath, answer
     if (!shown?.ok || shown.connected !== true || shown.writable !== true) return { action: 'kernel-unavailable', terminal };
     const read = terminalRead({ terminal, screen: true });
     const state = read?.ok ? classifyAgentScreen(read.screen).state : null;
+    // Delivery is proven from the screen, not Orca's receipt
+    // (scripts/kernel/wake-delivery.mjs): a stalled send whose text landed or
+    // queued is delivered; only a screen that shows none of it fails.
     if (state === 'queued-input' || state === 'staged-input') {
-      const sent = terminalSend({ terminal, text: '', enter: true });
-      return { action: sent?.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state };
+      const proof = sendEnterWithProof({ terminal });
+      return { action: proof.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state, ...deliveryFieldsOf(proof) };
     }
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
     const prompt = [
@@ -464,13 +467,14 @@ export const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath, answer
       'Re-read canonical api status and survey now; re-verify custody presence for the named provisions, settle or retry the waiting ask op, then continue the approved frontier.',
       'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
     ].join(' ');
-    const sent = terminalSend({ terminal, text: prompt, enter: true });
-    if (!sent?.ok) return { action: 'kernel-wake-failed', terminal, error: sent?.error ?? null };
+    const proof = sendWakeWithProof({ terminal, text: prompt, before: String(read.screen ?? '') });
+    const delivered = deliveryFieldsOf(proof);
+    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, error: proof.sent?.error || proof.sendErrorCode || null, ...delivered };
     ledger.transaction(() => ledger.appendEvent({
       workflowId, entityType: 'workflow', entityId: workflowId,
-      kind: 'kernel-transition-woken', payload: { transition: 'ask-answered', dispatchId, terminal },
+      kind: 'kernel-transition-woken', payload: { transition: 'ask-answered', dispatchId, terminal, ...delivered },
     }));
-    return { action: 'kernel-woken', terminal };
+    return { action: 'kernel-woken', terminal, ...delivered };
   } catch (error) {
     return { action: 'kernel-wake-error', terminal, error: String(error?.message ?? error) };
   }

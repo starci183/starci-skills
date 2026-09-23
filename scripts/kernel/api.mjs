@@ -66,7 +66,6 @@ import {
 import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
@@ -74,7 +73,7 @@ import { quitAgent } from './quit-agent.mjs';
 import { markAskClosed } from '../connectors/telegram.mjs';
 import { autoAcceptAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
-import { sendWakeWithProof, sendEnterWithProof } from './wake-delivery.mjs';
+import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -450,9 +449,13 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     // A queued message waits for Enter: deliver it; it already asks the
     // Kernel to act, and it reads status first. A staged paste is submitted
     // the same way, never buried under a second wake (inc-06aeecf432f1).
+    // Delivery is proven from the screen, not Orca's receipt: a stalled or
+    // blocked send whose text landed or queued is delivered, and only a screen
+    // that shows none of it fails (scripts/kernel/wake-delivery.mjs).
     if (state === 'queued-input' || state === 'staged-input') {
-      const sent = terminalSend({ terminal, text: '', enter: true });
-      return { action: sent?.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state };
+      const proof = sendEnterWithProof({ terminal });
+      return { action: proof.ok ? `kernel-${state}-sent` : 'kernel-wake-failed', terminal, state, ...deliveryFieldsOf(proof),
+        ...(proof.ok ? {} : { error: proof.sent?.error || proof.sendErrorCode || null }) };
     }
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
     const prompt = [
@@ -461,14 +464,15 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
       'Re-read canonical api status and survey now; consume, independently check and settle the exact report, release its worker, then continue the approved frontier.',
       'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
     ].join(' ');
-    const sent = terminalSend({ terminal, text: prompt, enter: true });
-    if (!sent?.ok) return { action: 'kernel-wake-failed', terminal, state, error: sent?.error ?? null };
+    const proof = sendWakeWithProof({ terminal, text: prompt, before: String(read.screen ?? '') });
+    const sent = proof.sent ?? {}, delivered = deliveryFieldsOf(proof);
+    if (!proof.ok) return { action: 'kernel-wake-failed', terminal, state, error: sent.error || proof.sendErrorCode || null, ...delivered };
     ledger.transaction(() => ledger.appendEvent({
       workflowId, entityType: 'workflow', entityId: workflowId,
       kind: 'kernel-transition-woken',
-      payload: { transition, jobId, dispatchId, terminal, priorState: state },
+      payload: { transition, jobId, dispatchId, terminal, priorState: state, ...delivered },
     }));
-    return { action: 'kernel-woken', terminal, state, receipt: sent.receipt ?? null };
+    return { action: 'kernel-woken', terminal, state, receipt: sent.receipt ?? null, ...delivered };
   } catch (error) {
     return { action: 'kernel-wake-error', terminal, error: String(error?.message ?? error) };
   }

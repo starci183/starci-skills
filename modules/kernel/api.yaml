@@ -978,7 +978,12 @@ commands:
       events 'report-filed'. After the transaction commits, the api
       best-effort wakes the SAME Kernel terminal when its provider frame is
       turn-idle and records `kernel-transition-woken`; terminal failure never
-      rolls back or weakens the authoritative report row. The watchdog
+      rolls back or weakens the authoritative report row. Like `api nudge`,
+      delivery is proven from the screen (scripts/kernel/wake-delivery.mjs):
+      an agent_prompt_stalled/agent_prompt_blocked receipt whose wake landed
+      or queued is kernel-woken, a staged wake gets one Enter-only send, and
+      only a screen-proven miss is kernel-wake-failed; kernelWake and the
+      event carry delivery, evidence and sendErrorCode. The watchdog
       (modules/models/runtimes.yaml allocation.watchdogCadenceMs) is only the fallback for a missed/racing event wake. The file stays the artifact the row binds —
       the ROW is the record, and `api status` projects it so the kernel
       knows exactly when an op answered and with what outcome. A row filed

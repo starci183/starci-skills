@@ -33,15 +33,23 @@ const screenReader = (read, terminal) => () => {
 };
 
 /**
+ * The receipt/event fields a proven wake adds (api nudge, the transition wake,
+ * the watchdog, the ask-answered wake): {delivery, evidence, sendErrorCode?, enterRetried?}.
+ */
+export const deliveryFieldsOf = (proof) => ({ delivery: proof.delivery, evidence: proof.evidence,
+  ...(proof.sendErrorCode ? { sendErrorCode: proof.sendErrorCode } : {}), ...(proof.enterRetried ? { enterRetried: true } : {}) });
+
+/**
  * Type `text` into `terminal` with Enter and prove from the screen what happened.
  * Returns {ok, delivery, evidence, sent, sendErrorCode, enterRetried, screenState}.
+ * `before` is a frame the caller just read (it saves one terminal read).
  * `deps` ({read, send, sleep}) replaces the Orca wrappers in unit specs.
  */
-export function sendWakeWithProof({ terminal, text, stagedPattern = DEFAULT_STAGED_PATTERN, reads = WAKE_PROOF_READS,
-  intervalMs = WAKE_PROOF_INTERVAL_MS, deps = {} }) {
+export function sendWakeWithProof({ terminal, text, before: beforeScreen = null, stagedPattern = DEFAULT_STAGED_PATTERN,
+  reads = WAKE_PROOF_READS, intervalMs = WAKE_PROOF_INTERVAL_MS, deps = {} }) {
   const read = screenReader(deps.read ?? terminalRead, terminal);
   const send = deps.send ?? terminalSend, sleep = deps.sleep ?? sleepSync;
-  const before = read() ?? '';
+  const before = typeof beforeScreen === 'string' ? beforeScreen : (read() ?? '');
   const sent = send({ terminal, text, enter: true });
   let proof = null, enterRetried = false;
   // A confirmed send needs one look (queued vs delivered); an unconfirmed one
