@@ -30,7 +30,7 @@
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, wakeDeliveryOf, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, wakeDeliveryOf, exitedAgentPromptRow, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
@@ -45,6 +45,15 @@ const screenReader = (read, terminal) => () => {
     const r = read({ terminal, screen: true });
     return r?.ok ? String(r.screen ?? '') : null;
   } catch { return null; }
+};
+
+// A frame that ends in a bare shell prompt has no agent left to read a wake: the
+// shell would run the text as a command (term_8a556567, 2026-09-24 02:23). Nothing
+// is sent; the refusal says so with delivery 'agent-exited'.
+const exitedRefusal = (screen) => {
+  const row = exitedAgentPromptRow(screen);
+  return row ? { ok: false, delivery: 'agent-exited', evidence: 'shell-prompt', shellPrompt: row, sent: null, sendErrorCode: null,
+    enterRetried: false, splitRetried: false, splitOutcome: null, split: null, screenState: 'agent-exited' } : null;
 };
 
 // No trace of the wake and the provider still at its prompt: the send was dropped.
@@ -98,6 +107,8 @@ export function sendWakeWithProof({ terminal, text, before: beforeScreen = null,
   const read = screenReader(deps.read ?? terminalRead, terminal);
   const send = deps.send ?? terminalSend, sleep = deps.sleep ?? sleepSync;
   const before = typeof beforeScreen === 'string' ? beforeScreen : (read() ?? '');
+  const exited = exitedRefusal(before);
+  if (exited) return exited;
   const sent = send({ terminal, text, enter: true });
   let proof = null, enterRetried = false;
   // A confirmed send the frame agrees with (proven, or no longer idle) needs
@@ -144,6 +155,8 @@ export function sendEnterWithProof({ terminal, sentText = null, stagedPattern = 
   reads = WAKE_PROOF_READS, intervalMs = WAKE_PROOF_INTERVAL_MS, deps = {} }) {
   const read = screenReader(deps.read ?? terminalRead, terminal);
   const send = deps.send ?? terminalSend, sleep = deps.sleep ?? sleepSync;
+  const exited = exitedRefusal(read());
+  if (exited) return exited;
   const sent = send({ terminal, text: '', enter: true });
   if (sent?.ok) return { ok: true, delivery: 'delivered', evidence: 'receipt', sent, sendErrorCode: null, screenState: null };
   let screenState = null;

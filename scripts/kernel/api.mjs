@@ -71,7 +71,7 @@ import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
-import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -387,9 +387,10 @@ const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
   return { sentText, stagedPattern };
 };
 // The worker liveness values that prove the exact operation terminal can never
-// file its report: the terminal exists but is disconnected/unwritable, or a
-// running Orca answered that the handle names no terminal at all.
-const DEAD_WORKER_LIVENESS = ['disconnected', 'gone'];
+// file its report: the terminal exists but is disconnected/unwritable, a
+// running Orca answered that the handle names no terminal at all, or the
+// terminal is back at a bare shell prompt because its agent exited.
+const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited'];
 const observeOperationWorker = (job, now = Date.now(), db = null) => {
   const terminalHandle = operationTerminalHandleOf(job);
   if (!terminalHandle) return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null, liveness: 'unknown', reason: 'operation terminal handle unavailable', observedAt: now };
@@ -398,11 +399,14 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
     const outputAgeMs = Number.isFinite(lastOutputAt) ? Math.max(0, now - lastOutputAt) : null;
     const connected = shown?.connected === true, writable = shown?.writable === true;
-    let screenState = null;
+    let screenState = null, shellPrompt = null;
     if (shown?.ok && connected && writable) {
       try {
         const read = terminalRead({ terminal: terminalHandle, screen: true });
-        if (read?.ok) screenState = classifyAgentScreen(read.screen, db ? stagedInputEvidenceOf(db, job) : {}).state;
+        // A frame ending in a bare shell prompt: the agent exited and its
+        // terminal is a plain shell that would run a nudge as a command.
+        if (read?.ok) shellPrompt = exitedAgentPromptRow(read.screen);
+        if (read?.ok) screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, db ? stagedInputEvidenceOf(db, job) : {}).state;
       } catch { /* terminal-show fallback below remains conservative */ }
     }
     const stale = staleAwareState(screenState, outputAgeMs, ACTIVE_STALE_MS);
@@ -411,6 +415,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
     // Orca stays 'unknown' and never proves a worker dead.
     const liveness = !shown?.ok ? (TERMINAL_GONE_CODES.has(shown?.errorCode) ? 'gone' : 'unknown')
       : !connected || !writable ? 'disconnected'
+      : screenState === 'agent-exited' ? 'agent-exited'
       : screenState === 'staged-input' ? 'staged-input'
       : screenState === 'wedged' ? 'wedged'
       : stale.staleActive ? 'turn-idle'
@@ -422,7 +427,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
       : 'live-idle';
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness, connected, writable,
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
-      outputAgeMs, screenState, ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
+      outputAgeMs, screenState, ...(shellPrompt ? { shellPrompt } : {}), ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}),
       ...(shown?.errorCode ? { errorCode: shown.errorCode } : {}), observedAt: now };
   } catch (error) {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'unknown', reason: String(error?.message ?? error), observedAt: now };
@@ -446,6 +451,8 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     }
     const read = terminalRead({ terminal, screen: true });
     if (!read?.ok) return { action: 'kernel-unreadable', terminal, error: read?.error ?? null };
+    const shellPrompt = exitedAgentPromptRow(read.screen);
+    if (shellPrompt) return { action: 'kernel-exited', terminal, state: 'agent-exited', shellPrompt };
     const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
     const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
     const state = staleAwareState(classifyAgentScreen(read.screen).state, outputAgeMs, ACTIVE_STALE_MS).state;
@@ -506,6 +513,13 @@ function cmdNudge(ledger, args) {
   if (!worker.terminalHandle || !worker.connected || !worker.writable) {
     const out = { ok: false, jobId, nudged: false, reason: 'worker-unavailable', worker };
     emit(out, `nudge REFUSED for ${jobId}: exact worker is unavailable`, args.json);
+    process.exit(1);
+  }
+  // The agent exited and left a bare shell: a wake would run as a shell command.
+  // Nothing is typed; status reads it worker-dead and reconcile --dead-worker recovers it.
+  if (worker.liveness === 'agent-exited') {
+    const out = { ok: false, jobId, nudged: false, reason: 'agent-exited', delivery: 'agent-exited', worker };
+    emit(out, `nudge REFUSED for ${jobId}: the worker's agent exited (its terminal shows the shell prompt '${worker.shellPrompt}'); nothing was typed - run api reconcile --job ${jobId} --dead-worker`, args.json);
     process.exit(1);
   }
   if (worker.liveness === 'active' || worker.liveness === 'active-unclassified') {
@@ -623,9 +637,10 @@ function cmdObserve(ledger, args) {
     catch (error) { read = { ok: false, error: String(error?.message ?? error) }; }
     if (!read?.ok) turnState = 'unreadable';
     else {
-      screenState = classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
+      const shellPrompt = exitedAgentPromptRow(read.screen);
+      screenState = shellPrompt ? 'agent-exited' : classifyAgentScreen(read.screen, stagedInputEvidenceOf(db, job)).state;
       const stale = staleAwareState(screenState, terminal.idleMs, ACTIVE_STALE_MS);
-      turnState = OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
+      turnState = shellPrompt ? 'agent-exited' : OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
       if (stale.staleActive) terminal.livenessReason = 'stale-active';
       screen = String(read.screen ?? '').split(/\r?\n/).slice(-lines).join('\n');
     }

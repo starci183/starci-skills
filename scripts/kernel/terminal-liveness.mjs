@@ -93,6 +93,24 @@ export function stagedInputRow(screen, stagedPattern = DEFAULT_STAGED_PATTERN, {
   return stagedInputRegion(screen, { stagedPattern, sentText })?.row ?? null;
 }
 
+// A terminal whose agent process exited shows its host shell again: the frame ENDS in a bare prompt row.
+// A nudge typed there on 2026-09-24 02:23 (term_8a556567, a dead mm-work op) was run by PowerShell as a
+// command. Agents that run shell tools print "PS D:\x> cmd" rows in their transcript too, but an agent TUI
+// always ends its frame with its own input box or footer, so only a bare prompt as the LAST non-empty row
+// counts - and only a bare one: "PS D:\x> qwen ..." is a launch still starting, not an exit.
+const SHELL_PROMPT_ROWS = [
+  /^PS(?:\s+\S[^>]*)?>$/,                    // PowerShell: "PS D:\Repositories\x>"
+  /^[A-Za-z]:\\[^<>|*?"\r\n]*>$/,           // cmd.exe: "D:\Repositories\x>"
+  // POSIX: "$", "#", "%", "user@host:~/x$", "user@host ~ %", "bash-5.2$", "(venv) user@host:~$"
+  /^(?:\([^)]*\)\s*)?(?:[\w.-]+@[\w.-]+(?:[:\s]\S*)?\s*|[\w.-]+-\d+(?:\.\d+)*)?[$#%]$/,
+];
+/** The bare shell prompt row a frame ends in (its agent has exited), or null. */
+export function exitedAgentPromptRow(screen) {
+  const rows = String(screen ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+  const last = rows.at(-1);
+  return last && SHELL_PROMPT_ROWS.some((pattern) => pattern.test(last)) ? last : null;
+}
+
 export const WEDGE_MINUTES = 30;
 
 // Rows that may sit between a live spinner and the provider's input row without

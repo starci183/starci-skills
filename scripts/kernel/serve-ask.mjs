@@ -55,7 +55,7 @@ import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen } from './terminal-liveness.mjs';
+import { classifyAgentScreen, exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, askAutoAcceptPolicy } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
@@ -459,6 +459,9 @@ export const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath, answer
     const shown = terminalShow({ terminal });
     if (!shown?.ok || shown.connected !== true || shown.writable !== true) return { action: 'kernel-unavailable', terminal };
     const read = terminalRead({ terminal, screen: true });
+    // A Kernel whose agent exited left a bare shell that would run the wake as a command.
+    const shellPrompt = read?.ok ? exitedAgentPromptRow(read.screen) : null;
+    if (shellPrompt) return { action: 'kernel-exited', terminal, state: 'agent-exited', shellPrompt };
     const state = read?.ok ? classifyAgentScreen(read.screen).state : null;
     // Delivery is proven from the screen, not Orca's receipt
     // (scripts/kernel/wake-delivery.mjs): a stalled send whose text landed or
