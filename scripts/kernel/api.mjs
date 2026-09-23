@@ -334,6 +334,12 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     const read = terminalRead({ terminal, screen: true });
     if (!read?.ok) return { action: 'kernel-unreadable', terminal, error: read?.error ?? null };
     const state = classifyAgentScreen(read.screen).state;
+    // A queued message waits for Enter: deliver it; it already asks the
+    // Kernel to act, and it reads status first.
+    if (state === 'queued-input') {
+      const sent = terminalSend({ terminal, text: '', enter: true });
+      return { action: sent?.ok ? 'kernel-queued-input-sent' : 'kernel-wake-failed', terminal, state };
+    }
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
     const prompt = [
       `Durable transition wake for workflow ${workflowId}: ${transition}.`,
@@ -612,7 +618,7 @@ function cmdSurvey(ledger, args) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'worker-nudge-ready', 'worker-wedged', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -875,6 +881,13 @@ function cmdStatus(ledger, args) {
   const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
 
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
+  // A consumed report whose job is still open is a verdict the Kernel owes:
+  // it read the report and yielded before check/settle (a WSPV kernel sat
+  // idle on one, and nothing woke it because the frontier read engaged).
+  const settleReady = reports.filter((report) => report.consumed_at && report.job_id).filter((report) => {
+    const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(report.job_id);
+    return row && ['running', 'answering'].includes(row.status);
+  }).map((report) => report.job_id);
   const nudgeReadyWorkers = workers.filter((worker) => ['turn-idle', 'live-idle'].includes(worker.liveness)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker whose turn has run past WEDGE_MINUTES on one shell command that
@@ -882,6 +895,7 @@ function cmdStatus(ledger, args) {
   const wedgedWorkers = workers.filter((worker) => worker.liveness === 'wedged');
   const frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
+    : settleReady.length > 0 ? 'settle-ready'
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : wedgedWorkers.length > 0 ? 'worker-wedged'
     : openOperations > 0 ? 'engaged'
@@ -905,9 +919,12 @@ function cmdStatus(ledger, args) {
     unconsumedReports,
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
     wedgedJobs: wedgedWorkers.map((worker) => worker.jobId),
+    settleReadyJobs: settleReady,
     queued,
     queuedCauses,
-    reason: frontierState === 'worker-wedged'
+    reason: frontierState === 'settle-ready'
+      ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
+      : frontierState === 'worker-wedged'
       ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
       : frontierState === 'awaiting-owner'
       ? `no operation is open and the owner holds ${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')}); the answer wakes the Kernel`

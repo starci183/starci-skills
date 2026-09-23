@@ -91,6 +91,15 @@ test('a turn past the wedge threshold on a command with no output is wedged, a l
   assert.equal(classifyAgentScreen('• Working (1h 5m · esc to interrupt)\n│ No output yet\n› Ask Codex').state,'wedged','hours count too');
 });
 
+// A supervisor message reached a WSPV Kernel mid-turn; Devin queued it and the
+// idle prompt then waited for Enter while nothing else happened.
+test('an idle prompt holding queued messages is queued-input; a running turn is not',()=>{
+  const idle=' Yielding.\n─────\n❭ Press Enter to send queued messages now\n─────\nSWE-2 Max   Context: 97k / 262k tokens (37%)';
+  assert.equal(classifyAgentScreen(idle).state,'queued-input');
+  const busy='⠉⠁ Thinking · 4m 46s (esc twice to interrupt)\n❭ Press Enter to send queued messages now';
+  assert.equal(classifyAgentScreen(busy).state,'active','Enter during a running turn would cut into it');
+});
+
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
   assert.match(prompt,/external watchdog owns the 5-minute cadence/i);

@@ -94,7 +94,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
-    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],wedgedJobs:[],
+    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],wedgedJobs:[],settleReadyJobs:[],
     queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish',
   });
@@ -381,6 +381,27 @@ test('no open operation plus an unanswered ask is awaiting-owner, not actionable
   s=status();
   assert.equal(s.frontier.state,'orphaned-frontier','once answered the Kernel owes the next transition');
   assert.equal(s.frontier.actionable,true);
+});
+
+// A WSPV kernel consumed a done report and yielded before settling it; the
+// frontier read engaged (not actionable) so nothing ever woke it.
+test('a consumed report whose job is still running makes the frontier settle-ready',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-settle-ready';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
+      VALUES('impl-a35',?,'interface.implement',35,0,'op','op',?,'running',?,?)`).run(wf,json({opId:'interface.implement'}),at,at);
+    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at)
+      VALUES(?,'impl-a35','interface.implement',35,0,'done',?,?,?)`).run(wf,json({outcome:'done',summary:'done'}),at,at);
+  });
+  const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
+  assert.equal(r.status,0,r.stderr);
+  const f=out(r).frontier;
+  assert.equal(f.state,'settle-ready');
+  assert.equal(f.actionable,true);
+  assert.deepEqual(f.settleReadyJobs,['impl-a35']);
 });
 
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{

@@ -137,6 +137,12 @@ export async function watchdogTick() {
   const lastOutputAt = Number(shown.terminal?.lastOutputAt) || null;
   const outputAgeMs = lastOutputAt == null ? null : Math.max(0, Date.now() - lastOutputAt);
 
+  if (classified.state === 'queued-input') {
+    // A queued message is already the Kernel's input; Enter delivers it.
+    if (!repair) return { ok: true, workflowId, phase, terminal, action: 'queued-input', outputAgeMs };
+    const sent = terminalSend({ terminal, text: '', enter: true });
+    return { ok: sent.ok, workflowId, phase, terminal, action: sent.ok ? 'queued-input-sent' : 'wake-failed', outputAgeMs, error: sent.error ?? null };
+  }
   if (classified.state === 'turn-idle') {
     // A kernel waiting on the owner or on a running op has nothing to do; waking
     // it every tick only burns a turn. Wake only when status says the Kernel

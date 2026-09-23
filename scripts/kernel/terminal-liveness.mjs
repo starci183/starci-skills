@@ -55,6 +55,10 @@ export function classifyAgentScreen(screen) {
     if (minutes >= WEDGE_MINUTES && /No output yet/i.test(recent)) return { state: 'wedged', minutes, recent };
     return { state: 'active', recent };
   }
+  // Devin queues a message sent while a turn runs; when the turn ends the
+  // idle prompt waits for Enter and nothing else happens. Only an idle screen
+  // qualifies: Enter during a running turn would cut into it.
+  if (/Press Enter to send queued messages/i.test(topLevelRecent)) return { state: 'queued-input', recent };
   if (readyPrompt.test(topLevelRecent)) return { state: 'turn-idle', recent };
   return { state: 'unknown', recent };
 }
