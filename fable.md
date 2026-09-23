@@ -1135,6 +1135,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 12:13 Collab approval (a6) done, 6/8 pass; gateway ready (dependsOn không gồm notification), watchdog đã đánh thức kernel để
   dispatch song song với notification: record-deps (3b2767b26) chỉ ra song song đúng. WSPV audit chạy lại đang chạy. Không vá.
 
+- 12:23 Collab notification (a7) done, 7/8 pass, gateway đang chạy. WSPV audit a35 failed nhưng hội tụ: F10, F12, F11 đã đóng
+  qua a33-a35, chỉ còn F3 ("Provisioning order" hiện mã mua hàng thay vì mã đơn cấp phát riêng, có thể backend chưa có mã này).
+  Kernel lo. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
