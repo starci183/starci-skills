@@ -204,12 +204,13 @@ policy:
       scoped to its own owned paths, recorded as check cut-slice-postcondition; the full gate commands
       and their finding inventory stay unchanged except for sibling-owned paths, recorded as
       cut-regression-inventory; a finding a passed ordinal resolved may not reappear. The raw nonzero
-      full result is integration evidence, not the slice's red verdict. The FINAL ordinal must record
-      full-regression-final green from the unchanged full gates before the leg advances."
+      full result is integration evidence, not the slice's red verdict. The pass that CLOSES the set -
+      the last ordinal to settle, whichever it is, not the highest (inc-751dd1ac4492) - must record
+      full-regression-final green from the unchanged full gates over the whole set before the leg advances."
     forbids:
       - declaring a non-final slice done without the scoped gates on its own paths
       - accepting a full-gate finding on a path this slice or a passed ordinal owns
-      - advancing the leg before the final ordinal records full-regression-final green
+      - advancing the leg before the pass that closes the set records full-regression-final green
 route:
   nodeKinds: [implementation]
   phase: [implement]

@@ -146,8 +146,9 @@ steps:
         where every failed assertion is the bound proposal's selected migration delta. Without
         context.cut it must become green after the edits. With cutSetAuthority, a non-final slice
         instead proves its exact-slice postcondition plus an unchanged, monotonic full-regression
-        inventory whose remaining failures map only to unsettled sibling ordinals; the final ordinal
-        must make the unchanged full regression green. A missing, non-covering or unrunnable suite
+        inventory whose remaining failures map only to unsettled sibling ordinals; the pass that
+        closes the set (the last ordinal to settle, whichever it is) must make the unchanged full
+        regression green. A missing, non-covering or unrunnable suite
         is reported `blocked` with blocker kind `test-gap`, which routes to test.author; it is never
         a reason to skip the proof or author coverage inside this op. Read the adopted naming,
         error-identity, structure and typing conventions the restructure must preserve or improve
@@ -180,7 +181,7 @@ steps:
         from only the declared migration failures to fully green. Under cutSetAuthority, a non-final
         ordinal runs the unchanged full command and may retain only failures mapped to unsettled
         sibling ordinals, while an independent exact-slice check is green and the failure inventory
-        is monotonic; the final ordinal makes the full command green. Unrelated observable behavior
+        is monotonic; the pass that closes the set makes the full command green. Unrelated observable behavior
         remains unchanged. A different command, narrowed selection, rewritten assertion, post-edit
         failure or new architecture/pattern violation is failed with the diff between the two
         outputs. Nothing is re-worded or skipped to make the after run look green.
@@ -216,7 +217,8 @@ proofs:
         migrationAuthority requires the bound declared migration failures before and a fully green
         result after with the assertion inventory unchanged, except for the explicit cutSetAuthority
         intermediate rule: non-final ordinals require green `cut-slice-postcondition` and
-        `cut-regression-inventory`, while the final ordinal requires green `full-regression-final`.
+        `cut-regression-inventory`, while the pass that closes the set (the last ordinal to settle,
+        whichever it is) requires green `full-regression-final`.
         Where the slice lives in a checked FE/BE repository, the same starci code-patterns check ran
         verbatim on both sides with its reports retained; a new architecture or pattern violation
         after the change is a failure. A missing, different or narrowed check on either side is a
@@ -327,9 +329,10 @@ policy:
       unchanged, the full failure set must not gain an unrelated assertion, and a failure already
       resolved by a passed ordinal may not reappear. Record the raw nonzero full-regression result
       as integration evidence, not as the slice's red verdict. The Kernel records two green checks
-      for a non-final pass: `cut-slice-postcondition` and `cut-regression-inventory`. The FINAL
-      ordinal must additionally record `full-regression-final` green from the unchanged command;
-      only then may the semantic leg advance."
+      for a non-final pass: `cut-slice-postcondition` and `cut-regression-inventory`. The pass that
+      CLOSES the set - the last ordinal to settle, whichever it is, not the highest
+      (inc-751dd1ac4492) - must additionally record `full-regression-final` green from the unchanged
+      command; only then may the semantic leg advance."
     forbids:
       - declaring a non-final slice done from file edits alone or without an exact-slice executable
         check

@@ -130,8 +130,9 @@ BOUNDARY — hard rules, non-negotiable:
     non-final slice may leave only mapped sibling failures in the unchanged
     full regression. Independently record green `cut-slice-postcondition` and
     `cut-regression-inventory`; preserve the raw nonzero integration output as
-    evidence. Require `full-regression-final` green on the final ordinal before
-    advancing the semantic leg. A settled job `api status` lists in
+    evidence. Require `full-regression-final` green on the pass that closes the
+    set - the last ordinal to settle, whichever it is (`api status` cutSets
+    closingOrdinal), not the highest - before advancing the semantic leg. A settled job `api status` lists in
     `staleInput` read a law input that changed after dispatch: redo it as a
     new attempt of the same op and cut ordinal (`api enqueue` with the same
     `--cut-id/--cut-ordinal/--cut-total`), a stale cut seam-first — the seam

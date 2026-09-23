@@ -211,6 +211,13 @@ commands:
       awaitingOwner: '[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means the Kernel re-enqueues the op now, `pending` means the owner has not answered'
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
+      cutSets: >-
+        [{op, id, total, passed[], open[], jobs:{<ordinal>:{jobId,status}}, closingOrdinal?, closingJob?,
+        closingCheck?}] — every cut set of the workflow with an ordinal whose latest job has not settled
+        succeeded. With exactly one open ordinal it names that ordinal as the closing pass: its settle
+        requires `full-regression-final` besides the slice checks (settle.cutSet), so the Kernel runs the
+        unchanged full gates over the whole set before that settle. Ordinals settle out of order, so the
+        closing ordinal is whichever is left, not the highest (inc-751dd1ac4492)
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
       workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it'
     refuses:
@@ -847,12 +854,18 @@ commands:
       plain directory) settles without the proof, as does every fail or
       blocked verdict and every op without a committing commitPolicy. A
       proof that ran is recorded as `landed` on the receipt and result_json.
-    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
+    cutSet: >-
+      A cut pass records result.cutSet {id, total, closesSet, open[]} on the job and the op-settled
+      event. The closing pass (closesSet true) also appends `cut-set-closed` {op, cut, closedBy,
+      ordinal, check: full-regression-final}: the set counts done only there, after the unchanged full
+      gates ran green over every ordinal. `api status` cutSets names the pass that will close each
+      open set before it happens.
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
       - checks-not-green: 'pass requires at least one independently recorded green check and zero red checks'
-      - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the final ordinal additionally lacks full-regression-final'
+      - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the pass that CLOSES its cut set additionally lacks full-regression-final. The closing pass is the one that leaves no other ordinal of {op, cut id} open - every other ordinal''s latest job already settled succeeded - whichever ordinal settles last; ordinal === total is not the rule (inc-751dd1ac4492: ordinals settle out of order once the seam passes). The error names which case applies'
       - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'

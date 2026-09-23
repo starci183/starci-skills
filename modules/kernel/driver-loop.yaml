@@ -214,8 +214,11 @@ tick:
       only failures mapped to unsettled sibling ordinals; its independent
       Kernel checks are green `cut-slice-postcondition` and
       `cut-regression-inventory`, with the raw nonzero integration result kept
-      as evidence rather than mislabeled green. The final ordinal must record
-      `full-regression-final` green. This is a saga-style bounded migration:
+      as evidence rather than mislabeled green. The pass that closes the set
+      - the last ordinal to settle, whichever it is (`api status` cutSets
+      names it as closingOrdinal) - must record `full-regression-final` green:
+      the Kernel runs the unchanged full gates over the whole set before that
+      settle (inc-751dd1ac4492). This is a saga-style bounded migration:
       slice acceptance proves monotonic progress, final acceptance proves the
       global postcondition.
       If a complete disjoint partition cannot be derived from repository

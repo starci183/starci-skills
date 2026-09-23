@@ -132,12 +132,13 @@ policy:
       except for sibling-owned paths, and a finding a passed ordinal resolved may not reappear. The
       raw nonzero full result is recorded as integration evidence, not as the slice's red verdict.
       The Kernel records `cut-slice-postcondition` and `cut-regression-inventory` green for a
-      non-final pass; the FINAL ordinal must additionally record `full-regression-final` green from
-      the unchanged full validation before the leg advances."
+      non-final pass; the pass that CLOSES the set - the last ordinal to settle, whichever it is, not
+      the highest (inc-751dd1ac4492) - must additionally record `full-regression-final` green from
+      the unchanged full validation over the whole set before the leg advances."
     forbids:
       - declaring a non-final slice done without an exact-slice validation of its own records
       - accepting a full-validation finding on a path this slice or a passed ordinal owns
-      - advancing the leg before the final ordinal records full-regression-final green
+      - advancing the leg before the pass that closes the set records full-regression-final green
   modePolicy:
     selection: required-exactly-one
     implicitChain: false

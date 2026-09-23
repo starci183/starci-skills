@@ -305,6 +305,32 @@ const retryLineageFor = (db, { workflowId, op, cut, attempt }) => {
     .get(workflowId, op, attempt);
   return priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob)) : null;
 };
+/**
+ * The cut set {workflowId, op, cut.id} as the ledger holds it now: the latest job (highest attempt) of each
+ * ordinal 1..cut.total and the ordinals whose latest job has not settled succeeded. `ownJobId` counts as
+ * passed for its own ordinal - it is the job being settled. Ordinals settle in any order once the seam
+ * passed, so "final" is not ordinal === total: the pass that leaves no other ordinal open is the one that
+ * CLOSES the set, whichever ordinal it is (inc-751dd1ac4492: ordinal total could pass while a lower sibling
+ * was still running, and the last sibling to settle then passed on slice checks alone, so no ordinal ever
+ * ran the whole-set integration gate).
+ */
+const cutSetStateOf = (db, { workflowId, op, cut, ownJobId = null }) => {
+  const rows = db.prepare(`SELECT job_id,status,attempt,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY attempt`).all(workflowId, op, String(cut.id));
+  const latest = new Map();
+  for (const row of rows) latest.set(Number(row.ordinal), row);
+  const own = rows.find((row) => row.job_id === ownJobId);
+  const ordinals = Array.from({ length: Math.max(0, Number(cut.total) || 0) }, (_, i) => i + 1);
+  const open = ordinals.filter((n) => !(own && Number(own.ordinal) === n) && latest.get(n)?.status !== 'succeeded');
+  return {
+    id: String(cut.id), op, total: Number(cut.total),
+    passed: ordinals.filter((n) => !open.includes(n)),
+    open,
+    jobs: Object.fromEntries(ordinals.filter((n) => latest.has(n)).map((n) => [n, { jobId: latest.get(n).job_id, status: latest.get(n).status }])),
+  };
+};
+const CUT_SLICE_CHECKS = ['cut-slice-postcondition', 'cut-regression-inventory'];
+const CUT_SET_CLOSING_CHECK = 'full-regression-final';
 const operationTerminalHandleOf = (row, payload = jobPayloadOf(row)) => payload?.managed?.agentTerminalHandle
   ?? payload?.orca?.agentTerminalHandle
   ?? payload?.hierarchy?.runtime?.terminalHandle
@@ -1035,7 +1061,20 @@ function cmdStatus(ledger, args) {
         ? `settled ${staleReady.map(staleLabel).join(', ')} read inputs that changed since dispatch; re-dispatch each as a new attempt of the same op and cut ordinal (a cut seam-first) before yielding`
       : null,
   };
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, ...stale };
+  // Open cut sets and which ordinal's pass closes each: that pass is the one
+  // `api settle` holds to full-regression-final, so the Kernel runs the whole-set
+  // integration gate before it (inc-751dd1ac4492). A set with one open ordinal
+  // names it; ordinals settle out of order, so it need not be the highest.
+  const cutSets = [];
+  for (const row of workflowJobs) {
+    const cut = jobPayloadOf(row).cut;
+    if (!cut?.id || !row.op_id || cutSets.some((set) => set.op === row.op_id && set.id === String(cut.id))) continue;
+    const set = cutSetStateOf(db, { workflowId, op: row.op_id, cut });
+    if (!set.open.length) continue;
+    cutSets.push({ op: row.op_id, id: set.id, total: set.total, passed: set.passed, open: set.open, jobs: set.jobs,
+      ...(set.open.length === 1 ? { closingOrdinal: set.open[0], closingJob: set.jobs[set.open[0]]?.jobId ?? null, closingCheck: CUT_SET_CLOSING_CHECK } : {}) });
+  }
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, cutSets, ...stale };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
@@ -1045,6 +1084,7 @@ function cmdStatus(ledger, args) {
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
       ...queued.map((item) => `  ${item.jobId} (${item.opId ?? '-'}) ${item.queuedBecause}${item.detail ? ` — ${item.detail}` : ''}`),
       ...staleOperations.map((item) => `  stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}${item.heldBy ? ` (waits on seam ${item.heldBy})` : ''}`),
+      ...cutSets.map((set) => `  cut-set: ${set.op} ${set.id} passed ${set.passed.length}/${set.total}, open ${set.open.join(',')}${set.closingOrdinal ? ` — the pass of ordinal ${set.closingOrdinal}${set.closingJob ? ` (${set.closingJob})` : ''} closes it and records ${set.closingCheck}` : ''}`),
     ].join('\n'),
     args.json);
 }
@@ -2872,7 +2912,7 @@ function cmdSettle(ledger, args, repo) {
 
   let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
-  let awaitingOwner = false;
+  let awaitingOwner = false, cutSet = null;
   ledger.transaction(() => {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -2935,15 +2975,25 @@ function cmdSettle(ledger, args, repo) {
         throw Object.assign(new Error(`pass requires independently recorded green checks for ${jobId}`), { code: 'checks-not-green' });
       }
       if (payload.cut) {
-        const requiredNames = payload.cut.ordinal < payload.cut.total
-          ? ['cut-slice-postcondition', 'cut-regression-inventory']
-          : ['cut-slice-postcondition', 'cut-regression-inventory', 'full-regression-final'];
+        // Every slice pass records its scoped postcondition and the unchanged
+        // inventory. The pass that CLOSES the set - every other ordinal's
+        // latest job already settled succeeded, whichever ordinal settles last
+        // - additionally records full-regression-final: the unchanged full
+        // gates run once over the whole cut set before it counts done
+        // (inc-751dd1ac4492; verdict-contract.yaml cutSetAuthority).
+        cutSet = cutSetStateOf(db, { workflowId: job.workflow_id, op: jobOpOf(job), cut: payload.cut, ownJobId: jobId });
+        const closesSet = cutSet.open.length === 0;
+        const requiredNames = closesSet ? [...CUT_SLICE_CHECKS, CUT_SET_CLOSING_CHECK] : CUT_SLICE_CHECKS;
         const missing = requiredNames.filter((name) => !recordedChecks.some((check) => check?.name === name && check.exitCode === 0));
         if (missing.length) {
-          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')}`), {
+          const why = closesSet
+            ? `this pass closes cut set ${cutSet.id} (every other ordinal of ${cutSet.total} settled succeeded), so the unchanged full gates run over the whole set and record ${CUT_SET_CLOSING_CHECK}`
+            : `ordinal(s) ${cutSet.open.join(',')} of cut set ${cutSet.id} are still open, so this slice records its scoped checks and the set's last pass records ${CUT_SET_CLOSING_CHECK}`;
+          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')} — ${why}`), {
             code: 'cut-checks-missing', cut: payload.cut, missing,
           });
         }
+        result.cutSet = { id: cutSet.id, total: cutSet.total, closesSet, open: cutSet.open };
       }
     }
     machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
@@ -2957,8 +3007,15 @@ function cmdSettle(ledger, args, repo) {
       .run(payload.settledAt, job.workflow_id, reportDispatchIdOf(db, job)).changes > 0;
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed },
+      kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed, ...(result.cutSet ? { cutSet: result.cutSet } : {}) },
     });
+    // The set is done only here: its last pass recorded the whole-set gate.
+    if (result.cutSet?.closesSet) {
+      ledger.appendEvent({
+        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+        kind: 'cut-set-closed', payload: { op: jobOpOf(job), cut: payload.cut, closedBy: jobId, ordinal: payload.cut.ordinal, check: CUT_SET_CLOSING_CHECK },
+      });
+    }
   });
 
   // Mirror of releaseTwoPhase's machine half: lease rows are gone; now release
@@ -3049,8 +3106,8 @@ function cmdSettle(ledger, args, repo) {
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''})`, args.json);
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
 // The operation Task an op holds, whichever launch kind opened it, and the

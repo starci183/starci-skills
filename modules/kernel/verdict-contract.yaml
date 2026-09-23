@@ -240,9 +240,14 @@ accepts:
       integration command may remain nonzero on a non-final slice only as
       preserved evidence whose residual failures map exclusively to unsettled
       sibling ordinals. The green Kernel checks are the independently executed
-      `cut-slice-postcondition` and `cut-regression-inventory`; the final ordinal
-      additionally requires `full-regression-final` green. No generic operation
-      may reinterpret a red check this way.
+      `cut-slice-postcondition` and `cut-regression-inventory`; the pass that
+      closes the cut set additionally requires `full-regression-final` green.
+      The closing pass is the one that leaves no other ordinal open (every
+      other ordinal's latest job settled succeeded), whichever ordinal settles
+      last - never ordinal === total, because ordinals settle out of order
+      once the seam passes (inc-751dd1ac4492). `api settle` enforces it and
+      appends `cut-set-closed`; the set counts done only there. No generic
+      operation may reinterpret a red check this way.
   - layer: boundary-correct
     rule: >-
       A blocked verdict is accepted only with a typed blocker in BLOCKER_KINDS
