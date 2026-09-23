@@ -5,7 +5,8 @@
 // canonical status/survey projections, observe the attested Kernel terminal,
 // wake the same terminal after an LLM turn falls back to its input prompt, or
 // ask start-workflow to replace a terminal a responding Orca proves
-// disconnected (twice), or to adopt back a live kernel whose seat was lost.
+// disconnected (twice) or back at a bare shell prompt (its agent exited, seen
+// on two reads), or to adopt back a live kernel whose seat was lost.
 // An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable:
 // waited out and re-verified, never a restart (scripts/kernel/host-outage.mjs).  It never
 // plans, enqueues, routes, dispatches, reconciles, settles or finishes Ops.
@@ -25,9 +26,10 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState, exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
-import { settledKernelVerdict, DEAD_VERDICTS } from './host-outage.mjs';
+import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
+import { sleepSync } from '../api/orca/lib.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -112,6 +114,7 @@ const replaceKernel = (base) => {
   return {
     ...base, ok: started.ok && started.value?.ok !== false, action: started.ok ? 'restarted' : 'restart-failed',
     replacementTerminal: started.value?.terminal ?? null,
+    ...(started.value?.exitedTerminalsClosed ? { exitedTerminalsClosed: started.value.exitedTerminalsClosed } : {}),
     detail: started.value ?? started.stderr ?? started.stdout,
   };
 };
@@ -159,6 +162,23 @@ export async function watchdogTick() {
 
   const read = terminalRead({ terminal, screen: true });
   if (!read.ok) return { ok: false, workflowId, phase, terminal, action: 'terminal-unreadable', error: read.error };
+  // The kernel's agent exited and left its host shell: a responding Orca (the
+  // show and the read both answered) shows a plain shell, which is a dead
+  // kernel, not an 'observed' one. A second read after the settle confirms it;
+  // start-workflow re-proves it, launches the replacement and then closes this
+  // shell. An Orca outage never reaches here (host-unavailable above).
+  const shellPrompt = exitedAgentPromptRow(read.screen);
+  if (shellPrompt) {
+    const deathReason = `agent exited: the kernel terminal is back at the shell prompt '${shellPrompt}'`;
+    if (!repair) return { ok: true, workflowId, phase, terminal, action: 'restart-needed', state: 'agent-exited', shellPrompt, reason: deathReason };
+    if (DEATH_SETTLE_MS > 0) sleepSync(DEATH_SETTLE_MS);
+    const again = terminalRead({ terminal, screen: true });
+    if (!again.ok || !exitedAgentPromptRow(again.screen)) return {
+      ok: true, workflowId, phase, terminal, action: 'agent-exit-unconfirmed', state: 'agent-exited', shellPrompt,
+      reason: again.ok ? 'the second read no longer ends in a shell prompt' : `the second read failed: ${again.error ?? 'unreadable'}`,
+    };
+    return replaceKernel({ workflowId, phase, terminal, state: 'agent-exited', shellPrompt, deathReason });
+  }
   const screen = classifyKernelScreen(read.screen);
   const lastOutputAt = Number(shown.terminal?.lastOutputAt) || null;
   const outputAgeMs = lastOutputAt == null ? null : Math.max(0, Date.now() - lastOutputAt);

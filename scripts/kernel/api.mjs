@@ -67,7 +67,7 @@ import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
-import { closeOperationTerminal } from './close-op-terminal.mjs';
+import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from './serve-ask.mjs';
@@ -3430,17 +3430,45 @@ const opRiskHints = (op) => {
   } catch { return null; }
 };
 const EVIDENCE_CAP = 40;
+// The dead worker's terminal is not left open behind the recovery: an agent
+// that exited leaves its host shell (a stray PowerShell tab per dead op), and
+// a requeue clears the bindings settle would have closed it by. It is closed
+// with its tab only on fresh proof that it is a bare shell or disconnected
+// (close-op-terminal.mjs closeExitedTerminal); an agent screen or an Orca that
+// does not answer leaves it open. A close attempt is recorded on the job as
+// 'dead-worker-terminal-closed'. Returns the close result, or null.
+const closeDeadWorkerTerminal = (ledger, job, handle) => {
+  if (!handle) return null;
+  // A repeat after the close landed is a no-op, not a second close event.
+  const done = ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='dead-worker-terminal-closed'").all(job.job_id)
+    .map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => p.attempt === job.attempt && p.handle === handle && p.closed === true);
+  if (done) return { handle, closed: true, proof: done.proof ?? null, alreadyClosed: true };
+  const closed = bestEffort(() => closeExitedTerminal(handle)) ?? null;
+  if (closed?.proof && closed.proof !== 'gone') {
+    ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'dead-worker-terminal-closed',
+      payload: { opId: jobOpOf(job), attempt: job.attempt, ...closed } });
+  }
+  return closed;
+};
+const closedNote = (closed) => !closed ? ''
+  : closed.closed ? `; terminal ${closed.handle} closed (${closed.proof}${closed.shellPrompt ? ` '${closed.shellPrompt}'` : ''})`
+  : closed.proof === 'gone' ? '' : `; terminal ${closed.handle} left open (${closed.reason ?? closed.error ?? 'close refused'})`;
 function reconcileDeadWorker(ledger, args, job, repo) {
   const db = ledger.db, jobId = job.job_id, op = jobOpOf(job), payload = jobPayloadOf(job);
   const prior = parseJson(job.result_json ?? '', {}) ?? {};
+  // A job recovered before its shell was closed: the recorded dead terminal of this attempt.
+  const recordedDeadTerminal = () => [...(Array.isArray(payload.deadWorkers) ? payload.deadWorkers : [])]
+    .reverse().find((entry) => entry?.attempt === job.attempt && entry?.terminal)?.terminal ?? null;
   if (job.status === 'queued' && prior.reason === 'dead-worker-requeued') {
-    const out = { ok: true, jobId, recovery: 'requeued', alreadyRecovered: true, status: 'queued', attempt: job.attempt };
-    emit(out, `reconcile ${jobId}: dead worker already requeued (attempt ${job.attempt})`, args.json);
+    const terminalClosed = closeDeadWorkerTerminal(ledger, job, recordedDeadTerminal());
+    const out = { ok: true, jobId, recovery: 'requeued', alreadyRecovered: true, status: 'queued', attempt: job.attempt, ...(terminalClosed ? { terminalClosed } : {}) };
+    emit(out, `reconcile ${jobId}: dead worker already requeued (attempt ${job.attempt})${closedNote(terminalClosed)}`, args.json);
     return;
   }
   if (job.status === 'effect_unknown' && prior.reason === 'dead-worker-fenced') {
-    const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: job.attempt, evidence: prior.evidence ?? [] };
-    emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and api settle it`, args.json);
+    const terminalClosed = closeDeadWorkerTerminal(ledger, job, recordedDeadTerminal());
+    const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: job.attempt, evidence: prior.evidence ?? [], ...(terminalClosed ? { terminalClosed } : {}) };
+    emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and api settle it${closedNote(terminalClosed)}`, args.json);
     return;
   }
   if (!['running', 'answering'].includes(job.status)) {
@@ -3550,14 +3578,16 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       try { machineRefsReleased = machine.release(machineRefs).released; } finally { machine.close(); }
     } catch { /* ledger proof stands; machine TTLs expire independently */ }
   }
+  // After the recovery is written: the dead worker's shell is closed, never before.
+  const terminalClosed = closeDeadWorkerTerminal(ledger, job, worker.terminalHandle);
   const out = recovery === 'requeued'
     ? { ok: true, jobId, recovery, status: 'queued', attempt: job.attempt, attemptConsumed: false, effectState: 'none', dispatchId,
-      leasesReleased, machineRefsReleased, worker, proof: result.proof }
+      leasesReleased, machineRefsReleased, worker, proof: result.proof, ...(terminalClosed ? { terminalClosed } : {}) }
     : { ok: true, jobId, recovery, status: 'effect_unknown', attempt: job.attempt, effectState: result.effectState, dispatchId,
-      evidence: recorded, worker, paths: pathProof };
+      evidence: recorded, worker, paths: pathProof, ...(terminalClosed ? { terminalClosed } : {}) };
   emit(out, recovery === 'requeued'
-    ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${job.attempt} queued (leases released: ${leasesReleased}) - route and dispatch it again`
-    : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and api settle it (fail or blocked), then retry as a new attempt`, args.json);
+    ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${job.attempt} queued (leases released: ${leasesReleased}) - route and dispatch it again${closedNote(terminalClosed)}`
+    : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and api settle it (fail or blocked), then retry as a new attempt${closedNote(terminalClosed)}`, args.json);
 }
 
 // Re-open an effect_unknown dispatch only when the host can now prove that

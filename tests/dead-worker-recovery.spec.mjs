@@ -62,7 +62,8 @@ const world=(t,fn,{terminal={connected:false,writable:false}}={})=>withLedger(t,
   const job=()=>ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB);
   const leases=()=>ledger.db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(JOB).n;
   const events=kind=>ledger.db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND entity_id=? AND kind=?').all(WF,JOB,kind);
-  return fn({repoRoot,ledger,run,job,leases,events});
+  const orcaState=()=>JSON.parse(fs.readFileSync(stateFile,'utf8'));
+  return fn({repoRoot,ledger,run,job,leases,events,orcaState});
 });
 
 const status=run=>{const r=run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
@@ -174,3 +175,96 @@ test('a commit on the owned paths since dispatch fences the job even with a clea
   assert.ok(out(r).evidence.includes(`commit:${sha}`),JSON.stringify(out(r).evidence));
   assert.equal(job().status,'effect_unknown');
 }));
+
+// 2026-09-24: reconcile --dead-worker recovered agent-exited workers and left each one's shell open - a
+// stray PowerShell tab per dead op (mia-mia term_0982b445). The recovery now closes that terminal with its
+// tab, but only on fresh proof: disconnected, or a frame that ends in a bare shell prompt.
+// Captured 2026-09-24 from term_0982b445 (mia-mia-backend): a Codex op whose agent exited mid-turn.
+const DEAD_CODEX=['','• Ran node \'D:\\Repositories\\starci-academy-backend\\.claude\\bin\\starci.mjs\' validate \'.starciwork\' --json','  └ {',
+  '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
+  '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
+  '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
+  'PS D:\\Repositories\\mia-mia-backend>'].join('\n');
+const EXITED={connected:true,writable:true,sent:true,command:'codex --model gpt-6-sol',screen:DEAD_CODEX};
+const closeEvents=events=>events('dead-worker-terminal-closed').map(r=>JSON.parse(r.payload_json));
+
+test('an exited worker is requeued and its bare-shell terminal is closed with its tab, after the recovery',t=>world(t,({run,job,events,orcaState})=>{
+  assert.equal(status(run).workers.find(w=>w.jobId===JOB)?.liveness,'agent-exited');
+  const r=run('reconcile','--job',JOB,'--dead-worker');
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const body=out(r);
+  assert.equal(body.recovery,'requeued');
+  assert.deepEqual([body.terminalClosed.handle,body.terminalClosed.closed,body.terminalClosed.proof,body.terminalClosed.shellPrompt],
+    [HANDLE,true,'shell-prompt','PS D:\\Repositories\\mia-mia-backend>']);
+  assert.deepEqual(orcaState().closedTabs,[HANDLE],'closed with its tab, so Orca never restores the shell');
+  assert.equal(orcaState().terminals[HANDLE].closed,true);
+  assert.equal(job().status,'queued','the close follows the requeue');
+  const recorded=closeEvents(events);
+  assert.equal(recorded.length,1);
+  assert.deepEqual([recorded[0].handle,recorded[0].closed,recorded[0].proof,recorded[0].attempt],[HANDLE,true,'shell-prompt',1]);
+  const again=out(run('reconcile','--job',JOB,'--dead-worker'));
+  assert.equal(again.alreadyRecovered,true);
+  assert.equal(again.terminalClosed.alreadyClosed,true);
+  assert.equal(closeEvents(events).length,1,'a repeat closes nothing twice');
+  assert.equal(orcaState().closed.length,1);
+},{terminal:EXITED}));
+
+test('a fenced exited worker has its shell closed too; the evidence is in git, not in the shell',t=>world(t,({repoRoot,run,job,orcaState})=>{
+  fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
+  const body=out(run('reconcile','--job',JOB,'--dead-worker'));
+  assert.equal(body.recovery,'fenced');
+  assert.equal(job().status,'effect_unknown');
+  assert.deepEqual([body.terminalClosed.closed,body.terminalClosed.proof],[true,'shell-prompt']);
+  assert.deepEqual(orcaState().closedTabs,[HANDLE]);
+},{terminal:EXITED}));
+
+test('a disconnected worker terminal is closed after the requeue',t=>world(t,({run,events,orcaState})=>{
+  const body=out(run('reconcile','--job',JOB,'--dead-worker'));
+  assert.deepEqual([body.recovery,body.terminalClosed.closed,body.terminalClosed.proof],['requeued',true,'disconnected']);
+  assert.deepEqual(orcaState().closed,[HANDLE]);
+  assert.equal(closeEvents(events).length,1);
+}));
+
+test('a gone worker handle is requeued with nothing closed and no close event',t=>world(t,({run,events,orcaState})=>{
+  const body=out(run('reconcile','--job',JOB,'--dead-worker'));
+  assert.deepEqual([body.recovery,body.terminalClosed.closed,body.terminalClosed.proof],['requeued',false,'gone']);
+  assert.equal((orcaState().closed??[]).length,0);
+  assert.equal(closeEvents(events).length,0);
+},{terminal:{stale:true}}));
+
+test('a job requeued before the close existed has its recorded shell closed by the next --dead-worker',t=>world(t,({ledger,run,job,events,orcaState})=>{
+  // The pre-fix outcome: requeued, bindings cleared, the dead terminal only in payload.deadWorkers, its shell still open.
+  const payload=JSON.parse(job().payload_json);
+  delete payload.orca;delete payload.hierarchy.runtime.terminalHandle;
+  payload.deadWorkers=[{attempt:1,dispatchId:HANDLE,terminal:HANDLE,liveness:'agent-exited',recovery:'requeued',at:Date.now()}];
+  ledger.db.prepare("UPDATE jobs SET status='queued',worker_id=NULL,payload_json=?,result_json=? WHERE job_id=?")
+    .run(JSON.stringify(payload),JSON.stringify({reason:'dead-worker-requeued'}),JOB);
+  const body=out(run('reconcile','--job',JOB,'--dead-worker'));
+  assert.equal(body.alreadyRecovered,true);
+  assert.deepEqual([body.terminalClosed.handle,body.terminalClosed.closed,body.terminalClosed.proof],[HANDLE,true,'shell-prompt']);
+  assert.deepEqual(orcaState().closedTabs,[HANDLE]);
+  assert.equal(closeEvents(events).length,1);
+},{terminal:EXITED}));
+
+test('closeExitedTerminal closes only on proof: a bare shell or a disconnected terminal, never an agent screen or an outage',async()=>{
+  const {closeExitedTerminal}=await import('../scripts/kernel/close-op-terminal.mjs');
+  const closes=[];const close=h=>{closes.push(h);return {ok:true};};
+  const up={ok:true,connected:true,writable:true};
+  const probe=(shown,screen)=>closeExitedTerminal('t1',{show:()=>shown,read:()=>screen==null?{ok:false}:{ok:true,screen},close});
+  let r=probe(up,DEAD_CODEX);
+  assert.deepEqual([r.closed,r.proof,r.shellPrompt],[true,'shell-prompt','PS D:\\Repositories\\mia-mia-backend>']);
+  r=probe({ok:true,connected:false,writable:false},null);
+  assert.deepEqual([r.closed,r.proof],[true,'disconnected']);
+  assert.equal(closes.length,2);
+  closes.length=0;
+  const live=['• Ran git status','  └ PS D:\\x> git status','› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
+  r=probe(up,live);assert.deepEqual([r.closed,r.proof,r.reason],[false,null,'agent-screen']);
+  r=probe(up,null);assert.deepEqual([r.closed,r.reason],[false,'unreadable']);
+  r=probe({ok:false,hostUnavailable:true,errorCode:'runtime_unavailable',error:'Start the Orca app first.'});
+  assert.deepEqual([r.closed,r.proof,r.reason],[false,null,'host-unavailable']);
+  r=probe({ok:false,errorCode:'terminal_handle_stale'});assert.deepEqual([r.closed,r.proof],[false,'gone']);
+  r=probe({ok:false,errorCode:'runtime_error',error:'odd'});assert.deepEqual([r.closed,r.reason],[false,'unverified']);
+  assert.deepEqual(closes,[],'nothing closed without proof');
+  r=closeExitedTerminal('t1',{show:()=>up,read:()=>({ok:true,screen:DEAD_CODEX}),close:()=>({ok:false,error:'terminal_close_refused'})});
+  assert.deepEqual([r.closed,r.proof,r.error],[false,'shell-prompt','terminal_close_refused']);
+});

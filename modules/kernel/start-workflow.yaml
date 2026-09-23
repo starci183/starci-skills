@@ -62,6 +62,23 @@ claim:
     generation is unchanged). Dead means a RESPONDING Orca says so
     (scripts/kernel/host-outage.mjs): the handle is terminal_handle_stale or
     missing from the listing, or listed disconnected/unwritable.
+  onAgentExited: >-
+    A kernel terminal that is connected but whose frame ENDS in a bare shell
+    prompt (scripts/kernel/terminal-liveness.mjs exitedAgentPromptRow: the
+    agent exited and left its PowerShell/cmd/POSIX shell) is a dead kernel on
+    a responding Orca, never a live signal and never adoptable. The watchdog
+    confirms it with a second read after the death settle and asks
+    start-workflow for a replacement; start-workflow re-proves it, clears the
+    seat (kernel-stale-cleared with agentExited, shellPrompt), launches the
+    replacement and only THEN closes the old shell with its tab on fresh proof
+    it is still a bare shell or disconnected
+    (close-op-terminal.mjs closeExitedTerminal), recorded as
+    kernel-exited-terminal-closed {liveTerminal, terminals[]} and returned as
+    exitedTerminalsClosed; a shell left open is an open
+    kernel-stale-terminal-unclosed incident, and a closed one resolves the
+    open incidents of that kind naming it. A kernel job terminal in that
+    state does not answer kernel-terminal-alive either. A failed launch
+    leaves the shell for the next start to close.
   onHostOutage: >-
     Orca not answering - runtime_unavailable, orca.exe ENOENT while an update
     replaces it, a timed-out call - says nothing about any terminal. It is
@@ -76,7 +93,9 @@ claim:
     kernel-terminal-alive, exit 3) and `--adopt <terminal>` binds it back - the
     terminal must be named by the kernel job or a kernel event of the
     workflow, live on a responding Orca, in the repo's worktree and showing an
-    agent session, and no other live kernel may hold the signal. Adopt writes
+    agent session (a frame ending in a bare shell prompt refuses
+    adopt-terminal-agent-exited), and no other live kernel may hold the
+    signal; a signal terminal whose agent exited is closed after the adopt. Adopt writes
     the signal, marks the job running with that worker, resolves the open
     kernel-stale-terminal-unclosed incidents naming it, records
     kernel-adopted and types nothing into the terminal. The watchdog adopts on

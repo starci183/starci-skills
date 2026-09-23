@@ -47,7 +47,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { kernelTerminalVerdict } from './host-outage.mjs';
-import { classifyAgentScreen } from './terminal-liveness.mjs';
+import { classifyAgentScreen, exitedAgentPromptRow } from './terminal-liveness.mjs';
+import { closeExitedTerminal } from './close-op-terminal.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
@@ -341,6 +342,16 @@ const renderKernelPrompt = ({ workflowId, inboxId, goalRevision }) => promptTemp
 
 const MANAGED_DEAD_STATE = /stop|fail|dead|exit|release|abandon/i;
 
+// The bare shell prompt a connected kernel terminal ends in once its agent
+// exited (terminal-liveness.mjs exitedAgentPromptRow), or null. An unreadable
+// frame proves nothing and reads null.
+function agentExitedRow(handle) {
+  try {
+    const read = terminalRead({ terminal: handle, screen: true });
+    return read?.ok ? exitedAgentPromptRow(read.screen) : null;
+  } catch { return null; }
+}
+
 // A live signal is proven, not assumed: command-terminal kernels by a
 // connected+writable terminal, managed kernels by worker-show reporting a
 // non-terminal worker state. Nothing that cannot be proven live blocks a
@@ -371,6 +382,11 @@ async function signalHealth(signal) {
   // does not answer proves nothing (hostUnavailable), and neither does a
   // refusal the listing cannot settle (unverified).
   const probe = kernelTerminalVerdict(value.terminal);
+  // A connected terminal whose agent exited is a plain shell, not a kernel:
+  // dead on a responding Orca, closed only after its replacement launched.
+  const exited = probe.verdict === 'live' ? agentExitedRow(value.terminal) : null;
+  if (exited) return { live: false, agentExited: true, shellPrompt: exited,
+    reason: `agent exited: the terminal is back at the shell prompt '${exited}'`, terminal: probe.shown?.terminal ?? null, value };
   return { live: probe.verdict === 'live', gone: probe.verdict === 'gone',
     hostUnavailable: probe.verdict === 'host-unavailable', unverified: probe.verdict === 'unverified',
     errorCode: probe.errorCode ?? null, reason: probe.reason, terminal: probe.shown?.terminal ?? null, value };
@@ -430,6 +446,12 @@ async function adoptKernel(workflowId, handle) {
   if (worktreePath && !samePath(worktreePath, repo))
     refuse('adopt-terminal-wrong-worktree', { workflowId, terminal: handle, error: `${handle} runs in ${worktreePath}, not ${repo}` });
   const read = terminalRead({ terminal: handle, screen: true });
+  // A frame that ends in a bare shell prompt: the kernel's agent exited and
+  // the terminal is a plain shell. It is replaced, never adopted.
+  const shellPrompt = read.ok ? exitedAgentPromptRow(read.screen) : null;
+  if (shellPrompt)
+    refuse('adopt-terminal-agent-exited', { workflowId, terminal: handle, screenState: 'agent-exited', shellPrompt,
+      error: `${handle} is back at the shell prompt '${shellPrompt}': its agent exited, so it is a dead kernel to replace, not one to adopt` });
   const screenState = read.ok ? classifyAgentScreen(read.screen).state : 'unreadable';
   if (['failed', 'unknown', 'unreadable'].includes(screenState))
     refuse('adopt-terminal-no-agent', { workflowId, terminal: handle, screenState,
@@ -466,8 +488,11 @@ async function adoptKernel(workflowId, handle) {
         previousSignal: priorSignal ? { token: priorSignal.token, terminal: priorValue.terminal ?? null, reason: priorHealth?.reason ?? null } : null,
         resolvedIncidents: resolved } });
   });
+  // The signal's own terminal was an exited agent's shell: closed now that a live kernel holds the seat.
+  const exitedClosed = priorHealth?.agentExited ? closeExitedKernelTerminals(workflowId, [priorValue.terminal], handle) : [];
   const out = { ok: true, workflowId, kernel: token, terminal: handle, adopted: true, agent, model: seat.model, screenState,
-    previousJobStatus: job.status, resolvedIncidents: resolved, replaced: false };
+    previousJobStatus: job.status, resolvedIncidents: resolved, replaced: false,
+    ...(exitedClosed.length ? { exitedTerminalsClosed: exitedClosed } : {}) };
   console.log(asJson ? JSON.stringify(out) : `[Kernel] ${workflowId} adopted live terminal ${handle} (${agent ?? 'agent?'}; ${screenState})`);
   process.exit(0);
 }
@@ -493,6 +518,43 @@ function closeStaleKernelTerminal(handle) {
   try { closed = terminalClose({ terminal: handle }); }
   catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
   return { handle, ok: closed?.ok === true, ...(closed?.error ? { error: String(closed.error) } : {}) };
+}
+
+// A kernel terminal whose agent exited is a bare shell left open beside its
+// replacement. It is closed only AFTER the replacement (or an adopted kernel)
+// holds the seat, and only on fresh proof that it is still a bare shell or
+// disconnected (close-op-terminal.mjs closeExitedTerminal) - one workflow, one
+// kernel terminal. Each result is recorded (kernel-exited-terminal-closed); a
+// terminal left open is an open kernel-stale-terminal-unclosed incident.
+function closeExitedKernelTerminals(workflowId, handles, liveHandle) {
+  const results = [];
+  for (const handle of new Set(handles.filter(Boolean))) {
+    if (handle === liveHandle) continue;
+    results.push(closeExitedTerminal(handle));
+  }
+  if (!results.length) return results;
+  const at = Date.now();
+  const generation = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId)?.generation ?? 0;
+  const unclosed = results.filter((r) => !r.closed && r.proof !== 'gone');
+  ledger.transaction(() => {
+    // A shell now closed (or gone) is no longer residue: its open unclosed-terminal incidents resolve.
+    for (const r of results.filter((x) => x.closed || x.proof === 'gone')) {
+      const ids = ledger.db.prepare("SELECT incident_id FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE '%kernel-stale-terminal-unclosed%' AND last_progress LIKE ?")
+        .all(workflowId, `%${r.handle}%`).map((row) => row.incident_id);
+      for (const id of ids) ledger.db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(at, id);
+      if (ids.length) r.resolvedIncidents = ids;
+    }
+    ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation, kind: 'kernel-exited-terminal-closed',
+      payload: { liveTerminal: liveHandle, terminals: results }, createdAt: at });
+    for (const r of unclosed) {
+      ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,NULL,0,0,0,0,?,'open',?)")
+        .run(`inc-${crypto.randomBytes(6).toString('hex')}`, workflowId,
+          `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', handle: r.handle, ok: false, agentExited: true,
+            ...(r.proof ? { proof: r.proof } : {}), error: r.error ?? r.reason ?? null })}`, at);
+    }
+  });
+  for (const r of unclosed) console.error(`start-workflow: warning: exited kernel terminal ${r.handle} was not closed (${r.error ?? r.reason ?? 'no reason given'}) — incident opened`);
+  return results;
 }
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
@@ -598,6 +660,9 @@ try {
   // The seat may be gone while the kernel is not: a restart that failed during
   // an Orca outage stopped the job and deleted the signal of a kernel that kept
   // running. Never launch a second kernel beside it; --adopt binds it back.
+  // A kernel job terminal whose agent exited is a bare shell, not a kernel:
+  // it does not block the launch and is closed once the replacement is up.
+  const exitedKernelTerminals = [];
   {
     const kernelJob = ledger.db.prepare('SELECT status,worker_id,payload_json FROM jobs WHERE job_id=?').get(`kernel-${target}`);
     for (const handle of kernelJobHandles(kernelJob)) {
@@ -607,6 +672,7 @@ try {
         refuse('host-unavailable', { workflowId: target, terminal: handle, error: probe.reason }, EXIT_HOST_UNAVAILABLE);
       if (probe.verdict === 'unverified')
         refuse('kernel-terminal-unverified', { workflowId: target, terminal: handle, error: probe.reason });
+      if (probe.verdict === 'live' && agentExitedRow(handle)) { exitedKernelTerminals.push(handle); continue; }
       if (probe.verdict === 'live')
         refuse('kernel-terminal-alive', { workflowId: target, terminal: handle, jobStatus: kernelJob.status,
           error: `kernel job terminal ${handle} is alive (job ${kernelJob.status}); adopt it with --adopt ${handle} instead of launching a second kernel` }, EXIT_KERNEL_ALIVE);
@@ -622,6 +688,11 @@ try {
     // A restart closes the previous kernel terminal BEFORE the new one is
     // recorded — one workflow, one live kernel terminal.
     if (priorHealth.value?.dispatch) releaseManagedWorker(priorHealth.value.dispatch);
+    else if (priorHealth.agentExited) {
+      // The exited agent's shell stays open until the replacement launched.
+      Object.assign(staleKernel, { agentExited: true, shellPrompt: priorHealth.shellPrompt, terminalClose: 'after-replacement' });
+      exitedKernelTerminals.unshift(staleKernel.terminal);
+    }
     else if (priorHealth.gone) staleKernel.terminalClosed = { handle: staleKernel.terminal, ok: true, gone: true };
     else staleKernel.terminalClosed = closeStaleKernelTerminal(staleKernel.terminal);
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(target);
@@ -842,7 +913,11 @@ try {
       createdAt: now });
   });
 
+  // The replacement holds the seat: the exited kernel's shell is closed now.
+  const exitedClosed = closeExitedKernelTerminals(workflowId, exitedKernelTerminals, handle);
+
   const out = { ok: true, workflowId, kernel: token, terminal: handle, host: 'orca', executionHost: 'orca',
+    ...(exitedClosed.length ? { exitedTerminalsClosed: exitedClosed } : {}),
     agent: route.agent, routedBy: route.routedBy, launch: routeInfo.launch, modelAttested: true,
     ...(kernelModel ? { model: kernelModel } : {}), ...(kernelEffort ? { effort: kernelEffort } : {}),
     ...(route.route?.profile ? { profile: route.route.profile } : {}),

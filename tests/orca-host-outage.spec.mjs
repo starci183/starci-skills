@@ -182,7 +182,7 @@ test('--adopt refuses a terminal that is not this kernel and a bare shell; re-ad
   f.loseSeat();
   f.writeState(s=>{s.terminals[f.kernel].screen='PS D:\\repo>';});
   const shell=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
-  assert.equal(shell.status,1);assert.equal(lastJson(shell.stdout)?.step,'adopt-terminal-no-agent','a bare shell is not a kernel');
+  assert.equal(shell.status,1);assert.equal(lastJson(shell.stdout)?.step,'adopt-terminal-agent-exited','a bare shell is an exited kernel, not one to adopt');
   assert.equal(f.ledgerRows().job.status,'stopped','a refused adopt changes nothing');
 });
 
@@ -244,4 +244,111 @@ test('watchdog: a kernel a responding Orca proves dead is still replaced',t=>{
   assert.notEqual(result.replacementTerminal,f.kernel);
   const rows=f.ledgerRows();
   assert.deepEqual([rows.job.status,rows.job.worker_id,rows.job.attempt],['running',result.replacementTerminal,2]);
+});
+
+/* ------------------------------------------------ kernel agent exited */
+
+// A kernel whose agent exited leaves its host shell: Orca (responding) shows the
+// terminal connected and writable, the frame ends in a bare PowerShell prompt. The
+// watchdog read it 'observed' and the workflow sat without a kernel. It is a dead
+// kernel: replaced through start-workflow, and its shell closed only after the
+// replacement holds the seat. Shaped on a Codex kernel's exit (token usage and
+// resume line) with the idle frame still above it.
+const EXITED_KERNEL=['• Yielding - waiting on the op report.','› Ask Codex to do anything','  gpt-6-sol high · repo','',
+  'Token usage: total=1,204,331 input=1,150,002 (+ 9,876,544 cached) output=54,329 (reasoning 31,020)',
+  'To continue this session, run codex resume 0199a7c2-5b1e-7d40-9c1f-3e2a8b6d4f10','','PS D:\\Repositories\\mia-mia-backend>'].join('\n');
+const exitKernel=f=>f.writeState(s=>{s.terminals[f.kernel].screen=EXITED_KERNEL;});
+// Every call in order with its terminal argument: 'terminal create' / 'terminal close:<handle>'.
+const callLog=f=>{
+  const file=path.join(path.dirname(f.repo),'calls.jsonl');
+  return fs.readFileSync(file,'utf8').trim().split('\n').filter(Boolean).map(l=>json(l).argv).map(a=>{
+    const verb=a.slice(0,2).join(' '),i=a.indexOf('--terminal');
+    return i>=0&&verb==='terminal close'?`${verb}:${a[i+1]}`:verb;
+  });
+};
+
+test('watchdog: a kernel whose agent exited to a shell is replaced, and its shell closed after the replacement',t=>{
+  const f=fixture(t);
+  exitKernel(f);
+  const {status,result,stderr}=tick(f);
+  assert.equal(status,0,stderr||JSON.stringify(result));
+  assert.deepEqual([result.action,result.state,result.shellPrompt],['restarted','agent-exited','PS D:\\Repositories\\mia-mia-backend>'],JSON.stringify(result));
+  const next=result.replacementTerminal;
+  assert.ok(next&&next!==f.kernel);
+  assert.deepEqual(result.exitedTerminalsClosed.map(c=>[c.handle,c.closed,c.proof]),[[f.kernel,true,'shell-prompt']]);
+  const calls=callLog(f);
+  const created=calls.lastIndexOf('terminal create'),closed=calls.indexOf(`terminal close:${f.kernel}`);
+  assert.ok(closed>created&&created>=0,`the old shell is closed after the replacement launched: ${calls.join(', ')}`);
+  assert.deepEqual(f.readState().closedTabs,[f.kernel],'closed with its tab');
+  const rows=f.ledgerRows();
+  assert.deepEqual([rows.signal.terminal,rows.job.status,rows.job.worker_id,rows.job.attempt],[next,'running',next,2]);
+  assert.ok(rows.kinds.includes('kernel-stale-cleared')&&rows.kinds.includes('kernel-restarted')&&rows.kinds.includes('kernel-exited-terminal-closed'),rows.kinds.join(','));
+  assert.deepEqual(rows.incidents,[],'a closed shell leaves no residue incident');
+});
+
+test('watchdog without --repair reports an exited kernel as restart-needed and touches nothing',t=>{
+  const f=fixture(t);
+  exitKernel(f);
+  const before=f.ledgerRows();
+  const r=f.run(WATCHDOG,['--repo',f.repo,'--workflow',f.workflowId,'--once','--json']);
+  const result=lastJson(r.stdout);
+  assert.deepEqual([result.action,result.state],['restart-needed','agent-exited'],JSON.stringify(result));
+  assert.deepEqual(f.ledgerRows(),before);
+  assert.equal(f.readState().closed,undefined,'nothing closed');
+});
+
+test('an Orca outage is still host-unavailable while the kernel frame shows a shell',t=>{
+  const f=fixture(t);
+  exitKernel(f);
+  const before=f.ledgerRows();const creates=f.calls().filter(c=>c==='terminal create').length;
+  const {result}=tick(f,{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'});
+  assert.deepEqual([result.ok,result.action],[true,'host-unavailable'],JSON.stringify(result));
+  const started=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'});
+  assert.equal(started.status,75);
+  assert.deepEqual(f.ledgerRows(),before);
+  assert.equal(f.calls().filter(c=>c==='terminal create').length,creates);
+});
+
+test('start-workflow: an exited kernel is not a live seat; a failed launch leaves its shell for the next start to close',t=>{
+  const f=fixture(t);
+  exitKernel(f);
+  // The pinned kernel agent is dead: the launch fails after the seat was cleared.
+  const failed=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],{STARCI_FAKE_ORCA_DEAD:'codex'});
+  assert.equal(failed.status,1,failed.stdout);
+  assert.equal(f.readState().closed,undefined,'no replacement, so the old shell is not closed');
+  assert.equal(f.ledgerRows().signal,null);
+  // The next start finds the shell through the kernel job, launches, then closes it.
+  const started=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json']);
+  assert.equal(started.status,0,started.stderr||started.stdout);
+  const out=json(started.stdout);
+  assert.notEqual(out.terminal,f.kernel,'an exited kernel job terminal is not kernel-terminal-alive');
+  assert.deepEqual(out.exitedTerminalsClosed.map(c=>[c.handle,c.closed,c.proof]),[[f.kernel,true,'shell-prompt']]);
+  assert.deepEqual(f.readState().closedTabs,[f.kernel]);
+});
+
+test('--adopt refuses a kernel terminal whose agent exited',t=>{
+  const f=fixture(t);
+  f.loseSeat();
+  exitKernel(f);
+  const r=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
+  assert.equal(r.status,1);
+  const out=lastJson(r.stdout);
+  assert.deepEqual([out.step,out.screenState,out.shellPrompt],['adopt-terminal-agent-exited','agent-exited','PS D:\\Repositories\\mia-mia-backend>']);
+  assert.equal(f.ledgerRows().job.status,'stopped','a refused adopt changes nothing');
+  assert.equal(f.readState().closed,undefined);
+});
+
+test('watchdog: a lost seat whose kernel terminal is a bare shell is relaunched, never adopted',t=>{
+  const f=fixture(t);
+  f.loseSeat();
+  exitKernel(f);
+  const {status,result,stderr}=tick(f);
+  assert.equal(status,0,stderr||JSON.stringify(result));
+  assert.equal(result.action,'restarted',JSON.stringify(result));
+  assert.notEqual(result.terminal,f.kernel);
+  assert.deepEqual(result.exitedTerminalsClosed.map(c=>[c.handle,c.closed]),[[f.kernel,true]]);
+  const rows=f.ledgerRows();
+  assert.deepEqual([rows.signal.terminal,rows.job.status],[result.terminal,'running']);
+  assert.deepEqual(rows.incidents,[{incident_id:'inc-unclosed-1',status:'resolved'}],'the closed shell is no longer residue');
+  assert.deepEqual(result.exitedTerminalsClosed[0].resolvedIncidents,['inc-unclosed-1']);
 });

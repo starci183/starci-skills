@@ -646,7 +646,8 @@ commands:
       `--dead-worker` is the saga recovery of a RUNNING (or answering) job whose
       exact worker terminal is gone: status worker liveness disconnected, or
       gone (a running Orca answered terminal_handle_stale - every op terminal
-      after a host shutdown), frontier `worker-dead`. An unreachable Orca
+      after a host shutdown), or agent-exited (the terminal is back at a bare
+      shell prompt), frontier `worker-dead`. An unreachable Orca
       (liveness unknown) refuses worker-liveness-unproven and a live terminal
       refuses worker-alive; both write nothing. Three routes. (1) A report is
       filed for the attempt: nothing is written and the answer is
@@ -678,8 +679,17 @@ commands:
       fail or blocked, then retries as a new attempt whose contract names the
       partial state; a plain reconcile of that job refuses dead-worker-fenced.
       Repeating --dead-worker on a recovered job is idempotent
-      (alreadyRecovered:true). Returns
-      '{ok:true,jobId,recovery:requeued|fenced|settle,status,attempt,effectState,attemptConsumed,evidence?,worker,proof?|paths?}'.
+      (alreadyRecovered:true). After a requeue or a fence is written (and on
+      a repeat, for the attempt's recorded dead terminal) the worker's
+      terminal is closed with its tab (scripts/kernel/close-op-terminal.mjs
+      closeExitedTerminal) only on fresh proof that it is disconnected or its
+      frame ends in a bare shell prompt (an exited agent's PowerShell); an
+      agent screen, an unreadable frame or an Orca that does not answer
+      leaves it open. The attempt is returned as terminalClosed
+      {handle,closed,proof:disconnected|shell-prompt|gone|null,shellPrompt?,tab?,reason?,error?}
+      and, unless the handle is gone, recorded as the job event
+      'dead-worker-terminal-closed'. The settle route closes nothing. Returns
+      '{ok:true,jobId,recovery:requeued|fenced|settle,status,attempt,effectState,attemptConsumed,evidence?,worker,proof?|paths?,terminalClosed?}'.
     reap: >-
       `--reap` cleans a SETTLED op's terminal that is still live (one settled
       before settle closed tabs and stopped leftover agent processes, or a
