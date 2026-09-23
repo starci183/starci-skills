@@ -157,7 +157,12 @@ export function orcaTreeFindings(db, terminals, { repo = null } = {}) {
     // A [Kernel]/[Op] title that names a workflow this ledger does not hold is
     // another project's terminal: several ledgers share one Orca host.
     const titledWorkflow = /\bwf-[a-z0-9-]+/i.exec(terminal.title ?? '')?.[0] ?? null;
-    const foreign = titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow);
+    // A managed [Op] tab title names no workflow, so a terminal sitting in
+    // another project's worktree is that project's too: nivo's two live
+    // architecture.decide workers read as orphans on the StarCi Next and Mia
+    // Mia polls.
+    const foreign = (titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow))
+      || (repo != null && terminal.worktreePath != null && !underRepo(terminal.worktreePath, repo));
     const ours = knownHandles.has(terminal.handle) || (STARCI_TITLE.test(terminal.title ?? '') && !foreign);
     if (!ours || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;
     const owner = jobs.find((job) => handlesOf(job).includes(terminal.handle)) ?? null;

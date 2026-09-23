@@ -211,5 +211,9 @@ test('STRAY_TERMINAL names a live terminal in the project worktree that is no li
     const f=orcaTreeFindings(ledger.db,rows,{repo:'D:/Repositories/nivo-backend'});
     assert.deepEqual(f.filter(x=>x.code==='STRAY_TERMINAL').map(x=>x.terminal).sort(),['term-old','term-shell']);
     assert.equal(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='STRAY_TERMINAL').length,0,'without a repo the placement check is off');
+    // A managed [Op] tab title names no workflow: in another project's worktree it is that project's worker.
+    const other=readTerminals([...healthyTerminals().map(at('D:/Repositories/nivo-backend')),at('D:/Repositories/nivo-backend')(term('term-nivo-op','[Op] architecture.decide'))]);
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/starci-next'}).some(x=>x.terminal==='term-nivo-op'),false,'another project [Op] worker is not this ledger orphan');
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/nivo-backend'}).find(x=>x.terminal==='term-nivo-op')?.code,'ORPHAN_TERMINAL','in its own project it still is');
   });
 });
