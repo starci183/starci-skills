@@ -12,10 +12,12 @@ shape:
     business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
     scripts/checks/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
-    silently. Transition note: trees still carrying the retired work/node@N records under
-    business/{overview,srs} or architecture/{overview,sds} are tolerated by the gate - those records are
-    readable legacy inputs owned by the engine's SRS/SDS readers and are being migrated to these flat
-    families by workspace.canonicalization; ops must never author new work/node records."
+    silently. Retired work/node@N records - under business/{overview,srs} or architecture/{overview,sds},
+    and root-level .starciwork/<name>/index.yaml operations or import records outside features/ (an
+    import-cv-seam folder beside features/, say) - are tolerated by the gate as read-only inputs of the
+    engine's readers. workspace.canonicalization retires the first into these flat families and the second
+    into the catalog's setup entries (shape.setup); nothing edits them in place, and ops must never author
+    new work/node records."
   br: features/<feature>/br/<name>/index.yaml, schema work/business-rule@1. May carry appliesTo, module
     (a string or list of module-root directory paths - never individual files, see the owners note under
     implementation below) and blockedBy.
@@ -122,6 +124,11 @@ shape:
     provenance (see scripts/checks/render.mjs's capture-identity rule) - and a generation-bearing asset
     never sits outside a work/ui-screen@1 record's own assets/."
   featureCatalog: index.yaml at the .starciwork root, schema work/catalog@1 - one entry per feature
+  setup: "index.yaml at the .starciwork root under extensions.work3.setup.<workflow>.<mode>, typed by
+    work-catalog.schema.yaml $defs.setup - the record workspace.manage's prepare, import and stacks modes
+    write, with its evidence bundle at evidence/<workflow>.<mode>/ beside the catalog. The layout has no
+    operations family, and no record directory sits at the root besides features/, brand/ and _resources/;
+    workspace.manage writes.node says why the catalog carries it."
   feature: features/<feature>/index.yaml
   resources: ".starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml, schema
     work/resource@1. uat.verify's reads.environment/reads.accounts/reads.fixtures and
@@ -161,7 +168,7 @@ rules:
     digest into their own inputDigest. A rev bump or a changed colour therefore suspends their
     completions; no authored edge per screen is required, and backend-only work is untouched."
   - One project owns one canonical .starciwork in its bound source repository. Its product catalog
-    is features/index.yaml; every actual feature owns its own directory of flat family folders,
+    is the root index.yaml (shape.featureCatalog); every actual feature owns its own directory of flat family folders,
     features/<feature>/<family>/<name>/index.yaml with the families shape.families lists.
   - The project or repository name belongs in workspace metadata, not a wrapper directory. Do not
     author .starciwork/<project>/, .starciwork/business/ or .starciwork/features/business/.
@@ -277,7 +284,8 @@ rules:
     nothing else: a finished workflow's rows end there, and an archived one is recovered from a backup
     rather than from a record that carries its own archive."
   - "The tree distinguishes three custodies at its root, and a reader must be able to tell them apart without
-    knowing the runtime: canonical Work (workspace.yaml, brand/, features/ - tracked, hashed), the tracked
+    knowing the runtime: canonical Work (workspace.yaml, the catalog index.yaml with its setup
+    evidence/, brand/, features/, _resources/ - tracked, hashed), the tracked
     counter-record (ledger-anchor.json - tracked, not hashed into Work), and runtime custody (runtime.sqlite
     and the kernel-* directories - untracked, never hashed, excluded from validation). A file at the root that
     is none of these is drift."

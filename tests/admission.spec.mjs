@@ -100,6 +100,7 @@ test('workspace.manage derives explicit migration slices instead of claiming bro
   const policy=parseYaml(fs.readFileSync(file,'utf8')).policy.modePolicy.ownershipDerivation;
   assert.equal(policy.rule,'narrowest-concrete-selected-prefixes');
   assert.deepEqual(policy.broadRootsForbiddenWhenDerivable,['repository root','.starciwork','.starcistacks']);
-  assert.ok(policy.importSlices.some(slice=>slice.includes('.starciwork/<scope>/')&&slice.includes('migration')));
+  assert.ok(policy.importSlices.some(slice=>slice.includes('.starciwork/index.yaml')&&slice.includes('.starciwork/evidence/<workflow>.import/')&&slice.includes('migration')));
+  assert.ok(!policy.importSlices.some(slice=>/\.starciwork\/<scope/.test(slice)),'no root-level scope record directory is an import slice');
   assert.ok(policy.concurrency.includes('landing-app'));
 });

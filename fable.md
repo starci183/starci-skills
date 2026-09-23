@@ -1064,6 +1064,87 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   status đọc dependsOn của bản ghi Work trong owned_paths; owner đã succeeded thì giải phóng. Live: 6 slice dependency, không
   actionable.
 
+- 09:20 Fork báo 3 lỗi. (1) của trò: workspace.manage prepare vẫn ghi bản ghi scope gốc .starciwork/<scope>/index.yaml mà
+  layout cấm, nên dự án mới (Mia Mia) không bắt đầu được spec-foundation; giao lane nền (đích hợp lệ, schema đóng, spec bắt ghi
+  gốc). (2) lineage retry của cut sai và (3) kernel báo active 3.7 giờ vì dòng spinner cũ: fork làm lane P8. Nivo không dính (3).
+
+- 09:40 Lane xong `3edefde1b`: workspace.manage prepare/import/stacks ghi setup lên catalog gốc .starciwork/index.yaml tại
+  extensions.work3.setup.<workflow>.<mode> (schema đóng, dùng lại các trường của scope); evidence ở .starciwork/evidence/<wf>.<mode>/;
+  spec từ chối mọi manifest ghi bản ghi gốc ngoài layout. Check xanh, 46/46 (lane: 155 pass). Đã gửi fork các bước cho kernel Mia
+  Mia. Còn mở: node fields của scope.finish vẫn liệt kê state/blocker/completion.
+
+- 09:40 Không vá. WSPV audit a32 done, a33 failed, kernel đang xử lý (transition-ready). Collab 6 slice dependency theo
+  dependsOn, watchdog idle-waiting (vá 3b2767b26 chạy đúng). Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00;
+  hai ask còn mở (WSPV thanh toán, Modules thuế) đều thuộc nhóm để thầy quyết.
+
+- 09:50 WSPV yield dưới tiêu đề " Running (codex):" bị đọc thành spinner, 2 report audit chờ 20 phút. Vá `36be1bf2c` (dòng có từ
+  trạng thái kết thúc bằng ":" là văn xuôi); đã đánh thức WSPV. Phát hiện: kernel WSPV sửa owned_paths trong payload job (ghi thẳng
+  ledger, tự khai trong inc-f3f8d80df3dc) vì landed-check của P7 tìm đường dẫn frontend trong nivo-backend; giao fork P7b (resolve
+  theo repo đích). Kernel cũng commit 94MB evidence vào nivo-backend với ALLOW_SECRET_SCAN=1: đưa vào danh sách buổi sáng.
+
+- 09:55 Không vá. WSPV đã xử lý a32/a33 sau khi được đánh thức (vá 36be1bf2c đúng), một worker audit đang chạy. Collab 6 slice
+  dependency, membership chạy. Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00: từ đây trò không trả lời ask
+  thay thầy nữa. Chờ fork: P7b (landed-check theo repo đích) và P8 (lineage retry cut, spinner cũ).
+
+- 10:03 Ủy quyền đã hết, không trả lời ask. Collab membership xong (a10 done sau a2 partial), còn 5 slice dependency. WSPV một
+  worker audit đang chạy. Modules awaiting-owner. AUTH owner-gate. Không vá.
+
+- 10:13 Yên, không vá. WSPV worker audit active (có output), Collab slice conversation đang chạy, 5 dependency. Modules và
+  AUTH chờ thầy.
+
+- 10:23 Yên. WSPV worker interface.implement (ab51c9eaa9) nghĩ 35 phút nhưng lệnh đã xong và đang ra chữ: không treo.
+  Collab slice kế tiếp chạy. Modules, AUTH chờ thầy. Không vá.
+
+- 10:33 Yên. Collab backend.implement a3 (conversation) done, còn 4 slice dependency. WSPV worker implement vẫn active.
+  Modules, AUTH chờ thầy. Không vá.
+
+- 10:45 Kernel Collab bị báo active dù đã yield: dòng ngắt bắt đầu bằng "running." chữ thường khớp regex không phân biệt
+  hoa thường. Vá `ddda061f1`: từ trạng thái phân biệt hoa thường. Live: cả 4 kernel turn-idle đúng. Collab 3/8
+  slice backend.implement pass, routing đang chạy.
+
+- 10:58 Phát hiện gốc: watchdog là tiến trình chạy lâu, nạp terminal-liveness một lần lúc khởi động (03:37-05:18), nên mọi
+  vá classifier trong đêm không tới watchdog (Collab bị báo active). Vá `9270d970e`: vòng lặp chạy mỗi nhịp bằng một tiến trình con
+  --once mới. Đã dừng và khởi động lại 4 watchdog nivo (log nối tiếp), cả 4 báo idle-waiting đúng. Báo fork khởi động lại 4 watchdog
+  starci-next và mia-mia.
+
+- 11:03 Yên. 4 watchdog mới chạy đúng (idle-waiting, không lỗi). Collab backend.implement a4 (routing) done, 4/8 pass, tasks
+  đang chạy, còn 3 dependency. WSPV worker implement active. Modules, AUTH chờ thầy. Không vá.
+
+- 11:13 Yên. WSPV interface.implement a37 done, kernel active đang settle (settle-ready đúng). Collab tasks đang chạy (4/8
+  pass). Modules, AUTH chờ thầy. Không vá.
+
+- 11:25 Form ask thuế của Modules hết ttl 4 giờ (dead) trong khi kernel awaiting-owner: thầy bấm vào link chết, không ai phục
+  vụ lại. Vá `b2c0ce8ab`: ask chờ mà không có form sống = askReserveDispatches, frontier ask-reserve actionable. Đã báo kernel
+  Modules phục vụ lại ctx_596b59ca7bd4. Form thanh toán WSPV vẫn sống (phục vụ ~07:26, hết ~11:26); bản vá sẽ bắt khi nó hết hạn.
+
+- 11:35 ask-reserve chạy đúng: Modules đã phục vụ lại ask thuế (http://127.0.0.1:6970/a-2e190e5a4ba7e57e62, ttl mới 4 giờ),
+  quay về awaiting-owner. Form thanh toán WSPV hết hạn đúng dự đoán, frontier liệt kê ctx_b77ce6a3b9a7, watchdog đã đánh thức
+  kernel WSPV. WSPV audit a34 failed (kernel lo). Nhiễu: watchdog Modules một lần kernel-failed-screen thoáng qua, màn hình hiện
+  không khớp mẫu lỗi, không restart.
+
+- 11:45 Kernel WSPV bị đánh thức 2 lần vì form thanh toán hết hạn nhưng vẫn dẫn link chết: status dạng text không in reason hay
+  askReserveDispatches. Vá `e4faf58ff`: text in reason và dòng ask-reserve kèm lệnh serve-ask; driver-loop nói link chết là việc, không
+  phải chờ owner. Đã báo WSPV phục vụ lại. Collab tasks done (a5), approval và notification chạy song song, còn gateway.
+
+- 11:53 WSPV đã phục vụ lại ask thanh toán: http://127.0.0.1:6969/a-a5b6a272f6c5354503 (vá e4faf58ff có tác dụng). Hai ask sống,
+  không còn reserve. Collab approval và notification chạy song song, còn gateway. Không vá.
+
+- 12:03 Yên. WSPV interface.implement a38 done và đã settle (rail height), 1 job ready kernel đang dispatch. Collab approval
+  và notification chạy, còn gateway. Modules, AUTH chờ thầy; hai ask sống. Không vá.
+
+- 12:13 Collab approval (a6) done, 6/8 pass; gateway ready (dependsOn không gồm notification), watchdog đã đánh thức kernel để
+  dispatch song song với notification: record-deps (3b2767b26) chỉ ra song song đúng. WSPV audit chạy lại đang chạy. Không vá.
+
+- 12:23 Collab notification (a7) done, 7/8 pass, gateway đang chạy. WSPV audit a35 failed nhưng hội tụ: F10, F12, F11 đã đóng
+  qua a33-a35, chỉ còn F3 ("Provisioning order" hiện mã mua hàng thay vì mã đơn cấp phát riêng, có thể backend chưa có mã này).
+  Kernel lo. Không vá.
+
+- 12:33 Yên. Collab gateway đang chạy (7/8). WSPV worker sửa F3 đang chạy. Modules, AUTH chờ thầy; hai ask sống. Không vá.
+
+- 12:43 Yên. Collab gateway và WSPV worker F3 vẫn active có output. Modules, AUTH chờ thầy. Không vá.
+
+- 12:53 Yên. Collab gateway và WSPV worker F3 chạy khoảng 40 phút, vẫn có output, không wedged. Modules, AUTH chờ thầy. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |

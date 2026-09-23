@@ -69,6 +69,12 @@ test('a Kernel yield summary that says "Running now:" is turn-idle, not active',
   ].join('\n');
   assert.equal(classifyAgentScreen(screen).state,'turn-idle');
   assert.equal(classifyAgentScreen('Running: provisioning r3\n❭ Ask Devin to build features').state,'turn-idle');
+  // Any line that ends in a colon is a heading of the Kernel's own prose (WSPV
+  // later yielded under " Running (codex):" and sat 20 minutes unwoken).
+  assert.equal(classifyAgentScreen(' Running (codex):\n   •  ctx_f38 — payment-pending audit\n Yielding — wait reason: audit reports.\n❭ Ask Devin to build features').state,'turn-idle');
+  assert.equal(classifyAgentScreen('• Working (4m 36s · esc to interrupt) · 1 background terminal running\n› Ask Codex').state,'active');
+  // A wrapped prose line that happens to start with lowercase "running." is not a spinner.
+  assert.equal(classifyAgentScreen(' Yield state:  backend.implement — 3/8 settled; wave 4 (routing)\n running. Remaining: tasks → approval ∥ notification → gateway.\n❭ Ask Devin to build features').state,'turn-idle');
   assert.equal(classifyAgentScreen('○ Running command\n│ $ node api.mjs status\n❭ Guide Devin while it works').state,'active','a real status line still wins');
   assert.equal(classifyAgentScreen('• Running canonical status\n› Ask Codex to do anything').state,'active');
 });
@@ -116,4 +122,25 @@ test('watchdog wakes a turn-idle Kernel only when status says the frontier is ac
   assert.match(src,/action: 'idle-waiting'/);
   const supervise=fs.readFileSync(new URL('../modules/supervisor/supervise.yaml',import.meta.url),'utf8');
   assert.match(supervise,/watchdog\.mjs --repo <repo> --workflow <id> --repair/,'the recovery recipe spawns a watchdog that can wake');
+});
+
+// Every nivo watchdog imported the liveness classifier once, hours before the
+// night's classifier fixes, and kept calling yielded Kernels active. The loop
+// now runs each tick as a fresh `--once` child, so a fix lands on the next tick.
+test('the watchdog loop runs each tick in a fresh child and stops on a finished workflow', async t => {
+  const { withLedger, seedWorkflow } = await import('./_ledger-fixture.mjs');
+  const { spawnSync } = await import('node:child_process');
+  const path = await import('node:path');
+  const WATCHDOG = path.resolve(import.meta.dirname, '..', 'scripts', 'kernel', 'watchdog.mjs');
+  await withLedger(t, async ({ repoRoot, ledger }) => {
+    seedWorkflow(ledger, { id: 'wf-watchdog-loop', state: { phase: 'finished' } });
+    ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-watchdog-loop'").run();
+    const r = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-loop', '--interval-ms', '10000', '--json'],
+      { encoding: 'utf8', windowsHide: true, timeout: 60000 });
+    assert.equal(r.status, 0, r.stderr || r.stdout);
+    const last = JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
+    assert.equal(last.action, 'finished', 'the child tick reported finished and the loop ended');
+  });
+  const source = fs.readFileSync(WATCHDOG, 'utf8');
+  assert.match(source, /spawnSync\(process\.execPath, \[self, \.\.\.argv, '--once'/, 'the loop re-executes itself per tick');
 });

@@ -193,12 +193,27 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exit(2);
   }
   let exitCode = 0;
-  do {
+  if (once) {
     const result = await watchdogTick();
     print(result);
-    if (!result.ok) exitCode = 1;
-    if (once || result.action === 'finished') break;
-    await new Promise(resolve => setTimeout(resolve, intervalMs));
-  } while (true);
-  process.exitCode = exitCode;
+    process.exitCode = result.ok ? 0 : 1;
+  } else {
+    // The long-lived loop runs every tick as a fresh `--once` child, so a
+    // runtime fix to the liveness classifier or the wake rules reaches an
+    // already-running watchdog on its next tick. A watchdog that imported the
+    // classifier once at 03:37 kept calling yielded Kernels active all night
+    // after the fixes landed.
+    const self = fileURLToPath(import.meta.url);
+    do {
+      const child = spawnSync(process.execPath, [self, ...argv, '--once', '--json'], { encoding: 'utf8', windowsHide: true, timeout: Math.max(intervalMs, 120000) });
+      const line = String(child.stdout ?? '').trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
+      let result = null;
+      try { result = JSON.parse(line); } catch { result = { ok: false, workflowId, action: 'tick-failed', error: (child.stderr || line || `exit ${child.status}`).slice(0, 400) }; }
+      print(result);
+      if (!result.ok) exitCode = 1;
+      if (result.action === 'finished') break;
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    } while (true);
+    process.exitCode = exitCode;
+  }
 }

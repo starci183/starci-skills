@@ -25,10 +25,10 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: .starciwork/<scope>/index.yaml
+    path: .starciwork/index.yaml extensions.work3.setup.<workflow>.<mode>
     purpose:
-      en: Read current target scope record, refs, dependencies, assertions and validator freshness.
-        Preserve unaffected accepted content.
+      en: Read the catalog and this workflow's setup entry for the selected mode - refs, assertions,
+        declared targets and review - and validator freshness. Preserve unaffected accepted content.
   - id: selection
     path: selected request operation + exact mode contract in this operator JSON
     purpose:
@@ -43,14 +43,24 @@ reads:
         policy, op permissions and existing task authority.
 writes:
   - id: node
-    path: .starciwork/<scope>/index.yaml
-    fields: [completion.inputDigest, completion.evidence]
+    path: .starciwork/index.yaml extensions.work3.setup.<workflow>.<mode>
+    fields: [extensions.work3.setup.<workflow>.<mode>]
     content:
-      en: Bind only the selected mode completion profile and its actual evidence.
+      en: "N, the completion target of every mode, is the root catalog .starciwork/index.yaml
+        (work/catalog@1), and the mode's record is its entry extensions.work3.setup.<workflow>.<mode>,
+        typed by modules/schemas/work-catalog.schema.yaml $defs.setup; E is
+        .starciwork/evidence/<workflow>.<mode>/ beside it (work-layout.yaml shape.setup). The catalog
+        carries it because a prepare, import or stacks scope spans the whole product rather than one
+        feature, the catalog is the product-wide index work-layout.yaml declares at the tree root, and the layout has no
+        operations family - a root-level .starciwork/<scope>/index.yaml record is outside the layout and
+        is never authored. A catalog carries no state, so the entry carries none: the mode's completion
+        is the kernel's settled verdict on its job, and the entry's review records that outcome and the
+        checks it rests on. An existing root-level work/node record from an earlier import is read-only
+        input that workspace.canonicalization retires; this op never edits or deletes it."
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
-    artifacts: [manifest.yaml, result.json]
+    artifacts: [manifest.yaml, result.yaml]
     content:
       en: Record operation, exact scope, criteria, output artifact references, observed effects and
         unresolved findings.
@@ -89,7 +99,8 @@ blockers:
       en: Missing, unknown or multiple operations; select a single mode under existing task authority.
 placeholders:
   feature: Selected feature slug
-  scope: Selected operations scope slug
+  workflow: The running workflow id the setup entry is keyed by
+  mode: The selected execution mode (prepare, import or stacks)
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   write-ceiling: Explicit owned source paths
@@ -121,7 +132,9 @@ policy:
         - .starciwork
         - .starcistacks
       importSlices:
-        - exact selected .starciwork/<scope>/ migration record paths
+        - .starciwork/index.yaml (the catalog and its import setup entry), the exact
+          .starciwork/evidence/<workflow>.import/ migration evidence bundle and the exact selected
+          .starciwork/features/<feature>/ migration record paths
         - exact selected repository/import resource paths and retained asset paths
         - exact selected .starcistacks migration/deployment declaration paths when stack material is
           in scope
@@ -152,10 +165,11 @@ policy:
             en: Read the actual requested outcome, agreed scope and existing workspace identity; do not turn
               examples or future ideas into obligations.
         - id: target
-          path: .starciwork/<scope>/index.yaml
+          path: .starciwork/index.yaml extensions.work3.setup.<workflow>.prepare
           purpose:
-            en: Read current target scope record, refs, dependencies, assertions and validator freshness.
-              Preserve unaffected accepted content.
+            en: Read the catalog and this workflow's prepare setup entry, its refs, declared targets,
+              assertions and validator freshness; on a new project both are absent. Preserve unaffected
+              accepted content.
         - id: declaration
           path: current explicit repository scope +
             .starciwork/_resources/repositories/<resource>/resource.yaml
@@ -171,9 +185,9 @@ policy:
               existing workspace unchanged. Never invent repository/environment resources merely to
               satisfy setup.
         - id: node
-          path: .starciwork/index.yaml + .starciwork/features/<feature>/index.yaml +
-            .starciwork/features/<feature>/<family>/<name>/index.yaml +
-            .starciwork/<scope>/index.yaml
+          path: .starciwork/index.yaml (catalog + extensions.work3.setup.<workflow>.prepare) +
+            .starciwork/features/<feature>/index.yaml +
+            .starciwork/features/<feature>/<family>/<name>/index.yaml
           fields:
             - schema
             - id
@@ -183,15 +197,18 @@ policy:
             - dependsOn
             - refs
             - blockedBy
-            - assertions
-            - "extensions.work3.nativeGoal: actual returned current-task goal reference only"
+            - "extensions.work3.setup.<workflow>.prepare: request, description, refs, assertions, nodes,
+              deps, exclusions, openQuestions, review"
+            - "extensions.work3.setup.<workflow>.prepare.nativeGoal: actual returned current-task goal
+              reference only"
           content:
             en: "Every authored index.yaml carries the schema const its path declares. Capture the
               customer-language product catalog in .starciwork/index.yaml (work/catalog@1, one entry
               per feature) and each feature's readable overview in features/<feature>/index.yaml
               (work/feature@1: id, title, description, no state); these do not approve inferred
-              module requirements. The one setup scope record .starciwork/<scope>/index.yaml is N
-              for this op - a root-level operations record carrying only scope-review assertions.
+              module requirements. N is the catalog's setup entry
+              extensions.work3.setup.<workflow>.prepare (the op-level writes.node says why), carrying
+              the scope-review assertions, the declared targets as nodes/deps and the exclusions.
               Seeded product records live in flat family folders
               (fr/nfr/br/data/journey/decision/sds/ui/impl/uat/contract/integration) and remain
               todo. Source-generated scope awaiting confirmation stays todo with blockers[];
@@ -204,18 +221,18 @@ policy:
               ids in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec
               changes before review proof. For a bounded revision of existing imported consumer
               scope, inspect eligibility and accepted inputs before freezing the next effectful
-              goal; reuse workspace identity and bindings. The setup scope record alone is the
-              preparation completion target. Explicitly bound child paths/resources are preparation
+              goal; reuse workspace identity and bindings. The setup entry alone is the preparation
+              completion target. Explicitly bound child paths/resources are preparation
               write scope: correct only selected incomplete semantics and set confirmed records todo
               without implementation completion. Do not introduce preparation for already-ready
               scope or require product-wide scaffolding."
         - id: evidence
-          path: E/manifest.yaml + E/scope-review.md + E/repository-observation.json
+          path: E/manifest.yaml + E/scope-review.md + E/repository-observation.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
-            en: Retain source-intent citations and actual scope/coverage review under the setup leaf only. Set
-              setup done only after real review evidence and validation; initial scaffolding has no
-              completion. No code/UAT pass.
+            en: Retain source-intent citations and actual scope/coverage review in the setup entry's own
+              bundle E only. The entry's review reaches pass only after real review evidence and
+              validation; initial scaffolding has no review. No code/UAT pass.
         - id: resource
           path: .starciwork/_resources/repositories/<resource>/resource.yaml
           fields:
@@ -250,7 +267,7 @@ policy:
             en: Inspect exact Git root/common-dir, remote identity, full HEAD, worktree registration, links and
               dirty paths with read-only commands. Bind only selected verified repository resources
               to the existing canonical .starciwork root. Do not reset, clean, stash, switch or
-              create another canonical tree. Retain sanitized repository-observation.json;
+              create another canonical tree. Retain sanitized repository-observation.yaml;
               source-free setup explicitly records no repository yet.
         - reads:
             - intent
@@ -275,7 +292,7 @@ policy:
           action:
             en: When the user explicitly requests a native goal for this current chat/task and an actual
               supported goal tool exists, inspect/create/reuse that goal according to the tool
-              contract; retain only its returned reference in extensions.work3.nativeGoal. Otherwise
+              contract; retain only its returned reference in the setup entry's nativeGoal. Otherwise
               keep purpose in .starciwork and the current chat. Never invent a platform goal ID or
               create a separate task/agent goal automatically.
         - reads:
@@ -311,7 +328,7 @@ policy:
               never run predecessors or weaken dependsOn/refs/required to proceed.
       placeholders:
         feature: Selected feature slug
-        scope: Selected operations scope slug
+        workflow: The running workflow id the setup entry is keyed by
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
         write-ceiling: Explicit owned source paths
@@ -342,10 +359,12 @@ policy:
         dispatch: never
       reads:
         - id: target
-          path: .starciwork/<scope>/index.yaml
+          path: .starciwork/index.yaml extensions.work3.setup.<workflow>.import
           purpose:
-            en: Read current target scope record, refs, dependencies, assertions and validator freshness.
-              Preserve unaffected accepted content.
+            en: Read the catalog and this workflow's import setup entry, its refs, assertions and validator
+              freshness; for a new import the entry is absent. Root-level .starciwork/<name>/index.yaml
+              records an earlier import left are read-only source observations. Preserve unaffected
+              accepted content.
         - id: repo
           path: repository:<repo-id>/<bound-paths>
           purpose:
@@ -398,9 +417,9 @@ policy:
               preserve an existing identity. Never put the canonical root inside the selected
               disposable target.
         - id: node
-          path: .starciwork/index.yaml + .starciwork/features/<feature>/index.yaml +
-            .starciwork/<scope>/index.yaml + optional .starciwork/<scope-cleanup>/index.yaml +
-            selected imported features/<feature>/<family>/<name>/index.yaml records
+          path: .starciwork/index.yaml (catalog + extensions.work3.setup.<workflow>.import) +
+            .starciwork/features/<feature>/index.yaml + selected imported
+            features/<feature>/<family>/<name>/index.yaml records
           fields:
             - schema
             - id
@@ -408,16 +427,16 @@ policy:
             - description
             - dependsOn
             - refs
-            - assertions
             - state
             - blockers
-            - completion
-            - "description: Pilot boundary / Observed source mapping / Approved intent / Candidate
-              scope / Unknowns"
+            - "extensions.work3.setup.<workflow>.import: request, description (Pilot boundary /
+              Observed source mapping / Approved intent / Candidate scope / Unknowns), refs,
+              assertions, nodes, deps, exclusions, openQuestions, migration, review"
           content:
-            en: Every authored index.yaml carries the schema const its path declares. N is the operations
-              migration-review scope record at .starciwork/<scope>/index.yaml, with
-              inventory/preservation/import assertions. Capture the product catalog in
+            en: Every authored index.yaml carries the schema const its path declares. N is the catalog's
+              migration-review setup entry extensions.work3.setup.<workflow>.import (the op-level
+              writes.node says why), with inventory/preservation/import assertions and
+              migration.pilot. Capture the product catalog in
               .starciwork/index.yaml (work/catalog@1) and each feature's overview in
               features/<feature>/index.yaml (work/feature@1, no state) before importing product
               records. Every newly imported flat family record (br/fr/nfr/data/journey/decision/sds/
@@ -426,9 +445,9 @@ policy:
               and only approved graph scope. Do not overwrite existing accepted records. For an
               explicitly selected preset, declare its review targets before consumers run; their
               expected assertions remain bounded to intent review and imported graph integrity,
-              never product completion. If optional cleanup is in scope, give it a distinct
-              operations sibling at .starciwork/<scope-cleanup>/index.yaml, never a child of N, with
-              exact deletion assertions; unresolved cleanup remains blocked.
+              never product completion. If optional cleanup is in scope, the entry's migration names
+              cleanupTarget and the exact cleanupAssertions, and migration.cleanup stays blocked
+              until they pass; no separate cleanup record is authored.
         - id: resources
           path: .starciwork/_resources/repositories/<resource>/resource.yaml +
             .starciwork/_resources/imports/<resource>/resource.yaml +
@@ -451,8 +470,8 @@ policy:
               selected imported node refs before computing review digest. Do not copy whole source
               repositories or credentials into .starciwork.
         - id: evidence
-          path: E/manifest.yaml + E/inventory.json + E/source-map.md + E/preservation.json +
-            E/import-review.md + E/cleanup.json
+          path: E/manifest.yaml + E/inventory.yaml + E/source-map.md + E/preservation.yaml +
+            E/import-review.md + E/cleanup.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Inventory each selected path: origin repository/commit, tracked/dirty/untracked/ignored status,
@@ -545,7 +564,7 @@ policy:
               deletion authority, verified durable bytes and recoverable commits/uncommitted data.
               Remove a registered worktree with Git without force, or remove a verified custom
               artifact directory recoverably. If any check fails, leave original untouched and
-              record the separate cleanup leaf blocked. Do not run a successor op.
+              record the cleanup blocked in evidence. Do not run a successor op.
         - reads:
             - target
             - intent
@@ -556,7 +575,8 @@ policy:
           action:
             en: Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported
               IDs/refs/assertions, preservation hashes and all uninvestigate states. Write only
-              observed migration evidence and migration-review completion after verification. Keep
+              observed migration evidence, then the setup entry's review and migration.cleanup after
+              verification. Keep
               product children uninvestigate and cleanup truth explicit; commit only selected
               documentation when authorized, record actual commit separately in evidence, then stop.
       proofs:
@@ -592,7 +612,7 @@ policy:
               missing/uncertain; do not delete or force.
       placeholders:
         feature: Selected feature slug
-        scope: Selected operations scope slug
+        workflow: The running workflow id the setup entry is keyed by
         repo-id: Resolved repository resource ID
         bound-paths: Inspected source read set
         write-ceiling: Explicit owned source paths
@@ -633,10 +653,10 @@ policy:
         dispatch: never
       reads:
         - id: target
-          path: .starciwork/<scope>/index.yaml
+          path: .starciwork/index.yaml extensions.work3.setup.<workflow>.stacks
           purpose:
-            en: The selected stacks scope record, its refs to the settled design and its assertions. For an
-              explicitly new target, absence is expected.
+            en: This workflow's stacks setup entry on the catalog, its refs to the settled design and its
+              assertions. For an explicitly new target, absence is expected.
         - id: architecture
           path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
           purpose:
@@ -672,10 +692,11 @@ policy:
               files, README.md runbook, <name>/<name>.enc secret pairs with the plaintext member
               gitignored, runtime config/env/files, seeds and infra.
         - id: node
-          path: .starciwork/<scope>/index.yaml
-          fields: [completion.inputDigest, completion.evidence]
+          path: .starciwork/index.yaml extensions.work3.setup.<workflow>.stacks
+          fields: ["extensions.work3.setup.<workflow>.stacks: request, refs, assertions, review"]
           content:
-            en: Bind the stacks scope completion to its actual evidence.
+            en: N is the catalog's stacks setup entry (the op-level writes.node says why); its review names
+              the stacks check run per environment and its outcome.
         - id: evidence
           path: E/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -731,7 +752,7 @@ policy:
             en: A declared secret cannot be encrypted with an available custody key; plaintext is never
               written as a tracked file.
       placeholders:
-        scope: Selected stacks scope slug
+        workflow: The running workflow id the setup entry is keyed by
         feature: Feature folder holding the settled design records
         environment: An environment the declaration admits
         repo-id: Resolved owner repository resource ID

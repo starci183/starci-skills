@@ -249,6 +249,9 @@ tick:
       `worker-wedged` is not a wait either: api observe each id in
       `frontier.wedgedJobs` once, then api nudge it to interrupt the stuck
       command, or reconcile and re-dispatch the attempt.
+      `frontier.askReserveDispatches` (an unanswered ask whose serve-ask form
+      expired or was never served) is not a wait either: re-serve each with
+      serve-ask --dispatch before yielding; a dead link is not an owner wait.
       `awaiting-owner` (no open operation, at least one unanswered ask) is a
       legitimate wait: yield naming the pending ask dispatch ids; the
       answer's ask-answered wake brings you back.
