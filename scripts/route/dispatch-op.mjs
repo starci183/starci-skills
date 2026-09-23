@@ -338,6 +338,7 @@ function main() {
     result.spawn = {
       ok: spawned.ok === true, handle: spawned.terminal ?? null,
       step: spawned.step, error: spawned.error ?? null, command: spawned.command,
+      ...(spawned.trust ? { trust: spawned.trust } : {}), ...(spawned.gateAnswers ? { gateAnswers: spawned.gateAnswers } : {}),
     };
     console.log(JSON.stringify(result, null, 2));
     if (!result.spawn.ok) process.exit(1);

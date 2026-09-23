@@ -54,6 +54,7 @@ import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
   awaitSubmission, awaitAttestation,
 } from '../agent/lib.mjs';
+import { ensureLaunchTrust } from '../agent/trust.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
@@ -1778,7 +1779,7 @@ const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, se
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false,
   effectState = 'none', details = null, providerHealthEvidence = null,
-  closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null,
+  closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null, trust = null,
 }) => {
   const authFailure = Boolean(providerHealthEvidence) || confirmedAuthFailure({ step, signal, error, details });
   const { terminalClosed, closed } = closeRejectedLaunch({ model, terminal, closeTerminal, alreadyClosed, settled, effectState });
@@ -1849,7 +1850,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth,
-        terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}) },
+        terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}) },
     });
     if (providerHealth) {
       ledger.appendEvent({
@@ -1870,6 +1871,18 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
   return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth,
     terminalClosed, ...(closed ? { closed } : {}) };
 };
+
+// gate-auto-approved: one event per launch gate the runtime answered
+// (scripts/agent/lib.mjs awaitReadiness), whether or not the gate then cleared.
+function recordGateAnswers(ledger, { workflowId, entityType, entityId, provider, terminal, answers }) {
+  const sent = (Array.isArray(answers) ? answers : []).filter((a) => a?.keystroke);
+  if (!sent.length) return;
+  ledger.transaction(() => {
+    for (const a of sent) ledger.appendEvent({ workflowId, entityType, entityId, kind: 'gate-auto-approved',
+      payload: { gate: a.gate, keystroke: a.keystroke, answered: a.answered === true, cleared: a.cleared === true,
+        provider, terminal, ...(a.reason ? { reason: a.reason } : {}) } });
+  });
+}
 
 /* ------------------------------------------------------ op IPC helpers */
 // §6 admission for an op dispatch. The durable fence is taken BEFORE anything
@@ -2169,7 +2182,10 @@ function cmdDispatch(ledger, args, repo) {
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
   });
   const handle = spawned.terminal ?? null;
+  recordGateAnswers(ledger, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+    provider: model.provider, terminal: handle, answers: spawned.gateAnswers });
   const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle,
+    ...(spawned.trust ? { trust: spawned.trust } : {}), ...(spawned.gateAnswers ? { gateAnswers: spawned.gateAnswers } : {}),
     ...(spawned.gate ? { gate: spawned.gate, remedy: spawned.remedy ?? null } : {}),
     ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}) };
   spawn.ok = spawned.ok === true;
@@ -2183,7 +2199,7 @@ function cmdDispatch(ledger, args, repo) {
       step: spawned.step, signal: spawned.signal ?? null, error: spawned.error ?? null,
       terminal: handle, closeTerminal: handle, alreadyClosed: true,
       incident: spawned.step === 'attestation', details: spawned,
-      createRecovery: spawned.createRecovery ?? null,
+      createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null,
     });
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, spawn: { ...spawn, reason } };
     emit(out, `dispatch REJECTED for ${jobId} (${spawned.step}): ${reason} — job status=${rejection.status}, terminal closed`, args.json);
@@ -2198,7 +2214,7 @@ function cmdDispatch(ledger, args, repo) {
     // the sidebar (fable.md orca-hierarchy: [Op] interface.audit "Idle").
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId ?? handle, closeTerminal: handle,
-      incident, effectState: 'none', details, createRecovery: spawned.createRecovery ?? null,
+      incident, effectState: 'none', details, createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null,
     });
     const reason = signal ?? error ?? `command-terminal dispatch failed at ${step}`;
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, step, dispatchId, terminal: handle, error: reason },
@@ -2261,7 +2277,7 @@ function cmdDispatch(ledger, args, repo) {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), ...(spawned.createRecovery ? { createRecovery: spawned.createRecovery } : {}), ...(spawned.trust ? { trust: spawned.trust } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
@@ -2406,12 +2422,13 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     return { effectState: cleanup.effectState, observation: null, cleanup };
   };
 
+  let trust = null;
   const reject = ({ step, signal = null, error = null, dispatchId = null, incident = false,
     effectState = 'none', details = null }) => {
     const reconciliation = reconcileFailure(effectState, dispatchId);
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId, incident,
-      effectState: reconciliation.effectState, details, settled: reconciliation.cleanup,
+      effectState: reconciliation.effectState, details, settled: reconciliation.cleanup, trust,
     });
     const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
@@ -2447,6 +2464,11 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     return reject({ step: 'task-create', error: task?.error ?? 'task-create returned no taskId' });
   }
   const taskId = task.taskId;
+
+  // 4a. Pre-trust the worktree the managed worker launches in (trust.mjs):
+  // the owner never answers a Claude/Codex launch prompt.
+  try { trust = ensureLaunchTrust({ agent: model.provider, cwd: worktree }); }
+  catch (e) { trust = { agent: model.provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
 
   // 4. worker-start — outcome ok means a ready worker (calls.yaml classify:
   // exit 0 + result.state 'ready'). Anything else, including a receipt with no
@@ -2532,7 +2554,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, ...(trust ? { trust } : {}), parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = {

@@ -25,6 +25,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { classifyAgentScreen, gateRemedy, stagedInputRow } from '../kernel/terminal-liveness.mjs';
+import { ensureLaunchTrust } from './trust.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -156,6 +157,58 @@ const failureOnScreen = (adapter, screen) => {
   return null;
 };
 
+// ---- launch-gate auto-answer ----------------------------------------------
+// Owner instruction 2026-09-23: the runtime, never the owner, approves the
+// launch prompts of the directories it launches agents in. Pre-trust
+// (scripts/agent/trust.mjs) keeps those prompts from appearing; when one still
+// appears, a gate the agent card allowlists (gateAutoAnswer.gates) is answered
+// ONCE from the screen: the cursor is walked to the card's `select` option with
+// arrow keys and Enter is pressed, each key a raw terminal-send. Anything not
+// on the allowlist (login, usage limit, an unknown menu) is refused as before,
+// with no keystroke. A gate that is still there after settleMs is refused too.
+const KEYS = { down: '\x1b[B', up: '\x1b[A', enter: '\r' };
+const GATE_CURSOR = /^\s*[❯›▶>]\s*\S/u;
+const MAX_GATE_MOVES = 6;
+
+export function gateAutoAnswerRule(adapter, gate) {
+  const spec = adapter?.gateAutoAnswer;
+  const rule = spec?.gates?.[gate];
+  if (!rule || typeof rule.select !== 'string' || !rule.select.trim()) return null;
+  return { select: rule.select, delayMs: Math.max(0, Number(rule.delayMs ?? spec.delayMs) || 0),
+    settleMs: Math.max(1000, Number(rule.settleMs ?? spec.settleMs) || 6000) };
+}
+
+/** Where the menu cursor sits relative to the option labelled `label`, or null. */
+export function gateMenuPosition(screen, label) {
+  const rows = String(screen ?? '').split(/\r?\n/).slice(-40).map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
+  const want = String(label).toLowerCase();
+  let target = -1;
+  for (let i = rows.length - 1; i >= 0; i -= 1) if (rows[i].toLowerCase().includes(want)) { target = i; break; }
+  if (target < 0) return null;
+  let cursor = -1;
+  for (let d = 0; d <= 8 && cursor < 0; d += 1)
+    for (const i of [target - d, target + d]) if (i >= 0 && i < rows.length && GATE_CURSOR.test(rows[i])) { cursor = i; break; }
+  if (cursor < 0) return null;
+  return { onTarget: cursor === target, direction: Math.sign(target - cursor) };
+}
+
+function answerGate(handle, rule, screen) {
+  const keys = [];
+  const press = (name) => { terminalSend({ terminal: handle, text: KEYS[name] ?? name, enter: false }); keys.push(name); };
+  // Claude's accessible confirm renders "Enter y/n:" instead of a menu.
+  if (/enter y\/n:/i.test(screen ?? '')) { press('y'); press('enter'); return { answered: true, keystroke: keys.join(',') }; }
+  let current = screen;
+  for (let moves = 0; ; moves += 1) {
+    const at = gateMenuPosition(current, rule.select);
+    if (!at) return { answered: false, keystroke: keys.join(','), reason: `option '${rule.select}' with a menu cursor is not on screen` };
+    if (at.onTarget) { press('enter'); return { answered: true, keystroke: keys.join(',') }; }
+    if (moves >= MAX_GATE_MOVES) return { answered: false, keystroke: keys.join(','), reason: `cursor did not reach '${rule.select}' in ${MAX_GATE_MOVES} moves` };
+    press(at.direction > 0 ? 'down' : 'up');
+    sleepSync(300);
+    current = terminalRead({ terminal: handle }).screen ?? '';
+  }
+}
+
 // Card-driven readiness: screen must show the provider's prompt pattern
 // (and identity when declared) before anything is sent.
 function awaitReadiness(handle, adapter, { cwd = null } = {}) {
@@ -165,23 +218,50 @@ function awaitReadiness(handle, adapter, { cwd = null } = {}) {
   const timeoutMs = Number(spec.timeoutMs) || 120000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
   let screen = '';
+  const gateAnswers = [];
+  const settle = (state) => {
+    for (const a of gateAnswers) if (a.answered) a.cleared = state?.gate !== a.gate;
+    return gateAnswers.length ? { gateAnswers } : {};
+  };
   for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
     const read = terminalRead({ terminal: handle });
     screen = read.screen;
     const failure = failureOnScreen(adapter, screen);
-    if (read.ok && failure) return { ok: false, reason: `terminal rejected readiness: ${failure.signal}`, screen, ...failure };
-    // A screen waiting on a human answer never turns ready by itself: fail at
-    // once and name the gate; answering it stays the owner's decision.
+    if (read.ok && failure) return { ok: false, reason: `terminal rejected readiness: ${failure.signal}`, screen, ...failure, ...settle(null) };
+    // A screen waiting on an answer never turns ready by itself. An
+    // allowlisted launch gate is answered once by the runtime; any other gate
+    // (or one that persists) fails at once and names the gate.
     const screenState = read.ok ? classifyAgentScreen(screen) : null;
     if (screenState?.state === 'interactive-gate') {
-      const remedy = gateRemedy(screenState.gate, { cwd });
-      return { ok: false, state: 'interactive-gate', signal: 'interactive-gate', gate: screenState.gate, remedy,
-        reason: `terminal is blocked on interactive gate '${screenState.gate}' and needs the owner's answer${remedy ? ` — to clear it once: ${remedy}` : ''}`, screen };
+      const gate = screenState.gate;
+      const rule = gateAutoAnswerRule(adapter, gate);
+      const prior = gateAnswers.find((a) => a.gate === gate);
+      if (rule && !prior) {
+        if (rule.delayMs) {
+          // Claude refuses keys for a moment after a dialog opens.
+          sleepSync(rule.delayMs);
+          screen = terminalRead({ terminal: handle }).screen ?? screen;
+        }
+        const answer = answerGate(handle, rule, screen);
+        gateAnswers.push({ gate, keystroke: answer.keystroke, answered: answer.answered, at: Date.now(), settleMs: rule.settleMs,
+          ...(answer.reason ? { reason: answer.reason } : {}) });
+        if (answer.answered) { if (elapsed < timeoutMs) sleepSync(intervalMs); continue; }
+      } else if (rule && prior?.answered && Date.now() - prior.at < prior.settleMs) {
+        if (elapsed < timeoutMs) sleepSync(intervalMs);
+        continue;
+      }
+      const remedy = gateRemedy(gate, { cwd });
+      const tried = gateAnswers.find((a) => a.gate === gate);
+      const why = !rule ? "is not on the agent card's gateAutoAnswer allowlist and needs the owner's answer"
+        : tried?.answered ? `persisted after the runtime answered it (${tried.keystroke})`
+          : `could not be auto-answered (${tried?.reason ?? 'no answer'})`;
+      return { ok: false, state: 'interactive-gate', signal: 'interactive-gate', gate, remedy,
+        reason: `terminal is blocked on interactive gate '${gate}' — it ${why}${remedy ? ` — to clear it once: ${remedy}` : ''}`, screen, ...settle(screenState) };
     }
-    if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen };
+    if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen, ...settle(screenState) };
     if (elapsed < timeoutMs) sleepSync(intervalMs);
   }
-  return { ok: false, reason: `terminal readiness timeout after ${timeoutMs}ms`, screen };
+  return { ok: false, reason: `terminal readiness timeout after ${timeoutMs}ms`, screen, ...settle(null) };
 }
 
 const modelPattern = (model) => {
@@ -437,6 +517,12 @@ export function recoverCreatedTerminal({ worktree, title, before = null, error =
 export function spawnAgent({ provider, model = null, effort = null, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true } = {}) {
   const built = buildSpawnCommand({ provider, kernel, command, model, effort });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
+  // Pre-trust the launch directory (trust.mjs) so the agent opens at its
+  // input box, not at a trust/consent prompt; the receipt joins every result.
+  let trust = null;
+  try { trust = ensureLaunchTrust({ agent: provider, cwd: worktree }); }
+  catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
+  let gateAnswers = null;
   const before = terminalSnapshot(worktree);
   const create = terminalCreate({ worktree, title, command: built.command });
   // A handle-less create whose effect is unknown is reconciled before it is
@@ -456,10 +542,12 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
         ...(closed?.error ? { error: typeof closed.error === 'string' ? closed.error : JSON.stringify(closed.error) } : {}) };
     }
     return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, terminal: handle, provider, command: built.command,
-      ...(terminalClosed ? { terminalClosed } : {}), ...(createRecovery ? { createRecovery } : {}) };
+      ...(terminalClosed ? { terminalClosed } : {}), ...(createRecovery ? { createRecovery } : {}),
+      ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
   };
   if (!handle) return fail('create', create.error || 'no terminal handle', null, create.errorCode ? { errorCode: create.errorCode } : {});
   const ready = awaitReadiness(handle, built.adapter, { cwd: worktree });
+  gateAnswers = ready.gateAnswers ?? null;
   if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null,
     { screen: ready.screen, matched: ready.matched, ...(ready.gate ? { state: ready.state, gate: ready.gate, remedy: ready.remedy ?? null } : {}) });
   const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen);
@@ -483,7 +571,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
   }
   return { ok: true, terminal: handle, provider, model: model ?? null, effort: effort ?? null,
     modelAttested: modelAttested.model, command: built.command, commandSource: built.commandSource,
-    ...(createRecovery ? { createRecovery } : {}) };
+    ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
 }
 
 // Health: terminal identity is the proof — connected + writable, with the
