@@ -540,6 +540,30 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [authority]
+  # The owner's acceptance of the whole workflow, and the last leg of every chain. Like review.verify it
+  # belongs to no lane - a lane walks one node, the handover walks the workflow: the planner appends it
+  # after every other leg (scripts/route/route-plan.mjs) and the kernel enqueues it for a chain approved
+  # before it existed. It proves nothing new and builds nothing; it writes the handover package as
+  # evidence and asks the owner. Its ask has three closed options - approve, feedback, question - and
+  # the three handover routes below say what each answer does. `api finish` refuses a workflow without
+  # the owner's approval (scripts/kernel/handover.mjs handoverGateOf).
+  handover.review:
+    family: prove
+    role: verify
+    operator: handover.review
+    readOnly: false
+    # It reads what the goal asked for and what every leg delivered, the source it runs from and the
+    # runtime it runs on; `readOnly: false` means it may author its own evidence bundle, nothing else.
+    reads: [record, srs, sds, code, evidence, runtime]
+    writes: [evidence]
+    knowledge: [application-stacks]
+    checks: []
+    stacks: [modules/schemas/work-layout.yaml]
+    carries: []
+    purpose: Hand the finished workflow to the owner - what was built, where, how to run and test it, what waits on credentials, what was not proven live, the known risks - and ask them to approve it, report a defect or ask a question; only the owner's approval finishes the workflow.
+    reports:
+      outcomes: [done, failed, ask, blocked]
+      blockers: [environment, authority]
   # The one kind that runs BEFORE a lane rather than inside one, in three modes. A node whose record declares no
   # write scope or no check cannot be launched, and completing that record is work, not a question for the user;
   # an intake authors a whole feature the tree does not hold; a cut splits a node too big for one operation into
@@ -1124,6 +1148,42 @@ routes:
     limit: 1
     then: needUser
     purpose: A decision the goal does not authorise belongs to the user, not to a model.
+  # The handover ask is the one ask whose answer is routed, not relayed: `on.answer` is the option the
+  # owner picked on it (scripts/kernel/handover.mjs decisionOf over the serve-ask receipt), and the three
+  # rows stand before question-needs-the-user because an explicit `from` wins.
+  - id: handover-approved-settles-the-workflow
+    on: {outcome: ask, answer: approve}
+    from: handover.review
+    to: {kind: same}
+    limit: 1
+    then: retry
+    purpose: |-
+      The owner approved the package: handover.review runs once more, reads the approval and files done,
+      and `api settle --verdict pass` records the handover-approved event from the answer receipt. A
+      receipt whose answeredBy is not the owner never approves, and serve-ask refuses a delegated approve
+      outright; `api finish` then closes the workflow.
+  - id: handover-feedback-repairs-the-build
+    on: {outcome: ask, answer: feedback}
+    from: handover.review
+    to: {kind: lane.build, origin: repair}
+    limit: 5
+    then: reopen
+    purpose: |-
+      The owner found a defect: the note is one repair of the slice it names - that node's lane build step
+      (`interface.implement` for a screen, `backend.implement` for an API) - or, when the note says the
+      requirement or the design itself is wrong, the srs-gap / sds-gap / interface-gap route of that record.
+      The handover waits behind the fix and runs again with what was fixed at the top of the package. Past
+      the limit the workflow raises an incident to the owner instead of another round.
+  - id: handover-question-is-answered-then-handed-over-again
+    on: {outcome: ask, answer: question}
+    from: handover.review
+    to: {kind: same}
+    limit: 5
+    then: retry
+    purpose: |-
+      The owner asked a question: handover.review runs again with the answer at the top of the package and
+      asks again. The kernel never answers it in chat or in an ask of its own; the answer travels in the
+      package the owner reads.
   - id: question-needs-the-user
     on: {outcome: ask}
     from: any

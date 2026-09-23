@@ -7,7 +7,7 @@
 // .starciwork/_resources/repositories/<resource>/resource.yaml (inc-5c968fe64492).
 // A preflight that compares the contract with the layout refuses such a path, so
 // the contradiction surfaces as a stalled workflow hours later. This spec makes
-// it surface here instead: it walks all 36 manifests (op-level and every
+// it surface here instead: it walks all 37 manifests (op-level and every
 // policy.executionModes.<mode>) and unifies each .starciwork path against
 //   - admitted: modules/schemas/work-layout.yaml shape (its leading path per
 //     entry - each family through its own entry, so ac is br/<rule>/ac/<name>, not a flat ac/);
@@ -186,7 +186,7 @@ test('the layout and schema catalog parse into path patterns this spec can use',
   const keys = new Set(admitted.map((a) => a.key));
   for (const k of ['workspace', 'brand', 'featureCatalog', 'feature', 'resources', 'uatFlow', 'uatRun', 'workflowRunState', 'impl', 'ac'])
     assert.ok(keys.has(k), `shape.${k} yields no admitted path`);
-  assert.equal(ops.length, 36, 'every op manifest is walked');
+  assert.equal(ops.length, 37, 'every op manifest is walked');
   assert.ok(familyFolders.every(Boolean), 'every family in shape.families has its own shape entry');
   assert.ok(familyFolders.includes('br/<rule>/ac') && familyFolders.includes('impl/<repository>'));
   const resources = admitted.filter((a) => a.key === 'resources').map((a) => a.segs.join('/')).sort();

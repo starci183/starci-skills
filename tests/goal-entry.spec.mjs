@@ -97,7 +97,7 @@ test('goal revision preview is read-only, identity-preserving and approval-gated
   assert.deepEqual(preview?.checkpoint?.queuedSupersedable,[queuedJobId]);
   assert.deepEqual(preview?.checkpoint?.mustSettleFirst,[]);
   assert.deepEqual(preview?.opChainDiff?.after,[
-    'scope.define','test.author','code.refactor','workspace.manage','review.verify',
+    'scope.define','test.author','code.refactor','workspace.manage','review.verify','handover.review',
   ]);
   assert.deepEqual(preview?.opChainDiff?.removed,['work.author']);
   assert.deepEqual(preview?.opChainDiff?.added,['scope.define','workspace.manage']);

@@ -798,6 +798,8 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',t
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='term-k7-kernel' WHERE job_id=?").run(jobId);
     ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
       .run(wf,'token-k7',json({terminal:'term-k7-kernel',modelAttested:true}),at);
+    // Finish needs the owner's handover approval (tests/handover.spec.mjs owns that gate).
+    ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-k7-handover',kind:'handover-approved',payload:{jobId:'job-k7-handover',dispatchId:'ask-k7',answeredBy:'owner'}});
   });
   const goalsBefore=read(repo,l=>l.db.prepare('SELECT count(*) n FROM goals WHERE workflow_id=?').get(wf).n);
   assert.ok(goalsBefore>=1);

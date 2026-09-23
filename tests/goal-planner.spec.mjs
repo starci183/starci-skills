@@ -24,6 +24,7 @@ test('Work and stack canonicalization derives the migration chain without generi
     'code.refactor',
     'workspace.manage',
     'review.verify',
+    'handover.review',
   ]);
   assert.ok(!plan.legs.some(leg => leg.op === 'work.author'));
 });
@@ -46,7 +47,7 @@ test('assisted UAT preparation is a separate existing-build workflow', () => {
   const plan = body(result);
   assert.equal(plan.status, 'ok');
   assert.equal(plan.scopeKind, 'assisted-uat-prepare');
-  assert.deepEqual(plan.legs.map(leg => leg.op), ['request.analyze', 'uat.assisted.prepare']);
+  assert.deepEqual(plan.legs.map(leg => leg.op), ['request.analyze', 'uat.assisted.prepare', 'handover.review']);
   assert.ok(!plan.legs.some(leg => leg.op === 'interface.implement'));
 });
 
@@ -56,7 +57,7 @@ test('assisted UAT verification consumes the exact prepared package before accep
   const plan = body(result);
   assert.equal(plan.status, 'ok');
   assert.equal(plan.scopeKind, 'assisted-uat-verify');
-  assert.deepEqual(plan.legs.map(leg => leg.op), ['request.analyze', 'uat.assisted.prepare', 'uat.assisted.verify']);
+  assert.deepEqual(plan.legs.map(leg => leg.op), ['request.analyze', 'uat.assisted.prepare', 'uat.assisted.verify', 'handover.review']);
   assert.ok(!plan.legs.some(leg => leg.op === 'uat.verify'));
 });
 
@@ -109,7 +110,7 @@ test('a Vietnamese specification prompt derives spec-foundation with no build or
   assert.equal(plan.status, 'ok');
   assert.equal(plan.scopeKind, 'spec-foundation');
   assert.deepEqual(plan.legs.map(leg => leg.op + (leg.instance ? '#' + leg.instance : '')), [
-    'workspace.manage', 'business.decide', 'architecture.decide', 'workspace.manage#stacks', 'review.verify',
+    'workspace.manage', 'business.decide', 'architecture.decide', 'workspace.manage#stacks', 'review.verify', 'handover.review',
   ]);
   assert.ok(!plan.legs.some(leg => BUILD_LEG.test(leg.op) || /scaffold/.test(leg.op)));
   assert.equal(plan.legalityFindings, undefined);
@@ -121,13 +122,13 @@ test('a Vietnamese base-repo prompt derives greenfield-scaffold with no decide l
   const plan = body(result);
   assert.equal(plan.status, 'ok');
   assert.equal(plan.scopeKind, 'greenfield-scaffold');
-  assert.deepEqual(plan.legs.map(leg => leg.op), ['backend.scaffold', 'interface.scaffold', 'review.verify']);
+  assert.deepEqual(plan.legs.map(leg => leg.op), ['backend.scaffold', 'interface.scaffold', 'review.verify', 'handover.review']);
   assert.ok(!plan.legs.some(leg => /.decide$/.test(leg.op)), 'the stack and toolchain are fixed; no decide leg');
 });
 
 test('greenfield-scaffold adds package.scaffold only on a package phrase and keeps its architecture prerequisite', () => {
   const backendOnly = body(run('scaffold the enrolment api backend'));
-  assert.deepEqual(backendOnly.legs.map(leg => leg.op), ['backend.scaffold', 'review.verify']);
+  assert.deepEqual(backendOnly.legs.map(leg => leg.op), ['backend.scaffold', 'review.verify', 'handover.review']);
   const pkg = body(run('scaffold a shared package for the design tokens'));
   const ops = pkg.legs.map(leg => leg.op);
   assert.ok(ops.includes('package.scaffold'));
@@ -143,7 +144,7 @@ test('an SDS mentioned beside a build verb stays a build, not a specification', 
 
 const FULLSTACK_LEGS = [
   'request.analyze', 'scope.define', 'business.decide', 'architecture.decide', 'brand.decide', 'interface.draw',
-  'work.author', 'backend.implement', 'interface.implement', 'interface.audit', 'e2e.verify', 'uat.verify', 'review.verify',
+  'work.author', 'backend.implement', 'interface.implement', 'interface.audit', 'e2e.verify', 'uat.verify', 'review.verify', 'handover.review',
 ];
 
 test('a feature named through both surfaces derives feature-build-fullstack with its own backend build', () => {
@@ -218,8 +219,8 @@ test('a settled brand record drops brand.decide as an out-of-band assumption; an
 // The Mia Mia work-and-stacks goal of 2026-09-23, verbatim: a specification
 // goal that also asks for a brand (offset-pop family, pink token, mascot Mia).
 const MIAMIA_SPEC_PROMPT = 'Hoàn thiện .starciwork và .starcistacks cho Mia Mia trong repo mia-mia-backend (backend, sở hữu Work) và miamia-fe (frontend); source cũ đã được xoá để viết lại, bản cũ nằm ở tag legacy/pre-rewrite-2026-09-23 và worktree chỉ đọc D:/Repositories/mia-mia-backend-legacy, D:/Repositories/miamia-fe-legacy. Tầm nhìn sản phẩm theo bộ 8 slide "Sổ tay ôn thi của Mia" (ảnh gốc ở miamia-fe-legacy/design/mia-mia-pink-series): ôn tiếng Anh THPT như một cuộc phiêu lưu; học theo cụm từ (chọn chủ đề → học nghĩa, ví dụ trong đề, cụm đi kèm → chơi để nhớ → dùng trong đề; sai thì cụm quay lại đúng lúc theo lịch hôm nay, sau 3 ngày, sau 1 tuần); luyện đề thật THPTQG với hai chế độ luyện tự do (chọn chủ đề, số câu, tạm dừng, không áp lực thời gian) và thi mô phỏng (40 câu, 50 phút, giao diện như đề thật), sai câu nào xem giải thích rồi tự động thêm vào ôn tập và thử câu tương tự; Mia AI giải thích có bằng chứng trong đoạn, phân tích bài sau khi nộp, gợi ý bài ôn vừa sức, nhắc lại đúng lúc; game Vocab Defense, Vocab Race, Match Pairs, Couple Quiz (ý tưởng mở rộng: Thám tử đáp án, Thoát phòng đọc hiểu); bản đồ năng lực (từ vựng, ngữ pháp, đọc hiểu, điền từ, sắp xếp câu) và nhiệm vụ hôm nay; học cùng bạn: chuỗi ngày học, đấu đội 2v2 tính điểm theo đóng góp, Mia Wrapped, bạn bè; gói Miễn phí và Pro, sắp có Cambridge, IELTS, TOEIC. Nguồn nghiệp vụ tham khảo chỉ đọc: biz.md và docs trong mia-mia-backend-legacy (free/Pro, credit, xếp hạng, luật chấm), nội dung ở study-with-mia-english và kho dữ liệu miamia-data (39 đề THPTQG, cụm từ, ngữ pháp). Code cũ chỉ là tham khảo, không phải authority. Việc cần làm: tạo một .starciwork chuẩn trong mia-mia-backend; viết SRS cho mọi feature theo tầm nhìn trên và biz.md; viết SDS/architecture cho mọi feature (NestJS monorepo gồm API GraphQL và máy chủ game thời gian thực Colyseus, Next.js frontend, Postgres, Redis, Qdrant, MinIO, Keycloak, OpenRouter qua bộ cân bằng key, thanh toán PayOS và SePay); brand theo family offset-pop của @starci/grammar với token brand hồng của Mia Mia và mascot Mia; khai báo .starcistacks dev và prod; validate bằng các check của runtime. Được commit và push lên origin main của mia-mia-backend.';
-const SPEC_LEGS = ['workspace.manage', 'business.decide', 'architecture.decide', 'workspace.manage#stacks', 'review.verify'];
-const SPEC_BRAND_LEGS = ['workspace.manage', 'business.decide', 'architecture.decide', 'brand.decide', 'workspace.manage#stacks', 'review.verify'];
+const SPEC_LEGS = ['workspace.manage', 'business.decide', 'architecture.decide', 'workspace.manage#stacks', 'review.verify', 'handover.review'];
+const SPEC_BRAND_LEGS = ['workspace.manage', 'business.decide', 'architecture.decide', 'brand.decide', 'workspace.manage#stacks', 'review.verify', 'handover.review'];
 const legIds = plan => plan.legs.map(leg => leg.op + (leg.instance ? '#' + leg.instance : ''));
 const BRAND_ASSUMED = 'brand: settled record brand/index.yaml state done — satisfied out-of-band, no chain leg';
 
@@ -232,7 +233,7 @@ test('spec-foundation carries brand.decide only on brand intent and only while n
   const settled = body(runWith(MIAMIA_SPEC_PROMPT, '--work', workRoot(t, 'done')));
   assert.deepEqual(legIds(settled), SPEC_LEGS);
   assert.deepEqual(settled.assumed, [BRAND_ASSUMED]);
-  // No brand intent: the StarCi Next specification prompt keeps its five legs.
+  // No brand intent: the StarCi Next specification prompt keeps its six legs.
   assert.deepEqual(legIds(body(run(SPEC_PROMPT))), SPEC_LEGS);
   assert.deepEqual(legIds(body(run('viết SDS, khai báo .starcistacks và bộ nhận diện có linh vật'))), SPEC_BRAND_LEGS);
 });

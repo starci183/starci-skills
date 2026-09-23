@@ -144,13 +144,14 @@ commands:
   # --------------------------------------------------------------------------
 
   survey:
-    args: '--workflow <id>'
+    args: '--workflow <id> [--deliveries]'
     reads: >-
       workflows row; latest goals row (revision, goal_identity, json.opChain —
       the approved shape plan diffs against); all jobs; inbox rows; live
       signals; the tail of events; open incidents; the contracts rows of
       settled jobs and the current bytes of the law inputs they recorded
-      (staleInput below)
+      (staleInput below); with --deliveries, every settled job's filed report
+      and every handover ask with its answer receipt
     writes: 'nothing — pure projection'
     returns:
       ok: true
@@ -172,9 +173,17 @@ commands:
         slice of the same cut waits on. Computed by `staleInputs()` in scripts/kernel/input-digests.mjs,
         each distinct path digested once per call
       staleInputError: 'present only when the projection itself failed; staleInput is then []'
+      deliveries: >-
+        --deliveries only: [{jobId, op, attempt, status, verdict, repository, ownedPaths, reportFile,
+        outcome, summary, files, head, branch, credentialPending, open, blocker, checks[{name, command,
+        exitCode}]}] — every settled (succeeded|failed) job except handover.review, with the fields of its
+        filed report (reportFiled:false when none was filed); what a handover package is assembled from
+        (scripts/kernel/handover.mjs deliveriesOf). survey is a read projection, so an op terminal may call it
+      credentialPending: '--deliveries only: the union of every delivery report''s credentialPending'
+      handoverHistory: '--deliveries only: [{dispatchId, attempt, state:pending|answered|superseded, decision:approve|feedback|question|null, answeredBy, byOwner, note, answeredAt, receiptPath}] — every handover.review ask, oldest first'
     refuses:
       - workflow-unknown: 'no workflows row for --workflow'
-    usedBy: 'the ticks deep read — first call of every iteration (driver-loop.yaml tick.survey)'
+    usedBy: 'the ticks deep read — first call of every iteration (driver-loop.yaml tick.survey); with --deliveries, the handover.review op'
 
   status:
     args: '--workflow <id>'
@@ -189,7 +198,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|ask-reserve|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks with no live serve-ask form - never served or ttl expired; the Kernel re-serves each with serve-ask --dispatch, and any entry makes the frontier actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -197,6 +206,17 @@ commands:
         worker comes first, and its reason says to read `api inbox` and ack each key with a
         disposition. An ack (or finish) clears it
       peerMessages: '[{key, from, kind, subject, at}] — the same pending rows; empty once the workflow is finished'
+      handover: >-
+        {op:handover.review, state:approved|running|awaiting-owner|answered|retired|due|not-started, due,
+        inApprovedChain, jobId, ask:{dispatchId, jobId, attempt, state, decision, answeredBy, byOwner, note,
+        receiptPath}|null, approvedSeq, lastBusinessSettleSeq, finishAllowed, finishRefusal?} — the owner
+        handover (scripts/kernel/handover.mjs handoverProjection; driver-loop.yaml handoverLoop). With no
+        operation open it decides three frontier states, each actionable: `handover-answered` (the latest
+        handover ask was answered and nothing acted on it yet; reason names the move per decision) and
+        `finish-ready` (a handover-approved event newer than the last business settle: run api finish)
+        stand before ask-reserve; `handover-due` (every approved leg other than the handover holds a
+        succeeded job, no current approval, no other answered ask left to re-enqueue) stands before
+        orphaned-frontier. A pending handover ask is `awaiting-owner` like any other ask
       'frontier.staleOperations': >-
         [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
         whose law inputs changed since dispatch, which the Kernel re-dispatches as a new attempt
@@ -347,7 +367,11 @@ commands:
       opChain legs. Added/removed/re-rooted legs are divergence; leg order
       and allowlist wording inside the approved shape are not
       (modules/schemas/goal-plan.yaml rules: acyclic dependsOn, disjoint
-      allowlists).
+      allowlists). One addition is not divergence: handover.review appended
+      as the LAST leg of a plan whose approved opChain predates it — the
+      owner handover every workflow owes before `api finish`
+      (driver-loop.yaml handoverLoop). The diff then records
+      handoverAppended:true.
     returns:
       ok: true
       goalRevision: '<revision the plan was derived against>'
@@ -915,6 +939,7 @@ commands:
       - report-missing: 'report file unreadable'
       - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here), a done|partial report of an op whose manifest commitPolicy commits without `head` = a 7-40 character hex sha (the api resolves the op''s commitPolicy exactly as settle does; the worker puts `git rev-parse HEAD` of the checkout holding its owned paths into `head` and re-files), prose that lost its non-ASCII letters to a legacy code page (a question mark inside words, U+FFFD) — the file must be written as UTF-8 (scripts/kernel/report-envelope.mjs lossyTextFields)'
       - outcome-mismatch: '--outcome flag contradicts the envelope outcome'
+      - 'report-invalid (handover ask): a handover.review ask whose question.options are not exactly three distinct non-empty labels in the order approve, feedback, question, or that declares picks (scripts/kernel/handover.mjs handoverAskProblem)'
       - report-identity-mismatch: 'the caller is an op (conventions.callerBoundary) and --job is not its own job'
       - job-unknown / job-settled
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
@@ -1063,6 +1088,16 @@ commands:
       plain directory) settles without the proof, as does every fail or
       blocked verdict and every op without a committing commitPolicy. A
       proof that ran is recorded as `landed` on the receipt and result_json.
+    handover: >-
+      A `pass` of a handover.review job is the owner's approval turned into a ledger fact. Settle reads
+      the latest handover ask filed before this attempt and its serve-ask answer receipt
+      (scripts/kernel/handover.mjs handoverApprovalOf): the ask must be answered, the receipt bound to
+      that ask, the picked option approve, and both the receipt and the ask-answered event must name
+      answeredBy owner - a delegated answer never approves - and no business job (any op but
+      handover.review) may have settled after the ask was filed. Then, after op-settled, it appends
+      `handover-approved` {jobId, dispatchId (the answered ask), answeredBy, at (the answer time),
+      askJobId, receiptPath, lastBusinessSettleSeq} and returns handoverApproved on the receipt; `api
+      finish` reads that event.
     cutSet: >-
       A cut pass records result.cutSet {id, total, closesSet, open[]} on the job and the op-settled
       event. The closing pass (closesSet true) also appends `cut-set-closed` {op, cut, closedBy,
@@ -1076,6 +1111,7 @@ commands:
       - checks-not-green: 'pass requires at least one independently recorded green check and zero red checks'
       - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the pass that CLOSES its cut set additionally lacks full-regression-final. The closing pass is the one that leaves no other ordinal of {op, cut id} open - every other ordinal''s latest job already settled succeeded - whichever ordinal settles last; ordinal === total is not the rule (inc-751dd1ac4492: ordinals settle out of order once the seam passes). The error names which case applies'
       - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
+      - 'handover-not-approved: a handover.review pass without the owner''s approve receipt for the latest handover ask, with a delegated (non-owner) answer, or with a business settle after that ask was filed (settle.handover); nothing is written and the job keeps its status'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
       - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes, prefixed <checkout>: when several repositories are checked>], repos:[{repo, role, paths, dirty}], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution)'
@@ -1142,11 +1178,22 @@ commands:
       goals/jobs/reports/events all stay — a
       finished goal is history, not deletion
       (start-workflow.yaml: finished goals never re-enter the queue).
-    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}]}'
+    handoverGate: >-
+      A workflow is done only when the owner approved its handover. Before writing anything, finish
+      requires a `handover-approved` event (settle.handover) whose seq is newer than the last
+      op-settled event of any job other than the Kernel and handover.review
+      (scripts/kernel/handover.mjs handoverGateOf). A chain approved before handover.review existed is
+      held to the same gate: the kernel appends the leg (driver-loop.yaml handoverLoop). The one
+      existing exit without an approval is a workflow the owner archived (workflows.archived_at set);
+      no api verb sets it and no flag bypasses the gate. finished_json and the workflow-finished event
+      carry handover {via: handover-approved|archived, approvedSeq, answeredBy}. A workflow already
+      finished finishes again idempotently without the gate.
+    returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}}'
     refuses:
       - workflow-unknown
       - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'
-    usedBy: 'tick.finish — called only once every job is settled AND the final verify leg passed (driver-loop.yaml)'
+      - 'handover-not-approved: no handover-approved event, or the newest one predates the last business settle (handoverGate); run handover.review and let the owner approve it'
+    usedBy: 'tick.finish — called only once every job is settled, the final verify leg passed and the owner approved the handover (driver-loop.yaml)'
 
 # ============================================================================
 # ASK LIFECYCLE — the events an `outcome: ask` report passes through after it
@@ -1160,7 +1207,7 @@ askLifecycle:
     - ask-serving: 'the localhost form is bound and answering. payload {dispatchId, url, fields, ttlMs}; the newest ask-serving for a dispatch is the URL that counts'
     - ask-serving-expired: 'the --ttl window closed with no submission. payload {dispatchId}; the URL is dead until a re-serve appends a newer ask-serving'
     - ask-superseded: 'a later ask report for the same (workflow, op) and the same subject (the asking job params.subject, else overlapping question.refs) was served and retires this one; an ask of the same op about another subject stays open. payload {dispatchId: <retired ask>, by: <the ask now serving>, opId}; terminal — a retired ask is closed without an answer and is never relayed to the owner'
-    - ask-answered: 'the owner submitted the form. payload {dispatchId, receiptPath, custodyWritten, envWritten, pointersWritten, errors} — names and custody paths only, never values; terminal'
+    - ask-answered: 'the owner submitted the form. payload {dispatchId, receiptPath, answeredBy, optionIndex, custodyWritten, envWritten, pointersWritten, errors} — names and custody paths only, never values; terminal. The receipt (starci/ask-answer@1) carries option, optionIndex (the picked option''s position in question.options), picks, answeredBy, note and at. On a handover.review ask serve-ask refuses a delegate''s approve (403): only the owner approves a handover'
   open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id; modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead or unserved before it reaches the owner'
 
 # ============================================================================

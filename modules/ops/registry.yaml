@@ -28,7 +28,7 @@ coarsePhases:
   verify: post-implementation
   release: post-implementation
   operate: cross-cutting
-count: 36
+count: 37
 ops:
   - id: architecture.decide
     family: architecture
@@ -479,6 +479,36 @@ ops:
         - runtime-self-edit
     lifecyclePosition: implement | implementation
     kindInferred: update
+  - id: handover.review
+    family: handover
+    goal: "Hand the finished workflow to the owner and ask for acceptance: assemble one handover package
+      in the owner's language - what was built and why, where it lives, exactly how to run and test
+      it, what sti"
+    nodeKinds:
+      - operations
+    completionProfile: operations
+    reads:
+      - goal
+      - deliveries
+      - repo
+      - evidence
+    writes:
+      - package
+    route:
+      nodeKinds:
+        - workflow
+      phase:
+        - operate
+        - cross-cutting
+      intent:
+        - handover
+        - owner-acceptance
+      prerequisites:
+        - every other leg of the approved chain settled
+      riskHints:
+        - waits-on-owner
+    lifecyclePosition: operate | cross-cutting
+    kindInferred: review
   - id: integration.verify
     family: integration
     goal: Prove one declared external integration against the real provider, in its sandbox account,

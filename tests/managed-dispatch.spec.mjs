@@ -263,6 +263,8 @@ test('finish closes the kernel terminal and every Task the Run still holds open'
     ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
       payload:{opId:'code.refactor',owned_paths:['docs/'],managed:{runId:'run-fake-1',taskId:'task-orphan-1',dispatchId:'dispatch-fake-1'}}});
     ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE job_id=?").run(jobId);
+    // Finish needs the owner's handover approval (tests/handover.spec.mjs owns that gate).
+    ledger.appendEvent({workflowId,entityType:'job',entityId:'job-finish-handover',kind:'handover-approved',payload:{jobId:'job-finish-handover',dispatchId:'ask-finish',answeredBy:'owner'}});
   }finally{ledger.close();}
 
   const finished=fx.run(API,'finish','--repo',fx.repo,'--workflow',workflowId,'--json');

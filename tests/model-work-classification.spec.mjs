@@ -17,7 +17,7 @@ const rank=d=>DIFFICULTY.indexOf(d);
 
 test('every op manifest and every kinds.yaml kind carries a complete roleOfKind entry that agrees on role',()=>{
   const ops=fs.readdirSync(path.join(ROOT,'modules','ops','ops')).filter(f=>f.endsWith('.yaml')).map(f=>f.slice(0,-5));
-  assert.equal(ops.length,36);
+  assert.equal(ops.length,37);
   for(const kind of [...ops,...Object.keys(kinds.kinds)]){
     const entry=runtimes.roleOfKind[kind];
     assert.ok(entry&&typeof entry==='object',`${kind} has no {role, work, floor} entry`);

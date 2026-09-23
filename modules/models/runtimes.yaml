@@ -229,6 +229,7 @@ roleOfKind:
   scope.finish: {role: implement, work: hands-on, floor: hard}
   runtime.operate: {role: implement, work: hands-on, floor: medium}
   review.verify: {role: verify, work: think, floor: hard}
+  handover.review: {role: verify, work: think, floor: hard}
   e2e.verify: {role: verify, work: hands-on, floor: medium}
   integration.verify: {role: verify, work: hands-on, floor: hard}
   security.verify: {role: verify, work: think, floor: hard}

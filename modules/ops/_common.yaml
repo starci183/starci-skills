@@ -48,13 +48,16 @@ sections:
         effect returns to the owner as an api incident or an owner ask. While the packet carries
         owner_delegation, an answer receipt whose answeredBy is that delegate, inside its window and
         outside its excluded classes, is the owner's answer and binds like one; the receipt carries
-        the delegate's reason. Every operation reaches the owner the same one way: it files its
+        the delegate's reason. The handover approval is never delegated: a workflow is done only
+        when the owner approves its handover.review ask, and a delegate may answer that ask with
+        feedback or a question, never with the approval. Every operation reaches the owner the same one way: it files its
         report with outcome ask and the question (api report) and ends its turn; the kernel serves
         it through serve-ask and re-enqueues the operation with the answer bound. No operation asks
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a
         reply - nothing answers those channels and nothing records what they say."
       - Every selected workflow finishes through the kernel's gate/finish contract
-        (modules/kernel/api.yaml `finish`). Missing .starciwork routes to
+        (modules/kernel/api.yaml `finish`), and that gate requires the owner's approval of the
+        workflow's handover (modules/ops/ops/handover.review.yaml), the last leg of every chain. Missing .starciwork routes to
         workspace-bootstrap; invalid .starciwork is not overwritten. Preserve the original request
         and resume the same target workflow. After validation and before a goal or effect, inspect
         stale nodes with the read-only Work traversal; validation still enforces freshness when
@@ -306,7 +309,7 @@ sections:
         delivery from its implementation profile. Refresh applicable repository/environment resource
         revisions from actual inspected source/build state before validating: the core does not
         watch Git HEAD or live deployment drift."
-      - Every changed code piece has a scoped local commit when the user's task includes committing.
+      - "Every changed code piece has a scoped local commit when the user's task includes committing.
         Stage exact files, inspect staged diff, run applicable checks and record the real SHA; no
         blanket `git add .`, amend, force or unrelated changes. A branch other workflows and ops
         commit on (main of a product repo) is append-only: never `git reset`, rebase, amend, drop or
@@ -317,7 +320,7 @@ sections:
         committing is not authorized, report an uncommitted source delivery and do not forge code
         completion. An unchanged implementation can bind an existing inspected commit and prove it
         without an empty commit. Documentation/evidence commits belong to the canonical
-        `.starciwork` repository, not imaginary product commits.
+        `.starciwork` repository, not imaginary product commits."
       - "Keep origin commit, integration/cherry-pick commit, tested commit and deployed immutable
         artifact distinct. `completion.codeRefs` binds the delivered code; detailed mapping belongs
         in `E/lineage.json` or `E/result.md`, with evidence-level `extensions.work3.lineage`

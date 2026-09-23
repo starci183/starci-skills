@@ -458,6 +458,7 @@ const stageRankOf = op => {
 };
 
 const EXTERNAL_OPS = new Set(['request.analyze']); // model/kinds.yaml external: true
+const HANDOVER_OP = 'handover.review'; // scripts/kernel/handover.mjs HANDOVER_OP
 
 // Prerequisite phrase -> requirement. route.prerequisites are English; this is
 // the fixed phrase table mapping each declared prerequisite to a chain edge, a
@@ -490,6 +491,7 @@ function parsePrerequisite(text, ops) {
     [/^repository bound/i, { kind: 'condition' }],
     [/^grammar bound/i, { kind: 'condition' }],
     [/^a settled SDS only when/i, { kind: 'condition' }],
+    [/^every other leg of the approved chain settled/i, { kind: 'condition' }],
   ];
   for (const [re, req] of table) if (re.test(t)) return { ...req, note: req.note ?? t };
   return { kind: 'condition', note: `unparsed prerequisite treated as a condition: '${t}'` };
@@ -819,6 +821,19 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   if (hints.workspaceCanonicalization && legs.has('workspace.manage') && legs.has('review.verify')) {
     edges.push(['workspace.manage', 'review.verify']);
     legs.get('review.verify').needsSatisfiedBy.push('workspace.manage (canonical roots reconstructed)');
+  }
+  // handover.review: the owner's acceptance closes every chain, after every
+  // other leg (modules/ops/ops/handover.review.yaml; legality.yaml
+  // producesVocabulary 'handover: approved'). api finish refuses a workflow
+  // the owner has not approved, so no chain is complete without it.
+  if (legs.size && !legs.has(HANDOVER_OP)) {
+    const others = [...legs.values()];
+    const handover = ensureLeg(HANDOVER_OP, {
+      forVar: { family: 'handover', suffix: '', state: 'approved' },
+      injected: 'owner handover: the final leg of every chain — the workflow is done only when the owner approves it',
+    });
+    for (const leg of others) edges.push([leg.legId, handover.legId]);
+    handover.needsSatisfiedBy.push('every other leg of the chain (the delivery the owner is handed)');
   }
 
   return { legs, edges, gaps, assumptions, goalAssumed: [...new Set(goal.assumed)] };

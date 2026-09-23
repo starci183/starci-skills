@@ -233,8 +233,20 @@ LOOP:
     mere existence of another open job is NOT a conflict. Apply the path test
     across every workflow represented by the ledger, so disjoint goals run
     concurrently and intersecting scopes serialize.
-  - Finish: all jobs settled + final verify pass → api finish (goal finished,
-    history preserved; Kernel singleton/job/terminal live custody released).
+  - Handover: the last leg of every chain is `handover.review`
+    ({skillRoot}/modules/kernel/driver-loop.yaml handoverLoop). When status says
+    `handover-due`, enqueue it (`--paths .starciwork/evidence/<workflow>.handover`),
+    even when the approved chain predates it — append it as the last plan leg,
+    which `api plan` does not count as divergence. Its ask (approve / feedback /
+    question) is served with serve-ask like any ask. On `handover-answered`:
+    approve by the owner → enqueue it again, check, settle pass (settle records
+    handover-approved); feedback → route the note to the fix op of the slice it
+    names, then hand over again; question → enqueue it again, the next package
+    answers it. Only the owner approves; a delegated answer never does.
+  - Finish: all jobs settled + final verify pass + the owner approved the
+    handover (frontier `finish-ready`) → api finish (goal finished, history
+    preserved; Kernel singleton/job/terminal live custody released). api finish
+    refuses `handover-not-approved` without a current owner approval.
   - Stuck: an op idle longer than allocation.stallAfterMs = wedged → api
     incident; a job holding a lease is
     never re-dispatched — settle the wedged attempt first, then retry is a NEW

@@ -5,7 +5,7 @@
 //
 //   node scripts/kernel/api.mjs <cmd> --repo <path> [...] [--json]
 //
-//   survey   --repo <path> --workflow <id>
+//   survey   --repo <path> --workflow <id> [--deliveries]
 //   status   --repo <path> --workflow <id>
 //   hierarchy --repo <path> --workflow <id>
 //   plan     --repo <path> --workflow <id> --file <plan.json>
@@ -78,6 +78,9 @@ import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './
 import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
+import {
+  HANDOVER_APPROVED, HANDOVER_OP, deliveriesOf, handoverApprovalOf, handoverAskProblem, handoverGateOf, handoverProjection, handoverReason,
+} from './handover.mjs';
 import { opInputPaths, recordInputs, staleInputs, staleOperationsOf } from './input-digests.mjs';
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
@@ -166,7 +169,7 @@ const summarizeCheckEvidence = (value) => {
 
 const usage = (code) => {
   console.error(`use: node scripts/kernel/api.mjs <cmd> --repo <path> [...] [--json]
-  survey   --workflow <id>
+  survey   --workflow <id> [--deliveries]
   status   --workflow <id>
   hierarchy --workflow <id>
   plan     --workflow <id> --file <plan.json>
@@ -206,7 +209,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -1122,6 +1125,10 @@ function cmdSurvey(ledger, args) {
     incidentsOpen: incidents,
     eventsHead: ledger.eventsHead(workflowId),
     ...stale,
+    // --deliveries: what a handover package is assembled from - every settled
+    // job's filed report and the earlier handover answers. A read projection,
+    // so an op terminal may call it (modules/ops/ops/handover.review.yaml).
+    ...(args.deliveries ? deliveriesOf(db, workflowId) : {}),
   };
   emit(out, [
     `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${wf.title ?? '-'}`,
@@ -1130,6 +1137,11 @@ function cmdSurvey(ledger, args) {
     `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
     `last events: ${events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none'}`,
     ...staleOperationsOf(stale.staleInput).map((item) => `stale-input: ${staleLabel(item)} — ${item.paths.join(', ')}`),
+    ...(out.deliveries ? [
+      `deliveries: ${out.deliveries.length} settled job(s); credentialPending: ${out.credentialPending.join(', ') || 'none'}; handover asks: ${out.handoverHistory.length}`,
+      ...out.deliveries.map((d) => `  ${d.jobId} ${d.op} a${d.attempt} ${d.status}${d.outcome ? ` outcome=${d.outcome}` : ''}${d.head ? ` head=${d.head}` : ''}${d.summary ? ` — ${d.summary}` : ''}`),
+      ...out.handoverHistory.map((h) => `  handover ${h.dispatchId} a${h.attempt} ${h.state}${h.decision ? ` ${h.decision} by ${h.answeredBy ?? '-'}` : ''}${h.note ? ` — ${h.note}` : ''}`),
+    ] : []),
   ].join('\n'), args.json);
 }
 
@@ -1155,7 +1167,7 @@ function askFormAlive(payload, { probeMs = 1500 } = {}) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'ask-reserve', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-question', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready', 'ask-reserve', 'handover-due', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -1509,6 +1521,10 @@ function cmdStatus(ledger, args) {
   // ranks below the reports, settles and blocked workers already in flight.
   const peerMessages = wf.phase === 'finished' ? []
     : pendingPeerMessagesOf(db, workflowId).map(({ key, from, kind, subject, at }) => ({ key, from, kind, subject, at }));
+  // The owner handover (scripts/kernel/handover.mjs): an answered handover ask
+  // is the Kernel's move, a current owner approval makes finish the next move,
+  // and a chain whose every leg settled owes the handover leg.
+  const handover = handoverProjection(db, workflowId, { legOps });
   const frontierState = wf.phase === 'finished' ? 'finished'
     : unconsumedReports > 0 ? 'transition-ready'
     : settleReady.length > 0 ? 'settle-ready'
@@ -1517,6 +1533,8 @@ function cmdStatus(ledger, args) {
     : wedgedWorkers.length > 0 ? 'worker-wedged'
     : peerMessages.length > 0 ? 'peer-message'
     : openOperations > 0 ? 'engaged'
+    : wf.phase === 'running' && handover.state === 'answered' ? 'handover-answered'
+    : wf.phase === 'running' && handover.state === 'approved' ? 'finish-ready'
     // Nothing open, but a question is with the owner: the workflow waits on
     // them, not on the Kernel, so nothing should wake it until the answer.
     : wf.phase === 'running' && askReserve.length > 0 ? 'ask-reserve'
@@ -1524,6 +1542,7 @@ function cmdStatus(ledger, args) {
     // hold yet (a leg whose first job cannot be enqueued before the owner
     // decides - a StarCi Next frontend waiting on brand, inc-103f2028ba77).
     : wf.phase === 'running' && (pendingOwner.length > 0 || ownerGates.length > 0) ? 'awaiting-owner'
+    : wf.phase === 'running' && handover.due ? 'handover-due'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
   // A settled result whose law inputs changed is work the Kernel owes now: it
@@ -1547,7 +1566,7 @@ function cmdStatus(ledger, args) {
     peerMessageKeys: peerMessages.map((message) => message.key),
     queued,
     queuedCauses,
-    reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'peer-message'].includes(frontierState))
+    reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'].includes(frontierState))
       ? `unanswered ask(s) ${askReserve.join(', ')} have no live form (never served or the serve-ask ttl expired); re-serve each with api serve-ask --workflow <id> --dispatch <id> before yielding`
       : frontierState === 'worker-question'
       ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked the coordinator through orca orchestration ask and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
@@ -1557,6 +1576,8 @@ function cmdStatus(ledger, args) {
       ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`
       : frontierState === 'peer-message'
       ? `${peerMessages.length} peer message(s) wait on you (${peerMessages.map((message) => `${message.key} ${message.kind} from ${message.from}`).join(', ')}); read api inbox --workflow <id>, act on each (a request in your scope becomes work, a heads-up adjusts your plan, answer with api notify --kind reply --reply-to <key>), then ack each with api inbox --ack <key> --disposition <what you did> before yielding`
+      : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
+      ? handoverReason(handover, workflowId)
       : frontierState === 'awaiting-owner'
       ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}; the answer or api incident --resolve wakes the Kernel`
       : frontierState === 'orphaned-frontier'
@@ -1582,11 +1603,12 @@ function cmdStatus(ledger, args) {
     cutSets.push({ op: row.op_id, id: set.id, total: set.total, passed: set.passed, open: set.open, jobs: set.jobs,
       ...(set.open.length === 1 ? { closingOrdinal: set.open[0], closingJob: set.jobs[set.open[0]]?.jobId ?? null, closingCheck: CUT_SET_CLOSING_CHECK } : {}) });
   }
-  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, ...stale };
+  const out = { ok: true, workflowId, phase: wf.phase ?? null, frontier, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale };
   emit(out,
     [
       `${workflowId} phase=${out.phase ?? '-'} frontier=${frontierState}${actionable ? ' ACTIONABLE' : ' (no actionable work)'} jobs{${Object.entries(byStatus).map(([s, n]) => `${s}:${n}`).join(',') || '-'}} failures{failed:${failures.failed},awaiting-owner:${failures.awaitingOwner}} leases=${leases.length} inbox-pending=${inboxPending} reports=${reports.length}(${unconsumedReports} unconsumed) workers=${workers.map((w) => `${w.jobId}:${w.liveness}`).join(',') || '-'}`,
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
+      `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
@@ -1625,17 +1647,24 @@ function cmdPlan(ledger, args) {
   const g = latestGoal(db, workflowId);
   const storedLegs = goalJsonOf(g)?.opChain?.legs ?? null;
   const storedOps = storedLegs ? storedLegs.map((l) => l?.op ?? l).filter(Boolean) : null;
+  // A chain approved before the owner handover existed lacks its final leg.
+  // Appending handover.review as the LAST leg is the one addition the Kernel
+  // makes without the owner (api finish requires it), so it is no divergence.
+  const handoverAppended = Boolean(storedOps) && !storedOps.includes(HANDOVER_OP) && planOps.at(-1) === HANDOVER_OP
+    && planOps.indexOf(HANDOVER_OP) === planOps.length - 1;
+  const comparedOps = handoverAppended ? planOps.slice(0, -1) : planOps;
   // Structural diff only: which stored legs the plan dropped, which plan ops
   // were never in the approved chain, whether shared ops changed order.
   const divergence = {
     storedOps: storedOps ?? null,
     planOps,
     missing: storedOps ? storedOps.filter((o) => !planOps.includes(o)) : [],
-    extra: storedOps ? planOps.filter((o) => !storedOps.includes(o)) : [...planOps],
+    extra: storedOps ? comparedOps.filter((o) => !storedOps.includes(o)) : [...planOps],
     reordered: storedOps
-      ? JSON.stringify(storedOps.filter((o) => planOps.includes(o))) !== JSON.stringify(planOps.filter((o) => storedOps.includes(o)))
+      ? JSON.stringify(storedOps.filter((o) => comparedOps.includes(o))) !== JSON.stringify(comparedOps.filter((o) => storedOps.includes(o)))
       : false,
     noStoredChain: storedOps === null,
+    ...(handoverAppended ? { handoverAppended: true } : {}),
   };
   divergence.diverged = divergence.missing.length > 0 || divergence.extra.length > 0 || divergence.reordered;
 
@@ -3471,7 +3500,7 @@ function cmdSettle(ledger, args, repo) {
 
   let machineRefs = [], released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
-  let awaitingOwner = false, cutSet = null;
+  let awaitingOwner = false, cutSet = null, handoverApproval = null;
   ledger.transaction(() => {
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -3500,7 +3529,8 @@ function cmdSettle(ledger, args, repo) {
     if (row) envelope = parseJson(row.report_json);
     if (!row && reportAbs) {
       const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job) });
-      if (valid.ok) {
+      const malformedHandoverAsk = valid.ok && jobOpOf(job) === HANDOVER_OP && valid.report.outcome === 'ask' && handoverAskProblem(valid.report.question);
+      if (valid.ok && !malformedHandoverAsk) {
         envelope = valid.report;
         db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
           .run(job.workflow_id, dispatchId, jobOpOf(job), job.attempt, job.generation, envelope.outcome, JSON.stringify(envelope), job.worker_id ?? null, payload.settledAt);
@@ -3555,6 +3585,18 @@ function cmdSettle(ledger, args, repo) {
         result.cutSet = { id: cutSet.id, total: cutSet.total, closesSet, open: cutSet.open };
       }
     }
+    // A handover.review pass is the owner's approval turned into a ledger fact:
+    // it settles only on the owner's approve receipt for the latest handover
+    // ask with no business settle after it (scripts/kernel/handover.mjs). A
+    // delegated answer never approves.
+    if (verdict === 'pass' && jobOpOf(job) === HANDOVER_OP) {
+      const approval = handoverApprovalOf(db, job.workflow_id, { attempt: job.attempt });
+      if (!approval.approved) {
+        throw Object.assign(new Error(`handover.review ${jobId} cannot settle pass: ${approval.reason}`), { code: 'handover-not-approved' });
+      }
+      handoverApproval = approval;
+      result.handoverApproval = { dispatchId: approval.ask.dispatchId, answeredBy: approval.ask.answeredBy, receiptPath: approval.ask.receiptPath };
+    }
     machineRefs = db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map((r) => r.machine_ref);
     released = db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes;
     db.prepare('UPDATE jobs SET status=?, payload_json=?, result_json=?, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?')
@@ -3571,6 +3613,18 @@ function cmdSettle(ledger, args, repo) {
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-settled', payload: { verdict, status, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, awaitingOwner, leasesReleased: released, machineRefs, reportsConsumed, ...(result.cutSet ? { cutSet: result.cutSet } : {}) },
     });
+    // The owner's approval, recorded after the settle it rides on so it is
+    // newer than every business settle (api finish reads it: handoverGateOf).
+    if (handoverApproval) {
+      ledger.appendEvent({
+        workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+        kind: HANDOVER_APPROVED, payload: {
+          jobId, dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy,
+          at: handoverApproval.ask.answeredAt, askJobId: handoverApproval.ask.jobId, receiptPath: handoverApproval.ask.receiptPath,
+          lastBusinessSettleSeq: handoverApproval.lastBusinessSettleSeq,
+        },
+      });
+    }
     // The set is done only here: its last pass recorded the whole-set gate.
     if (result.cutSet?.closesSet) {
       ledger.appendEvent({
@@ -3677,7 +3731,7 @@ function cmdSettle(ledger, args, repo) {
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(managedWorker ? { managedWorker } : {}), ...(landed?.checked ? { landed: landed.detail } : {}) };
   emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''} status=${status} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${taskClosed ? `, task ${taskClosed.taskId} ${taskClosed.status} ok=${taskClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} stop=${managedWorker.stop.ok} release=${managedWorker.release.ok}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 }
 
@@ -3758,6 +3812,16 @@ function cmdFinish(ledger, args) {
       code: 'workflow-open-jobs', openJobs: openOperations,
     });
   }
+  // A workflow is done when the owner approved its handover: a handover-approved
+  // event newer than the last business settle (scripts/kernel/handover.mjs
+  // handoverGateOf). An archived workflow is the one existing way out.
+  const handoverGate = already ? null : handoverGateOf(db, workflowId);
+  if (handoverGate && !handoverGate.ok) {
+    throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${handoverGate.reason}; run handover.review as the final leg and let the owner approve it (api status handover)`), {
+      code: 'handover-not-approved', approvedSeq: handoverGate.approvedSeq ?? null, lastBusinessSettleSeq: handoverGate.lastBusinessSettleSeq ?? null,
+    });
+  }
+  const handoverFinish = handoverGate ? { via: handoverGate.via, approvedSeq: handoverGate.approvedSeq ?? null, answeredBy: handoverGate.approval?.answeredBy ?? null } : null;
 
   const kernelSignal = db.prepare("SELECT token,value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
   const kernelJob = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY created_at DESC LIMIT 1").get(workflowId);
@@ -3773,7 +3837,7 @@ function cmdFinish(ledger, args) {
   let closed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0;
   ledger.transaction(() => {
     db.prepare("UPDATE workflows SET phase='finished', finished_json=?, updated_at=? WHERE workflow_id=?")
-      .run(JSON.stringify({ finishedAt: now, by: 'kernel-api' }), now, workflowId);
+      .run(JSON.stringify({ finishedAt: now, by: 'kernel-api', ...(handoverFinish ? { handover: handoverFinish } : {}) }), now, workflowId);
     closed = db.prepare("UPDATE inbox SET status='done', applied_at=? WHERE workflow_id=? AND status NOT IN ('done','applied')").run(now, workflowId).changes;
     kernelSignalsReleased = db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId).changes;
     if (kernelJob) {
@@ -3789,7 +3853,7 @@ function cmdFinish(ledger, args) {
     }
     ledger.appendEvent({
       workflowId, entityType: 'workflow', entityId: workflowId,
-      kind: 'workflow-finished', payload: { inboxClosed: closed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal },
+      kind: 'workflow-finished', payload: { inboxClosed: closed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, ...(handoverFinish ? { handover: handoverFinish } : {}) },
     });
   });
   // A finish leaves no open Task in the workflow Run. Settle closes an op's
@@ -3809,7 +3873,7 @@ function cmdFinish(ledger, args) {
 
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, alreadyFinished: already,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
-    tasksClosed };
+    tasksClosed, ...(handoverFinish ? { handover: handoverFinish } : {}) };
   emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   // Emit the durable receipt first because a Kernel normally closes its own
   // terminal here. The ledger is already authoritative if the host closes the
@@ -3909,6 +3973,10 @@ function cmdReport(ledger, args, repo) {
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)
     throw Object.assign(new Error(`--outcome '${args.outcome}' contradicts the envelope's '${report.outcome}'`), { code: 'outcome-mismatch' });
+  // The handover ask is the one ask whose answer the kernel routes: its three
+  // options are closed and ordered (scripts/kernel/handover.mjs).
+  const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
+  if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
   const dispatchId = report.dispatch, op = jobOpOf(job);
   ledger.transaction(() => {
     const now = Date.now();

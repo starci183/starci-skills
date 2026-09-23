@@ -1,0 +1,157 @@
+schema: starci/op@1
+id: handover.review
+goal:
+  en: "Hand the finished workflow to the owner and ask for acceptance: assemble one handover package in
+    the owner's language - what was built and why, where it lives, exactly how to run and test it, what
+    still runs on placeholder credentials, what was not proven live and the known risks - and ask the
+    owner to approve it, report a defect or ask a question. The workflow is done only when the owner
+    approves; the approval is the owner's own and a delegated answer never gives it."
+nodeKinds: [operations]
+completionProfile: operations
+sideEffects: []
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: goal
+    path: api survey --workflow <workflow> --json (goal revision, markdown, approved opChain)
+    purpose:
+      en: The goal the owner accepted - its purpose, scope, exclusions and done metrics - and the approved
+        leg chain it was delivered through.
+  - id: deliveries
+    path: api survey --workflow <workflow> --deliveries --json (deliveries, credentialPending, handoverHistory)
+    purpose:
+      en: Every settled operation of the workflow with its filed report - summary, files, repository, head
+        commit, branch, checks, open items, blocker and credentialPending - plus every earlier handover
+        ask of this workflow with the owner's decision, who answered it and the owner's note.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: The delivered source at the commits the reports name - README, package scripts, env examples,
+        .starcistacks manifests and the run and test commands the repository itself declares.
+  - id: evidence
+    path: N/evidence.yaml and N/evidence/<id>/manifest.yaml of each delivered record
+    purpose:
+      en: The proof each delivered record carries - which assertions passed, which were not run, and whether
+        a live proof ran against the real provider or runtime (proof.boundary, fakes, blocked environment).
+writes:
+  - id: package
+    path: E/**
+    artifacts: [handover-<attempt>.md, handover-<attempt>.json]
+    content:
+      en: "E is .starciwork/evidence/<workflow>.handover/ beside the root catalog - the workflow-level bundle
+        the setup record uses as precedent (work-layout.yaml shape.setup): a handover spans the whole
+        workflow, not one feature record, and the kernel grants exactly this directory as the job's owned
+        path. Each attempt adds its own handover-<attempt>.md, the package the owner reads, written in
+        owner_language, and handover-<attempt>.json, the same content as data {built, why,
+        repositories[{repository, branch, head}], run[], test[], credentialPending[], notProvenLive[],
+        risks[], answeredQuestion?, fixedFeedback?}. Files of an earlier attempt stay as they are."
+steps:
+  - reads:
+      - goal
+      - deliveries
+    writes: []
+    action:
+      en: "Read the approved goal and every delivery, then the latest entry of handoverHistory; it decides
+        which run this is. No entry, or an entry the kernel already acted on (a feedback note whose fix
+        settled, an owner question), is a handover: assemble the package and ask. The latest entry
+        answered approve with byOwner true is the owner's acceptance: file done as the final step says.
+        An approve answered by anyone other than the owner is no acceptance - hand over again so the
+        owner answers. A workflow with no settled delivery has nothing to hand over: report blocked
+        with kind authority and NOTHING_DELIVERED."
+  - reads:
+      - goal
+      - deliveries
+      - repo
+      - evidence
+    writes: [package]
+    action:
+      en: "Write the package in owner_language, plain words, in this order: (1) what was built and why,
+        mapped from the goal's purpose to the delivered slices; (2) where it lives - every repository,
+        branch and head commit the deliveries name; (3) how to run it, step by step, with the exact
+        commands, environment files and URLs the repository declares; (4) how to test it, step by step -
+        each step's URL or command, the account alias to use (never a secret) and the result the owner
+        should see; (5) what runs on placeholder credentials - every credentialPending variable, the
+        feature it gates and what the owner provides to make it live (modules/ops/_common.yaml Bounded
+        finish and blockers); (6) what was not proven live - every proof that did not run against the
+        real provider or runtime, with why; (7) known risks - open items, partial or failed legs,
+        residual findings and anything unverified. When the latest handover answer is the owner's
+        question, open the package with its answer; when it is feedback, open with what was fixed, in
+        which commit, and how to re-test it. Every command, URL, repository, branch and commit comes
+        from the repository or a delivery report; one that cannot be established is written as unknown,
+        never invented."
+  - reads:
+      - deliveries
+    writes: [package]
+    action:
+      en: "Ask with api report, outcome ask, then end the turn. question.text opens with a two-line summary
+        (the owner may read it first in a clipped Telegram message) followed by the whole package.
+        question.options holds exactly three options, in this order, labelled in owner_language:
+        approve - the workflow is done; feedback or bug - the reviewer describes it in the note;
+        question - the reviewer asks it in the note (for vi: \"Duyệt - workflow hoàn tất\", \"Góp ý / báo
+        lỗi - mô tả trong ghi chú\", \"Đặt câu hỏi - ghi trong ghi chú\"). No picks. question.refs names
+        the package paths, question.assets any evidence image the test steps point at, and files lists
+        the package. api report refuses a handover ask of any other shape. The kernel serves it through
+        serve-ask and parks this attempt awaiting the owner; nothing in this turn waits for the answer."
+  - reads:
+      - deliveries
+    writes: []
+    action:
+      en: "When the latest handover answer is the owner's approve, file done with summary \"approved by the
+        owner: <ask dispatch id>\", no new package and no new ask. api settle turns that pass into the
+        handover-approved event from the answer receipt, and refuses it (handover-not-approved) when the
+        receipt is not the owner's approval of the latest package or a business job settled after that
+        package was filed."
+proofs:
+  - id: package-grounded
+    requirement:
+      en: Every command, URL, repository, branch and commit in the package traces to the repository or a
+        delivery report, and every credentialPending variable and every proof that did not run live is
+        listed.
+  - id: handover-ask-shape
+    requirement:
+      en: The ask carries three distinct options in the order approve, feedback, question and no picks;
+        api report refuses any other handover ask.
+    check: scripts/kernel/handover.mjs
+  - id: owner-approval
+    requirement:
+      en: A pass settles only on the owner's approve receipt for the latest handover ask with no business
+        settle after it, and api finish refuses a workflow without a handover-approved event newer than
+        its last business settle.
+    check: scripts/kernel/handover.mjs
+blockers:
+  - code: NOTHING_DELIVERED
+    condition:
+      en: The workflow has no settled delivery to hand over; the chain before the handover has not run.
+  - code: SOURCE_UNREADABLE
+    condition:
+      en: A delivered repository or the commit a report names cannot be read, so the run and test steps
+        cannot be grounded; name the repository and commit.
+placeholders:
+  workflow: The running workflow id the handover bundle is keyed by
+  attempt: This handover.review job's attempt number
+  repo-id: Resolved repository resource ID of a delivery
+  bound-paths: Inspected source read set
+  id: An evidence bundle id of a delivered record
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks: [starci-validate]
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
+policy:
+  handoverPolicy:
+    options: [approve, feedback, question]
+    approval: owner-only
+    delegation: a delegate may answer feedback or question; serve-ask refuses a delegated approve
+    settle: api settle records handover-approved on a handover.review pass and refuses handover-not-approved otherwise
+    finish: api finish refuses handover-not-approved without a handover-approved event newer than the last business settle
+    feedback: modules/models/kinds.yaml route handover-feedback-repairs-the-build, then handover.review again
+    question: handover.review again with the answer in the package
+route:
+  nodeKinds: [workflow]
+  phase: [operate, cross-cutting]
+  intent: [handover, owner-acceptance]
+  prerequisites: [every other leg of the approved chain settled]
+  riskHints: [waits-on-owner]

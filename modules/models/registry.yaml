@@ -352,6 +352,14 @@ operators:
     environments:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+  handover.review:
+    skill: starci
+    # Writing the owner's handover is judging what was delivered and what was not proven: think work, the
+    # same reasoning runtimes in the same order.
+    chain: [claude-agent, codex-agent]
+    environments:
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   runtime.operate:
     skill: starci
     chain: [qwen-agent, devin-agent, codex-agent, claude-agent]

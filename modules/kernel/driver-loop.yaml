@@ -116,7 +116,7 @@ tick:
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
     - drive     # loop{ status -> reconcile effect_unknown -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
-    - finish    # api finish --workflow — every job settled AND the final verify passed
+    - finish    # api finish --workflow — every job settled AND the owner approved the handover (handoverLoop)
   citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, inbox, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, finish"
 
   survey:
@@ -277,7 +277,10 @@ tick:
       serve-ask --dispatch before yielding; a dead link is not an owner wait.
       `awaiting-owner` (no open operation, at least one unanswered ask) is a
       legitimate wait: yield naming the pending ask dispatch ids; the
-      answer's ask-answered wake brings you back.
+      answer's ask-answered wake brings you back. A pending handover ask is
+      this wait too. `handover-answered`, `finish-ready` and `handover-due`
+      are never waits: each is the next handover move (handoverLoop below),
+      and `api status` `handover` names it.
     reconcile: >-
       An `effect_unknown` job is part of the open frontier and remains fenced.
       Before routing it, call `api reconcile --job <id>`. The api reads the
@@ -472,14 +475,17 @@ tick:
 
   finish:
     rule: >-
-      When `api status` shows every job settled AND the final verify leg
-      settled pass, `api finish` closes the workflow: phase=finished, goal
-      finished, history preserved (api.yaml finish). For product delivery the
-      final verify must include one current reconciliation proving SRS, SDS,
-      code, test/E2E and UAT against the same delivery revision; a settled job
-      list is not that proof. `api finish` is idempotent — the ordering is the
-      driver's precondition, not an api refusal (api.yaml finish).
-    citation: "modules/kernel/api.yaml finish — 'run the gates, finish'"
+      When `api status` shows every job settled, the final verify leg settled
+      pass AND the owner approved the handover (frontier `finish-ready`),
+      `api finish` closes the workflow: phase=finished, goal finished, history
+      preserved (api.yaml finish). For product delivery the final verify must
+      include one current reconciliation proving SRS, SDS, code, test/E2E and
+      UAT against the same delivery revision; a settled job list is not that
+      proof. The approval is enforced, not instructed: `api finish` refuses
+      `handover-not-approved` unless a `handover-approved` event is newer than
+      the last business settle (scripts/kernel/handover.mjs handoverGateOf).
+      A finished workflow finishes again idempotently.
+    citation: "modules/kernel/api.yaml finish — 'run the gates, finish'; scripts/kernel/handover.mjs"
 
 # ============================================================================
 # 2 — VERDICT HANDLING. What the driver does with each settled verdict.
@@ -531,6 +537,8 @@ verdictTable:
       (limit 3, pause); environment -> needUser (limit 1); authority ->
       needUser (limit 1); outcome ask -> needUser (limit 1 — the kernel may
       answer only from the options the question offered, never an invented one).
+      A handover.review ask is the exception that is routed by its answer:
+      approve, feedback or question (handoverLoop; kinds.yaml handover routes).
     provisionAsk: >-
       Owner-bound needs go through provision.ask / decision.prepare and are
       projected to the owner as owner requests via the inbox
@@ -611,6 +619,68 @@ interfaceAuditLoop:
     accepted direction lineage; it is not an audit self-waiver.
   citation: "modules/ops/ops/interface.audit.yaml auditPolicy; modules/models/kinds.yaml interface audit routes"
 
+handoverLoop:
+  why: >-
+    Owner ruling 2026-09-23: at handover one op lets the owner test, give
+    feedback or ask, and the workflow counts as done only when the reviewer
+    approves. handover.review is that op and the last leg of every chain
+    (modules/ops/ops/handover.review.yaml; modules/models/kinds.yaml
+    handover routes).
+  enqueue: >-
+    When every other approved leg settled (frontier `handover-due`), enqueue
+    handover.review with `--paths .starciwork/evidence/<workflow>.handover`
+    and no other grant, route it and dispatch it. A chain approved before the
+    op existed has no handover leg: append it as the LAST leg of the derived
+    plan - `api plan` records divergence.handoverAppended and does not count
+    it as divergence - and enqueue it anyway; no owner question is needed to
+    add it, because `api finish` refuses without it.
+  ask: >-
+    The attempt reads the goal and `api survey --deliveries` and files
+    outcome ask with the package. `api report` refuses a handover ask that is
+    not exactly the options approve, feedback, question in that order.
+    Settle it `blocked` (awaiting-owner, no business attempt spent), run
+    `api serve-ask --workflow <id> --dispatch <ask dispatch>`, and yield on
+    `awaiting-owner`; an expired form is `ask-reserve` like any other ask.
+  approve: >-
+    `handover-answered` with decision approve and byOwner true: enqueue
+    handover.review again. It reads the approval and files done; record one
+    kernel check (name handover-owner-approval, command the `api status
+    --workflow <id> --json` read, exit 0, evidence the ask dispatch, decision
+    and answeredBy) with `api check`, then `api settle --verdict pass`. Settle
+    re-reads the receipt itself and records `handover-approved {jobId,
+    dispatchId, answeredBy, at}`, or refuses `handover-not-approved` when the
+    receipt is not the owner's approve of the latest handover ask or a
+    business job settled after that package was filed. Then frontier reads
+    `finish-ready`: retire any leftover ask and `api finish`.
+  delegation: >-
+    Only the owner approves. serve-ask refuses a delegated approve outright;
+    a receipt whose answeredBy is not the owner never settles the handover
+    pass and never satisfies `api finish`, whatever config.yaml delegation
+    allows for other asks. A delegate's feedback or question is routed like
+    the owner's.
+  feedback: >-
+    `handover-answered` with decision feedback: the note (status handover.ask.note,
+    the receipt's note) is a defect report. Route it to the fix op of the slice it
+    names - that node's lane build step with origin repair, or the
+    srs-gap / sds-gap / interface-gap route when the note says the requirement
+    or the design itself is wrong - enqueued with `--title "handover feedback
+    <ask dispatch>: <the note in a line>"`; the fix op reads the whole note in
+    `api survey --workflow <id> --deliveries` handoverHistory. Once that fix
+    settles pass the frontier reads `handover-due`: run handover.review again;
+    its package opens with what was fixed and how to re-test it.
+  question: >-
+    `handover-answered` with decision question: enqueue handover.review again.
+    The attempt reads the question from `api survey --deliveries`
+    handoverHistory and opens its package with the answer, then asks again.
+    The kernel never answers the owner in chat or in an ask of its own.
+  staleness: >-
+    A business job that settles after the approval makes it stale: status
+    `handover.finishAllowed` turns false and the handover runs again.
+  archived: >-
+    The one existing way out without an approval is a workflow whose record
+    the owner archived (workflows.archived_at); nothing in the api sets it.
+  citation: "modules/ops/ops/handover.review.yaml; scripts/kernel/handover.mjs; modules/models/kinds.yaml routes"
+
 assistedUatLoop:
   classify: >-
     Third-party involvement is not itself a human gate. Use ordinary automated
@@ -675,8 +745,8 @@ replanTriggers:
     citation: "modules/models/kinds.yaml routes purpose lines; modules/kernel/api.yaml incident"
 
   - trigger: goal-completes
-    when: "every leg settled and the gates ran"
-    driverDoes: "evaluate goal metrics against the goal's done block; `api finish` closes the workflow (phase=finished, inbox closed, 'workflow-finished' event); the kernel's job ends — the chat only ever hears the verdict"
+    when: "every leg settled, the gates ran and the owner approved the handover"
+    driverDoes: "evaluate goal metrics against the goal's done block; `api finish` closes the workflow (phase=finished, inbox closed, 'workflow-finished' event) and refuses handover-not-approved without the owner's approval (handoverLoop); the kernel's job ends — the chat only ever hears the verdict"
     citation: "modules/kernel/api.yaml finish"
 
 # ============================================================================

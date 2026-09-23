@@ -42,6 +42,7 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
 import { loadConfig, activeDelegation } from '../../engine/config.mjs';
 import { markAskClosed, notifyAsk } from '../connectors/telegram.mjs';
+import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
 
 // The form speaks the owner's language (config.yaml `language`). Unknown
 // languages fall back to English; the op writes the question itself in the
@@ -606,6 +607,13 @@ const main = async () => {
             return;
           }
         }
+        // A handover is approved by the owner alone (modules/ops/ops/handover.review.yaml);
+        // a delegate may send feedback or a question, never the approval.
+        if (report.op_id === HANDOVER_OP && answeredBy !== OWNER && HANDOVER_DECISIONS[Number(optionIdx)] === 'approve') {
+          res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+          res.end(`answered_by ${answeredBy} cannot approve a handover; only the owner approves it (a delegate may send feedback or a question)`);
+          return;
+        }
         const picks = {};
         for (const p of pickGroupsOf(question, images)) {
           const v = params.get(`pick:${p.id}`);
@@ -618,6 +626,7 @@ const main = async () => {
           schema: 'starci/ask-answer@1',
           workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
           option: optionIdx != null ? (() => { const o = (question.options ?? [])[Number(optionIdx)]; return o == null ? null : (typeof o === 'string' ? o : o.label ?? null); })() : null,
+          optionIndex: optionIdx != null && (question.options ?? [])[Number(optionIdx)] != null ? Number(optionIdx) : null,
           picks: Object.keys(picks).length ? picks : null,
           answeredBy, ...(delegation ? { delegation } : {}),
           custodyWritten, envWritten, pointersWritten, bridge, errors,
@@ -626,7 +635,7 @@ const main = async () => {
         fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
         ledger.transaction(() => ledger.appendEvent({
           workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
-          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy, custodyWritten, envWritten, pointersWritten, errors },
+          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy, optionIndex: receipt.optionIndex, custodyWritten, envWritten, pointersWritten, errors },
         }));
         const wake = wakeKernel(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receiptPath });
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
