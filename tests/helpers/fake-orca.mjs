@@ -233,6 +233,7 @@ else if (verb === 'terminal close') {
   const r = record(handle);
   if (r) { r.closed = true; r.connected = false; r.writable = false; }
   state.closed = [...(state.closed || []), handle];
+  if (argv.includes('--tab')) state.closedTabs = [...(state.closedTabs || []), handle];
   save();
   out({ ok: true, result: { closed: handle } });
 }
@@ -241,7 +242,7 @@ else if (verb === 'terminal close') {
 else if (verb === 'terminal list') {
   const open = Object.values(state.terminals || {}).filter(t => !t.closed);
   out({ ok: true, result: { terminals: open
-    .map(t => ({ handle: t.handle, title: t.title ?? null, worktree: t.worktree ?? null,
+    .map(t => ({ handle: t.handle, title: t.title ?? null, worktree: t.worktree ?? null, tabId: t.tabId ?? 'tab-' + t.handle,
       connected: t.connected !== false, writable: t.writable !== false })),
     ...(argv.includes('--include-visual-layouts') ? { visualLayouts: [{ worktreeId: 'fake-worktree', root: { type: 'group',
       tabs: open.map(t => ({ tabId: 'tab-' + t.handle, title: t.tabTitle ?? t.title ?? null,

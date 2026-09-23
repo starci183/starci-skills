@@ -59,6 +59,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -1770,7 +1771,7 @@ const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, se
   if (closeTerminal) {
     if (alreadyClosed)
       return { terminalClosed: true, closed: { kind: 'terminal', handle: closeTerminal, ok: true, by: 'launcher' } };
-    const r = bestEffort(() => terminalClose({ terminal: closeTerminal }));
+    const r = bestEffort(() => closeOperationTerminal(closeTerminal));
     return { terminalClosed: r?.ok === true,
       closed: { kind: 'terminal', handle: closeTerminal, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) } };
   }
@@ -2981,7 +2982,7 @@ function cmdSettle(ledger, args, repo) {
   const managed = settledPayload?.managed ?? null;
   let terminalClosed = null;
   if (job.worker_id && !managed) {
-    const closed = terminalClose({ terminal: job.worker_id });
+    const closed = closeOperationTerminal(job.worker_id);
     terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.error ? { error: closed.error } : {}) };
   }
 
@@ -3020,17 +3021,22 @@ function cmdSettle(ledger, args, repo) {
       catch (e) { retry = { ok: false, outcome: 'unknown', error: String(e?.message ?? e) }; }
       agentTerminal = { handle: agentHandle, retryRelease: { ok: retry?.ok === true, state: retry?.state ?? null }, connected: connectedNow() };
       if (agentTerminal.connected === true) {
-        const closed = terminalClose({ terminal: agentHandle });
+        const closed = closeOperationTerminal(agentHandle);
         agentTerminal.closed = closed.ok === true;
         agentTerminal.connected = connectedNow();
       }
     }
+    // worker-release closes the agent's pane, not its tab; the tab outlives it
+    // in Orca's layout and the session comes back under a new handle.
+    let agentTab = null;
+    if (agentHandle && !agentTerminal?.closed) agentTab = closeOperationTerminal(agentHandle, { tabOnly: true });
     managedWorker = {
       dispatchId: managed.dispatchId,
       stop: { ok: stop?.ok === true, outcome: stop?.outcome ?? null, state: stop?.state ?? null, ...(stop?.error ? { error: stop.error } : {}) },
       release: { ok: release?.ok === true, outcome: release?.outcome ?? null, state: release?.state ?? null, ...(release?.error ? { error: release.error } : {}) },
       ...(residual ? { residual } : {}),
       ...(agentTerminal ? { agentTerminal } : {}),
+      ...(agentTab ? { agentTab: { tab: agentTab.tab ?? null, ok: agentTab.ok === true } } : {}),
     };
   }
 

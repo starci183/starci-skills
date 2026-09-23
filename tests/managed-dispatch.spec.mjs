@@ -245,8 +245,9 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   assert.equal(worker?.agentTerminal?.handle,'fake-terminal-1');
   assert.equal(worker?.agentTerminal?.connected,false,'the settled op leaves no connected agent terminal');
   const closes=fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close');
-  if(unknown===1) assert.equal(closes.length,0,'a repeated release that disconnects the terminal needs no close');
-  else assert.deepEqual(closes.map(a=>a[a.indexOf('--terminal')+1]),['fake-terminal-1'],'only the exact agent terminal is closed');
+  // Either way the agent's own tab is closed once, so Orca cannot bring the
+  // session back under a new handle (tests/close-op-terminal.spec.mjs).
+  assert.deepEqual(closes.map(a=>[a[a.indexOf('--terminal')+1],a.includes('--tab')]),[['fake-terminal-1',true]],'only the exact agent terminal, with its tab');
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.agentTerminal?.connected,false,'the ledger keeps the worker receipt');
 });
 
