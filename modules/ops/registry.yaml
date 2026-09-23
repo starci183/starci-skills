@@ -158,6 +158,13 @@ ops:
     goal: Settle one product's visual identity in the single brand record - colour tokens traced to the
       real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - so
       every later
+    params:
+      ownerRulings:
+        default: ""
+        setBy: kernel
+      referenceSources:
+        default: ""
+        setBy: kernel
     nodeKinds:
       - brand
     completionProfile: brand

@@ -13,6 +13,24 @@ graphPolicy:
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
   prerequisiteState: done
   dispatch: never
+params:
+  ownerRulings:
+    type: string
+    default: ''
+    setBy: kernel
+    doc:
+      en: The owner's identity rulings, verbatim, each with where it was recorded (an owner-gate
+        incident answer, a serve-ask answer). A StarCi Next brand op read only the empty bound
+        frontend repository and reported no ruling while the owner's answer sat in an incident the
+        worker cannot open.
+  referenceSources:
+    type: string
+    default: ''
+    setBy: kernel
+    doc:
+      en: Comma-separated read-only paths the owner's ruling names as the identity to follow, for
+        example another product's global CSS and the dashboard and subscription pages it styles.
+        Values traced to a declaration in these files are traced to a real file.
 reads:
   - id: target
     path: .starciwork/brand/index.yaml
@@ -23,18 +41,21 @@ reads:
         and this op creates it at rev 1 as the record's first owner, not a second one."
   - id: owner
     path: .starciwork/features/*/{br,fr,decision}/**/index.yaml + the selected request and the owner's
-      recorded rulings
+      recorded rulings + params.ownerRulings
     purpose:
       en: Inferring identity from a competitor, a template or a screenshot is not a ruling.
   - id: grammar
     path: consuming app manifest/lockfile + resolved component package exports/types/renderers/CSS + app
-      family root/style imports
+      family root/style imports; before the app is scaffolded, the grammar package and family the
+      owner's ruling names
     purpose:
       en: Resolve the installed design grammar from the actual consuming app, honoring workspace aliases
         and bundler resolution, and record package identity, version, resolved path and inspected
-        file hashes. A similarly named family variable is not proof it is wired.
+        file hashes. A similarly named family variable is not proof it is wired. A frontend that is not
+        scaffolded yet has no manifest; then the family the owner ruled is read from the grammar
+        package itself and recorded as the family the scaffold installs.
   - id: sources
-    path: repository:<repo-id>/<bound-paths>
+    path: repository:<repo-id>/<bound-paths> + params.referenceSources
     purpose:
       en: Read the real token and style files of the frontend repository - the app's global CSS, the
         family root, the theme and token files the owner named or that this repository actually
