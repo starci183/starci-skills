@@ -22,6 +22,28 @@ test('qwen op command carries the credential-refresh prefix and --yolo',()=>{
   assert.equal(r.commandSource,'modules/models/agents/qwen.yaml');
 });
 
+test('qwen names itself to Orca through its pane title, labelled with the op job',()=>{
+  // Orca 1.4.209 has no qwen hook and does not map `node cli-entry.js` to qwen-code; a pane title ending
+  // " - qwen-code" is what gives the tab the Qwen logo and spinner (agents/qwen.yaml hostIdentity).
+  const op=buildSpawnCommand({provider:'qwen',env:{STARCI_ROLE:'op',STARCI_OP_JOB:'job-q1'}});
+  assert.ok(!op.error,op.error);
+  assert.ok(op.command.includes(process.platform==='win32'?"$env:CLI_TITLE='job-q1 - qwen-code';":"export CLI_TITLE='job-q1 - qwen-code';"),op.command.slice(0,200));
+  assert.ok(op.command.indexOf('CLI_TITLE')<op.command.indexOf('qwen --'),'the title is set before qwen starts');
+  assert.match(buildSpawnCommand({provider:'qwen'}).command,/CLI_TITLE='qwen - qwen-code'/);
+  assert.doesNotMatch(buildSpawnCommand({provider:'devin'}).command,/CLI_TITLE/,'only cards that declare hostIdentity get it');
+});
+
+test('devin on Windows runs with a copy of its config whose Orca hook path Git Bash can execute',()=>{
+  // Orca writes the devin-hook as a bare backslash path; Devin runs hook commands through Git Bash, which
+  // drops the backslashes and exits 127, so the tab never left Idle (agents/devin.yaml statusHookReason).
+  const prefix=loadAdapter('devin').card.commandPrefix.win32;
+  assert.match(prefix,/Join-Path \$env:APPDATA 'devin\\config\.json'/);
+  assert.match(prefix,/starci-devin-config-' \+ \$PID/);
+  assert.match(prefix,/\$starciDevinArgs=@\('--config', \$starciDevinCfg\)/);
+  assert.match(prefix,/function devin \{ & \$devinExe @starciDevinArgs @args \}/);
+  assert.doesNotMatch(prefix,/Set-Alias -Name devin/,'an alias would shadow the function and drop --config');
+});
+
 test('devin kernel command uses kernelCommandRequirements (dangerous)',()=>{
   const r=buildSpawnCommand({provider:'devin',kernel:true});
   assert.ok(!r.error,r.error);

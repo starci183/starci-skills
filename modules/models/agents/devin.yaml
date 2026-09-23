@@ -8,9 +8,22 @@ why: |-
   worktree, so Orca owns a fresh terminal and Dispatch for each attempt and observes the same report boundary
   as every other operation agent. The underlying account-selected model is deliberately not inferred.
 commandPrefix:
-  win32: '$devinExe=(Get-Command devin -ErrorAction SilentlyContinue).Source; if (-not $devinExe) { $devinExe=Join-Path $env:LOCALAPPDATA ''devin\cli\bin\devin.exe'' }; if (-not (Test-Path -LiteralPath $devinExe)) { Write-Error ''Devin CLI is not installed''; exit 127 }; Remove-Item Env:ACP_BACKEND -ErrorAction SilentlyContinue; & $devinExe models list --format json *> $null; if ($LASTEXITCODE -ne 0) { Write-Error ''Devin CLI is not authenticated''; exit $LASTEXITCODE }; Set-Alias -Name devin -Value $devinExe; '
+  win32: '$devinExe=(Get-Command devin -ErrorAction SilentlyContinue).Source; if (-not $devinExe) { $devinExe=Join-Path $env:LOCALAPPDATA ''devin\cli\bin\devin.exe'' }; if (-not (Test-Path -LiteralPath $devinExe)) { Write-Error ''Devin CLI is not installed''; exit 127 }; Remove-Item Env:ACP_BACKEND -ErrorAction SilentlyContinue; & $devinExe models list --format json *> $null; if ($LASTEXITCODE -ne 0) { Write-Error ''Devin CLI is not authenticated''; exit $LASTEXITCODE }; $starciDevinArgs=@(); $starciDevinCfgSrc=Join-Path $env:APPDATA ''devin\config.json''; if (Test-Path -LiteralPath $starciDevinCfgSrc) { $starciDevinCfgText=[IO.File]::ReadAllText($starciDevinCfgSrc); if ($starciDevinCfgText -match ''agent-hooks\\\\devin-hook\.cmd'') { $starciDevinCfg=Join-Path $env:TEMP (''starci-devin-config-'' + $PID + ''.json''); [IO.File]::WriteAllText($starciDevinCfg, [regex]::Replace($starciDevinCfgText, ''(?<="command"\s*:\s*")[^"]*?agent-hooks\\\\devin-hook\.cmd(?=")'', { param($m) $m.Value.Replace(''\\'', ''/'') })); $starciDevinArgs=@(''--config'', $starciDevinCfg) } }; Remove-Variable starciDevinCfgText, starciDevinCfgSrc -ErrorAction SilentlyContinue; function devin { & $devinExe @starciDevinArgs @args }; '
   posix: 'command -v devin >/dev/null 2>&1 && env -u ACP_BACKEND devin models list --format json >/dev/null && '
   reason: Fail before Task delivery when the official CLI is absent or the owner is not authenticated; auth status alone exits zero while logged out, so the read-only model inventory is the probe. No token is copied into commands or receipts.
+  statusHookReason: |-
+    Orca shows Devin's working/idle state only from its devin-hook (the pane is recognised as Devin by its devin.exe
+    foreground process, but that gives no status). Orca 1.4.209 installs the hook into %APPDATA%\devin\config.json
+    as the bare Windows path C:\Users\<you>\.orca\agent-hooks\devin-hook.cmd, while Devin CLI 3000.10.27 runs a
+    hook `command` through Git Bash on Windows. Bash eats the unquoted backslashes and every hook exits 127
+    ("Effects evaluator failed for hook None: Command exited with code 127" in %APPDATA%\devin\cli\logs), so the
+    tab sat at Idle while Devin worked. The win32 prefix therefore launches Devin with --config pointing at a
+    per-terminal copy (%TEMP%\starci-devin-config-<pid>.json) of the owner's config in which only those hook
+    commands are rewritten to forward slashes; everything else is copied byte for byte and the owner's file, which
+    Orca rewrites at every start, is never touched. The copy exists only when Orca's hook is installed; without it
+    Devin starts on its default config as before. Settings Devin saves during the session land in the copy.
+    Verified 2026-09-24: hooks ran with zero failures and Orca's status for the pane went working on
+    UserPromptSubmit/PreToolUse and done on Stop, on the first turn and on the next.
 environmentStrip:
   - name: ACP_BACKEND
     reason: |-
@@ -99,8 +112,8 @@ knownFailures:
     meaning: Wedged agent, not a slow task — output freshness is the health signal.
     action: Kill and respawn the agent; work is recovered by the next attempt surveying the tree.
     seenAt: 2026-09-20
-verifiedAt: 2026-09-20
-verifiedAgainst: 'devin CLI v3000.10.27'
+verifiedAt: 2026-09-24
+verifiedAgainst: 'devin CLI v3000.10.27, Orca 1.4.209'
 forbidden:
   - provider-native-subagent
   - cloud-handoff

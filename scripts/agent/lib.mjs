@@ -41,7 +41,8 @@ export function loadAdapter(provider) {
 }
 
 // Build the terminal command for a provider. Composition:
-//   credentialRefresh[plat] + commandPrefix[plat]          ← card-owned env prep (ACP strip, stale-key unset)
+//   env + hostIdentity.env                                 ← launch env, Orca tab identity (qwen CLI_TITLE)
+//   + credentialRefresh[plat] + commandPrefix[plat]        ← card-owned env prep (ACP strip, stale-key unset)
 //   + hostLaunchPrefix[plat]                               ← keeps the launch on Orca's runtime-owned PTY path
 //   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
 //     AND any missing card requirements (kernel → kernelCommandRequirements)
@@ -93,6 +94,18 @@ export function credentialRefreshCommand(card, plat = process.platform === 'win3
   if (/['\r\n]/.test(file)) return null;
   return step.replaceAll('<secrets-file>', file);
 }
+// A card's hostIdentity.env: variables that let Orca recognise the agent in
+// its tab (logo + working spinner). Orca names a pane's agent from agent hooks,
+// the foreground process, or the pane title; an agent whose process is a bare
+// `node` and that has no Orca hook (Qwen Code) is only recognisable by title.
+// `<label>` renders to the op job id when the launch carries STARCI_OP_JOB,
+// otherwise to the card's agent name.
+export function hostIdentityEnv(card, env = null) {
+  const vars = card?.hostIdentity?.env;
+  if (!vars || typeof vars !== 'object' || Array.isArray(vars)) return {};
+  const label = String(env?.STARCI_OP_JOB || card?.agent || 'agent');
+  return Object.fromEntries(Object.entries(vars).map(([key, value]) => [key, String(value).replaceAll('<label>', label)]));
+}
 export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null } = {}) {
   const { card, error } = loadAdapter(provider);
   if (error) return { provider, error };
@@ -106,7 +119,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // for terminal handle after creation" while the tab still spawns later,
   // untracked. A leading shell call operator runs the same binary on the
   // runtime-owned PTY path qwen and devin already use (agent card reason).
-  const prefix = [envPrefix(env, plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
+  const prefix = [envPrefix(env, plat), envPrefix(hostIdentityEnv(card, env), plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
   const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements

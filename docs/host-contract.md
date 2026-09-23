@@ -53,6 +53,8 @@ credentialRefresh: {win32: '…', posix: '…', secretsFile?: '.secrets/<file>.e
                                  # <secrets-file> in a step is the runtime-root path of secretsFile (lib.mjs credentialRefreshCommand),
                                  # read inside the terminal's shell so no secret value enters the command
 hostLaunchPrefix: {win32: '&', posix: 'command'}  # codex/claude: keep Orca's create on the runtime-owned PTY path
+hostIdentity: {env: {CLI_TITLE: '<label> - qwen-code'}}  # vars that let Orca name the agent in its tab (qwen: pane title);
+                                 # <label> = the op job id, else the card agent (lib.mjs hostIdentityEnv)
 environmentStrip:                # vars removed INSIDE the terminal command
   - {name: ACP_BACKEND, reason: "…"}
 
@@ -118,7 +120,7 @@ called by `api dispatch`:
 
 ```text
 loadAdapter(provider)            → parse modules/models/agents/<agent>.yaml
-buildSpawnCommand(...)           → credentialRefresh[plat] + commandPrefix[plat] + hostLaunchPrefix[plat]
+buildSpawnCommand(...)           → env + hostIdentity.env + credentialRefresh[plat] + commandPrefix[plat] + hostLaunchPrefix[plat]
                                    + command | commandRequirements
                                    (kernel → kernelCommandRequirements;
                                     native-managed → terminalFallback.command + bypassFlag)

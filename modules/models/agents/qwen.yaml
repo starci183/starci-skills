@@ -35,6 +35,24 @@ credentialRefresh:
     Only the file path enters the command; no value is ever placed in a command, receipt or log.
   win32: '$starciQwenKey=$null; if (Test-Path -LiteralPath ''<secrets-file>'') { $starciQwenKey=Get-Content -LiteralPath ''<secrets-file>'' | Where-Object { $_ -match ''^\s*QWENCLOUD_API_KEY\s*='' } | Select-Object -First 1 }; if ($starciQwenKey) { $env:BAILIAN_TOKEN_PLAN_API_KEY=($starciQwenKey -replace ''^\s*QWENCLOUD_API_KEY\s*=\s*'','''').Trim().Trim([char]34,[char]39) } else { Remove-Item Env:BAILIAN_TOKEN_PLAN_API_KEY -ErrorAction SilentlyContinue }; Remove-Variable starciQwenKey -ErrorAction SilentlyContinue; '
   posix: 'starci_qk=; if [ -f ''<secrets-file>'' ]; then starci_qk=$(sed -n ''s/^[[:space:]]*QWENCLOUD_API_KEY[[:space:]]*=[[:space:]]*//p'' ''<secrets-file>'' | head -n 1 | tr -d ''\r"''); fi; if [ -n "$starci_qk" ]; then export BAILIAN_TOKEN_PLAN_API_KEY="$starci_qk"; else unset BAILIAN_TOKEN_PLAN_API_KEY; fi; unset starci_qk; '
+  stillNeeded: |-
+    Re-checked 2026-09-24 on Orca 1.4.209 after the User variable was rotated and Orca restarted at 02:38: a bare
+    `qwen` in a fresh Orca terminal still answered HTTP 401 "invalid API-key". Orca terminals are spawned by its
+    long-lived terminal daemon, which kept the old environment across the app restart, so the in-terminal refresh
+    stays until that daemon itself restarts with the new key.
+hostIdentity:
+  env:
+    CLI_TITLE: '<label> - qwen-code'
+  reason: |-
+    Orca 1.4.209 names a tab's agent from its agent hooks, its foreground process or its pane title. Qwen Code has
+    no Orca hook, and its process is `node ...\@qwen-code\qwen-code\cli-entry.js`, which Orca does not map to
+    qwen-code (only `qwen` itself, or a Cursor/Pi/Prime package path, is recognised). Qwen Code writes its pane
+    title from CLI_TITLE (default "Qwen - <folder>"), prefixed with a half-circle spinner while it responds, and
+    Orca reads a title ending in " - qwen-code" as an anchored qwen-code owner. The tab then shows the Qwen
+    logo and the working spinner. Verified 2026-09-24 on Orca 1.4.209 + Qwen Code 0.24.4: without it the pane
+    had no agentIdentity; with it `terminal list` reported agentIdentity qwen-code, title "◐ ... - qwen-code"
+    while a shell tool ran and "... - qwen-code" at rest. `<label>` is the op job id (lib.mjs hostIdentityEnv).
+    The idle state is shown only as "no spinner": the title carries no idle word Orca would read.
 readiness:
   screenPattern: 'Type your message'
   identityPattern: 'deepseek-v4\.1-flash'
@@ -94,7 +112,7 @@ knownFailures:
     action: 'Deliver the brief via @<file> reference (see delivery.fileDirectory) — already encoded.'
     seenAt: established
 verifiedAt: 2026-09-24
-verifiedAgainst: 'Qwen Code 0.24.2, deepseek-v4.1-flash on the QwenCloud Token Plan, Orca 1.4.188'
+verifiedAgainst: 'Qwen Code 0.24.4, deepseek-v4.1-flash on the QwenCloud Token Plan, Orca 1.4.209'
 forbidden:
   - qwen-agent-tool
   - provider-native-subagent
