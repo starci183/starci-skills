@@ -858,12 +858,18 @@ function cmdStatus(ledger, args) {
     if (!subject) return latestAttempt.get(row.op_id) === row.attempt;
     return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && subjectOfJob(other.job_id) === subject);
   };
-  const awaitingOwner = ownerWaits.filter(stillWaits).map((row) => {
-    const dispatchId = jobResultOf(row).askDispatchId
-      ?? db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' ORDER BY created_at DESC LIMIT 1").get(workflowId, row.op_id, row.attempt)?.dispatch_id
-      ?? null;
+  const askDispatchOf = (row) => jobResultOf(row).askDispatchId
+    ?? db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' ORDER BY created_at DESC LIMIT 1").get(workflowId, row.op_id, row.attempt)?.dispatch_id
+    ?? null;
+  // An ask nobody answered or retired still waits on the owner whatever its
+  // lineage: a later job of the same op without a shared subject or cut is not
+  // its replacement.
+  const pendingAsk = (row) => { const d = askDispatchOf(row); return Boolean(d) && !askAnswers.has(d); };
+  const awaitingOwner = ownerWaits.filter((row) => stillWaits(row) || pendingAsk(row)).map((row) => {
+    const dispatchId = askDispatchOf(row);
     return { jobId: row.job_id, opId: row.op_id, attempt: row.attempt, dispatchId, answer: (dispatchId && askAnswers.get(dispatchId)) ?? 'pending' };
   });
+  const pendingOwner = awaitingOwner.filter((item) => item.answer === 'pending');
   const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
 
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
@@ -873,6 +879,9 @@ function cmdStatus(ledger, args) {
     : unconsumedReports > 0 ? 'transition-ready'
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : openOperations > 0 ? 'engaged'
+    // Nothing open, but a question is with the owner: the workflow waits on
+    // them, not on the Kernel, so nothing should wake it until the answer.
+    : wf.phase === 'running' && pendingOwner.length > 0 ? 'awaiting-owner'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
   // A settled result whose law inputs changed is work the Kernel owes now: it
@@ -891,7 +900,9 @@ function cmdStatus(ledger, args) {
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
     queued,
     queuedCauses,
-    reason: frontierState === 'orphaned-frontier'
+    reason: frontierState === 'awaiting-owner'
+      ? `no operation is open and the owner holds ${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')}); the answer wakes the Kernel`
+      : frontierState === 'orphaned-frontier'
       ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
       : frontierState === 'worker-nudge-ready'
         ? 'one or more exact running workers are at an idle provider prompt without a report; Kernel must call api nudge for each listed job now'

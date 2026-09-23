@@ -356,6 +356,33 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(because(second).queuedBecause,'ready');
 });
 
+// Live Modules had nothing open but one unanswered tax ask whose job lineage
+// did not survive a later same-op job; status called it orphaned-frontier and
+// the watchdog woke the waiting kernel every five minutes.
+test('no open operation plus an unanswered ask is awaiting-owner, not actionable',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-awaiting-owner';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    const job=(id,attempt,status,result)=>ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
+      VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`).run(id,wf,'business.decide',attempt,json({opId:'business.decide'}),status,json(result),at+attempt,at+attempt);
+    job('bd-tax',12,'failed',{verdict:'awaiting-owner',askDispatchId:'ctx_tax'});
+    job('bd-record',13,'succeeded',{verdict:'pass'});
+    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'ask',?,?,?)`)
+      .run(wf,'ctx_tax','business.decide',12,json({outcome:'ask',summary:'tax',question:{text:'tax?'}}),at,at);
+  });
+  const status=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r);};
+  let s=status();
+  assert.equal(s.frontier.state,'awaiting-owner');
+  assert.equal(s.frontier.actionable,false);
+  assert.deepEqual(s.awaitingOwner.map(a=>[a.jobId,a.answer]),[['bd-tax','pending']],'the pending ask is listed although a later attempt of the op exists');
+  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-answered',payload:{dispatchId:'ctx_tax'}}));
+  s=status();
+  assert.equal(s.frontier.state,'orphaned-frontier','once answered the Kernel owes the next transition');
+  assert.equal(s.frontier.actionable,true);
+});
+
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);

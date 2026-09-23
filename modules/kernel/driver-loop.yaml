@@ -241,6 +241,9 @@ tick:
       call `api nudge` for each exact id in `frontier.nudgeReadyJobs` before
       applying any age/wedge threshold. `orphaned-frontier` is likewise an
       immediate technical plan/repair transition, not a reason to yield.
+      `awaiting-owner` (no open operation, at least one unanswered ask) is a
+      legitimate wait: yield naming the pending ask dispatch ids; the
+      answer's ask-answered wake brings you back.
     reconcile: >-
       An `effect_unknown` job is part of the open frontier and remains fenced.
       Before routing it, call `api reconcile --job <id>`. The api reads the

@@ -171,7 +171,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|worker-nudge-ready|engaged|awaiting-owner|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.staleOperations': >-
         [{jobId, op, attempt, cut?, heldBy?, paths[]}] — staleInput grouped per job: settled work
         whose law inputs changed since dispatch, which the Kernel re-dispatches as a new attempt
