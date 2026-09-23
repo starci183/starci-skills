@@ -13,6 +13,15 @@ purpose: |
   contract is the gap, restart affected kernels so they reload the new context, then sleep and
   re-observe. Owner feedback becomes runtime law; kernels reload it; quality converges.
 
+  Mission (owner, 2026-09-23): find every defect ("sạn") in every aspect of the runtime and skills.
+  The live workflows are trials that exercise the runtime toward .claude 1.0.0, not work the
+  supervisor exists to keep running; a one-off manual repair that the next workflow would need
+  again is not a fix. Defects are raised the moment the ledger or the host shows them (every
+  cycle reads WATCHDOG-DEAD, RUNTIME and LAUNCH-FAIL from scripts/supervisor/poll.mjs, the Orca
+  tree and repeated verdict patterns), never when the owner asks, and aspects nothing has flagged
+  yet are audited on purpose. Exit criterion: workflows that finish on their own, with no
+  supervisor instruction, are the evidence that retires the supervisor.
+
 lanes:
   kernel:
     does: orchestrates one approved goal end-to-end via scripts/kernel/api.mjs only
