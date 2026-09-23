@@ -3293,7 +3293,7 @@ function cmdSettle(ledger, args, repo) {
   let terminalClosed = null;
   if (job.worker_id && !managed) {
     const closed = closeOperationTerminal(job.worker_id);
-    terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.error ? { error: closed.error } : {}) };
+    terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(closed.error ? { error: closed.error } : {}) };
   }
 
   // Managed settle — calls.yaml settle-dispatch: worker-stop then
@@ -3358,10 +3358,10 @@ function cmdSettle(ledger, args, repo) {
   const taskClosed = closeOperationTask(db, job, settledPayload);
   // The worker receipt is kept with the Task proof: settle's stdout is the
   // only other place it lived, and an orphaned op terminal left no trace.
-  if (taskClosed || managedWorker) {
+  if (taskClosed || managedWorker || terminalClosed) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}) }), Date.now(), jobId);
+      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) }), Date.now(), jobId);
   }
 
   const status = verdict === 'pass' ? 'succeeded' : 'failed';

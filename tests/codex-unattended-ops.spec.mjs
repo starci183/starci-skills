@@ -194,6 +194,10 @@ test('a Codex op dispatches as an unattended command terminal: Task, preamble, a
   assert.equal(s.status,0,`settle failed: ${s.stderr||s.stdout}`);
   assert.equal(jobRow(fx.repo,jobId)?.status,'succeeded');
   assert.ok((fx.orcaState().closed??[]).includes('fake-terminal-1'),'settle closes the op terminal');
+  // With its tab, so Orca cannot resume the session under a new handle, and the
+  // receipt stays on the job (two nivo strays were traced only by reading them).
+  assert.deepEqual(fx.orcaState().closedTabs,['fake-terminal-1']);
+  assert.deepEqual(JSON.parse(jobRow(fx.repo,jobId).payload_json).terminalClosed,{handle:'fake-terminal-1',ok:true,tab:'tab-fake-terminal-1'});
   assert.deepEqual(fx.find('orchestration worker-stop'),[],'no managed worker to stop');
 });
 
