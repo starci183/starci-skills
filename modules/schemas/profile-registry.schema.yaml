@@ -136,3 +136,13 @@ $defs:
               adapter: {type: string, minLength: 1}
               nestedAgents: {const: forbidden}
               capacityGate: {const: explicit-workflow-quota}
+          - type: object
+            additionalProperties: false
+            required: [kind, dispatch, adapter, composition]
+            properties:
+              kind: {const: command-terminal}
+              dispatch: {const: return-preamble-and-send}
+              adapter: {type: string, minLength: 1}
+              # The command is composed from the adapter card's terminalFallback:
+              # routed model/effort through modelArgs/effortArgs plus bypassArgs.
+              composition: {const: card-terminal-fallback}

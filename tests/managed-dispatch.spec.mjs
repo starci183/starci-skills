@@ -141,17 +141,17 @@ test('managed dispatch: route persists the decision, spawn marks the job running
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-managed',parentNodeId:'workflow:wf-managed',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-managed'").run();
     ledger.enqueueJob({jobId,workflowId:'wf-managed',opId:'code.refactor',kind:'op',
-      payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent'}});
+      payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}
 
-  const r=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','codex-agent','--spawn','--json');
+  const r=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(r.status,0,`managed dispatch failed: ${r.stderr||r.stdout}`);
   const job=jobRow(fx.repo,jobId);
   assert.equal(job?.status,'running',`managed dispatch must mark the job running, got ${job?.status}`);
   assert.equal(job?.worker_id,'dispatch-fake-1','worker_id is the Dispatch id, not a terminal handle');
   // Route persisted the decision: the resolved profile/agent lives on the
   // durable job, not in launcher memory.
-  assert.match(job?.payload_json??'',/codex/,`the dispatch decision must be persisted on the job payload: ${job?.payload_json}`);
+  assert.match(job?.payload_json??'',/claude/,`the dispatch decision must be persisted on the job payload: ${job?.payload_json}`);
   const seen=fx.calls();
   for(const step of ['orchestration run-create','orchestration task-create','orchestration worker-start','orchestration dispatch-show','terminal rename','orchestration worker-show'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
@@ -159,8 +159,10 @@ test('managed dispatch: route persists the decision, spawn marks the job running
     'worker-start already owns Task injection; a second orchestration dispatch would double-dispatch the operation');
   const calls=fx.callArgv();
   const workerStartCall=calls.find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
-  assert.equal(workerStartCall?.[workerStartCall.indexOf('--agent')+1],'codex',
-    'Codex operations use Orca native managed-agent admission, not an unguarded shell command');
+  // Claude is the managed exemplar: Codex operations launch as unattended
+  // command terminals (tests/codex-unattended-ops.spec.mjs).
+  assert.equal(workerStartCall?.[workerStartCall.indexOf('--agent')+1],'claude',
+    'managed profiles use Orca native managed-agent admission');
   assert.equal(workerStartCall?.[workerStartCall.indexOf('--from')+1],'fake-kernel-terminal',
     'the dedicated Kernel terminal is the explicit Orca Run/worker coordinator');
   const taskCreateCall=calls.find(argv=>argv.slice(0,2).join(' ')==='orchestration task-create');
@@ -390,10 +392,10 @@ test('a dispatch refused after the worker exists closes that worker in the same 
     ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
     ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
-      payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent'}});
+      payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}
 
-  const rejected=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','codex-agent','--spawn','--json');
+  const rejected=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.notEqual(rejected.status,0,'a worker-start refusal is a rejected dispatch');
   const out=json(rejected.stdout);
   assert.equal(out?.rejected,'dispatch-rejected');

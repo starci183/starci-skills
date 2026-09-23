@@ -13,7 +13,7 @@ name:
 release:
   api: orchestration.worker-release
 terminalFallback:
-  when: orchestration.worker-start is unavailable or a plain command terminal is wanted
+  when: every unattended Codex launch — the Kernel terminal and every operation agent (the codex profiles are command-terminal, card-composed); worker-start carries no approval/sandbox flag
   command: codex
   modelArgs: ['--model', '<model>']
   effortArgs: ['-c', 'model_reasoning_effort="<effort>"']

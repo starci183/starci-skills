@@ -197,6 +197,7 @@ operationAgent:
         api: terminal.rename
         cli: 'orca terminal rename --terminal <terminal-handle> --title "[Op] <operation> - <scope>" --json'
   managedFallback:
+    note: 'Unattended Codex ops never take this path: the codex profiles are command-terminal and launch with the codex card command incl. its bypassArgs (--ask-for-approval never --sandbox danger-full-access), because worker-start has no approval/sandbox flag.'
     calls:
       startAgent:
         api: orchestration.worker-start

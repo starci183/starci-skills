@@ -44,7 +44,7 @@ const enqueueOp=(f,workflowId,jobId,ownedPath)=>{
   const ledger=openLedger({file:ledgerFileFor(f.repo)});
   try{
     ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
-      payload:{opId:'code.refactor',owned_paths:[ownedPath],model:'codex-agent'}});
+      payload:{opId:'code.refactor',owned_paths:[ownedPath],model:'claude-agent'}});
   }finally{ledger.close();}
 };
 const payloadOf=(repo,jobId)=>{
@@ -111,8 +111,9 @@ test('the workflow Orca Run survives a kernel restart — one run-create, one ru
   assert.equal(first.status,0,first.stderr);
   const firstKernel=json(first.stdout)?.terminal;assert.ok(firstKernel);
 
+  // claude-agent is the managed exemplar; Codex ops are command terminals (tests/codex-unattended-ops.spec.mjs).
   enqueueOp(f,workflowId,'job-run-survives-1','docs/a/');
-  const d1=f.run(API,'dispatch','--repo',f.repo,'--job','job-run-survives-1','--model','codex-agent','--spawn','--json');
+  const d1=f.run(API,'dispatch','--repo',f.repo,'--job','job-run-survives-1','--model','claude-agent','--spawn','--json');
   assert.equal(d1.status,0,d1.stderr||d1.stdout);
   assert.equal(json(d1.stdout)?.managed?.runId,'run-fake-1');
   assert.equal(payloadOf(f.repo,`kernel-${workflowId}`)?.orca?.runId,'run-fake-1',
@@ -131,7 +132,7 @@ test('the workflow Orca Run survives a kernel restart — one run-create, one ru
   assert.equal(afterRestart?.hierarchy?.attempt,2);
 
   enqueueOp(f,workflowId,'job-run-survives-2','docs/b/');
-  const d2=f.run(API,'dispatch','--repo',f.repo,'--job','job-run-survives-2','--model','codex-agent','--spawn','--json');
+  const d2=f.run(API,'dispatch','--repo',f.repo,'--job','job-run-survives-2','--model','claude-agent','--spawn','--json');
   assert.equal(d2.status,0,d2.stderr||d2.stdout);
   assert.equal(json(d2.stdout)?.managed?.runId,'run-fake-1','the op after the restart joins the SAME Run');
 

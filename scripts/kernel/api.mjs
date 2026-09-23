@@ -63,7 +63,7 @@ import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
-import { selectPool, resolveLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
+import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import { opInputPaths, recordInputs, staleInputs, staleOperationsOf } from './input-digests.mjs';
@@ -1629,7 +1629,8 @@ const resolveModel = (target) => {
   if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
   const orca = doc?.launch?.orca ?? {};
-  return { target, provider: doc?.provider ?? null, kind: orca.kind ?? 'unknown', command: orca.command ?? null, profile: path.relative(skillRoot, file) };
+  return { target, provider: doc?.provider ?? null, kind: orca.kind ?? 'unknown', command: orca.command ?? null,
+    requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
 };
 
 // dispatch-op.mjs's packet builder is not exported (it runs main() on import),
@@ -2015,8 +2016,19 @@ function cmdDispatch(ledger, args, repo) {
   // The composed command is what a spawn would actually run — card env prefix
   // + credential strip + requirements (the --yolo/dangerous flags). Dry-run
   // prints it so reviewers see the injected flags, not just the profile body.
+  // A command-terminal profile without a static command (the Codex
+  // profiles) is card-composed: the agent card's terminalFallback supplies the
+  // binary, modelArgs/effortArgs carry the routed model + effort, and its
+  // bypassArgs make the op unattended — the same composition the Kernel
+  // terminal boots with (modules/models/agents/codex.yaml).
+  const cardLaunch = model.kind === 'command-terminal' && !model.command
+    ? resolveCardLaunchModel({ target: model.target, requestedModel: model.requestedModel, payload })
+    : null;
   const spawnCmd = model.kind === 'command-terminal'
-    ? buildSpawnCommand({ provider: model.provider, command: model.command })
+    ? (cardLaunch?.error
+      ? { error: `${model.target} has no launch model: ${cardLaunch.error}` }
+      : buildSpawnCommand({ provider: model.provider, command: model.command,
+        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null }))
     : null;
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
@@ -2038,7 +2050,9 @@ function cmdDispatch(ledger, args, repo) {
       ok: true, spawned: false, jobId, packet, prompt,
       leases: opLeaseRequests(payload),
       spawnCommand: spawnCmd
-        ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null, ...(spawnCmd.error ? { error: spawnCmd.error } : {}) }
+        ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null,
+          ...(cardLaunch && !cardLaunch.error ? { model: cardLaunch.modelId, effort: cardLaunch.effort, modelSource: cardLaunch.source } : {}),
+          ...(spawnCmd.error ? { error: spawnCmd.error } : {}) }
         : { command: null, error: `${model.target} is launch kind '${model.kind}' — composed by 'orca orchestration worker-start', not terminal create` },
       orca: { worktree, title, terminalTitle, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
@@ -2116,9 +2130,16 @@ function cmdDispatch(ledger, args, repo) {
   }
   // Command-terminal agents still join the workflow's Orca Run. Create the
   // operation Task first, then create/attest the terminal, dispatch that Task
-  // to the exact handle and submit Orca's returned preamble. This gives Qwen
-  // and Devin the same durable Kernel → Task → Dispatch hierarchy as managed
+  // to the exact handle and submit Orca's returned preamble. This gives Qwen,
+  // Devin and Codex the same durable Kernel → Task → Dispatch hierarchy as managed
   // workers without pretending Orca owns their process lifecycle.
+  if (cardLaunch?.error) {
+    const error = `${model.target} has no launch model: ${cardLaunch.error}`;
+    rejectDispatch(ledger, job, jobId, op, model, { step: 'route', error });
+    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, step: 'route', error },
+      `dispatch REJECTED for ${jobId} (route): ${error}`, args.json);
+    process.exit(1);
+  }
   const run = ensureWorkflowRun(ledger, { job, jobId, payload });
   if (!run.ok) {
     rejectDispatch(ledger, job, jobId, op, model, { step: 'run-create', error: run.error });
@@ -2139,9 +2160,13 @@ function cmdDispatch(ledger, args, repo) {
 
   // spawnAgent assembles the command and attests readiness/model, but prompt
   // delivery is delayed until Orca returns this Task's authoritative preamble.
+  // A card-composed launch pins the routed model and effort on the command
+  // line and spawnAgent attests the model from the rendered terminal before
+  // the Task is dispatched to it.
   const spawned = spawnAgent({
     provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
+    model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
   });
   const handle = spawned.terminal ?? null;
   const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle };
@@ -2204,6 +2229,10 @@ function cmdDispatch(ledger, args, repo) {
   payload.agent = model.provider;
   payload.provider = model.provider;
   payload.model = model.target;
+  if (cardLaunch) {
+    payload.modelId = spawned.modelAttested ?? cardLaunch.modelId;
+    payload.effort = cardLaunch.effort ?? null;
+  }
   payload.hierarchy = payload.hierarchy ?? {
     schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
     parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
@@ -2229,7 +2258,7 @@ function cmdDispatch(ledger, args, repo) {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
