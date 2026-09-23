@@ -999,6 +999,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   dùng runner có thật + đường dẫn test mà op implement phải tạo, tài khoản vai trò là identity resource có blockers
   (không đổi schema). Validator đã khớp work-layout, không cần sửa. Check xanh, spec 126/126. Đã báo kernel Collab.
 
+- 09:45 Modules đã hỏi owner theo kênh mới (4 ask). Lỗi: serve-ask supersede theo op id, nên ask Accounting xoá luôn
+  ask Chatbot và Shell đang mở. Vá `76aaa2164` (supersede chỉ khi cùng params.subject/question.refs) và `52e9f12d6` (poll hiện
+  ask phục vụ lại). Kernel đã phục vụ lại hai ask đó. Trả lời theo ủy quyền: Accounting 4 lựa chọn đề xuất; Chatbot 4 đề xuất,
+  riêng giới hạn vận hành chọn cấu hình theo từng cài đặt (không bịa số); Shell: cookie HttpOnly + Bearer cho Core. Để thầy:
+  ước tính thuế Accounting (a12) và ask WSPV checkout A/B/C (VNPAY/SePay; audit a28 đã chỉ ra đúng câu trả lời A trước đây của
+  trò chạm vào nhóm payment-provider bị loại). Merge lane P6 `505fc60d2` (brand.decide có điều kiện cho spec-foundation).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
