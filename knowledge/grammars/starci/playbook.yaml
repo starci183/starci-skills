@@ -7,11 +7,17 @@ purpose: |
   A shape not listed here is not a house idiom. It may still be composed for the approved product
   direction when existing Common semantics, family anatomy and product facts can express it; only
   promotion into the family's reusable idiom set belongs to the family owner.
+  Shapes marked `since: "0.5.0"` compose the forms, overlay and navigation renderers Common added in
+  0.5.0. They name renderers directly (`composition`) rather than idioms, because no product source
+  has yet shown them twice; `guidance` holds the rules every Core app built on them follows.
 appliesTo:
   - grammar
 family: starci
 provenance:
   publicEntry: "@starci/grammar/common"
+  package: "@starci/grammar"
+  version: "0.5.0"
+  captured: "2026-09-23"
   limitations: |
     Use this playbook only when this family is selected in the current .starciwork specification.
     Examples below are historical references; verify actually installed exports (prefer
@@ -82,6 +88,95 @@ shapes:
       The way onward as TextAction, last. Whether the provider shortcut precedes the form is seen
       once; carry the reference's order and say so.
 
+  - id: account-settings-form
+    title: Settings or profile form — named groups, one submit, server errors in place
+    since: "0.5.0"
+    referenceMayContribute: |
+      Keep: which groups exist, their order, and which fields are required. Never crosses over: field
+      chrome, validation copy style, or a control the package does not publish.
+    composition:
+      - renderer: Form
+        role: |
+          The boundary: `label` (form landmark), `onSubmit(FormData)`, `validationErrors` keyed by field
+          `name` for server-side refusals, `isPending` while the submit is in flight
+      - renderer: Fieldset
+        role: One per named group (`legend`, optional `description`, cross-field `errorMessage`)
+      - renderer: "Select / ComboBox / Textarea / NumberField / SearchField / DateField / DatePicker"
+        role: |
+          Each control carries its own `label`, `description`, `errorMessage`, `isRequired`, `name` —
+          the shared Field contract; a placeholder is never the name
+      - renderer: "Checkbox / CheckboxGroup / RadioGroup / Switch / SegmentedControl / Slider"
+        role: |
+          Choices; a Switch is an immediate setting, a Checkbox a value submitted with the form
+      - renderer: Field
+        role: |
+          Only for a control Grammar does not publish (a third-party widget, OtpInput, a native input):
+          its render prop hands over the id and `aria-describedby`/`aria-invalid` so the control is
+          announced like a Grammar one
+      - renderer: Button
+        role: One `variant="primary" type="submit"` after the last group; `isPending` mirrors the Form's
+    notes: |
+      The base `Input` still speaks `hint`/`isError`; the 0.5.0 controls speak
+      `description`/`errorMessage`/`isInvalid`. Do not mix the two vocabularies in one form without
+      checking that the Form's `validationErrors` reaches the control. In Core, fields are white fills
+      with a transparent border (see family.yaml `fields-on-a-surface`): on a top-level SurfaceCard
+      verify the rendered field edge.
+
+  - id: destructive-confirmation
+    title: Destructive confirmation — one irreversible decision
+    since: "0.5.0"
+    composition:
+      - renderer: AlertDialog
+        role: |
+          `tone="negative"` (the default), `title` naming the consequence, `confirmLabel` and
+          `cancelLabel` in the product's words; `onConfirm` may return a promise, which keeps the confirm
+          pending and the dialog open until it settles
+      - renderer: Button
+        role: The trigger, inside the Core root; never a red Button (Core has no destructive variant)
+    notes: |
+      Initial focus lands on the cancel action and an outside press never dismisses. A reversible
+      action is not a confirmation: act, then offer undo through a Toast `action`.
+
+  - id: secondary-task-sheet
+    title: Secondary task beside the page — filters, details, an edit
+    since: "0.5.0"
+    composition:
+      - renderer: Drawer
+        role: |
+          `placement="right"` at wide widths; `placement="bottom"` (grab handle shown by default) when
+          the task is thumb-driven on a phone. `footer` may take a render function receiving `close`
+      - renderer: Dialog
+        role: When the task must block the page and is short (`size` sm/md/lg/full)
+    notes: |
+      Both portal into the Core root and restore focus to their trigger. One overlay at a time; a
+      Popover or DropdownMenu opened from inside a Drawer stays inside the same root.
+
+  - id: app-shell-mobile-first
+    title: App shell — TopBar above, BottomNav below at phone widths, one Toaster
+    since: "0.5.0"
+    composition:
+      - renderer: CoreGrammarRoot
+        role: The single root around everything below
+      - renderer: TopBar
+        role: |
+          `brand` (a link home), `actions` (search, notifications, account — visible at every width),
+          `navigation` inline from 48rem; with `menu` supplied, the menu trigger replaces the inline
+          navigation below 48rem and opens an app-owned Drawer (`aria-controls` → the drawer id)
+      - renderer: BottomNav
+        role: |
+          3-5 primary destinations with `icon` + `label`, `currentId`, `position="fixed"`,
+          `visibility="compact"` so it disappears from 48rem where TopBar navigation (or a Sidebar)
+          takes over. Never both a BottomNav and a TopBar menu for the same destinations
+      - renderer: PageContainer
+        role: |
+          The main content; pad its block end by `var(--starci-core-bottom-nav-offset)` while the
+          fixed BottomNav is shown — Common publishes the value on the root and nothing reads it
+      - renderer: Toaster
+        role: Once, last child of the root; `placement="top"` while a fixed BottomNav is shown
+    notes: |
+      In Core the current BottomNav item is the violet `--accent` label at weight 600; its icon pill
+      reads `--accent-soft`, which Core does not bind (transparent unless the host HeroUI theme sets it).
+
 readingSteps:
   - id: business-shape-first
     order: 1
@@ -142,3 +237,39 @@ imageryClarification:
     Extending or adding an owner is not authorized by this playbook; it needs an op with explicit
     library-edit scope. Historical image notes are design references, not decisions for the current
     product.
+guidance:
+  - id: overlays-inside-the-root
+    requirement: |
+      Every overlay trigger (Dialog, AlertDialog, Drawer, Popover, DropdownMenu, and the Select,
+      ComboBox and DatePicker fields) must render inside `CoreGrammarRoot`. They portal into the nearest
+      `.grammar-common-root`; a trigger in a separate React tree or outside the root opens its overlay
+      in `<body>`, where no Core token, theme or forced-colours rule applies.
+    rationale: |
+      Core's DNA is scoped to `[data-grammar-family="core"]`; an overlay is only Core while it is a DOM
+      descendant of that scope.
+  - id: one-toaster-placed-clear-of-chrome
+    requirement: |
+      Mount exactly one `Toaster` (with `label` and `dismissLabel`) inside the root and add toasts with
+      `toastQueue.add({ title, description, tone, action })`. Keep the default `bottom-end` on a page
+      with no fixed bottom chrome; use `placement="top"` (or `top-end`) while a fixed `BottomNav` is
+      shown, because the Toaster does not read the BottomNav offset and would cover the bar. A toast
+      with an `action`, or `tone` negative/pending, persists until dismissed.
+    rationale: |
+      A second Toaster duplicates announcements; a bottom toaster over the tab bar hides navigation and
+      takes the thumb's target.
+  - id: forms-share-the-field-contract
+    requirement: |
+      Compose forms from the Field-contract controls inside `Form` (and `Fieldset` for named groups);
+      reach for `Field` only to give a non-Grammar control the same label/description/error anatomy.
+      Server refusals go in `Form validationErrors` by field `name`, not in a separate banner.
+    rationale: |
+      One contract means one error location a screen reader can find, and one set of
+      `data-grammar-field-*` hooks every family paints.
+  - id: mobile-chrome-by-width
+    requirement: |
+      Below 48rem: TopBar (brand + actions) above, BottomNav (3-5 destinations) fixed below, content
+      padded by the BottomNav offset, 44px targets (Common's floor). From 48rem: BottomNav
+      `visibility="compact"` hides and the destinations move to TopBar `navigation` or a Sidebar.
+    rationale: |
+      Both chrome renderers switch at the same 48rem breakpoint, so one set of destinations is always
+      visible exactly once.

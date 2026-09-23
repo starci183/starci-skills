@@ -42,14 +42,24 @@ topics:
     path: common/DNA.yaml
     title: Common Grammar — DNA
     summary: |
-      Snapshot of the `@starci/grammar/common` public entry: the custom-property names its own stylesheet
-      writes or reads, the 42 renderers it publishes with their class names and stamped rule ids, and the
-      absences read beside them. Common supplies anatomy, not colour.
+      Snapshot of the `@starci/grammar/common` public entry at 0.5.0: the custom-property names its
+      stylesheet set writes or reads, the 95 renderers it publishes (42 base, 20 forms, 14 overlays,
+      19 navigation) with their class names and stamped rule ids, and the absences read beside them.
+      Common supplies anatomy, not colour. Generated from source and drift-checked.
   - id: starci
     path: starci/index.yaml
     title: StarCi Core Grammar
     summary: |
-      Historical snapshot of the StarCi Core family — DNA, idioms, playbook and family boundaries.
+      Historical snapshot of the StarCi Core family — DNA, idioms, playbook (including composing the
+      0.5.0 forms, overlays and navigation chrome) and family boundaries.
+  - id: offset-pop
+    path: offset-pop/index.yaml
+    title: Offset Pop Grammar
+    summary: |
+      Snapshot of the product-neutral Offset Pop family — cream canvas, ink outline plus hard offset
+      shadow, one pink decision accent with a text-safe accent for text — with DNA, idioms, a
+      mobile-first playbook for playful learning or consumer apps, and family boundaries including two
+      decisions flagged for the family owner.
 families:
   - id: common
     title: common
@@ -67,3 +77,10 @@ families:
     reusableStyle: starci/idioms.yaml
     productComposition: starci/playbook.yaml
     index: starci/index.yaml
+  - id: offset-pop
+    title: offset-pop
+    authority: offset-pop/family.yaml
+    packageSnapshot: offset-pop/DNA.yaml
+    reusableStyle: offset-pop/idioms.yaml
+    productComposition: offset-pop/playbook.yaml
+    index: offset-pop/index.yaml

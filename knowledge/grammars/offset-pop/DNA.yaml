@@ -1,156 +1,251 @@
 schema: starci/knowledge-source@1
-id: grammar.starci.dna
-title: StarCi Core — DNA
+id: grammar.offset-pop.dna
+title: Offset Pop — DNA
 purpose: |
-  Package snapshot of the StarCi Core Grammar family: the DNA module's values, the tokens Core's sheet
-  sets on its root (and the Common-read `--starci-core-*` names it inherits), the 95 Common renderers
-  Core publishes with their closed prop values, classes and stamped rule ids, and gaps. Historical
-  observation only — not a claim that the currently installed package has these APIs or gaps. Static
-  source inspection does not prove runtime behavior.
+  Package snapshot of the Offset Pop Grammar family: the DNA module's values (the Core-shaped colour,
+  geometry, rhythm, elevation and motion groups plus the family's `offset` and `palette` groups), the
+  tokens Offset Pop's sheets set on its root with their dark and forced-colours values, the 95 Common
+  renderers it publishes with their closed prop values, classes and stamped rule ids, and gaps.
+  Historical observation only — not a claim that the currently installed package has these APIs or
+  gaps. Static source inspection does not prove runtime behavior.
 appliesTo:
   - grammar
-family: starci
+family: offset-pop
 provenance:
   package: "@starci/grammar"
   version: "0.5.0"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
-  familyEntry: "@starci/grammar/core"
-  styleEntrypoint: "@starci/grammar/core/styles.css"
+  familyEntry: "@starci/grammar/offset-pop"
+  styleEntrypoint: "@starci/grammar/offset-pop/styles.css"
   generatedBy: "scripts/checks/grammar-knowledge.mjs --write (dna, tokens[], renderers[], identity.counts, provenance.digests)"
   driftCheck: |
     `node scripts/checks/grammar-knowledge.mjs` (and `tests/grammar-knowledge.spec.mjs` under `npm test`)
-    compares this file with the source: `dna` must deep-equal every object `src/core/dna.ts` exports,
-    each token row's value/dark/overrides must equal what `src/core/styles.css` (or Common) sets, and the
-    renderer rows must equal the Common registry census, closed values included.
+    compares this file with the source: `dna` must deep-equal every object `src/offset-pop/dna.ts`
+    exports (accentText and the `offset`/`palette` groups included), each token row's value, dark value
+    and overrides must equal what the family sheets set on the root, and the renderer rows must equal
+    the Common registry census, closed values included.
   method: |
-    * dna — every frozen object `src/core/dna.ts` exports, loaded by stripping its TypeScript types, key
-      for key (`STARCI_CORE_DNA`, the spacing scale, token names, band token names, light and dark
-      defaults).
-    * tokens[] — every custom property `src/core/styles.css` assigns on the family root
-      `.grammar-common-root[data-grammar-family="core"]` (`valueFrom: family`; `dark` is the explicit
-      `[data-grammar-theme="dark"]` value; `overrides` are the system-dark and forced-colours blocks),
-      plus every `--starci-core-*` name the Common sheets assign (`valueFrom: common`), read with a
-      fallback (`common-fallback`) or receive from a renderer's inline style (`renderer`) — Core
-      inherits those anatomy knobs and a brand bound to `starci` may override them.
-    * renderers[] — the same Common registry census as common/DNA.yaml (Core replaces only
-      `GrammarRoot`), plus `closedValues`: every `readonly prop?: <closed type>` member of the props type
-      and of the local types its declaration names or its members are typed as. A literal union (or an
-      alias of one declared beside the renderer) is listed as `values`; a closed alias imported from
-      elsewhere in the package as `type`.
-  censusChange: |
-    Relative to the 0.4.13 capture (2026-09-05): every one of the 66 earlier token values reproduces;
-    the rows now also carry Core's semantic bindings (`--accent`, `--background`, `--field-*`,
-    `--shadow-surface`, …) and the new Common anatomy knobs. Closed values are re-derived: a few rows
-    gained a member the old census missed (`Icon.source`, `Text.parentEmphasis`, `Rail.landmark`,
-    `WorkspaceShell.mainLandmark`), `Sidebar` lost `source` (a member of its item type, not its props),
-    and `FencedCodeBlock`/`MarkdownTableFrame` lost a `measure` that belongs to `MarkdownArticle`.
+    * dna — every frozen object `src/offset-pop/dna.ts` exports, loaded by stripping its TypeScript
+      types, key for key.
+    * tokens[] — every custom property the family's own sheets (`src/offset-pop/styles.css` and the three
+      `components-*.css` it imports) assign on the family root
+      `.grammar-common-root[data-grammar-family="offset-pop"]`: the `--offset-pop-*` contract, the
+      compatibility names (`--offset-pop-surface-muted`, `--offset-pop-transition`) and the Common
+      semantic variables the family binds (`--accent`, `--accent-soft`, `--link`, `--field-*`, …).
+      `value` is the light/default value, `dark` the explicit `[data-grammar-theme="dark"]` value, and
+      `overrides` every other root-level block (system dark, narrow width, reduced motion, forced
+      colours). The five band names Offset Pop re-exports (`OFFSET_POP_BAND_TOKEN_NAMES`) are Common's
+      and carry Common's value (`valueFrom: common`). Custom properties set below the root (the
+      per-state `--offset-pop-state-color`, the field ring) are family internals and are not rows.
+    * renderers[] — the same Common registry census as common/DNA.yaml (Offset Pop replaces only
+      `GrammarRoot`), plus `closedValues`, measured exactly as in starci/DNA.yaml.
   limitations: |
-    Snapshot generated 2026-09-23 from package @starci/grammar@0.5.0 at the recorded checkout.
-    Before use, inspect the selected repository's manifest/lockfile, exported types, renderers
-    and CSS; record actual source/version in .starciwork. If source is unavailable, report
-    unverified; do not infer current APIs or defects from these tables. The current public
-    consumer entry observed for FE work is @starci/grammar/common — verify installed exports
-    rather than inventing APIs. Family ownership boundaries are in family.yaml; composition
-    references are idioms.yaml and playbook.yaml.
+    Snapshot generated 2026-09-23 from @starci/grammar@0.5.0 source (integration commit plus the
+    `lane-op/polish` row and Subnav fixes), read statically. Before use, inspect the selected
+    repository's manifest/lockfile, exported types, renderers and CSS; record actual source/version in
+    .starciwork. If source is unavailable, report unverified; do not infer current APIs or defects from
+    these tables. Family boundaries are in family.yaml; composition references are idioms.yaml and
+    playbook.yaml.
   digests:
-    - path: "packages/grammar/src/core/index.ts"
-      sha256: "93ffa130ba3d4e36610806971013b25d76fffff032510225db06d51f31cfba30"
-    - path: "packages/grammar/src/core/dna.ts"
-      sha256: "1cb228e073f88e02b632b3b698ce0dcb3ee1f8399401cc43610fbd02fc0b9aa3"
-    - path: "packages/grammar/src/core/styles.css"
-      sha256: "592b30ad3171136180bd579f9a55a2dafd4009a117f562b07f2eab4850f83af6"
+    - path: "packages/grammar/src/offset-pop/index.tsx"
+      sha256: "2606e85f26dac7bc82e8d3edaa0ec23df23e5df0576b9273b66d537f3cef2994"
+    - path: "packages/grammar/src/offset-pop/dna.ts"
+      sha256: "5ed5b10a69855e15ee27e13926f7550a3711e1eb60a15f40c51e0f73e9824618"
+    - path: "packages/grammar/src/offset-pop/conformance.ts"
+      sha256: "6f9e9b9685a438a9c2d99ca092cbd704395a69a0ffa764d5b044591fbd8a32da"
+    - path: "packages/grammar/src/offset-pop/styles.css"
+      sha256: "c103dd8dafe47d69de14e396093782039ce1dd2788e4e8a30c1620cd4b547326"
+    - path: "packages/grammar/src/offset-pop/components-forms.css"
+      sha256: "138c4d3f7a080d90aa7f311f2999fa215339d1e49e59f545867e29b34bce3952"
+    - path: "packages/grammar/src/offset-pop/components-overlays.css"
+      sha256: "8a278f04d4d6dc0b1496e3eba0fe5bf46ef305f6f089f915b6ebe9fe3902f57d"
+    - path: "packages/grammar/src/offset-pop/components-navigation.css"
+      sha256: "675c315d1e0e7181c56ad531267f0fa511a9cf71fe55990c1e811156f025d7c4"
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "b7627b364cad8edccbde07d995d44a2001b9eb1026aa687820ee4c57a6f885b6"
 identity:
   package: "@starci/grammar"
   version: "0.5.0"
+  familyId: "offset-pop"
+  dnaId: "offset-pop"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
-  familyId: "core"
-  dnaId: "starci-core"
-  rootComponent: "CoreGrammarRoot"
-  familyScope: "data-grammar-family=\"core\""
-  styleEntrypoint: "@starci/grammar/core/styles.css"
+  rootComponent: "OffsetPopGrammarRoot"
+  familyDefinition: "offsetPopGrammar = defineGrammarFamily({ id: \"offset-pop\", replacements: { GrammarRoot }, extensions: {} })"
+  familyScope: "data-grammar-family=\"offset-pop\""
+  cssLayer: "starci-grammar-offset-pop"
+  styleEntrypoint: "@starci/grammar/offset-pop/styles.css"
+  familySheets:
+    - "src/offset-pop/styles.css (imports ../common/styles.css first)"
+    - "src/offset-pop/components-forms.css"
+    - "src/offset-pop/components-overlays.css"
+    - "src/offset-pop/components-navigation.css"
   publicEntry: "@starci/grammar/common"
-  conformance: "coreRuleConformance: all 150 COMMON_UI_RULE_IDS inherited, no family evidence"
-  componentTreatment: |
-    None of its own for the 53 renderers added in 0.5.0: Core ships no `components-*.css`, so forms,
-    overlays and navigation render in Common anatomy painted through the semantic variables Core binds
-    (`--accent`, `--surface`, `--field-*`, `--radius`, `--shadow-surface`, …).
+  conformance: "offsetPopRuleConformance: 33 family-owned rules (OFFSET_POP_FAMILY_EVIDENCE), 117 inherited, of 150"
+  familyOwnedRules:
+    - ACCENT-1
+    - BOUNDARY-1
+    - BOUNDARY-4
+    - BOUNDARY-5
+    - BOUNDARY-6
+    - COLOR-5
+    - CONTROL-STATE-2
+    - CORE-BOUNDARY-1
+    - CORE-BOUNDARY-4
+    - CORE-BOUNDARY-5
+    - CORE-SURFACE-2
+    - FLOW-2
+    - FONT-6
+    - FOCUS-1
+    - GAP-4
+    - MARGIN-2
+    - MEASURE-5
+    - MOTION-1
+    - MOTION-2
+    - MOTION-3
+    - OVERFLOW-2
+    - PADDING-2
+    - PADDING-3
+    - PADDING-4
+    - RESPONSIVE-1
+    - STATE-5
+    - SURFACE-1
+    - SURFACE-2
+    - SURFACE-3
+    - SURFACE-4
+    - TONE-2
+    - TONE-3
+    - TRUTH-1
+  contrast:
+    source: "src/offset-pop/dna.ts header table, asserted in src/offset-pop/styles.spec.ts"
+    pairs:
+      - pair: "foreground on canvas / surface / surfaceSecondary"
+        light: "16.86 / 17.49 / 13.78"
+        dark: "17.47 / 15.44 / 12.80"
+      - pair: "muted on canvas / surface / surfaceSecondary"
+        light: "5.81 / 6.03 / 4.75"
+        dark: "10.16 / 8.98 / 7.45"
+      - pair: "accentForeground (ink) on accent (pink)"
+        light: "5.23"
+        dark: "5.23"
+      - pair: "accentText on canvas / surface / surfaceSecondary"
+        light: "6.22 / 6.45 / 5.09"
+        dark: "7.65 / 6.76 / 5.61"
+      - pair: "focus (pink) on canvas / surface, non-text"
+        light: "3.22 / 3.34"
+        dark: "5.42 / 4.79"
+      - pair: "danger foreground (ink) on critical red"
+        light: "4.72"
+        dark: "4.72"
+    notes: |
+      White on the family pink is 3.40:1 and white on the critical red 3.77:1, so both fills carry the
+      ink as their foreground. Pink as body-size text on the light canvas is 3.22:1, which is why text
+      reads `accentText` and the pink stays a fill and a ring.
+  rendererTreatment: |
+    The family replaces no renderer except GrammarRoot; every one of the 95 is Common's, painted by the
+    family sheets through `data-component`, `data-grammar-*` hooks and vendor state attributes. The 53
+    renderers added in 0.5.0 are each targeted by a family rule (asserted by the
+    `components-{forms,overlays,navigation}.spec.ts` suites).
   counts:
     renderers: 95
-    tokens: 99
+    tokens: 79
     claimEntries: 174
-    gaps: 13
+    gaps: 3
+
+observations:
+  - id: one-seam-per-row-pair
+    observation: |
+      Static rows (`[data-grammar-row]`, StaticStateRow) have no hover or focus treatment, and the seam
+      between two rows is exactly one 2px line: the family repaints Common's between-rows edge
+      (`[data-grammar-row] + [data-grammar-row]`, `border-block-start` at the outline width) instead of
+      adding a second edge below each row. BOUNDARY-3 stays inherited.
+  - id: interactive-rows
+    observation: |
+      ListBox options, Select/ComboBox options and selectable DataTable rows are their own pointer and
+      focus target and take their states from the vendor's attributes: `data-hovered` (or `data-focused`
+      on a popover option) paints the yellow 32% wash on an unselected, enabled row; `data-focus-visible`
+      a 2px `--focus` ring at offset 0 on the row edge (DataTable keeps Common's inset pink ring);
+      selected paints `--accent-soft` (theme-aware: `#f8dbe8` light, `#3b2936` dark) with an
+      `inset 0.25rem` pink leading edge and the `--offset-pop-accent-text` label. Reduced motion drops the
+      transitions and any transform; forced colours keep a Highlight edge in place of the fill.
+  - id: current-and-selected-share-the-soft-fill
+    observation: |
+      A focused, hovered or open DropdownMenu item and the selected row states read the same
+      theme-aware `--accent-soft` fill in every theme, so there is no separate dark-only rule for them.
 
 dna:
-  STARCI_CORE_BAND_TOKEN_NAMES:
+  OFFSET_POP_BAND_TOKEN_NAMES:
     bandOffset: "--starci-core-band-offset"
     bandHeight: "--starci-core-band-height"
     bandSubnavHeight: "--starci-core-band-subnav-height"
     railOffset: "--starci-core-rail-offset"
     subnavOffset: "--starci-core-subnav-offset"
-  STARCI_CORE_DARK_TOKEN_DEFAULTS:
-    "--starci-core-canvas": "oklch(12% 0.0015 354.13)"
-    "--starci-core-surface": "oklch(21.03% 0.003 354.13)"
-    "--starci-core-surface-secondary": "oklch(25.7% 0.0023 354.13)"
-    "--starci-core-foreground": "oklch(99.11% 0.0015 354.13)"
-    "--starci-core-muted": "oklch(70.5% 0.003 354.13)"
-    "--starci-core-border": "oklch(28% 0.0015 354.13)"
-    "--starci-core-separator": "oklch(25% 0.0015 354.13)"
-    "--starci-core-success": "oklch(73.29% 0.1941 162.85)"
-    "--starci-core-success-foreground": "oklch(21.03% 0.0059 162.85)"
-    "--starci-core-warning": "oklch(82.03% 0.1392 88.38)"
-    "--starci-core-warning-foreground": "oklch(21.03% 0.0059 88.38)"
-    "--starci-core-danger": "oklch(59.4% 0.1973 36.67)"
-    "--starci-core-danger-foreground": "oklch(99.11% 0 0)"
-    "--starci-core-info": "oklch(72% 0.17 250)"
-    "--starci-core-info-foreground": "oklch(21.03% 0.0059 250)"
-  STARCI_CORE_DNA:
-    id: "starci-core"
+  OFFSET_POP_DARK_TOKEN_DEFAULTS:
+    "--offset-pop-canvas": "#17121d"
+    "--offset-pop-surface": "#251d2c"
+    "--offset-pop-surface-secondary": "#3b2936"
+    "--offset-pop-foreground": "#fff8ef"
+    "--offset-pop-muted": "#c8bdca"
+    "--offset-pop-border": "#fff8ef"
+    "--offset-pop-separator": "#fff8ef"
+    "--offset-pop-success": "#91e4ca"
+    "--offset-pop-success-foreground": "#1c1524"
+    "--offset-pop-warning": "#ffd447"
+    "--offset-pop-warning-foreground": "#1c1524"
+    "--offset-pop-danger": "#e84a5f"
+    "--offset-pop-danger-foreground": "#1c1524"
+    "--offset-pop-info": "#f8d8e6"
+    "--offset-pop-info-foreground": "#1c1524"
+    "--offset-pop-accent-text": "#ff7ab8"
+    "--offset-pop-ink": "#fff8ef"
+    "--offset-pop-shadow-ink": "#050306"
+  OFFSET_POP_DNA:
+    id: "offset-pop"
     version: 1
     color:
-      accent: "#7547ff"
-      accentForeground: "oklch(100% 0 0)"
-      focus: "#7248ff"
+      accent: "#ff3593"
+      accentForeground: "#1c1524"
+      focus: "#ff3593"
       light:
-        canvas: "oklch(97.02% 0.0015 354.13)"
-        surface: "oklch(100% 0.0008 354.13)"
-        surfaceSecondary: "oklch(95.24% 0.0012 354.13)"
-        foreground: "oklch(21.03% 0.0015 354.13)"
-        muted: "oklch(55.17% 0.003 354.13)"
-        border: "oklch(90% 0.0015 354.13)"
-        separator: "oklch(92% 0.0015 354.13)"
-        success: "oklch(73.29% 0.1941 162.85)"
-        successForeground: "oklch(21.03% 0.0059 162.85)"
-        warning: "oklch(78.19% 0.159 84.37)"
-        warningForeground: "oklch(21.03% 0.0059 84.37)"
-        danger: "oklch(65.32% 0.2335 37.78)"
-        dangerForeground: "oklch(99.11% 0 0)"
-        info: "oklch(72% 0.17 250)"
-        infoForeground: "oklch(21.03% 0.0059 250)"
+        canvas: "#fff8ef"
+        surface: "#fffdf9"
+        surfaceSecondary: "#f8dbe8"
+        foreground: "#1c1524"
+        muted: "#675f6c"
+        border: "#1c1524"
+        separator: "#1c1524"
+        success: "#91e4ca"
+        successForeground: "#1c1524"
+        warning: "#ffd447"
+        warningForeground: "#1c1524"
+        danger: "#e84a5f"
+        dangerForeground: "#1c1524"
+        info: "#f8d8e6"
+        infoForeground: "#1c1524"
+        accentText: "#b8005f"
       dark:
-        canvas: "oklch(12% 0.0015 354.13)"
-        surface: "oklch(21.03% 0.003 354.13)"
-        surfaceSecondary: "oklch(25.7% 0.0023 354.13)"
-        foreground: "oklch(99.11% 0.0015 354.13)"
-        muted: "oklch(70.5% 0.003 354.13)"
-        border: "oklch(28% 0.0015 354.13)"
-        separator: "oklch(25% 0.0015 354.13)"
-        success: "oklch(73.29% 0.1941 162.85)"
-        successForeground: "oklch(21.03% 0.0059 162.85)"
-        warning: "oklch(82.03% 0.1392 88.38)"
-        warningForeground: "oklch(21.03% 0.0059 88.38)"
-        danger: "oklch(59.4% 0.1973 36.67)"
-        dangerForeground: "oklch(99.11% 0 0)"
-        info: "oklch(72% 0.17 250)"
-        infoForeground: "oklch(21.03% 0.0059 250)"
+        canvas: "#17121d"
+        surface: "#251d2c"
+        surfaceSecondary: "#3b2936"
+        foreground: "#fff8ef"
+        muted: "#c8bdca"
+        border: "#fff8ef"
+        separator: "#fff8ef"
+        success: "#91e4ca"
+        successForeground: "#1c1524"
+        warning: "#ffd447"
+        warningForeground: "#1c1524"
+        danger: "#e84a5f"
+        dangerForeground: "#1c1524"
+        info: "#f8d8e6"
+        infoForeground: "#1c1524"
+        accentText: "#ff7ab8"
     geometry:
       pageMeasure: "80rem"
       readingMeasure: "72ch"
-      surfaceRadius: "1rem"
-      controlRadius: "0.75rem"
+      surfaceRadius: "1.5rem"
+      controlRadius: "1rem"
       pillRadius: "999px"
     rhythm:
       inlineGap: "0.5rem"
@@ -159,11 +254,26 @@ dna:
       regionGap: "1.5rem"
       pageInset: "clamp(1rem, 3vw, 2rem)"
     elevation:
-      surface: "0 8px 28px oklch(21.03% 0.0059 354.13 / 0.07)"
+      surface: "var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)"
     motion:
-      duration: "180ms"
-      easing: "cubic-bezier(0.2, 0, 0, 1)"
-  STARCI_CORE_SPACING_SCALE:
+      duration: "140ms"
+      easing: "cubic-bezier(.2, .8, .2, 1)"
+    offset:
+      x: "0.25rem"
+      y: "0.5rem"
+      outlineWidth: "2px"
+      ink: "#1c1524"
+      shadowInk: "#1c1524"
+      dark:
+        ink: "#fff8ef"
+        shadowInk: "#050306"
+    palette:
+      pink: "#ff3593"
+      blush: "#f8d8e6"
+      yellow: "#ffd447"
+      mint: "#91e4ca"
+      critical: "#e84a5f"
+  OFFSET_POP_SPACING_SCALE:
     "0": "0rem"
     "1": "0.25rem"
     "2": "0.5rem"
@@ -178,159 +288,508 @@ dna:
     "0.5": "0.125rem"
     "1.5": "0.375rem"
     "2.5": "0.625rem"
-  STARCI_CORE_TOKEN_DEFAULTS:
-    "--starci-core-accent": "#7547ff"
-    "--starci-core-accent-foreground": "oklch(100% 0 0)"
-    "--starci-core-focus": "#7248ff"
-    "--starci-core-canvas": "oklch(97.02% 0.0015 354.13)"
-    "--starci-core-surface": "oklch(100% 0.0008 354.13)"
-    "--starci-core-surface-secondary": "oklch(95.24% 0.0012 354.13)"
-    "--starci-core-foreground": "oklch(21.03% 0.0015 354.13)"
-    "--starci-core-muted": "oklch(55.17% 0.003 354.13)"
-    "--starci-core-border": "oklch(90% 0.0015 354.13)"
-    "--starci-core-separator": "oklch(92% 0.0015 354.13)"
-    "--starci-core-success": "oklch(73.29% 0.1941 162.85)"
-    "--starci-core-success-foreground": "oklch(21.03% 0.0059 162.85)"
-    "--starci-core-warning": "oklch(78.19% 0.159 84.37)"
-    "--starci-core-warning-foreground": "oklch(21.03% 0.0059 84.37)"
-    "--starci-core-danger": "oklch(65.32% 0.2335 37.78)"
-    "--starci-core-danger-foreground": "oklch(99.11% 0 0)"
-    "--starci-core-info": "oklch(72% 0.17 250)"
-    "--starci-core-info-foreground": "oklch(21.03% 0.0059 250)"
-    "--starci-core-page-measure": "80rem"
-    "--starci-core-reading-measure": "72ch"
-    "--starci-core-surface-radius": "1rem"
-    "--starci-core-control-radius": "0.75rem"
-    "--starci-core-pill-radius": "999px"
-    "--starci-core-page-inset": "clamp(1rem, 3vw, 2rem)"
-    "--starci-core-inline-gap": "0.5rem"
-    "--starci-core-row-gap": "0.75rem"
-    "--starci-core-section-gap": "1rem"
-    "--starci-core-region-gap": "1.5rem"
-    "--starci-core-surface-shadow": "0 8px 28px oklch(21.03% 0.0059 354.13 / 0.07)"
-    "--starci-core-motion-duration": "180ms"
-    "--starci-core-motion-easing": "cubic-bezier(0.2, 0, 0, 1)"
-  STARCI_CORE_TOKEN_NAMES:
-    accent: "--starci-core-accent"
-    accentForeground: "--starci-core-accent-foreground"
-    focus: "--starci-core-focus"
-    canvas: "--starci-core-canvas"
-    surface: "--starci-core-surface"
-    surfaceSecondary: "--starci-core-surface-secondary"
-    foreground: "--starci-core-foreground"
-    muted: "--starci-core-muted"
-    border: "--starci-core-border"
-    separator: "--starci-core-separator"
-    success: "--starci-core-success"
-    successForeground: "--starci-core-success-foreground"
-    warning: "--starci-core-warning"
-    warningForeground: "--starci-core-warning-foreground"
-    danger: "--starci-core-danger"
-    dangerForeground: "--starci-core-danger-foreground"
-    info: "--starci-core-info"
-    infoForeground: "--starci-core-info-foreground"
-    pageMeasure: "--starci-core-page-measure"
-    readingMeasure: "--starci-core-reading-measure"
-    surfaceRadius: "--starci-core-surface-radius"
-    controlRadius: "--starci-core-control-radius"
-    pillRadius: "--starci-core-pill-radius"
-    pageInset: "--starci-core-page-inset"
-    inlineGap: "--starci-core-inline-gap"
-    rowGap: "--starci-core-row-gap"
-    sectionGap: "--starci-core-section-gap"
-    regionGap: "--starci-core-region-gap"
-    elevation: "--starci-core-surface-shadow"
-    motionDuration: "--starci-core-motion-duration"
-    motionEasing: "--starci-core-motion-easing"
+  OFFSET_POP_TOKEN_DEFAULTS:
+    "--offset-pop-accent": "#ff3593"
+    "--offset-pop-accent-foreground": "#1c1524"
+    "--offset-pop-focus": "#ff3593"
+    "--offset-pop-canvas": "#fff8ef"
+    "--offset-pop-surface": "#fffdf9"
+    "--offset-pop-surface-secondary": "#f8dbe8"
+    "--offset-pop-foreground": "#1c1524"
+    "--offset-pop-muted": "#675f6c"
+    "--offset-pop-border": "#1c1524"
+    "--offset-pop-separator": "#1c1524"
+    "--offset-pop-success": "#91e4ca"
+    "--offset-pop-success-foreground": "#1c1524"
+    "--offset-pop-warning": "#ffd447"
+    "--offset-pop-warning-foreground": "#1c1524"
+    "--offset-pop-danger": "#e84a5f"
+    "--offset-pop-danger-foreground": "#1c1524"
+    "--offset-pop-info": "#f8d8e6"
+    "--offset-pop-info-foreground": "#1c1524"
+    "--offset-pop-accent-text": "#b8005f"
+    "--offset-pop-page-measure": "80rem"
+    "--offset-pop-reading-measure": "72ch"
+    "--offset-pop-surface-radius": "1.5rem"
+    "--offset-pop-control-radius": "1rem"
+    "--offset-pop-pill-radius": "999px"
+    "--offset-pop-page-inset": "clamp(1rem, 3vw, 2rem)"
+    "--offset-pop-inline-gap": "0.5rem"
+    "--offset-pop-row-gap": "0.75rem"
+    "--offset-pop-section-gap": "1rem"
+    "--offset-pop-region-gap": "1.5rem"
+    "--offset-pop-surface-shadow": "var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)"
+    "--offset-pop-motion-duration": "140ms"
+    "--offset-pop-motion-easing": "cubic-bezier(.2, .8, .2, 1)"
+    "--offset-pop-shadow-x": "0.25rem"
+    "--offset-pop-shadow-y": "0.5rem"
+    "--offset-pop-outline-width": "2px"
+    "--offset-pop-ink": "#1c1524"
+    "--offset-pop-shadow-ink": "#1c1524"
+    "--offset-pop-pink": "#ff3593"
+    "--offset-pop-blush": "#f8d8e6"
+    "--offset-pop-yellow": "#ffd447"
+    "--offset-pop-mint": "#91e4ca"
+    "--offset-pop-critical": "#e84a5f"
+  OFFSET_POP_TOKEN_NAMES:
+    accent: "--offset-pop-accent"
+    accentForeground: "--offset-pop-accent-foreground"
+    focus: "--offset-pop-focus"
+    canvas: "--offset-pop-canvas"
+    surface: "--offset-pop-surface"
+    surfaceSecondary: "--offset-pop-surface-secondary"
+    foreground: "--offset-pop-foreground"
+    muted: "--offset-pop-muted"
+    border: "--offset-pop-border"
+    separator: "--offset-pop-separator"
+    success: "--offset-pop-success"
+    successForeground: "--offset-pop-success-foreground"
+    warning: "--offset-pop-warning"
+    warningForeground: "--offset-pop-warning-foreground"
+    danger: "--offset-pop-danger"
+    dangerForeground: "--offset-pop-danger-foreground"
+    info: "--offset-pop-info"
+    infoForeground: "--offset-pop-info-foreground"
+    accentText: "--offset-pop-accent-text"
+    pageMeasure: "--offset-pop-page-measure"
+    readingMeasure: "--offset-pop-reading-measure"
+    surfaceRadius: "--offset-pop-surface-radius"
+    controlRadius: "--offset-pop-control-radius"
+    pillRadius: "--offset-pop-pill-radius"
+    pageInset: "--offset-pop-page-inset"
+    inlineGap: "--offset-pop-inline-gap"
+    rowGap: "--offset-pop-row-gap"
+    sectionGap: "--offset-pop-section-gap"
+    regionGap: "--offset-pop-region-gap"
+    elevation: "--offset-pop-surface-shadow"
+    motionDuration: "--offset-pop-motion-duration"
+    motionEasing: "--offset-pop-motion-easing"
+    shadowX: "--offset-pop-shadow-x"
+    shadowY: "--offset-pop-shadow-y"
+    outlineWidth: "--offset-pop-outline-width"
+    ink: "--offset-pop-ink"
+    shadowInk: "--offset-pop-shadow-ink"
+    pink: "--offset-pop-pink"
+    blush: "--offset-pop-blush"
+    yellow: "--offset-pop-yellow"
+    mint: "--offset-pop-mint"
+    critical: "--offset-pop-critical"
 
 tokens:
   - name: "--accent"
-    value: "var(--starci-core-accent)"
+    value: "var(--offset-pop-accent)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:44"
+    source: "packages/grammar/src/offset-pop/styles.css:66"
   - name: "--accent-foreground"
-    value: "var(--starci-core-accent-foreground)"
+    value: "var(--offset-pop-accent-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:45"
+    source: "packages/grammar/src/offset-pop/styles.css:67"
+  - name: "--accent-soft"
+    value: "var(--offset-pop-surface-secondary)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:101"
+  - name: "--accent-soft-foreground"
+    value: "var(--offset-pop-accent-text)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:102"
   - name: "--background"
-    value: "var(--starci-core-canvas)"
+    value: "var(--offset-pop-canvas)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:47"
+    source: "packages/grammar/src/offset-pop/styles.css:69"
   - name: "--border"
-    value: "var(--starci-core-border)"
+    value: "var(--offset-pop-border)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:54"
+    source: "packages/grammar/src/offset-pop/styles.css:76"
   - name: "--danger"
-    value: "var(--starci-core-danger)"
+    value: "var(--offset-pop-danger)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:60"
+    source: "packages/grammar/src/offset-pop/styles.css:82"
   - name: "--danger-foreground"
-    value: "var(--starci-core-danger-foreground)"
+    value: "var(--offset-pop-danger-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:61"
+    source: "packages/grammar/src/offset-pop/styles.css:83"
   - name: "--field-background"
-    value: "var(--starci-core-surface)"
+    value: "var(--offset-pop-surface)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:64"
+    source: "packages/grammar/src/offset-pop/styles.css:86"
   - name: "--field-border"
-    value: "transparent"
+    value: "var(--offset-pop-border)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:65"
+    source: "packages/grammar/src/offset-pop/styles.css:87"
   - name: "--field-foreground"
-    value: "var(--starci-core-foreground)"
+    value: "var(--offset-pop-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:66"
+    source: "packages/grammar/src/offset-pop/styles.css:88"
   - name: "--field-placeholder"
-    value: "var(--starci-core-muted)"
+    value: "var(--offset-pop-muted)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:67"
+    source: "packages/grammar/src/offset-pop/styles.css:89"
   - name: "--field-radius"
-    value: "var(--starci-core-control-radius)"
+    value: "var(--offset-pop-control-radius)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:69"
+    source: "packages/grammar/src/offset-pop/styles.css:91"
   - name: "--focus"
-    value: "var(--starci-core-focus)"
+    value: "var(--offset-pop-focus)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:46"
+    source: "packages/grammar/src/offset-pop/styles.css:68"
   - name: "--foreground"
-    value: "var(--starci-core-foreground)"
+    value: "var(--offset-pop-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:48"
+    source: "packages/grammar/src/offset-pop/styles.css:70"
   - name: "--info"
-    value: "var(--starci-core-info)"
+    value: "var(--offset-pop-info)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:62"
+    source: "packages/grammar/src/offset-pop/styles.css:84"
   - name: "--info-foreground"
-    value: "var(--starci-core-info-foreground)"
+    value: "var(--offset-pop-info-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:63"
+    source: "packages/grammar/src/offset-pop/styles.css:85"
+  - name: "--link"
+    value: "var(--offset-pop-accent-text)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:103"
   - name: "--muted"
-    value: "var(--starci-core-muted)"
+    value: "var(--offset-pop-muted)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:53"
-  - name: "--radius"
-    value: "var(--starci-core-control-radius)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:68"
-  - name: "--separator"
-    value: "var(--starci-core-separator)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:55"
-  - name: "--shadow-surface"
-    value: "var(--starci-core-surface-shadow)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:70"
-  - name: "--starci-core-accent"
-    value: "#7547ff"
+    source: "packages/grammar/src/offset-pop/styles.css:75"
+  - name: "--offset-pop-accent"
+    value: "#ff3593"
     valueFrom: "family"
     overrides:
-      - context: "@media (forced-colors: active)"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
         value: "Highlight"
-    source: "packages/grammar/src/core/styles.css:11"
-  - name: "--starci-core-accent-foreground"
-    value: "oklch(100% 0 0)"
+    source: "packages/grammar/src/offset-pop/styles.css:28"
+  - name: "--offset-pop-accent-foreground"
+    value: "#1c1524"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:12"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "HighlightText"
+    source: "packages/grammar/src/offset-pop/styles.css:29"
+  - name: "--offset-pop-accent-text"
+    value: "#b8005f"
+    dark: "#ff7ab8"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#ff7ab8"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:46"
+  - name: "--offset-pop-blush"
+    value: "#f8d8e6"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:17"
+  - name: "--offset-pop-border"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:36"
+  - name: "--offset-pop-canvas"
+    value: "#fff8ef"
+    dark: "#17121d"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#17121d"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:31"
+  - name: "--offset-pop-control-radius"
+    value: "1rem"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:55"
+  - name: "--offset-pop-critical"
+    value: "#e84a5f"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:20"
+  - name: "--offset-pop-danger"
+    value: "#e84a5f"
+    dark: "#e84a5f"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#e84a5f"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:42"
+  - name: "--offset-pop-danger-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:43"
+  - name: "--offset-pop-focus"
+    value: "#ff3593"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Highlight"
+    source: "packages/grammar/src/offset-pop/styles.css:30"
+  - name: "--offset-pop-foreground"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:34"
+  - name: "--offset-pop-info"
+    value: "#f8d8e6"
+    dark: "#f8d8e6"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#f8d8e6"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:44"
+  - name: "--offset-pop-info-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:45"
+  - name: "--offset-pop-ink"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:21"
+  - name: "--offset-pop-inline-gap"
+    value: "var(--grammar-inline-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:52"
+  - name: "--offset-pop-mint"
+    value: "#91e4ca"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:19"
+  - name: "--offset-pop-motion-duration"
+    value: "140ms"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-reduced-motion: reduce)"
+        value: "0ms"
+    source: "packages/grammar/src/offset-pop/styles.css:58"
+  - name: "--offset-pop-motion-easing"
+    value: "cubic-bezier(.2, .8, .2, 1)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:59"
+  - name: "--offset-pop-muted"
+    value: "#675f6c"
+    dark: "#c8bdca"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#c8bdca"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "GrayText"
+    source: "packages/grammar/src/offset-pop/styles.css:35"
+  - name: "--offset-pop-outline-width"
+    value: "2px"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:23"
+  - name: "--offset-pop-page-inset"
+    value: "var(--grammar-page-inset)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:49"
+  - name: "--offset-pop-page-measure"
+    value: "80rem"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:47"
+  - name: "--offset-pop-pill-radius"
+    value: "999px"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:56"
+  - name: "--offset-pop-pink"
+    value: "#ff3593"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Highlight"
+    source: "packages/grammar/src/offset-pop/styles.css:16"
+  - name: "--offset-pop-reading-measure"
+    value: "72ch"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:48"
+  - name: "--offset-pop-region-gap"
+    value: "var(--grammar-region-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:50"
+  - name: "--offset-pop-row-gap"
+    value: "var(--grammar-row-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:53"
+  - name: "--offset-pop-section-gap"
+    value: "var(--grammar-section-gap)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:51"
+  - name: "--offset-pop-separator"
+    value: "#1c1524"
+    dark: "#fff8ef"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#fff8ef"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:37"
+  - name: "--offset-pop-shadow-ink"
+    value: "#1c1524"
+    dark: "#050306"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#050306"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:22"
+  - name: "--offset-pop-shadow-x"
+    value: "0.25rem"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:24"
+  - name: "--offset-pop-shadow-y"
+    value: "0.5rem"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (max-width: 40rem)"
+        value: "0.25rem"
+    source: "packages/grammar/src/offset-pop/styles.css:25"
+  - name: "--offset-pop-success"
+    value: "#91e4ca"
+    dark: "#91e4ca"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#91e4ca"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:38"
+  - name: "--offset-pop-success-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:39"
+  - name: "--offset-pop-surface"
+    value: "#fffdf9"
+    dark: "#251d2c"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#251d2c"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:32"
+  - name: "--offset-pop-surface-muted"
+    value: "var(--offset-pop-surface-secondary)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:62"
+  - name: "--offset-pop-surface-radius"
+    value: "1.5rem"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (max-width: 40rem)"
+        value: "1.25rem"
+    source: "packages/grammar/src/offset-pop/styles.css:54"
+  - name: "--offset-pop-surface-secondary"
+    value: "#f8dbe8"
+    dark: "#3b2936"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#3b2936"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:33"
+  - name: "--offset-pop-surface-shadow"
+    value: "var(--offset-pop-shadow-x) var(--offset-pop-shadow-y) 0 var(--offset-pop-shadow-ink)"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "none"
+    source: "packages/grammar/src/offset-pop/styles.css:57"
+  - name: "--offset-pop-transition"
+    value: "var(--offset-pop-motion-duration) var(--offset-pop-motion-easing)"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-reduced-motion: reduce)"
+        value: "0ms linear"
+    source: "packages/grammar/src/offset-pop/styles.css:63"
+  - name: "--offset-pop-warning"
+    value: "#ffd447"
+    dark: "#ffd447"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#ffd447"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "CanvasText"
+    source: "packages/grammar/src/offset-pop/styles.css:40"
+  - name: "--offset-pop-warning-foreground"
+    value: "#1c1524"
+    dark: "#1c1524"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
+        value: "#1c1524"
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:41"
+  - name: "--offset-pop-yellow"
+    value: "#ffd447"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "Canvas"
+    source: "packages/grammar/src/offset-pop/styles.css:18"
+  - name: "--radius"
+    value: "var(--offset-pop-control-radius)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:90"
+  - name: "--separator"
+    value: "var(--offset-pop-separator)"
+    valueFrom: "family"
+    source: "packages/grammar/src/offset-pop/styles.css:77"
+  - name: "--shadow-surface"
+    value: "var(--offset-pop-surface-shadow)"
+    valueFrom: "family"
+    overrides:
+      - context: "@media (forced-colors: active) (any) | [data-grammar-theme]"
+        value: "none"
+    source: "packages/grammar/src/offset-pop/styles.css:92"
   - name: "--starci-core-band-height"
     value: "calc(4rem + 1px)"
     valueFrom: "common"
@@ -343,402 +802,46 @@ tokens:
     value: "calc(3.25rem + 1px)"
     valueFrom: "common"
     source: "packages/grammar/src/common/styles.css:1303"
-  - name: "--starci-core-border"
-    value: "oklch(90% 0.0015 354.13)"
-    dark: "oklch(28% 0.0015 354.13)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(28% 0.0015 354.13)"
-      - context: "@media (forced-colors: active)"
-        value: "CanvasText"
-    source: "packages/grammar/src/core/styles.css:19"
-  - name: "--starci-core-bottom-nav-count"
-    value: "4"
-    valueFrom: "renderer"
-    source: "packages/grammar/src/common/components-navigation.css:405"
-  - name: "--starci-core-bottom-nav-offset"
-    value: "calc(4rem + env(safe-area-inset-bottom, 0px))"
-    valueFrom: "common"
-    source: "packages/grammar/src/common/components-navigation.css:400"
-  - name: "--starci-core-bottom-nav-z"
-    value: "40"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/components-navigation.css:394"
-  - name: "--starci-core-canvas"
-    value: "oklch(97.02% 0.0015 354.13)"
-    dark: "oklch(12% 0.0015 354.13)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(12% 0.0015 354.13)"
-      - context: "@media (forced-colors: active)"
-        value: "Canvas"
-    source: "packages/grammar/src/core/styles.css:14"
-  - name: "--starci-core-contained-max-height"
-    value: "calc(100dvh - 3rem)"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:600"
-  - name: "--starci-core-control-min-size"
-    value: "2.75rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1388"
-  - name: "--starci-core-control-radius"
-    value: "0.75rem"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:37"
-  - name: "--starci-core-copy-gap"
-    value: "0.25rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1098"
-  - name: "--starci-core-danger"
-    value: "oklch(65.32% 0.2335 37.78)"
-    dark: "oklch(59.4% 0.1973 36.67)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(59.4% 0.1973 36.67)"
-      - context: "@media (forced-colors: active)"
-        value: "CanvasText"
-    source: "packages/grammar/src/core/styles.css:25"
-  - name: "--starci-core-danger-foreground"
-    value: "oklch(99.11% 0 0)"
-    dark: "oklch(99.11% 0 0)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(99.11% 0 0)"
-      - context: "@media (forced-colors: active)"
-        value: "Canvas"
-    source: "packages/grammar/src/core/styles.css:26"
-  - name: "--starci-core-data-table-max-block-size"
-    value: "24rem"
-    valueFrom: "renderer"
-    source: "packages/grammar/src/common/components-navigation.css:652"
-  - name: "--starci-core-disabled-opacity"
-    value: "0.55"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:646"
-  - name: "--starci-core-field-gap"
-    value: "0.5rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:257"
-  - name: "--starci-core-focus"
-    value: "#7248ff"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (forced-colors: active)"
-        value: "Highlight"
-    source: "packages/grammar/src/core/styles.css:13"
-  - name: "--starci-core-foreground"
-    value: "oklch(21.03% 0.0015 354.13)"
-    dark: "oklch(99.11% 0.0015 354.13)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(99.11% 0.0015 354.13)"
-      - context: "@media (forced-colors: active)"
-        value: "CanvasText"
-    source: "packages/grammar/src/core/styles.css:17"
-  - name: "--starci-core-form-compact-measure"
-    value: "28rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:238"
-  - name: "--starci-core-form-measure"
-    value: "30rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:231"
-  - name: "--starci-core-highlight-angle"
-    value: "360deg"
-    valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:513"
-  - name: "--starci-core-highlight-inset"
-    value: "0"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:525"
-  - name: "--starci-core-info"
-    value: "oklch(72% 0.17 250)"
-    dark: "oklch(72% 0.17 250)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(72% 0.17 250)"
-      - context: "@media (forced-colors: active)"
-        value: "CanvasText"
-    source: "packages/grammar/src/core/styles.css:27"
-  - name: "--starci-core-info-foreground"
-    value: "oklch(21.03% 0.0059 250)"
-    dark: "oklch(21.03% 0.0059 250)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(21.03% 0.0059 250)"
-      - context: "@media (forced-colors: active)"
-        value: "Canvas"
-    source: "packages/grammar/src/core/styles.css:28"
-  - name: "--starci-core-inline-gap"
-    value: "var(--grammar-inline-gap)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:34"
-  - name: "--starci-core-motion-duration"
-    value: "180ms"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:40"
-  - name: "--starci-core-motion-easing"
-    value: "cubic-bezier(0.2, 0, 0, 1)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:41"
-  - name: "--starci-core-muted"
-    value: "oklch(55.17% 0.003 354.13)"
-    dark: "oklch(70.5% 0.003 354.13)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(70.5% 0.003 354.13)"
-      - context: "@media (forced-colors: active)"
-        value: "GrayText"
-    source: "packages/grammar/src/core/styles.css:18"
-  - name: "--starci-core-navbar-z"
-    value: "50"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1268"
-  - name: "--starci-core-overlay-tone"
-    value: "var(--muted, GrayText)"
-    valueFrom: "common"
-    source: "packages/grammar/src/common/components-overlays.css:12"
-  - name: "--starci-core-page-inset"
-    value: "var(--grammar-page-inset)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:31"
-  - name: "--starci-core-page-measure"
-    value: "80rem"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:29"
-  - name: "--starci-core-pill-radius"
-    value: "999px"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:38"
-  - name: "--starci-core-rail-collapsed"
-    value: "4rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1124"
-  - name: "--starci-core-rail-compact"
-    value: "16rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1120"
-  - name: "--starci-core-rail-gap"
-    value: "1rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1148"
-  - name: "--starci-core-rail-gap-compact"
-    value: "0.75rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1210"
   - name: "--starci-core-rail-offset"
     value: "var(--starci-core-band-offset, 5.5rem)"
     valueFrom: "common-fallback"
     source: "packages/grammar/src/common/styles.css:1146"
-  - name: "--starci-core-rail-standard"
-    value: "20rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1128"
-  - name: "--starci-core-rail-wide"
-    value: "24rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1132"
-  - name: "--starci-core-reading-measure"
-    value: "72ch"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:30"
-  - name: "--starci-core-region-gap"
-    value: "var(--grammar-region-gap)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:32"
-  - name: "--starci-core-row-gap"
-    value: "var(--grammar-row-gap)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:35"
-  - name: "--starci-core-row-gap-compact"
-    value: "0.5rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1204"
-  - name: "--starci-core-row-inset"
-    value: "1rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:810"
-  - name: "--starci-core-section-gap"
-    value: "var(--grammar-section-gap)"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:33"
-  - name: "--starci-core-separator"
-    value: "oklch(92% 0.0015 354.13)"
-    dark: "oklch(25% 0.0015 354.13)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(25% 0.0015 354.13)"
-      - context: "@media (forced-colors: active)"
-        value: "CanvasText"
-    source: "packages/grammar/src/core/styles.css:20"
-  - name: "--starci-core-sidebar-collapsed-width"
-    value: "4rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1748"
-  - name: "--starci-core-sidebar-width"
-    value: "16rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1741"
   - name: "--starci-core-subnav-offset"
     value: "var(--starci-core-band-height, 4rem)"
     valueFrom: "common-fallback"
     source: "packages/grammar/src/common/styles.css:1450"
-  - name: "--starci-core-subnav-z"
-    value: "40"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1448"
-  - name: "--starci-core-success"
-    value: "oklch(73.29% 0.1941 162.85)"
-    dark: "oklch(73.29% 0.1941 162.85)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(73.29% 0.1941 162.85)"
-      - context: "@media (forced-colors: active)"
-        value: "CanvasText"
-    source: "packages/grammar/src/core/styles.css:21"
-  - name: "--starci-core-success-foreground"
-    value: "oklch(21.03% 0.0059 162.85)"
-    dark: "oklch(21.03% 0.0059 162.85)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(21.03% 0.0059 162.85)"
-      - context: "@media (forced-colors: active)"
-        value: "Canvas"
-    source: "packages/grammar/src/core/styles.css:22"
-  - name: "--starci-core-surface"
-    value: "oklch(100% 0.0008 354.13)"
-    dark: "oklch(21.03% 0.003 354.13)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(21.03% 0.003 354.13)"
-      - context: "@media (forced-colors: active)"
-        value: "Canvas"
-    source: "packages/grammar/src/core/styles.css:15"
-  - name: "--starci-core-surface-inset"
-    value: "1rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:566"
-  - name: "--starci-core-surface-radius"
-    value: "1rem"
-    valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:36"
-  - name: "--starci-core-surface-secondary"
-    value: "oklch(95.24% 0.0012 354.13)"
-    dark: "oklch(25.7% 0.0023 354.13)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(25.7% 0.0023 354.13)"
-      - context: "@media (forced-colors: active)"
-        value: "Canvas"
-    source: "packages/grammar/src/core/styles.css:16"
-  - name: "--starci-core-surface-shadow"
-    value: "0 8px 28px oklch(21.03% 0.0059 354.13 / 0.07)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (forced-colors: active)"
-        value: "none"
-    source: "packages/grammar/src/core/styles.css:39"
-  - name: "--starci-core-top-bar-z"
-    value: "40"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/components-navigation.css:334"
-  - name: "--starci-core-verdict-edge"
-    value: "inset 2px 0 0 0 var(--success, var(--starci-core-success, #15803d))"
-    valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:708"
-  - name: "--starci-core-warning"
-    value: "oklch(78.19% 0.159 84.37)"
-    dark: "oklch(82.03% 0.1392 88.38)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(82.03% 0.1392 88.38)"
-      - context: "@media (forced-colors: active)"
-        value: "CanvasText"
-    source: "packages/grammar/src/core/styles.css:23"
-  - name: "--starci-core-warning-foreground"
-    value: "oklch(21.03% 0.0059 84.37)"
-    dark: "oklch(21.03% 0.0059 88.38)"
-    valueFrom: "family"
-    overrides:
-      - context: "@media (prefers-color-scheme: dark) [data-grammar-theme=\"system\"]"
-        value: "oklch(21.03% 0.0059 88.38)"
-      - context: "@media (forced-colors: active)"
-        value: "Canvas"
-    source: "packages/grammar/src/core/styles.css:24"
-  - name: "--starci-core-workspace-floating-inset"
-    value: "1rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1702"
-  - name: "--starci-core-workspace-floating-max"
-    value: "22rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1704"
-  - name: "--starci-core-workspace-floating-z"
-    value: "40"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1701"
-  - name: "--starci-core-workspace-leading-seam"
-    value: "2rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1657"
-  - name: "--starci-core-workspace-navigation-track"
-    value: "minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem))"
-    valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1574"
-  - name: "--starci-core-workspace-navigation-width"
-    value: "18rem"
-    valueFrom: "common-fallback"
-    source: "packages/grammar/src/common/styles.css:1574"
-  - name: "--starci-core-workspace-rail-track"
-    value: "minmax(16rem, var(--starci-core-rail-standard, 20rem))"
-    valueFrom: "common"
-    source: "packages/grammar/src/common/styles.css:1575"
   - name: "--success"
-    value: "var(--starci-core-success)"
+    value: "var(--offset-pop-success)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:56"
+    source: "packages/grammar/src/offset-pop/styles.css:78"
   - name: "--success-foreground"
-    value: "var(--starci-core-success-foreground)"
+    value: "var(--offset-pop-success-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:57"
+    source: "packages/grammar/src/offset-pop/styles.css:79"
   - name: "--surface"
-    value: "var(--starci-core-surface)"
+    value: "var(--offset-pop-surface)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:49"
+    source: "packages/grammar/src/offset-pop/styles.css:71"
   - name: "--surface-foreground"
-    value: "var(--starci-core-foreground)"
+    value: "var(--offset-pop-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:50"
+    source: "packages/grammar/src/offset-pop/styles.css:72"
   - name: "--surface-secondary"
-    value: "var(--starci-core-surface-secondary)"
+    value: "var(--offset-pop-surface-secondary)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:51"
+    source: "packages/grammar/src/offset-pop/styles.css:73"
   - name: "--surface-secondary-foreground"
-    value: "var(--starci-core-foreground)"
+    value: "var(--offset-pop-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:52"
+    source: "packages/grammar/src/offset-pop/styles.css:74"
   - name: "--warning"
-    value: "var(--starci-core-warning)"
+    value: "var(--offset-pop-warning)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:58"
+    source: "packages/grammar/src/offset-pop/styles.css:80"
   - name: "--warning-foreground"
-    value: "var(--starci-core-warning-foreground)"
+    value: "var(--offset-pop-warning-foreground)"
     valueFrom: "family"
-    source: "packages/grammar/src/core/styles.css:59"
+    source: "packages/grammar/src/offset-pop/styles.css:81"
 
 renderers:
   - component: "Accordion"
@@ -2395,106 +2498,34 @@ renderers:
 
 gaps:
   - components:
-      - "SurfaceCard"
-      - "SurfaceListCard"
-      - "SurfaceAccordionCard"
+      - "BottomNav"
+      - "Toaster"
     missing: |
-      no typed heading level and no labelled-by-external-heading capability, so a surface whose
-      correct level is not 3 has no owner
+      the fixed BottomNav publishes `--starci-core-bottom-nav-offset` and nothing reads it (see
+      common/DNA.yaml): Offset Pop draws the dock with a thicker ink top edge and an upward hard shadow,
+      and a bottom-placed Toaster still lands on top of it. Content padding and toaster placement are
+      the app's
     evidence:
-      - "packages/grammar/src/core/primitive/Label/index.tsx"
-      - "packages/grammar/src/core/branch/SurfaceCard/index.tsx"
-  - components:
-      - "Badge"
-    missing: |
-      `Badge` accepts absent `children` and renders a non-breaking space, so a glyph-only chip is
-      representable and word presence is not enforced by the type
-    evidence:
-      - "packages/grammar/src/core/primitive/Badge/index.tsx"
-  - components:
-      - "Tabs"
-    missing: |
-      `leading` is an optional `ReactNode`, not a typed `Icon`, so nothing forces a glyph or its
-      `usage` on each peer
-    evidence:
-      - "packages/grammar/src/core/branch/Tabs/index.tsx"
-  - components:
-      - "Button"
-      - "TextAction"
-    missing: |
-      neither action publishes a motion anchor or attribute for its adornment, so a family has nothing
-      to animate beyond `data-component`
-    evidence:
-      - "packages/grammar/src/core/primitive/Button/index.tsx"
-      - "packages/grammar/src/core/primitive/TextAction/index.tsx"
-  - components:
-      - "Icon"
-    missing: |
-      `Icon` has no direction-aware mirroring contract; the app's registry chooses the literal glyph
-    evidence:
-      - "packages/grammar/src/core/primitive/Icon/index.tsx"
-  - components:
-      - "IconButton"
-    missing: |
-      `isActive` emits `data-active="true"` only, with no `aria-pressed`, so an active utility is
-      visual-only
-    evidence:
-      - "packages/grammar/src/core/primitive/IconButton/index.tsx"
-  - components:
-      - "Tooltip"
-    missing: |
-      `aria-describedby` is placed on the tooltip's wrapper `span`, not on the focusable control, so
-      the description is not programmatically attached to the button
-    evidence:
-      - "packages/grammar/src/core/branch/Tooltip/index.tsx"
-  - components:
-      - "Icon"
-    missing: |
-      `Icon` accepts only `source`; there is no fallback or error contract, so a missing registry
-      mapping must be resolved by the app before render
-    evidence:
-      - "packages/grammar/src/core/primitive/Icon/index.tsx"
-  - components:
-      - "MediaFrame"
-    missing: |
-      no `object-position` or focal prop, and `className` reaches the figure rather than the viewport
-      child, so a required off-centre crop has no owner
-    evidence:
-      - "packages/grammar/src/core/primitive/MediaFrame/index.tsx"
-      - "packages/grammar/src/common/styles.css"
-  - components:
-      - "MediaFrame"
-    missing: |
-      `MediaFrame` publishes no loading or error prop and renders no state. The `Image` primitive added
-      in 0.5.0 does (`ImageLoadState`, an `aspect` prop), so a picture that must show its own loading or
-      failure is an `Image`, not a `MediaFrame`
-    evidence:
-      - "packages/grammar/src/core/primitive/MediaFrame/index.tsx"
-      - "packages/grammar/src/core/primitive/Image/index.tsx"
-  - components:
-      - "OtpInput"
-    missing: |
-      `OtpInput` publishes `disabled` and `invalid` (not the `isDisabled`/`isInvalid` names every 0.5.0
-      form control uses) and no skeleton input, so its unresolved state has no owner
-    evidence:
-      - "packages/grammar/src/core/OtpInput.tsx"
-  - components:
-      - "OtpInput"
-    missing: |
-      `OtpInput` publishes no `label`, `description` or `errorMessage` slot of its own; only `id` and
-      `describedBy` link outside text. Since 0.5.0 the app can wrap it in `Field` (whose render prop hands
-      over the id and `aria-describedby`) to give it the shared label/description/error anatomy
-    evidence:
-      - "packages/grammar/src/core/OtpInput.tsx"
-      - "packages/grammar/src/core/primitive/Field/index.tsx"
-  - components:
-      - "Core semantic bindings"
-    missing: |
-      Core binds no `--accent-soft`, `--accent-soft-foreground` or `--link`. The soft accent pairing,
-      Markdown links and the current `BottomNav` icon pill (`var(--accent-soft, transparent)`) therefore
-      resolve from the host's HeroUI theme when one is loaded, else from Common's fallbacks — not from
-      Core's violet. Offset Pop binds all three
-    evidence:
-      - "packages/grammar/src/core/styles.css"
       - "packages/grammar/src/common/components-navigation.css"
+      - "packages/grammar/src/offset-pop/components-navigation.css"
+      - "packages/grammar/src/common/components-overlays.css"
+  - components:
+      - "Offset Pop token contract"
+    missing: |
+      no DNA name for the press vector or the small chip shadow. Button and its press use a literal
+      `0.25rem 0.25rem` offset, the current BottomNav pill and selected ListBox row `0.125rem 0.1875rem`;
+      only the surface/overlay shadow reads `--offset-pop-shadow-x/-y`, so the narrow-viewport shadow
+      drop (0.5rem to 0.25rem) moves surfaces but not buttons or chips
+    evidence:
       - "packages/grammar/src/offset-pop/styles.css"
+      - "packages/grammar/src/offset-pop/components-navigation.css"
+  - components:
+      - "Offset Pop palette"
+    missing: |
+      `yellow` and `mint` have no semantic name of their own beyond warning and success: the yellow row
+      wash (`color-mix(… yellow 32% …)`) and the yellow BottomNav badge read the palette ink directly,
+      so an adapter that retunes `--offset-pop-warning` leaves those washes on the old yellow
+    evidence:
+      - "packages/grammar/src/offset-pop/components-navigation.css"
+      - "packages/grammar/src/offset-pop/components-forms.css"
+      - "packages/grammar/src/offset-pop/dna.ts"

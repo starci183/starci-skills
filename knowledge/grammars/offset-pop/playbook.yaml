@@ -1,0 +1,277 @@
+schema: starci/knowledge-source@1
+id: grammar.offset-pop.playbook
+title: Offset Pop — playbook
+purpose: |
+  How a playful, mobile-first learning or consumer app is composed from the renderers Offset Pop
+  publishes: which renderers a business shape asks for, in what order, with which props, and the rules
+  every Offset Pop app follows (one root, one pink per decision, thumb-sized targets, a bottom-sheet
+  Drawer for secondary tasks, BottomNav at phone widths). Product-neutral: the shapes name no product,
+  and every label below is a role, not copy. A shape not listed here may still be composed from Common
+  semantics and family anatomy for an approved product direction.
+appliesTo:
+  - grammar
+family: offset-pop
+provenance:
+  package: "@starci/grammar"
+  version: "0.5.0"
+  checkout: b6a13be97a9d1e15b7d3f628709158e81c744a2a
+  captured: "2026-09-23"
+  publicEntry: "@starci/grammar/common"
+  familyEntry: "@starci/grammar/offset-pop"
+  limitations: |
+    Use this playbook only when Offset Pop is selected in the current .starciwork specification. The
+    shapes are package usage written from the family's source, not observations of a shipped product;
+    verify installed exports, props and CSS before promising a capability, and do not invent Grammar
+    APIs absent from DNA.yaml or installed source. Reading steps are reasoning within one op, not an
+    auto-running op chain.
+shapes:
+  - id: app-shell
+    title: App shell — TopBar, content, BottomNav, one Toaster
+    composition:
+      - renderer: OffsetPopGrammarRoot
+        role: |
+          The one root around the whole app, `theme="system"` unless the product fixes a theme; imports
+          `@starci/grammar/offset-pop/styles.css`
+      - renderer: TopBar
+        role: |
+          `brand` (product identity, a link home) and `actions` (an Avatar or IconButton for the account,
+          notifications) — both stay visible at every width. `navigation` only if the product has wide
+          layouts; the destinations live in BottomNav on a phone
+      - renderer: BottomNav
+        role: |
+          3-5 primary destinations, each `icon` + `label`, `currentId` from the route,
+          `position="fixed"`, `visibility="compact"` (hidden from 48rem, where TopBar navigation or a
+          Sidebar takes over). A count goes in `badge` with a `badgeLabel` so it is announced
+      - renderer: PageContainer
+        role: |
+          The route content, padded at its block end by `var(--starci-core-bottom-nav-offset)` while the
+          dock is shown (Common publishes the value on the root; nothing reads it for you)
+      - renderer: Toaster
+        role: |
+          Once, inside the root, with `label` and `dismissLabel`; `placement="top"` while the BottomNav
+          is shown so toasts never cover the dock
+    notes: |
+      The dock is a raised sticker (3px ink top edge, upward hard shadow, 4rem items, pink current pill);
+      do not add an app border or shadow to it.
+
+  - id: home-continue
+    title: Home — where the reader left off, one next step
+    referenceMayContribute: |
+      Keep: which sections exist and which one is the next step. Never crosses over: layout grid, card
+      chrome, or a section that would need a renderer the family does not publish.
+    composition:
+      - renderer: SectionHeader
+        role: The greeting or section title; its eyebrow reads `accentText`, never the pink
+      - renderer: SurfaceCard
+        role: |
+          One top-level sticker for the next step (`isHighlight` on that card only), holding the title
+          and one supporting line (Text size="sm" tone="muted"), a real measurement, and one
+          Button variant="primary" — the view's single pink fill
+      - renderer: "Progress / ProgressCircle / Meter"
+        role: Only a verified value with a truthful `label` (ACCENT-4); an unknown value is not drawn
+      - renderer: SurfaceListCard
+        role: Peers (recent items, suggestions) as static rows; no second primary Button
+      - renderer: "Skeleton / EmptyNotice"
+        role: Pending is the same tree at rest (Skeleton in place of content); empty or failed is EmptyNotice
+    notes: |
+      A streak, level or reward count is a Badge or a Meter, not a second pink call to action.
+
+  - id: practice-step
+    title: One question per screen — choose, check, see the outcome
+    composition:
+      - renderer: Progress
+        role: How far through the set the reader is, from a real count
+      - renderer: Heading
+        role: The prompt; `scale="display"` only for a single short prompt
+      - renderer: "RadioGroup / CheckboxGroup / SegmentedControl"
+        role: |
+          The answer choices as the control itself (each choice is a full-width, 44px-plus target with
+          its own label); `isInvalid`/`errorMessage` only for a validation problem, never for a wrong answer
+      - renderer: Button
+        role: |
+          One variant="primary" type="submit" ("check" in the product's words), full width at the bottom
+          of the content, `isDisabled` until a choice exists — the layout does not move when it enables
+      - renderer: Alert
+        role: |
+          The outcome in place, above the action: `tone="affirmative"` (mint) or `tone="negative"`
+          (critical), its single `action` for the next step; the tone is the outcome, never decoration
+      - renderer: Drawer
+        role: |
+          `placement="bottom"` for an optional explanation or hint the reader opens; the handle is
+          decorative, the close button and Escape are the ways out
+    notes: |
+      Feedback that must not interrupt (a streak kept, an item saved) is a Toast, not an Alert; feedback
+      the reader must act on stays in the page.
+
+  - id: result-celebration
+    title: Result — celebrate a finished set, offer one way on
+    composition:
+      - renderer: SurfaceCard
+        role: The result sticker, `isHighlight`
+      - renderer: Heading
+        role: "`scale=\"display\"` (weight 900, tight tracking) for the one headline"
+      - renderer: "ProgressCircle / Meter / DescriptionList"
+        role: The score and its facts, each a real value with a label
+      - renderer: Button
+        role: One variant="primary" onward; a secondary Button or TextAction to review
+      - renderer: Toast
+        role: An earned reward announced politely (`toastQueue.add` with `tone="affirmative"`)
+    notes: |
+      Celebration is the display headline, the mint outcome and the sticker's press; the family adds no
+      confetti, and motion stays press travel only (removed under reduced motion).
+
+  - id: bottom-sheet-task
+    title: Secondary task on a phone — filters, pickers, details, quick edit
+    composition:
+      - renderer: Drawer
+        role: |
+          `placement="bottom"` below 48rem (upward hard shadow, grab handle), `placement="right"` on wide
+          layouts; `title` names the task, `footer` holds one primary Button (a render function receives
+          `close`)
+      - renderer: "Select / DatePicker / TagGroup / Switch"
+        role: The controls inside; their own popovers stay inside the root and the sheet
+    notes: |
+      The TopBar `menu` opens the same kind of Drawer (`aria-controls` → its id). One sheet at a time.
+
+  - id: sign-up-and-onboarding
+    title: Sign-up or onboarding — short groups, one submit per step
+    composition:
+      - renderer: Stepper
+        role: Where the reader is in a multi-step flow (pink current, mint complete, critical error)
+      - renderer: Form
+        role: "`label`, `onSubmit(FormData)`, `validationErrors` by field `name`, `isPending`"
+      - renderer: Fieldset
+        role: One per named group
+      - renderer: "Select / DateField / Checkbox / Switch / RadioGroup / Textarea"
+        role: Each with its own `label`, `description`, `errorMessage`, `isRequired`, `name`
+      - renderer: Field
+        role: Only for a control the package does not publish (OtpInput, a third-party widget)
+      - renderer: Button
+        role: One variant="primary" type="submit" per step
+    notes: |
+      Field focus is the hard offset shadow (critical while invalid); do not add an app focus ring.
+
+  - id: settings
+    title: Settings — immediate toggles, grouped, destructive actions confirmed
+    composition:
+      - renderer: Fieldset
+        role: One per group of settings
+      - renderer: "Switch / Select / SegmentedControl"
+        role: A Switch applies immediately; confirm the change with a polite Toast, not a dialog
+      - renderer: AlertDialog
+        role: |
+          For an irreversible action only: `tone="negative"` (the confirm fills critical, not pink),
+          `confirmLabel`/`cancelLabel` in the product's words; initial focus lands on cancel
+      - renderer: Toast
+        role: Undo for a reversible action (`action` keeps the toast until dismissed)
+
+  - id: browse-and-pick
+    title: Browse a catalogue — search, filter, pick
+    composition:
+      - renderer: SearchField
+        role: The query, labelled
+      - renderer: TagGroup
+        role: Filters as outlined chips; selected chips turn pink and lift
+      - renderer: "ListBox / SurfaceListCard"
+        role: |
+          ListBox when picking is the task (yellow hover wash, pink focus ring, soft-pink selected row
+          with a pink leading edge); SurfaceListCard when rows only report facts
+      - renderer: Pagination
+        role: Current page is the raised pink pill
+      - renderer: "Skeleton / EmptyNotice"
+        role: Pending keeps the list shape; empty and failed are EmptyNotice
+
+readingSteps:
+  - id: business-shape-first
+    order: 1
+    title: Business shape first
+    instruction: |
+      Name the shape and the one outcome the screen exists to produce. That outcome is the view's single
+      pink fill; everything else is ink on cream.
+  - id: then-reference
+    order: 2
+    title: Then the reference, if the request supplied one
+    instruction: |
+      A reference contributes region order, which decision dominates, and what folds into a bottom
+      sheet. It never contributes palette, outline, shadow or component anatomy — those are this
+      family's and knowledge/ui's.
+  - id: then-compose
+    order: 3
+    title: Then the shape's composition, mobile first
+    instruction: |
+      Compose the shape's renderers at phone width first (BottomNav, bottom-sheet Drawer, full-width
+      primary Button), then let the published 48rem switches (BottomNav compact, TopBar navigation,
+      Drawer right) carry the wide layout.
+  - id: compare-dna
+    order: 4
+    title: Compare DNA with actually installed source
+    instruction: |
+      Confirm named renderers, props and closed values against DNA.yaml and installed exports, and read
+      family.yaml's gaps and owner decisions before promising a capability.
+  - id: resolve-product-composition
+    order: 5
+    title: Then resolve the remaining product composition
+    instruction: |
+      Reuse a shape where it fits; otherwise compose existing Common semantics and family anatomy. A
+      shape absent from this table is an evidence limit on house style, not a reason to stop work
+      already inside the approved product scope.
+
+authoritySplit:
+  directionChoiceRequired: |
+    DIRECTION_CHOICE_REQUIRED is reserved for a material product choice whose acceptable options lead to
+    different outcomes and whose answer is absent from the request. Product facts, copy, mascot and
+    assets come from the product; Common semantics from knowledge/ui; outline, shadow, palette and
+    reusable treatments from this family. The two decisions flagged for the family owner in family.yaml
+    (BOUNDARY-6 departure, single pink) are not the product's to change.
+
+guidance:
+  - id: one-root-overlays-inside
+    requirement: |
+      Render everything — chrome, content, every overlay trigger (Dialog, AlertDialog, Drawer, Popover,
+      DropdownMenu, the Select/ComboBox/DatePicker fields) and the Toaster — inside one
+      `OffsetPopGrammarRoot`. Overlays portal into the nearest Grammar root; a trigger outside it opens a
+      plain, unstyled overlay in `<body>` with no outline, no offset, no dark palette.
+    rationale: |
+      The family is a scope on the root; only its DOM descendants are Offset Pop.
+  - id: one-pink-per-view
+    requirement: |
+      Give each view at most one pink-filled action (Button variant="primary", or the single confirm /
+      toast / alert action the family fills). Text that must carry the accent uses Text tone="accent"
+      (which reads `accentText`); never set the pink as a text colour.
+    rationale: |
+      Pink as body text is 3.22:1 on the canvas; one fill per view is what makes the decision obvious in
+      a family where selection, current and focus share the same pink.
+  - id: big-touch-targets
+    requirement: |
+      Keep the published sizes: Common's 44px floor for controls, the Subnav toggle and the TopBar
+      trigger; BottomNav items at 4rem with a 3.25rem by 2rem icon pill. Do not shrink them with app
+      classes, and put answer choices in RadioGroup/CheckboxGroup/SegmentedControl rather than small
+      custom chips.
+    rationale: |
+      A playful, thumb-driven app is used one-handed; the family's targets are part of its idiom.
+  - id: bottom-sheet-for-secondary
+    requirement: |
+      On a phone, secondary tasks open in `Drawer placement="bottom"`; reserve `Dialog` for a short task
+      that must block the page and `AlertDialog` for an irreversible decision.
+    rationale: |
+      The bottom sheet keeps the task within thumb reach and throws its shadow upward into the page.
+  - id: toaster-clear-of-the-dock
+    requirement: |
+      One Toaster; `placement="top"` whenever the fixed BottomNav is shown, and pad content by
+      `var(--starci-core-bottom-nav-offset)`.
+    rationale: |
+      Neither the Toaster nor the page reads the dock's offset; a bottom toaster would sit on the dock.
+  - id: no-extra-chrome
+    requirement: |
+      Do not add app-level borders, blur shadows, gradients or a second accent colour to family
+      renderers; do not restyle the palette per screen. Adapt the family only through the
+      `OFFSET_POP_TOKEN_NAMES` custom properties on the root.
+    rationale: |
+      The outline, the hard offset and the one pink are the family; an extra layer turns stickers into
+      a different, noisier family and breaks the dark and forced-colours mappings.
+  - id: product-neutral
+    requirement: |
+      Keep product names, copy, mascots and illustration inside the product. The family and this
+      playbook name roles only.
+    rationale: |
+      Offset Pop is a shared family; its first consumer does not own it.

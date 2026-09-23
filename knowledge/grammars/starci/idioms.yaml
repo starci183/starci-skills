@@ -29,6 +29,12 @@ promotion:
     At least two occurrences in the evidence blocks listed under provenance.sources. A composition
     seen once is recorded under seenOnce and never composed from as house style. Where the owner has
     already written down the intent, that sentence is quoted from the block's own classNames.ts.
+  packageCompositions: |
+    The forms, overlay and navigation renderers added in @starci/grammar 0.5.0 (Form, Fieldset, Field,
+    Dialog, AlertDialog, Drawer, Toaster, TopBar, BottomNav, …) have no occurrence in the evidence
+    blocks yet, so none of their compositions is an idiom here. How a Core app composes them is written
+    as package usage in playbook.yaml (`since: "0.5.0"` shapes and `guidance`); a composition seen twice
+    in product source can be promoted later under the bar above.
 idioms:
   - id: joined-bands-flush-card
     title: Joined bands in one flush card
@@ -371,6 +377,13 @@ idioms:
           ownerQuotes:
             - text: Secondary text actions wrap cleanly instead of overflowing
               source: AuthenticationPanel
+    notes: |
+      The evidence predates 0.5.0 and was built from an app `form` and the base `Input`. The package now
+      publishes the boundary itself: `Form` (landmark `label`, `onSubmit`, `validationErrors` by field
+      `name`, `isPending`) and `Fieldset`, with every 0.5.0 control carrying its own label, description
+      and error slot. The idiom's order is unchanged — fields, then the status sentence, then one
+      primary submit — and the playbook's `account-settings-form` shape spells the 0.5.0 composition.
+      Using `Form` is package usage, not a promoted idiom.
 
 seenOnce:
   note: |
