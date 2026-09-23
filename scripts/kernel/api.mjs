@@ -2076,6 +2076,14 @@ const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, se
   };
 };
 
+// The last rows the refused terminal showed. Five Codex op launches failed
+// model attestation ("did not render gpt-6-sol within 15000ms") and the
+// rejections kept no screen, so nobody could tell a slow start from an update
+// prompt or an error; the tail now rides on the dispatch-rejected event.
+const screenTailOf = (screen) => {
+  const rows = String(screen ?? '').split(/\r?\n/).map((line) => line.trimEnd()).filter(Boolean).slice(-15);
+  return rows.length ? rows.join('\n').slice(-1500) : null;
+};
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false,
   effectState = 'none', details = null, providerHealthEvidence = null,
@@ -2150,7 +2158,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth,
-        terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}) },
+        terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}),
+        ...(screenTailOf(details?.screen) ? { screenTail: screenTailOf(details.screen) } : {}) },
     });
     if (providerHealth) {
       ledger.appendEvent({

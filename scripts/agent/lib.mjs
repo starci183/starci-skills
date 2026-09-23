@@ -22,6 +22,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
+import { closeOperationTerminal } from '../kernel/close-op-terminal.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { classifyAgentScreen, gateRemedy, stagedInputRegion } from '../kernel/terminal-liveness.mjs';
@@ -569,7 +570,9 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
     let terminalClosed = null;
     if (handle) {
       let closed;
-      try { closed = terminalClose({ terminal: handle }); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
+      // With its tab when the tab is its own, so Orca cannot resume the refused
+      // agent under a new handle (scripts/kernel/close-op-terminal.mjs).
+      try { closed = closeOperationTerminal(handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
       terminalClosed = { handle, ok: closed?.ok === true,
         ...(closed?.error ? { error: typeof closed.error === 'string' ? closed.error : JSON.stringify(closed.error) } : {}) };
     }

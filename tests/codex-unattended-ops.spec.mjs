@@ -215,3 +215,14 @@ test('a rejected Codex op launch closes its terminal and never starts a managed 
   const live=Object.values(fx.orcaState().terminals??{}).filter(term=>!term.closed).map(term=>term.handle);
   assert.deepEqual(live,[],'the refused terminal is closed');
 });
+
+// Five nivo Codex op launches failed model attestation ("did not render
+// gpt-6-sol within 15000ms") and their rejections kept no screen; the refused
+// terminal's tail now rides on dispatch-rejected, and the spawner closes a
+// refused terminal with its tab.
+test('a refused launch keeps its screen tail and is closed with its tab',()=>{
+  const api=fs.readFileSync(path.join(ROOT,'scripts','kernel','api.mjs'),'utf8');
+  assert.ok(api.includes('screenTail: screenTailOf(details.screen)'),'dispatch-rejected carries the screen tail');
+  const lib=fs.readFileSync(path.join(ROOT,'scripts','agent','lib.mjs'),'utf8');
+  assert.ok(lib.includes('closed = closeOperationTerminal(handle)'),'a refused terminal closes with its tab');
+});
