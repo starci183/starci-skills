@@ -125,3 +125,38 @@ test('reconcile --retry-lineage repairs a wrong-lineage queued job and refuses a
   assert.equal(settled.status,1);
   assert.equal(refusal(settled).code,'retry-lineage-not-queued');
 });
+
+// Incident inc-26189cb8bfda (starci-next base-repos, backend.scaffold): enqueueing cut be-baseline-r1-g2
+// ordinals 2..5 wrote payload.retry.retryOf chained to the preceding sibling with businessAttempt 2..5 -
+// four first executions of distinct slices charged as business retries. The pre-fix enqueue chained every
+// job of the op to the op's latest attempt; a cut ordinal chains only to its own ordinal (fab36d654).
+// Also covers a different cut id of the same op: an earlier cut's failed ordinal is not a predecessor.
+test('first executions of cut ordinals 2..5 carry no retry lineage, whatever settled before them',t=>{
+  const repo=workRoot(t),wf='wf-cut-lineage-first-exec';
+  seedGoal(repo,wf);
+  const enqueue=(cutId,ordinal,total)=>{
+    const r=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths',`docs/${cutId}-${ordinal}`,
+      '--cut-id',cutId,'--cut-ordinal',String(ordinal),'--cut-total',String(total),'--json');
+    assert.equal(r.status,0,r.stderr||r.error?.message);
+    return out(r).job_id;
+  };
+  // An earlier generation of the cut whose ordinal 2 failed: a different cut id never chains.
+  const g1o2=enqueue('be-baseline-r1-g1',2,5);
+  settle(repo,g1o2,'failed',{verdict:'fail'});
+  // The seam ordinal of the new cut ran and passed; ordinals 2..5 are then enqueued together.
+  const seam=enqueue('be-baseline-r1-g2',1,5);
+  settle(repo,seam,'succeeded',{verdict:'pass'});
+  const siblings=[2,3,4,5].map(n=>enqueue('be-baseline-r1-g2',n,5));
+  for(const [i,jobId] of siblings.entries()){
+    assert.equal(payloadOf(repo,jobId).retry,undefined,
+      `ordinal ${i+2} is a first execution of its own slice, not a business retry of ordinal ${i+1}`);
+  }
+  // Durable attempts stay op-wide and distinct; only the business counter is per ordinal.
+  const attempts=read(repo,l=>siblings.map(id=>l.db.prepare('SELECT attempt FROM jobs WHERE job_id=?').get(id).attempt));
+  assert.deepEqual(attempts,[3,4,5,6]);
+  // A real retry of ordinal 4 after it fails chains to ordinal 4 only, at business attempt 2.
+  settle(repo,siblings[2],'failed',{verdict:'fail'});
+  const retry=enqueue('be-baseline-r1-g2',4,5);
+  const lineage=payloadOf(repo,retry).retry;
+  assert.deepEqual([lineage.retryOf,lineage.businessAttempt,lineage.retryClass],[siblings[2],2,'business']);
+});
