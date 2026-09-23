@@ -1157,6 +1157,12 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   tra hình thức TITLE_DRIFT, STRAY_TERMINAL và bước form mỗi vòng (`36ee7fe11`). config.yaml kernel = claude/opus-5-5.
   Merge P8 `fab36d654`, P7b `d1cb38455`, R `12a1ddb74`.
 
+- 13:55 Test đầy đủ sau merge: 1208 pass, 0 fail, 4 skip. Đã tạo lại 4 workflow (chuỗi như đã duyệt, AUTH/WSPV bỏ brand vì
+  brand đã xong): wf-nivo-app-auth-mudqjob3, wf-nivo-workspace-provision-mudqjokb, wf-nivo-modules-agentos-mudqjov6,
+  wf-nivo-collab-group-chat-mudqjp5g. Kernel Claude Opus 5.5 không khởi động được (Orca hết giờ chờ handle) vì Claude Code
+  chưa onboarding (~/.claude.json thiếu hasCompletedOnboarding); cần thầy chạy claude một lần. 242 bản ghi worker Orca giữ
+  lại (identity_unproven) không giải phóng được bằng CLI; chỉ orchestration reset (toàn cục) xóa được.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
