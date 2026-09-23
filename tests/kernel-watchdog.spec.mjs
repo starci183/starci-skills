@@ -123,3 +123,24 @@ test('watchdog wakes a turn-idle Kernel only when status says the frontier is ac
   const supervise=fs.readFileSync(new URL('../modules/supervisor/supervise.yaml',import.meta.url),'utf8');
   assert.match(supervise,/watchdog\.mjs --repo <repo> --workflow <id> --repair/,'the recovery recipe spawns a watchdog that can wake');
 });
+
+// Every nivo watchdog imported the liveness classifier once, hours before the
+// night's classifier fixes, and kept calling yielded Kernels active. The loop
+// now runs each tick as a fresh `--once` child, so a fix lands on the next tick.
+test('the watchdog loop runs each tick in a fresh child and stops on a finished workflow', async t => {
+  const { withLedger, seedWorkflow } = await import('./_ledger-fixture.mjs');
+  const { spawnSync } = await import('node:child_process');
+  const path = await import('node:path');
+  const WATCHDOG = path.resolve(import.meta.dirname, '..', 'scripts', 'kernel', 'watchdog.mjs');
+  await withLedger(t, async ({ repoRoot, ledger }) => {
+    seedWorkflow(ledger, { id: 'wf-watchdog-loop', state: { phase: 'finished' } });
+    ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-watchdog-loop'").run();
+    const r = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-loop', '--interval-ms', '10000', '--json'],
+      { encoding: 'utf8', windowsHide: true, timeout: 60000 });
+    assert.equal(r.status, 0, r.stderr || r.stdout);
+    const last = JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
+    assert.equal(last.action, 'finished', 'the child tick reported finished and the loop ended');
+  });
+  const source = fs.readFileSync(WATCHDOG, 'utf8');
+  assert.match(source, /spawnSync\(process\.execPath, \[self, \.\.\.argv, '--once'/, 'the loop re-executes itself per tick');
+});
