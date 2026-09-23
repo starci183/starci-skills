@@ -96,8 +96,15 @@ export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEO
     `SELECT r.workflow_id, r.dispatch_id, r.report_id, r.created_at FROM reports r
       WHERE r.outcome='ask' AND NOT EXISTS (
         SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
-          AND e.kind IN ('ask-answered','ask-superseded')
+          AND e.kind='ask-answered'
           AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
+      -- a supersede closes an ask unless it was served again afterwards (a
+      -- wrongly retired question the kernel re-serves is open again)
+      AND NOT EXISTS (
+        SELECT 1 FROM events s WHERE s.workflow_id=r.workflow_id AND s.kind='ask-superseded'
+          AND json_extract(s.payload_json,'$.dispatchId')=r.dispatch_id
+          AND NOT EXISTS (SELECT 1 FROM events v WHERE v.workflow_id=r.workflow_id AND v.kind='ask-serving'
+            AND json_extract(v.payload_json,'$.dispatchId')=r.dispatch_id AND v.seq > s.seq))
       ORDER BY r.report_id DESC`).all();
   const seen = new Set(); const out = [];
   for (const a of asks) {

@@ -88,6 +88,20 @@ test('an ask of the same op about a different subject is not superseded',async t
   });
 });
 
+test('a superseded ask that is served again is open again',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_old'});
+    seedAskReport(ledger,{dispatchId:'ctx_new'});
+    assert.equal(serve(repoRoot).status,0);
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id),['ctx_new']);
+    const r=serve(repoRoot,'--dispatch','ctx_old');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id).sort(),['ctx_new','ctx_old'],
+      'the re-served question reaches the owner list again');
+  });
+});
+
 test('--review reads an ask; it never retires one',async t=>{
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
