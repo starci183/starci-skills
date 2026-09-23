@@ -30,11 +30,13 @@ import turtleUrl from './assets/turtle.png';
 
 const meta: Meta = {
   title: 'Grammar/Core anatomy',
-  // Pinned to Core with the consumer accent these reference renders were captured with.
+  // Pinned to Core with a consumer accent override. The reference renders were captured with
+  // #2F6BFF; white on it is 4.49:1, one hair under AA, so the override is the nearest AA-safe
+  // blue (#2F69FF, 4.58:1 with the white accent foreground).
   globals: { grammarFamily: 'core' },
   parameters: {
     layout: 'fullscreen',
-    grammar: { bleed: true, rootStyle: { ['--starci-core-accent' as string]: '#2F6BFF' } },
+    grammar: { bleed: true, rootStyle: { ['--starci-core-accent' as string]: '#2F69FF' } },
   },
 };
 export default meta;

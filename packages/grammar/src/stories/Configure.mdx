@@ -51,10 +51,14 @@ The preview decorator reads `parameters.grammar`:
 ## Checks
 
 ```sh
-npm run build-storybook                 # static build
-npx vitest run --project storybook      # every story in Chromium, with a11y checks (todo mode)
-VITE_A11Y_TEST=error VITE_GRAMMAR_FAMILY=offset-pop VITE_GRAMMAR_THEME=dark \
-  npx vitest run --project storybook    # fail on violations for one family and theme
+npm run build-storybook                               # static build
+npm run test:a11y                                     # every story in Chromium, axe after each render,
+                                                      # once per family x theme (12 cells)
+npm run test:a11y -- --project "a11y:offset-pop:dark" # one family x theme cell
 ```
+
+The a11y gate fails a story on any axe violation that is not waived in
+`.storybook/a11y-allowlist.json`. Each waiver names one story id and one rule, with a reason and
+an owner, and needs review like a code change.
 
 `src/stories/catalog.spec.ts` fails if a Common renderer is added without a story.
