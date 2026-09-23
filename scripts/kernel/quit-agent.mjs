@@ -11,6 +11,8 @@
 // running. A busy agent queues the command and quits when its turn ends.
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalRead } from '../api/orca/terminal-read.mjs';
+import { exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 
 // The quit input each agent CLI understands at its prompt. Claude gets two
@@ -29,11 +31,14 @@ export const QUIT_WAIT_MS = 6000;
  * when the agent has no known quit command or the terminal is not live.
  */
 export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 500,
-  show = terminalShow, send = terminalSend, sleep = sleepSync } = {}) {
+  show = terminalShow, send = terminalSend, read = terminalRead, sleep = sleepSync } = {}) {
   const command = QUIT_COMMAND[agent];
   if (!handle || !command) return null;
   const connected = () => { try { const s = show({ terminal: handle }); return s?.ok === true ? s.connected === true : null; } catch { return null; } };
   if (connected() !== true) return null;
+  // An agent that already exited left a bare shell: typing the quit input there would run it as a
+  // shell command (a /quit or a Ctrl+C sent to PowerShell). Nothing is typed; the close follows.
+  try { const r = read({ terminal: handle, screen: true }); if (r?.ok && exitedAgentPromptRow(r.screen)) return { sent: false, exited: true, command, agentExited: true }; } catch { /* unreadable: fall through */ }
   let sent = false;
   try { const r = send({ terminal: handle, text: command, enter: QUIT_ENTER[agent] ?? true }); sent = r?.ok === true || r?.errorCode === 'agent_prompt_stalled'; } catch { sent = false; }
   for (let waited = 0; waited < waitMs; waited += intervalMs) {

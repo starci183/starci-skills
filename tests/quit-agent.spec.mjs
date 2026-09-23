@@ -9,7 +9,7 @@ test('the agent quit command is typed and the terminal is watched until it disco
   let connected = true; const sent = [];
   const show = () => ({ ok: true, connected });
   const send = ({ text, enter }) => { sent.push([text, enter]); connected = false; return { ok: true }; };
-  const r = quitAgent({ handle: 'term-1', agent: 'claude', show, send, sleep: () => {} });
+  const r = quitAgent({ handle: 'term-1', agent: 'claude', show, send, read: () => ({ ok: true, screen: '❯ \n  ⏵⏵ bypass permissions on' }), sleep: () => {} });
   assert.deepEqual(r, { sent: true, exited: true, command: '\u0003\u0003' });
   assert.deepEqual(sent, [['\u0003\u0003', false]], 'Claude quits on a double Ctrl+C with no Enter; a pasted /exit is only chat text');
   assert.equal(QUIT_COMMAND.codex, '/quit');
@@ -19,6 +19,16 @@ test('no quit for an unknown agent or a terminal that is already gone; a busy ag
   assert.equal(quitAgent({ handle: 'term-1', agent: 'devin', show: () => ({ ok: true, connected: true }), send: () => ({ ok: true }), sleep: () => {} }), null);
   assert.equal(quitAgent({ handle: 'term-1', agent: 'claude', show: () => ({ ok: true, connected: false }), send: () => { throw new Error('never sent'); }, sleep: () => {} }), null);
   const busy = quitAgent({ handle: 'term-1', agent: 'codex', waitMs: 1000, intervalMs: 500,
-    show: () => ({ ok: true, connected: true }), send: () => ({ ok: false, errorCode: 'agent_prompt_stalled' }), sleep: () => {} });
+    show: () => ({ ok: true, connected: true }), read: () => ({ ok: true, screen: '• Working (3s)\n› Ask Codex to do anything' }),
+    send: () => ({ ok: false, errorCode: 'agent_prompt_stalled' }), sleep: () => {} });
   assert.deepEqual(busy, { sent: true, exited: false, command: '/quit' }, 'a queued quit counts as sent; the close still follows');
+});
+
+// A settled worker whose agent already exited leaves a bare PowerShell prompt; a
+// quit typed there would run as a shell command. Nothing is typed.
+test('no quit input is typed into a bare shell left by an exited agent', () => {
+  const r = quitAgent({ handle: 'term-1', agent: 'codex', show: () => ({ ok: true, connected: true }),
+    read: () => ({ ok: true, screen: String.raw`› Ask Codex to do anything` + '\n' + String.raw`PS D:\Repositories\nivo-backend>` }),
+    send: () => { throw new Error('never typed'); }, sleep: () => {} });
+  assert.deepEqual(r, { sent: false, exited: true, command: '/quit', agentExited: true });
 });
