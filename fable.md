@@ -1036,6 +1036,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   thanh toán và gia hạn), a30 blocked vì route ma trận (/purchases/:id vs /provisioning) mâu thuẫn trong bản ghi: op-defect,
   kernel lo qua vòng sửa implement. Modules đang chạy lại a8 (leased). Collab chờ composition. AUTH chờ owner-gate.
 
+- 08:25 P7 xanh nhưng chưa merge: 23/25 report implement gần đây của nivo thiếu head, nên settle pass sẽ bị từ chối hàng loạt.
+  Yêu cầu fork: envelope đòi head cho op có commitPolicy (lỗi lúc report, worker còn sống sửa được) + luật chuyển tiếp ở settle
+  (report cũ thiếu head: bỏ kiểm tra ancestor, vẫn đòi owned paths sạch). Scaffold/content/workspace commit "khi được phép" mà
+  không có commitPolicy: đưa vào danh sách buổi sáng (quyết định quyền push).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
