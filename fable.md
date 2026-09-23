@@ -1041,6 +1041,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   (report cũ thiếu head: bỏ kiểm tra ancestor, vẫn đòi owned paths sạch). Scaffold/content/workspace commit "khi được phép" mà
   không có commitPolicy: đưa vào danh sách buổi sáng (quyết định quyền push).
 
+- 08:25 Không vá. Modules architecture.decide a9 (Shell, chạy lại sau 09c3af799) done: vá decisionLog chạy đúng trên việc thật.
+  WSPV kernel đang sửa theo audit. Collab composition vẫn active (worker còn output). AUTH chờ owner-gate. P7 chờ fork bổ sung.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
