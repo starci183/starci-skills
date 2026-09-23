@@ -1195,6 +1195,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   `c3ae4687a` (Mia Mia prepare kẹt CATALOG_DIRTY); owner-gate không job = awaiting-owner `680d1c0b0`; scaffold cutSetAuthority.
   Chờ thầy: brand + grammar cho StarCi Next FE (inc-d456b748085a); brand Mia Mia đi theo mm-work.
 
+- 14:40 Yên, 8 workflow: 4 nivo worker đầu tiên đang chạy; sn-work và mm-work worker chạy lại sau vá; sn-base chờ thầy (brand,
+  grammar); mm-base giữ 2 job frontend sau owner-gate chờ brand. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
