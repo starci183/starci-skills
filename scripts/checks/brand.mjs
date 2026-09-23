@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
+import {grammarDistRefusal} from './grammar-dist.mjs';
 
 /**
  * The brand is proven, not stated. A brand record says what the product's colour, mascot and icon law is;
@@ -238,6 +239,10 @@ export function readSourceTokens(sourceRoot,source){
   const relative=path.relative(path.resolve(sourceRoot),file);
   if(relative.startsWith('..'))return {...entry,error:'the declared path escapes its repository root'};
   if(!fs.existsSync(file))return {...entry,error:'this repository does not carry the declared file'};
+  // A source inside a built @starci/grammar dist is read only when that dist is the build of its source:
+  // a stale dist would bind the brand to tokens the package no longer ships.
+  const refusal=grammarDistRefusal(file);
+  if(refusal)return {...entry,found:true,error:refusal.message,staleGrammarDist:{state:refusal.state,root:refusal.root,fix:refusal.fix}};
   let text;
   try{text=readText(file);}catch(error){return {...entry,found:true,error:String(error.message??error)};}
   if(source.kind==='css'||path.extname(file).toLowerCase()==='.css'){
@@ -349,6 +354,9 @@ export function checkTokensMatchSource({brand,sourceRoot}){
   const sources=declared.map(source=>readSourceTokens(sourceRoot,source));
   const readable=sources.filter(source=>source.lookup);
   const files=sources.map(({lookup,...rest})=>rest);
+  const refused=files.filter(source=>source.staleGrammarDist);
+  if(refused.length)return check(id,'fail',`Refusing to bind the brand to a stale grammar build: ${refused.map(source=>source.error).join(' ')}`,
+    {sourceRoot:slash(sourceRoot),files});
   if(!readable.length)return check(id,'skip','Not one declared colour source could be read from this repository root, so no token was compared.',
     {sourceRoot:slash(sourceRoot),files});
   const findings=tokens.map(token=>{

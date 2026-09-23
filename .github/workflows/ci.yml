@@ -30,6 +30,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # packages/grammar/dist is untracked; `npm run check` refuses a missing or stale one
+      # (scripts/checks/grammar-dist.mjs), so build it from this commit's source first.
+      - name: Build @starci/grammar
+        working-directory: packages/grammar
+        run: |
+          npm ci
+          npm run build
+
       - name: Static checks
         run: npm run check
 

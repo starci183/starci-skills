@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { checkGrammarGuards, GRAMMAR_GUARD_RULES } from '../scripts/checks/code-patterns/grammar-guards.mjs';
+import { writeStamp } from '../packages/grammar/scripts/build-stamp.mjs';
 
 const require = createRequire(import.meta.url);
 const typescriptRoot = path.dirname(require.resolve('typescript/package.json'));
@@ -87,6 +88,20 @@ test('repository workspace and standalone provider bind the same public export b
     assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
     assert.equal(result.execution.package.selection, 'standalone-import');
   });
+});
+
+test('a repository Grammar whose dist is not the build of its source is refused before it is probed', t => {
+  const f = fixture(t, { source: 'repository' });
+  f.write('packages/grammar/src/common/index.ts', 'export const COMMON_UI_RULE_IDS = [] as const\n');
+  const stale = checkGrammarGuards(f.input);
+  assert.deepEqual(stale.checkedRuleIds, []); assert.equal(stale.execution, null);
+  assert.ok(stale.errors.some(item => /dist at .* is unstamped: .*Fix: run npm run build in packages\/grammar\.$/.test(item.message)), JSON.stringify(stale.errors));
+  writeStamp(f.provider);
+  const fresh = checkGrammarGuards(f.input);
+  assert.deepEqual(fresh.errors, []); assert.deepEqual(fresh.checkedRuleIds, [...GRAMMAR_GUARD_RULES]);
+  f.write('packages/grammar/src/common/index.ts', 'export const COMMON_UI_RULE_IDS = ["RULE-A"] as const\n');
+  const edited = checkGrammarGuards(f.input);
+  assert.ok(edited.errors.some(item => item.message.includes('is stale') && item.message.endsWith('Fix: run npm run build in packages/grammar.')));
 });
 
 test('standalone package resolution follows Node export-condition precedence and default exports', async t => {

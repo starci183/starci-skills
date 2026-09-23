@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
+import { assertGrammarDistFresh } from '../grammar-dist.mjs';
 
 export const GRAMMAR_GUARD_RULES = Object.freeze(['FE_GRAMMAR_GUARD_BEHAVIOR']);
 const CONTRACT_SCHEMA = 'starci/grammar-guard-contract@1';
@@ -463,6 +464,8 @@ export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } =
     const { value: contract } = readContract(root);
     if (!contextFiles.includes('package.json') && !files.includes('package.json')) throw Error('Target package contract is outside the bound input context.');
     const resolved = resolvePackage(root, contract, spawn); resolved.sourceKind = contract.source.kind;
+    // The probe executes the selected package's dist: a dist that is not the build of its source is refused, not probed.
+    assertGrammarDistFresh(resolved.root);
     if (contract.source.kind === 'repository') {
       const providerManifest = slash(path.relative(root, path.join(resolved.root, 'package.json')));
       if (inside(root, resolved.root) && !contextFiles.includes(providerManifest) && !files.includes(providerManifest)) throw Error('Repository Grammar package is outside the bound input context.');

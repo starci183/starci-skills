@@ -11,6 +11,7 @@ import {
   contrastRatio,deltaEOk,formatBrandChecks,importSpecifiers,parseColor,parseCssCustomProperties,parseTokenData,
   readBrandRecord,readSourceTokens,runBrandChecks
 } from '../scripts/checks/brand.mjs';
+import {OLD_DANGER,SRC_CSS,grammarFixture} from './fixtures/grammar-dist.mjs';
 
 const ACCENT='#7547ff';
 const ACCENT_OKLCH='oklch(56.50% 0.2534 286.60)';
@@ -175,6 +176,54 @@ test('tokens-match-source skips rather than passing when it cannot read the sour
   assert.equal(unread.evidence.files[0].error,'this repository does not carry the declared file');
   const escaping=checkTokensMatchSource({brand:{...brand,sources:[{repository:'fe',path:'../outside.css',kind:'css'}]},sourceRoot:empty});
   assert.equal(escaping.evidence.files[0].error,'the declared path escapes its repository root');
+});
+
+/** A frontend that consumes @starci/grammar through a `file:` link and binds its brand to the linked dist CSS. */
+function grammarConsumer(t,grammar){
+  const root=temporary(t,'fe-grammar');
+  write(root,'package.json',JSON.stringify({name:'fe',dependencies:{'@starci/grammar':'file:../grammar'}}));
+  fs.mkdirSync(path.join(root,'node_modules','@starci'),{recursive:true});
+  fs.symlinkSync(grammar.root,path.join(root,'node_modules','@starci','grammar'),'junction');
+  return root;
+}
+const grammarBrand=()=>({...brandSpec(),
+  color:{tokens:[{token:'--starci-core-accent',value:ACCENT_OKLCH,role:'primary'},{token:'--starci-core-danger',value:DANGER_OKLCH,role:'danger'}]},
+  sources:[{repository:'fe',path:'node_modules/@starci/grammar/dist/core/styles.css',kind:'css'}]});
+
+test('tokens-match-source reads a grammar dist only when it is the build of its source',t=>{
+  const grammar=grammarFixture(t);
+  const fe=grammarConsumer(t,grammar);
+  const brand=grammarBrand();
+  const fresh=checkTokensMatchSource({brand,sourceRoot:fe});
+  assert.equal(fresh.outcome,'pass',JSON.stringify(fresh));
+
+  // The source moved on (a merge) and nobody rebuilt: the old dist must not be read as the shipped tokens.
+  grammar.write('src/core/styles.css',SRC_CSS.replace('oklch(50.13% 0.1783 28.70)','oklch(52% 0.19 28.7)'));
+  const stale=checkTokensMatchSource({brand,sourceRoot:fe});
+  assert.equal(stale.outcome,'fail','a stale dist is refused, not skipped and not read');
+  assert.match(stale.detail,/is stale: .*Fix: run npm run build in packages\/grammar\./);
+  assert.equal(stale.evidence.files[0].staleGrammarDist.state,'stale');
+  assert.equal(stale.evidence.tokens,undefined,'no token was compared against the refused dist');
+});
+
+test('the brand check refuses an unstamped 0.4.x dist whose danger token is the old one',t=>{
+  const grammar=grammarFixture(t,{stamp:false});
+  grammar.write('dist/core/styles.css',SRC_CSS.replace('oklch(50.13% 0.1783 28.70)',OLD_DANGER));
+  const fe=grammarConsumer(t,grammar);
+  const {work}=tree(t,{brand:grammarBrand(),label:'tree-grammar'});
+  const result=runBrandChecks({tree:work,sourceRoot:fe});
+  const tokens=result.checks.find(entry=>entry.id==='tokens-match-source');
+  assert.equal(tokens.outcome,'fail');
+  assert.match(tokens.detail,/is unstamped: .*--starci-core-danger .*Fix: run npm run build in packages\/grammar\./);
+  assert.equal(result.ok,false);
+});
+
+test('a hand-edited grammar dist is refused even when its stamp matches the source',t=>{
+  const grammar=grammarFixture(t);
+  grammar.write('dist/core/styles.css',SRC_CSS.replace('oklch(50.13% 0.1783 28.70)',OLD_DANGER));
+  const refused=checkTokensMatchSource({brand:grammarBrand(),sourceRoot:grammarConsumer(t,grammar)});
+  assert.equal(refused.outcome,'fail');
+  assert.match(refused.detail,/is tampered: .*Fix: run npm run build in packages\/grammar\./);
 });
 
 test('contrast-aa measures declared text pairs and the primary on its surface',()=>{
