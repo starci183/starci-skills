@@ -104,7 +104,7 @@ conventions:
     payload managed/orca agentTerminalHandle, hierarchy runtime terminalHandle) is that op even as a
     managed worker-start agent whose env StarCi cannot set; (3) from an op caller every kernel verb
     (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, settle, check,
-    consume-report, serve-ask, incident, finish) refuses `op-context-refused` before it runs, and `report`
+    consume-report, serve-ask, retire-ask, incident, finish) refuses `op-context-refused` before it runs, and `report`
     refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
     binding the report binding then proves); each refusal appends 'op-caller-refused' on the op's
     job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
@@ -831,6 +831,21 @@ commands:
       - workflow-unknown
       - ask-unknown
     usedBy: 'drive.wait — an ask-reserve frontier re-serves each askReserveDispatches entry'
+  retire-ask:
+    args: '--workflow <id> --dispatch <id> --reason <text>'
+    reads: 'the reports row that filed that ask; its ask-answered/ask-superseded events'
+    writes: >-
+      one event ask-superseded {dispatchId, by:null, opId, retired:true, reason}
+      - the terminal kind every open-ask reader already honours - so the owner
+      is no longer asked a question the workflow has outgrown (a premise a
+      later merge changed, an ask a later attempt made moot). An ask already
+      answered or superseded writes nothing and returns retired:false.
+    returns: '{ok:true, workflowId, dispatchId, retired, reason|already}'
+    refuses:
+      - workflow-unknown
+      - ask-unknown
+      - retire-needs-reason
+    usedBy: 'drive.wait — an awaiting-owner frontier whose only open ask is obsolete'
   consume-report:
     args: '--job <job_id>'
     reads: 'the reports row for the job''s dispatch_id'

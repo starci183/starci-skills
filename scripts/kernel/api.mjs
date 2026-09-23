@@ -181,6 +181,7 @@ const usage = (code) => {
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
   serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>]
+  retire-ask --workflow <id> --dispatch <id> --reason <text>
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
   incident --workflow <id> --resolve <incidentId> [--detail <s>]
   finish   --workflow <id>`);
@@ -3687,6 +3688,32 @@ function cmdServeAsk(ledger, args, repo) {
   emit(out, `serve-ask launched for ${workflowId}${dispatchId ? ` dispatch ${dispatchId}` : ''} (pid ${out.pid}); status shows ask-serving once the form binds`, args.json);
 }
 
+/* ------------------------------------------------------------ retire-ask */
+// `retire-ask --workflow <id> --dispatch <id> --reason <text>`: close an ask the
+// owner should no longer answer. A StarCi Next brand ask asked the owner to
+// rule on 0.4.13 contrast values that grammar 0.5.0 then fixed; with no way to
+// retire it the workflow read awaiting-owner on a stale question
+// (inc-6886d1399989). The ask is recorded ask-superseded with by:null and the
+// reason, the same terminal kind serve-ask writes for a replaced ask.
+function cmdRetireAsk(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow, dispatchId = args.dispatch;
+  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const report = db.prepare("SELECT op_id FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId);
+  if (!report) throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
+  const reason = String(args.reason ?? '').trim();
+  if (!reason) throw Object.assign(new Error('retire-ask needs --reason <text>: a retired ask keeps why the owner no longer answers it'), { code: 'retire-needs-reason' });
+  const closed = db.prepare("SELECT kind FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(workflowId, dispatchId);
+  if (closed) {
+    const out = { ok: true, workflowId, dispatchId, retired: false, already: closed.kind };
+    emit(out, `retire-ask ${dispatchId}: already ${closed.kind}`, args.json);
+    return;
+  }
+  ledger.appendEvent({ workflowId, entityType: 'report', entityId: dispatchId, kind: 'ask-superseded',
+    payload: { dispatchId, by: null, opId: report.op_id ?? null, retired: true, reason } });
+  const out = { ok: true, workflowId, dispatchId, retired: true, reason };
+  emit(out, `retired ask ${dispatchId}: ${reason}`, args.json);
+}
+
 /* -------------------------------------------------------- consume-report */
 // Kernel-facing: mark the job's reports row integrated so it is never read
 // as a live answer again.
@@ -3728,7 +3755,7 @@ function cmdConsumeReport(ledger, args) {
 const OP_ROLE = 'op';
 const opLaunchEnv = (jobId) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId });
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'reply', 'settle', 'check', 'consume-report', 'serve-ask', 'incident', 'finish']);
+  'questions', 'reply', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'finish']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -3765,7 +3792,7 @@ async function main() {
     questions: ['workflow'], reply: ['workflow', 'message'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
-    'consume-report': ['job'], 'serve-ask': ['workflow'],
+    'consume-report': ['job'], 'serve-ask': ['workflow'], 'retire-ask': ['workflow', 'dispatch', 'reason'],
     incident: [],
     finish: ['workflow'],
   };
@@ -3819,6 +3846,7 @@ async function main() {
       case 'check': return cmdCheck(ledger, args, repo);
       case 'consume-report': return cmdConsumeReport(ledger, args);
       case 'serve-ask': return cmdServeAsk(ledger, args, repo);
+      case 'retire-ask': return cmdRetireAsk(ledger, args);
       case 'incident': return cmdIncident(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
     }

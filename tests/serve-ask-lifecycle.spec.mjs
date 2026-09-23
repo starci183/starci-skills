@@ -138,3 +138,22 @@ test('api serve-ask launches the form for a filed ask and refuses one that was n
     assert.deepEqual(askEvents(ledger,'ask-serving-expired').map(p=>p.dispatchId),['ctx_api']);
   });
 });
+
+// A StarCi Next brand ask asked the owner to rule on 0.4.13 contrast values
+// that grammar 0.5.0 then fixed (inc-6886d1399989); retire-ask closes it.
+test('api retire-ask closes an obsolete ask so it is no longer open, and needs a reason',async t=>{
+  await withLedger(t,async({repoRoot,ledger})=>{
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
+    seedAskReport(ledger,{dispatchId:'ctx_stale'});
+    const API=path.join(ROOT,'scripts','kernel','api.mjs');
+    const api=(...a)=>spawnSync(process.execPath,[API,'retire-ask','--repo',repoRoot,'--workflow',WORKFLOW,...a,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
+    assert.notEqual(api('--dispatch','ctx_stale').status,0,'a retired ask keeps its reason');
+    assert.match(api('--dispatch','ctx_nope','--reason','x').stderr,/ask-unknown/);
+    const r=api('--dispatch','ctx_stale','--reason','grammar 0.5.0 fixed the contrast the ask was about');
+    assert.equal(r.status,0,r.stderr||r.stdout);
+    assert.equal(JSON.parse(r.stdout).retired,true);
+    assert.deepEqual(askEvents(ledger,'ask-superseded').map(p=>[p.dispatchId,p.by,p.retired]),[['ctx_stale',null,true]]);
+    assert.deepEqual((await openAsks(ledger.db)).map(a=>a.dispatch_id),[],'a retired ask is no longer open');
+    assert.equal(JSON.parse(api('--dispatch','ctx_stale','--reason','again').stdout).retired,false,'retiring twice writes nothing');
+  });
+});
