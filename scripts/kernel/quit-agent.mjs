@@ -13,8 +13,14 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 
-// The quit command each agent CLI understands at its prompt.
-export const QUIT_COMMAND = { claude: '/exit', codex: '/quit', qwen: '/quit' };
+// The quit input each agent CLI understands at its prompt. Claude gets two
+// Ctrl+C in one write, no Enter: Orca delivers `/exit` as pasted text, which
+// Claude answers as a chat message instead of running the command — and where a
+// prompt sat staged in the input box, `/exit` + Enter submitted that prompt and
+// restarted a settled op (three leaked op terminals, 2026-09-24). The first
+// Ctrl+C clears the input box, the second exits.
+export const QUIT_COMMAND = { claude: '\u0003\u0003', codex: '/quit', qwen: '/quit' };
+const QUIT_ENTER = { claude: false };
 export const QUIT_WAIT_MS = 6000;
 
 /**
@@ -29,7 +35,7 @@ export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 5
   const connected = () => { try { const s = show({ terminal: handle }); return s?.ok === true ? s.connected === true : null; } catch { return null; } };
   if (connected() !== true) return null;
   let sent = false;
-  try { const r = send({ terminal: handle, text: command, enter: true }); sent = r?.ok === true || r?.errorCode === 'agent_prompt_stalled'; } catch { sent = false; }
+  try { const r = send({ terminal: handle, text: command, enter: QUIT_ENTER[agent] ?? true }); sent = r?.ok === true || r?.errorCode === 'agent_prompt_stalled'; } catch { sent = false; }
   for (let waited = 0; waited < waitMs; waited += intervalMs) {
     sleep(intervalMs);
     if (connected() === false) return { sent, exited: true, command };

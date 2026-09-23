@@ -243,8 +243,9 @@ else if (verb === 'terminal send' && record(arg('terminal'))?.gate && !record(ar
   }
   save(); out({ ok: true, result: { send: { accepted: true, bytesWritten: key.length } } });
 }
-else if (verb === 'terminal send' && ['/exit', '/quit'].includes(arg('text') ?? '') && argv.includes('--enter')) {
-  // An agent CLI's own quit command ends its process: the terminal disconnects.
+else if (verb === 'terminal send' && ((['/exit', '/quit'].includes(arg('text') ?? '') && argv.includes('--enter')) || arg('text') === '\u0003\u0003')) {
+  // An agent CLI's own quit input ends its process: the terminal disconnects.
+  // Claude's is a double Ctrl+C with no Enter (scripts/kernel/quit-agent.mjs).
   const r = record(arg('terminal'));
   if (r) { r.quit = arg('text'); r.connected = false; r.writable = false; }
   state.quits = [...(state.quits || []), { handle: arg('terminal'), text: arg('text') }];

@@ -10,8 +10,8 @@ test('the agent quit command is typed and the terminal is watched until it disco
   const show = () => ({ ok: true, connected });
   const send = ({ text, enter }) => { sent.push([text, enter]); connected = false; return { ok: true }; };
   const r = quitAgent({ handle: 'term-1', agent: 'claude', show, send, sleep: () => {} });
-  assert.deepEqual(r, { sent: true, exited: true, command: '/exit' });
-  assert.deepEqual(sent, [['/exit', true]]);
+  assert.deepEqual(r, { sent: true, exited: true, command: '\u0003\u0003' });
+  assert.deepEqual(sent, [['\u0003\u0003', false]], 'Claude quits on a double Ctrl+C with no Enter; a pasted /exit is only chat text');
   assert.equal(QUIT_COMMAND.codex, '/quit');
 });
 
