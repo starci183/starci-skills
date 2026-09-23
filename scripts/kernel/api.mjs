@@ -659,7 +659,43 @@ const approvedLegOps = (goalJson) => {
   return [...new Set(legs.map((leg) => (typeof leg === 'string' ? leg : leg?.op)).filter(Boolean))];
 };
 /** One queued job's blocking cause and the id that holds it. */
-function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [] }) {
+/**
+ * Work-record order the kernel already declared: a job owns record
+ * directories (owned_paths holding an index.yaml with an id); when one of its
+ * records dependsOn a record another job of this workflow owns, that job holds
+ * it. Returns jobId -> [blocking jobIds]. A Collab kernel ran seven
+ * implementation slices one at a time from these edges while status called
+ * them all ready - and missed the one that could already run in parallel.
+ */
+function recordDependencies(repo, workflowJobs) {
+  const ownerOfRecord = new Map(), recordsOfJob = new Map();
+  for (const row of workflowJobs) {
+    const owned = (jobPayloadOf(row).owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
+    for (const rel of owned) {
+      if (!rel.startsWith('.starciwork/')) continue;
+      let doc = null;
+      try { doc = parseYaml(fs.readFileSync(path.join(repo, rel.replace(/\/+$/, ''), 'index.yaml'), 'utf8')); } catch { continue; }
+      if (!doc?.id) continue;
+      // Every job that owned the record, in created order: the record is met
+      // once any of them succeeded; otherwise the latest owner holds it.
+      ownerOfRecord.set(doc.id, [...(ownerOfRecord.get(doc.id) ?? []), row]);
+      recordsOfJob.set(row.job_id, [...(recordsOfJob.get(row.job_id) ?? []), doc]);
+    }
+  }
+  const out = new Map();
+  for (const [jobId, docs] of recordsOfJob) {
+    const blockers = [...new Set(docs.flatMap((doc) => (Array.isArray(doc.dependsOn) ? doc.dependsOn : [])
+      .map((dep) => {
+        const owners = ownerOfRecord.get(typeof dep === 'string' ? dep : dep?.id) ?? [];
+        if (!owners.length || owners.some((owner) => owner.status === 'succeeded')) return null;
+        return owners[owners.length - 1].job_id;
+      })
+      .filter((owner) => owner && owner !== jobId)))];
+    if (blockers.length) out.set(jobId, blockers);
+  }
+  return out;
+}
+function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], recordDeps = new Map() }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -699,7 +735,7 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
     ? db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY attempt DESC LIMIT 1")
       .get(job.workflow_id ?? payload.hierarchy?.workflowId, opId, payload.cut.id)?.job_id ?? null
     : null;
-  for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : [])]) {
+  for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...(recordDeps.get(job.job_id) ?? [])]) {
     const prior = heldByJob(priorId);
     if (prior) {
       return {
@@ -707,7 +743,9 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
         blockedBy: { op: prior.op_id, job: prior.job_id },
         detail: priorId === seam
           ? `cut ${payload.cut.id} seam ${prior.job_id} is ${prior.status}; the other ordinals wait for it`
-          : `declared --after job ${prior.job_id} is ${prior.status}`,
+          : (recordDeps.get(job.job_id) ?? []).includes(priorId)
+            ? `a Work record this job owns dependsOn a record owned by ${prior.job_id}, which is ${prior.status}`
+            : `declared --after job ${prior.job_id} is ${prior.status}`,
       };
     }
   }
@@ -823,9 +861,10 @@ function cmdStatus(ledger, args) {
     if (model) runningByModel[model] = (runningByModel[model] ?? 0) + 1;
   }
   const ownerGates = openOwnerGates(db, workflowId);
+  const recordDeps = recordDependencies(path.resolve(args.repo ?? process.cwd()), workflowJobs);
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates }),
+    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates, recordDeps }),
   }));
   // Ready means the Kernel can move it now: a queued job nothing holds, or a
   // fenced launch to reconcile. A queued job waiting on a leg, a slot or a

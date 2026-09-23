@@ -191,7 +191,9 @@ commands:
         first cause that bites, in this order. A job whose payload.after names a job, or whose cut seam
         (the same cut id at ordinal 1) has not settled succeeded, is `dependency` with blockedBy {op, job}:
         the kernel records a composition-first order with enqueue --after instead of holding siblings in
-        its head, and an unsettled seam holds the other ordinals. `owner-gate` — an open incident of kind
+        its head, and an unsettled seam holds the other ordinals. A Work record in a job's owned_paths whose dependsOn
+        names a record owned by another job of the workflow is held the same way until one owner of that
+        record succeeded. `owner-gate` — an open incident of kind
         owner-gate names this job or its op in --holds (or, without --holds, as its --op): a step
         only the owner drives holds it, and no admission check can clear that. Then `dependency` — an approved leg that precedes this
         op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:

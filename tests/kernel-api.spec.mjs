@@ -404,6 +404,29 @@ test('a consumed report whose job is still running makes the frontier settle-rea
   assert.deepEqual(f.settleReadyJobs,['impl-a35']);
 });
 
+// A Collab kernel ran seven implementation slices in their Work records'
+// dependsOn order while status called every waiting slice ready.
+test('a Work record dependsOn owned by another open job holds the job as dependency; a succeeded owner releases it',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-record-deps';
+  const owner=ownerConfig(t,{budgets:{maxOps:null,perOpMs:null,dailyTokens:null}});
+  seedGoal(repo,wf);
+  const rec=(name,deps)=>{const dir=path.join(repo,'.starciwork','features','f','impl','r',name);fs.mkdirSync(dir,{recursive:true});
+    fs.writeFileSync(path.join(dir,'index.yaml'),stringifyYaml({schema:'work/implementation@1',id:`impl.f.r.${name}`,dependsOn:deps.map(d=>`impl.f.r.${d}`)}));
+    return `.starciwork/features/f/impl/r/${name}`;};
+  const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
+  const enq=(p)=>{const r=api('enqueue','--workflow',wf,'--op','docs.author','--paths',p);assert.equal(r.status,0,r.stderr||r.stdout);return out(r).job_id;};
+  const base=enq(rec('composition',[]));
+  const tasks=enq(rec('tasks',['composition']));
+  const approval=enq(rec('approval',['composition','tasks']));
+  const because=(id)=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier.queued.find(q=>q.jobId===id);};
+  assert.equal(because(base).queuedBecause,'ready');
+  assert.deepEqual(because(tasks).blockedBy,{op:'docs.author',job:base});
+  assert.equal(because(approval).queuedBecause,'dependency');
+  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(base));
+  assert.equal(because(tasks).queuedBecause,'ready','the succeeded owner releases its dependents');
+  assert.deepEqual(because(approval).blockedBy,{op:'docs.author',job:tasks});
+});
+
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);
