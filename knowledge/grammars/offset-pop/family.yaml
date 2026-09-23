@@ -1,0 +1,292 @@
+schema: starci/knowledge-source@1
+id: grammar.offset-pop.family
+title: Offset Pop family and DNA
+purpose: |
+  Family identity, CSS dependency direction, Offset Pop DNA ownership, the family's boundaries over
+  Common (what it owns, what it deliberately departs from, what it inherits), theme/accessibility
+  binding, source-backed behaviour and the decisions its owner must confirm. Snapshot observations —
+  verify installed source before treating any gap or API as current.
+appliesTo:
+  - grammar
+family: offset-pop
+provenance:
+  package: "@starci/grammar"
+  version: "0.5.0"
+  checkout: b6a13be97a9d1e15b7d3f628709158e81c744a2a
+  captured: "2026-09-23"
+  publicEntry: "@starci/grammar/common"
+  sources:
+    - packages/grammar/src/offset-pop/dna.ts
+    - packages/grammar/src/offset-pop/styles.css
+    - packages/grammar/src/offset-pop/components-forms.css
+    - packages/grammar/src/offset-pop/components-overlays.css
+    - packages/grammar/src/offset-pop/components-navigation.css
+    - packages/grammar/src/offset-pop/conformance.ts
+    - packages/grammar/src/offset-pop/index.tsx
+  limitations: |
+    Historical snapshot only. Before use, inspect the selected repository's manifest/lockfile,
+    exported types, renderers and CSS; record actual source/version in .starciwork. If source is
+    unavailable, report unverified; do not infer current APIs or defects from these tables. Contrast
+    figures are the ones `src/offset-pop/dna.ts` records and `styles.spec.ts` asserts; they were not
+    re-measured on a rendered page here.
+identity:
+  definedBy: offsetPopGrammar
+  selectedBy: OffsetPopGrammarRoot
+  implements: Common contract
+  notes: |
+    A sibling of StarCi Core over Common, never its child: `defineGrammarFamily` with id `offset-pop`,
+    scope `data-grammar-family="offset-pop"`, one replacement (`GrammarRoot`) and no extension, so the
+    family publishes exactly the 95 Common renderers. `src/offset-pop/index.tsx` re-exports
+    `../common/index.js`, the DNA module and the conformance record. The family is product-neutral: no
+    product name, copy or asset ships in it.
+  applicableUiRules:
+    - TONE-1..3
+    - ACCENT-1..5
+    - BOUNDARY-1..6
+    - COLOR-3..5
+    - FOCUS-1..4
+    - MOTION-1..4
+    - SURFACE-1..5
+cssDependency:
+  direction: |
+    offset-pop/styles.css imports ../common/styles.css first (which brings Common's three component
+    sheets), then the family's own components-forms.css, components-overlays.css and
+    components-navigation.css. Every family rule sits in `@layer starci-grammar-offset-pop`, which
+    Common's layer statement orders after `starci-grammar-common`, and is scoped under
+    `.grammar-common-root[data-grammar-family="offset-pop"]`. Common never imports the family; the
+    family never imports Core.
+  commonOwns:
+    - renderer anatomy, props and semantics (all 95 renderers)
+    - geometry, state structure and responsive composition
+    - universal --grammar-* spacing (the family does not re-space)
+    - the 44px touch floor
+    - the overlay portal into the nearest Grammar root
+  offsetPopOwns:
+    - family-scoped values and theme bindings (light, dark, system dark, forced colours)
+    - the ink outline at `--offset-pop-outline-width` in place of Common's 1px edges
+    - the hard offset shadow and the press travel that collapses it
+    - which Common states the one pink fills
+    - the text-safe accent for every place Common would paint the accent as text
+    - narrow-viewport shadow geometry
+dna:
+  publishedBy: "@starci/grammar/offset-pop"
+  publishes:
+    - OFFSET_POP_DNA
+    - OFFSET_POP_SPACING_SCALE
+    - OFFSET_POP_TOKEN_NAMES
+    - OFFSET_POP_TOKEN_DEFAULTS
+    - OFFSET_POP_DARK_TOKEN_DEFAULTS
+    - OFFSET_POP_BAND_TOKEN_NAMES
+  shape: |
+    Key for key the shape of `STARCI_CORE_DNA` (color.accent/accentForeground/focus, color.light and
+    color.dark with Core's fifteen keys, geometry, rhythm, elevation, motion) plus `accentText` in both
+    colour themes and two family groups: `offset { x, y, outlineWidth, ink, shadowInk, dark }` and
+    `palette { pink, blush, yellow, mint, critical }`. Values equal the CSS defaults; the exact table is
+    generated into DNA.yaml and drift-checked against dna.ts.
+  values: |
+    Pink `#ff3593` is the accent and the focus ring; the ink `#1c1524` is outline, text and the accent's
+    foreground. Light canvas cream `#fff8ef`, surface `#fffdf9`, secondary surface `#f8dbe8`; dark canvas
+    `#17121d`, surface `#251d2c`, ink flipped to cream `#fff8ef` with a near-black shadow ink `#050306`.
+    Semantic fills come from the palette: success mint `#91e4ca`, warning yellow `#ffd447`, danger
+    critical `#e84a5f`, info blush `#f8d8e6`, each with the ink as its foreground in both themes.
+    Offset `0.25rem` x `0.5rem` (y drops to 0.25rem at 40rem and below), outline 2px, surface radius
+    1.5rem (1.25rem narrow), control radius 1rem, pill 999px, motion 140ms `cubic-bezier(.2, .8, .2, 1)`.
+    `accentText` is `#b8005f` in light and `#ff7ab8` in dark.
+  bindsSemanticVariables:
+    - canvas/background
+    - surface and surface-secondary (with their foregrounds)
+    - foreground
+    - muted
+    - border/separator (both the ink)
+    - accent/accent-foreground/focus
+    - accent-soft (secondary surface) and accent-soft-foreground (accentText)
+    - link (accentText)
+    - success/warning/danger/info pairs
+    - fields (background surface, border ink, placeholder muted, radius control)
+    - radius and field radius
+    - shadow-surface (the hard offset)
+  compatibilityAliases:
+    - name: --offset-pop-surface-muted
+      targets: --offset-pop-surface-secondary
+    - name: --offset-pop-transition
+      targets: "--offset-pop-motion-duration --offset-pop-motion-easing"
+    - name: "--offset-pop-page-inset / -region-gap / -section-gap / -inline-gap / -row-gap"
+      targets: "the matching --grammar-* value"
+  aliasNote: |
+    The rhythm names alias Common's `--grammar-*` scale exactly as Core's do; Offset Pop does not
+    re-space. The band names in `OFFSET_POP_BAND_TOKEN_NAMES` are Common's `--starci-core-band-*`
+    names, re-exported so a consumer reads them from the family entry; the family never writes them.
+authority:
+  signature:
+    rule: |
+      Objects are drawn with a solid ink outline (`--offset-pop-outline-width` in `--border`) AND a hard,
+      unblurred offset shadow (`--offset-pop-shadow-x` by `--offset-pop-shadow-y` in
+      `--offset-pop-shadow-ink`). Press moves the object into its shadow (translate plus shadow collapse)
+      and reduced motion removes the travel. Nested surfaces keep the outline, drop the shadow and take
+      the secondary surface. This pairing is the family's recognisable face; dropping either half is a
+      different family.
+    evidence:
+      - "offset-pop/styles.css: [data-grammar-surface-depth=\"top\"] box-shadow var(--shadow-surface)"
+      - "offset-pop/components-overlays.css: [data-grammar-overlay-surface] outline + offset"
+      - "conformance.ts: BOUNDARY-5, BOUNDARY-6, MOTION-1, MOTION-2"
+  pinkIsTheDecision:
+    rule: |
+      The one pink (`--accent`, `--offset-pop-pink`) is a FILL and a RING, never text. It fills the
+      decision a view is asking for (the primary or confirm action, the single toast or alert action),
+      a checked/selected/current state inside a control (Checkbox, Switch, SegmentedControl, the current
+      BottomNav pill, the current Pagination page, the selected Calendar day and tag), a real
+      measurement (Slider, Meter, Rating, Spinner), and the focus ring. Wherever Common would paint the
+      accent as TEXT — Text tone "accent", the SectionHeader eyebrow, the current tab label, Markdown
+      links (`--link`), a selected menu item, ListBox/Select option or DataTable row — the family reads
+      `--offset-pop-accent-text` instead (6.22:1 on the light canvas; the pink itself is 3.22:1). The
+      `Link` renderer keeps ink text and carries the pink only as its 2px underline.
+    evidence:
+      - "offset-pop/styles.css: --accent-soft-foreground and --link bound to --offset-pop-accent-text"
+      - "conformance.ts: ACCENT-1, TONE-3, SURFACE-4"
+  rowStates:
+    rule: |
+      Interactive rows (ListBox options, Select/ComboBox options, selectable DataTable rows) are their
+      own pointer and focus target: hover is the yellow wash (`--offset-pop-yellow` 32%), keyboard focus
+      a 2px pink ring at offset 0 on the row edge, and selected is the soft pink fill (`--accent-soft`,
+      theme-aware: blush-pink in light, plum in dark) with a pink leading edge and the `accentText`
+      label; forced colours keep a Highlight edge. A static row (`StaticStateRow`, `[data-grammar-row]`)
+      has no hover or focus treatment, and the seam between rows is one 2px line (Common's between-rows
+      edge repainted at the outline width).
+    evidence:
+      - "offset-pop/components-navigation.css: ListBox and DataTable row states"
+      - "offset-pop/components-forms.css: [data-grammar-popover] [data-grammar-option]"
+      - "offset-pop/styles.css: [data-grammar-row] + [data-grammar-row]"
+  departures:
+    - id: BOUNDARY-6-outline-plus-shadow
+      decisionForOwner: true
+      rule: BOUNDARY-6
+      commonReading: |
+        A top-level card is separated by elevation (`--shadow-surface`) instead of a line; the border
+        and the shadow are alternatives, and drawing both is a DOUBLE_OWNER.
+      familyReading: |
+        A `depth="top"` surface keeps the hard offset shadow AND the 2px ink outline (overlay surfaces,
+        DataTable and Calendar too). Forced colours drop the shadow and keep only the outline.
+      why: |
+        The hard shadow is a solid ink copy of the outline displaced by the offset, not a diffuse
+        elevation; without the outline the object reads as a floating block of colour, and the
+        outline-plus-offset is the signature above.
+      status: |
+        Recorded as family-owned evidence in `OFFSET_POP_FAMILY_EVIDENCE["BOUNDARY-6"]`. It is a
+        deliberate departure from the Common reading, and the family owner should confirm it as house
+        law (or narrow it, e.g. to top-level surfaces only) before a product review treats the
+        double edge as a defect.
+    - id: ACCENT-3-COLOR-3-single-pink
+      decisionForOwner: true
+      rule: "ACCENT-3 / COLOR-3"
+      commonReading: |
+        Selection, destination, command emphasis and focus stay distinguishable, and each survives with
+        colour removed.
+      familyReading: |
+        One pink fills the decision action, marks the selected/current state and draws the focus ring.
+        The family does NOT separate them by hue; it inherits both rules and relies on Common's
+        non-colour carriers: a fill on an action versus a fill inside a control, an outline for focus
+        (2px ring, offset .25rem, or 0 on a row), `aria-selected`/`aria-current` state attributes, the
+        soft-fill-plus-leading-edge for selection, and underline for destinations (Link: ink text with a
+        pink underline).
+      why: |
+        A second decision hue would dilute the family's single-accent look; distinguishability is
+        carried by geometry and state, which is what COLOR-3 measures once colour is removed.
+      status: |
+        ACCENT-3 and COLOR-3 stay INHERITED (no family evidence). The single-pink reading is a
+        deliberate family decision the owner should confirm: a product surface where a focused, a
+        selected and a primary element sit side by side must be checked with colour removed.
+  inherited: |
+    117 of the 150 Common rule ids are inherited unchanged, including the spacing, size and flow rules
+    (the family does not re-space) and BOUNDARY-3 (one line between rows: the family repaints Common's
+    seam, adds none).
+themeAndAccessibility:
+  supports:
+    - light
+    - explicit dark
+    - system dark
+    - forced colors
+    - focus-visible
+    - reduced motion
+  under: Offset Pop root
+  preserves: Common semantics
+  constraint: |
+    Cannot use palette or motion to change business truth: a neutral tone is never painted as success
+    or danger (TRUTH-1), and press travel carries no state.
+  darkTheme: |
+    A real dark palette, not an inversion: plum-black canvas, cream ink for outlines and text, near-black
+    shadow ink so the offset still reads, lighter candy-pink `accentText`; the semantic fills keep their
+    light values with the ink as foreground.
+  forcedColors: |
+    Pink becomes Highlight, the ink and every edge CanvasText, fills Canvas, and every shadow `none`;
+    current and selected states keep a Highlight edge or outline instead of the pink fill.
+  applicableUiRules:
+    - A11Y-1..4
+    - COLOR-5
+    - FOCUS-1..4
+    - MOTION-1..4
+    - STATE-1..5
+sourceBackedBehavior:
+  - id: overlays-keep-the-scope
+    observation: |
+      Dialog, AlertDialog, Drawer, Popover, DropdownMenu and the Select/ComboBox/DatePicker popovers
+      portal into the nearest Grammar root, so they carry the outline, the hard offset and the dark or
+      forced-colours palette of the root that opened them. The modal backdrop is a blush tint (72%) in
+      light and a pink-tinted near-black in explicit dark.
+  - id: sheets-throw-shadow-away-from-their-edge
+    observation: |
+      A right Drawer's shadow falls left, a left one's right, a bottom sheet's upward and a top sheet's
+      downward, so the shadow never points into the edge the sheet slides from.
+  - id: toasts-clear-each-shadow
+    observation: |
+      Stacked toasts are spaced by the shadow offset plus .5rem (1rem, .75rem at 40rem and below) so each
+      hard shadow clears the next toast (GAP-4). The single toast action fills pink.
+  - id: dock
+    observation: |
+      BottomNav is a raised dock: a 3px ink top edge (1.5x the outline), a half-offset upward hard
+      shadow, items at least 4rem tall, the current item a pink icon pill (3.25rem by 2rem) with an ink
+      outline and small hard shadow, badges yellow with an ink outline.
+  - id: fields
+    observation: |
+      Fields are ink-outlined boxes on the surface at the control radius; focus is the hard offset shadow
+      (ink, or critical while invalid) over a transparent 2px outline that forced colours turn into a
+      Highlight ring; error text mixes critical 65% with the ink to clear AA.
+  - id: narrow-viewports
+    observation: |
+      At 40rem and below only shadow geometry changes: the offset y and the surface radius shrink, and
+      DataTable and Calendar take a smaller shadow at 30rem. No hook, region or content is removed.
+gaps:
+  note: |
+    Recorded at the snapshot; recheck source before treating one as current. The generated list with
+    evidence is DNA.yaml `gaps`; Common-wide gaps are in common/DNA.yaml.
+  entries:
+    - components:
+        - BottomNav
+        - Toaster
+      missing: |
+        nothing reads the fixed BottomNav's `--starci-core-bottom-nav-offset`, so content padding above
+        the dock and a top placement for the Toaster are the app's to supply
+      evidence:
+        - packages/grammar/src/common/components-navigation.css
+        - packages/grammar/src/common/components-overlays.css
+    - components:
+        - Button
+        - BottomNav
+        - ListBox
+      missing: |
+        the press vector and the small chip shadow are literals (`0.25rem 0.25rem`,
+        `0.125rem 0.1875rem`), not DNA names, so they do not follow the narrow-viewport shadow drop
+      evidence:
+        - packages/grammar/src/offset-pop/styles.css
+        - packages/grammar/src/offset-pop/components-navigation.css
+openQuestions:
+  - id: confirm-boundary-6-departure
+    owner: family owner
+    question: |
+      Is the outline-plus-hard-offset on top-level surfaces (BOUNDARY-6 departure) house law for every
+      Offset Pop product, or should it be narrowed?
+  - id: confirm-single-pink
+    owner: family owner
+    question: |
+      Is one pink for action, selection, current and focus (ACCENT-3/COLOR-3 inherited, distinguished by
+      geometry and state only) accepted, or should selection/current move to a second hue from the
+      palette?

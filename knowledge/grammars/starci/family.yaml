@@ -2,17 +2,17 @@ schema: starci/knowledge-source@1
 id: grammar.starci.family
 title: StarCi Core family and DNA
 purpose: |
-  Family identity, CSS dependency direction, Core DNA ownership, theme/accessibility binding, and
-  source-backed gaps for StarCi Core. Snapshot observations — verify installed source before treating
-  any gap or API as current.
+  Family identity, CSS dependency direction, Core DNA ownership, theme/accessibility binding, what Core
+  paints for the renderers Common added in 0.5.0, and source-backed gaps for StarCi Core. Snapshot
+  observations — verify installed source before treating any gap or API as current.
 appliesTo:
   - grammar
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.4.13"
-  checkout: 41be722701c439e76910f80a8cbb65261da72e01
-  captured: "2026-09-05"
+  version: "0.5.0"
+  checkout: b6a13be97a9d1e15b7d3f628709158e81c744a2a
+  captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
   limitations: |
     Historical snapshot only. Before use, inspect the selected repository's manifest/lockfile,
@@ -26,7 +26,10 @@ identity:
   implements: Common contract
   notes: |
     StarCi Core implements the Common contract; it is not the parent of Common or of any other family.
-    CORE_GRAMMAR_COMPONENTS remains only a compatibility alias to COMMON_GRAMMAR_COMPONENTS.
+    CORE_GRAMMAR_COMPONENTS remains only a compatibility alias to COMMON_GRAMMAR_COMPONENTS, which holds
+    95 renderers at 0.5.0 (42 base, 20 forms, 14 overlays, 19 navigation). Core replaces only
+    GrammarRoot and extends nothing. `coreRuleConformance` inherits all 150 Common rule ids and claims
+    no family evidence.
   applicableUiRules:
     - TONE-1..3
     - ACCENT-1..5
@@ -36,15 +39,18 @@ identity:
     - PADDING-0..8
 cssDependency:
   direction: |
-    core/styles.css imports common/styles.css. Common supplies renderer anatomy, geometry, state
-    structure, responsive composition, and universal --grammar-* spacing. Core supplies only
-    family-scoped values and theme bindings. Common never imports Core; another family never imports Core.
+    core/styles.css imports common/styles.css, which imports Common's three component sheets
+    (components-forms.css, components-overlays.css, components-navigation.css). Common supplies renderer
+    anatomy, geometry, state structure, responsive composition, and universal --grammar-* spacing. Core
+    supplies only family-scoped values and theme bindings, and ships no component sheet of its own.
+    Common never imports Core; another family never imports Core.
   commonOwns:
     - renderer anatomy
     - geometry
     - state structure
     - responsive composition
     - universal --grammar-* spacing
+    - the 44px touch floor (form controls, BottomNav, TopBar trigger, Subnav toggle)
   coreOwns:
     - family-scoped values
     - theme bindings
@@ -52,9 +58,17 @@ dna:
   publishedBy: "@starci/grammar/core"
   publishes:
     - STARCI_CORE_DNA
-    - token names
-    - light/dark defaults
-    - earlier spacing aliases
+    - STARCI_CORE_SPACING_SCALE
+    - STARCI_CORE_TOKEN_NAMES
+    - STARCI_CORE_BAND_TOKEN_NAMES
+    - STARCI_CORE_TOKEN_DEFAULTS
+    - STARCI_CORE_DARK_TOKEN_DEFAULTS
+  values: |
+    Violet accent `#7547ff` (focus `#7248ff`) on a near-white canvas `oklch(97.02% 0.0015 354.13)` with
+    white surfaces; a soft diffuse elevation `0 8px 28px oklch(21.03% 0.0059 354.13 / 0.07)`; surface
+    radius 1rem, control radius .75rem, pill 999px; motion 180ms `cubic-bezier(0.2, 0, 0, 1)`. Dark is
+    its own palette (canvas `oklch(12% …)`, surface `oklch(21.03% …)`), not an inversion. Exact values
+    and the dark set are generated into DNA.yaml.
   bindsSemanticVariables:
     - canvas/background
     - surface
@@ -63,10 +77,15 @@ dna:
     - border/separator
     - accent/focus
     - success/warning/danger/info pairs
-    - fields
+    - fields (background surface, border transparent, placeholder muted, radius control)
     - radii
     - shadow
     - motion
+  doesNotBind:
+    - --accent-soft
+    - --accent-soft-foreground
+    - --link
+    - --field-shadow
   universalSpacingSource: Common
   universalSpacing:
     - COMMON_SPACING_SCALE
@@ -96,6 +115,10 @@ themeAndAccessibility:
   preserves: Common semantics
   constraint: |
     Cannot use palette or motion to change business truth.
+  overlays: |
+    Dialog, AlertDialog, Drawer, Popover, DropdownMenu and the Select/ComboBox/DatePicker popovers
+    portal into the nearest `.grammar-common-root`, so an overlay opened from inside `CoreGrammarRoot`
+    keeps Core's tokens, `data-grammar-theme` and the forced-colours mapping. Toaster renders in place.
   applicableUiRules:
     - A11Y-1..4
     - FOCUS-1..4
@@ -109,17 +132,40 @@ sourceBackedBehavior:
       The inner bounded frame becomes transparent/no-shadow, so the label is visually inside Core
       material. Heritage's symmetric test paints only its inner frame, keeping the label outside without
       creating a second contract.
+  - id: new-renderers-in-common-anatomy
+    observation: |
+      The 53 renderers added in 0.5.0 (forms, overlays, navigation) get no Core-specific rule: they are
+      Common anatomy painted through the semantic variables Core binds. A checked, selected or current
+      state fills with the violet `--accent`; overlay surfaces take `--surface` and the soft Core
+      elevation through `--shadow-surface`; the alert/toast tone comes from Common's
+      `--starci-core-overlay-tone` pointing at the matching semantic colour.
+  - id: fields-on-a-surface
+    observation: |
+      Core binds `--field-border: transparent` and `--field-background` to the surface colour. On the
+      canvas a field reads as a white fill; on a SurfaceCard (the same white) its box is drawn only by
+      `--field-shadow`, which Core does not bind — the host HeroUI theme's value, or none. Verify the
+      rendered field edge before placing a form directly on a top-level card.
   - id: button-no-destructive
     observation: |
-      ButtonVariant has no destructive/danger variant (CTA-4).
-  - id: no-modal-focus-containment
+      ButtonVariant has no destructive/danger variant (CTA-4). A destructive confirmation is an
+      `AlertDialog` with `tone="negative"`, not a red Button.
+  - id: modal-focus-containment
     observation: |
-      Common has no general modal focus-containment/restoration owner (FOCUS-3).
+      Since 0.5.0 Common owns modal focus containment and restoration: Dialog, AlertDialog and Drawer trap
+      focus, dismiss on Escape and (unless disabled) outside press, lock page scroll, hide the page from
+      assistive tech and return focus to the trigger (FOCUS-3). The 0.4.13 absence is closed.
+  - id: subnav-touch-floor
+    observation: |
+      Common's Subnav menu toggle takes the 44px floor (`--starci-core-control-min-size`, 2.75rem) in both
+      axes on a coarse pointer or at 40rem and below, so Core's Subnav meets the same touch minimum as the
+      form controls and BottomNav without a Core rule.
 gaps:
   note: |
     Capabilities recorded as absent at the snapshot, with historical source locations.
     Recheck actual installed source before recording a current gap in the .starciwork node; this list
-    is not the sole live gap inventory and does not trigger library edits.
+    is not the sole live gap inventory and does not trigger library edits. The generated list with
+    evidence is DNA.yaml `gaps`; Common-wide gaps (unpainted class hooks, the unread BottomNav offset,
+    stacking) are in common/DNA.yaml.
   entries:
     - components:
         - SurfaceCard
@@ -131,13 +177,6 @@ gaps:
       evidence:
         - packages/grammar/src/core/primitive/Label/index.tsx
         - packages/grammar/src/core/branch/SurfaceCard/index.tsx
-    - components:
-        - Common overlay owner
-      missing: |
-        Common publishes no general overlay or elevation prop
-      evidence:
-        - packages/grammar/src/core/branch/Tooltip/index.tsx
-        - packages/grammar/src/common/styles.css
     - components:
         - Badge
       missing: |
@@ -198,20 +237,32 @@ gaps:
     - components:
         - MediaFrame
       missing: |
-        MediaFrame publishes no loading or error prop and renders no state
+        MediaFrame publishes no loading or error prop and renders no state; the 0.5.0 `Image` primitive
+        does, so a picture that must show its own loading or failure is an `Image`
       evidence:
         - packages/grammar/src/core/primitive/MediaFrame/index.tsx
+        - packages/grammar/src/core/primitive/Image/index.tsx
     - components:
         - OtpInput
       missing: |
-        OtpInput publishes disabled and invalid (not the isDisabled/isError names) and no skeleton
-        input, so its unresolved state has no owner
+        OtpInput publishes disabled and invalid (not the isDisabled/isInvalid names the 0.5.0 form
+        controls use) and no skeleton input, so its unresolved state has no owner
       evidence:
         - packages/grammar/src/core/OtpInput.tsx
     - components:
         - OtpInput
       missing: |
-        OtpInput publishes no label, hint, or errorMessage slot; only describedBy links outside text,
-        so its visible identity has no Common owner
+        OtpInput publishes no label, description or errorMessage slot of its own; only id and describedBy
+        link outside text. Wrapping it in `Field` gives it the shared anatomy
       evidence:
         - packages/grammar/src/core/OtpInput.tsx
+        - packages/grammar/src/core/primitive/Field/index.tsx
+    - components:
+        - Core semantic bindings
+      missing: |
+        Core binds no --accent-soft, --accent-soft-foreground or --link, so the soft accent pairing,
+        links and the current BottomNav icon pill resolve from the host's HeroUI theme or Common's
+        fallbacks rather than from Core's violet
+      evidence:
+        - packages/grammar/src/core/styles.css
+        - packages/grammar/src/common/components-navigation.css
