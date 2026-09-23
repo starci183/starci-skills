@@ -35,6 +35,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import {
   openLedger, ledgerFileFor, machineFileFor, openMachine,
   newToken, JOB_STATUSES, reserveTwoPhase, transitionWorkflowToRunning,
@@ -173,6 +174,7 @@ const usage = (code) => {
   op-contract --job <job_id>  |  --workflow <id> --op <opId> [--attempt <n>]
   check    --job <job_id> (--checks '<json>' | --checks-file <path>)
   consume-report --job <job_id>
+  serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>]
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
   incident --workflow <id> --resolve <incidentId> [--detail <s>]
   finish   --workflow <id>`);
@@ -3380,6 +3382,28 @@ function cmdCheck(ledger, args, repo) {
   emit(out, `checks recorded for ${job.job_id} (op ${op}, attempt ${attempt})`, args.json);
 }
 
+/* ------------------------------------------------------------- serve-ask */
+// `serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>]`: launch the
+// owner-facing ask form (scripts/kernel/serve-ask.mjs) detached. A StarCi
+// Next Kernel held an ask-reserve for an hour (inc-2558dd227dfd): status told
+// it to re-serve with serve-ask.mjs, but its hard boundary allows mutations
+// only through api.mjs, so the owner never got a live form. The form itself
+// records ask-serving on bind; this verb only launches it for a real ask.
+function cmdServeAsk(ledger, args, repo) {
+  const db = ledger.db, workflowId = args.workflow;
+  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  const dispatchId = args.dispatch ?? null;
+  if (dispatchId && !db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId)) {
+    throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
+  }
+  const script = path.join(skillRoot, 'scripts', 'kernel', 'serve-ask.mjs');
+  const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
+  const child = spawn(process.execPath, argv, { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot });
+  child.unref();
+  const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/serve-ask.mjs' };
+  emit(out, `serve-ask launched for ${workflowId}${dispatchId ? ` dispatch ${dispatchId}` : ''} (pid ${out.pid}); status shows ask-serving once the form binds`, args.json);
+}
+
 /* -------------------------------------------------------- consume-report */
 // Kernel-facing: mark the job's reports row integrated so it is never read
 // as a live answer again.
@@ -3416,7 +3440,7 @@ async function main() {
     reconcile: ['job'], nudge: ['job'], observe: ['job'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
-    'consume-report': ['job'],
+    'consume-report': ['job'], 'serve-ask': ['workflow'],
     incident: [],
     finish: ['workflow'],
   };
@@ -3456,6 +3480,7 @@ async function main() {
       case 'op-contract': return cmdOpContract(ledger, args);
       case 'check': return cmdCheck(ledger, args, repo);
       case 'consume-report': return cmdConsumeReport(ledger, args);
+      case 'serve-ask': return cmdServeAsk(ledger, args, repo);
       case 'incident': return cmdIncident(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
     }

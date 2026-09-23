@@ -731,6 +731,19 @@ commands:
       - job-unknown / job-settled
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
 
+  serve-ask:
+    args: '--workflow <id> [--dispatch <id>] [--ttl <ms>]'
+    reads: 'the workflow row; with --dispatch, the reports row that filed that ask'
+    writes: >-
+      nothing itself: it launches scripts/kernel/serve-ask.mjs detached, which
+      binds the localhost form and appends ask-serving (ask-serving-expired on
+      --ttl, ask-answered on submit). It is how a Kernel clears
+      frontier.askReserveDispatches without leaving the api surface.
+    returns: '{ok:true, workflowId, dispatchId, pid, servedBy}'
+    refuses:
+      - workflow-unknown
+      - ask-unknown
+    usedBy: 'drive.wait — an ask-reserve frontier re-serves each askReserveDispatches entry'
   consume-report:
     args: '--job <job_id>'
     reads: 'the reports row for the job''s dispatch_id'
