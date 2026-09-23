@@ -1201,6 +1201,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 14:45 Tiến triển: nivo AUTH, WSPV, Modules xong scope.define, kernel đang dispatch bước kế; sn-work workspace.manage done (vá R2
   có tác dụng), chờ settle; mm-work prepare qua slice 1 (cutSetAuthority có tác dụng). Đóng lại terminal nền lạc term_6e3ea4dd (orphaned).
 
+- 14:50 Thầy quyết: StarCi Next FE dùng grammar core, brand mặc định như dashboard và subscriptions của StarCi Academy. Đã chuyển
+  nguyên văn cho kernel sn-base kèm nguồn tham chiếu starci-academy-fe (dashboard, subscriptions, globals.css, theme-context) để ghi
+  bản ghi brand, resolve inc-d456b748085a và chạy tiếp interface.scaffold.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
