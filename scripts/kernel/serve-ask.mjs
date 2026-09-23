@@ -23,6 +23,10 @@
 // when this run parks a replacement for an earlier ask of the same op and
 // subject (params.subject, else question.refs), and
 // `ask-answered` on submission.
+//
+// On bind the owner is also told on Telegram when config.yaml
+// connectors.telegram is set up (scripts/connectors/telegram.mjs notifyAsk):
+// the question, its options and the form's link on the public gateway host.
 
 import fs from 'node:fs';
 import http from 'node:http';
@@ -37,6 +41,7 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
 import { loadConfig, activeDelegation } from '../../engine/config.mjs';
+import { notifyAsk } from '../connectors/telegram.mjs';
 
 // The form speaks the owner's language (config.yaml `language`). Unknown
 // languages fall back to English; the op writes the question itself in the
@@ -659,6 +664,11 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
       kind: 'ask-serving', payload: { dispatchId: report.dispatch_id, url, pid: process.pid, fields: { files: fields.files, vars: fields.vars }, ttlMs: ttl },
     });
     console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, url, port: bound, ttlMs: ttl }));
+    // The one Telegram send point (docs/connectors.md): the owner learns of the
+    // ask, with its public gateway link, the moment the form binds. It never
+    // throws and a missing token or chat id is one stderr line, so the form
+    // serves either way; a --review form asks nothing and sends nothing.
+    if (!readonly) notifyAsk({ ledgerFile: file, workflowId: args.workflow, dispatchId: report.dispatch_id }).catch(() => {});
   });
   tryNext();
   setTimeout(() => {

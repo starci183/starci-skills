@@ -40,6 +40,8 @@ Optional keys:
 - `allocation.preferredProvider` — `null` for automatic capacity or one declared provider id for a bounded
   preference; this never forms a fallback chain
 - `debug` — boolean
+- `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
+  all off by default; secrets are named by env var, never stored (docs/connectors.md)
 
 ## Kernel group
 

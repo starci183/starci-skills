@@ -43,8 +43,135 @@ export function parallelGear(config=loadConfig()){
   validateConfig(config);
   return config?.parallel?.gear??defaultParallelGear();
 }
+/**
+ * config.yaml `connectors` — the owner's public ask channel (docs/connectors.md). Everything defaults off.
+ * Secrets never live here: `tokenEnv`/`botTokenEnv` NAME the environment variable holding the secret
+ * (or `<NAME>_FILE` pointing at a custody file); a value that is not an env var name is refused, so a
+ * pasted token fails closed instead of landing in a plain-text file.
+ */
+export const CLOUDFLARE_MODES=['off','quick','named'];
+/** The serve-ask port band (scripts/kernel/serve-ask.mjs PORT_BASE..+PORT_SCAN); the gateway stays outside it. */
+export const ASK_PORT_BAND=[6969,7069];
+export const CONNECTOR_DEFAULTS=Object.freeze({
+  secretsFile:null,
+  repos:[],
+  gateway:{port:7070},
+  cloudflare:{mode:'off',tunnel:null,credentialsFile:null,tokenEnv:'CLOUDFLARE_TUNNEL_TOKEN',hostname:null,access:false},
+  telegram:{enabled:false,botTokenEnv:'TELEGRAM_BOT_TOKEN',chatId:null,exposeCredentialAsks:false},
+});
+const ENV_NAME=/^[A-Z_][A-Z0-9_]{0,63}$/;
+const HOSTNAME=/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+const TUNNEL_REF=/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+const CHAT_ID=/^(?:-?\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$/;
+const SECRET_KEYS=['token','tunnelToken','botToken','secret','apiToken','password'];
+function validateConnectors(connectors){
+  if(connectors===null)return;
+  const bad=message=>{throw Error(`Invalid config.yaml: connectors${message}`);};
+  if(!plain(connectors))bad(' must be {secretsFile?, repos?, gateway?, cloudflare?, telegram?} or null.');
+  const closed=(node,where,keys)=>{
+    if(!plain(node))bad(`.${where} must be a mapping.`);
+    for(const key of Object.keys(node)){
+      if(SECRET_KEYS.includes(key))bad(`.${where}.${key}: secrets never live in config.yaml — set the environment variable the *Env key names instead.`);
+      if(!keys.includes(key))bad(`.${where} has unknown key ${key} (allowed: ${keys.join(', ')}).`);
+    }
+  };
+  closed(connectors,'',['secretsFile','repos','gateway','cloudflare','telegram']);
+  if(connectors.secretsFile!==undefined&&connectors.secretsFile!==null&&(typeof connectors.secretsFile!=='string'||!connectors.secretsFile.trim()))bad('.secretsFile must be a dotenv file path (relative to the skill root) or null.');
+  if(connectors.repos!==undefined&&(!Array.isArray(connectors.repos)||connectors.repos.some(repo=>typeof repo!=='string'||!repo.trim())))bad('.repos must be a list of repository paths.');
+  if(connectors.gateway!==undefined){
+    closed(connectors.gateway,'gateway',['port']);
+    const port=connectors.gateway.port;
+    if(port!==undefined&&(!Number.isInteger(port)||port<1024||port>65535||(port>=ASK_PORT_BAND[0]&&port<=ASK_PORT_BAND[1])))
+      bad(`.gateway.port must be an integer port in 1024..65535 outside the serve-ask band ${ASK_PORT_BAND.join('..')}.`);
+  }
+  const envName=(where,value)=>{if(value!==undefined&&(typeof value!=='string'||!ENV_NAME.test(value)))bad(`.${where} must name an environment variable (UPPER_SNAKE), never hold the secret itself.`);};
+  if(connectors.cloudflare!==undefined){
+    const cf=connectors.cloudflare;
+    closed(cf,'cloudflare',['mode','tunnel','credentialsFile','tokenEnv','hostname','access']);
+    if(cf.mode!==undefined&&!CLOUDFLARE_MODES.includes(cf.mode))bad(`.cloudflare.mode must be one of ${CLOUDFLARE_MODES.join(' | ')}.`);
+    envName('cloudflare.tokenEnv',cf.tokenEnv);
+    if(cf.hostname!==undefined&&cf.hostname!==null&&(typeof cf.hostname!=='string'||!HOSTNAME.test(cf.hostname)))bad('.cloudflare.hostname must be a bare hostname (no scheme, no path) or null.');
+    if(cf.access!==undefined&&typeof cf.access!=='boolean')bad('.cloudflare.access must be true or false.');
+    if(cf.tunnel!==undefined&&cf.tunnel!==null&&(typeof cf.tunnel!=='string'||!TUNNEL_REF.test(cf.tunnel)))bad('.cloudflare.tunnel must be the named tunnel UUID (or name) or null.');
+    if(cf.credentialsFile!==undefined&&cf.credentialsFile!==null&&(typeof cf.credentialsFile!=='string'||!cf.credentialsFile.trim()))bad('.cloudflare.credentialsFile must be the tunnel credentials JSON path or null.');
+    if(cf.credentialsFile&&!cf.tunnel)bad('.cloudflare.credentialsFile needs cloudflare.tunnel (the tunnel UUID the credentials belong to).');
+    if(cf.mode==='named'&&!cf.hostname)bad('.cloudflare.mode named needs cloudflare.hostname (the public hostname routed to the gateway).');
+    if(cf.mode==='quick'&&(cf.tunnel||cf.credentialsFile))bad('.cloudflare.mode quick runs no named tunnel; tunnel/credentialsFile are for mode named.');
+    if(cf.mode==='quick'&&cf.hostname)bad('.cloudflare.mode quick gets a random trycloudflare.com hostname; set hostname only for mode named.');
+  }
+  if(connectors.telegram!==undefined){
+    const tg=connectors.telegram;
+    closed(tg,'telegram',['enabled','botTokenEnv','chatId','exposeCredentialAsks']);
+    if(tg.enabled!==undefined&&typeof tg.enabled!=='boolean')bad('.telegram.enabled must be true or false.');
+    envName('telegram.botTokenEnv',tg.botTokenEnv);
+    if(tg.chatId!==undefined&&tg.chatId!==null&&!((Number.isSafeInteger(tg.chatId))||(typeof tg.chatId==='string'&&CHAT_ID.test(tg.chatId))))
+      bad('.telegram.chatId must be a numeric chat id, an @channel name, or null.');
+    if(tg.exposeCredentialAsks!==undefined&&typeof tg.exposeCredentialAsks!=='boolean')bad('.telegram.exposeCredentialAsks must be true or false.');
+    if(tg.enabled===true&&(tg.chatId===undefined||tg.chatId===null))bad('.telegram.enabled needs telegram.chatId.');
+  }
+}
+/**
+ * The secret an env var NAME resolves to: `env[name]`, else the contents of the file `env[name + '_FILE']`
+ * points at (the custody pointer convention). Returns null when neither is set. Callers pass the value to
+ * the one API that needs it and never print it.
+ */
+/** Parse a dotenv file (KEY=VALUE lines, # comments, optional export/quotes). An absent file is {}. */
+export function readDotenv(file){
+  let text='';try{text=fs.readFileSync(file,'utf8');}catch{return {};}
+  const out={};
+  for(const line of text.split(/\r?\n/)){
+    const m=line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if(!m)continue;
+    let value=m[2];
+    if(value.length>=2&&(value[0]==='"'||value[0]==="'")&&value.at(-1)===value[0])value=value.slice(1,-1);
+    out[m[1]]=value;
+  }
+  return out;
+}
+/** The dotenv file connectors.secretsFile names, resolved against the skill root; null when unset. */
+export const connectorSecretsFile=(config,root=configRoot)=>{const file=config?.connectors?.secretsFile;return typeof file==='string'&&file.trim()?path.resolve(root,file):null;};
+/**
+ * The environment the connectors resolve secrets from: connectors.secretsFile's values under the process
+ * environment (a real env var wins). It holds secrets — hand it to connectorSecret, never print it.
+ */
+export function connectorEnv(config,env=process.env,root=configRoot){const file=connectorSecretsFile(config,root);return file?{...readDotenv(file),...env}:env;}
+export function connectorSecret(name,env=process.env){
+  if(typeof name!=='string'||!ENV_NAME.test(name))return null;
+  const direct=typeof env[name]==='string'?env[name].trim():'';
+  if(direct)return direct;
+  const pointer=typeof env[`${name}_FILE`]==='string'?env[`${name}_FILE`].trim():'';
+  if(!pointer)return null;
+  try{const value=fs.readFileSync(pointer,'utf8').trim();return value||null;}catch{return null;}
+}
+/**
+ * The normalized `connectors` block: defaults filled in, the secrets' PRESENCE (booleans, never values),
+ * whether each connector is ready to run, and the owner-facing warnings the security posture earns.
+ */
+export function connectorsConfig(config=loadConfig(),env=process.env,root=configRoot){
+  validateConfig(config);
+  env=connectorEnv(config,env,root);
+  const raw=plain(config?.connectors)?config.connectors:{},d=CONNECTOR_DEFAULTS;
+  const cloudflare={...d.cloudflare,...(raw.cloudflare??{})},telegram={...d.telegram,...(raw.telegram??{})};
+  if(cloudflare.credentialsFile)cloudflare.credentialsFile=path.resolve(root,cloudflare.credentialsFile.replace(/^~(?=[\\/])/,env.USERPROFILE??env.HOME??'~'));
+  cloudflare.tokenPresent=connectorSecret(cloudflare.tokenEnv,env)!==null;
+  cloudflare.credentialsPresent=Boolean(cloudflare.credentialsFile&&fs.existsSync(cloudflare.credentialsFile));
+  cloudflare.auth=cloudflare.mode!=='named'?null:cloudflare.credentialsFile?'credentials-file':'token';
+  cloudflare.publicBase=cloudflare.mode==='named'?`https://${cloudflare.hostname}`:null;
+  telegram.chatId=telegram.chatId===null?null:String(telegram.chatId);
+  telegram.botTokenPresent=connectorSecret(telegram.botTokenEnv,env)!==null;
+  telegram.configured=telegram.enabled===true&&telegram.chatId!==null&&telegram.botTokenPresent;
+  const warnings=[];
+  if(cloudflare.mode==='quick')warnings.push('cloudflare.mode quick: the ask link is public and unauthenticated — anyone holding the URL can open and answer the form; the hostname changes on every restart.');
+  if(cloudflare.mode==='named'&&!cloudflare.access)warnings.push(`cloudflare.access is false: ${cloudflare.hostname} is not fronted by Cloudflare Access, so the nonce URL is the only credential.`);
+  if(cloudflare.auth==='credentials-file'&&!cloudflare.credentialsPresent)warnings.push(`cloudflare.credentialsFile ${cloudflare.credentialsFile} does not exist.`);
+  if(cloudflare.auth==='token'&&!cloudflare.tokenPresent)warnings.push(`cloudflare.mode named: the tunnel token is not set — export ${cloudflare.tokenEnv} (or ${cloudflare.tokenEnv}_FILE).`);
+  if(telegram.enabled&&!telegram.botTokenPresent)warnings.push(`telegram.enabled: the bot token is not set — export ${telegram.botTokenEnv} (or ${telegram.botTokenEnv}_FILE).`);
+  if(telegram.exposeCredentialAsks)warnings.push('telegram.exposeCredentialAsks is true: credential asks are posted as public links; Telegram cloud chats are not end-to-end encrypted.');
+  return {secretsFile:connectorSecretsFile(config,root),repos:[...(raw.repos??d.repos)],gateway:{...d.gateway,...(raw.gateway??{})},cloudflare,telegram,warnings};
+}
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  if(config?.connectors!==undefined)validateConnectors(config.connectors);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){

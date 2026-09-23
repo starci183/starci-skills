@@ -34,3 +34,4 @@ packages/**/storybook-static/
 
 # Scratch space for throwaway experiments: use it freely, it is never committed.
 /ex-testing/
+/.secrets/

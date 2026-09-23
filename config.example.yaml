@@ -65,3 +65,39 @@ models:
     planner: sol-opus
     kernelManager: sol-opus
     validator: sol-opus
+# connectors — the owner's public ask channel (docs/connectors.md). Everything is off by default.
+# One local gateway (scripts/connectors/ask-gateway.mjs) fronts every serve-ask form; a Cloudflare
+# tunnel (scripts/connectors/tunnel.mjs) publishes the gateway; when serve-ask binds a form, the
+# kernel's ask path sends the owner one Telegram message (scripts/connectors/telegram.mjs) with the
+# question, its options and the public link. Telegram carries owner asks only.
+# SECRETS NEVER GO IN THIS FILE: tokenEnv/botTokenEnv NAME an environment variable holding the token
+# (or <NAME>_FILE pointing at a custody file); a value that is not an UPPER_SNAKE env var name is refused.
+#   secretsFile: a gitignored dotenv file (relative to this skill root) whose KEY=VALUE lines count as
+#     environment for the *Env keys; a real environment variable wins. Absent file = no values.
+#   repos: ledger-owner repository roots whose asks go public, relative to the source root (the
+#     directory holding this skill) or absolute. [] = the source root plus every .workspaces project owner.
+#   gateway.port: the one fixed local port the tunnel points at (outside the 6969..7069 form band).
+#   cloudflare.mode: off | quick | named.
+#     quick — `cloudflared tunnel --url`, a random https://*.trycloudflare.com host, no account, no auth,
+#       a new host on every restart. Good for decisions only.
+#     named — a fixed `hostname`, authenticated one of two ways: `tunnel` (UUID) + `credentialsFile`
+#       (the JSON `cloudflared tunnel create` wrote; the manager writes its own ingress config mapping
+#       hostname -> the gateway and never reads ~/.cloudflared/config.yml), or a remotely managed tunnel
+#       token in `tokenEnv` (its public hostname is routed to http://127.0.0.1:<gateway.port> in the
+#       Cloudflare dashboard).
+#   cloudflare.access: whether a Cloudflare Access application guards `hostname` (informational; false
+#     prints a warning). Recommended for anything beyond yes/no decisions.
+#   telegram.enabled / chatId: the owner's chat with the bot (BotFather token in botTokenEnv). Send the
+#     bot /start, then `node scripts/connectors/telegram.mjs discover-chat` prints the chat id.
+#   telegram.exposeCredentialAsks: false keeps a credential/secret ask off the public link — the message
+#     says to answer it on this machine and carries only the localhost link, and the gateway refuses it.
+connectors:
+  secretsFile: .secrets/connectors.env
+  repos: []
+  gateway: {port: 7070}
+  cloudflare: {mode: off, tunnel: null, credentialsFile: null, tokenEnv: CLOUDFLARE_TUNNEL_TOKEN, hostname: null, access: false}
+  telegram:
+    enabled: false
+    botTokenEnv: TELEGRAM_BOT_TOKEN
+    chatId: null
+    exposeCredentialAsks: false
