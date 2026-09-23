@@ -343,6 +343,8 @@ calls:
       carries Coordinator -> Monitor notices (launcher `notify`). Orca fences a terminal to the one Run it consumes
       (consumer_fenced), so parent-Run mail never reaches a Monitor bound to its nested Run; typed input does. A busy
       agent queues the text and Orca answers agent_prompt_stalled, so delivery is proven from the screen, not this receipt.
+      agent_prompt_blocked means Orca typed the text into an idle agent prompt but refused the Enter sent with it;
+      scripts/api/orca/terminal-send.mjs follows it with one Enter-only send (receipt enterRetry).
   dispatch:
     command: orchestration dispatch
     kind: mutation

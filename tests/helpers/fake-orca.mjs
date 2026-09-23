@@ -229,10 +229,14 @@ else if (verb === 'terminal send') {
   if (r && text) { r.sent = true; r.prompt = text; if (stuckPaste) r.staged = true; }
   else if (r && !text && argv.includes('--enter')) {
     r.enters = (r.enters || 0) + 1;
-    if (stuckPaste === 'enter' || stuckPaste === 'inline-enter') r.staged = false;
+    if (stuckPaste === 'enter' || stuckPaste === 'inline-enter' || stuckPaste === 'blocked') r.staged = false;
     if (!r.sent) r.sent = true;
   }
-  state.sends += 1; save(); out({ ok: true, result: { sent: true } });
+  state.sends += 1; save();
+  // STARCI_FAKE_ORCA_STUCK_PASTE=blocked: Orca types the text but refuses the
+  // Enter that came with it (agent_prompt_blocked); an Enter-only send submits.
+  if (stuckPaste === 'blocked' && text && argv.includes('--enter')) fail({ ok: false, error: { code: 'agent_prompt_blocked', message: 'agent_prompt_blocked' } });
+  out({ ok: true, result: { sent: true } });
 }
 else if (verb === 'terminal close') {
   const handle = arg('terminal');
