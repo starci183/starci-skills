@@ -478,7 +478,7 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
       VALUES('bd-tax',?,'business.decide',1,0,'op','op',?,'failed',?,?,?)`).run(wf,json({opId:'business.decide'}),json({verdict:'awaiting-owner',askDispatchId:'ctx_tax'}),at,at);
     ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,'ctx_tax','business.decide',1,0,'ask',?,?,?)`)
       .run(wf,json({outcome:'ask',summary:'tax',question:{text:'tax?'}}),at,at);
-    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x'}});
+    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x',pid:process.pid}});
   });
   const frontier=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r).frontier;};
   assert.equal(frontier().state,'awaiting-owner','a live form waits on the owner');
