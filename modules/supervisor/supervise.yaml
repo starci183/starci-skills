@@ -108,8 +108,10 @@ loop:
         say what changed, what was patched, what restarted, and render owner-gate URLs
         verbatim with inline artifacts. A quiet cycle still gets a one-line "no change"
         note so the owner knows the loop is alive; silence reads as a dead loop.
-        Every cycle also sends the owner's Telegram progress report (owner, 2026-09-23):
-        `node scripts/supervisor/progress-report.mjs --send`. It spells each running workflow
+        The Telegram progress report is ON DEMAND only: the owner types /status to the bot and
+        the bridge sends it (owner, 2026-09-24: "gõ status để xem thì supervisor không báo 10p/
+        lần nữa"). A cycle never runs `progress-report.mjs --send` on its own; the supervisor
+        sends it only when the owner asks for it in chat. The report spells each running workflow
         out in Vietnamese: goal, every leg by name (done / running with duration / waiting /
         not yet), the latest report, pending questions with their response.<domain> links,
         owner gates, open runtime defects and a finish time. A terse table was rejected
