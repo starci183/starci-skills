@@ -1141,6 +1141,8 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 
 - 12:33 Yên. Collab gateway đang chạy (7/8). WSPV worker sửa F3 đang chạy. Modules, AUTH chờ thầy; hai ask sống. Không vá.
 
+- 12:43 Yên. Collab gateway và WSPV worker F3 vẫn active có output. Modules, AUTH chờ thầy. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
