@@ -41,6 +41,9 @@ export type NavigationFeatureNavProps = Omit<ComponentPropsWithoutRef<"header">,
  * The composition owns the single outer separator: the primary and feature
  * layers are intentionally continuous. Deeper responsive navigation belongs
  * to the independent Subnav branch instead of becoming a third navbar layer.
+ *
+ * Landmark rule: this `<header>` is the page's one banner. In `WorkspaceShell`'s `header` slot the
+ * shell yields its own `<header>` for a plain `div`, so the banner is never nested or duplicated.
  */
 export const NavigationFeatureNav = ({
     identity,

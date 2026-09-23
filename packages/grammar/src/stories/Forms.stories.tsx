@@ -61,12 +61,9 @@ export const Input: Story = {
   ),
 };
 
-/** OtpInput has no label prop: the consumer names it with a `<label for>` (and `describedBy` for errors). */
-const LabelledOtp = ({ id, label, ...props }: { readonly id: string; readonly label: string } & Omit<G.OtpInputProps, 'id' | 'name'>) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-    <label htmlFor={id}>{label}</label>
-    <G.OtpInput id={id} name={id} {...props} />
-  </div>
+/** OtpInput's `label` names the slot group and the input; `describedBy` wires the error text. */
+const LabelledOtp = ({ id, ...props }: { readonly id: string; readonly label: string } & Omit<G.OtpInputProps, 'id' | 'name'>) => (
+  <G.OtpInput id={id} name={id} {...props} />
 );
 
 export const OtpInput: Story = {

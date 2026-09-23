@@ -1,4 +1,5 @@
 import { Label as HeroLabel, Meter as HeroMeter } from "@heroui/react"
+import type { ComponentPropsWithRef } from "react"
 import type { PresentationState } from "../../../common/state.js"
 import { vendorStatusFor } from "../../overlayScope.js"
 
@@ -19,9 +20,16 @@ export type MeterProps = {
 /**
  * ATOM - `Meter`: a static reading inside a known range (`role="meter"`).
  *
+ * The role is exactly `meter` (ARIA 1.2), never React Aria's `"meter progressbar"` fallback list:
+ * validators resolve a role list to an unsupported token and reject the `aria-value*` attributes
+ * (axe 4.13 `aria-allowed-attr`), while every current engine exposes `meter` (Chromium, WebKit
+ * and Gecko map it to a level indicator / progress bar natively).
+ *
  * Unlike `Progress`, a meter is not work moving toward completion. Tone is a PresentationState and is
  * echoed on `data-grammar-tone` for family treatments.
  */
+const renderMeterRoot = (domProps: ComponentPropsWithRef<"div">) => <div {...domProps} role="meter" />
+
 export const Meter = ({
     label,
     value,
@@ -45,6 +53,7 @@ export const Meter = ({
             color={status === "default" ? "accent" : status}
             size="md"
             className="starci-core-meter"
+            render={renderMeterRoot}
         >
             {isLabelHidden ? null : (
                 <span className="starci-core-meter-header">

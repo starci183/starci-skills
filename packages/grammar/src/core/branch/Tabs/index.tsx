@@ -82,7 +82,7 @@ export const Tabs = (props: TabsProps) => {
     if (!isClientReady) return <div aria-hidden="true" className={tabsFrameClassName} data-contract={frameContract} data-grammar-tabs="true" data-grammar-tabs-client="pending" data-grammar-tabs-inset={inset} style={{ minHeight: "3rem" }} />
 
     return <div ref={frameRef} className={tabsFrameClassName} data-contract={frameContract} data-grammar-tabs="true" data-grammar-tabs-client="ready" data-grammar-tabs-inset={inset} data-grammar-tab-labels={props.labelVisibility ?? "responsive"}>
-        <HorizontalScrollRegion className={tabsScrollClassName} overflow="needed" data-grammar-tabs-overflow="scroll" hideScrollBar>
+        <HorizontalScrollRegion className={tabsScrollClassName} overflow="needed" data-grammar-tabs-overflow="scroll" hideScrollBar isFocusable={false}>
             <HeroTabs
                 variant="secondary"
                 selectedKey={props.selectedKey}

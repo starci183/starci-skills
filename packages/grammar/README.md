@@ -192,6 +192,16 @@ renderers with prop-compatible versions and add extensions whose names don't col
   an edge or outline, not a fill.
 - **Motion.** Under `prefers-reduced-motion: reduce`, Common's component anatomy drops its
   animations, and Offset Pop also removes its press travel and every other transform.
+- **Structure.** One banner per page, owned by the app bar: `TopBar` / `NavigationFeatureNav`
+  in `WorkspaceShell`'s `header` slot makes the shell's wrapper a plain `div`
+  (`headerLandmark="slot"`, automatic for those two; pass it for an app-owned `<header>`), and
+  `SectionHeader` is never a `<header>`. Surface names (`SurfaceCard`, `SurfaceListCard`,
+  `SurfaceAccordionCard`) default to `h3`; pass `headingLevel` (2-6) so the outline never skips a
+  level. `SurfaceListCard`'s collection is the list (`<ul>`, or `role="list"` when scrolling), so
+  its rows are `<li>`; use `empty` for an empty-state notice. Every scroll owner that holds
+  non-focusable content (scroll regions, the Rail body, code and table frames) is a named
+  `tabIndex=0` region. A fixed `BottomNav` publishes `--starci-core-bottom-nav-offset`, which the
+  outermost page container (or the Footer) and a bottom Toaster read.
 - **States.** `PRESENTATION_STATES` (`neutral`, `informative`, `affirmative`, `cautionary`,
   `negative`, `pending`, `unavailable`) is the render-neutral state vocabulary. Components stamp
   it as `data-grammar-*` hooks for family CSS.

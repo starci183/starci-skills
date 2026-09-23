@@ -101,6 +101,28 @@
         flex: none;
     }
 
+    /*
+     * Keyboard-reachable scroll owners (VerticalScrollRegion / HorizontalScrollRegion when focusable,
+     * the Rail body, fenced code and Markdown table frames) draw the same inset focus ring the chat
+     * scroll owners use, so a Tab stop that scrolls is never invisible.
+     */
+    [data-grammar-scroll-region][tabindex="0"]:focus-visible,
+    .starci-core-horizontal-scroll-region[tabindex="0"]:focus-visible,
+    .starci-core-rail-body[tabindex="0"]:focus-visible,
+    .starci-core-fenced-code-block pre[tabindex="0"]:focus-visible,
+    .starci-core-markdown-table-frame[tabindex="0"]:focus-visible {
+        outline: 2px solid var(--focus, var(--starci-core-focus, Highlight));
+        outline-offset: -2px;
+    }
+
+    /* OtpInput with a drawn label: the label stacks above the slot strip, which keeps its own scroll. */
+    .starci-core-otp-field {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
     .starci-core-visually-hidden {
         position: absolute;
         width: 1px;
@@ -678,6 +700,13 @@
     .starci-core-owned-collection {
         width: 100%;
         min-width: 0;
+    }
+
+    /* The collection IS the list (`<ul role="list">`, or the scroll region with role="list"): no UA indent or bullets. */
+    .starci-core-owned-collection:is(ul, ol, [role="list"]) {
+        margin: 0;
+        padding: 0;
+        list-style: none;
     }
 
     /* A verdict list is flush inside its shell; the shell already owns the corner. */

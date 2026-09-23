@@ -68,6 +68,18 @@ export const SurfaceListCard: Story = {
           <G.StaticStateRow item={{ id: 'l', label: 'Loading row', state: 'pending' }} />
         </G.SurfaceListCard>
       </State>
+      <State label="Empty (notice, not a list)" direction="column">
+        <G.SurfaceListCard label="Saved" empty={<G.EmptyNotice message="Nothing saved yet." description="Saved lessons appear here." />} />
+      </State>
+      <State label="Contained scroll (focusable list)" direction="column">
+        <div style={{ height: 160, display: 'flex', flexDirection: 'column' }}>
+          <G.SurfaceListCard label="History" isScrollable>
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+              <G.StaticStateRow key={day} item={{ id: day, label: day, description: 'One lesson', state: 'affirmative' }} />
+            ))}
+          </G.SurfaceListCard>
+        </div>
+      </State>
     </Matrix>
   ),
 };

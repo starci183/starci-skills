@@ -26,8 +26,8 @@ export default meta;
 
 type Story = StoryObj;
 
-const Placeholder = ({ label, height = 120 }: { readonly label: string; readonly height?: number }) => (
-  <G.SurfaceCard label={label}>
+const Placeholder = ({ label, height = 120, headingLevel }: { readonly label: string; readonly height?: number; readonly headingLevel?: G.SurfaceHeadingLevel }) => (
+  <G.SurfaceCard label={label} {...(headingLevel === undefined ? {} : { headingLevel })}>
     <div style={{ minHeight: height }}><G.Text tone="muted">{label} content</G.Text></div>
   </G.SurfaceCard>
 );
@@ -217,7 +217,8 @@ export const WorkspaceShell: Story = {
         <G.PageContainer>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem 0' }}>
             <G.SectionHeader title="Lessons" description="Everything in this workspace." level={1} />
-            <Placeholder label="Primary" height={240} />
+            {/* The page title is an h1, so the first card under it names itself at rank 2. */}
+            <Placeholder label="Primary" height={240} headingLevel={2} />
           </div>
         </G.PageContainer>
       }

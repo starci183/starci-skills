@@ -25,7 +25,12 @@ export type StaticStateRowProps = {
     readonly item: StaticStateRowData
 }
 
-/** One non-interactive, product-neutral row in a Core-owned static collection. */
+/**
+ * One non-interactive, product-neutral row in a Core-owned static collection.
+ *
+ * It is an `<li>`: render it inside a list - `SurfaceListCard` (whose collection is the list) or an
+ * app-owned `<ul>`/`<ol>` - never loose, where it would be a list item without a list.
+ */
 export const StaticStateRow = (props: StaticStateRowProps) => {
     const item = props.item
     const state = item.state ?? "neutral"

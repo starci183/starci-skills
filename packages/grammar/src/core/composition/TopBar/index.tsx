@@ -32,6 +32,9 @@ export type TopBarProps = Omit<ComponentPropsWithoutRef<"header">, "children" | 
  * The application bar (`<header>`, the banner landmark at page level): brand, inline navigation,
  * actions and a menu trigger that replaces the inline navigation below 48rem. The trigger reports
  * `aria-expanded`; the drawer it opens stays app/overlay-owned.
+ *
+ * Landmark rule: a page has ONE banner, and the app bar owns it. Hosted in `WorkspaceShell`'s
+ * `header` slot, the shell yields (its wrapper becomes a plain `div`) so the banner is never nested.
  */
 export const TopBar = ({ brand, navigation, actions, menu, position = "sticky", className, ...headerProps }: TopBarProps) => (
     <header

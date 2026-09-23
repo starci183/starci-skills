@@ -10,6 +10,12 @@ export type MarkdownArticleProps = {
 type FencedCodeBlockFrameProps = {
     readonly language?: string
     readonly action?: ReactNode
+    /**
+     * Accessible name of the scrolling code region (e.g. "Install command"). Defaults to
+     * `language`. Authored code scrolls inline and is plain text, so its `<pre>` is a Tab stop
+     * (WCAG 2.1.1); a name makes it a `role="region"` a screen reader can announce.
+     */
+    readonly label?: string
 }
 
 type AuthoredCodeProps = {
@@ -26,7 +32,15 @@ export type FencedCodeBlockProps = FencedCodeBlockFrameProps & (AuthoredCodeProp
 
 export type MarkdownTableFrameProps = {
     readonly children: ReactNode
+    /** Accessible name of the scrolling frame; with it the frame is a `role="region"`. */
+    readonly label?: string
 }
+
+/** Keyboard reachability for an inline-scrolling reading frame whose content is plain text. */
+const scrollFrameProps = (label: string | undefined) => ({
+    tabIndex: 0,
+    ...(label === undefined ? {} : { role: "region", "aria-label": label }),
+})
 
 /** Own the business-neutral reading rhythm for one semantic Markdown document. */
 export const MarkdownArticle = (props: MarkdownArticleProps) => (
@@ -41,7 +55,7 @@ export const MarkdownArticle = (props: MarkdownArticleProps) => (
 
 /** Own bounded code overflow while allowing a caller-supplied neutral action such as Copy. */
 export const FencedCodeBlock = (props: FencedCodeBlockProps) => {
-    const body = "children" in props ? props.children : <pre><code>{props.code}</code></pre>
+    const body = "children" in props ? props.children : <pre {...scrollFrameProps(props.label ?? props.language)}><code>{props.code}</code></pre>
     return (
         <div
             className={fencedCodeBlockClassName}
@@ -63,6 +77,7 @@ export const MarkdownTableFrame = (props: MarkdownTableFrameProps) => (
     <div
         className={markdownTableFrameClassName}
         data-contract="OVERFLOW-4"
+        {...scrollFrameProps(props.label)}
     >
         {props.children}
     </div>

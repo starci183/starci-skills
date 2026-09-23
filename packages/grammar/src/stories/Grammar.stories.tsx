@@ -160,6 +160,7 @@ export const TasksScreen: Story = {
             </SurfaceCard>
             <SurfaceListCard
               label="All tasks"
+              headingLevel={2}
               fact="4 tasks"
               footer={<Text tone="muted">Completed tasks stay here until you delete them.</Text>}
             >
@@ -221,9 +222,12 @@ export const EmptyState: Story = {
               <Heading level={1}>Your tasks</Heading>
               <Text tone="muted">A little progress, every day.</Text>
             </div>
-            <SurfaceListCard label="All tasks" fact="0 tasks">
-              <EmptyNotice message="No tasks yet." description="Add the first one above." />
-            </SurfaceListCard>
+            <SurfaceListCard
+              label="All tasks"
+              headingLevel={2}
+              fact="0 tasks"
+              empty={<EmptyNotice message="No tasks yet." description="Add the first one above." />}
+            />
           </div>
         </PageContainer>
       }

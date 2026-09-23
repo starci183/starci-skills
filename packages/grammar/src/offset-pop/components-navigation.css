@@ -98,6 +98,14 @@
         color: var(--accent-foreground);
     }
 
+    /*
+     * The dock is taller than Common's bar (4rem items, a 1.5x ink rule and a raised shadow above
+     * it), so it redefines the block size the fixed-bar offset is computed from.
+     */
+    .grammar-common-root[data-grammar-family="offset-pop"] {
+        --starci-core-bottom-nav-block-size: calc(4.5rem + var(--offset-pop-outline-width) * 1.5 + var(--offset-pop-shadow-y) * 0.5);
+    }
+
     /* BottomNav: a chunky raised dock with a pink current pill. */
     .grammar-common-root[data-grammar-family="offset-pop"] [data-component="BottomNav"] {
         border-block-start: calc(var(--offset-pop-outline-width) * 1.5) solid var(--offset-pop-ink);

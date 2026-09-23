@@ -396,8 +396,48 @@
         bottom: 0;
     }
 
+    /*
+     * THE FIXED BAR RESERVES ITS OWN SPACE.
+     *
+     * A fixed BottomNav publishes `--starci-core-bottom-nav-offset` on its GrammarRoot: the bar's
+     * block size (`--starci-core-bottom-nav-block-size`, which a family redefines when it redraws the
+     * bar) plus the device safe area. It is published only while the bar is actually drawn - always
+     * for `visibility="always"`, below 48rem for `compact` - and is 0 otherwise.
+     *
+     * Three readers consume it, so no content and no toast ever sits under the bar:
+     *   - the OUTERMOST page container (WorkspaceShell, PrimaryRailLayout or PageContainer) pads its
+     *     block end by the offset, so the last content scrolls clear of the bar;
+     *   - a page Footer takes that padding instead when the page has one (it is the last block);
+     *   - a bottom-placed Toaster lifts above the bar.
+     */
+    .grammar-common-root {
+        --starci-core-bottom-nav-block-size: calc(4rem + 1px);
+    }
+
     .grammar-common-root:has(.starci-core-bottom-nav[data-grammar-bottom-nav-position="fixed"]) {
-        --starci-core-bottom-nav-offset: calc(4rem + env(safe-area-inset-bottom, 0px));
+        --starci-core-bottom-nav-offset: 0px;
+    }
+
+    .grammar-common-root:has(.starci-core-bottom-nav[data-grammar-bottom-nav-position="fixed"][data-grammar-bottom-nav-visibility="always"]) {
+        --starci-core-bottom-nav-offset: calc(var(--starci-core-bottom-nav-block-size) + env(safe-area-inset-bottom, 0px));
+    }
+
+    @media (max-width: 47.99rem) {
+        .grammar-common-root:has(.starci-core-bottom-nav[data-grammar-bottom-nav-position="fixed"][data-grammar-bottom-nav-visibility="compact"]) {
+            --starci-core-bottom-nav-offset: calc(var(--starci-core-bottom-nav-block-size) + env(safe-area-inset-bottom, 0px));
+        }
+    }
+
+    .grammar-common-root:has(.starci-core-bottom-nav[data-grammar-bottom-nav-position="fixed"]):not(:has(.starci-core-footer)) :is(.starci-core-workspace-shell, .starci-core-primary-rail-layout, .starci-core-page-container):not(:is(.starci-core-workspace-shell, .starci-core-primary-rail-layout, .starci-core-page-container, .starci-core-navigation-feature-nav, .starci-core-top-bar, .starci-core-bottom-nav) *) {
+        padding-block-end: var(--starci-core-bottom-nav-offset);
+    }
+
+    .grammar-common-root:has(.starci-core-bottom-nav[data-grammar-bottom-nav-position="fixed"]) .starci-core-footer {
+        padding-block-end: calc(var(--grammar-section-gap, 1rem) + max(var(--starci-core-bottom-nav-offset), env(safe-area-inset-bottom, 0px)));
+    }
+
+    .grammar-common-root:has(.starci-core-bottom-nav[data-grammar-bottom-nav-position="fixed"]) .starci-core-toaster:is([data-placement="bottom-start"], [data-placement="bottom"], [data-placement="bottom-end"]) {
+        bottom: max(var(--grammar-page-inset, 1rem), env(safe-area-inset-bottom, 0px), calc(var(--starci-core-bottom-nav-offset) + var(--grammar-page-inset, 1rem)));
     }
 
     .starci-core-bottom-nav-list {

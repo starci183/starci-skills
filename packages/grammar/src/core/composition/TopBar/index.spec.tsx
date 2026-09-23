@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { useState } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { FAMILY_WRAPS, expectedFamilyScope } from "../../../__test__/grammarRoots.js"
+import { WorkspaceShell } from "../WorkspaceShell/index.js"
 import { TopBar } from "./index.js"
 
 afterEach(cleanup)
@@ -52,5 +53,15 @@ describe.each(FAMILY_WRAPS)("TopBar under %s", (family, wrap) => {
     it("can keep the trigger at every width", () => {
         render(wrap(<TopBar brand="Brand" menu={{ icon: null, openLabel: "Menu", closeLabel: "Close", isOpen: false, onOpenChange: () => {}, visibility: "always" }} />))
         expect(screen.getByRole("banner").getAttribute("data-grammar-top-bar-menu")).toBe("always")
+    })
+})
+
+describe.each(FAMILY_WRAPS)("TopBar hosted in WorkspaceShell under %s", (_family, wrap) => {
+    it("is the page's only banner; the shell does not wrap it in a second one", () => {
+        const { container } = render(wrap(<WorkspaceShell header={<TopBar brand="Brand" position="static" />} primary={<p>Body</p>} primaryLabel="Body" />))
+        const banners = screen.getAllByRole("banner")
+        expect(banners).toHaveLength(1)
+        expect(banners[0]?.getAttribute("data-component")).toBe("TopBar")
+        expect(container.querySelectorAll("header header")).toHaveLength(0)
     })
 })

@@ -1,5 +1,6 @@
 import { forwardRef, type ComponentProps, type ReactNode } from "react"
 import { ScrollShadow, cn } from "@heroui/react"
+import { scrollRegionFocusProps } from "../VerticalScrollRegion/index.js"
 
 /**
  * Which overflow answer this region gives for its one axis.
@@ -17,17 +18,23 @@ export type HorizontalScrollRegionProps = Omit<ComponentProps<"div">, "children"
     readonly hideScrollBar?: boolean
     /** The region's own overflow answer; the stamp and the render both follow it. */
     readonly overflow?: HorizontalScrollRegionOverflow
+    /**
+     * Keyboard reachability (WCAG 2.1.1). Default `true`: the region is a Tab stop and, when named,
+     * a `role="region"`. Pass `false` when every scrolled item is itself focusable (tabs, OTP slots).
+     */
+    readonly isFocusable?: boolean
 }
 
 /** Preserve intrinsic inline content and expose HeroUI's horizontal overflow affordance. */
 export const HorizontalScrollRegion = forwardRef<HTMLDivElement, HorizontalScrollRegionProps>((props, ref) => {
-    const { hideScrollBar = true, overflow = "always", className, ...regionProps } = props
+    const { hideScrollBar = true, overflow = "always", isFocusable = true, className, ...regionProps } = props
     const contract = overflow === "needed"
         ? "PADDING-1 MEASURE-3 OVERFLOW-4 OVERFLOW-5"
         : "PADDING-1 MEASURE-3 OVERFLOW-3 OVERFLOW-5"
     return (
         <ScrollShadow
             {...regionProps}
+            {...scrollRegionFocusProps(regionProps, isFocusable)}
             ref={ref}
             className={cn("starci-core-horizontal-scroll-region", className)}
             data-contract={contract}

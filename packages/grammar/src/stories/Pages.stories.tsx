@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
+import { expect } from 'storybook/test';
 import * as G from '../common/index.js';
 import {
   BellGlyph,
@@ -68,7 +69,7 @@ const SettingsFormPage = () => {
             <G.SectionHeader level={1} title="Profile" description="How you appear to other people in this workspace." />
             {saved ? <G.Alert tone="affirmative" title="Profile saved" dismissLabel="Dismiss" onDismiss={() => setSaved(false)} /> : null}
             <G.Form label="Profile settings" onSubmit={() => setSaved(true)}>
-              <G.SurfaceCard label="Public profile">
+              <G.SurfaceCard label="Public profile" headingLevel={2}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <G.Input id="settings-name" name="name" label="Display name" defaultValue="Alex Morgan" isRequired />
                   <G.Input id="settings-email" name="email" label="Email" kind="email" defaultValue="alex@example.test" isError errorMessage="Verify this address before saving." />
@@ -76,7 +77,7 @@ const SettingsFormPage = () => {
                   <G.FileDropzone label="Photo" prompt="Drop an image or browse" accept="image/*" icon={<G.Icon source={UploadGlyph} usage="heading" />} />
                 </div>
               </G.SurfaceCard>
-              <G.SurfaceCard label="Preferences">
+              <G.SurfaceCard label="Preferences" headingLevel={2}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <G.Select name="language" label="Language" options={[{ id: 'en', label: 'English' }, { id: 'vi', label: 'Tiếng Việt' }, { id: 'fr', label: 'Français' }]} defaultValue="en" />
                   <G.SegmentedControl name="theme" label="Appearance" options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} defaultValue="system" />
@@ -90,7 +91,7 @@ const SettingsFormPage = () => {
                 <G.Button type="submit" variant="primary">Save changes</G.Button>
               </div>
             </G.Form>
-            <G.SurfaceCard label="Danger zone" state="negative">
+            <G.SurfaceCard label="Danger zone" headingLevel={2} state="negative">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                 <G.Text tone="muted">Delete the account and every lesson record.</G.Text>
                 <G.AlertDialog
@@ -237,7 +238,8 @@ const MobileHomePage = () => {
     return mobileQueue;
   });
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', paddingBottom: '5rem' }}>
+    // No bottom padding hack: the fixed BottomNav's offset pads the outermost PageContainer.
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <G.TopBar
         position="sticky"
         brand={<G.Link href="#home">Studio</G.Link>}
@@ -248,17 +250,17 @@ const MobileHomePage = () => {
         <G.PageContainer measure="reading">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.25rem 0' }}>
             <G.SectionHeader composition="context-intro" level={1} title="Good morning" description="Three short lessons today." />
-            <G.SurfaceCard label="Continue" fact="Lesson 4 of 12" wholeAction={{ kind: 'link', href: '#lesson-4', label: 'Continue Present simple' }}>
+            <G.SurfaceCard label="Continue" headingLevel={2} fact="Lesson 4 of 12" wholeAction={{ kind: 'link', href: '#lesson-4', label: 'Continue Present simple' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <G.Image src={placeholderImage('Present simple')} alt="" aspect="wide" />
-                <G.Heading level={2}>Present simple</G.Heading>
+                <G.Heading level={3}>Present simple</G.Heading>
                 <G.Progress label="Lesson progress" value={60} />
               </div>
             </G.SurfaceCard>
-            <G.SurfaceCard label="This week" fact="3 of 5 days">
+            <G.SurfaceCard label="This week" headingLevel={2} fact="3 of 5 days">
               <G.Meter label="Weekly goal" value={3} maxValue={5} valueLabel="3 of 5 days" tone="affirmative" />
             </G.SurfaceCard>
-            <G.SurfaceListCard label="Up next">
+            <G.SurfaceListCard label="Up next" headingLevel={2}>
               <G.StaticStateRow item={{ id: 'n1', label: 'Past continuous', description: '12 minutes', state: 'neutral' }} />
               <G.StaticStateRow item={{ id: 'n2', label: 'Conditionals', description: 'Locked', state: 'unavailable' }} />
             </G.SurfaceListCard>
@@ -280,6 +282,90 @@ const MobileHomePage = () => {
       <G.Toaster label="Notifications" dismissLabel="Dismiss notification" queue={queue} placement="top" />
     </div>
   );
+};
+
+/* ------------------------------------------------------------------ fixed BottomNav layout */
+
+const fixedNavQueue = G.createToastQueue();
+
+/**
+ * A shell page under a FIXED compact BottomNav with a bottom-placed Toaster. The bar publishes
+ * `--starci-core-bottom-nav-offset` (its block size + the safe area) on the GrammarRoot; the
+ * outermost page container pads its end by it and the Toaster lifts above it, so neither the last
+ * content nor a toast sits under the bar.
+ */
+const FixedBottomNavPage = () => {
+  const [current, setCurrent] = useState('home');
+  const [queue] = useState(() => {
+    fixedNavQueue.clear();
+    fixedNavQueue.add({ title: 'Lesson saved for offline', tone: 'affirmative', timeout: 0 });
+    return fixedNavQueue;
+  });
+  return (
+    <>
+      <G.WorkspaceShell
+        header={<G.TopBar position="static" brand={<G.Link href="#home">Studio</G.Link>} actions={<G.IconButton source={SearchGlyph} label="Search" onPress={noop} />} />}
+        primaryLabel="Lessons"
+        primary={
+          <G.PageContainer measure="reading">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <G.SectionHeader level={1} title="Lessons" description="Everything scrolls clear of the bar." />
+              {['Articles', 'Plurals', 'Pronouns', 'Present simple', 'Past simple'].map((title) => (
+                <G.SurfaceCard key={title} label={title} headingLevel={2}>
+                  <G.Text tone="muted">Five short exercises.</G.Text>
+                </G.SurfaceCard>
+              ))}
+              <div data-story-last-content="true"><G.Text>End of the list.</G.Text></div>
+            </div>
+          </G.PageContainer>
+        }
+      />
+      <G.BottomNav
+        label="Primary"
+        position="fixed"
+        visibility="compact"
+        currentId={current}
+        onSelect={setCurrent}
+        items={[
+          { id: 'home', label: 'Home', icon: <G.Icon source={HomeGlyph} /> },
+          { id: 'learn', label: 'Learn', icon: <G.Icon source={BookGlyph} /> },
+          { id: 'alerts', label: 'Alerts', icon: <G.Icon source={BellGlyph} />, badge: '2', badgeLabel: '2 unread' },
+          { id: 'profile', label: 'Profile', icon: <G.Icon source={UserGlyph} /> },
+        ]}
+      />
+      <G.Toaster label="Notifications" dismissLabel="Dismiss notification" queue={queue} placement="bottom" />
+    </>
+  );
+};
+
+const nextFrame = () => new Promise<void>((resolve) => { requestAnimationFrame(() => { resolve(); }); });
+
+/** Follows the toolbar family, so the sweep checks the offset in every family at 360px. */
+export const FixedBottomNavLayout: Story = {
+  name: 'Fixed BottomNav layout (360px)',
+  parameters: {
+    viewport: { options: { phone360: { name: 'Phone 360 x 740', styles: { width: '360px', height: '740px' }, type: 'mobile' } } },
+  },
+  globals: { viewport: { value: 'phone360', isRotated: false } },
+  render: () => <FixedBottomNavPage />,
+  play: async ({ canvasElement }) => {
+    const nav = canvasElement.querySelector<HTMLElement>('[data-component="BottomNav"]');
+    const last = canvasElement.querySelector<HTMLElement>('[data-story-last-content="true"]');
+    const toasts = canvasElement.querySelector<HTMLElement>('[data-component="Toaster"] ol');
+    await expect(nav).not.toBeNull();
+    await expect(last).not.toBeNull();
+    await expect(toasts).not.toBeNull();
+    const offset = getComputedStyle(canvasElement.querySelector('.grammar-common-root') ?? canvasElement).getPropertyValue('--starci-core-bottom-nav-offset').trim();
+    await expect(offset).not.toBe('');
+    // Scroll to the very end; the last content must end at or above the bar's top edge.
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await nextFrame();
+    await nextFrame();
+    const barTop = nav!.getBoundingClientRect().top;
+    await expect(Math.round(last!.getBoundingClientRect().bottom)).toBeLessThanOrEqual(Math.round(barTop));
+    await expect(Math.round(toasts!.getBoundingClientRect().bottom)).toBeLessThanOrEqual(Math.round(barTop));
+    window.scrollTo(0, 0);
+  },
 };
 
 /* ------------------------------------------------------------------ stories per family */

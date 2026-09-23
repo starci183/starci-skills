@@ -12,6 +12,8 @@ describe.each(GRAMMAR_ROOT_CASES)("Common Meter under $name", ({ Root, family })
         const meter = screen.getByRole("meter", { name: "Storage used" })
 
         expect(meter.getAttribute("data-component")).toBe("Meter")
+        // Exactly `meter`: a "meter progressbar" role list makes validators reject aria-value* (axe 4.13).
+        expect(meter.getAttribute("role")).toBe("meter")
         expect(meter.getAttribute("data-grammar-tone")).toBe("cautionary")
         expect(meter.getAttribute("aria-valuenow")).toBe("3.2")
         expect(meter.getAttribute("aria-valuemax")).toBe("5")
@@ -24,6 +26,8 @@ describe.each(GRAMMAR_ROOT_CASES)("Common Meter under $name", ({ Root, family })
     it("keeps the accessible name when the drawn label is hidden", () => {
         render(<Root><Meter label="Strength" value={60} isLabelHidden /></Root>)
         const meter = screen.getByRole("meter", { name: "Strength" })
+        expect(meter.getAttribute("role")).toBe("meter")
+        expect(meter.getAttribute("aria-valuenow")).toBe("60")
         expect(meter.getAttribute("aria-label")).toBe("Strength")
         expect(meter.getAttribute("data-grammar-tone")).toBe("neutral")
         expect(screen.queryByText("Strength")).toBeNull()
