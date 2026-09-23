@@ -57,7 +57,7 @@ import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { classifyAgentScreen } from './terminal-liveness.mjs';
+import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
@@ -207,6 +207,10 @@ const emit = (out, human, asJson) => {
 // still count as a live turn. One authority: modules/models/runtimes.yaml
 // allocation.liveness.activeUnclassifiedMs.
 const ACTIVE_UNCLASSIFIED_MS = allocationMs('liveness.activeUnclassifiedMs');
+// An `active` screen whose terminal printed nothing for this long is a frozen
+// frame: it reads turn-idle (reason stale-active) so the nudge frontier and the
+// transition wake reach it (allocation.liveness.activeStaleMs).
+const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
 
 // Operation statuses that hold one of the workflow's concurrent slots. A queued
 // job has not been dispatched and holds nothing; everything from the lease
@@ -318,9 +322,11 @@ const observeOperationWorker = (job, now = Date.now()) => {
         if (read?.ok) screenState = classifyAgentScreen(read.screen).state;
       } catch { /* terminal-show fallback below remains conservative */ }
     }
+    const stale = staleAwareState(screenState, outputAgeMs, ACTIVE_STALE_MS);
     const liveness = !shown?.ok ? 'unknown'
       : !connected || !writable ? 'disconnected'
       : screenState === 'wedged' ? 'wedged'
+      : stale.staleActive ? 'turn-idle'
       : screenState === 'active' ? 'active'
       : screenState === 'turn-idle' ? 'turn-idle'
       : screenState === 'interactive-gate' ? 'interactive-gate'
@@ -329,7 +335,7 @@ const observeOperationWorker = (job, now = Date.now()) => {
       : 'live-idle';
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness, connected, writable,
       terminalStatus: shown?.terminal?.status ?? null, lastOutputAt: Number.isFinite(lastOutputAt) ? lastOutputAt : null,
-      outputAgeMs, screenState, observedAt: now };
+      outputAgeMs, screenState, ...(stale.staleActive && connected && writable ? { livenessReason: 'stale-active' } : {}), observedAt: now };
   } catch (error) {
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle, liveness: 'unknown', reason: String(error?.message ?? error), observedAt: now };
   }
@@ -352,7 +358,9 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
     }
     const read = terminalRead({ terminal, screen: true });
     if (!read?.ok) return { action: 'kernel-unreadable', terminal, error: read?.error ?? null };
-    const state = classifyAgentScreen(read.screen).state;
+    const lastOutputAt = Number(shown?.terminal?.lastOutputAt);
+    const outputAgeMs = Number.isFinite(lastOutputAt) && lastOutputAt > 0 ? Math.max(0, Date.now() - lastOutputAt) : null;
+    const state = staleAwareState(classifyAgentScreen(read.screen).state, outputAgeMs, ACTIVE_STALE_MS).state;
     // A queued message waits for Enter: deliver it; it already asks the
     // Kernel to act, and it reads status first.
     if (state === 'queued-input') {
@@ -435,7 +443,7 @@ function cmdNudge(ledger, args) {
   }
   ledger.transaction(() => ledger.appendEvent({
     workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
-    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness },
+    kind: 'op-worker-nudged', payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, ...(worker.livenessReason ? { livenessReason: worker.livenessReason } : {}) },
   }));
   const out = { ok: true, jobId, nudged: true, worker, receipt: sent.receipt ?? null };
   emit(out, `nudged ${jobId}: resumed exact worker ${worker.terminalHandle} to file its durable report`, args.json);
@@ -491,7 +499,9 @@ function cmdObserve(ledger, args) {
     if (!read?.ok) turnState = 'unreadable';
     else {
       screenState = classifyAgentScreen(read.screen).state;
-      turnState = OBSERVE_TURN_STATES[screenState] ?? 'unknown';
+      const stale = staleAwareState(screenState, terminal.idleMs, ACTIVE_STALE_MS);
+      turnState = OBSERVE_TURN_STATES[stale.state] ?? 'unknown';
+      if (stale.staleActive) terminal.livenessReason = 'stale-active';
       screen = String(read.screen ?? '').split(/\r?\n/).slice(-lines).join('\n');
     }
   }

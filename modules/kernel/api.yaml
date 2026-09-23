@@ -212,7 +212,7 @@ commands:
       activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
       inboxPending: '<n> — unclaimed inbox rows for this workflow'
       reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
-      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn'
+      workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|turn-idle|live-idle|interactive-gate|failed|disconnected|unknown,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,observedAt}] — connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it'
     refuses:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'

@@ -19,6 +19,11 @@ const INTERACTIVE_GATES = [
 
 export const WEDGE_MINUTES = 30;
 
+// Rows that may sit between a live spinner and the provider's input row without
+// meaning the turn ended: blank/rule chrome, Claude's todo list under its
+// spinner (⎿ ☐ ☒ ...), Codex queued-message rows (↳), and a status/footer row.
+const SPINNER_COMPANION = /^\s*$|^\s*[─━═╌┄_-]{3,}|^\s*[⎿↳☐☒◻◼□■✓✔]|^\s*(?:\d+\s+)?(?:queued|messages? queued)\b|^\s*(?:tip|hint)\b/iu;
+
 export function classifyAgentScreen(screen) {
   const lines = String(screen ?? '').split(/\r?\n/).filter(Boolean);
   const recentLines = lines.slice(-14);
@@ -29,9 +34,8 @@ export function classifyAgentScreen(screen) {
   // Kernel turn.  Classifying them as top-level activity strands a filed
   // report at a Kernel input prompt because both the event wake and watchdog
   // incorrectly conclude that the Kernel is still active.
-  const topLevelRecent = recentLines
-    .filter(line => !/^\s*[│┃┆┊]/u.test(line))
-    .join('\n');
+  const topRows = recentLines.filter(line => !/^\s*[│┃┆┊]/u.test(line));
+  const topLevelRecent = topRows.join('\n');
   const failure = /not logged in|authentication (?:failed|required)|session expired|fatal error|agent child exited|process exited/i;
   // A status word counts only as a spinner/status line, never as the Kernel's
   // own prose: a yield summary headed "Running now:" once read as activity,
@@ -46,7 +50,17 @@ export function classifyAgentScreen(screen) {
   const gate = INTERACTIVE_GATES.find(({ pattern }) => pattern.test(topLevelRecent));
   if (gate) return { state: 'interactive-gate', gate: gate.gate, recent };
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
-  if (active.test(topLevelRecent)) {
+  // The LAST rows decide. A spinner row followed by the Kernel's finished
+  // answer and then its input row is scrollback of a turn that already ended:
+  // a Codex Kernel sat 3.7 hours at its prompt with an old "Working" row in
+  // the last lines and the watchdog kept calling it active. A live spinner sits
+  // directly above the input row (only chrome/todo/queued rows between).
+  // Both patterns anchor on (?:^|\n), so each reads one row as well as a frame.
+  const lastIndex = (pattern) => { for (let i = topRows.length - 1; i >= 0; i -= 1) if (pattern.test(topRows[i])) return i; return -1; };
+  const lastActive = lastIndex(active), lastPrompt = lastIndex(readyPrompt);
+  const finishedAfterSpinner = lastActive >= 0 && lastPrompt > lastActive
+    && topRows.slice(lastActive + 1, lastPrompt).some(line => !SPINNER_COMPANION.test(line));
+  if (active.test(topLevelRecent) && !finishedAfterSpinner) {
     // A turn whose spinner has run past WEDGE_MINUTES while its one shell
     // command still shows no output is stuck, not working: a Collab worker sat
     // 60 minutes on `... | xargs grep` reading stdin, and "active" hid it.
@@ -61,4 +75,18 @@ export function classifyAgentScreen(screen) {
   if (/Press Enter to send queued messages/i.test(topLevelRecent)) return { state: 'queued-input', recent };
   if (readyPrompt.test(topLevelRecent)) return { state: 'turn-idle', recent };
   return { state: 'unknown', recent };
+}
+
+/**
+ * An `active` screen is trusted only while the terminal is still printing: a
+ * provider spinner re-renders its timer every second, so output older than
+ * `activeStaleMs` (modules/models/runtimes.yaml allocation.liveness.activeStaleMs)
+ * means the frame is frozen, and the terminal is treated as turn-idle with the
+ * reason `stale-active`. Every other state, and an unknown output age, passes
+ * through unchanged. Returns {state, staleActive, reason}.
+ */
+export function staleAwareState(state, outputAgeMs, activeStaleMs) {
+  const age = Number(outputAgeMs), limit = Number(activeStaleMs);
+  const stale = state === 'active' && outputAgeMs != null && Number.isFinite(age) && Number.isFinite(limit) && limit > 0 && age > limit;
+  return stale ? { state: 'turn-idle', staleActive: true, reason: 'stale-active' } : { state, staleActive: false, reason: null };
 }
