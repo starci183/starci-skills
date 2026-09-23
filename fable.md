@@ -1149,6 +1149,14 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   starci-next và mia-mia đã khởi động lại trên main (re-exec mỗi nhịp). P8 xanh nhưng đang merge main (giữ các hành vi liveness đêm
   qua), thêm api reconcile --retry-lineage cho job queued chưa dispatch. P7b đang làm (landed-check theo repo đích).
 
+- 13:30 Thầy dậy, thấy sidebar nivo loạn (op mất tên, worker nằm ngoài, 58 agent) và chọn "xóa hết và restart", kernel
+  mặc định Opus 5.5. Đã làm: snapshot 4 goal; dừng 4 watchdog; settle blocked 12 job mở; api finish 4 workflow; đóng mọi
+  terminal nivo; đóng 160 task Orca (run-use terminal tạm vào từng run cũ, task-update completed); đang giải phóng 341 worker
+  (abandon + release). Gốc rễ tìm ra và vá: settle/finish đóng Task bằng "done" mà Orca chỉ nhận completed nên chưa bao
+  giờ đóng được (`8f2623030`); CLI ghi đè tên terminal, watchdog đặt lại [Kernel]/[Op] (`705cda9ef`); supervisor thêm kiểm
+  tra hình thức TITLE_DRIFT, STRAY_TERMINAL và bước form mỗi vòng (`36ee7fe11`). config.yaml kernel = claude/opus-5-5.
+  Merge P8 `fab36d654`, P7b `d1cb38455`, R `12a1ddb74`.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
