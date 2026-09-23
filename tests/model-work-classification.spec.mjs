@@ -93,19 +93,22 @@ test('every declared operator chain of a think kind names only frontier pools, C
   }
 });
 
-// Owner rule: hands-on work goes to Qwen and Devin first, the frontier pools only as overflow; insane is
-// frontier-only.
+// Owner rule (2026-09-24): medium and hard hands-on work goes to Devin, Qwen (DeepSeek V4.1 Flash) and Codex,
+// Opus only as overflow; easy goes to Qwen first; insane is frontier-only.
 const handsOnKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='hands-on').map(([kind])=>kind);
 
-test('hands-on orders lead with Qwen and Devin, overflow to Codex then Claude, and insane stays frontier-only',()=>{
+test('hands-on orders: Devin, Qwen, Codex then Claude at medium and hard, Qwen first at easy, insane frontier-only',()=>{
   const {tiers,preference}=runtimes.allocation;
   for(const role of ['implement','write','verify']){
     assert.deepEqual(preference[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],role);
-    assert.deepEqual(tiers.easy[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],`easy ${role}`);
-    assert.deepEqual(tiers.medium[role],['qwen-agent','devin-agent','codex-agent','claude-agent'],`medium ${role}`);
-    assert.deepEqual(tiers.hard[role],['devin-agent','codex-agent','claude-agent'],`hard ${role}`);
+    assert.deepEqual(tiers.easy[role],['qwen-agent','codex-agent','claude-agent'],`easy ${role}`);
+    assert.deepEqual(tiers.medium[role],['devin-agent','qwen-agent','codex-agent','claude-agent'],`medium ${role}`);
+    assert.deepEqual(tiers.hard[role],['devin-agent','qwen-agent','codex-agent','claude-agent'],`hard ${role}`);
     assert.deepEqual(tiers.insane[role],['claude-agent','codex-agent'],`insane ${role}`);
   }
+  for(const tier of ['easy','medium','hard'])
+    assert.deepEqual(runtimes.allocation.balanced.overflowOnly['hands-on'][tier],['claude-agent'],`Opus is ${tier} hands-on overflow under balanced`);
+  assert.equal(runtimes.allocation.balanced.overflowOnly['hands-on'].insane,undefined,'insane balances Opus and Sol');
   const registry=read('modules/models/registry.yaml');
   for(const kind of handsOnKinds){
     const chain=registry.operators[kind]?.chain;

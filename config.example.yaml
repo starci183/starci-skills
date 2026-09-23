@@ -55,10 +55,28 @@ budgets:
                      # route/dispatch refuse `max-ops` at min(this, maxParallelOps)
   perOpMs: null      # per-op wall-clock ceiling in milliseconds
   dailyTokens: null  # daily token ceiling across kernel + ops
-# Adaptive mode combines fresh quota, live reservations and task/model suitability. Set preferredProvider to a
-# provider id such as codex or devin for a bounded owner bias; it is not a fallback chain. Devin also requires
-# an explicit workflow allocation such as `devin-agent=2@implement+verify+write` before it has any capacity.
-allocation: {mode: adaptive, preferredProvider: null}
+# allocation — how `api route` spreads jobs over the runtime pools (scripts/agent/models.mjs selectPool).
+#   mode: adaptive (the only mode). Gates always apply first: role, difficulty pin, host tools, quota/auth,
+#     provider circuit, running < maxParallel. Think work stays on the frontier pools whatever the policy.
+#   preferredProvider: a provider id (codex, devin, ...) for a bounded owner bias in route-model; not a
+#     fallback chain. null = none.
+#   policy: prefer-then-overflow — the first eligible pool of the runtimes.yaml tier order;
+#           balanced — among the eligible pools, the one furthest below its target share of the jobs
+#           dispatched in the last windowHours (this repo's ledger plus the other product ledgers the
+#           machine ledger registered). --prefer only breaks ties under balanced; --avoid always removes.
+#     Absent = the runtimes.yaml allocation.policy default (prefer-then-overflow).
+#   shares: target shares per runtimes.yaml pool, normalized over the named pools. Absent = equal.
+#   windowHours: how far back the dispatches are counted (default 24, at most 720).
+#   grants: '<pool>=<slots>@<role>+<role>' — the default grant every workflow gets. Once a grants list is
+#     declared it is the whole set: a pool whose runtimes.yaml capacityAuthority is explicit-workflow-quota
+#     (Devin) routes only for the roles and up to the running slots a grant names ([] closes it).
+allocation:
+  mode: adaptive
+  preferredProvider: null
+  policy: balanced
+  shares: {claude-agent: 25, codex-agent: 25, devin-agent: 25, qwen-agent: 25}
+  windowHours: 24
+  grants: [devin-agent=10@implement+verify+write]
 # Non-operation models are a quota-aware peer pool over the provider-window runtime pools of
 # modules/models/runtimes.yaml: claude-agent (Claude Opus 5.5) and codex-agent (GPT-6 Sol), the two
 # runtimes that carry plan, decide and verify. Member order is the route order; eligibility and qualification

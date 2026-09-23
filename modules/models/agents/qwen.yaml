@@ -1,7 +1,7 @@
 schema: starci/agent-card@1
 agent: qwen
 kind: command-terminal-agent
-model: qwen3.8-flash
+model: deepseek-v4.1-flash
 modelAuthority: rendered-terminal-footer
 commandRequirements:
   - '--exclude-tools agent'
@@ -9,20 +9,35 @@ commandRequirements:
 commandRequirementsReason: |-
   --yolo is mandatory for terminal-spawned qwen, not optional: without it the TUI asks command approval
   per tool kind (Read, grep, Bash...) and answering "allow always" only whitelists that one kind — the
-  next kind re-prompts and the agent stalls forever.
+  next kind re-prompts and the agent stalls forever. A command must spell it --yolo and never add
+  --approval-mode: Qwen Code 0.24.2 exits at startup with "Cannot use both --yolo (-y) and --approval-mode
+  together" (seen 2026-09-24 with the old profile command, which therefore never reached a prompt).
 why: |-
   Orca 1.4.188's native qwen-code adapter cannot deliver a Task prompt to Qwen Code 0.23.3
   (agent_prompt_stalled, agent_readiness timeout). A terminal created with the declared qwen command
   renders an input prompt within seconds, accepts the Task preamble through terminal send, and
   reports worker_done through the Dispatch context created by dispatch --return-preamble.
+  Re-verified 2026-09-24 on Orca 1.4.188 + Qwen Code 0.24.2 with deepseek-v4.1-flash: an Orca terminal created
+  with the composed declared command rendered the input prompt and the footer model, accepted a terminal
+  send and answered; a PTY launch with the @file delivery prompt showed the "esc to cancel" spinner, ran a
+  shell tool under --yolo and answered. The native qwen-code worker-start adapter was not retried; it stays
+  forbidden below because dispatch never uses it.
 credentialRefresh:
   envKey: BAILIAN_TOKEN_PLAN_API_KEY
-  reason: A running Orca process keeps the environment it started with; a stale copy of the key overrides the current value in the Qwen env file and yields HTTP 401. The terminal command unsets only that variable name so Qwen reads its own env file. No value is ever placed in a command, receipt or log.
-  win32: 'Remove-Item Env:BAILIAN_TOKEN_PLAN_API_KEY -ErrorAction SilentlyContinue; '
-  posix: 'unset BAILIAN_TOKEN_PLAN_API_KEY; '
+  secretsFile: .secrets/models.env
+  secretName: QWENCLOUD_API_KEY
+  reason: |-
+    A running Orca process keeps the environment it started with, and Qwen Code gives an inherited variable
+    precedence over its ~/.qwen/.env file, so a stale copy of the key yields HTTP 401 (seen 2026-09-24 after the
+    key rotation). The terminal command therefore sets BAILIAN_TOKEN_PLAN_API_KEY inside the terminal's own shell
+    from QWENCLOUD_API_KEY in the gitignored runtime secrets file (scripts/agent/lib.mjs credentialRefreshCommand
+    fills <secrets-file>); when that file has no such line it unsets the variable so Qwen reads its own env file.
+    Only the file path enters the command; no value is ever placed in a command, receipt or log.
+  win32: '$starciQwenKey=$null; if (Test-Path -LiteralPath ''<secrets-file>'') { $starciQwenKey=Get-Content -LiteralPath ''<secrets-file>'' | Where-Object { $_ -match ''^\s*QWENCLOUD_API_KEY\s*='' } | Select-Object -First 1 }; if ($starciQwenKey) { $env:BAILIAN_TOKEN_PLAN_API_KEY=($starciQwenKey -replace ''^\s*QWENCLOUD_API_KEY\s*=\s*'','''').Trim().Trim([char]34,[char]39) } else { Remove-Item Env:BAILIAN_TOKEN_PLAN_API_KEY -ErrorAction SilentlyContinue }; Remove-Variable starciQwenKey -ErrorAction SilentlyContinue; '
+  posix: 'starci_qk=; if [ -f ''<secrets-file>'' ]; then starci_qk=$(sed -n ''s/^[[:space:]]*QWENCLOUD_API_KEY[[:space:]]*=[[:space:]]*//p'' ''<secrets-file>'' | head -n 1 | tr -d ''\r"''); fi; if [ -n "$starci_qk" ]; then export BAILIAN_TOKEN_PLAN_API_KEY="$starci_qk"; else unset BAILIAN_TOKEN_PLAN_API_KEY; fi; unset starci_qk; '
 readiness:
   screenPattern: 'Type your message'
-  identityPattern: 'qwen3.8-flash'
+  identityPattern: 'deepseek-v4\.1-flash'
   timeoutMs: 120000
   intervalMs: 5000
 delivery:
@@ -37,7 +52,9 @@ submission:
   settleMs: 3000
   timeoutMs: 45000
   maxEnter: 2
-modelMarker: qwen3.8-flash
+# The footer renders the ~/.qwen/settings.json modelProviders entry name,
+# "deepseek-v4.1-flash (Token Plan Singapore)"; the id is a delimited token inside it.
+modelMarker: deepseek-v4.1-flash
 approvalMode:
   working: yolo
   reasoning: yolo
@@ -68,12 +85,16 @@ knownFailures:
     meaning: Lane was spawned without --yolo; per-kind allows do not generalize.
     action: Kill and respawn with --yolo in the command; do not keep answering menus.
     seenAt: 2026-09-20
+  - signal: 'Cannot use both --yolo \(-y\) and --approval-mode together'
+    meaning: The launch command carried --approval-mode beside the --yolo this card requires; Qwen Code 0.24.2 prints its help and exits, so the terminal never renders a prompt and dispatch fails with a readiness timeout.
+    action: Spell the approval mode --yolo only in the profile command (modules/models/profiles/qwen-agent.yaml).
+    seenAt: 2026-09-24
   - signal: 'Multi-kilobyte prompt pasted via terminal send → V8 native crash'
     meaning: Inline paste overflow.
     action: 'Deliver the brief via @<file> reference (see delivery.fileDirectory) — already encoded.'
     seenAt: established
-verifiedAt: 2026-09-20
-verifiedAgainst: 'Qwen Code 0.23.3'
+verifiedAt: 2026-09-24
+verifiedAgainst: 'Qwen Code 0.24.2, deepseek-v4.1-flash on the QwenCloud Token Plan, Orca 1.4.188'
 forbidden:
   - qwen-agent-tool
   - provider-native-subagent

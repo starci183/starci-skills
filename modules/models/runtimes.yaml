@@ -29,37 +29,56 @@ purpose: |-
 # route/dispatch with `max-ops` at it.
 maxParallelOps: 20
 allocation:
-  # The workflow-bound profile applies adaptive capacity from validated config.yaml; this is the default it overrides.
+  # The default policy. config.yaml allocation.policy overrides it for `api route` (engine/config.mjs
+  # configuredAllocationPolicy): prefer-then-overflow takes the first eligible pool of the tier order below;
+  # balanced takes, among the eligible pools of that order, the one furthest below its config.yaml
+  # allocation.shares target of the recent dispatches (scripts/agent/balance.mjs counts them; scripts/agent/
+  # models.mjs selectPool picks). Under both, every gate (role, difficulty pin, owner grant, host tools,
+  # quota/auth, circuit, maxParallel) applies first, and the order below still breaks ties.
   policy: prefer-then-overflow
+  # Under balanced, a pool listed here for a work class and tier is taken only when no other pool of the
+  # order is eligible: Opus stays hands-on overflow below insane, so its share is spent on think work; at
+  # insane, where only Opus and Sol pin a model, the two balance.
+  balanced:
+    overflowOnly:
+      hands-on:
+        easy: [claude-agent]
+        medium: [claude-agent]
+        hard: [claude-agent]
+  # A think verify kind that audits a think op's output (its records overlap the output of the latest
+  # settled think op of the workflow; scripts/kernel/api.mjs cmdRoute finds it) routes to the other frontier
+  # family when that family is eligible: Sol reviews Opus's records and Opus reviews Sol's.
+  thinkAuditCrossFamily: true
   # A tier may order its runtimes per role. `think` is the order for every kind roleOfKind marks think work,
-  # whatever its role, and decide and plan are think roles: Claude Opus 5.5 first, GPT-6 Sol when Claude is
-  # unavailable, and never a pool without a frontier model. Think kinds route at a hard floor, where
+  # whatever its role, and decide and plan are think roles: Claude Opus 5.5 and GPT-6 Sol only, never a pool
+  # without a frontier model. Under prefer-then-overflow Opus leads and Sol takes over when Opus is
+  # unavailable; under balanced the two alternate by share. Think kinds route at a hard floor, where
   # codex-agent pins Sol; the keys below hard exist for direct role consumers that bring no kind.
-  # Hands-on work (implement, write, and verify kinds roleOfKind marks hands-on) goes to Qwen and Devin first,
-  # then Sol/Luna, then Opus as overflow. Qwen pins no hard model, so the hard tier starts at Devin; insane is
-  # frontier-only.
+  # Hands-on work (implement, write, and verify kinds roleOfKind marks hands-on): medium and hard go to Devin
+  # (SWE-2-max), Qwen (DeepSeek V4.1 Flash) and Codex, Opus only as overflow; easy goes to Qwen first, where
+  # Devin pins no model. Insane is frontier-only: Devin and Qwen pin no insane model.
   tiers:
     hard:
-      default: [devin-agent, codex-agent, claude-agent]
-      implement: [devin-agent, codex-agent, claude-agent]
-      write: [devin-agent, codex-agent, claude-agent]
-      verify: [devin-agent, codex-agent, claude-agent]
+      default: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      write: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      verify: [devin-agent, qwen-agent, codex-agent, claude-agent]
       think: [claude-agent, codex-agent]
       decide: [claude-agent, codex-agent]
       plan: [claude-agent, codex-agent]
     medium:
-      default: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      default: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      implement: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      write: [devin-agent, qwen-agent, codex-agent, claude-agent]
+      verify: [devin-agent, qwen-agent, codex-agent, claude-agent]
       think: [claude-agent]
       decide: [claude-agent]
       plan: [claude-agent]
     easy:
-      default: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      implement: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      write: [qwen-agent, devin-agent, codex-agent, claude-agent]
-      verify: [qwen-agent, devin-agent, codex-agent, claude-agent]
+      default: [qwen-agent, codex-agent, claude-agent]
+      implement: [qwen-agent, codex-agent, claude-agent]
+      write: [qwen-agent, codex-agent, claude-agent]
+      verify: [qwen-agent, codex-agent, claude-agent]
       think: [claude-agent]
       decide: [claude-agent]
       plan: [claude-agent]
@@ -93,7 +112,8 @@ allocation:
   # bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a coarse screen over the same
   # measure — the estimate is the authority. When N > 1 slices are admitted together the kernel
   # rotates --prefer across the difficulty tier's pool order so the fleet spreads over
-  # devin/codex/claude/qwen lanes instead of piling onto the first pool.
+  # devin/codex/claude/qwen lanes instead of piling onto the first pool. Under the balanced policy that
+  # rotation only breaks ties: each routed slice is already counted before the next one is routed.
   # A gear never raises a pool's maxParallel, maxParallelOps or budgets.maxOps: it raises only what
   # `api estimate` requests, and admission still clamps it.
   slicing:
@@ -177,19 +197,22 @@ runtimes:
       medium: claude-opus-5-5
       hard: claude-opus-5-5
       insane: claude-opus-5-5
-  # The Qwen flash pool serves cheap work only: easy and medium. No hard/insane pin - it is ineligible there.
+  # The Qwen Code pool runs DeepSeek V4.1 Flash on the QwenCloud Token Plan (owner 2026-09-24, replacing
+  # qwen3.8-flash): easy, medium and hard hands-on work. No insane pin - it is ineligible there.
   qwen-agent:
     target: qwen-agent
     provider: qwen
     roles: [implement, verify, write]
     maxParallel: 10
     models:
-      easy: qwen3.8-flash
-      medium: qwen3.8-flash
+      easy: deepseek-v4.1-flash
+      medium: deepseek-v4.1-flash
+      hard: deepseek-v4.1-flash
   # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
-  # capacity: 10 parallel lanes. The CLI's auth/readiness and observed launch/refusal status are the live
-  # capacity signal on top of this cap. swe-2-max is a medium+ agent: no easy pin, so easy work never lands
-  # on Devin even though the easy tier names the pool.
+  # capacity: 10 parallel lanes, opened by the owner's default grant (config.yaml allocation.grants
+  # devin-agent=10@implement+verify+write applies to every workflow; once config.yaml declares a grants list,
+  # `api route` rejects a grant-gated pool that list does not open). The CLI's auth/readiness and observed launch/refusal status are the live capacity signal on top of
+  # this cap. swe-2-max is a medium+ agent: no easy pin, and the easy tier does not list the pool.
   devin-agent:
     target: devin-agent
     provider: devin

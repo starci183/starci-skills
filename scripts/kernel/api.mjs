@@ -78,6 +78,9 @@ import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
 import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
+import { kindRoute as kindRouteOf } from '../agent/models.mjs';
+import { recentDispatchCounts, thinkAuthorOf } from '../agent/balance.mjs';
+import { configuredAllocationPolicy } from '../../engine/config.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import {
@@ -2207,7 +2210,26 @@ async function cmdRoute(ledger, args) {
     };
   }
 
-  const decision = selectPool({ kind, difficulty, bias, capacity });
+  // Owner allocation (config.yaml allocation, engine/config.mjs configuredAllocationPolicy): the policy,
+  // target shares and window of the balanced allocator, and the grants that open an
+  // explicit-workflow-quota pool (Devin). A declared grants list is the whole set of grants; with none
+  // declared, or no readable config, routing keeps the runtimes.yaml default policy and ungated pools.
+  let allocation = null;
+  try { allocation = configuredAllocationPolicy(loadConfig(ownerRoot)); } catch { allocation = null; }
+  const balancedRoute = (allocation?.policy ?? rtDoc?.allocation?.policy) === 'balanced';
+  const recent = balancedRoute
+    ? recentDispatchCounts({ db, ledgerFile: ledger.path ?? null, windowHours: allocation?.windowHours })
+    : null;
+  const routeKind = kindRouteOf(kind, rtDoc);
+  const author = routeKind.work === 'think' && routeKind.role === 'verify'
+    ? (() => { try { return thinkAuthorOf(db, job, { runtimes: rtDoc }); } catch { return null; } })()
+    : null;
+  const decision = selectPool({ kind, difficulty, bias, capacity,
+    policy: allocation?.policy ?? undefined,
+    shares: allocation?.shares ?? undefined,
+    recent: recent?.counts,
+    grants: allocation?.grants ?? undefined,
+    auditOf: author?.pool ?? undefined });
   if (decision?.toolUnavailable) {
     const { tools, holders } = decision.toolUnavailable;
     const serving = holders.filter((h) => h.roles.includes(decision.role));
@@ -2230,6 +2252,16 @@ async function cmdRoute(ledger, args) {
   const decided = {
     model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? null,
     routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [],
+    // Always written (null when absent) so a reroute never keeps the previous decision's values.
+    routePolicy: decision.policy ?? null,
+    routeBalance: decision.balance ? {
+      windowHours: recent?.windowHours ?? null, recentTotal: recent?.total ?? null, ledgers: recent?.ledgers?.length ?? 0,
+      candidates: decision.balance.candidates,
+      deficits: Object.fromEntries(Object.entries(decision.balance.deficits).map(([pool, d]) => [pool, {
+        target: Number(d.target.toFixed(3)), actual: Number(d.actual.toFixed(3)), deficit: Number(d.deficit.toFixed(3)) }])),
+    } : null,
+    routeCrossFamily: decision.crossFamily
+      ? { ...decision.crossFamily, authorJob: author?.jobId ?? null, authorOp: author?.opId ?? null } : null,
   };
   const selectedRuntime = Object.entries(pools)
     .find(([poolId, runtime]) => (runtime?.target ?? poolId) === decision.target)?.[1] ?? null;
@@ -2261,6 +2293,13 @@ async function cmdRoute(ledger, args) {
   emit(out, [
     `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
     `  chain: ${decided.routeChain.join(' → ') || '(none)'}`,
+    ...(decided.routeBalance
+      ? [`  balanced (last ${decided.routeBalance.windowHours}h, ${decided.routeBalance.recentTotal} jobs): ${Object.entries(decided.routeBalance.deficits)
+        .map(([pool, d]) => `${pool} ${Math.round(d.actual * 100)}%/${Math.round(d.target * 100)}%`).join(', ')}`]
+      : []),
+    ...(decided.routeCrossFamily?.applied
+      ? [`  cross-family audit: ${decided.routeCrossFamily.authorOp ?? 'think op'} ran on ${decided.routeCrossFamily.author}; the auditor takes the other family`]
+      : []),
     ...(decided.routeRejected.length
       ? ['  rejected:', ...decided.routeRejected.map((r) => `    ${r.target}: ${r.reason}`)]
       : []),

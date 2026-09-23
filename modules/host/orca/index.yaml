@@ -145,9 +145,9 @@ operationAgent:
   createTask:
     api: orchestration.task-create
     cli: 'orca orchestration task-create --run <run-id> --task-title "<concise-operation-title>" --display-name "[Op] <operation> - <scope>" --spec "<one-operation-contract>" --json'
-  qwen38Flash:
+  qwen:
     agent: qwen
-    model: qwen3.8-flash
+    model: deepseek-v4.1-flash
     modelAuthority: rendered-terminal-footer
     launch: command-terminal
     nestedAgents: forbidden

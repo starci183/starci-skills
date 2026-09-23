@@ -49,7 +49,9 @@ model: devin-agent               # logical model label (never inferred)
 commandPrefix:                   # env prep + auth probe, per platform
   win32: '…'
   posix: 'command -v devin >/dev/null && env -u ACP_BACKEND devin models list … && '
-credentialRefresh: {win32: '…', posix: '…'}   # optional card-owned credential step
+credentialRefresh: {win32: '…', posix: '…', secretsFile?: '.secrets/<file>.env'}   # optional card-owned credential step;
+                                 # <secrets-file> in a step is the runtime-root path of secretsFile (lib.mjs credentialRefreshCommand),
+                                 # read inside the terminal's shell so no secret value enters the command
 hostLaunchPrefix: {win32: '&', posix: 'command'}  # codex/claude: keep Orca's create on the runtime-owned PTY path
 environmentStrip:                # vars removed INSIDE the terminal command
   - {name: ACP_BACKEND, reason: "…"}

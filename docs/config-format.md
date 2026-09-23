@@ -39,6 +39,14 @@ Optional keys:
   are recomputed before every future assignment
 - `allocation.preferredProvider` — `null` for automatic capacity or one declared provider id for a bounded
   preference; this never forms a fallback chain
+- `allocation.policy` — `prefer-then-overflow` (the `runtimes.yaml` default: first eligible pool of the tier
+  order) or `balanced` (among the eligible pools, the one furthest below its target share of the jobs
+  dispatched in the last `windowHours`, counted over this repo's ledger and the host's other product ledgers)
+- `allocation.shares` — `{<runtime pool>: <weight>}` target shares, normalized over the named pools
+- `allocation.windowHours` — the balanced window in hours (default 24, at most 720)
+- `allocation.grants` — `['<pool>=<slots>@<role>+<role>']`, the default grant every workflow gets; once
+  declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
+  for the granted roles and up to the granted running slots
 - `debug` — boolean
 - `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
   all off by default; secrets are named by env var, never stored (docs/connectors.md)
@@ -105,11 +113,12 @@ group ([Kernel group](#kernel-group)). Every kind has one
 entry in `modules/models/runtimes.yaml` `roleOfKind` — its role, whether its work is `think` or `hands-on`,
 and the difficulty `floor` read from what its op does. Think work is any op whose output is a canonical
 record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
-runs only on `allocation.preference.think`, Claude Opus 5.5 then GPT-6 Sol, at a hard floor where
+runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6 Sol, at a hard floor where
 `codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
-order. Hands-on work — implementing, testing, refactoring, running and measuring under a settled record —
-walks the `allocation.tiers` implement, write and verify orders: Qwen and Devin first, the frontier pools as
-overflow. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
+order; under `balanced` the two alternate by share, and a think audit (a verify kind reading a think op's
+output) goes to the other family when it is eligible. Hands-on work — implementing, testing, refactoring,
+running and measuring under a settled record — walks the `allocation.tiers` implement, write and verify
+orders: Devin, Qwen (DeepSeek V4.1 Flash) and Codex at medium and hard, Qwen first at easy, Opus as overflow. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
 its scope measures and may land on any pool. A floor raises a measured difficulty and never lowers it
 (`scripts/agent/models.mjs` `selectPool`). The non-operation pool lists its members in route order, Claude
 first; Qwen and Devin carry neither `plan` nor `decide`, so these functions never reach them. Functions
@@ -137,4 +146,5 @@ identity.
 An `agent` and `provider` may currently carry the same string, but their fields
 are not interchangeable. Routing records use `provider` for quota authority.
 
-Files without `allocation` resolve to `{mode:"adaptive", preferredProvider:null}` in memory.
+Files without `allocation` resolve to `{mode:"adaptive", preferredProvider:null, policy:null, shares:null,
+windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and no grant gating.

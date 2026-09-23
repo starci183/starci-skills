@@ -210,6 +210,57 @@ export function uatSettings(config=loadConfig()){
   const value=plain(config?.uat)?config.uat.maxConcurrent:null;
   return Number.isInteger(value)?{maxConcurrent:value,source:'uat'}:{maxConcurrent:UAT_DEFAULTS.maxConcurrent,source:'default'};
 }
+/**
+ * config.yaml `allocation` beyond mode/preferredProvider — how `api route` spreads jobs over the pools
+ * (scripts/agent/models.mjs selectPool):
+ *   policy: prefer-then-overflow (the runtimes.yaml default) | balanced — among the eligible pools, the one
+ *     furthest below its target share of the recent dispatches wins.
+ *   shares: {<runtime pool>: <weight >= 0>} — target shares, normalized over the named pools. Absent = equal.
+ *   windowHours: how far back the recent dispatches are counted (default 24).
+ *   grants: ['<pool>=<slots>@<role>+<role>'] — the owner's default grant, applied to every workflow, that opens
+ *     a capacityAuthority explicit-workflow-quota pool (Devin) for those roles up to <slots> running jobs.
+ */
+export const ALLOCATION_POLICIES=Object.freeze(['prefer-then-overflow','balanced']);
+export const ALLOCATION_KEYS=Object.freeze(['mode','preferredProvider','policy','shares','windowHours','grants']);
+export const DEFAULT_ALLOCATION_WINDOW_HOURS=24;
+const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
+/** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
+export function parseAllocationGrant(text){
+  const m=typeof text==='string'?GRANT.exec(text.trim()):null;
+  return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
+}
+function validateAllocationBalance(allocation,runtimes){
+  const bad=message=>{throw Error(`Invalid config.yaml: allocation.${message}`);};
+  if(allocation.policy!==undefined&&allocation.policy!==null&&!ALLOCATION_POLICIES.includes(allocation.policy))
+    bad(`policy must be one of ${ALLOCATION_POLICIES.join(' | ')}.`);
+  if(allocation.shares!==undefined&&allocation.shares!==null){
+    const shares=allocation.shares;
+    if(!plain(shares)||!Object.keys(shares).length)bad('shares must map runtime pools to non-negative weights, e.g. {claude-agent: 25, codex-agent: 25}.');
+    for(const [pool,weight] of Object.entries(shares)){
+      if(!plain(runtimes[pool]))bad(`shares.${pool} is not a modules/models/runtimes.yaml pool (known: ${Object.keys(runtimes).sort().join(', ')}).`);
+      if(typeof weight!=='number'||!Number.isFinite(weight)||weight<0)bad(`shares.${pool} must be a non-negative number.`);
+    }
+    if(!Object.values(shares).some(weight=>weight>0))bad('shares must give at least one pool a positive weight.');
+  }
+  if(allocation.windowHours!==undefined&&allocation.windowHours!==null&&!(typeof allocation.windowHours==='number'&&Number.isFinite(allocation.windowHours)&&allocation.windowHours>0&&allocation.windowHours<=720))
+    bad('windowHours must be a number of hours in (0, 720].');
+  if(allocation.grants!==undefined&&allocation.grants!==null){
+    if(!Array.isArray(allocation.grants))bad('grants must be a list of "<pool>=<slots>@<role>+<role>" strings.');
+    const seen=new Set();
+    for(const text of allocation.grants){
+      const grant=parseAllocationGrant(text);
+      if(!grant)bad(`grants entry ${JSON.stringify(text)} is not "<pool>=<slots>@<role>+<role>" (e.g. devin-agent=10@implement+verify+write).`);
+      const runtime=runtimes[grant.pool];
+      if(!plain(runtime))bad(`grants entry ${text}: ${grant.pool} is not a modules/models/runtimes.yaml pool.`);
+      if(seen.has(grant.pool))bad(`grants names ${grant.pool} more than once.`);
+      seen.add(grant.pool);
+      const max=Number(runtime.maxParallel);
+      if(!(grant.slots>=1&&(!Number.isFinite(max)||grant.slots<=max)))bad(`grants entry ${text}: slots must be 1..${Number.isFinite(max)?max:'maxParallel'} (runtimes.yaml maxParallel).`);
+      const unserved=grant.roles.filter(role=>!(runtime.roles??[]).includes(role));
+      if(unserved.length)bad(`grants entry ${text}: ${grant.pool} does not serve role ${unserved.join(', ')} (runtimes.yaml roles: ${(runtime.roles??[]).join(', ')}).`);
+    }
+  }
+}
 export function validateConfig(config){
   const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
@@ -219,9 +270,10 @@ export function validateConfig(config){
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){
     const allocation=config.allocation,preferred=allocation?.preferredProvider;
-    if(!plain(allocation)||Object.keys(allocation).some(key=>!['mode','preferredProvider'].includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
-      throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>}.');
+    if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
+      throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>, policy?, shares?, windowHours?, grants?}.');
     if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
+    validateAllocationBalance(allocation,runtimes);
   }
   if(plain(config?.kernel)&&Object.hasOwn(config.kernel,'group')){
     const kernel=config.kernel,group=kernel.group;
@@ -280,8 +332,22 @@ export function effectiveNonOperationModels(config=loadConfig()){const models=va
  */
 export function configuredAllocationPolicy(config=loadConfig()){
   validateConfig(config);
-  if(plain(config.allocation))return {mode:ADAPTIVE_ALLOCATION_MODE,preferredProvider:config.allocation.preferredProvider??null,source:'allocation'};
-  return {mode:ADAPTIVE_ALLOCATION_MODE,preferredProvider:null,source:'default'};
+  const allocation=plain(config.allocation)?config.allocation:null;
+  // null = the owner declared no grants list: grant-gated pools keep their pre-grant (ungated) routing.
+  // A declared list, even [], is the whole set of grants.
+  const grants=Array.isArray(allocation?.grants)
+    ?Object.fromEntries(allocation.grants.map(parseAllocationGrant).map(({pool,slots,roles})=>[pool,{slots,roles}]))
+    :null;
+  return {
+    mode:ADAPTIVE_ALLOCATION_MODE,
+    preferredProvider:allocation?.preferredProvider??null,
+    // null = the runtimes.yaml allocation.policy default
+    policy:allocation?.policy??null,
+    shares:allocation?.shares?{...allocation.shares}:null,
+    windowHours:allocation?.windowHours??DEFAULT_ALLOCATION_WINDOW_HOURS,
+    grants,
+    source:allocation?'allocation':'default',
+  };
 }
 export const nonOperationModels=(role,config=loadConfig())=>{if(!Object.hasOwn(NON_OPERATION_ROLES,role))throw Error(`Unknown non-operation model role ${role}`);return effectiveNonOperationModels(config)[role].runtimes;};
 function readExample(root=configRoot){const yaml=path.join(root,'config.example.yaml');if(fs.existsSync(yaml))return validateConfig(parseYaml(fs.readFileSync(yaml,'utf8')));throw Error('Missing config.example.yaml');}

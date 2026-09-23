@@ -27,7 +27,7 @@ receipts:
     - dispatch-return-preamble-context
     - submission-verified-on-screen
     - dispatch-show-assignee-equals-created-terminal
-    - rendered-model-qwen3.8-flash
+    - rendered-model-deepseek-v4.1-flash
   devinAdditional:
     - explicit-positive-workflow-slot
     - stored-cli-auth-proven-by-read-only-model-inventory-before-launch
@@ -73,7 +73,7 @@ dispatchAssertions:
   - After provider attestation, terminal title is renamed and verified as [Op] <operation> - <scope> before effects are admitted.
   - A native activity-title drift during execution is mutable UI metadata; with exact Task, Dispatch, worker, agent and model identity it is recanonicalized rather than used to reject valid effects.
   - A managed operation is never dispatched to an existing terminal; only worker-start creates its supervised native agent. A command-terminal operation is dispatched only to the terminal the same attempt created.
-  - Devin is never an implicit candidate fallback; only an allocator candidate admitted by an explicit positive workflow slot may reach the launcher.
+  - Devin is never an implicit candidate fallback; only an allocator candidate admitted by an explicit positive workflow slot may reach the launcher. The owner's default grant (config.yaml allocation.grants, e.g. devin-agent=10@implement+verify+write) is that slot for every workflow, and `api route` enforces it.
   - An operation's `done` is never accepted on its own word: the kernel re-runs every declared check itself, computes the changed files from git and refuses a report whose files fall outside the operation allowlist.
   - Current-runtime worker-start omits --on; a named --on value is used only after live runtime inventory returns that exact environment id.
   - Literal or guessed environment labels such as windows are rejected before worker-start.

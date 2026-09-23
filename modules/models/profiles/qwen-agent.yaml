@@ -1,7 +1,7 @@
-# Profile: qwen-agent — the Qwen command-terminal pool.
-# Business frame: the cost-first executor. Default operation target of the
-# orchestration profile and first seat in every easy and medium hands-on order —
-# bounded, ceiling-guarded work it can fail cheaply and hand upward.
+# Profile: qwen-agent — the Qwen Code command-terminal pool, running DeepSeek V4.1 Flash on the owner's
+# QwenCloud Token Plan (owner 2026-09-24; it replaced qwen3.8-flash).
+# Business frame: the cost-first executor. Default operation target of the orchestration profile and a
+# hands-on seat at easy, medium and hard — bounded, ceiling-guarded work it can fail cheaply and hand upward.
 
 target: qwen-agent            # registry.yaml + runtimes.yaml
 provider: qwen                # runtimes.yaml — provider family qwencloud-token-plan (registry.yaml targets)
@@ -9,11 +9,14 @@ runtime: qwen                 # registry.yaml targets.qwen-agent.runtime
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: qwen3.8-flash   # registry.yaml
+  requestedModel: deepseek-v4.1-flash   # registry.yaml
   profiles:
-    working: qwen3.8-flash-worker     # registry.yaml targets — fast bounded implementation/content/repair
-    reasoning: qwen3.8-flash-reviewer # registry.yaml targets — "lower-cost reasoning fallback when the Max reviewer is unavailable"
+    working: deepseek-v4.1-flash-worker     # registry.yaml targets — bounded implementation/content/repair
+    reasoning: deepseek-v4.1-flash-reviewer # registry.yaml targets — bounded hands-on verification (never think work)
   modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch  # registry.yaml targets
+  # Qwen Code resolves the id through ~/.qwen/settings.json modelProviders.openai (the entry named
+  # "deepseek-v4.1-flash (Token Plan Singapore)", base URL token-plan.ap-southeast-1.maas.aliyuncs.com,
+  # envKey BAILIAN_TOKEN_PLAN_API_KEY) and renders that name in its footer, which the card attests.
 
 capacity:
   maxParallel: 10             # cached from runtimes.yaml; route-model.mjs reports drift
@@ -22,7 +25,9 @@ capacity:
 launch:
   orca:                       # registry.yaml orcaLaunch — command-terminal, NOT managed-agent
     kind: command-terminal
-    command: "qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
+    # --yolo, never --approval-mode yolo: Qwen Code 0.24.2 refuses to start when both are given ("Cannot use
+    # both --yolo (-y) and --approval-mode together"), and the agent card appends --yolo when it is missing.
+    command: "qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false"
     reasoningCommand: same command shape             # registry.yaml reasoningCommand
     dispatch: return-preamble-and-send               # launcher: dispatch --return-preamble, terminal send, verify submission
     adapter: qwen
@@ -40,15 +45,15 @@ position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/
 
 business:
   question: >-
-    "Which pool takes the first, cheapest shot at bounded execution so expensive
+    "Which pool takes the cheapest shot at bounded execution so expensive
     pools only see what survives escalation?" — qwen-agent.
   whenNeeded:
-    - Easy and medium hands-on work (runtimes.yaml roleOfKind work hands-on) — every hands-on order spends its capacity first.
-    - Easy-tier fan-out (runtimes.yaml allocation.fanOut) — cheap parallelism.
+    - Easy hands-on work first, and medium and hard hands-on work beside Devin and Codex (runtimes.yaml allocation.tiers; balanced allocation spreads them by share).
+    - Fan-out slices (runtimes.yaml allocation.fanOut) — cheap parallelism.
     - The default operation target (registry.yaml orchestration.defaultOperationTarget).
   whenNot:
     - Think work — canonical records and quality verdicts run on the frontier pools only.
-    - Hard and insane work — the pool pins no model there, so a hard floor starts the order at Devin.
+    - Insane work — the pool pins no insane model, so insane stays on Opus and Sol.
     - Host-tool routes — the qwen agent card lists no host tool (modules/models/agents/qwen.yaml capabilities.hostTools).
     - Any work needing nested/sub agents — the `agent` tool is excluded and nestedAgents is forbidden.
   pickedBy: >-
@@ -57,4 +62,4 @@ business:
   failureModes:
     - A ceiling stop (turns/wall/tool-calls) is failure, not completion — do not read a cut-off terminal as a finished op.
     - Command-terminal launch means prompt delivery is verified via terminal send + Dispatch attestation; a silent terminal is a failed attempt, not a slow one (selection text).
-    - "INFERRED: sending it hard-tier work anyway (it is absent from hard lists) means paying retries for capability the tiering already priced out."
+    - A Token Plan quota exhausted mid-window answers 401/429 for every lane at once — the provider circuit parks the pool; the scorecard (scripts/agent/model-scorecard.mjs) shows the token burn before it runs out.

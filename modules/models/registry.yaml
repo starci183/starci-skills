@@ -49,8 +49,8 @@ defaults:
     working: opus
     reasoning: opus-reviewer
   qwen:
-    working: qwen3.8-flash-worker
-    reasoning: qwen3.8-flash-reviewer
+    working: deepseek-v4.1-flash-worker
+    reasoning: deepseek-v4.1-flash-reviewer
   devin:
     working: devin-worker
     reasoning: devin-reviewer
@@ -103,14 +103,14 @@ targets:
       agent: claude
   qwen-agent:
     runtime: qwen
-    requestedModel: qwen3.8-flash
+    requestedModel: deepseek-v4.1-flash
     profiles:
-      working: qwen3.8-flash-worker
-      reasoning: qwen3.8-flash-reviewer
+      working: deepseek-v4.1-flash-worker
+      reasoning: deepseek-v4.1-flash-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model qwen3.8-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
-      reasoningCommand: qwen --model qwen3.8-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      command: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      reasoningCommand: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
       adapter: qwen
       nestedAgents: forbidden
@@ -154,8 +154,8 @@ targets:
       nestedAgents: forbidden
       capacityGate: explicit-workflow-quota
 targetAliases:
-  qwen-qwen3.8-flash-worker: qwen-agent
-  qwen-qwen3.8-flash-reviewer: qwen-agent
+  qwen-deepseek-v4.1-flash-worker: qwen-agent
+  qwen-deepseek-v4.1-flash-reviewer: qwen-agent
   codex-gpt-6-sol: codex-agent
   codex-gpt-6-luna: codex-agent
   qwen-qwen3.8-max-worker: qwen3.8-max
@@ -169,7 +169,7 @@ targetAliases:
   # names the window.
   claude-opus: claude-agent
   claude-opus-5-5: claude-agent
-  qwen3.8-flash: qwen-agent
+  deepseek-v4.1-flash: qwen-agent
 skills:
   starci:
     chains:
@@ -472,9 +472,10 @@ selection: |-
 costPolicy: |-
   Runtime pools are provider quota windows: the Codex pool carries gpt-6-luna for easy and medium work and
   gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role, the Qwen pool
-  carries qwen3.8-flash, and Devin stays closed until an owner grants slots. modules/models/runtimes.yaml
+  carries deepseek-v4.1-flash (DeepSeek V4.1 Flash on the QwenCloud Token Plan) for easy, medium and hard work,
+  and Devin opens through the owner's default grant (config.yaml allocation.grants). modules/models/runtimes.yaml
   roleOfKind splits the kinds: think work (canonical records and quality verdicts) runs the Claude pool, then
-  the Codex pool on Sol; hands-on work runs the Qwen and Devin pools first and the Codex and Claude pools as
+  the Codex pool on Sol; hands-on work runs the Devin, Qwen and Codex pools with the Claude pool as
   overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
   the Claude pool decides the identity and defers that artwork with a concrete brief, and the Codex pool, the
   only one with an image generator, generates it when it takes the launch.

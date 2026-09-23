@@ -39,7 +39,7 @@ test('--plan --kind code.refactor --difficulty hard walks the tier in declared o
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.plan,true);
   // roleOfKind pins code.refactor -> implement; the hard tier's implement chain is the contract.
-  assert.deepEqual(body.tier?.chain,['devin-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
+  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
   assert.ok(Array.isArray(body.candidates)&&body.candidates.length===body.tier.chain.length);
   // qualifications.yaml ships empty: every candidate must carry an evidence annotation, not a silent pass.
   for(const c of body.candidates)
@@ -57,10 +57,10 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.config?.preferredProvider,'codex','the bias must be reported, never hidden');
-  assert.deepEqual(body.tier?.chain,['devin-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
+  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
   assert.equal(body.pick?.primary?.target,'codex-agent','preferredProvider hoists the first pickable candidate of that provider');
   // Bias is bounded: the non-preferred tier members remain as fallbacks, never removed.
-  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','claude-agent']);
+  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','qwen-agent','claude-agent']);
 });
 
 // The kernel route is the think group: Claude Opus 5.5 first, GPT-6 Sol when Claude is unavailable.
@@ -220,7 +220,7 @@ test('the unpinned kernel route resolves to Claude Opus 5.5',t=>{
   assert.equal(body.workload.work,'think');
 });
 
-test('backend.implement measured medium routes to Qwen or Devin, and a hard floor never lands on Qwen',t=>{
+test('backend.implement measured medium routes to Qwen or Devin, and a hard floor starts at Devin',t=>{
   const body=pick(t,['--kind','backend.implement','--difficulty','medium']);
   assert.ok(['qwen-agent','devin-agent'].includes(body.pick.target),body.pick.target);
   assert.deepEqual(body.fallbackChain.slice(-2).map(f=>f.target),['codex-agent','claude-agent']);

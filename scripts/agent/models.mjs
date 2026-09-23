@@ -26,6 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
@@ -187,11 +188,26 @@ export function missingHostTools({ pool, kind, modelsDir, opsDir } = {}) {
 // capacity map is caller-supplied live state: capacity[target] =
 // {auth, quota:{state}, running, openIncident}; an absent entry means "no
 // live signal" and passes the capacity gates (unknown is OK — dead is not).
-function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, runtimes, modelsDir, opsDir }) {
+function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, grants, runtimes, modelsDir, opsDir }) {
   const reasons = [];
   if (!pool) return [`no runtimes.yaml entry for pool '${target}'`];
   if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role))
     reasons.push(`pool does not serve role '${role}'`);
+  // An explicit-workflow-quota pool opens only under an owner grant
+  // (config.yaml allocation.grants, engine/config.mjs allocationGrants). A
+  // caller that passes no grants at all is a direct low-level consumer and is
+  // not gated; `api route` always passes the owner's grants.
+  if (grants && pool.capacityAuthority === 'explicit-workflow-quota') {
+    const grant = grants[pool.target ?? target] ?? grants[target] ?? null;
+    if (!grant) reasons.push(`pool needs an owner grant (capacityAuthority explicit-workflow-quota; config.yaml allocation.grants names none for ${target})`);
+    else {
+      if (role && Array.isArray(grant.roles) && !grant.roles.includes(role))
+        reasons.push(`owner grant ${target}=${grant.slots}@${(grant.roles ?? []).join('+')} does not cover role '${role}'`);
+      const running = Number(capacity?.[target]?.running ?? 0);
+      if (Number.isFinite(Number(grant.slots)) && running >= Number(grant.slots))
+        reasons.push(`pool at granted capacity (${running}/${grant.slots} granted)`);
+    }
+  }
   for (const tool of missingHostTools({ pool, kind, modelsDir, opsDir }))
     reasons.push(`pool agent '${pool.provider}' lacks host tool '${tool}' required by kind '${kind}' (route.riskHints host-tool-required:${tool})`);
   const lm = resolveLaunchModel(target, difficulty, { runtimes });
@@ -211,11 +227,50 @@ function poolRejectionReasons({ pool, target, role, kind, difficulty, capacity, 
   return reasons;
 }
 
+export { ALLOCATION_POLICIES };
+
+// Balanced allocation: each pool's deficit is its owner target share minus its
+// share of the recent dispatches (`recent` = {pool: count}, read from the
+// ledgers by scripts/agent/balance.mjs). Target shares are normalized over the
+// pools the owner named; a pool the owner gave no share targets 0. With no
+// recent dispatches every actual share is 0, so the largest target (then chain
+// order) wins — the same pool prefer-then-overflow would pick at equal shares.
+export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
+  const shareTotal = Object.values(shares ?? {}).reduce((sum, v) => sum + (Number(v) > 0 ? Number(v) : 0), 0);
+  const recentTotal = Object.values(recent ?? {}).reduce((sum, v) => sum + (Number(v) > 0 ? Number(v) : 0), 0);
+  return Object.fromEntries(pools.map((pool) => {
+    const target = shareTotal > 0 ? Math.max(0, Number(shares?.[pool] ?? 0)) / shareTotal : 0;
+    const actual = recentTotal > 0 ? Math.max(0, Number(recent?.[pool] ?? 0)) / recentTotal : 0;
+    return [pool, { target, actual, deficit: target - actual }];
+  }));
+}
+
+// The frontier family a pool belongs to (its provider), for the cross-family
+// audit rule. Only think-order pools have one.
+const frontierProviderOf = (rt, target) => {
+  const frontier = rt?.allocation?.preference?.think ?? [];
+  if (!frontier.includes(target)) return null;
+  return rt?.runtimes?.[target]?.provider ?? target;
+};
+
 // Full pool selection: kind → role and floor (roleOfKind, role overridable),
 // difficulty raised to the floor, chain = tier∩role, bias, then eligibility
-// per candidate (role, host tools, launch model, capacity). Returns the first
-// eligible pool with its launch model, or {error} with the full rejected list.
-export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir } = {}) {
+// per candidate (role, owner grant, host tools, launch model, capacity).
+//   policy prefer-then-overflow (runtimes.yaml default): the first eligible
+//     pool of the biased chain.
+//   policy balanced (config.yaml allocation.policy): among the eligible pools,
+//     the one furthest below its target share (balanceDeficits); `avoid`
+//     still removes, `prefer` only breaks ties, and a pool runtimes.yaml
+//     allocation.balanced.overflowOnly lists for the work class is taken only
+//     when no other pool is eligible.
+//   Cross-family audit (runtimes.yaml allocation.thinkAuditCrossFamily): a
+//     think verify kind auditing a think op's output (`auditOf` = the author's
+//     pool) goes to an eligible frontier pool of the other provider family
+//     when one exists, under either policy.
+// Returns the chosen pool with its launch model, or {error} with the full
+// rejected list.
+export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
+  policy, shares, recent, grants, auditOf } = {}) {
   const rt = runtimes ?? loadRuntimes(modelsDir);
   const measured = normalizeDifficulty(difficulty);
   if (!measured) return { error: `unknown difficulty '${difficulty}'` };
@@ -223,19 +278,66 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const d = raiseToFloor(measured, route.floor);
   const resolvedRole = role ?? route.role;
   if (!resolvedRole) return { error: `no role resolves for kind '${kind}'` };
+  const allocationPolicy = ALLOCATION_POLICIES.includes(policy) ? policy
+    : (ALLOCATION_POLICIES.includes(rt?.allocation?.policy) ? rt.allocation.policy : 'prefer-then-overflow');
+  const balanced = allocationPolicy === 'balanced';
   // Think work walks the tier's `think` order whatever its role; the role
   // still gates each pool below.
   const chainKey = route.work === 'think' ? 'think' : resolvedRole;
   const { chain: unbiased, tierSource } = chainFor({ role: chainKey, difficulty: d, runtimes: rt });
-  const chain = applyBias(unbiased, bias);
+  // Balanced keeps the tier order and lets `prefer` only break deficit ties;
+  // `avoid` removes under both policies.
+  const chain = balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
   const rejected = [];
+  const eligible = [];
   for (const target of chain) {
     const pool = rt?.runtimes?.[target] ?? null;
-    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, runtimes: rt, modelsDir, opsDir });
+    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
+    eligible.push(target);
+    if (!balanced && !auditOf) break; // prefer-then-overflow stops at the first eligible pool
+  }
+  if (eligible.length) {
+    let candidates = eligible;
+    let crossFamily = null;
+    const authorFamily = auditOf && route.work === 'think' && resolvedRole === 'verify'
+      && rt?.allocation?.thinkAuditCrossFamily !== false ? frontierProviderOf(rt, auditOf) : null;
+    if (authorFamily) {
+      const other = candidates.filter((t) => { const f = frontierProviderOf(rt, t); return f && f !== authorFamily; });
+      crossFamily = { author: auditOf, authorFamily, applied: other.length > 0 };
+      if (other.length) candidates = other;
+    }
+    let balance = null;
+    let target;
+    if (balanced) {
+      const workClass = route.work ?? 'hands-on';
+      // overflowOnly.<work class> is a list for every tier, or a map keyed by difficulty tier.
+      const declared = rt?.allocation?.balanced?.overflowOnly?.[workClass];
+      const overflowOnly = (Array.isArray(declared) ? declared : declared?.[d]) ?? [];
+      const primary = candidates.filter((t) => !overflowOnly.includes(t));
+      if (primary.length) candidates = primary;
+      const deficits = balanceDeficits(candidates, { shares, recent });
+      const preferred = new Set((bias?.prefer ?? []).filter(Boolean));
+      const EPS = 1e-9;
+      target = candidates.reduce((best, t) => {
+        if (best === null) return t;
+        const diff = deficits[t].deficit - deficits[best].deficit;
+        if (diff > EPS) return t;
+        if (Math.abs(diff) <= EPS && preferred.has(t) && !preferred.has(best)) return t;
+        return best;
+      }, null);
+      balance = { candidates, deficits };
+    } else {
+      target = candidates[0];
+    }
+    // prefer-then-overflow reports only the pools passed over before the pick.
+    const shownRejected = balanced ? rejected
+      : rejected.filter((r) => chain.indexOf(r.target) < chain.indexOf(target));
+    const pool = rt.runtimes[target];
     const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
     return { target: pool.target ?? target, modelId, effort, role: resolvedRole, work: route.work, difficulty: d,
-      measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected };
+      measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected: shownRejected, policy: allocationPolicy,
+      ...(balance ? { balance } : {}), ...(crossFamily ? { crossFamily } : {}) };
   }
   // No capacity or health state can fix a missing host tool, so when no pool in
   // the chain could ever take the job for want of one, the refusal says which.

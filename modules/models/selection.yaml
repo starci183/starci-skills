@@ -259,8 +259,12 @@ reviewerPolicy:
 #    sources: runtimes.yaml allocation + registry.yaml fallback/selection
 # ---------------------------------------------------------------------------
 allocationFacts:
-  policy: prefer-then-overflow        # runtimes.yaml — try the preferred pool,
-                                      # overflow downward; never sideways-invent
+  policy: prefer-then-overflow        # runtimes.yaml default — try the preferred pool,
+                                      # overflow downward; never sideways-invent.
+  # config.yaml allocation.policy balanced replaces the pick, never the gates: among the eligible pools of
+  # the chain, the one furthest below its allocation.shares target of the recent dispatches wins
+  # (runtimes.yaml allocation.balanced; scripts/agent/balance.mjs counts, models.mjs selectPool picks).
+  balancedPolicy: modules/models/runtimes.yaml allocation.balanced
   # Concurrency is not restated here. modules/models/runtimes.yaml owns every
   # slot count: maxParallelOps is the fleet ceiling, runtimes.<pool>.maxParallel
   # the enforced per-pool limit.
@@ -283,7 +287,9 @@ allocationFacts:
       relative chain order; avoid removes them. Bias is applied AFTER the chain is built and NEVER
       bypasses eligibility: a preferred pool that fails a gate is still rejected with its typed reason.
     eligibility: >-
-      Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles; pool.models[difficulty]
+      Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles; an explicit-workflow-quota
+      pool holds an owner grant covering the role with running < granted slots (when config.yaml declares
+      allocation.grants); pool.models[difficulty]
       exists (no silent cross-difficulty fallback); provider-wide durable capacity.auth ≠ 'dead'; capacity.quota.state ≠
       'dead' (unknown/limited pass); capacity.running < pool.maxParallel; capacity.openIncident ≠ true.
       Every skipped pool is reported in rejected[] with its typed reason. A refreshable stale-token

@@ -79,6 +79,20 @@ const renderArgs = (args, values) => {
 export const envPrefix = (env = {}, plat = process.platform === 'win32' ? 'win32' : 'posix') => Object.entries(env ?? {})
   .filter(([key, value]) => /^[A-Z_][A-Z0-9_]*$/.test(key) && value != null && !/['\r\n]/.test(String(value)))
   .map(([key, value]) => (plat === 'win32' ? `$env:${key}='${value}';` : `export ${key}='${value}';`)).join(' ');
+// A card's credentialRefresh step for one platform, with `<secrets-file>`
+// replaced by the absolute path of credentialRefresh.secretsFile under this
+// runtime root. The step reads the secret from that file inside the terminal's
+// own shell, so no value ever enters the command, a receipt or a log.
+export function credentialRefreshCommand(card, plat = process.platform === 'win32' ? 'win32' : 'posix') {
+  const step = card?.credentialRefresh?.[plat];
+  if (typeof step !== 'string' || !step.trim()) return null;
+  if (!step.includes('<secrets-file>')) return step;
+  const rel = card?.credentialRefresh?.secretsFile;
+  if (typeof rel !== 'string' || !rel.trim() || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) return null;
+  const file = path.join(skillRoot, rel).replace(/\\/g, '/');
+  if (/['\r\n]/.test(file)) return null;
+  return step.replaceAll('<secrets-file>', file);
+}
 export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null } = {}) {
   const { card, error } = loadAdapter(provider);
   if (error) return { provider, error };
@@ -92,7 +106,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // for terminal handle after creation" while the tab still spawns later,
   // untracked. A leading shell call operator runs the same binary on the
   // runtime-owned PTY path qwen and devin already use (agent card reason).
-  const prefix = [envPrefix(env, plat), card?.credentialRefresh?.[plat], card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
+  const prefix = [envPrefix(env, plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
   const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements
