@@ -618,7 +618,7 @@ function cmdSurvey(ledger, args) {
 // Frontier states that are themselves a call to act. 'engaged' is not one —
 // it only becomes actionable when the workflow also holds a ready operation.
 // frontier.actionable is the single boolean the driver's yield rule reads.
-const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'orphaned-frontier', 'idle'];
+const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged', 'ask-reserve', 'orphaned-frontier', 'idle'];
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
@@ -917,6 +917,17 @@ function cmdStatus(ledger, args) {
     return { jobId: row.job_id, opId: row.op_id, attempt: row.attempt, dispatchId, answer: (dispatchId && askAnswers.get(dispatchId)) ?? 'pending' };
   });
   const pendingOwner = awaitingOwner.filter((item) => item.answer === 'pending');
+  // A pending ask is only answerable while its serve-ask form is up. The form
+  // expires (ask-serving-expired, --ttl) and then the owner's link is dead
+  // while the Kernel waits on them: a Modules tax ask sat unanswerable that
+  // way. Such an ask is the Kernel's to re-serve, so it is actionable.
+  const lastLifecycle = (dispatchId, kind) => db.prepare("SELECT seq FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(workflowId, kind, dispatchId)?.seq ?? null;
+  const askReserve = pendingOwner.filter((item) => {
+    if (!item.dispatchId) return false;
+    const served = lastLifecycle(item.dispatchId, 'ask-serving');
+    const expired = lastLifecycle(item.dispatchId, 'ask-serving-expired');
+    return served == null || (expired != null && expired > served);
+  }).map((item) => item.dispatchId);
   const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
 
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
@@ -940,6 +951,7 @@ function cmdStatus(ledger, args) {
     : openOperations > 0 ? 'engaged'
     // Nothing open, but a question is with the owner: the workflow waits on
     // them, not on the Kernel, so nothing should wake it until the answer.
+    : wf.phase === 'running' && askReserve.length > 0 ? 'ask-reserve'
     : wf.phase === 'running' && pendingOwner.length > 0 ? 'awaiting-owner'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
@@ -948,7 +960,7 @@ function cmdStatus(ledger, args) {
   const stale = staleInputProjection(db, wf);
   const staleOperations = staleOperationsOf(stale.staleInput);
   const staleReady = staleOperations.filter((item) => !item.heldBy);
-  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0;
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0;
   const frontier = {
     state: frontierState,
     actionable,
@@ -959,9 +971,12 @@ function cmdStatus(ledger, args) {
     nudgeReadyJobs: nudgeReadyWorkers.map((worker) => worker.jobId),
     wedgedJobs: wedgedWorkers.map((worker) => worker.jobId),
     settleReadyJobs: settleReady,
+    askReserveDispatches: askReserve,
     queued,
     queuedCauses,
-    reason: frontierState === 'settle-ready'
+    reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-nudge-ready', 'worker-wedged'].includes(frontierState))
+      ? `unanswered ask(s) ${askReserve.join(', ')} have no live form (never served or the serve-ask ttl expired); re-serve each with scripts/kernel/serve-ask.mjs --dispatch <id> before yielding`
+      : frontierState === 'settle-ready'
       ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api check and api settle for each before yielding`
       : frontierState === 'worker-wedged'
       ? `${wedgedWorkers.map((worker) => worker.jobId).join(', ')} sat past the wedge threshold on one shell command with no output; api observe once, then api nudge it to interrupt that command, or reconcile and re-dispatch the attempt`

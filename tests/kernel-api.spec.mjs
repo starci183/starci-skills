@@ -94,7 +94,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
-    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],wedgedJobs:[],settleReadyJobs:[],
+    state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],wedgedJobs:[],settleReadyJobs:[],askReserveDispatches:[],
     queued:[],queuedCauses:{},
     reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish',
   });
@@ -371,6 +371,7 @@ test('no open operation plus an unanswered ask is awaiting-owner, not actionable
     job('bd-record',13,'succeeded',{verdict:'pass'});
     ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'ask',?,?,?)`)
       .run(wf,'ctx_tax','business.decide',12,json({outcome:'ask',summary:'tax',question:{text:'tax?'}}),at,at);
+    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x'}});
   });
   const status=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r);};
   let s=status();
@@ -425,6 +426,31 @@ test('a Work record dependsOn owned by another open job holds the job as depende
   seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(base));
   assert.equal(because(tasks).queuedBecause,'ready','the succeeded owner releases its dependents');
   assert.deepEqual(because(approval).blockedBy,{op:'docs.author',job:tasks});
+});
+
+// The Modules tax ask's serve-ask form hit its ttl while the kernel waited on
+// the owner; the owner's link was dead and nothing re-served it.
+test('an unanswered ask whose form expired is ask-reserve (actionable); a live form is awaiting-owner',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-ask-reserve';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>{
+    const at=Date.now();
+    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
+      VALUES('bd-tax',?,'business.decide',1,0,'op','op',?,'failed',?,?,?)`).run(wf,json({opId:'business.decide'}),json({verdict:'awaiting-owner',askDispatchId:'ctx_tax'}),at,at);
+    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,'ctx_tax','business.decide',1,0,'ask',?,?,?)`)
+      .run(wf,json({outcome:'ask',summary:'tax',question:{text:'tax?'}}),at,at);
+    ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x'}});
+  });
+  const frontier=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r).frontier;};
+  assert.equal(frontier().state,'awaiting-owner','a live form waits on the owner');
+  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving-expired',payload:{dispatchId:'ctx_tax'}}));
+  let f=frontier();
+  assert.equal(f.state,'ask-reserve');
+  assert.equal(f.actionable,true);
+  assert.deepEqual(f.askReserveDispatches,['ctx_tax']);
+  seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-y'}}));
+  assert.equal(frontier().state,'awaiting-owner','re-served, it waits on the owner again');
 });
 
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
