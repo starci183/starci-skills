@@ -1027,6 +1027,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   Modules giữ slice. Sửa phạm vi P7 của fork: ops nivo khai báo push:false (nivo-backend đi trước origin 198 commit), nên
   landed-check chỉ đòi owned paths sạch và commit có trong HEAD local; origin chỉ khi push:true.
 
+- 08:20 Lane xong `09c3af799`: decisionLog (đóng, rev/at/gap/chosen/why/alternatives?) thêm vào extensions.work3 của 16 schema
+  flat; phát hiện 15/16 schema chưa hề nối extensions vào properties (cả integrations mà business.decide đang ghi cũng bị từ
+  chối). Luật legacy: phần chỉ nằm trong work/node cũ được sửa ở bản ghi flat tương ứng (rev 1 = chép lại, rev 2 = sửa,
+  change.reason nêu bản legacy bị thay). Check xanh, spec 104/104. Đã báo kernel Modules chạy lại a8.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
