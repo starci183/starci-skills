@@ -34,12 +34,15 @@ const nearestExistingDir = (abs) => {
 };
 
 // Owned paths grouped by the git checkout that holds each one, as pathspecs
-// relative to that checkout's top level. A path in no checkout is left out; no
-// checkout at all means the job predates a resolvable target.
-export function landingRepos({ base, ownedPaths, timeoutMs }) {
+// relative to that checkout's top level. `placements` ({base, path, role} per
+// owned path, scripts/kernel/target-repo.mjs ownedPathPlacements) resolve each
+// path against its own repository; without them every path resolves against
+// `base`. A path in no checkout is left out; no checkout at all means the job
+// predates a resolvable target.
+export function landingRepos({ base, ownedPaths = [], placements, timeoutMs }) {
   const repos = new Map();
-  for (const owned of ownedPaths) {
-    const abs = path.resolve(base, owned);
+  for (const item of placements ?? ownedPaths.map((owned) => ({ base, path: owned, role: null }))) {
+    const abs = path.resolve(item.base, item.path);
     const dir = nearestExistingDir(abs);
     if (!dir) continue;
     const top = git(dir, ['rev-parse', '--show-toplevel'], timeoutMs);
@@ -48,8 +51,8 @@ export function landingRepos({ base, ownedPaths, timeoutMs }) {
     const root = path.resolve(top.stdout.trim());
     const rest = path.relative(dir, abs).replaceAll('\\', '/');
     const spec = `${prefix.stdout.trim()}${rest}`.replace(/\/+$/, '') || '.';
-    if (!repos.has(root)) repos.set(root, []);
-    repos.get(root).push(spec);
+    if (!repos.has(root)) repos.set(root, { specs: [], role: item.role ?? null });
+    repos.get(root).specs.push(spec);
   }
   return repos;
 }
@@ -64,16 +67,27 @@ const dirtyOf = (root, specs, timeoutMs, label) => {
 
 // Returns {checked:false, why} when the job names no resolvable checkout (the
 // settle then behaves as it always has), else {checked:true, ok, reason?, detail}.
-export function landedProof({ base, ownedPaths, head, branch, pushes }) {
+// A placement with {unresolved} (a repository id the binding cannot resolve)
+// is landed-unverifiable before any git read. detail.repos names the checkout,
+// binding role and dirty paths of every repository checked.
+export function landedProof({ base, ownedPaths, placements, head, branch, pushes }) {
   const timeoutMs = allocationMs('settleGit.commandMs');
-  const repos = landingRepos({ base, ownedPaths, timeoutMs });
+  const unresolved = (placements ?? []).filter((p) => p.unresolved);
+  if (unresolved.length) {
+    return { checked: true, ok: false, reason: 'landed-unverifiable', detail: {
+      step: 'repository', error: 'owned path names a repository the project binding cannot resolve',
+      unresolved: unresolved.map((p) => ({ path: p.owned, repository: p.repository, via: p.via })),
+    } };
+  }
+  const repos = landingRepos({ base, ownedPaths, placements, timeoutMs });
   if (!repos.size) return { checked: false, why: 'repo-unresolved' };
   const multi = repos.size > 1;
-  const dirty = [], missing = [];
-  for (const [root, specs] of repos) {
+  const dirty = [], missing = [], checked = [];
+  for (const [root, { specs, role }] of repos) {
     const d = dirtyOf(root, specs, timeoutMs, multi ? `${root}:` : '');
-    if (d.error) return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { repo: root, step: 'status', error: d.error } };
+    if (d.error) return { checked: true, ok: false, reason: 'landed-unverifiable', detail: { repo: root, role, step: 'status', error: d.error } };
     dirty.push(...d.dirty);
+    checked.push({ repo: root, role, paths: specs, dirty: d.dirty.map((p) => (multi ? p.slice(root.length + 1) : p)) });
   }
   const claimed = typeof head === 'string' && head.trim() ? head.trim() : null;
   let repo = [...repos.keys()][0];
@@ -93,7 +107,7 @@ export function landedProof({ base, ownedPaths, head, branch, pushes }) {
     }
   }
   const localHead = git(repo, ['rev-parse', 'HEAD'], timeoutMs);
-  const detail = { repo, dirty, head: claimed, headCheck, localHead: localHead.ok ? localHead.stdout.trim() : null, missing };
+  const detail = { repo, dirty, repos: checked, head: claimed, headCheck, localHead: localHead.ok ? localHead.stdout.trim() : null, missing };
   if (dirty.length || missing.length || !pushes) {
     return dirty.length || missing.length
       ? { checked: true, ok: false, reason: 'not-landed', detail }
