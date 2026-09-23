@@ -27,6 +27,15 @@
 // the model is accepted only after its exact id renders on screen.
 //
 //   node scripts/kernel/start-workflow.mjs --repo <path> [--goal <workflow_id>] [--agent <name>] [--plan] [--json]
+//   node scripts/kernel/start-workflow.mjs --repo <path> --goal <workflow_id> --adopt <terminal> [--json]
+//
+// A replacement needs a kernel proven dead by a RESPONDING Orca
+// (scripts/kernel/host-outage.mjs). An Orca outage (runtime_unavailable,
+// orca.exe ENOENT during an update) is refused with step host-unavailable and
+// exit 75, touching nothing; a kernel job whose terminal is still alive while
+// its signal is gone is refused with step kernel-terminal-alive (exit 3), and
+// --adopt <terminal> binds that live kernel back: signal re-written, job
+// running, the residue incidents of the failed restart resolved.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -36,7 +45,9 @@ import { openLedger, ledgerFileFor, transitionWorkflowToRunning } from '../../en
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent } from '../agent/lib.mjs';
-import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalRead } from '../api/orca/terminal-read.mjs';
+import { kernelTerminalVerdict } from './host-outage.mjs';
+import { classifyAgentScreen } from './terminal-liveness.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
@@ -50,6 +61,7 @@ const repo = path.resolve(arg('repo', process.cwd()));
 const agentOverride = arg('agent');
 const goalId = arg('goal'); // explicit <workflow_id> — per modules/kernel/start-workflow.yaml
 const asJson = process.argv.includes('--json');
+const adoptHandle = arg('adopt');
 const planOnly = process.argv.includes('--plan');
 
 const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
@@ -354,12 +366,110 @@ async function signalHealth(signal) {
     };
   }
   if (!value.terminal) return { live: false, reason: 'signal has no terminal handle', terminal: null, value };
-  const shown = terminalShow({ terminal: value.terminal });
-  const live = shown.ok && shown.connected && shown.writable;
   // A running Orca that no longer knows the handle (every terminal after a
-  // host reboot) proves there is nothing left to close.
-  const gone = !shown.ok && TERMINAL_GONE_CODES.has(shown.errorCode);
-  return { live, gone, reason: live ? 'terminal connected' : gone ? shown.errorCode : (shown.error || shown.exitCause || 'terminal disconnected'), terminal: shown.terminal, value };
+  // host reboot) proves there is nothing left to close (gone). An Orca that
+  // does not answer proves nothing (hostUnavailable), and neither does a
+  // refusal the listing cannot settle (unverified).
+  const probe = kernelTerminalVerdict(value.terminal);
+  return { live: probe.verdict === 'live', gone: probe.verdict === 'gone',
+    hostUnavailable: probe.verdict === 'host-unavailable', unverified: probe.verdict === 'unverified',
+    errorCode: probe.errorCode ?? null, reason: probe.reason, terminal: probe.shown?.terminal ?? null, value };
+}
+
+// A refusal that changed nothing: JSON on stdout (the watchdog reads it) and a
+// distinct exit code - 75 (EX_TEMPFAIL) when Orca is not answering.
+function refuse(step, fields = {}, code = 1) {
+  const out = { ok: false, step, ...fields };
+  if (asJson) console.log(JSON.stringify(out));
+  else console.error(`start-workflow: ${step}: ${fields.error ?? ''}`);
+  process.exit(code);
+}
+const EXIT_HOST_UNAVAILABLE = 75;
+const EXIT_KERNEL_ALIVE = 3;
+const parseJson = (text) => { try { return JSON.parse(text || '{}') ?? {}; } catch { return {}; } };
+
+// The kernel job's own terminal handles: the worker_id and the hierarchy seat.
+function kernelJobHandles(job) {
+  if (!job) return [];
+  const payload = parseJson(job.payload_json);
+  return [...new Set([job.worker_id, payload?.hierarchy?.runtime?.terminalHandle].filter(Boolean))];
+}
+
+// Bind a live kernel terminal back to its workflow (--adopt). The terminal must
+// be proven this workflow's kernel (the kernel job or a kernel event names it),
+// live on a responding Orca, in this repo's worktree and showing an agent; the
+// current signal must not be a different live kernel.
+async function adoptKernel(workflowId, handle) {
+  const wf = ledger.db.prepare('SELECT phase,generation FROM workflows WHERE workflow_id=?').get(workflowId);
+  if (!wf) refuse('adopt-no-workflow', { workflowId, terminal: handle, error: `no workflow ${workflowId}` });
+  const jobId = `kernel-${workflowId}`;
+  const job = ledger.db.prepare('SELECT job_id,status,worker_id,attempt,payload_json FROM jobs WHERE job_id=?').get(jobId);
+  if (!job) refuse('adopt-no-kernel-job', { workflowId, terminal: handle, error: `${jobId} does not exist; boot the kernel instead` });
+  const events = ledger.db.prepare("SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND entity_type='kernel' AND payload_json LIKE ? ORDER BY created_at")
+    .all(workflowId, `%${handle}%`).map((e) => ({ ...e, payload: parseJson(e.payload_json) }));
+  const namedByEvent = events.some((e) => e.payload?.terminal === handle || e.payload?.handle === handle);
+  if (!kernelJobHandles(job).includes(handle) && !namedByEvent)
+    refuse('adopt-terminal-not-this-kernel', { workflowId, terminal: handle,
+      error: `${handle} is neither ${jobId}'s terminal nor named by a kernel event of ${workflowId}` });
+
+  const priorSignal = ledger.db.prepare("SELECT * FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
+  const priorValue = parseJson(priorSignal?.value_json);
+  let priorHealth = null;
+  if (priorSignal && priorValue.terminal !== handle) {
+    priorHealth = await signalHealth(priorSignal);
+    if (priorHealth.hostUnavailable) refuse('host-unavailable', { workflowId, terminal: handle, error: priorHealth.reason }, EXIT_HOST_UNAVAILABLE);
+    if (priorHealth.live) refuse('kernel-already-live', { workflowId, terminal: handle, liveTerminal: priorValue.terminal ?? null,
+      error: `${workflowId} already has a live kernel (${priorValue.terminal ?? priorSignal.token}); quit and close it first` });
+    if (priorHealth.unverified) refuse('kernel-terminal-unverified', { workflowId, terminal: priorValue.terminal ?? null, error: priorHealth.reason });
+  }
+
+  const probe = kernelTerminalVerdict(handle);
+  if (probe.verdict === 'host-unavailable') refuse('host-unavailable', { workflowId, terminal: handle, error: probe.reason }, EXIT_HOST_UNAVAILABLE);
+  if (probe.verdict !== 'live') refuse('adopt-terminal-not-live', { workflowId, terminal: handle, error: probe.reason });
+  const worktreePath = probe.shown?.terminal?.worktreePath ?? null;
+  if (worktreePath && !samePath(worktreePath, repo))
+    refuse('adopt-terminal-wrong-worktree', { workflowId, terminal: handle, error: `${handle} runs in ${worktreePath}, not ${repo}` });
+  const read = terminalRead({ terminal: handle, screen: true });
+  const screenState = read.ok ? classifyAgentScreen(read.screen).state : 'unreadable';
+  if (['failed', 'unknown', 'unreadable'].includes(screenState))
+    refuse('adopt-terminal-no-agent', { workflowId, terminal: handle, screenState,
+      error: `${handle} shows no agent session (${screenState}); a bare shell or a dead agent is not a kernel` });
+
+  // The seat facts the terminal was launched with, from its own boot event.
+  const boot = [...events].reverse().find((e) => ['kernel-booted', 'kernel-restarted', 'kernel-adopted'].includes(e.kind) && e.payload?.terminal === handle)?.payload ?? {};
+  const agent = boot.agent ?? probe.shown?.terminal?.agentIdentity ?? null;
+  const seat = { terminal: handle, host: 'orca', agent, routedBy: boot.routedBy ?? 'adopted', model: boot.model ?? null,
+    effort: boot.effort ?? null, launch: 'terminal', modelAttested: boot.modelAttested === true, adopted: true };
+  const token = `kernel-${crypto.randomBytes(6).toString('hex')}`;
+  const now = Date.now();
+  const previousPayload = parseJson(job.payload_json);
+  const payload = JSON.stringify({
+    ...previousPayload,
+    route: { ...(previousPayload.route ?? {}), host: 'orca', agent, routedBy: seat.routedBy, model: seat.model, effort: seat.effort, launch: 'terminal' },
+    hierarchy: { ...(previousPayload.hierarchy ?? {}),
+      runtime: { ...(previousPayload.hierarchy?.runtime ?? {}), host: 'orca', agent, provider: agent, model: seat.model, terminalHandle: handle } },
+  });
+  let resolved = [];
+  ledger.transaction(() => {
+    ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId);
+    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,?,?,?,NULL)")
+      .run(workflowId, process.pid, token, JSON.stringify(seat), now);
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id=?,result_json=NULL,payload_json=?,updated_at=? WHERE job_id=?")
+      .run(handle, payload, now, jobId);
+    // The failed restart recorded this very terminal as unclosed residue; it is the kernel again.
+    resolved = ledger.db.prepare("SELECT incident_id FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE '%kernel-stale-terminal-unclosed%' AND last_progress LIKE ?")
+      .all(workflowId, `%${handle}%`).map((row) => row.incident_id);
+    for (const id of resolved) ledger.db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(now, id);
+    ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: wf.generation ?? 0, kind: 'kernel-adopted', createdAt: now,
+      payload: { ...seat, screenState, attempt: job.attempt,
+        previousJob: { status: job.status, worker_id: job.worker_id },
+        previousSignal: priorSignal ? { token: priorSignal.token, terminal: priorValue.terminal ?? null, reason: priorHealth?.reason ?? null } : null,
+        resolvedIncidents: resolved } });
+  });
+  const out = { ok: true, workflowId, kernel: token, terminal: handle, adopted: true, agent, model: seat.model, screenState,
+    previousJobStatus: job.status, resolvedIncidents: resolved, replaced: false };
+  console.log(asJson ? JSON.stringify(out) : `[Kernel] ${workflowId} adopted live terminal ${handle} (${agent ?? 'agent?'}; ${screenState})`);
+  process.exit(0);
 }
 
 // Best-effort settlement of a managed dispatch (stale kernel replacement or a
@@ -430,6 +540,8 @@ try {
       ledger: ledgerFileFor(repo), frontend: context?.fe ?? null,
       kernel: health.live
         ? `LIVE (${signal.token}; ${health.reason}) — will not spawn a second`
+        : health.hostUnavailable || health.unverified
+          ? `UNPROVEN (${signal.token}; ${health.reason}) — no replacement until Orca proves it dead`
         : signal
           ? `STALE (${signal.token}; ${health.reason}) — will replace on start`
           : route.error
@@ -461,6 +573,11 @@ try {
     if (wf?.phase === 'finished') { console.error(`goal ${goalId} is finished — finished goals never re-enter the queue`); process.exit(1); }
   }
 
+  if (adoptHandle) {
+    if (!goalId) refuse('adopt-needs-goal', { terminal: adoptHandle, error: '--adopt needs --goal <workflow_id>' });
+    await adoptKernel(goalId, adoptHandle);
+  }
+
   if (!target) { console.log(asJson ? '{"ok":true,"reason":"queue-empty"}' : 'queue empty — no pending or claimed goal'); process.exit(0); }
 
   // A signal is only live when its Orca terminal is connected and writable. A
@@ -472,6 +589,28 @@ try {
       ...(priorHealth.value?.dispatch ? { dispatch: priorHealth.value.dispatch } : {}), replaced: false, note: priorHealth.reason };
     console.log(asJson ? JSON.stringify(out) : `kernel already live for ${target} (${priorSignal.token})`);
     process.exit(0);
+  }
+  // An Orca outage or an unsettled refusal proves nothing: touch no seat.
+  if (priorSignal && priorHealth.hostUnavailable)
+    refuse('host-unavailable', { workflowId: target, terminal: priorHealth.value?.terminal ?? null, error: priorHealth.reason }, EXIT_HOST_UNAVAILABLE);
+  if (priorSignal && priorHealth.unverified)
+    refuse('kernel-terminal-unverified', { workflowId: target, terminal: priorHealth.value?.terminal ?? null, error: priorHealth.reason });
+  // The seat may be gone while the kernel is not: a restart that failed during
+  // an Orca outage stopped the job and deleted the signal of a kernel that kept
+  // running. Never launch a second kernel beside it; --adopt binds it back.
+  {
+    const kernelJob = ledger.db.prepare('SELECT status,worker_id,payload_json FROM jobs WHERE job_id=?').get(`kernel-${target}`);
+    for (const handle of kernelJobHandles(kernelJob)) {
+      if (handle === priorHealth.value?.terminal) continue;
+      const probe = kernelTerminalVerdict(handle);
+      if (probe.verdict === 'host-unavailable')
+        refuse('host-unavailable', { workflowId: target, terminal: handle, error: probe.reason }, EXIT_HOST_UNAVAILABLE);
+      if (probe.verdict === 'unverified')
+        refuse('kernel-terminal-unverified', { workflowId: target, terminal: handle, error: probe.reason });
+      if (probe.verdict === 'live')
+        refuse('kernel-terminal-alive', { workflowId: target, terminal: handle, jobStatus: kernelJob.status,
+          error: `kernel job terminal ${handle} is alive (job ${kernelJob.status}); adopt it with --adopt ${handle} instead of launching a second kernel` }, EXIT_KERNEL_ALIVE);
+    }
   }
   let staleKernel = null;
   if (priorSignal) {

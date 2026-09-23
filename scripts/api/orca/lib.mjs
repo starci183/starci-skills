@@ -29,7 +29,35 @@ export const READ_MAX_BUFFER = 64 * 1024 * 1024;
 
 export function orcaRun(args, { timeout = 120000, maxBuffer } = {}) {
   const r = spawnSync(ORCA, [...ORCA_PREFIX_ARGS, ...args], { encoding: 'utf8', timeout, windowsHide: true, ...(maxBuffer ? { maxBuffer } : {}) });
-  return { status: r.status, error: r.error?.message, stdout: r.stdout?.trim(), stderr: r.stderr?.trim() };
+  return { status: r.status, error: r.error?.message, spawnError: r.error?.code ?? (r.error ? 'spawn-error' : null),
+    stdout: r.stdout?.trim(), stderr: r.stderr?.trim() };
+}
+
+// ---- host outage ------------------------------------------------------------
+// An Orca that is not answering says nothing about any terminal. On 2026-09-24
+// Orca auto-updated (1.4.188 -> 1.4.209) and restarted: for about a minute the
+// CLI answered runtime_unavailable ("Could not read Orca runtime metadata ...
+// Start the Orca app first") and, while the binary was being replaced, spawning
+// orca.exe failed with ENOENT. The terminal daemon and every kernel survived,
+// but the watchdogs read both answers as dead kernels: six workflows lost their
+// kernel seat and one got a second kernel. A host-unavailable answer is never
+// evidence about a terminal - callers wait and re-verify once Orca answers.
+export const HOST_UNAVAILABLE_CODES = new Set(['runtime_unavailable']);
+const HOST_DOWN_TEXT = /could not read orca runtime metadata|start the orca app first/i;
+
+/**
+ * True when an Orca call got no answer from a running Orca: the binary could
+ * not be spawned (ENOENT/EACCES while an update replaces it), the call timed
+ * out or was killed, or Orca answered its own runtime_unavailable.
+ */
+export function hostUnavailableOf(run, receipt) {
+  if (!run) return false;
+  if (run.spawnError) return true;
+  if (run.status === null || run.status === undefined) return true;
+  const code = receipt?.error?.code;
+  if (typeof code === 'string' && HOST_UNAVAILABLE_CODES.has(code)) return true;
+  const message = typeof receipt?.error === 'string' ? receipt.error : receipt?.error?.message;
+  return run.status !== 0 && HOST_DOWN_TEXT.test(`${message ?? ''}\n${run.stderr ?? ''}\n${receipt ? '' : run.stdout ?? ''}`);
 }
 
 export const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -151,21 +179,25 @@ export function missingFrom(listing, entry, jsonFlag = JSON_FLAG) {
   return missing.length ? { command: entry.command, flags: missing } : null;
 }
 
+// Only a read listing is kept: a host that did not answer is asked again at the
+// next mutation instead of refusing every later call of this process.
+let listingHostUnavailable = false;
 function agentContextListing() {
-  if (liveListing !== undefined) return liveListing;
+  if (liveListing) return liveListing;
   const entry = CALLS.calls?.['agent-context'];
-  liveListing = null;
-  if (!entry) return liveListing;
+  if (!entry) return null;
   const r = orcaRun([...words(entry.command), `--${JSON_FLAG}`],
     { timeout: entry.timeoutMs ?? CALLS.defaults?.timeoutMs ?? 30000 });
   const receipt = jsonOf(r.stdout);
   liveListing = listingOf(receipt?.commands ?? receipt?.result?.commands ?? null);
+  listingHostUnavailable = !liveListing && hostUnavailableOf(r, receipt);
   return liveListing;
 }
 
 const liveDrift = (entry) => missingFrom(agentContextListing(), entry);
 
 const driftEnvelope = (verb, entry, missing) => ({
+  hostUnavailable: missing.listing === 'unreadable' && listingHostUnavailable,
   schema: ENVELOPE_SCHEMA,
   verb,
   command: entry.command,
@@ -210,6 +242,7 @@ export function orcaCall(verb, params = {}, { timeout } = {}) {
     outcome,
     effectState,
     reason,
+    hostUnavailable: hostUnavailableOf(r, receipt),
     missing: null,
     exitCode: r.status,
     receipt,

@@ -4,7 +4,10 @@
 // The watchdog is deliberately NOT a second orchestrator.  It may read the
 // canonical status/survey projections, observe the attested Kernel terminal,
 // wake the same terminal after an LLM turn falls back to its input prompt, or
-// ask start-workflow to replace a terminal proven disconnected.  It never
+// ask start-workflow to replace a terminal a responding Orca proves
+// disconnected (twice), or to adopt back a live kernel whose seat was lost.
+// An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable:
+// waited out and re-verified, never a restart (scripts/kernel/host-outage.mjs).  It never
 // plans, enqueues, routes, dispatches, reconciles, settles or finishes Ops.
 //
 //   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id>
@@ -22,9 +25,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-delivery.mjs';
+import { settledKernelVerdict, DEAD_VERDICTS } from './host-outage.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -91,6 +94,28 @@ export const buildWakePrompt = workflow => [
 
 const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(repo), '--workflow', workflowId, '--json']);
 
+// Replace the seat through start-workflow, which re-proves the old kernel dead
+// itself. Its refusals are answers, not failures: an Orca that is not answering
+// (step host-unavailable) is waited out by the next tick, and a kernel terminal
+// that is still alive but unbound (step kernel-terminal-alive - a restart that
+// failed during an Orca outage left the job stopped) is adopted back instead of
+// being replaced by a second kernel.
+const replaceKernel = (base) => {
+  const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--json']);
+  const step = started.value?.step ?? null;
+  if (step === 'host-unavailable') return { ...base, ok: true, action: 'host-unavailable', reason: started.value?.error ?? null };
+  if (step === 'kernel-terminal-alive' && started.value?.terminal) {
+    const adopted = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--adopt', started.value.terminal, '--json']);
+    return { ...base, ok: adopted.ok && adopted.value?.ok !== false, action: adopted.ok ? 'adopted' : 'adopt-failed',
+      adoptedTerminal: started.value.terminal, detail: adopted.value ?? adopted.stderr ?? adopted.stdout };
+  }
+  return {
+    ...base, ok: started.ok && started.value?.ok !== false, action: started.ok ? 'restarted' : 'restart-failed',
+    replacementTerminal: started.value?.terminal ?? null,
+    detail: started.value ?? started.stderr ?? started.stdout,
+  };
+};
+
 export async function watchdogTick() {
   const status = api('status');
   if (!status.ok || !status.value?.ok) return {
@@ -111,29 +136,26 @@ export async function watchdogTick() {
 
   if (!terminal) {
     if (!repair) return { ok: true, workflowId, phase, action: 'restart-needed', reason: 'kernel signal/terminal absent' };
-    const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--json']);
-    return {
-      ok: started.ok && started.value?.ok !== false,
-      workflowId, phase, action: started.ok ? 'restarted' : 'restart-failed',
-      terminal: started.value?.terminal ?? null,
-      detail: started.value ?? started.stderr ?? started.stdout,
-    };
+    const replaced = replaceKernel({ workflowId, phase });
+    return { ...replaced, terminal: replaced.replacementTerminal ?? replaced.adoptedTerminal ?? null };
   }
 
-  const shown = terminalShow({ terminal });
-  if (!shown.ok || !shown.connected || !shown.writable) {
-    if (!repair) return {
-      ok: true, workflowId, phase, terminal, action: 'restart-needed',
-      reason: shown.error || shown.exitCause || 'kernel terminal disconnected or unwritable',
-    };
-    const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--json']);
-    return {
-      ok: started.ok && started.value?.ok !== false,
-      workflowId, phase, terminal, action: started.ok ? 'restarted' : 'restart-failed',
-      replacementTerminal: started.value?.terminal ?? null,
-      detail: started.value ?? started.stderr ?? started.stdout,
-    };
+  // An Orca outage is never a dead kernel: wait for Orca to answer, probe
+  // again, and confirm a death with a second probe (scripts/kernel/host-outage.mjs).
+  const verdict = settledKernelVerdict(terminal, repair ? {} : { waitMs: 0, settleMs: 0 });
+  if (verdict.verdict === 'host-unavailable') return {
+    ok: true, workflowId, phase, terminal, action: 'host-unavailable', reason: verdict.reason,
+    ...(verdict.hostWait ? { hostWaitMs: verdict.hostWait.waitedMs } : {}),
+  };
+  if (verdict.verdict === 'unverified') return {
+    ok: false, workflowId, phase, terminal, action: 'terminal-unverified',
+    reason: `${verdict.reason}; an unproven death never replaces a kernel`,
+  };
+  if (DEAD_VERDICTS.has(verdict.verdict)) {
+    if (!repair) return { ok: true, workflowId, phase, terminal, action: 'restart-needed', reason: verdict.reason };
+    return replaceKernel({ workflowId, phase, terminal, deathReason: verdict.reason });
   }
+  const shown = verdict.shown;
 
   const read = terminalRead({ terminal, screen: true });
   if (!read.ok) return { ok: false, workflowId, phase, terminal, action: 'terminal-unreadable', error: read.error };

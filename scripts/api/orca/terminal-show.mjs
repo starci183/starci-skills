@@ -5,7 +5,9 @@
 // errorCode is Orca's typed refusal (receipt error.code) when it answered one:
 // a running Orca that no longer knows a handle — every terminal after a host
 // reboot — answers terminal_handle_stale, which is not the same as Orca being
-// unreachable (no receipt, errorCode null).
+// unreachable. hostUnavailable marks that second case (runtime_unavailable,
+// orca.exe ENOENT while an update replaces it, a timed-out call): it says
+// nothing about the terminal, so no caller may read it as a dead one.
 import { orcaCall, terminalOf, arg } from './lib.mjs';
 
 export function terminalShow({ terminal }) {
@@ -18,8 +20,9 @@ export function terminalShow({ terminal }) {
     connected: t?.connected === true,
     writable: t?.writable !== false,
     exitCause: t?.exitCause?.reason ?? null,
-    error: r.error,
+    error: r.error || (typeof r.receipt?.error === 'string' ? r.receipt.error : r.receipt?.error?.message) || null,
     errorCode: typeof code === 'string' && code ? code : null,
+    hostUnavailable: r.hostUnavailable === true,
   };
 }
 

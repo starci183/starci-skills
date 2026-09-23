@@ -9,7 +9,7 @@ import { orcaCall, arg, flag } from './lib.mjs';
 export function terminalList({ worktree, includeVisualLayouts = false } = {}) {
   const r = orcaCall('terminal-list', { worktree, 'include-visual-layouts': includeVisualLayouts === true });
   return { ok: r.exitCode === 0, terminals: r.result?.terminals ?? [],
-    visualLayouts: r.result?.visualLayouts ?? [], error: r.error };
+    visualLayouts: r.result?.visualLayouts ?? [], error: r.error, hostUnavailable: r.hostUnavailable === true };
 }
 
 if (process.argv[1]?.endsWith('terminal-list.mjs')) {

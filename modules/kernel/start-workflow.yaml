@@ -45,10 +45,11 @@ actor: >-
 host: orca
 executable: scripts/kernel/start-workflow.mjs
 
-usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>]
+usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>] [--adopt <terminal>]
 # --repo is the project repository that owns .starciwork/runtime.sqlite, not Source
 # without --goal: claims the oldest pending inbox goal
 # --agent pins an explicit Kernel agent override (routedBy: override)
+# --adopt binds a live kernel terminal back to its workflow (see claim.onLostSeat)
 
 claim:
   transaction: >-
@@ -58,7 +59,28 @@ claim:
     inbox 'claimed' with no signal, an expired startup reservation, or a signal
     whose Orca terminal is disconnected/unwritable → clear the stale binding and
     spawn a replacement kernel for the same workflow (kernel attempt+1; workflow
-    generation is unchanged).
+    generation is unchanged). Dead means a RESPONDING Orca says so
+    (scripts/kernel/host-outage.mjs): the handle is terminal_handle_stale or
+    missing from the listing, or listed disconnected/unwritable.
+  onHostOutage: >-
+    Orca not answering - runtime_unavailable, orca.exe ENOENT while an update
+    replaces it, a timed-out call - says nothing about any terminal. It is
+    host-unavailable: start-workflow refuses (step host-unavailable, exit 75)
+    before touching the signal, the job or any terminal, and the watchdog waits
+    with backoff, re-probes once Orca answers and confirms a death with a
+    second probe before it asks for a replacement (2026-09-24 Orca
+    auto-update: six kernel seats lost, one kernel duplicated).
+  onLostSeat: >-
+    A kernel job whose terminal is alive while its signal is gone (a restart
+    that failed mid-outage) is never replaced: start-workflow refuses (step
+    kernel-terminal-alive, exit 3) and `--adopt <terminal>` binds it back - the
+    terminal must be named by the kernel job or a kernel event of the
+    workflow, live on a responding Orca, in the repo's worktree and showing an
+    agent session, and no other live kernel may hold the signal. Adopt writes
+    the signal, marks the job running with that worker, resolves the open
+    kernel-stale-terminal-unclosed incidents naming it, records
+    kernel-adopted and types nothing into the terminal. The watchdog adopts on
+    its own when start-workflow answers kernel-terminal-alive.
   onFinished: >-
     workflows.phase='finished' refuses a new kernel — a completed goal is gone
     from the queue for good.

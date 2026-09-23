@@ -86,6 +86,14 @@
 //                          `terminal close` is refused ('*' refuses every
 //                          close) — drives the unclosed-stale-kernel spec.
 //
+//   STARCI_FAKE_ORCA_HOST 'runtime_unavailable': Orca is not running; every
+//                          call answers {error:{code:'runtime_unavailable'}}
+//                          (state.hostDown does the same from the state file).
+//   STARCI_FAKE_ORCA_HOST_DOWN_CALLS <n>: only the first n calls answer it -
+//                          an Orca restart that comes back mid-sequence.
+//   ENOENT (orca.exe missing while an update replaces it) is not a stub mode:
+//                          point STARCI_ORCA_COMMAND at MISSING_ORCA_COMMAND.
+//
 //   STARCI_FAKE_ORCA_OMIT_COMMAND comma-separated Orca commands ('terminal
 //                          send') the agent-context listing leaves out — drives
 //                          the host-contract-drift refusal spec.
@@ -192,6 +200,18 @@ const SCREEN_OF = r => r.dropStaged ? [String(r.screen), ...codexRows(r.prompt)]
     ? [String(r.screen), ...wrapRows(r.prompt, 76).map((row, i) => (i === 0 ? '❯ ' : '  ') + row), '✻ Pondering… (2s · ↓ 12 tokens)', ...CLAUDE_CHROME].join('\n')
     : String(r.screen);
 const verb = argv.slice(0, 2).join(' ');
+// STARCI_FAKE_ORCA_HOST='runtime_unavailable' (or state.hostDown): Orca is not
+// running - every call, agent-context included, answers the observed refusal
+// with an empty stderr and exit 1. STARCI_FAKE_ORCA_HOST_DOWN_CALLS=<n>: only
+// the first n calls do (an Orca app restarting, then back); state.hostDownServed
+// counts them. The terminals themselves are untouched: the daemon kept them.
+const hostDownCalls = Number(process.env.STARCI_FAKE_ORCA_HOST_DOWN_CALLS || 0);
+const hostDown = (process.env.STARCI_FAKE_ORCA_HOST || state.hostDown || '') === 'runtime_unavailable'
+  || (hostDownCalls > 0 && (state.hostDownServed || 0) < hostDownCalls);
+if (hostDown) {
+  state.hostDownServed = (state.hostDownServed || 0) + 1; save();
+  fail({ ok: false, error: { code: 'runtime_unavailable', message: 'Could not read Orca runtime metadata at C:\\Users\\fake\\AppData\\Roaming\\orca\\orca-runtime.json. Start the Orca app first.' } });
+}
 // The live-schema listing scripts/api/orca/lib.mjs compares against, derived
 // from calls.yaml so the stub can never disagree with the contract by accident.
 if (argv[0] === 'agent-context') {
@@ -464,3 +484,6 @@ process.exit(0);
 // was written from — the spec's tmp dir is not a StarCi tree.
 const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..').replaceAll('\\', '/');
 export const FAKE_ORCA = FAKE_ORCA_SOURCE.replace('__STARCI_ROOT__', JSON.stringify(REPO_ROOT));
+// A command that does not exist: spawning it fails with ENOENT, the answer a
+// caller got while an Orca auto-update was replacing orca.exe.
+export const MISSING_ORCA_COMMAND = path.join(REPO_ROOT, 'tests', 'fixtures', 'no-such-orca', 'orca.exe');
