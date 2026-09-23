@@ -63,6 +63,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { closeOperationTerminal } from './close-op-terminal.mjs';
+import { reapAgentProcess } from './reap-agent-process.mjs';
 import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -3294,6 +3295,8 @@ function cmdSettle(ledger, args, repo) {
   if (job.worker_id && !managed) {
     const closed = closeOperationTerminal(job.worker_id);
     terminalClosed = { handle: job.worker_id, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(closed.error ? { error: closed.error } : {}) };
+    const reaped = reapIfStillLive(db, job, settledPayload, job.worker_id);
+    if (reaped) terminalClosed.reaped = reaped;
   }
 
   // Managed settle — calls.yaml settle-dispatch: worker-stop then
@@ -3340,6 +3343,8 @@ function cmdSettle(ledger, args, repo) {
     // in Orca's layout and the session comes back under a new handle.
     let agentTab = null;
     if (agentHandle && !agentTerminal?.closed) agentTab = closeOperationTerminal(agentHandle, { tabOnly: true });
+    const reaped = agentHandle ? reapIfStillLive(db, job, settledPayload, agentHandle) : null;
+    if (reaped) agentTerminal = { ...(agentTerminal ?? { handle: agentHandle }), reaped };
     managedWorker = {
       dispatchId: managed.dispatchId,
       stop: { ok: stop?.ok === true, outcome: stop?.outcome ?? null, state: stop?.state ?? null, ...(stop?.error ? { error: stop.error } : {}) },
@@ -3688,6 +3693,24 @@ function cmdCheck(ledger, args, repo) {
   });
   const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, op, attempt, checks: parsed.checks.length, checkEvidence };
   emit(out, `checks recorded for ${job.job_id} (op ${op}, attempt ${attempt})`, args.json);
+}
+
+/* ------------------------------------------------------ reap-agent-process */
+// A settled op's terminal that still reads connected after its close is an
+// agent process Orca could not stop (stop_unverified, no renderer pane). Five
+// such Claude/Codex workers ran hidden on a machine short of memory until the
+// supervisor matched and stopped them by hand. The match is the agent image
+// started inside the op's dispatch window, and only a single candidate is
+// stopped (scripts/kernel/reap-agent-process.mjs).
+const agentOfJob = (payload) => (payload?.managed ? 'claude'
+  : /^(claude|codex|devin|qwen)/i.exec(String(payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase() ?? null);
+function reapIfStillLive(db, job, payload, handle) {
+  let shown = null;
+  try { shown = terminalShow({ terminal: handle }); } catch { return null; }
+  if (!shown?.ok || shown.connected !== true) return null;
+  const dispatched = db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND entity_id=? AND kind='op-dispatched' ORDER BY seq DESC LIMIT 1").get(job.workflow_id, job.job_id)?.created_at ?? null;
+  try { return reapAgentProcess({ agent: agentOfJob(payload), dispatchedAt: dispatched }); }
+  catch (error) { return { reaped: false, reason: String(error?.message ?? error) }; }
 }
 
 /* ------------------------------------------------------------- serve-ask */
