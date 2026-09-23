@@ -1129,6 +1129,9 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 11:53 WSPV đã phục vụ lại ask thanh toán: http://127.0.0.1:6969/a-a5b6a272f6c5354503 (vá e4faf58ff có tác dụng). Hai ask sống,
   không còn reserve. Collab approval và notification chạy song song, còn gateway. Không vá.
 
+- 12:03 Yên. WSPV interface.implement a38 done và đã settle (rail height), 1 job ready kernel đang dispatch. Collab approval
+  và notification chạy, còn gateway. Modules, AUTH chờ thầy; hai ask sống. Không vá.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
