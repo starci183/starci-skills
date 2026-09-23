@@ -212,7 +212,7 @@ function buildPrompt(packet, context) {
     `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
     `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> (--all|-- <files>)`,
     `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
-    `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory. Markers and reports are the truth.`,
+    `persistence: workflow state lives in the ledger, reached only through the api (op-contract, report) — never open, query or copy a ledger file (inc-360891316369); your own state lives in files under owned_paths, never in your memory. Markers and reports are the truth.`,
     `returns: {verdict: pass|fail|blocked, evidence: [...paths], suspicion?: string} — contract: ${VERDICT_CONTRACT}`,
     `Return verdict + evidence paths. Cite suspicion instead of fixing out of scope — a wrong spec is a blocker, not a guess.`,
   ];

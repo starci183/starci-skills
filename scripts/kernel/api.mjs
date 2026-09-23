@@ -1989,7 +1989,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   `  starci-stacks-check → checkApplicationStacks({repoRoot,environment,deploymentModelFile}) in ${path.join(skillRoot, 'scripts', 'checks', 'stacks.mjs')}`,
   `  starci-code-patterns-check → node ${path.join(skillRoot, 'scripts', 'checks', 'check-scoped-lint.mjs')} --profile <nest|next> --root <repo> (--all|-- <files>)`,
   `  a check you cannot execute is reported as environment/unavailable evidence — a placeholder result is NOT proof of an upstream defect.`,
-  `persistence: state lives in .starciwork/runtime.sqlite and files on disk — never in your memory.`,
+  `persistence: workflow state lives in the ledger, reached only through the api commands below (op-contract, report) — never open, query or copy a ledger file; the api refuses kernel verbs from an op terminal (inc-360891316369). Your own state lives in files under owned_paths, never in your memory.`,
   `reporting: your answer is a starci/op-report@1 JSON envelope — report.json on disk (the artifact) filed into the ledger (the durable signal):`,
   `  {"outcome":"${REPORT_OUTCOMES.join("|")}","summary":"<=600 chars","files":["paths under owned_paths"],"checks":[{"name","command","exitCode","evidence<=400ch"}],`,
   `   "open":[...] when partial, "question":{"text","options":[]} when ask, "blocker":{"kind","detail"} when blocked}`,
@@ -2311,7 +2311,7 @@ function cmdDispatch(ledger, args, repo) {
     ? (cardLaunch?.error
       ? { error: `${model.target} has no launch model: ${cardLaunch.error}` }
       : buildSpawnCommand({ provider: model.provider, command: model.command,
-        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null }))
+        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null, env: opLaunchEnv(jobId) }))
     : null;
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
@@ -2450,6 +2450,7 @@ function cmdDispatch(ledger, args, repo) {
     provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
     model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
+    env: opLaunchEnv(jobId),
   });
   const handle = spawned.terminal ?? null;
   recordGateAnswers(ledger, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -3678,6 +3679,47 @@ function cmdConsumeReport(ledger, args) {
   emit(out, `consume-report ${job.job_id} (dispatch ${dispatchId}): ${consumed ? 'report consumed' : 'no unconsumed report row'}`, args.json);
 }
 
+/* ------------------------------------------------------ caller boundary */
+// An op worker ran node:sqlite against .starciwork/runtime.sqlite to inspect
+// jobs (inc-360891316369). The op contract already forbade it; the owner wants
+// the boundary enforced, not instructed. What the api can enforce:
+//  - the op launch carries no ledger path (the packet and prompt name only the
+//    api verbs) and a role marker: a command-terminal op starts with
+//    STARCI_ROLE=op and STARCI_OP_JOB=<job> in its own shell (opLaunchEnv);
+//  - Orca exports ORCA_TERMINAL_HANDLE into every terminal it owns, including
+//    a managed worker-start agent whose env StarCi cannot set, so a caller
+//    whose handle is the bound terminal of an op job IS that op;
+//  - from an op caller the api refuses every kernel verb, and `report` only
+//    files for the caller's own job (whose dispatch/contract binding
+//    requireDispatchedReportBinding already proves).
+// Residual (modules/kernel/api.yaml conventions.callerBoundary): a worker
+// running with unattended permissions can still read the ledger file or unset
+// the marker; the api cannot stop raw file access, only refuse its verbs.
+const OP_ROLE = 'op';
+const opLaunchEnv = (jobId) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId });
+const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
+  'questions', 'reply', 'settle', 'check', 'consume-report', 'incident', 'finish']);
+const callerOf = (db, env = process.env) => {
+  const handle = env.ORCA_TERMINAL_HANDLE || null;
+  const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
+      OR json_extract(payload_json,'$.managed.agentTerminalHandle')=? OR json_extract(payload_json,'$.orca.agentTerminalHandle')=?
+      OR json_extract(payload_json,'$.hierarchy.runtime.terminalHandle')=?) ORDER BY updated_at DESC LIMIT 1`).get(handle, handle, handle, handle) : null;
+  if (env.STARCI_ROLE === OP_ROLE) return { role: OP_ROLE, jobId: env.STARCI_OP_JOB || byHandle?.job_id || null, via: 'env-role', handle };
+  if (byHandle) return { role: OP_ROLE, jobId: byHandle.job_id, via: 'terminal-handle', handle };
+  return { role: 'kernel', jobId: null, via: null, handle };
+};
+const refuseOpCaller = (ledger, { cmd, caller, code, detail }) => {
+  const job = caller.jobId ? ledger.db.prepare('SELECT job_id,workflow_id FROM jobs WHERE job_id=?').get(caller.jobId) : null;
+  if (job) {
+    try {
+      ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
+        kind: 'op-caller-refused', payload: { verb: cmd, code, via: caller.via, terminal: caller.handle } }));
+    } catch { /* the refusal stands without its receipt */ }
+  }
+  console.error(JSON.stringify({ ok: false, error: detail, code, verb: cmd, caller: { role: caller.role, jobId: caller.jobId, via: caller.via } }));
+  process.exit(1);
+};
+
 /* ------------------------------------------------------------------ main */
 async function main() {
   const argv = process.argv.slice(2);
@@ -3714,6 +3756,17 @@ async function main() {
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
     process.exit(1);
+  }
+  // An op terminal reaches the ledger only through its own report and the
+  // read projections (inc-360891316369).
+  const caller = callerOf(ledger.db);
+  if (caller.role === OP_ROLE && KERNEL_ONLY_VERBS.has(cmd)) {
+    refuseOpCaller(ledger, { cmd, caller, code: 'op-context-refused',
+      detail: `'${cmd}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own api report and nothing else` });
+  }
+  if (caller.role === OP_ROLE && cmd === 'report' && caller.jobId !== args.job) {
+    refuseOpCaller(ledger, { cmd, caller, code: 'report-identity-mismatch',
+      detail: `operation ${caller.jobId ?? '(unbound)'} (${caller.via}) may file a report only for its own job, not ${args.job}` });
   }
   try {
     switch (cmd) {

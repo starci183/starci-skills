@@ -238,6 +238,9 @@ sections:
         not content to repair silently."
       - "The layout covers the whole .starciwork tree. Workflow run state is the runtime.sqlite
         ledger — goals/jobs/inbox/reports/contracts/checks ROWS transacted through `api` verbs.
+        An operation never opens, queries or copies that file: it reads its contract with `api
+        op-contract` and files `api report` for its own job, and the api refuses every kernel verb
+        from an op terminal (modules/kernel/api.yaml conventions.callerBoundary, inc-360891316369).
         An operation's produced
         records (intake.json, a goal revision) travel as report evidence under its declared write
         ceiling; it never emits checks, contracts, inbox commands or report rows directly —

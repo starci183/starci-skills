@@ -70,7 +70,15 @@ const renderArgs = (args, values) => {
   });
 };
 
-export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null } = {}) {
+// `env` sets variables inside the terminal's own shell before the agent
+// starts (PowerShell on win32, POSIX sh elsewhere): the op launch carries
+// STARCI_ROLE=op and STARCI_OP_JOB=<job>, which scripts/kernel/api.mjs reads to
+// refuse kernel-only verbs from an op (inc-360891316369). Keys are
+// [A-Z_][A-Z0-9_]*; values are single-quoted and may not hold a quote.
+export const envPrefix = (env = {}, plat = process.platform === 'win32' ? 'win32' : 'posix') => Object.entries(env ?? {})
+  .filter(([key, value]) => /^[A-Z_][A-Z0-9_]*$/.test(key) && value != null && !/['\r\n]/.test(String(value)))
+  .map(([key, value]) => (plat === 'win32' ? `$env:${key}='${value}';` : `export ${key}='${value}';`)).join(' ');
+export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null } = {}) {
   const { card, error } = loadAdapter(provider);
   if (error) return { provider, error };
   // 'none' is in the config effort vocabulary (engine/config.mjs) and means
@@ -83,7 +91,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // for terminal handle after creation" while the tab still spawns later,
   // untracked. A leading shell call operator runs the same binary on the
   // runtime-owned PTY path qwen and devin already use (agent card reason).
-  const prefix = [card?.credentialRefresh?.[plat], card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
+  const prefix = [envPrefix(env, plat), card?.credentialRefresh?.[plat], card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
   const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements
@@ -538,8 +546,8 @@ export function recoverCreatedTerminal({ worktree, title, before = null, error =
 // `attest` (default true) adds the post-submission death-watch; a rejection
 // comes back as {ok:false, step:'attestation', signal} with the terminal
 // already closed — the caller must never mark the job running on it.
-export function spawnAgent({ provider, model = null, effort = null, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true } = {}) {
-  const built = buildSpawnCommand({ provider, kernel, command, model, effort });
+export function spawnAgent({ provider, model = null, effort = null, worktree, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null } = {}) {
+  const built = buildSpawnCommand({ provider, kernel, command, model, effort, env });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
   // Pre-trust the launch directory (trust.mjs) so the agent opens at its
   // input box, not at a trust/consent prompt; the receipt joins every result.

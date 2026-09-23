@@ -93,6 +93,24 @@ conventions:
     RAISE(ABORT,'lease-identity-drift')); a report whose identity fields
     contradict the job's bound {run, task, dispatch, from} fails
     starci/op-report@1 at filing (report-invalid)
+  callerBoundary: >-
+    The ledger is the Kernel's through these verbs; an op reaches it only through its own `report`
+    and the read projections (status, survey, hierarchy, estimate, op-contract). An op worker ran
+    node:sqlite against .starciwork/runtime.sqlite (inc-360891316369), so this is enforced, not only
+    instructed. ENFORCED: (1) the op packet and prompt name no ledger file - only the api verbs;
+    (2) a command-terminal op launches with STARCI_ROLE=op and STARCI_OP_JOB=<job> set in its own
+    shell (scripts/agent/lib.mjs envPrefix), and Orca exports ORCA_TERMINAL_HANDLE into every
+    terminal it owns, so a caller whose handle is the bound terminal of an op job (worker_id,
+    payload managed/orca agentTerminalHandle, hierarchy runtime terminalHandle) is that op even as a
+    managed worker-start agent whose env StarCi cannot set; (3) from an op caller every kernel verb
+    (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, settle, check,
+    consume-report, incident, finish) refuses `op-context-refused` before it runs, and `report`
+    refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
+    binding the report binding then proves); each refusal appends 'op-caller-refused' on the op's
+    job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
+    shell permissions can still open the ledger file or unset the marker and call from a terminal
+    Orca does not attribute to it. Nothing it reads that way is authority: only a filed report plus
+    the Kernel's own `api check` settles, and a ledger claim quoted from a screen is never evidence
   hierarchy: >-
     `hierarchy` projects starci/agent-hierarchy@1 from durable workflow/job
     identity. Stable nodes are workflow:<workflow>, agent:kernel:<workflow>
@@ -796,6 +814,7 @@ commands:
       - report-missing: 'report file unreadable'
       - report-invalid: 'fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths, missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch the job does not bind is refused here), a done|partial report of an op whose manifest commitPolicy commits without `head` = a 7-40 character hex sha (the api resolves the op''s commitPolicy exactly as settle does; the worker puts `git rev-parse HEAD` of the checkout holding its owned paths into `head` and re-files), prose that lost its non-ASCII letters to a legacy code page (a question mark inside words, U+FFFD) — the file must be written as UTF-8 (scripts/kernel/report-envelope.mjs lossyTextFields)'
       - outcome-mismatch: '--outcome flag contradicts the envelope outcome'
+      - report-identity-mismatch: 'the caller is an op (conventions.callerBoundary) and --job is not its own job'
       - job-unknown / job-settled
     usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
 
