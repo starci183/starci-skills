@@ -7,7 +7,12 @@ import { orcaCall, arg, flag } from './lib.mjs';
 export function terminalSend({ terminal, text, textFile, enter = true }) {
   const body = textFile ? fs.readFileSync(textFile, 'utf8') : (text ?? '');
   const r = orcaCall('terminal-send', { terminal, text: body, enter: Boolean(enter) });
-  return { ok: r.exitCode === 0, receipt: r.receipt, error: r.error };
+  // errorCode names Orca's refusal; agent_prompt_stalled means the text was
+  // typed but Orca could not see it submitted (calls.yaml terminal-send note),
+  // so the caller proves delivery from the screen instead of this receipt.
+  const e = r.receipt?.error;
+  const errorCode = typeof e === 'object' && e ? (e.code ?? null) : null;
+  return { ok: r.exitCode === 0, receipt: r.receipt, errorCode, error: r.error };
 }
 
 if (process.argv[1]?.endsWith('terminal-send.mjs')) {

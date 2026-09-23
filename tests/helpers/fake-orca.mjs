@@ -44,6 +44,19 @@
 //                          fake-terminal-1 — the kernel-restart spec proves the
 //                          replacement terminal is a different one.
 //
+//   STARCI_FAKE_ORCA_CREATE_TIMEOUT 'live' | 'dead': `terminal create` makes the
+//                          terminal but answers Orca's renderer-path error
+//                          "Timed out waiting for terminal handle after
+//                          creation" with no handle — the created terminal is
+//                          only visible through `terminal list`, where its pane
+//                          title is the cwd name (as Codex rewrites it) and its
+//                          tab title is the --title. 'dead': that terminal has
+//                          already disconnected.
+//   STARCI_FAKE_ORCA_STUCK_PASTE 'enter' | 'never': a non-empty `terminal send`
+//                          leaves the text staged in the input row
+//                          ("› [Pasted Content N chars]"). 'enter': one
+//                          Enter-only send submits it; 'never': it stays.
+//
 //   STARCI_FAKE_ORCA_CLOSE_FAILS comma-separated terminal handles whose
 //                          `terminal close` is refused ('*' refuses every
 //                          close) — drives the unclosed-stale-kernel spec.
@@ -111,6 +124,9 @@ const isDead = handle => mode === 'dead-terminal' || record(handle)?.connected =
 const commandProvider = handle => (String(record(handle)?.command ?? state.terminalCommand ?? '').match(/(?:^|[\s"'\\/])(claude|codex|qwen|devin)(?:\.exe|\.cmd)?(?=[\s"']|$)/i)?.[1] ?? '').toLowerCase();
 const gatedProviderOf = handle => { const p = commandProvider(handle); return p && gatedProviders.has(p) && gateScreens[p] ? p : null; };
 const hasSent = handle => { const r = record(handle); return r ? !!r.sent : state.sends > 0; };
+const createTimeout = process.env.STARCI_FAKE_ORCA_CREATE_TIMEOUT || '';
+const stuckPaste = process.env.STARCI_FAKE_ORCA_STUCK_PASTE || '';
+const STAGED = h => 'Codex\nmodel: ' + renderedModel(h) + '\n\n› [Pasted Content ' + String(record(h)?.prompt ?? '').length + ' chars]\n  gpt-6-sol high · repo\n';
 const verb = argv.slice(0, 2).join(' ');
 // The live-schema listing scripts/api/orca/lib.mjs compares against, derived
 // from calls.yaml so the stub can never disagree with the contract by accident.
@@ -137,10 +153,13 @@ if (verb === 'terminal create') {
   state.counter = (state.counter || 0) + 1;
   state.commands = [...(state.commands || []), state.terminalCommand];
   const handle = uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1';
-  state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: true, writable: true,
+  const timedOut = createTimeout === 'live' || createTimeout === 'dead';
+  const paneTitle = timedOut ? String(arg('worktree') || '').replaceAll('\\', '/').split('/').filter(Boolean).pop() || null : arg('title');
+  state.terminals = { ...(state.terminals || {}), [handle]: { handle, connected: createTimeout !== 'dead', writable: createTimeout !== 'dead',
     sent: false, prompt: null, command: state.terminalCommand, model: state.terminalModel,
-    title: arg('title'), worktree: arg('worktree'), closed: false } };
+    title: paneTitle, tabTitle: arg('title'), worktree: arg('worktree'), closed: false } };
   save();
+  if (timedOut) fail({ ok: false, error: { code: 'runtime_error', message: 'Timed out waiting for terminal handle after creation' } });
   out({ ok: true, result: { terminal: { handle, title: arg('title'), connected: true, writable: true } } });
 }
 else if (verb === 'terminal read' && gatedProviderOf(arg('terminal')))
@@ -150,10 +169,17 @@ else if (verb === 'terminal read')
   isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-      screen: mode === 'auth' ? DEAD(arg('terminal')) : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal'))) } } });
+      screen: mode === 'auth' ? DEAD(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
+        : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal')))) } } });
 else if (verb === 'terminal send') {
   const r = record(arg('terminal'));
-  if (r) { r.sent = true; r.prompt = arg('text'); }
+  const text = arg('text') ?? '';
+  if (r && text) { r.sent = true; r.prompt = text; if (stuckPaste) r.staged = true; }
+  else if (r && !text && argv.includes('--enter')) {
+    r.enters = (r.enters || 0) + 1;
+    if (stuckPaste === 'enter') r.staged = false;
+    if (!r.sent) r.sent = true;
+  }
   state.sends += 1; save(); out({ ok: true, result: { sent: true } });
 }
 else if (verb === 'terminal close') {
@@ -168,11 +194,15 @@ else if (verb === 'terminal close') {
 }
 // terminal list is the listing scripts/checks/check-orca-tree.mjs reads:
 // every terminal this stub created and has not closed.
-else if (verb === 'terminal list')
-  out({ ok: true, result: { terminals: Object.values(state.terminals || {})
-    .filter(t => !t.closed)
+else if (verb === 'terminal list') {
+  const open = Object.values(state.terminals || {}).filter(t => !t.closed);
+  out({ ok: true, result: { terminals: open
     .map(t => ({ handle: t.handle, title: t.title ?? null, worktree: t.worktree ?? null,
-      connected: t.connected !== false, writable: t.writable !== false })) } });
+      connected: t.connected !== false, writable: t.writable !== false })),
+    ...(argv.includes('--include-visual-layouts') ? { visualLayouts: [{ worktreeId: 'fake-worktree', root: { type: 'group',
+      tabs: open.map(t => ({ tabId: 'tab-' + t.handle, title: t.tabTitle ?? t.title ?? null,
+        panes: { type: 'terminal', handle: t.handle, tabId: 'tab-' + t.handle, title: t.title ?? null, connected: t.connected !== false } })) } }] } : {}) } });
+}
 else if (verb === 'terminal show')
   isDead(arg('terminal'))
     ? out({ ok: true, result: { terminal: { handle: arg('terminal'), status: 'exited', connected: false, writable: false, lastOutputAt: null } } })
