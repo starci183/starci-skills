@@ -1059,6 +1059,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   (chỉ khi idle), watchdog và wake của api/serve-ask bấm Enter. Live: WSPV settle-ready đúng a35. Collab backend.implement a1
   partial (composition), kernel đang xử lý.
 
+- 09:15 WSPV đã settle a35 và chạy tiếp (Enter đã gỡ kẹt). Collab composition xong (a9), kernel chạy 7 slice backend.implement
+  theo đúng dependsOn của bản ghi impl (gần như một chuỗi), nhưng status báo ready nên watchdog đánh thức vô ích. Vá `3b2767b26`:
+  status đọc dependsOn của bản ghi Work trong owned_paths; owner đã succeeded thì giải phóng. Live: 6 slice dependency, không
+  actionable.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
