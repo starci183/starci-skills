@@ -78,6 +78,7 @@ import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf } from './wake-
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
 import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
+import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
 import { kindRoute as kindRouteOf } from '../agent/models.mjs';
 import { recentDispatchCounts, thinkAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
@@ -205,6 +206,8 @@ const usage = (code) => {
   retire-ask --workflow <id> --dispatch <id> --reason <text>
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
   incident --workflow <id> --resolve <incidentId> [--detail <s>]
+  provider-health --provider <p> [--recover --reason <text> [--probe]]
+           the ledger provider-health row; --recover clears an open circuit (Kernel terminal only)
   finish   --workflow <id>`);
   process.exit(code);
 };
@@ -216,7 +219,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -1383,7 +1386,7 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
       return {
         queuedBecause: 'circuit-open',
         blockedBy: { provider: health.provider, pool: target },
-        detail: `provider ${health.provider} circuit open (${health.failureKind ?? 'auth'}) until ${health.expiresAt ?? 'explicit recovery'}`,
+        detail: `provider ${health.provider} circuit open (${health.failureKind ?? 'auth'}) until ${health.expiresAt ?? 'explicit recovery'}; the Kernel clears it early with ${providerRecoverCommand(health.provider)}`,
       };
     }
   }
@@ -2074,7 +2077,21 @@ const confirmedAuthFailure = ({ step, signal, error, details } = {}) => {
   const text = failureText(signal, error, details).toLowerCase();
   return /(?:\b401\b|not[_ -]?authenticated|authentication (?:failed|required)|oauth[^\n]*(?:expired|invalid|rejected)|(?:access[_ -]?)?token[^\n]*(?:expired|invalid|rejected)|invalid api[- ]?key|missing credentials|credential[^\n]*(?:expired|invalid|rejected))/.test(text);
 };
-const providerHealthOf = providerCircuitOf;
+// The credential a launch of this provider would present now, fingerprinted
+// (scripts/agent/credential-fingerprint.mjs). An Orca-managed provider's
+// identity comes from one `orca account list` per process, read only when a
+// circuit or a strike needs the comparison.
+let accountsOnce;
+const currentCredentialOf = (provider) => {
+  const card = credentialFingerprintOf(provider);
+  if (card.resolved) return card;
+  if (accountsOnce === undefined) { try { accountsOnce = accountList() ?? null; } catch { accountsOnce = null; } }
+  return credentialFingerprintOf(provider, { accounts: accountsOnce?.ok ? accountsOnce : null });
+};
+// An open circuit, closed early only by a rotated credential or api provider-health --recover.
+const providerHealthOf = (db, provider, now = Date.now()) => providerCircuitOf(db, provider, now, { credential: currentCredentialOf });
+// The one command that clears an open circuit before its expiry (kernel caller only).
+const providerRecoverCommand = (provider) => `api provider-health --provider ${provider} --recover --reason <text> --probe`;
 const allocationOf = (section) => {
   try {
     const doc = parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
@@ -2117,10 +2134,16 @@ const circuitBackoff = () => {
     return doc?.allocation?.circuitBackoff ?? null;
   } catch { return null; }
 };
-const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error, now, failureKind = 'auth' }) => {
+// An auth failure records the fingerprint of the credential it was observed
+// with (`credential`, resolved by the caller before its transaction); a row
+// recorded against a different credential is no prior strike and no prior trip.
+const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error, now, failureKind = 'auth', credential = null }) => {
   const key = normalizeProviderId(provider);
   if (!key) return null;
-  const prior = providerSignalOf(db, key, now);
+  const auth = failureKind === 'auth';
+  const rotatedFrom = (row) => auth && credentialRotated(row, credential);
+  const priorRow = providerSignalOf(db, key, now);
+  const prior = rotatedFrom(priorRow) ? null : priorRow;
   const failures = (prior?.failureKind === failureKind ? Number(prior.failures ?? 0) : 0) + 1;
   const strikeLimit = providerStrikeLimit(failureKind);
   const opens = failures >= strikeLimit;
@@ -2128,7 +2151,7 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
   const last = parseJson(lastRow?.value_json, {});
   const backoff = circuitBackoff();
   const sameRecent = last?.failureKind === failureKind && Number.isFinite(Number(last?.observedAt))
-    && backoff && now - Number(last.observedAt) <= Number(backoff.windowMs);
+    && backoff && now - Number(last.observedAt) <= Number(backoff.windowMs) && !rotatedFrom(last);
   const trips = opens ? (sameRecent ? Number(last.trips ?? 0) : 0) + 1 : Number(sameRecent ? (last.trips ?? 0) : 0);
   const base = providerCooldownMs(failureKind);
   const cooldown = opens && backoff && trips > 1
@@ -2141,6 +2164,8 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
     failureKind, strikeLimit, model: model ?? null, jobId, step,
     signal: signal ?? null, detail: error ?? null, observedAt: now,
     failures, trips, cooldownMs: cooldown,
+    ...(auth ? { credentialFingerprint: credential?.fingerprint ?? null, credentialSource: credential?.source ?? null } : {}),
+    ...(opens ? { recover: providerRecoverCommand(key) } : {}),
   };
   db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at)
     VALUES(?,?,NULL,NULL,?,?,?)
@@ -2148,6 +2173,104 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
     .run(PROVIDER_HEALTH_SCOPE, key, JSON.stringify(value), now, expiresAt);
   return value.status === 'unavailable' ? { ...value, expiresAt } : null;
 };
+
+/* -------------------------------------------------------- provider-health */
+// `api provider-health --provider <p>` shows this ledger's provider-health row
+// for one provider credential: open or not, the fingerprint of the credential
+// it recorded and of the one a launch would present now (never the value).
+// `--recover --reason <text> [--probe]` clears an OPEN circuit before its
+// expiry, so a fixed credential is not parked for the rest of an auth cooldown.
+// Nothing else clears one early but a rotated credential (providerCircuitOf):
+// resolving an incident does not. Kernel only: the caller's
+// ORCA_TERMINAL_HANDLE must be the terminal of a running kernel job of this
+// ledger; an op (op-context-refused), a caller marked STARCI_ROLE=supervisor
+// (supervisor-refused) and any unproven caller (kernel-proof-required) are
+// refused. With --probe the credential is proven live first
+// (scripts/agent/credential-probe.mjs) and a failed probe refuses the clear
+// (probe-failed, recorded as 'provider-health-recover-refused'). A clear
+// rewrites the row as status 'recovered' expiring now (failures and trips
+// restart) and appends 'provider-health-recovered' with the reason, the probe
+// and the circuit it cleared.
+const kernelCallerProof = (db, env = process.env) => {
+  const handle = env.ORCA_TERMINAL_HANDLE || null;
+  if (!handle) return null;
+  const hit = db.prepare("SELECT job_id,workflow_id,worker_id,payload_json FROM jobs WHERE kind='kernel' AND status='running' ORDER BY updated_at DESC").all()
+    .find((r) => r.worker_id === handle || parseJson(r.payload_json, {})?.hierarchy?.runtime?.terminalHandle === handle);
+  return hit ? { jobId: hit.job_id, workflowId: hit.workflow_id, handle } : null;
+};
+const refuseProviderRecover = (out, human) => {
+  console.error(JSON.stringify(out));
+  console.log(human);
+  process.exit(1);
+};
+async function cmdProviderHealth(ledger, args) {
+  const db = ledger.db, key = normalizeProviderId(args.provider), now = Date.now();
+  if (!key) throw Object.assign(new Error('provider-health needs a provider id'), { code: 'provider-unknown' });
+  const raw = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
+  const value = raw ? parseJson(raw.value_json, {}) ?? {} : null;
+  const current = currentCredentialOf(key);
+  const rotated = Boolean(value?.failureKind === 'auth' && credentialRotated(value, current));
+  const circuit = providerHealthOf(db, key, now);
+  const row = raw ? { ...value, at: raw.at, expiresAt: raw.expires_at, expired: raw.expires_at != null && raw.expires_at <= now } : null;
+  const credential = { fingerprint: current.fingerprint, source: current.source, resolved: current.resolved,
+    recorded: value?.credentialFingerprint ?? null, rotated };
+  const until = (at) => (at ? new Date(at).toISOString() : 'explicit recovery');
+  const state = circuit ? `OPEN (${circuit.failureKind ?? 'auth'}) until ${until(circuit.expiresAt)}`
+    : !row ? 'no row' : row.expired ? `closed (${row.status ?? '-'} row expired ${until(row.expiresAt)})`
+      : rotated ? `closed (credential rotated ${credential.recorded} -> ${credential.fingerprint}; row ${row.status})`
+        : `closed (${row.status ?? '-'})`;
+  if (!args.recover) {
+    emit({ ok: true, provider: key, open: Boolean(circuit), row, credential },
+      `provider-health ${key}: ${state}${row?.jobId ? `; opened by ${row.jobId} at ${row.step ?? '-'}: ${row.detail ?? row.signal ?? '-'}` : ''}; credential ${credential.fingerprint ?? 'unresolved'} (${credential.source ?? 'no source'})`
+      + (circuit ? `; clear with ${providerRecoverCommand(key)}` : ''), args.json);
+    return;
+  }
+  if (process.env.STARCI_ROLE === 'supervisor') {
+    refuseProviderRecover({ ok: false, code: 'supervisor-refused', provider: key,
+      error: `provider-health --recover is a Kernel decision; a supervisor reports the command and the workflow's Kernel runs it: ${providerRecoverCommand(key)}` },
+    `provider-health --recover REFUSED for ${key}: supervisor-refused`);
+  }
+  const kernel = kernelCallerProof(db);
+  if (!kernel) {
+    refuseProviderRecover({ ok: false, code: 'kernel-proof-required', provider: key, terminal: process.env.ORCA_TERMINAL_HANDLE || null,
+      error: `provider-health --recover runs only from a running Kernel terminal of this ledger (ORCA_TERMINAL_HANDLE bound to a running kernel job); the Kernel runs ${providerRecoverCommand(key)}` },
+    `provider-health --recover REFUSED for ${key}: kernel-proof-required`);
+  }
+  if (!circuit) {
+    emit({ ok: true, provider: key, recovered: false, reason: 'no-open-circuit', row, credential },
+      `provider-health ${key}: nothing to recover - ${state}`, args.json);
+    return;
+  }
+  let probe = null;
+  if (args.probe) {
+    const { probeProviderCredential } = await import('../agent/credential-probe.mjs');
+    probe = await probeProviderCredential(key, { accounts: accountsOnce?.ok ? accountsOnce : undefined });
+    if (!probe.ok) {
+      ledger.transaction(() => ledger.appendEvent({ workflowId: kernel.workflowId, entityType: 'provider', entityId: key,
+        kind: 'provider-health-recover-refused', payload: { provider: key, reason: args.reason, probe, kernelJob: kernel.jobId } }));
+      refuseProviderRecover({ ok: false, code: 'probe-failed', provider: key, probe,
+        error: `the ${probe.kind ?? 'credential'} probe failed (${probe.detail}); the circuit stays open until ${until(circuit.expiresAt)}` },
+      `provider-health --recover REFUSED for ${key}: probe-failed - ${probe.detail}`);
+    }
+  }
+  const previous = { status: circuit.status, failureKind: circuit.failureKind ?? null, jobId: circuit.jobId ?? null, step: circuit.step ?? null,
+    signal: circuit.signal ?? null, detail: circuit.detail ?? null, observedAt: circuit.observedAt ?? null, expiresAt: circuit.expiresAt ?? null,
+    trips: circuit.trips ?? null, credentialFingerprint: circuit.credentialFingerprint ?? null };
+  const probeSummary = probe ? { ok: probe.ok, kind: probe.kind, status: probe.status ?? null, detail: probe.detail } : null;
+  const recovered = {
+    schema: 'starci/provider-health@1', provider: key, status: 'recovered', recoveredAt: now, reason: args.reason,
+    failures: 0, trips: 0, credentialFingerprint: current.fingerprint, credentialSource: current.source, probe: probeSummary,
+    recoveredBy: { kernelJob: kernel.jobId, workflowId: kernel.workflowId, terminal: kernel.handle }, previous,
+  };
+  ledger.transaction(() => {
+    db.prepare('UPDATE signals SET value_json=?, at=?, expires_at=?, holder_pid=NULL, token=NULL WHERE scope=? AND key=?')
+      .run(JSON.stringify(recovered), now, now, PROVIDER_HEALTH_SCOPE, key);
+    ledger.appendEvent({ workflowId: kernel.workflowId, entityType: 'provider', entityId: key, kind: 'provider-health-recovered',
+      payload: { provider: key, reason: args.reason, probe: probeSummary, previous, credential, kernelJob: kernel.jobId } });
+  });
+  emit({ ok: true, provider: key, recovered: true, previous, probe, credential },
+    `provider-health ${key}: circuit cleared (was ${previous.failureKind} until ${until(previous.expiresAt)}, opened by ${previous.jobId ?? '-'})${probe ? `; probe: ${probe.detail}` : ' without a probe'}; reason: ${args.reason}`, args.json);
+}
 
 // `api route` — resolve the pool/model for one job and persist the decision on
 // its payload so `dispatch --spawn` launches exactly what was routed. Bias:
@@ -2235,7 +2358,9 @@ async function cmdRoute(ledger, args) {
       maxParallel: rt?.maxParallel ?? null,
       quota,
       auth: providerHealth || quota?.state === 'dead' ? 'dead' : 'ok',
-      authDetail: providerHealth?.detail ?? providerHealth?.signal ?? quota?.detail ?? null,
+      authDetail: providerHealth
+        ? `${providerHealth.detail ?? providerHealth.signal ?? providerHealth.failureKind ?? 'circuit open'} (circuit open until ${providerHealth.expiresAt ? new Date(providerHealth.expiresAt).toISOString() : 'explicit recovery'}; the Kernel clears it with ${providerRecoverCommand(providerHealth.provider)})`
+        : quota?.detail ?? null,
       providerHealth,
       openIncident: false,
     };
@@ -2516,6 +2641,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
   const reusable = effectState === 'none';
   const status = reusable ? 'queued' : (['partial', 'unknown', 'committed'].includes(effectState) ? 'effect_unknown' : 'failed');
   let providerHealth = null;
+  // Resolved outside the transaction: an Orca-managed identity is a host call.
+  const credential = authFailure && !providerHealthEvidence && model?.provider ? currentCredentialOf(model.provider) : null;
   ledger.transaction(() => {
     const now = Date.now();
     const leasesReleased = effectState === 'none'
@@ -2523,7 +2650,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       : 0;
     if (authFailure) {
       providerHealth = providerHealthEvidence ?? writeProviderCircuit(ledger.db, {
-        provider: model.provider, model: model.target, jobId, step, signal, error, now,
+        provider: model.provider, model: model.target, jobId, step, signal, error, now, credential,
       });
     } else if (step === 'readiness' && model?.provider) {
       // A spawned terminal that never reaches readiness means the provider's
@@ -2591,7 +2718,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     if (incident && !authFailure) {
       ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
         .run(`inc-${newToken().slice(0, 12)}`, job.workflow_id, op,
-          `[infra-provider] ${JSON.stringify({ provider: model.provider, signal: signal ?? error ?? null, jobId })}`, now);
+          `[infra-provider] ${JSON.stringify({ provider: model.provider, signal: signal ?? error ?? null, jobId,
+            ...(providerHealth?.status === 'unavailable' ? { circuitUntil: providerHealth.expiresAt ?? null, recover: providerRecoverCommand(providerHealth.provider) } : {}) })}`, now);
     }
   });
   return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth,
@@ -2828,7 +2956,7 @@ function cmdDispatch(ledger, args, repo) {
       providerHealthEvidence: providerHealth,
     });
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, providerHealth },
-      `dispatch REJECTED for ${jobId} (provider-health): ${error}; logical attempt retained`, args.json);
+      `dispatch REJECTED for ${jobId} (provider-health): ${error}; logical attempt retained; once the credential is fixed the Kernel runs ${providerRecoverCommand(providerHealth.provider)}`, args.json);
     process.exit(1);
   }
   // §6 admission — the repo-path leases and the job's fencing token are taken
@@ -4551,7 +4679,7 @@ function cmdConsumeReport(ledger, args) {
 const OP_ROLE = 'op';
 const opLaunchEnv = (jobId) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId });
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'reply', 'peers', 'notify', 'inbox', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'finish']);
+  'questions', 'reply', 'peers', 'notify', 'inbox', 'settle', 'check', 'consume-report', 'serve-ask', 'retire-ask', 'incident', 'provider-health', 'finish']);
 const callerOf = (db, env = process.env) => {
   const handle = env.ORCA_TERMINAL_HANDLE || null;
   const byHandle = handle ? db.prepare(`SELECT job_id,workflow_id FROM jobs WHERE kind<>'kernel' AND (worker_id=?
@@ -4591,6 +4719,7 @@ async function main() {
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
     'consume-report': ['job'], 'serve-ask': ['workflow'], 'retire-ask': ['workflow', 'dispatch', 'reason'],
     incident: [],
+    'provider-health': ['provider'],
     finish: ['workflow'],
   };
   if (!required[cmd]) usage(2);
@@ -4600,6 +4729,8 @@ async function main() {
   if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
   if (cmd === 'inbox' && args.ack != null) need(args.disposition, 'inbox --ack <key> needs --disposition <what was done>');
+  if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');
+  if (cmd === 'provider-health' && args.probe) need(args.recover, 'provider-health --probe goes with --recover');
   if (cmd === 'incident') {
     need(args.workflow, 'incident needs --workflow');
     if (!args.resolve) { need(args.kind, 'incident needs --kind (or --resolve <incidentId>)'); need(args.detail, 'incident needs --detail'); }
@@ -4649,6 +4780,7 @@ async function main() {
       case 'serve-ask': return await cmdServeAsk(ledger, args, repo);
       case 'retire-ask': return await cmdRetireAsk(ledger, args, repo);
       case 'incident': return cmdIncident(ledger, args);
+      case 'provider-health': return await cmdProviderHealth(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
     }
   } catch (error) {

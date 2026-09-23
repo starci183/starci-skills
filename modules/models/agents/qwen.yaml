@@ -29,6 +29,8 @@ credentialRefresh:
   envKey: BAILIAN_TOKEN_PLAN_API_KEY
   secretsFile: .secrets/models.env
   secretName: QWENCLOUD_API_KEY
+  # Where Qwen reads envKey itself when the secrets file has no secretName line (the step unsets the variable).
+  providerEnvFile: '<home>/.qwen/.env'
   reason: |-
     A running Orca process keeps the environment it started with, and Qwen Code gives an inherited variable
     precedence over its ~/.qwen/.env file, so a stale copy of the key yields HTTP 401 (seen 2026-09-24 after the
@@ -43,6 +45,14 @@ credentialRefresh:
     `qwen` in a fresh Orca terminal still answered HTTP 401 "invalid API-key". Orca terminals are spawned by its
     long-lived terminal daemon, which kept the old environment across the app restart, so the in-terminal refresh
     stays until that daemon itself restarts with the new key.
+credentialProbe:
+  kind: openai-models
+  settingsFile: '<home>/.qwen/settings.json'
+  reason: |-
+    `api provider-health --provider qwen --recover --probe` proves the credential before it clears an auth circuit:
+    GET <baseUrl>/models with the key credentialRefresh resolves (scripts/agent/credential-probe.mjs), where
+    baseUrl is the settingsFile modelProviders entry whose id is this card's model. It costs no tokens. Checked
+    2026-09-24 on the Token Plan Singapore endpoint: the current key answers 200, an invalid key 401 InvalidApiKey.
 hostIdentity:
   env:
     CLI_TITLE: '<label> - qwen-code'

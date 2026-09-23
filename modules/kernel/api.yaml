@@ -104,7 +104,7 @@ conventions:
     payload managed/orca agentTerminalHandle, hierarchy runtime terminalHandle) is that op even as a
     managed worker-start agent whose env StarCi cannot set; (3) from an op caller every kernel verb
     (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, reply, peers, notify, inbox,
-    settle, check, consume-report, serve-ask, retire-ask, incident, finish) refuses `op-context-refused` before it runs, and `report`
+    settle, check, consume-report, serve-ask, retire-ask, incident, provider-health, finish) refuses `op-context-refused` before it runs, and `report`
     refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
     binding the report binding then proves); each refusal appends 'op-caller-refused' on the op's
     job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
@@ -488,6 +488,16 @@ commands:
       running counts; provider quota probes; typed expiring provider-health
       signals. Free-form incident text is evidence for the Kernel but never
       provider-health input
+    providerCircuit: >-
+      a pool whose provider has an OPEN provider-health circuit is rejected with
+      "provider auth is unavailable: <detail> (circuit open until <iso>; the Kernel
+      clears it with api provider-health --provider <p> --recover --reason <text>
+      --probe)". An auth circuit records the non-reversible fingerprint of the
+      credential it rejected (scripts/agent/credential-fingerprint.mjs: first 12 hex
+      of sha256 over the key the card's credentialRefresh step resolves, or the Orca
+      host account id for claude/codex) and reads CLOSED once the credential in
+      effect has a different fingerprint. Otherwise only expiry or provider-health
+      --recover closes it; resolving an incident never does
     writes: >-
       jobs.payload_json gains {model, modelId, effort, routeChain,
       routeRejected, difficulty} — the PERSISTED route dispatch then launches
@@ -1275,6 +1285,47 @@ commands:
       plan divergence, retry budgets past their limit, unreconciled op
       deaths — anything the driver may not decide alone (driver-loop.yaml
       escalation.mustAskOwner)
+    providerCircuits: >-
+      resolving an incident never clears a provider-health circuit: the two are
+      separate facts. A circuit clears on expiry, on a rotated credential, or by
+      api provider-health --recover
+
+  provider-health:
+    args: '--provider <p>  |  --provider <p> --recover --reason <text> [--probe]'
+    reads: >-
+      the signals row scope provider-health key <p> (a -agent suffix is dropped);
+      the fingerprint of the credential a launch of <p> would present now
+      (scripts/agent/credential-fingerprint.mjs: the card's credentialRefresh
+      secret, or its providerEnvFile when the secrets file has no line, or the
+      Orca host account id for an orca-account card). No key value is read into
+      any output, event or log
+    returns: >-
+      read: {ok:true, provider, open, row:{...value, at, expiresAt, expired}|null,
+      credential:{fingerprint, source, resolved, recorded, rotated}}  |  --recover:
+      {ok:true, provider, recovered:true, previous, probe, credential} or
+      {ok:true, recovered:false, reason:'no-open-circuit'} when nothing is open
+    recover: >-
+      --recover clears an OPEN circuit before its expiry: the row becomes
+      {status:'recovered', recoveredAt, reason, failures:0, trips:0, probe,
+      recoveredBy:{kernelJob, workflowId, terminal}, previous} expiring now, and
+      events 'provider-health-recovered' {provider, reason, probe, previous,
+      credential, kernelJob} lands on the proving Kernel's workflow. --probe first
+      proves the credential live (scripts/agent/credential-probe.mjs): a card with
+      credentialProbe.kind openai-models (qwen) is asked GET <baseUrl>/models with
+      the credentialRefresh key, no tokens spent; any other provider passes on its
+      quota probe reading ok or limited. A failed probe refuses the clear
+    writes: 'with --recover only: the signals row above + events provider-health-recovered | provider-health-recover-refused'
+    refuses:
+      - 'op-context-refused: an op caller (KERNEL_ONLY_VERBS), read or recover'
+      - 'supervisor-refused: --recover from a caller marked STARCI_ROLE=supervisor; the supervisor reports the command and the Kernel runs it'
+      - 'kernel-proof-required: --recover whose ORCA_TERMINAL_HANDLE is not the terminal (worker_id or hierarchy seat) of a running kernel job in this ledger'
+      - 'probe-failed: --probe could not prove the credential; the circuit stays open and events provider-health-recover-refused {provider, reason, probe} is appended'
+      # --recover without --reason, or --probe without --recover, is a usage error (exit 2)
+    usedBy: >-
+      the Kernel, after the owner or a supervisor fixed a credential that an auth
+      circuit still holds (driver-loop.yaml providerCircuitRecovery). Route and
+      dispatch refusals, api status queuedBecause circuit-open and the
+      [infra-provider] incident text name this command
 
   # --------------------------------------------------------------------------
   # FINISH — the last call of the loop. History preserved; live custody removed.

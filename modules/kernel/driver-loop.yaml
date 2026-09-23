@@ -124,7 +124,7 @@ tick:
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
     - drive     # loop{ status -> reconcile effect_unknown and worker-dead (--dead-worker) -> route -> dispatch -> wait/observe -> report consumed -> checks re-run -> settle -> retry|incident } until the frontier empties
     - finish    # api finish --workflow — every job settled AND the owner approved the handover (handoverLoop)
-  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, inbox, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, finish"
+  citation: "modules/kernel/api.yaml commands — the api + this loop are the spine: survey, inbox, plan, enqueue, route, dispatch, reconcile, observe, op-contract, report, consume-report, check, settle, incident, provider-health, finish"
 
   survey:
     rule: >-
@@ -962,6 +962,31 @@ failureHandling:
       op whose stop cannot be reconciled is quarantined, not requeued.
       Never re-bind a Run a second time — a repeated run-use invalidates
       every live Dispatch.
+
+  providerCircuitRecovery:
+    symptom: >-
+      route rejects a pool with "provider auth is unavailable: ... circuit open
+      until <iso>", status reports queuedBecause circuit-open, or dispatch is
+      rejected at step provider-health, while the credential behind it has
+      since been fixed (an owner rotated the key, a launch-path repair landed).
+    rule: >-
+      A provider-health circuit is a ledger fact of its own. Resolving the
+      incident that described the failure does not clear it, and waiting out
+      a 24h auth cooldown on a credential already proven good parks the pool
+      for nothing. An auth circuit reads closed by itself when the credential
+      in effect has a different fingerprint from the one it rejected (a
+      rotated key). When the credential is unchanged but fixed, or the
+      circuit predates fingerprints, the Kernel runs
+      `api provider-health --provider <p> --recover --reason <what changed> --probe`
+      from its own terminal. The probe must pass; a refused probe means the
+      credential is still bad, so the circuit stays and the owner is told.
+      `api provider-health --provider <p>` (read-only) shows the row, its
+      recorded fingerprint and the current one first.
+    boundary: >-
+      Only the Kernel clears a circuit: the api proves the caller by its
+      ORCA_TERMINAL_HANDLE against a running kernel job. A supervisor or an op
+      that finds a fixable circuit reports the exact command to the Kernel
+      instead of running it.
 
   permissionStall:
     symptom: >-

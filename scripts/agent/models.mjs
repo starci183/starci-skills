@@ -27,6 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
+import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
@@ -373,14 +374,31 @@ export const PROVIDER_HEALTH_SCOPE = 'provider-health';
 const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().replace(/-agent$/, '');
 
 // The OPEN provider-health circuit for a provider in one ledger, or null.
-export function providerCircuitOf(db, provider, now = Date.now()) {
+// An auth circuit that recorded the fingerprint of the credential it rejected
+// (scripts/agent/credential-fingerprint.mjs) is CLOSED once the credential in
+// effect has a different fingerprint: the rejected credential was rotated
+// away. `credential` is the current {fingerprint} (or a function returning
+// it, called only when the comparison is needed); by default it is resolved
+// from the agent card, which for an Orca-managed provider without an account
+// list stays unresolved and keeps the circuit. Nothing else closes a circuit
+// early but `api provider-health --recover`.
+export function providerCircuitOf(db, provider, now = Date.now(), { credential } = {}) {
   const key = providerKey(provider);
   if (!key || !db) return null;
   const row = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
   if (!row || (row.expires_at != null && row.expires_at <= now)) return null;
   let value = {};
   try { value = JSON.parse(row.value_json || '{}') ?? {}; } catch { value = {}; }
-  return value?.status === 'unavailable' ? { ...value, at: row.at, expiresAt: row.expires_at } : null;
+  if (value?.status !== 'unavailable') return null;
+  if (value.failureKind === 'auth' && value.credentialFingerprint) {
+    let current = null;
+    try {
+      current = typeof credential === 'function' ? credential(key)
+        : credential !== undefined ? credential : credentialFingerprintOf(key);
+    } catch { current = null; }
+    if (credentialRotated(value, current)) return null;
+  }
+  return { ...value, at: row.at, expiresAt: row.expires_at };
 }
 
 export function providerAvailability({ probe = null, circuit = null } = {}) {
