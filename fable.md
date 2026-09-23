@@ -1188,6 +1188,13 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 
 - 14:13 Vẫn chờ R2. 4 workflow nivo queued. Không vá.
 
+- 14:45 Thầy restart Orca, khoán 8 workflow (nivo 4, miamia 2, starci-next 2). Merge R2 `f24853dd4` (Orca đẩy lệnh claude/codex qua
+  đường UI chờ 10s; thêm tiền tố launch). Vá khởi động Claude: readiness tìm ❯ ở mọi dòng `25f74a785`; attestation theo tên
+  hiển thị "Opus 5.5" `5d110d360`; spinner ✶ của Claude là active `58fc42a60`. 4 kernel nivo lên Opus 5.5 + 4 watchdog. Nhận bàn
+  giao 4 workflow của fork (watchdog của trò, fork đã tắt của họ); đóng 6 terminal lạc. Vá: workspace.manage cutSetAuthority
+  `c3ae4687a` (Mia Mia prepare kẹt CATALOG_DIRTY); owner-gate không job = awaiting-owner `680d1c0b0`; scaffold cutSetAuthority.
+  Chờ thầy: brand + grammar cho StarCi Next FE (inc-d456b748085a); brand Mia Mia đi theo mm-work.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
