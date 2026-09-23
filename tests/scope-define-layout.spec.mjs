@@ -78,7 +78,7 @@ const rootRecordWrites = ({ file, doc }) => writesOf(doc).flatMap(({ where, w })
     .map(m => `${file} ${where} writes .starciwork/${m[1]}/index.yaml`));
 
 test('no op manifest writes a record at a root-level .starciwork/<name>/index.yaml outside the layout', () => {
-  assert.deepEqual([...layoutRoots].sort(), ['_derived', 'brand', 'features']);
+  assert.deepEqual([...layoutRoots].sort(), ['_derived', 'brand', 'features', 'shell']);
   assert.deepEqual(ops.flatMap(rootRecordWrites), []);
   const synthetic = { file: 'synthetic.yaml', doc: { writes: [], policy: { executionModes: { import: { writes: [
     { id: 'node', path: '.starciwork/index.yaml + .starciwork/import-cv-seam/index.yaml' },

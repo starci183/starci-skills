@@ -15,6 +15,19 @@ sections:
       - "owner_language: everything a person reads as a log - terminal narration and progress lines,
         orchestration message subjects and bodies (worker_done, status, ask), report summary and
         notes, incident details, owner asks and the handover package."
+  - title: Product UI copy follows the shell record's productLocale (default - the brand record's voice.locales default), not owner_language
+    blocks:
+      - "Product UI copy - every label, heading, button, message, empty state and sample datum a product
+        user reads, in a drawing prompt, a generated direction, a message file or a rendered screen - is
+        written in the product locale: the shell record's productLocale.default (.starciwork/shell/index.yaml,
+        work/app-shell@1), else the brand record's voice.locales default. The packet carries it as
+        product_locale. owner_language is who reads the logs, not who uses the product, and it never
+        decides UI copy; canonical records stay English either way."
+      - "Chrome is read, never invented: the persistent app chrome (layout, top bar, brand lockup, navigation
+        destinations and their labels) and the demo tenant (workspace, user, currency, date format) come
+        from the shell record verbatim. A worker that needs a chrome, a label or a tenant the shell record
+        does not have reports APP_SHELL_UNSETTLED as a brand-gap; it does not pick one, because parallel
+        workers picking independently is how one product ends up with three logos."
   - title: Expandable business tree and local workflow tracking
     blocks:
       - Each record folder has one index.yaml record; index is the record, not an extra directory

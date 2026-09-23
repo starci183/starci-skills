@@ -1,0 +1,528 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:work:app-shell:1
+type: object
+additionalProperties: false
+description: "The product's application shell, as one record at shell/index.yaml beside features/ and
+  brand/. It is what the real persistent chrome IS - the layout component that wraps every signed-in screen,
+  the top bar and the brand lockup it carries, the navigation registry with its labels in every locale, the
+  locale product copy is written in, the demo tenant every drawing shows, and rendered captures of the real
+  shell and lockup. It exists because parallel drawing workers of one cut each invented their own logo,
+  sidebar, UI language and tenant when the chrome was only a sentence in a prompt. At most one exists per
+  tree. A ui-screen binds it by revision the way it binds the brand, so a changed shell is a visible input
+  change to every direction drawn inside the old one."
+required:
+  - schema
+  - id
+  - kind
+  - state
+  - rev
+  - origin
+  - app
+  - nav
+  - productLocale
+properties:
+  schema:
+    const: work/app-shell@1
+    description: Record family discriminator. Every record names its own family so a file can be validated
+      without inferring its meaning from the directory it happens to sit in.
+  id:
+    const: shell
+    description: The record's id, which is the word shell and nothing else. There is one shell per tree, so it
+      needs no feature segment and no name to tell it apart from a sibling it does not have.
+  kind:
+    const: shell
+    description: The node kind the Work readers resolve this record by, authored as well as implied by the
+      schema const so a reader that reads the kind first still recognises it.
+  state:
+    $ref: "#/$defs/state"
+  activity:
+    $ref: "#/$defs/activity"
+  rev:
+    type: integer
+    minimum: 1
+    description: The shell's revision. Every ui-screen cites this number in `shell.rev` rather than copying
+      the chrome, so a bump here marks every direction drawn inside an older shell stale in one edit.
+  origin:
+    enum:
+      - repository
+      - planned
+    description: "Where the record was read from. `repository` means the chrome exists in the bound frontend
+      and every field below was read out of its real source, with a rendered capture of it. `planned` is the
+      greenfield case - no frontend layout exists yet, so the navigation, locale and persona come from the
+      settled requirement, design and brand records and only the brand lockup is captured; the scaffold that
+      writes the first real shell turns it into `repository` and bumps `rev`. A planned shell never holds an
+      implementation to a layout component, because there is none to name."
+  app:
+    type: object
+    additionalProperties: false
+    required:
+      - root
+    description: Which application the shell belongs to - the bound repository and the app root inside it.
+    properties:
+      repository:
+        type: string
+        minLength: 1
+        description: The repository name as workspace.yaml `repositories[].name` spells it; omitted in a
+          single-repository product whose frontend lives beside the Work tree.
+      root:
+        $ref: "#/$defs/prose"
+        description: The app directory, relative to the repository root - apps/app, not the whole monorepo.
+      framework:
+        $ref: "#/$defs/prose"
+        description: The framework and router the chrome is written in, where it decides how a screen is
+          wrapped (a Next.js route-group layout, for instance).
+  source:
+    type: object
+    additionalProperties: false
+    required:
+      - layout
+      - files
+    description: The real source the chrome was read from, each file with its digest, so a change to the
+      layout, the top bar, the sidebar or the nav messages is a visible drift against this record rather than
+      a silent divergence between what drawings are told and what the product renders.
+    properties:
+      revision:
+        type: string
+        pattern: ^[a-f0-9]{7,64}$
+        description: The repository commit the files were read at.
+      layout:
+        $ref: "#/$defs/component"
+        description: The one layout component every in-shell screen is wrapped by. An implementation is held
+          to using exactly this component; a screen that brings a chrome of its own is drift.
+      files:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - path
+            - role
+            - sha256
+          properties:
+            path:
+              $ref: "#/$defs/prose"
+              description: The file's path relative to the repository root.
+            role:
+              $ref: "#/$defs/slug"
+              description: What the file contributes - top-bar, sidebar, nav-registry, messages, brand.
+            sha256:
+              $ref: "#/$defs/sha256"
+        description: Every other source file the record was read from - the top bar, the navigation
+          component, the locale message files the labels were copied out of, the brand component.
+  topBar:
+    type: object
+    additionalProperties: false
+    required:
+      - component
+      - slots
+    description: The top bar as it is - which component draws it, the brand lockup it carries, the controls
+      in it and, just as binding, the controls it deliberately does not have. A done shell names its lockup
+      here and carries its capture.
+    properties:
+      component:
+        $ref: "#/$defs/identifier"
+        description: The top bar component as it is exported.
+      brand:
+        type: object
+        additionalProperties: false
+        required:
+          - component
+          - asset
+        description: The brand lockup. The logo is a component, never a picture a drawing may invent, so the
+          record names the component and the rendered capture of it every direction is handed.
+        properties:
+          component:
+            $ref: "#/$defs/identifier"
+            description: The lockup component as it is exported.
+          path:
+            $ref: "#/$defs/prose"
+            description: Its source path relative to the repository root.
+          asset:
+            $ref: "#/$defs/prose"
+            description: The brand-lockup capture under this record's assets/, by the path `assets` lists it.
+      slots:
+        type: array
+        uniqueItems: true
+        description: The controls the top bar carries, in order - locale control, theme switch, account menu.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - key
+            - purpose
+          properties:
+            key:
+              $ref: "#/$defs/slug"
+            component:
+              $ref: "#/$defs/identifier"
+            purpose:
+              $ref: "#/$defs/prose"
+      absent:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/slug"
+        description: Controls the chrome does not have and a drawing must not add - search, a notification
+          bell. An absent control is a decision, and without it a generator fills the empty corner.
+  nav:
+    type: object
+    additionalProperties: false
+    required:
+      - component
+      - items
+    description: The navigation registry - every destination the shell offers, in order, with the route it
+      reaches, the message key its label comes from and the label in every locale, copied out of the real
+      message files. A drawing copies these labels verbatim; it never names a destination of its own.
+    properties:
+      component:
+        $ref: "#/$defs/identifier"
+        description: The navigation component as it is exported.
+      items:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - key
+            - route
+            - labels
+          properties:
+            key:
+              $ref: "#/$defs/slug"
+              description: The destination's key as the source spells it, which a ui-screen names as its
+                `shell.activeNav`.
+            route:
+              oneOf:
+                - $ref: "#/$defs/prose"
+                - type: "null"
+              description: The route it navigates to, or null for a destination the shell shows disabled.
+            i18nKey:
+              $ref: "#/$defs/prose"
+              description: The message key the label is read from.
+            group:
+              $ref: "#/$defs/slug"
+              description: The group the destination sits in, where the navigation groups them.
+            disabled:
+              type: boolean
+              description: Whether the shell draws it disabled.
+            labels:
+              type: object
+              minProperties: 1
+              propertyNames:
+                $ref: "#/$defs/localeTag"
+              additionalProperties:
+                $ref: "#/$defs/prose"
+              description: The label per locale, verbatim from the message files. The productLocale default
+                must be present.
+  productLocale:
+    type: object
+    additionalProperties: false
+    required:
+      - default
+      - fallback
+      - locales
+    description: "The language product UI copy is written in - which is not owner_language. owner_language
+      is who reads the logs; productLocale is who uses the product. It is read from the app's locale routing
+      and message files, defaulting to the brand record's voice.locales default, and every drawing states it
+      and writes its copy in it."
+    properties:
+      default:
+        $ref: "#/$defs/localeTag"
+      fallback:
+        $ref: "#/$defs/localeTag"
+      locales:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/localeTag"
+      source:
+        $ref: "#/$defs/prose"
+        description: Where the locale set was read - the routing config, the brand voice section.
+  persona:
+    type: object
+    additionalProperties: false
+    required:
+      - user
+      - currency
+      - dateFormat
+    description: The one demo tenant every direction shows - the workspace name, the signed-in user, the
+      currency and the date format. Fixed once here so three drawings of one product do not show three
+      companies, three people and two currencies.
+    properties:
+      workspace:
+        $ref: "#/$defs/prose"
+        description: The tenant or workspace name the chrome shows, omitted only for a product with no
+          tenant concept.
+      user:
+        $ref: "#/$defs/prose"
+      currency:
+        type: string
+        pattern: ^[A-Z]{3}$
+        description: The ISO 4217 code amounts are shown in.
+      dateFormat:
+        $ref: "#/$defs/prose"
+        description: The date pattern as the product renders it, in the productLocale default.
+      locale:
+        $ref: "#/$defs/localeTag"
+      source:
+        $ref: "#/$defs/prose"
+        description: Which fixture, seed or business record the persona was taken from.
+  assets:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: Rendered captures under shell/assets/**, each with its digest - the real shell at its
+      breakpoints and themes (`shell-capture`) and the brand lockup (`brand-lockup`). They are handed to the
+      image generator as reference images, which is what makes a drawing reproduce the chrome rather than
+      describe it.
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - role
+        - sha256
+      properties:
+        path:
+          $ref: "#/$defs/prose"
+          description: The file's path relative to this record's directory.
+        role:
+          enum:
+            - shell-capture
+            - brand-lockup
+          description: What the capture shows.
+        sha256:
+          $ref: "#/$defs/sha256"
+        route:
+          $ref: "#/$defs/prose"
+          description: The route the capture was rendered at.
+        viewport:
+          $ref: "#/$defs/prose"
+        theme:
+          enum:
+            - light
+            - dark
+        locale:
+          $ref: "#/$defs/localeTag"
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        provenance:
+          $ref: "#/$defs/prose"
+          description: How it was rendered - the served revision and the browser tool. A capture is a real
+            render, never a generated image.
+  review:
+    $ref: "#/$defs/review"
+  refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+    description: The records the shell was read against - the brand, the journeys and design records a
+      planned shell took its navigation from.
+  blockers:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+  verificationSource:
+    enum:
+      - kernel-observed
+      - observed
+      - authored-claim
+  because:
+    type: string
+    minLength: 1
+  change:
+    $ref: "#/$defs/change"
+  extensions:
+    type: object
+    propertyNames:
+      type: string
+      pattern: ^[A-Za-z][A-Za-z0-9]*$
+    description: Declarations that belong to a numbered extension of the Work model rather than to this
+      family's own vocabulary.
+dependentRequired:
+  because:
+    - verificationSource
+allOf:
+  - if:
+      type: object
+      properties:
+        state:
+          const: done
+      required:
+        - state
+    then:
+      type: object
+      required:
+        - topBar
+        - persona
+        - assets
+      properties:
+        topBar:
+          type: object
+          required:
+            - brand
+          properties:
+            brand: true
+        persona: true
+        assets:
+          type: array
+          contains:
+            type: object
+            properties:
+              role:
+                const: brand-lockup
+            required:
+              - role
+    description: "A settled shell is complete: its top bar names the lockup, the demo persona is fixed, and
+      the rendered brand lockup is among its captures, planned or not - it is the one image a drawing is
+      always handed instead of drawing a logo. A todo shell may be partial and says why in `blockers`;
+      nothing draws or builds against it until it is done."
+  - if:
+      type: object
+      properties:
+        state:
+          const: done
+        origin:
+          const: repository
+      required:
+        - state
+        - origin
+    then:
+      type: object
+      required:
+        - source
+      properties:
+        source: true
+        assets:
+          type: array
+          contains:
+            type: object
+            properties:
+              role:
+                const: shell-capture
+            required:
+              - role
+    description: A settled shell read from the repository names its source and carries at least one real
+      capture of it.
+  - if:
+      type: object
+      properties:
+        verificationSource:
+          const: authored-claim
+      required:
+        - verificationSource
+    then:
+      type: object
+      required:
+        - because
+      properties:
+        because: true
+$defs:
+  prose:
+    type: string
+    minLength: 1
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:[-_][a-z0-9]+)*$
+    description: A lowercase name, hyphens or underscores allowed, as source keys spell it.
+  identifier:
+    type: string
+    pattern: ^[A-Za-z_$][A-Za-z0-9_$]*$
+    description: A component name as it is exported.
+  component:
+    type: object
+    additionalProperties: false
+    required:
+      - component
+      - path
+      - sha256
+    properties:
+      component:
+        $ref: "#/$defs/identifier"
+      path:
+        $ref: "#/$defs/prose"
+        description: The file's path relative to the repository root.
+      sha256:
+        $ref: "#/$defs/sha256"
+  localeTag:
+    type: string
+    pattern: ^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$
+    description: A BCP 47 language tag - vi, en, pt-BR.
+  sha256:
+    type: string
+    pattern: ^[a-f0-9]{64}$
+  state:
+    enum:
+      - uninvestigate
+      - todo
+      - done
+  activity:
+    enum:
+      - idle
+      - investigating
+      - implementing
+      - verifying
+  timestamp:
+    type: string
+    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
+  review:
+    type: object
+    additionalProperties: false
+    required:
+      - reviewer
+      - authority
+      - reviewedAt
+    properties:
+      reviewer:
+        $ref: "#/$defs/prose"
+      authority:
+        $ref: "#/$defs/prose"
+      reviewedAt:
+        $ref: "#/$defs/timestamp"
+  change:
+    type: object
+    additionalProperties: false
+    required:
+      - rev
+      - kind
+      - at
+    properties:
+      rev:
+        type: integer
+        minimum: 1
+      kind:
+        enum:
+          - initial
+          - editorial
+          - clarifying
+          - breaking
+      at:
+        $ref: "#/$defs/timestamp"
+      withdraws:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+      retains:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/prose"
+      reason:
+        $ref: "#/$defs/prose"

@@ -77,6 +77,7 @@ packet:
       goal_identity: <identity>
     owner_language: <lang>              # config.yaml language; every owner-facing string is written in it
     owner_delegation: '{asks, until, excludes} | null'  # config.yaml delegation while active
+    product_locale: '{locale, source} | null'  # shell productLocale.default, else brand voice default; UI copy language
     records: [...]                      # .starciwork records it touches (the read set)
     owned_paths: [...]                  # what it may modify — boundary enforcement
   constraints:
@@ -152,6 +153,25 @@ fields:
       against their writes both directions. The one deliberate exception:
       two provision.ask ops may share a feature's decision folder — each
       writes a new slug of its own (the provision.ask exception).
+
+  context.product_locale:
+    meaning: >-
+      The language product UI copy is written in - every label, message and
+      sample datum a product user reads, in a drawing prompt, a message file
+      or a rendered screen. It is the Work tree's shell record
+      productLocale.default (.starciwork/shell/index.yaml, work/app-shell@1),
+      else the brand record's voice.locales default, with the source it was
+      read from; null when the tree has neither. It is deliberately not
+      owner_language: that is who reads the logs, this is who uses the
+      product, and three parallel drawings that took owner_language as their
+      UI language drew one product in two languages.
+    enforcedBy: >-
+      `productLocaleFor()` in scripts/kernel/product-locale.mjs resolves it
+      from the target repository's .starciwork when the packet is built
+      (scripts/kernel/api.mjs buildPacket) and the prompt states it beside
+      owner_language. scripts/checks/shell-conformance.mjs refuses a
+      direction prompt that does not state `Product locale: <default>`
+      (SHELL_LOCALE_DRIFT); modules/ops/_common.yaml carries the rule.
 
   context.workflow:
     meaning: >-

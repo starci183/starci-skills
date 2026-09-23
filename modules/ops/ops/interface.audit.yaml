@@ -79,6 +79,13 @@ reads:
     purpose:
       en: Resolve current brand tokens/rules and every selected icon, image, font and artwork-slot master,
         including identity/hash, rights, aspect/crop, semantic role and alt/announcement contract.
+  - id: shell
+    path: .starciwork/shell/index.yaml
+    purpose:
+      en: "The product's app shell record (work/app-shell@1) and its shell/assets/** captures: the layout,
+        top bar and lockup components, nav registry and labels per locale, productLocale, demo persona,
+        rev and origin - the chrome both the accepted direction and the delivered render are compared
+        against."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -142,6 +149,7 @@ writes:
       - routing.json
       - matrix.json
       - grammar.json
+      - shell.json
       - measurements.json
       - interactions.json
       - assets.json
@@ -228,6 +236,24 @@ steps:
         read as context and compared against them; a disagreement is a finding, and the producer's
         self-report is never the proof a cell passed. Product writes needed for business outcomes
         belong to UAT, not this audit.
+  - reads:
+      - shell
+      - accepted-draw-lineage
+      - repo
+      - implementation-captures
+    writes: [evidence]
+    action:
+      en: "Apply the shell lens in both directions and record it in shell.json. Direction versus shell: run
+        `node scripts/checks/shell-conformance.mjs` on every ui record directory in the accepted lineage
+        and compare each accepted direction's chrome, lockup, nav labels, UI language and demo tenant with
+        the shell record and its captures; a departure there is systemic direction drift - one wrong chrome
+        repeats on every screen drawn from it - classified `shell.conformance` and routed to interface.draw
+        as interface-gap. Implementation versus shell: run the same check on the implementation record
+        directory and compare each capture's chrome with the shell captures at the same viewport and theme;
+        a screen not wrapped by the named layout component, a screen-local sidebar, header or logo, or copy
+        outside the productLocale is bounded drift routed to interface.implement. A shell record that is
+        absent, unsettled or drifted from its source blocks the lens as APP_SHELL_UNSETTLED rather than
+        letting either side stand in for it."
   - reads:
       - intent
       - accepted-draw-lineage
@@ -353,6 +379,14 @@ proofs:
         audience, distinct from siblings, coherent with its family at the same
         camera/base/material/light/scale/density and legible at required responsive sizes. Generic,
         childish or interchangeable imagery remains actionable drift.
+  - id: shell-conformance
+    requirement:
+      en: "`node scripts/checks/shell-conformance.mjs` ran on every audited ui record directory and on the
+        implementation record directory, and its output is retained in shell.json. Every direction and every
+        capture shows the shell record's chrome, lockup, nav labels, productLocale copy and persona; a
+        direction-side departure routes interface.draw, an implementation-side one routes
+        interface.implement, and neither passes."
+    check: scripts/checks/shell-conformance.mjs
   - id: bounded-creative-rubric
     requirement:
       en: Applicable TASTE rows have measurements/calibration and never override deterministic findings.
@@ -425,6 +459,11 @@ blockers:
       en: A measured departure from the accepted draw is claimed as intentional and has a complete durable
         deviation case, but no explicit owner decision is bound to that exact case digest and
         draw/capture hashes.
+  - code: APP_SHELL_UNSETTLED
+    condition:
+      en: The shell record the audited screens sit in is absent, not done, planned, or drifted from its
+        recorded source digests, so neither the direction nor the capture can be compared with the real
+        chrome. Report `blocked` with blocker `brand-gap` naming the record.
   - code: AUDIT_INPUT_CHANGED
     condition:
       en: Product, environment, Grammar, brand, asset, matrix or intent changes during inspection.
@@ -506,6 +545,7 @@ policy:
       - light-dark.rhythm
       - imagery
       - creative.intent
+      - shell.conformance
       - taste
     constraintClasses: [hard, creative-rubric]
     statuses: [open, resolved, unchanged, new, reopened, blocked]
@@ -542,6 +582,13 @@ policy:
       lenses: [composition-hierarchy, section-order, light-dark-rhythm, imagery, creative-intent]
       resultStates: [pass, fail, inconclusive]
     visualEquivalenceRule: every-required-side-by-side-lens-pass
+    shellLens:
+      authority: .starciwork/shell/index.yaml
+      check: scripts/checks/shell-conformance.mjs
+      compares: [chrome, brand-lockup, nav-labels, product-locale-copy, demo-persona, layout-component]
+      directionDrift: {route: interface.draw, blocker: interface-gap, category: shell.conformance}
+      implementationDrift: {route: interface.implement, outcome: failed, category: shell.conformance}
+      unsettledShell: {outcome: blocked, blocker: brand-gap, code: APP_SHELL_UNSETTLED}
     technicalEvidenceRule: corroborating-only-never-substitutes-for-visual-equivalence
     deviationGovernance:
       defaultState: drift-open
@@ -614,6 +661,8 @@ policy:
       noActionableDrift: {outcome: done, route: none}
       boundedImplementationDrift: {outcome: failed, route: interface.implement}
       systemicOrDirectionDrift: {outcome: blocked, blocker: interface-gap, route: interface.draw}
+      directionShellDrift: {outcome: blocked, blocker: interface-gap, route: interface.draw}
+      unsettledShell: {outcome: blocked, blocker: brand-gap, route: brand.decide}
       intentionalDeviationPendingOwner:
         outcome: blocked
         blocker: interface-gap

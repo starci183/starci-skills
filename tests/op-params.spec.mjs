@@ -157,6 +157,10 @@ test('the dispatch packet carries the brief defaults with the overrides on top',
   const chosen = owned.def.max;
   const fx = fixture(t), repo = fx.repo(), wf = 'wf-params-packet';
   seedGoal(repo, wf, [{ seq: 1, op: owned.op, params: { [owned.name]: chosen } }]);
+  // interface.draw reads the product's shell record mustExist (dispatch refuses prerequisite-unmet
+  // without it); its productLocale is what the packet carries as product_locale.
+  fs.mkdirSync(path.join(repo, '.starciwork', 'shell'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.starciwork', 'shell', 'index.yaml'), 'schema: work/app-shell@1\nid: shell\nproductLocale: {default: vi, fallback: vi, locales: [vi, en]}\n');
   const enqueued = out(runApi('enqueue', '--repo', repo, '--workflow', wf, '--op', owned.op, '--paths', 'src/', '--json'));
   assert.ok(enqueued?.job_id, 'enqueue produced no job');
 
@@ -171,6 +175,10 @@ test('the dispatch packet carries the brief defaults with the overrides on top',
   }
   assert.match(body.prompt, new RegExp(`params: .*${owned.name}=${chosen}`),
     'the agent prompt must state the resolved values');
+  if (owned.op === 'interface.draw') {
+    assert.equal(body.packet.context.product_locale?.locale, 'vi', 'the packet carries the shell productLocale');
+    assert.match(body.prompt, /product_locale: vi .*never in owner_language/);
+  }
 });
 
 // provision.ask must say what it asks: params.subject is required of the kernel

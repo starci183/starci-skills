@@ -120,6 +120,22 @@ schemas:
       whenNot: Never duplicated per feature; not a state-carrying leaf.
       selectedBy: Implicit — source-staleness calls it 'implicit brand context' input.
 
+  - id: work/app-shell@1
+    file: modules/schemas/work-app-shell.schema.yaml
+    dialect: json-schema
+    subsystem: work-tree
+    governs: "The product's app shell as ONE root record beside brand/ — layout component, top bar and brand lockup, nav registry with labels per locale, productLocale, demo persona and real-shell captures."
+    binds: .starciwork/shell/index.yaml (+ shell/assets/**)
+    usedBy:
+      - "scripts/checks/shell-conformance.mjs (the record itself, each ui record's shell binding and direction prompts, an implementation's layout)"
+      - "scripts/checks/work-validate.mjs (binding findings reported as suspects)"
+      - "scripts/kernel/product-locale.mjs (the packet's product_locale)"
+    business:
+      question: "What chrome, language and demo tenant does every screen of this product sit inside?"
+      whenNeeded: Every interface.draw reads it and hands its captures to ImageGen; interface.implement and interface.audit hold screens to it.
+      whenNot: Never per feature and never per drawing — one record per tree, re-captured by its owning op when the real shell changes.
+      selectedBy: brand.decide captures it from the real frontend; interface.scaffold rewrites it when it creates the first shell.
+
   - id: work/business-rule@1
     file: modules/schemas/work-business-rule.schema.yaml
     dialect: json-schema

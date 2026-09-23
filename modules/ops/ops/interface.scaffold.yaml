@@ -45,6 +45,12 @@ reads:
     purpose:
       en: Read settled brand tokens the scaffold wires into the theme layer. Absent brand decisions report
         brand-gap rather than shipping placeholder styling as settled.
+  - id: shell
+    path: .starciwork/shell/index.yaml
+    purpose:
+      en: "The product's shell record (work/app-shell@1), normally origin planned before a frontend exists:
+        the destinations with their labels per locale, the productLocale, the persona and the brand-lockup
+        capture the first shell realises."
   - id: repo
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -96,6 +102,19 @@ writes:
     path: <node>/assets/first-shell-render.png
     content:
       en: The captured first-shell render, in image bytes, under the node's evidence assets.
+  - id: shellNode
+    path: .starciwork/shell/index.yaml
+    schema: work/app-shell@1
+    fields: [origin, app, source, topBar, nav, productLocale, persona, assets, rev, state, change]
+    content:
+      en: The shell record rewritten from the shell this scaffold created - origin repository, the layout,
+        top bar, lockup and navigation components with each file's sha256, the nav labels as written into
+        the message files, and the real captures - with `rev` bumped from the planned revision.
+  - id: shellAssets
+    path: .starciwork/shell/assets/<asset>
+    fields: [capture bytes with sha256 provenance]
+    content:
+      en: The first-shell render and the brand lockup cropped from it, stored as the shell record's captures.
 steps:
   - reads:
       - target
@@ -124,6 +143,7 @@ steps:
       - architecture
       - grammar
       - brand
+      - shell
     writes: [source]
     action:
       en: Write the manifest and toolchain first, exactly as knowledge/repository-baseline.yaml shapes
@@ -133,14 +153,25 @@ steps:
         .editorconfig, .gitattributes) - the manifest composed and every config and skeleton file copied
         byte for byte from the profile shape, with only its declared parameters and common-key
         placeholders filled - then the declared layout, then grammar-based theme wiring,
-        then the minimal first shell with the baseline liveness route. No screens or behaviour beyond
-        what the shell proves.
+        then the minimal first shell with the baseline liveness route. When a shell record exists, the
+        first shell realises it - its destinations, their labels per locale in the message files, the
+        default locale and the lockup - rather than a chrome of the scaffold's own. No screens or
+        behaviour beyond what the shell proves.
   - reads:
       - repo
     writes: [source, evidence, firstRender]
     action:
       en: Install, build, lint and run the harness for real; serve the shell locally and capture the first
         render. The capture is evidence, recorded under the node's assets.
+  - reads:
+      - repo
+      - shell
+    writes: [shellNode, shellAssets, evidence]
+    action:
+      en: Rewrite the shell record from the shell just created - origin repository, every chrome file with
+        its sha256, the nav registry and labels as written, productLocale, persona, and the first render
+        plus the lockup cropped from it as captures - bump its rev, and run `node
+        scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml`, keeping the output as evidence.
   - reads:
       - target
     writes: [node, evidence, firstRender]
@@ -170,7 +201,14 @@ proofs:
         observed hook and CI output is recorded.
   - id: scope
     requirement:
-      en: Every created file lives under the declared source root.
+      en: Every created source file lives under the declared source root; the node, its evidence and the shell
+        record with its captures are the only Work writes.
+  - id: shell-recorded
+    requirement:
+      en: The shell record names the created layout and chrome files by their current digests and carries the
+        real first-shell and lockup captures; `node scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml`
+        exits 0.
+    check: scripts/checks/shell-conformance.mjs
 blockers:
   - code: SDS_MISSING
     condition:

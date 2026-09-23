@@ -6,6 +6,8 @@ shape:
   workspace: workspace.yaml
   brand: brand/index.yaml
   brandAssets: brand/assets/**/<file-in-original-format>
+  shell: shell/index.yaml
+  shellAssets: shell/assets/**/<file-in-original-format>
   families: [br, ac, fr, nfr, data, journey, decision, sds, ui, impl, uat, contract, integration, gap, event]
   familiesNote: "The array above is the executable form of this shape block: every record lives in a flat
     family folder directly under its feature - features/<feature>/<family>/<name>/index.yaml - with no
@@ -127,7 +129,7 @@ shape:
   setup: "index.yaml at the .starciwork root under extensions.work3.setup.<workflow>.<mode>, typed by
     work-catalog.schema.yaml $defs.setup - the record workspace.manage's prepare, import and stacks modes
     write, with its evidence bundle at evidence/<workflow>.<mode>/ beside the catalog. The layout has no
-    operations family, and no record directory sits at the root besides features/, brand/ and _resources/;
+    operations family, and no record directory sits at the root besides features/, brand/, shell/ and _resources/;
     workspace.manage writes.node says why the catalog carries it."
   feature: features/<feature>/index.yaml
   resources: ".starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml, schema
@@ -168,6 +170,14 @@ rules:
     tokens, typography, mascot, logo, iconography, imagery, voice, motion and the product-wide
     don'ts are authored. Every design operation reads it instead of restating it, and the record
     names the real frontend token or component files its machine checks compare against."
+  - "A product's app shell is one record: shell/index.yaml at the tree root, a sibling of brand/, schema
+    work/app-shell@1, with its rendered captures in shell/assets/**. It records the real persistent chrome -
+    layout component, top bar and brand lockup, nav registry with labels per locale, productLocale, demo
+    persona - read from the bound frontend source (origin repository) or, before any frontend layout exists,
+    from the settled records (origin planned). A work/ui-screen@1 binds it explicitly as shell: {ref: shell,
+    rev} or {chromeless: true, because}; interface.draw hands its captures to ImageGen and copies its labels,
+    locale and persona verbatim, and scripts/checks/shell-conformance.mjs holds draws, implementations and
+    the record itself to it. At most one shell record exists per tree."
   - "Frontend-facing nodes bind the brand implicitly: a ui node, an implementation or uat node with a
     frontend layout, and any node that names the brand in refs or dependsOn fold the brand's spec
     digest into their own inputDigest. A rev bump or a changed colour therefore suspends their
@@ -290,7 +300,7 @@ rules:
     rather than from a record that carries its own archive."
   - "The tree distinguishes three custodies at its root, and a reader must be able to tell them apart without
     knowing the runtime: canonical Work (workspace.yaml, the catalog index.yaml with its setup
-    evidence/, brand/, features/, _resources/ - tracked, hashed), the tracked
+    evidence/, brand/, shell/, features/, _resources/ - tracked, hashed), the tracked
     counter-record (ledger-anchor.json - tracked, not hashed into Work), and runtime custody (runtime.sqlite
     and the kernel-* directories - untracked, never hashed, excluded from validation). A file at the root that
     is none of these is drift."
@@ -453,6 +463,10 @@ example:
     - assets/mascot/rest.png
     - assets/logo/mark.svg
     - assets/imagery/reference-hero.webp
+  shell/:
+    - index.yaml
+    - assets/shell-desktop-light.png
+    - assets/brand-lockup.png
   features/knowledge/:
     - index.yaml
     - fr/documents/index.yaml

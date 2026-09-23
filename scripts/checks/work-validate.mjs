@@ -13,6 +13,7 @@ import { checkFamiliesDrift, checkWorkTree, walk } from './check-example-work.mj
 import { checkWorkConsistencyTree } from './check-work-consistency.mjs';
 import { checkWorkArtifacts } from './check-work-artifacts.mjs';
 import { checkWorkSchemas } from './check-work-schemas.mjs';
+import { shellBindingFindings } from './shell-conformance.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -86,6 +87,17 @@ export function validateWork(target, { strict = false } = {}) {
     }
   } else {
     info.push(`${root}: standalone record validation; whole-tree artifact reconciliation is deferred to the owning catalog [RECORD_MODE]`);
+  }
+
+  // A ui record's shell binding (scripts/checks/shell-conformance.mjs): one drawn before the shell record
+  // existed, or bound to an older shell rev, stays valid and is listed as a suspect for a redraw; a binding
+  // that resolves to nothing is refused. Prompts and captures are the op proof's, not the validator's.
+  try {
+    for (const item of shellBindingFindings(root, enclosingWorkRoot)) {
+      (item.level === 'refuse' ? refused : item.level === 'suspect' ? suspect : info).push(`${item.file}: ${item.message} [${item.code}]`);
+    }
+  } catch (error) {
+    refused.push(`${root}: shell binding validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
   }
 
   let schemaCounts = null;

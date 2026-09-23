@@ -27,7 +27,10 @@ const segments = (value) => value.split('/').filter((part) => part && part !== '
 export function resolveReadPath(pattern, bindings) {
   const parts = segments(plainPath(pattern));
   const last = parts.map((part) => PLACEHOLDER.test(part)).lastIndexOf(true);
-  if (last < 0 || parts.some((part) => !PLACEHOLDER.test(part) && (GLOB.test(part) || /[<>]/.test(part)))) return [];
+  if (parts.some((part) => !PLACEHOLDER.test(part) && (GLOB.test(part) || /[<>]/.test(part)))) return [];
+  // A fixed path (no placeholder, no glob) is one file every job of the op needs - the product's one
+  // shell record, say (interface.draw reads.shell) - and resolves to itself whatever the binding.
+  if (last < 0) return parts.length && !/\s/.test(parts.join('/')) ? [parts.join('/')] : [];
   const prefix = parts.slice(0, last + 1), suffix = parts.slice(last + 1);
   const resolved = new Set();
   for (const binding of bindings) {

@@ -99,6 +99,7 @@ import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
+import { productLocaleFor } from './product-locale.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -2290,7 +2291,7 @@ const packetOwnedPaths = (payload, placements = []) => (payload.owned_paths ?? [
 const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
   ? `${p.root.replace(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
 
-const buildPacket = ({ job, payload, model, goal, params, placements }) => ({
+const buildPacket = ({ job, payload, model, goal, params, placements, productLocale = null }) => ({
   op: job.op_id ?? payload.opId,
   brief: `modules/ops/ops/${job.op_id ?? payload.opId}.yaml`,
   ...(params && Object.keys(params).length ? { params } : {}),
@@ -2303,6 +2304,8 @@ const buildPacket = ({ job, payload, model, goal, params, placements }) => ({
     attempt: job.attempt,
     owner_language: ownerLanguage(),
     owner_delegation: ownerDelegation(),
+    // UI copy language, not the log language (scripts/kernel/product-locale.mjs).
+    product_locale: productLocale,
     records: payload.records ?? [],
     owned_paths: packetOwnedPaths(payload, placements),
     ...(payload.cut ? { cut: payload.cut } : {}),
@@ -2339,6 +2342,7 @@ const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
   ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow.id} goal_revision=${packet.context.workflow.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow.goal_identity ?? '(unbound)'}`,
   `owner_language: ${packet.context.owner_language ?? 'en'} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
+  `product_locale: ${packet.context.product_locale ? `${packet.context.product_locale.locale} (${packet.context.product_locale.source})` : '(unset - no shell or brand locale)'} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim`,
   ...(packet.context.owner_delegation ? [`owner_delegation: the owner delegated ask answers to ${packet.context.owner_delegation.asks} until ${packet.context.owner_delegation.until} (config.yaml delegation); an answer receipt with answeredBy ${packet.context.owner_delegation.asks} inside that window IS the owner's answer, except for the excluded classes ${JSON.stringify(packet.context.owner_delegation.excludes)} which stay owner-only`] : []),
   `records: ${packet.context.records.join(', ') || '(none bound)'}`,
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
@@ -2644,7 +2648,7 @@ function cmdDispatch(ledger, args, repo) {
       return ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: workerCwd, timeoutMs: allocationMs('settleGit.commandMs') });
     } catch { return []; }
   })();
-  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements });
+  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo) });
   // The law inputs this attempt binds, digested now so survey/status can say
   // when one changed under a settled result (scripts/kernel/input-digests.mjs).
   // A digest failure records nothing rather than refusing the dispatch.

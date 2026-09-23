@@ -2,12 +2,15 @@ schema: starci/op@1
 id: brand.decide
 goal:
   en: Settle one product's visual identity in the single brand record - colour tokens traced to the
-    real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - so
-    every later drawing and build reads an identity instead of inventing one.
+    real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - and
+    capture the product's app shell in the single shell record - layout, top bar and brand lockup, nav
+    registry, product locale, demo persona, rendered captures - so every later drawing and build reads
+    an identity and a chrome instead of inventing them.
 nodeKinds: [brand]
 completionProfile: brand
 sideEffects:
   - generated placeholder mascot/logo asset bytes under the brand record's own assets
+  - a local render of the real frontend shell and brand lockup, captured under the shell record's own assets
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -68,6 +71,24 @@ reads:
         frontend repository - with their formats, dimensions and provenance. Reuse an existing
         verified asset before producing any new one; an asset whose rights or origin are unknown is
         reported, not adopted.
+  - id: shell
+    path: .starciwork/shell/index.yaml
+    purpose:
+      en: "The product's existing shell record (work/app-shell@1) with its rev, origin, recorded source
+        digests and shell/assets/** captures. Absent until the chrome is first captured; this op then
+        writes it at rev 1."
+  - id: shellSource
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: "The frontend's real persistent chrome: the layout component that wraps signed-in routes, the top
+        bar and its controls, the brand lockup component, the navigation component and its destination
+        registry, the locale routing config and the message files the nav labels are read from, and the
+        seed or fixture data a demo tenant is taken from. Absent when no frontend layout exists yet."
+  - id: settledDesign
+    path: .starciwork/features/*/{journey,sds}/**/index.yaml
+    purpose:
+      en: The accepted journeys and frontend design records a planned shell takes its destinations and demo
+        tenant from when the frontend has no layout yet.
   - id: knowledge
     path: knowledge/index.yaml + applicable UI presentation/composition and installed family topics
     purpose:
@@ -123,10 +144,46 @@ writes:
         the final mascot and never as a capture of a shipped surface. When no generator is actually
         available, record a concrete deferred brief instead and leave the slot empty: a missing file
         is never described as generated."
+  - id: shellNode
+    path: .starciwork/shell/index.yaml
+    schema: work/app-shell@1
+    fields:
+      - schema
+      - id
+      - kind
+      - state
+      - rev
+      - origin
+      - app
+      - source
+      - topBar
+      - nav
+      - productLocale
+      - persona
+      - assets
+      - review
+      - change
+    content:
+      en: "The one shell record (schema work/app-shell@1, id shell): origin repository with `source` naming
+        the layout component and every chrome file with its sha256 at the read revision, or origin planned
+        when no frontend layout exists; the top bar component, its slots in order and the controls it has
+        not (`absent`); the lockup component with the path of its capture; the nav registry in source order
+        with key, route, i18n key and the label in every locale copied from the message files;
+        productLocale {default, fallback, locales} from the locale routing (the brand voice default when
+        the app declares none); the persona {workspace, user, currency, dateFormat} from the seed or fixture
+        data the app demos with; and every capture under `assets` with role, sha256, route, viewport, theme
+        and locale. A sibling evidence.yaml binds the capture run. Bump `rev` whenever any of it changes."
+  - id: shellAssets
+    path: .starciwork/shell/assets/<asset>
+    fields: [capture bytes with sha256 provenance]
+    content:
+      en: Real browser renders of the running frontend - the shell at each declared breakpoint and theme in
+        the productLocale default, and the brand lockup cropped from the same render - never a generated
+        image. A planned shell carries the lockup rendered from the brand masters.
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
-    artifacts: [manifest.yaml, brand-check.txt, token-trace.md]
+    artifacts: [manifest.yaml, brand-check.txt, token-trace.md, shell-conformance.txt]
     content:
       en: Retain the actual output of the brand checks with their exit status, the token-to-source trace
         (token name, value, file and declaration it was read from), the resolved package/family
@@ -209,6 +266,28 @@ steps:
         artwork-slot conventions a drawing fills; voice; motion; and the `donts` list the record is
         judged against. A rule nobody could check from the record is rewritten until it can be."
   - reads:
+      - shell
+      - shellSource
+      - settledDesign
+      - assets
+      - profile
+    writes: [shellNode, shellAssets, evidence]
+    action:
+      en: "Capture the app shell into the shell record. When the frontend has a persistent layout, read it
+        from source: the layout component that wraps signed-in routes, the top bar with its slots in
+        order and the controls it does not carry, the lockup component, the navigation registry in source
+        order with each destination's key, route and message key, and the label for every locale copied
+        from the message files; the locale set, default and fallback from the locale routing; the demo
+        workspace, user, currency and date format from the seed or fixture the app demos with. Digest every
+        file read. Serve the app locally and render the shell in a real browser at each declared breakpoint
+        and theme in the default locale, and the lockup from the same render; store the captures with their
+        sha256, route, viewport, theme and locale. When no frontend layout exists yet, write origin planned:
+        destinations and persona from the accepted journeys and frontend design records, the locale from
+        the brand voice default, and the lockup rendered from the brand masters - never a chrome the
+        records do not name. A destination with no label in the default locale, or a tenant no seed or
+        record names, is a question with the candidate values, never an invented one. Bump the shell rev
+        whenever the chrome, labels, locale or persona changed."
+  - reads:
       - target
       - sources
     writes: [node, evidence]
@@ -216,7 +295,9 @@ steps:
       en: "Run the brand checks against the real frontend repository and keep their output: token values
         match their declared sources, every declared text pair holds the contrast floor, primary and
         danger are distinct unless the policy permits otherwise, every declared mascot asset exists
-        with its recorded hash, and the icon set is the only one named. Bump `rev` and record what
+        with its recorded hash, and the icon set is the only one named; run `node
+        scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as
+        shell-conformance.txt. Bump `rev` and record what
         changed. Report `done` exactly once with the new `rev`, the checks and the token-to-source
         trace; a failing check is `failed` with its output; a value that cannot be traced to a
         source is `ask` naming the token and the file; a source file the record needs and that does
@@ -246,7 +327,20 @@ proofs:
         and its provenance, and a generated placeholder is recorded as a placeholder. A deferred
         asset carries a concrete brief and an empty slot; no missing file is described as generated
         or accepted.
+  - id: shell-capture
+    requirement:
+      en: "`node scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` exits 0 on the written shell record:
+        it is done, its captures exist with their recorded hashes and include the brand lockup (and, for
+        origin repository, a real shell render), every nav item carries a label in the productLocale
+        default, and every recorded source file still hashes as recorded. `starci validate --strict`
+        compiles it against work/app-shell@1."
+    check: scripts/checks/shell-conformance.mjs
 blockers:
+  - code: SHELL_RENDER_UNAVAILABLE
+    condition:
+      en: The frontend has a persistent layout but it cannot be served or rendered in a browser on this host,
+        so no real shell capture can be taken. Report `blocked` with `environment` and the exact command
+        that failed; never substitute a generated image or a description for the capture.
   - code: BRAND_SOURCE_MISSING
     condition:
       en: A token/style source file this record must read does not exist in the selected repository, or
@@ -287,6 +381,6 @@ layoutPolicy:
 route:
   nodeKinds: [brand]
   phase: [decide, pre-implementation]
-  intent: [brand, identity, tokens, decide]
+  intent: [brand, identity, tokens, decide, shell, chrome]
   prerequisites: [scope defined]
   riskHints: [generates-assets]

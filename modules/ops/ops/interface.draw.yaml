@@ -56,6 +56,14 @@ reads:
     purpose:
       en: "The current brand record and its actual masters: tokens, typography, logo/mascot placement,
         imagery rules, rights, rev and forbidden treatments."
+  - id: shell
+    path: .starciwork/shell/index.yaml
+    mustExist: true
+    purpose:
+      en: "The product's one app shell record (work/app-shell@1) with its shell/assets/** captures: the
+        layout component and top bar, the brand lockup component and its rendered capture, the nav
+        registry with labels per locale, productLocale {default, fallback}, the demo persona {workspace,
+        user, currency, dateFormat}, its state, rev and origin (repository or planned)."
   - id: knowledge
     path: knowledge/index.yaml with the applicable UI composition, presentation, proof and family topics
     purpose:
@@ -112,6 +120,7 @@ writes:
       - title
       - state
       - brand
+      - shell
       - refs
       - "ui:
         {status,intent,surfaces,states,coverage,flow,accessibility,responsive,assets,artworkSlots,o\
@@ -130,7 +139,9 @@ writes:
         rule and effect, and `edgeCases` as sentences or {name, handling}; the map lives in the
         record itself, never only in an asset file. Accessibility, responsive rules, copy, interactions and artwork slots
         are described alongside them, and every generated image and prompt appears in both ui.assets
-        and the node assets list."
+        and the node assets list. The top-level `shell` binds the shell record the directions were drawn
+        inside as {ref: shell, rev: <its current rev>, activeNav: <registry key>}, or {chromeless: true,
+        because} for a pre-auth or public route."
   - id: designSource
     path: N/assets/**/<asset>
     fields:
@@ -170,13 +181,20 @@ steps:
       - business
       - architecture
       - brand
+      - shell
       - knowledge
       - grammar
       - repo
       - profile
     writes: [node]
     action:
-      en: "Freeze complete coverage before generation. Enumerate every required screen, reachable state
+      en: "Settle the chrome before anything else. Read the shell record and decide, per surface, whether it
+        sits inside the app shell or is chromeless (a pre-auth or public route, said with a because). An
+        in-shell surface needs a settled shell record - state done, a brand-lockup capture, and for origin
+        repository a shell capture whose source digests still match - and binds it by its current rev and
+        the nav key it shows selected. The chrome, the nav labels, the UI language and the demo tenant come
+        from that record and from nowhere else; a worker that finds it absent, unsettled or drifted reports
+        APP_SHELL_UNSETTLED instead of drawing a chrome of its own. Freeze complete coverage before generation. Enumerate every required screen, reachable state
         and responsive band from accepted journeys/SDS; map each combination to actual inspected
         Grammar components and state contracts. Enumerate the interaction flow with the same rigor:
         every transition's trigger and landing state, and every reachable edge case. Write that flow
@@ -198,6 +216,7 @@ steps:
       - business
       - architecture
       - brand
+      - shell
       - knowledge
       - grammar
       - target
@@ -210,11 +229,18 @@ steps:
         Every visible datum is concrete plausible data derived from the accepted business record —
         numbers, currency amounts, dates, names, statuses and copy — never lorem text or blurred
         stand-ins. Skeleton or shimmer appears only when the directed state IS the loading state.
-        Each direction renders the complete page in situ: the consuming app's real persistent chrome
-        — sidebar, navbar, subnav, page container, rail layout per its actual layout components —
-        surrounds the content region being directed, so the owner reviews the page as it will exist
-        rather than a fragment on a blank canvas. A pre-auth or chromeless route says so explicitly
-        rather than inventing chrome. Invoke built-in `image_gen.imagegen`; a browser capture,
+        Each direction renders the complete page in situ inside the product's real chrome as the shell
+        record captures it, so the owner reviews the page as it will exist rather than a fragment on a
+        blank canvas and every parallel direction shows the same shell. Hand ImageGen the shell record's
+        captures as reference images - the brand-lockup capture always, and a shell-capture at the
+        matching viewport/theme for an in-shell surface - and record them in generation.referencedImages
+        by their .starciwork/shell/assets/ path. Copy into the prompt verbatim: every nav label in the
+        productLocale default with the selected destination named, the line `Product locale: <default>`,
+        and the persona's workspace, user, currency and dateFormat. All UI copy is written in that
+        product locale, never in owner_language. The prompt names the lockup component and forbids any
+        other logo, product name treatment, navigation destination, top-bar control the record lists
+        under `absent`, tenant or person. A chromeless route says so in the prompt, keeps the lockup and
+        the product locale, and draws no app chrome. Invoke built-in `image_gen.imagegen`; a browser capture,
         hand-painted boxes, mockup export or prose-only substitute does not satisfy this operation.
         Save the returned image and exact prompt, open the image, review it, and record the actual
         tool provenance, naming an image model only when the tool itself exposed one."
@@ -237,8 +263,10 @@ steps:
         mixed visual families unless accepted intent explicitly requires them. Reject any direction
         that breaks a rule of the prompt step — including a direction that draws titled cards inside
         cards, per-band cards, gapped bands or floating actions where the resolved Grammar concepts
-        call for one joined surface with an external label row and hairline-separated bands — and
-        correct the prompt and regenerate within the bounded representative set. Declare every
+        call for one joined surface with an external label row and hairline-separated bands, and a
+        direction whose chrome, lockup, nav labels, UI language or demo tenant departs from the shell
+        record and its captures — and correct the prompt and regenerate within the bounded
+        representative set. Declare every
         embedded illustration/mascot/decorative/media region classified `raster-asset` as an
         artworkSlots entry for `interface.asset`. Record every `code-native` region with its
         semantic structure, Grammar primitive or family anatomy, responsive/state behavior and
@@ -252,7 +280,8 @@ steps:
       - workflow
     writes: [node, evidence, draws]
     action:
-      en: "Validate Work and every artifact hash, then report the representative images, prompt artifacts,
+      en: "Validate Work and every artifact hash, run `node scripts/checks/shell-conformance.mjs` on every
+        ui record directory written, then report the representative images, prompt artifacts,
         actual tool provenance and complete coverage map. State the truth boundary: the generated
         direction is a design input, not exact component/render/API evidence. `interface.implement`
         produces the actual Grammar implementation captures and code checks, and `uat.verify`
@@ -294,6 +323,15 @@ proofs:
         grammar, reduced-scale legibility proof and justified raster-asset or code-native
         realization. A readable but childish, clichéd or semantically interchangeable symbol does
         not pass merely because its label explains it.
+  - id: shell-conformance
+    requirement:
+      en: "`node scripts/checks/shell-conformance.mjs <ui-record-dir>` exits 0 for every ui record directory
+        written: the record binds the settled shell record at its current rev (or is chromeless with a
+        because), and every generated direction's exact prompt carries each nav label in the productLocale
+        default, the `Product locale: <default>` line and the persona verbatim, and was handed the
+        brand-lockup capture and a real shell capture as reference images. Its output is retained in
+        evidence; a direction drawn inside a chrome of its own does not pass."
+    check: scripts/checks/shell-conformance.mjs
   - id: binding
     requirement:
       en: "`starci validate` passes, and `starci validate --strict` passes on the ui record directory
@@ -302,6 +340,13 @@ proofs:
         covered, input bindings are current, and an honest not-run/fail cannot earn done."
     check: bin/starci.mjs
 blockers:
+  - code: APP_SHELL_UNSETTLED
+    condition:
+      en: An in-shell surface is in scope and the shell record is absent, not done, missing its brand-lockup
+        or shell capture, or its recorded source digests no longer match the frontend. Report `blocked`
+        with blocker `brand-gap` naming the record path and the failing check; brand.decide captures the
+        real shell (interface.scaffold on a greenfield scaffold). Never draw, describe or invent chrome to
+        proceed.
   - code: IMAGEGEN_TOOL_UNAVAILABLE
     condition:
       en: Built-in `image_gen.imagegen` is not exposed on this host. Report host-unsupported; do not
@@ -341,5 +386,6 @@ route:
     - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
     - brand.decide done
+    - shell record settled (.starciwork/shell/index.yaml state done, captured by brand.decide or interface.scaffold)
   riskHints:
     - host-tool-required:image_gen.imagegen

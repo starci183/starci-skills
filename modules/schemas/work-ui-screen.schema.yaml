@@ -50,6 +50,45 @@ properties:
         minimum: 1
         description: The revision of the brand record this screen was designed and captured against. A
           number rather than a copy of the tokens, because a copy is a second source of truth that drifts.
+  shell:
+    oneOf:
+      - type: object
+        additionalProperties: false
+        required:
+          - ref
+          - rev
+        properties:
+          ref:
+            const: shell
+            description: The shell record's id - there is one per tree, at shell/index.yaml.
+          rev:
+            type: integer
+            minimum: 1
+            description: The shell record's `rev` this screen was drawn inside. A shell bump makes the
+              binding stale, and scripts/checks/shell-conformance.mjs reports SHELL_REV_STALE until the
+              screen is redrawn against the current chrome.
+          activeNav:
+            type: string
+            pattern: ^[a-z0-9]+(?:[-_][a-z0-9]+)*$
+            description: The nav registry key this screen shows selected, as the shell record spells it.
+      - type: object
+        additionalProperties: false
+        required:
+          - chromeless
+          - because
+        properties:
+          chromeless:
+            const: true
+          because:
+            $ref: "#/$defs/prose"
+            description: Why this screen sits outside the app shell - a pre-auth route, a public page.
+    description: "The application shell this screen is drawn inside, bound by revision the way `brand` is -
+      `{ref: shell, rev}` naming the work/app-shell@1 record, or `{chromeless: true, because}` for a
+      route the product draws without its persistent chrome. `ui.shell` below is the direction's prose about
+      that chrome; this is the edge. It is optional on the schema so ui records drawn before the shell
+      record existed stay valid - `starci validate` lists each of them as SHELL_BINDING_MISSING for a
+      redraw - and interface.draw's shell-conformance proof is what requires it on every record the op
+      writes from now on (scripts/checks/shell-conformance.mjs)."
   ui:
     type: object
     additionalProperties: false

@@ -156,8 +156,8 @@ ops:
   - id: brand.decide
     family: brand
     goal: Settle one product's visual identity in the single brand record - colour tokens traced to the
-      real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - so
-      every later
+      real source files, typography, mascot, logo, iconography, imagery rules, voice and motion -
+      and capture th
     params:
       ownerRulings:
         default: ""
@@ -169,7 +169,7 @@ ops:
       - brand
     completionProfile: brand
     sideEffects:
-      count: 1
+      count: 2
       summary: generated placeholder mascot/logo asset bytes under the brand record's own assets
     reads:
       - target
@@ -177,11 +177,16 @@ ops:
       - grammar
       - sources
       - assets
+      - shell
+      - shellSource
+      - settledDesign
       - knowledge
       - profile
     writes:
       - node
       - brandAssets
+      - shellNode
+      - shellAssets
       - evidence
     route:
       nodeKinds:
@@ -194,6 +199,8 @@ ops:
         - identity
         - tokens
         - decide
+        - shell
+        - chrome
       prerequisites:
         - scope defined
       riskHints:
@@ -615,6 +622,7 @@ ops:
       - grammar
       - knowledge
       - brand-assets
+      - shell
       - repo
       - implementation-captures
       - producer-measurements
@@ -676,6 +684,7 @@ ops:
       - business
       - architecture
       - brand
+      - shell
       - knowledge
       - grammar
       - repo
@@ -702,6 +711,8 @@ ops:
         - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
         - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
         - brand.decide done
+        - shell record settled (.starciwork/shell/index.yaml state done, captured by brand.decide or
+          interface.scaffold)
       riskHints:
         - host-tool-required:image_gen.imagegen
     lifecyclePosition: direct | pre-implementation
@@ -727,6 +738,7 @@ ops:
       - finding
       - draws
       - design
+      - shell
       - environment
       - workflow
       - profile
@@ -773,6 +785,7 @@ ops:
       - architecture
       - grammar
       - brand
+      - shell
       - repo
       - conventions
       - profile
@@ -781,6 +794,8 @@ ops:
       - source
       - evidence
       - firstRender
+      - shellNode
+      - shellAssets
     route:
       nodeKinds:
         - implementation

@@ -1,0 +1,84 @@
+# The todo app's shell record (work/app-shell@1), read from examples/todo-app-frontend. It is honest about
+# being unsettled: the chrome the accepted ui.task.list direction drew is built inside TasksPage rather
+# than by one shared layout every screen sits in, the brand has no lockup (logo status unruled), and no
+# real shell or lockup capture has been rendered. Until brand.decide settles those, interface.draw of an
+# in-shell screen reports APP_SHELL_UNSETTLED instead of inventing a chrome of its own.
+schema: work/app-shell@1
+id: shell
+kind: shell
+state: todo
+activity: idle
+rev: 1
+origin: repository
+app:
+  repository: todo-app-frontend
+  root: .
+  framework: Next.js app router with next-intl locale segments (src/app/[lang])
+topBar:
+  component: WorkspaceShell
+  slots:
+    - key: destinations
+      component: DestinationNav
+      purpose: The primary destination row, the current screen marked.
+    - key: account
+      component: AccountPresence
+      purpose: The signed-in account name and Sign out.
+    - key: theme
+      component: ThemeToggle
+      purpose: The light, dark and system theme switch the locale layout mounts.
+    - key: locale
+      component: LocaleSwitcher
+      purpose: The English and Vietnamese switch the locale layout mounts.
+  absent:
+    - search
+    - notifications-bell
+nav:
+  component: DestinationNav
+  items:
+    - key: tasks
+      route: /tasks
+      i18nKey: shell.destinations.tasks
+      labels:
+        en: Tasks
+        vi: Công việc
+    - key: notifications
+      route: /notify/preferences
+      i18nKey: shell.destinations.notifications
+      labels:
+        en: Notifications
+        vi: Thông báo
+    - key: plan
+      route: /plan/usage
+      i18nKey: shell.destinations.plan
+      labels:
+        en: Plan
+        vi: Gói
+    - key: privacy
+      route: /privacy
+      i18nKey: shell.destinations.privacy
+      labels:
+        en: Privacy
+        vi: Quyền riêng tư
+productLocale:
+  default: en
+  fallback: en
+  locales:
+    - en
+    - vi
+  source: examples/todo-app-frontend/src/i18n/config.ts defaultLocale en, locales [en, vi]
+refs:
+  - ui.task.list
+blockers:
+  - The chrome is composed inside TasksPage (src/features/pages/tasks/index.tsx) around WorkspaceShell rather
+    than by one shared route layout, so there is no layout component every in-shell screen is wrapped by and
+    `source` is not recorded yet.
+  - The brand logo is unruled (brand/index.yaml logo.status), so no lockup component exists and no brand-lockup
+    capture can be rendered.
+  - No demo persona is fixed - the header shows the synthetic account Alex, amounts default to VND, and no
+    date format is recorded - so `persona` waits for brand.decide to read it from the seed and the app.
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-24T00:00:00Z
+  reason: The shell record family was introduced; the example records the todo app's chrome as it is and
+    what keeps it unsettled.

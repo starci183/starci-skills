@@ -89,6 +89,12 @@ reads:
         material image/package conflict before copying it. Read the accepted region-level
         realization map and preserve each `raster-asset` versus `code-native` decision; do not
         override or rebuild Grammar to make an accepted generated approximation appear exact.
+  - id: shell
+    path: .starciwork/shell/index.yaml
+    purpose:
+      en: "The product's app shell record (work/app-shell@1): the real layout component and its source path
+        every in-shell screen is wrapped by, the top bar and lockup components, the nav registry with its
+        keys, routes and message keys, productLocale and the demo persona, with its rev and origin."
   - id: environment
     path: .starciwork/_resources/environments/<environment>/resource.yaml
     purpose:
@@ -301,10 +307,16 @@ steps:
       - knowledge
       - assetSources
       - profile
+      - shell
     writes: [source, assetManifest, realizationCheck]
     action:
       en: Implement the mapped screens and shared layout once using actual installed components, tokens
-        and repository conventions. Apply scoped creation, refinement or the smallest defect repair;
+        and repository conventions. Every in-shell screen is wrapped by the layout component the shell
+        record names - through its route's layout or directly - and reaches navigation, the top bar and
+        the lockup only through the shell's own components; a screen-local sidebar, header, logo or
+        locale switch is drift, and a new destination is a nav registry change in the shell's source,
+        not a link drawn in a page. UI copy goes into the message files in every productLocale locale,
+        the default first. Apply scoped creation, refinement or the smallest defect repair;
         retain cross-image consistency, responsive behavior, keyboard and focus. Follow applicable
         knowledge even where literal image copying would violate it; unresolved material design
         conflicts remain blocked. Never flatten code-native cards, panels, controls, typography,
@@ -458,6 +470,14 @@ proofs:
     requirement:
       en: Fix scoped failures and rerun affected checks. Reuse existing authorization and keep secrets
         outside evidence.
+  - id: shell-layout
+    requirement:
+      en: "`node scripts/checks/shell-conformance.mjs <impl-record-dir>` exits 0 for the written
+        implementation record: an owned file or an ancestor route layout uses the layout component the
+        shell record names, and the shell record is captured from source (origin repository). A recorded
+        shell source file this build changed is reported by the same run as SHELL_SOURCE_DRIFT for the
+        owning op to re-capture; the output is retained in evidence."
+    check: scripts/checks/shell-conformance.mjs
   - id: asset-coverage
     requirement:
       en: "Every artwork slot the accepted directions declared has an entry in E/assets.json, that file
@@ -473,6 +493,11 @@ proofs:
         E/realization-check.json carries `schema: starci/realization-check@1` and holds the shape
         modules/schemas/realization-check.schema.yaml declares."
 blockers:
+  - code: APP_SHELL_UNSETTLED
+    condition:
+      en: An in-shell screen is in scope and the shell record is absent, planned (no layout captured from
+        source) or not done. Report `blocked` with blocker `brand-gap` naming the record; never build a
+        chrome of the screen's own to proceed.
   - code: DRAWS_INPUT_INVALID
     condition:
       en: draws is missing when required, is not an array, contains unreadable image references, or is
