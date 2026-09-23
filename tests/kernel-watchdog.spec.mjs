@@ -106,6 +106,16 @@ test('an idle prompt holding queued messages is queued-input; a running turn is 
   assert.equal(classifyAgentScreen(busy).state,'active','Enter during a running turn would cut into it');
 });
 
+// Claude Code 2.1.280 spins with "✶ Osmosing… (1m 0s · ↓ 2.7k tokens)" and no
+// "esc to interrupt"; a working nivo Claude kernel read turn-idle.
+test('a Claude Code star spinner with a timer is active; its idle prompt is not',()=>{
+  const busy=['  keep the model turn alive.','✶ Osmosing… (1m 0s · ↓ 2.7k tokens)','  ⎿  Tip: Use /btw to ask a quick side question','─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+  assert.equal(classifyAgentScreen(busy).state,'active');
+  assert.equal(classifyAgentScreen('✻ Cogitating… (12s · ↑ 300 tokens)\n❯').state,'active');
+  const idle=[' Yielding — waiting on the scope.define report.','─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+  assert.equal(classifyAgentScreen(idle).state,'turn-idle');
+});
+
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
   assert.match(prompt,/external watchdog owns the 5-minute cadence/i);

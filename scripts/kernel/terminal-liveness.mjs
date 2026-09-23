@@ -79,7 +79,11 @@ export function classifyAgentScreen(screen) {
   // "Thinking", "Running"; a wrapped prose line that starts with "running."
   // (a Collab Kernel yield summary) is not one.
   const statusWord = /(?:^|\n)\s*[•*○◦]?\s*(?:Working|Thinking|Running)\b(?!\s*:|\s+now\b|[^\n]*:[ \t]*(?:\n|$))/;
-  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d/i;
+  // Claude Code 2.1.280 spins with a star glyph and a random gerund plus a
+  // timer ("✶ Osmosing… (1m 0s · ↓ 2.7k tokens)") and no "esc to interrupt";
+  // without this marker a working Claude kernel read turn-idle and every
+  // watchdog wake landed in its queued-message box.
+  const activeMarker = /esc (?:twice )?to (?:interrupt|cancel)|background terminal running|(?:^|\n)[^\n]*[⠀-⣿][^\n]*\d|(?:^|\n)\s*[✶✻✳✢✽✺·*]\s+\S+…\s*\(\s*\d+(?:h|m|s)/i;
   const active = { test: (text) => statusWord.test(text) || activeMarker.test(text) };
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
