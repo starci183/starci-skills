@@ -35,12 +35,19 @@ const utilityTokens = (source: string): ReadonlyArray<string> => [...source.matc
 const UTILITY_DEBT: ReadonlyArray<string> = []
 
 describe("Shipped geometry", () => {
-    const files = [...sourceFiles(join(sourceRoot, "core")), ...sourceFiles(join(sourceRoot, "common"))]
+    const offsetPopFiles = sourceFiles(join(sourceRoot, "offset-pop"))
+    const files = [...sourceFiles(join(sourceRoot, "core")), ...sourceFiles(join(sourceRoot, "common")), ...offsetPopFiles]
     const offenders = files.filter((file) => utilityTokens(readFileSync(file, "utf8")).length > 0).map(posix)
 
     it("keeps layout and geometry in the packaged stylesheet, not in Tailwind utilities", () => {
         expect(files.length).toBeGreaterThan(20)
         expect(offenders.filter((file) => !UTILITY_DEBT.includes(file))).toEqual([])
+    })
+
+    it("scans Offset Pop's shipped modules too, and records no Offset Pop debt", () => {
+        expect(offsetPopFiles.map(posix)).toEqual(expect.arrayContaining(["offset-pop/index.tsx", "offset-pop/dna.ts", "offset-pop/conformance.ts"]))
+        expect(offenders.filter((file) => file.startsWith("offset-pop/"))).toEqual([])
+        expect(UTILITY_DEBT.filter((file) => file.startsWith("offset-pop/"))).toEqual([])
     })
 
     it("keeps the recorded debt honest, and keeps Sidebar out of it", () => {

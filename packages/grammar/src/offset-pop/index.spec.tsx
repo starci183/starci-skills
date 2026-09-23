@@ -41,6 +41,7 @@ describe("@starci/grammar/offset-pop", () => {
         expect(covered).toEqual(new Set(COMMON_UI_RULE_IDS))
         expect(offsetPopRuleConformance.familyEvidence).toHaveProperty("FOCUS-1")
         expect(offsetPopRuleConformance.familyEvidence).toHaveProperty("MOTION-2")
-        expect(offsetPopRuleConformance.familyEvidence).toHaveProperty("PADDING-3")
+        // The family declares no padding, so the inset rules stay Common's (see conformance.spec.ts).
+        expect(offsetPopRuleConformance.inheritedCommonRules).toContain("PADDING-3")
     })
 })
