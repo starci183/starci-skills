@@ -155,6 +155,23 @@ export function deriveRetryLineage(priorJob,{attempt=null,priorBusinessAttempt=n
   };
 }
 
+/**
+ * A row retired while still queued - `api reconcile --drop` (result.verdict `dropped`) or a goal revision
+ * that superseded it (result.reason `goal-revision-superseded`) - with no dispatch binding in its payload.
+ * It ran nothing, so it is no attempt: never a retry predecessor, never a cut seam, never the latest job
+ * of its ordinal (inc-5005d003825a: a retry chained to a dropped ordinal-1 row as business attempt 2 and
+ * lost the owner-answer lineage; inc-b428eb47fde3: ordinal 2 read a dropped seam as dependency-failed).
+ */
+export function retiredBeforeDispatch(job){
+  if(job?.status!=='cancelled')return false;
+  const result=resultOf(job),payload=payloadOf(job);
+  if(result.verdict!=='dropped'&&result.reason!=='goal-revision-superseded')return false;
+  const runtime=payload.hierarchy?.runtime??{};
+  const bound=Boolean(job.worker_id||payload.managed||payload.orca||runtime.dispatchId||runtime.terminalHandle
+    ||(Array.isArray(payload.rejectedDispatches)&&payload.rejectedDispatches.length));
+  return !bound;
+}
+
 /** The cut slice a job row carries, or null: {id, ordinal} identify one bounded SAME-op slice. */
 export function cutOf(job){
   const cut=payloadOf(job).cut;
@@ -166,10 +183,12 @@ export function cutOf(job){
  * independent slices, so the predecessor is the latest job with the SAME op, cut id AND ordinal - never a
  * sibling ordinal that happened to run later - and the business attempt counts only that ordinal's own
  * business attempts (1 + every earlier same-ordinal attempt whose disposition consumed one). `ordinalJobs`
- * are that ordinal's prior jobs (any order); the result is null when the ordinal has none (a first attempt).
+ * are that ordinal's prior jobs (any order); a row retired before it dispatched (retiredBeforeDispatch) is
+ * skipped, so the lineage stays on the last attempt that ran. The result is null when the ordinal has none
+ * (a first attempt).
  */
 export function cutRetryLineage(ordinalJobs,{attempt=null}={}){
-  const jobs=[...(ordinalJobs??[])].sort((a,b)=>Number(a.attempt)-Number(b.attempt));
+  const jobs=[...(ordinalJobs??[])].filter(job=>!retiredBeforeDispatch(job)).sort((a,b)=>Number(a.attempt)-Number(b.attempt));
   if(!jobs.length)return null;
   const prior=jobs.at(-1);
   const priorBusinessAttempt=1+jobs.slice(0,-1).filter(job=>retryDisposition(job).consumesBusinessRetry).length;

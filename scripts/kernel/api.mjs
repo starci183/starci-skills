@@ -49,7 +49,7 @@ import {
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
-  ownedPathsIntersect,
+  ownedPathsIntersect, retiredBeforeDispatch,
 } from '../../engine/admission.mjs';
 import {
   activeDelegation, allocationMs, allocationSettings, connectorsConfig, defaultParallelGear, inspectOwnerConfig, loadConfig, slicingGears,
@@ -325,20 +325,30 @@ const withOwnerWaitResult = (db, row) => (row && isAwaitingOwner(db, row) && job
  * before it (attempt < `attempt`). An uncut op chains to the op's latest attempt. A cut ordinal chains
  * only to its own ordinal - the latest job with the SAME op, cut id AND ordinal - and counts only that
  * ordinal's business attempts (engine/admission.mjs cutRetryLineage): a sibling ordinal that settled
- * later is never its predecessor. Null when there is no predecessor (a first attempt).
+ * later is never its predecessor. A row retired before it dispatched (reconcile --drop, a superseding goal
+ * revision) ran nothing and is skipped either way, so an owner-answer retry keeps the ask attempt as its
+ * predecessor (inc-5005d003825a). Null when there is no predecessor (a first attempt).
  */
 const retryLineageFor = (db, { workflowId, op, cut, attempt }) => {
-  const cols = 'job_id,workflow_id,op_id,status,attempt,payload_json,result_json';
+  const cols = 'job_id,workflow_id,op_id,status,attempt,worker_id,payload_json,result_json';
   if (cut) {
     const ordinalJobs = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<?
       AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=? ORDER BY attempt`)
       .all(workflowId, op, attempt, String(cut.id), Number(cut.ordinal)).map((row) => withOwnerWaitResult(db, row));
     return cutRetryLineage(ordinalJobs, { attempt });
   }
-  const priorJob = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC LIMIT 1`)
-    .get(workflowId, op, attempt);
-  return priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob)) : null;
+  const priorJob = db.prepare(`SELECT ${cols} FROM jobs WHERE workflow_id=? AND op_id=? AND attempt<? ORDER BY attempt DESC`)
+    .all(workflowId, op, attempt).find((row) => !retiredBeforeDispatch(row));
+  return priorJob ? deriveRetryLineage(withOwnerWaitResult(db, priorJob), { attempt }) : null;
 };
+/**
+ * The live head of a cut's seam (ordinal 1): its latest job that was not retired before dispatch. A
+ * dropped seam retry is no seam - the ordinals behind it wait on the attempt that actually ran, or on
+ * the retry the Kernel enqueues next (inc-b428eb47fde3). Null when the seam has no such job.
+ */
+const cutSeamHeadOf = (db, { workflowId, op, cutId }) => db.prepare(`SELECT job_id,status,attempt,worker_id,payload_json,result_json FROM jobs
+  WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY attempt DESC`)
+  .all(workflowId, op, String(cutId)).find((row) => !retiredBeforeDispatch(row)) ?? null;
 /**
  * The cut set {workflowId, op, cut.id} as the ledger holds it now: the latest job (highest attempt) of each
  * ordinal 1..cut.total and the ordinals whose latest job has not settled succeeded. `ownJobId` counts as
@@ -349,8 +359,10 @@ const retryLineageFor = (db, { workflowId, op, cut, attempt }) => {
  * ran the whole-set integration gate).
  */
 const cutSetStateOf = (db, { workflowId, op, cut, ownJobId = null }) => {
-  const rows = db.prepare(`SELECT job_id,status,attempt,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
-    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY attempt`).all(workflowId, op, String(cut.id));
+  // A row retired before it dispatched is no attempt of its ordinal (retiredBeforeDispatch).
+  const rows = db.prepare(`SELECT job_id,status,attempt,worker_id,payload_json,result_json,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY attempt`).all(workflowId, op, String(cut.id))
+    .filter((row) => row.job_id === ownJobId || !retiredBeforeDispatch(row));
   const latest = new Map();
   for (const row of rows) latest.set(Number(row.ordinal), row);
   const own = rows.find((row) => row.job_id === ownJobId);
@@ -1341,14 +1353,14 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
   }
 
   // A declared --after job, or the seam (ordinal 1) of this job's cut, that
-  // has not settled succeeded holds it like an earlier leg does.
+  // has not settled succeeded holds it like an earlier leg does. The seam is
+  // its live head: a dropped, never-dispatched seam retry is skipped.
   const heldByJob = (priorId) => {
     const prior = db.prepare('SELECT job_id,op_id,status FROM jobs WHERE job_id=?').get(priorId);
     return prior && prior.status !== 'succeeded' ? prior : null;
   };
   const seam = payload.cut && Number(payload.cut.ordinal) > 1
-    ? db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=1 ORDER BY attempt DESC LIMIT 1")
-      .get(job.workflow_id ?? payload.hierarchy?.workflowId, opId, payload.cut.id)?.job_id ?? null
+    ? cutSeamHeadOf(db, { workflowId: job.workflow_id ?? payload.hierarchy?.workflowId, op: opId, cutId: payload.cut.id })?.job_id ?? null
     : null;
   for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...(recordDeps.get(job.job_id) ?? [])]) {
     const prior = heldByJob(priorId);
@@ -1985,8 +1997,15 @@ function cmdEnqueue(ledger, args, repo) {
   // order lives in the ledger, so status never calls a held sibling ready.
   const after = [...new Set(String(args.after ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
   for (const prior of after) {
-    if (!db.prepare('SELECT 1 FROM jobs WHERE job_id=? AND workflow_id=?').get(prior, workflowId))
-      throw Object.assign(new Error(`--after names ${prior}, which is not a job of ${workflowId}`), { code: 'after-unknown' });
+    const row = db.prepare('SELECT status FROM jobs WHERE job_id=? AND workflow_id=?').get(prior, workflowId);
+    if (!row) throw Object.assign(new Error(`--after names ${prior}, which is not a job of ${workflowId}`), { code: 'after-unknown' });
+    // A settled row never changes status, so an --after on one that did not
+    // succeed can never be met. inc-5005d003825a: a retry of an answered ask
+    // was enqueued --after the ask attempt and could only be dropped; the
+    // retry chains to the ask through its retry lineage, never through --after.
+    if (FINAL_SETTLED.includes(row.status) && row.status !== 'succeeded') {
+      throw Object.assign(new Error(`--after names ${prior}, which already settled ${row.status} and can never succeed; a retry of it chains through its retry lineage (enqueue the same op${hasCut ? ' and cut ordinal' : ''} without --after)`), { code: 'after-settled' });
+    }
   }
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
@@ -3522,10 +3541,13 @@ function reconcileDrop(ledger, args, job) {
   if (evidence.length) {
     throw Object.assign(new Error(`job ${jobId} was dispatched (${evidence.join(', ')}); a dispatched attempt settles through settle, never --drop`), { code: 'drop-dispatched', evidence });
   }
+  // Siblings wait on this job as a seam only while it is the seam's live head.
+  const isSeamHead = Boolean(payload.cut && Number(payload.cut.ordinal) === 1
+    && cutSeamHeadOf(db, { workflowId: job.workflow_id, op: job.op_id, cutId: payload.cut.id })?.job_id === jobId);
   const waiting = db.prepare("SELECT job_id,op_id,payload_json FROM jobs WHERE workflow_id=? AND status='queued' AND job_id<>?").all(job.workflow_id, jobId)
     .filter((row) => {
       const p = jobPayloadOf(row);
-      const seamOf = p.cut && payload.cut && p.cut.id === payload.cut.id && Number(payload.cut.ordinal) === 1 && Number(p.cut.ordinal) > 1;
+      const seamOf = isSeamHead && p.cut && String(p.cut.id) === String(payload.cut.id) && Number(p.cut.ordinal) > 1;
       return (Array.isArray(p.after) && p.after.includes(jobId)) || seamOf;
     }).map((row) => row.job_id);
   ledger.transaction(() => {

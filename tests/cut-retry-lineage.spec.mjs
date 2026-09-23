@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
-import {cutRetryLineage} from '../engine/admission.mjs';
+import {cutRetryLineage,retiredBeforeDispatch} from '../engine/admission.mjs';
 
 // Incident inc-72839f63a1f5 (starci-next, 2026-09-24): cut cv-import-rev1 ordinal 1 failed, ordinals 2 and
 // 3 passed, and the ordinal-1 retry was enqueued with retry.retryOf = the successful ordinal 3 and
@@ -159,4 +159,112 @@ test('first executions of cut ordinals 2..5 carry no retry lineage, whatever set
   const retry=enqueue('be-baseline-r1-g2',4,5);
   const lineage=payloadOf(repo,retry).retry;
   assert.deepEqual([lineage.retryOf,lineage.businessAttempt,lineage.retryClass],[siblings[2],2,'business']);
+});
+
+// Incidents inc-5005d003825a and inc-b428eb47fde3 (starci-next work-and-stacks, cut business-paths-rag-rev1):
+// ordinal 1 settled blocked on an ask that was then answered; its retry was enqueued --after the ask attempt
+// and dropped (never dispatched), and the next ordinal-1 retry chained to that DROPPED row as a business
+// retry (businessAttempt 2) instead of the owner-answer lineage (businessAttempt 1); --retry-lineage then
+// reported repaired:false. After that retry was dropped too, ordinal 2's retry read the dropped row as its
+// seam and sat dependency-failed. A row retired before dispatch ran nothing: it is never a predecessor and
+// never a seam.
+const BCUT='business-paths-rag-rev1';
+const enqueueBiz=(repo,wf,ordinal,...extra)=>runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths',`docs/biz-${ordinal}`,
+  '--cut-id',BCUT,'--cut-ordinal',String(ordinal),'--cut-total','2',...extra,'--json');
+const enqueueBizOk=(repo,wf,ordinal)=>{const r=enqueueBiz(repo,wf,ordinal);assert.equal(r.status,0,r.stderr||r.error?.message);return out(r).job_id;};
+const dropJob=(repo,jobId,reason)=>{const r=runApi('reconcile','--repo',repo,'--job',jobId,'--drop','--reason',reason,'--json');assert.equal(r.status,0,r.stderr);return out(r);};
+const attemptOf=(repo,jobId)=>read(repo,l=>l.db.prepare('SELECT attempt FROM jobs WHERE job_id=?').get(jobId).attempt);
+/** Ordinal 1 settled blocked on a filed (and answered) ask; ordinal 2 settled fail with no report. */
+const businessIncident=(repo,wf)=>{
+  const o1=enqueueBizOk(repo,wf,1),o2=enqueueBizOk(repo,wf,2);
+  settle(repo,o1,'failed',{verdict:'blocked'});
+  const askAttempt=attemptOf(repo,o1);
+  seed(repo,l=>{
+    const at=Date.now();
+    l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'ask',?,?,?)`)
+      .run(wf,'ctx_ask','docs.author',askAttempt,json({outcome:'ask',summary:'four paths?',question:{text:'which paths?'}}),at,at);
+    l.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_ask',kind:'ask-answered',payload:{dispatchId:'ctx_ask',answeredBy:'auto-recommended'}});
+  });
+  settle(repo,o2,'failed',{verdict:'fail',reportFiled:false});
+  return {o1,o2};
+};
+const ownerAnswer=(o1,attempt)=>({retryOf:o1,resumeOf:null,attempt,businessAttempt:1,retryClass:'owner-answer',effectState:'unknown',
+  resumed:false,reusesDurableAttempt:false,consumesBusinessRetry:false});
+
+test('retiredBeforeDispatch: only a dropped or superseded row with no dispatch binding ran nothing',()=>{
+  const row=(status,result,payload={})=>({job_id:'j',attempt:3,status,payload_json:json(payload),result_json:json(result)});
+  assert.equal(retiredBeforeDispatch(row('cancelled',{verdict:'dropped',reason:'x'})),true);
+  assert.equal(retiredBeforeDispatch(row('cancelled',{reason:'goal-revision-superseded',effectState:'none'})),true);
+  assert.equal(retiredBeforeDispatch(row('failed',{verdict:'dropped'})),false,'only a cancelled row');
+  assert.equal(retiredBeforeDispatch(row('cancelled',{verdict:'cancelled'})),false,'a cancel of another kind is history');
+  assert.equal(retiredBeforeDispatch(row('cancelled',{reason:'goal-revision-superseded'},{rejectedDispatches:[{dispatchId:'d'}]})),false,
+    'a rejected dispatch crossed the boundary');
+  assert.equal(retiredBeforeDispatch(row('cancelled',{verdict:'dropped'},{orca:{dispatchId:'d'}})),false);
+
+  // cutRetryLineage skips the dropped row: the owner-answer lineage of the ask attempt stands.
+  const ask={job_id:'a6',attempt:6,status:'failed',payload_json:json({cut:{id:'c',ordinal:1,total:2}}),result_json:json({verdict:'awaiting-owner'})};
+  const dropped={job_id:'a9',attempt:9,status:'cancelled',payload_json:json({cut:{id:'c',ordinal:1,total:2},after:['a6']}),result_json:json({verdict:'dropped'})};
+  assert.deepEqual(cutRetryLineage([ask,dropped],{attempt:10}),ownerAnswer('a6',10));
+  assert.equal(cutRetryLineage([dropped],{attempt:10}),null,'an ordinal whose only row was dropped has no predecessor');
+});
+
+test('inc-5005d003825a: an owner-answer retry skips a dropped retry and --retry-lineage repairs the wrong lineage',t=>{
+  const repo=workRoot(t),wf='wf-biz-owner-answer';
+  seedGoal(repo,wf);
+  const {o1}=businessIncident(repo,wf);
+
+  // The accidental shape is refused now: --after a settled ask can never be met.
+  const refused=enqueueBiz(repo,wf,1,'--after',o1);
+  assert.equal(refused.status,1);
+  assert.equal(refusal(refused).code,'after-settled');
+
+  // Reproduce attempt 9 as the pre-fix kernel wrote it: queued --after the ask attempt, then dropped.
+  const a9=enqueueBizOk(repo,wf,1);
+  seed(repo,l=>l.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({...payloadOf(repo,a9),after:[o1]}),a9));
+  assert.equal(dropJob(repo,a9,'queued --after the answered ask').status,'cancelled');
+
+  // Attempt 10: the same ordinal re-enqueued without --after chains to the ask, not to the dropped row.
+  const a10=enqueueBizOk(repo,wf,1);
+  assert.deepEqual(payloadOf(repo,a10).retry,ownerAnswer(o1,attemptOf(repo,a10)));
+
+  // The durable payload the pre-fix enqueue wrote: retryOf the dropped row, a business retry at 2.
+  const wrong={retryOf:a9,resumeOf:null,attempt:attemptOf(repo,a10),businessAttempt:2,retryClass:'business',effectState:'unknown',
+    resumed:false,reusesDurableAttempt:false,consumesBusinessRetry:true};
+  seed(repo,l=>l.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({...payloadOf(repo,a10),retry:wrong}),a10));
+  const r=runApi('reconcile','--repo',repo,'--job',a10,'--retry-lineage','--json');
+  assert.equal(r.status,0,r.stderr);
+  const body=out(r);
+  assert.deepEqual([body.repaired,body.before.retryOf,body.after.retryOf,body.after.retryClass,body.after.businessAttempt],[true,a9,o1,'owner-answer',1]);
+  assert.deepEqual(payloadOf(repo,a10).retry,ownerAnswer(o1,attemptOf(repo,a10)));
+  const again=runApi('reconcile','--repo',repo,'--job',a10,'--retry-lineage','--json');
+  assert.equal(out(again).repaired,false,'idempotent once repaired');
+});
+
+test('inc-b428eb47fde3: a dropped seam retry is no seam; ordinal 2 waits on the live ordinal-1 head',t=>{
+  const repo=workRoot(t),wf='wf-biz-seam';
+  seedGoal(repo,wf);
+  const {o1,o2}=businessIncident(repo,wf);
+  const a9=enqueueBizOk(repo,wf,1);
+  dropJob(repo,a9,'queued --after the answered ask');
+  const a10=enqueueBizOk(repo,wf,1);
+
+  // Ordinal 2's retry chains to its own failed attempt as business attempt 2.
+  const a11=enqueueBizOk(repo,wf,2);
+  const lineage=payloadOf(repo,a11).retry;
+  assert.deepEqual([lineage.retryOf,lineage.businessAttempt,lineage.retryClass],[o2,2,'business']);
+  const queued=id=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r).frontier.queued.find(q=>q.jobId===id);};
+  assert.deepEqual([queued(a11).queuedBecause,queued(a11).blockedBy.job],['dependency',a10],'the queued ordinal-1 retry is the seam');
+
+  // Drop ordinal 1's retry as the incident did: dropping the live seam head names ordinal 2 as waiting,
+  // and the seam falls back to the ask attempt that actually ran - an owner wait, not a dead dependency.
+  assert.deepEqual(dropJob(repo,a10,'lineage points at a dropped row').waiting,[a11]);
+  assert.deepEqual([queued(a11).queuedBecause,queued(a11).blockedBy.job],['dependency',o1],
+    'never the cancelled attempt 10 read as dependency-failed');
+
+  // The next ordinal-1 retry becomes the seam; its lineage is still the owner answer.
+  const a12=enqueueBizOk(repo,wf,1);
+  assert.deepEqual(payloadOf(repo,a12).retry,ownerAnswer(o1,attemptOf(repo,a12)));
+  assert.deepEqual([queued(a11).queuedBecause,queued(a11).blockedBy.job],['dependency',a12]);
+  settle(repo,a12,'succeeded',{verdict:'pass'});
+  assert.equal(queued(a11).queuedBecause,'ready');
 });

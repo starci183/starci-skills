@@ -234,7 +234,9 @@ commands:
         Kernel is the only thing left to move it
       'frontier.queuedBecause precedence': >-
         first cause that bites, in this order. A job whose payload.after names a job, or whose cut seam
-        (the same cut id at ordinal 1) has not settled succeeded, is `dependency` with blockedBy {op, job}:
+        (the latest job of the same op and cut id at ordinal 1 that was not retired before dispatch -
+        a dropped or goal-superseded row with no dispatch binding, engine/admission.mjs
+        retiredBeforeDispatch, is no seam) has not settled succeeded, is `dependency` with blockedBy {op, job}:
         the kernel records a composition-first order with enqueue --after instead of holding siblings in
         its head, and an unsettled seam holds the other ordinals. A Work record in a job's owned_paths whose dependsOn
         names a record owned by another job of the workflow is held the same way until one owner of that
@@ -432,6 +434,11 @@ commands:
       counts only that ordinal's business attempts, `effectState` is that
       predecessor's, and `attempt` is the row's durable attempt; the first
       job of an ordinal carries no `retry`, whatever sibling ordinals ran.
+      A row retired before it dispatched (reconcile --drop, or a goal revision
+      that superseded it, with no dispatch binding: engine/admission.mjs
+      retiredBeforeDispatch) ran nothing and is never a predecessor, cut or
+      uncut: the retry of an answered ask stays retryClass owner-answer at
+      the ask's businessAttempt however many queued retries were dropped.
       `records` is the explicit closed read binding carried
       unchanged into the dispatch packet; omission means no Work record is
       bound and never licenses repository-wide discovery.
@@ -460,6 +467,8 @@ commands:
       - repository-unknown: '--repository names no repository the project binding (or, unbound, an existing directory) resolves'
       - path-repository-unknown: 'an owned path repository:<id>/… names a repository the project binding does not bind'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
+      - after-unknown: '--after names a job that is not a job of this workflow'
+      - after-settled: '--after names a job that already settled failed or cancelled; a settled row never succeeds, so the dependant could never run. A retry of that job (an answered ask included) chains through its retry lineage: enqueue the same op and cut ordinal without --after'
       - params-invalid: '--params is not a JSON object, names a param the brief does not declare, carries a value of the wrong type or outside its min/max/enum, sets a `setBy: owner` param the approved goal leg does not carry, or a goal leg carries a `setBy: kernel` param (scripts/route/dispatch-op.mjs resolveOpParams)'
       - 'params-invalid (field `reason`) for a missing `required: true` param: prints {ok:false, workflowId, op, reason:"params-invalid", param, detail} on stdout and exits 1, no job written. detail reads "<op> requires params.<name> (<type>, set by <setBy>): <doc> — none was given; re-run enqueue with --params ''{"<name>": <type>}''" (a `setBy: owner` param names the approved goal leg instead). provision.ask requires params.subject, the one-sentence provision or decision it asks'
     duplicates: >-
@@ -714,8 +723,12 @@ commands:
       dispatch boundary (the same evidence test as --retry-lineage): the row
       settles `cancelled` with result {verdict:'dropped', reason, at} and one
       event 'job-dropped' {op, attempt, reason, cut, waiting}. `waiting` names
-      every queued job whose --after or cut seam is this job; they read
-      dependency-failed in status until the Kernel re-points or drops them. It
+      every queued job whose --after is this job, or whose cut seam this job
+      is (it was the seam's live head). An --after dependant reads
+      dependency-failed in status until the Kernel re-points or drops it; a
+      dropped seam retry is no seam, so the other ordinals wait on the seam's
+      previous live job (an answered ask reads `dependency`) or on the next
+      ordinal-1 retry the Kernel enqueues. It
       is how a Kernel clears a cut whose grants are wrong before it re-plans
       it. Refuses drop-not-queued, drop-needs-reason and drop-dispatched
       (with `evidence`).
@@ -723,7 +736,8 @@ commands:
       `--retry-lineage` is a separate repair, not a launch reconcile: for a
       QUEUED job that never crossed the dispatch boundary it re-derives
       payload.retry exactly as enqueue now would (the cut rule above: same
-      op + cut id + ordinal) from the jobs before its attempt, rewrites it in
+      op + cut id + ordinal, skipping rows retired before dispatch) from the
+      jobs before its attempt, rewrites it in
       one transaction and appends one event 'retry-lineage-repaired'
       {attempt, cut, before, after}. An already-correct lineage writes
       nothing and returns repaired:false. Returns
