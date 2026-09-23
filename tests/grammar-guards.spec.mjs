@@ -164,6 +164,43 @@ test('a static public-entry helper outside the declared package inventory is una
   assert.deepEqual(result.checkedRuleIds, []);
 });
 
+test('npm files negations narrow a bounded inventory but never name one', async t => {
+  const published = ['dist', '!dist/stories', '!dist/__test__', '!dist/**/*.stories.*', '!dist/**/*.spec.*', '!dist/**/*.test.*', 'README.md', 'LICENSE'];
+  await t.test('bounded positives with the published 0.5.0 glob negations pass', async inner => {
+    for (const source of ['installed', 'repository']) await inner.test(source, leaf => {
+      const f = fixture(leaf, { source, packageFiles: published });
+      if (source === 'repository') {
+        f.write('packages/grammar/dist/button.stories.js', 'export default {};'); f.write('packages/grammar/dist/nested/a.spec.js', 'export {};');
+      }
+      const result = checkGrammarGuards(f.input);
+      assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+      assert.deepEqual(result.checkedRuleIds, GRAMMAR_GUARD_RULES);
+    });
+  });
+  await t.test('unbounded or escaping positives are still refused, negations included', async inner => {
+    for (const packageFiles of [['dist/**'], ['dist/*.js', '!dist/**/*.spec.*'], ['{dist,src}'], ['../dist'], ['!!dist/**/*.spec.*', 'dist'], ['dist', '!../x/**'], ['dist', '!']]) {
+      await inner.test(JSON.stringify(packageFiles), leaf => {
+        const result = checkGrammarGuards(fixture(leaf, { packageFiles }).input);
+        assert.ok(result.errors.some(item => item.message.includes('explicit bounded package inventory')), JSON.stringify(result.errors));
+        assert.deepEqual(result.checkedRuleIds, []);
+      });
+    }
+  });
+  await t.test('a negation alone never counts as inventory', inner => {
+    const result = checkGrammarGuards(fixture(inner, { packageFiles: ['!dist/**/*.spec.*', '!dist/stories'] }).input);
+    assert.ok(result.errors.some(item => item.message.includes('negations only narrow it')), JSON.stringify(result.errors));
+    assert.deepEqual(result.checkedRuleIds, []);
+  });
+  await t.test('a public-entry dependency the negations drop from the published package is unavailable', inner => {
+    const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from './stories/helper.js';`;
+    const f = fixture(inner, { source: 'repository', moduleSource, packageFiles: ['dist', '!dist/stories'] });
+    f.write('packages/grammar/dist/stories/helper.js', goodModule);
+    const result = checkGrammarGuards(f.input);
+    assert.ok(result.errors.some(item => item.message.includes('excluded from the published package inventory: dist/stories/helper.js')), JSON.stringify(result.errors));
+    assert.deepEqual(result.checkedRuleIds, []);
+  });
+});
+
 test('external imports and behavior reads are covered by canonical dependency custody', async t => {
   await t.test('a locked external package is byte-bound before and after the probe', inner => {
     const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from '@external/helper';`;

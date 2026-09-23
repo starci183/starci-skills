@@ -27,7 +27,12 @@ without requiring a self dependency.
 
 The adapter binds the target package manifest and lock, exact public entry, the
 existing files under the package's explicit published roots, and repository
-`src` and `scripts` inputs where present. It follows static relative, package
+`src` and `scripts` inputs where present. Positive `files` entries must be
+literal package paths; `!`-prefixed entries may be globs because npm only
+subtracts them from that bounded inventory, and a manifest with only negations
+names no inventory. The hash still covers every file under the positive roots,
+while a public-entry dependency that a negation drops from the published
+package makes coverage unavailable. It follows static relative, package
 imports and bare-package imports from the public entry, including literal
 `import()` and CommonJS `require()` edges. A bare dependency must resolve to a
 canonical package manifest whose exact name and version have a unique npm

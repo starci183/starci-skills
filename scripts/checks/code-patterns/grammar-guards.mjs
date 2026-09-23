@@ -114,13 +114,43 @@ function resolvePackage(root, contract, spawn) {
   return { root: packageRoot, entry: selected, selection: standalone ? 'standalone-import' : 'consumer-import' };
 }
 
+// npm `files`: positive entries name the inventory and must be literal package paths; `!`-prefixed entries only
+// subtract from it (npm-packlist never adds a file for a negation), so they may be globs. A negation alone names nothing.
+export function packageFileRules(files) {
+  const refuse = () => { throw Error('Grammar package files must be an explicit bounded package inventory.'); };
+  if (!Array.isArray(files) || !files.length) refuse();
+  const include = [], exclude = [];
+  for (const value of files) {
+    if (typeof value !== 'string') refuse();
+    const negated = value.startsWith('!'), pattern = negated ? value.slice(1) : value;
+    if (!pattern || pattern.startsWith('!') || path.isAbsolute(pattern) || /^[A-Za-z]:/.test(pattern) || pattern.includes('\\')
+      || pattern.split('/').includes('..') || (!negated && /[*?{}]/.test(pattern))) refuse();
+    (negated ? exclude : include).push(pattern.replace(/\/+$/, ''));
+  }
+  if (!include.length) throw Error('Grammar package files must name at least one bounded inventory entry; negations only narrow it.');
+  if (exclude.length && typeof path.posix.matchesGlob !== 'function') throw Error('Grammar package file negations need a Node runtime with path.matchesGlob.');
+  return { include, exclude };
+}
+
+/** True when a package-relative file is removed from the published inventory by a `files` negation (the file or any ancestor directory matches; a slash-free pattern matches at any depth). */
+export function excludedByPackageFiles(relative, exclude) {
+  if (!exclude.length) return false;
+  const segments = relative.split('/');
+  for (let index = 1; index <= segments.length; index += 1) {
+    const candidate = segments.slice(0, index).join('/');
+    for (const pattern of exclude) {
+      if (path.posix.matchesGlob(candidate, pattern) || (!pattern.includes('/') && path.posix.matchesGlob(segments[index - 1], pattern))) return true;
+    }
+  }
+  return false;
+}
+
 function packageInputs(packageRoot, sourceKind, entry) {
   const manifest = path.join(packageRoot, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
-  if (!Array.isArray(pkg.files) || !pkg.files.length || pkg.files.some(value => typeof value !== 'string' || !value || /[*?{}]/.test(value)
-    || path.isAbsolute(value) || value.includes('\\') || value.split('/').includes('..'))) throw Error('Grammar package files must be an explicit bounded package inventory.');
+  const rules = packageFileRules(pkg.files);
   const roots = new Set([manifest, entry]);
-  for (const value of pkg.files) {
+  for (const value of rules.include) {
     const absolute = path.resolve(packageRoot, value);
     if (inside(packageRoot, absolute) && fs.existsSync(absolute)) roots.add(absolute);
   }
@@ -146,7 +176,7 @@ function packageInputs(packageRoot, sourceKind, entry) {
   };
   for (const absolute of roots) visit(absolute);
   const sorted = [...files].sort(([a], [b]) => a.localeCompare(b));
-  return { pkg, files: sorted, bytes, readRoots: [...roots].map(value => fs.realpathSync(value)).sort() };
+  return { pkg, files: sorted, bytes, exclude: rules.exclude, readRoots: [...roots].map(value => fs.realpathSync(value)).sort() };
 }
 
 function targetInputs(root) {
@@ -282,6 +312,10 @@ function closureInputs(ts, root, resolved, inventory, spawn) {
     if (!fs.lstatSync(canonical).isFile()) throw Error('Grammar static dependency is not a regular file.');
     if (owner.kind === 'grammar' && !grammarInventory.has(canonical)) {
       throw Error(`Grammar public entry dependency is outside the bound package inventory: ${slash(path.relative(owner.root, canonical))}`);
+    }
+    // The digest still binds every file under the positive entries; a behavior dependency must also survive npm's negations.
+    if (owner.kind === 'grammar' && excludedByPackageFiles(slash(path.relative(owner.root, canonical)), inventory.exclude)) {
+      throw Error(`Grammar public entry dependency is excluded from the published package inventory: ${slash(path.relative(owner.root, canonical))}`);
     }
     if (!files.has(canonical)) { files.set(canonical, owner); pending.push(canonical); }
   };
