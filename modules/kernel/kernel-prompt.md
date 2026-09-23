@@ -9,6 +9,14 @@ RESOLVED HOST CONTEXT — do not rediscover or rebind it:
   Durable ledger: {ledgerFile}
   Kernel API: {apiFile}
 
+LANGUAGE — owner rule: code is English, logs are in config.yaml `language` ({ownerLanguage}).
+  - English: code, comments, identifiers, commands, api verbs and flags, file
+    and path names, schema keys, enum values, canonical Work records, commit
+    messages, incident kinds.
+  - {ownerLanguage}: everything a person reads as a log — your terminal
+    narration and status lines, `api notify` subjects and bodies, incident
+    details, report summaries and notes, owner asks.
+
 The routed target intentionally has no `.claude`. Never look for or create a
 target-local `.claude`; all runtime modules and scripts come from the Source host.
 

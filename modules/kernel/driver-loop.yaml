@@ -94,6 +94,13 @@ boundary:
     `api settle` closes the worker terminal — the kernel never reuses an op
     terminal and never re-dispatches into a settled job's handle. What a retry
     costs in rows and attempts is tick.drive.oneOpOneAgent below.
+  language: >-
+    Owner rule: code is English, logs are in config.yaml `language` (the
+    owner_language every packet carries). The kernel writes commands, api
+    verbs and flags, identifiers, Work records, commit messages and incident
+    kinds in English, and its terminal narration, status lines, `api notify`
+    subjects and bodies, incident details and owner-facing summaries in
+    owner_language.
   opTerminalObservation: >-
     The one sanctioned look at an op's screen is `api observe --job <id>` —
     read-only reasoning context through the api on the job's own exact

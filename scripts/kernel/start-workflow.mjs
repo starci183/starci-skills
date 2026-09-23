@@ -324,6 +324,7 @@ const renderKernelPrompt = ({ workflowId, inboxId, goalRevision }) => promptTemp
   .replaceAll('{ledgerFile}', ledgerFileFor(repo))
   .replaceAll('{bindingFile}', context?.file ?? '(no matching project binding; --repo is authoritative)')
   .replaceAll('{frontendRoot}', context?.fe ?? '(not bound)')
+  .replaceAll('{ownerLanguage}', inspectOwnerConfig(ownerRoot).config?.language ?? 'en')
   .replaceAll('{apiFile}', apiFile);
 
 const MANAGED_DEAD_STATE = /stop|fail|dead|exit|release|abandon/i;

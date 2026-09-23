@@ -6,6 +6,15 @@
 
 schema: starci/document@1
 sections:
+  - title: Language - code English, logs in owner_language
+    blocks:
+      - "Owner rule: code is English and logs follow config.yaml language, which the packet carries as
+        owner_language. English: source code, comments, identifiers, commands, api verbs and flags,
+        file and path names, schema keys, enum values, canonical Work record content (unless the
+        brief names owner_language for a field) and commit messages."
+      - "owner_language: everything a person reads as a log - terminal narration and progress lines,
+        orchestration message subjects and bodies (worker_done, status, ask), report summary and
+        notes, incident details, owner asks and the handover package."
   - title: Expandable business tree and local workflow tracking
     blocks:
       - Each record folder has one index.yaml record; index is the record, not an extra directory
