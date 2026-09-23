@@ -1098,6 +1098,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 10:33 Yên. Collab backend.implement a3 (conversation) done, còn 4 slice dependency. WSPV worker implement vẫn active.
   Modules, AUTH chờ thầy. Không vá.
 
+- 10:45 Kernel Collab bị báo active dù đã yield: dòng ngắt bắt đầu bằng "running." chữ thường khớp regex không phân biệt
+  hoa thường. Vá `ddda061f1`: từ trạng thái phân biệt hoa thường. Live: cả 4 kernel turn-idle đúng. Collab 3/8
+  slice backend.implement pass, routing đang chạy.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
