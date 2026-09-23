@@ -203,3 +203,24 @@ test('the supervisor cadence has one authority and supervise.yaml cites it',t=>{
   assert.doesNotMatch(yaml,new RegExp(String(DEFAULT_INTERVAL_MS)),
     'the cadence number lives in the code, never restated in the contract');
 });
+
+// All eight watchdogs were dead and Codex launches had failed 5/5 before the
+// owner asked; the supervisor must raise these on its own every cycle.
+test('a cycle reports a dead watchdog, runtime incidents of running workflows and a launch-failure streak', async (t) => {
+  const { withLedger, seedWorkflow } = await import('./_ledger-fixture.mjs');
+  const { cycle, RUNTIME_INCIDENT } = await import('../scripts/supervisor/poll.mjs');
+  assert.ok(RUNTIME_INCIDENT.test('[source-runtime-defect] x') && RUNTIME_INCIDENT.test('[runtime-api-unloadable] x') && !RUNTIME_INCIDENT.test('[owner-gate] x'));
+  await withLedger(t, async ({ repoRoot, ledger }) => {
+    seedWorkflow(ledger, { id: 'wf-health-a1b2c3d4', state: { phase: 'running' } });
+    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id='wf-health-a1b2c3d4'").run();
+    const now = Date.now();
+    ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,status,last_progress,updated_at) VALUES('inc-rt','wf-health-a1b2c3d4',NULL,'open','[environment] codex launches fail',?)").run(now);
+    for (let n = 0; n < 3; n++) ledger.appendEvent({ workflowId: 'wf-health-a1b2c3d4', entityType: 'job', entityId: `j${n}`, kind: 'dispatch-rejected', payload: { provider: 'codex', step: 'readiness', error: 'terminal readiness timeout' } });
+    const out = await cycle(ledger.db, { repo: repoRoot, state: { first: true, lastReportId: 0, lastArtifacts: now }, watchdogs: () => new Set() });
+    assert.match(out.text, /WATCHDOG-DEAD health: no watchdog process/);
+    assert.match(out.text, /RUNTIME health inc-rt \[environment\] codex launches fail/);
+    assert.match(out.text, /LAUNCH-FAIL codex: 3 refused launches/);
+    const alive = await cycle(ledger.db, { repo: repoRoot, state: { first: false, lastReportId: 0, lastArtifacts: now }, watchdogs: () => new Set(['wf-health-a1b2c3d4']) });
+    assert.doesNotMatch(alive.text, /WATCHDOG-DEAD/);
+  });
+});

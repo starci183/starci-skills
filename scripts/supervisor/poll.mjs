@@ -20,6 +20,7 @@
 // baseline.
 
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
@@ -164,14 +165,58 @@ export const newArtifacts = (repo, sinceMs) => {
   return found.sort((a, b) => b.mtime - a.mtime).slice(0, 12);
 };
 
+// --- health the supervisor must raise on its own -------------------------------
+// All eight watchdogs were dead and five Codex op launches had failed before the
+// owner asked why nothing moved: the supervisor saw neither because nothing it
+// polls said so. Each cycle now reports a running workflow with no watchdog,
+// runtime-shaped open incidents, and a streak of refused agent launches.
+export const RUNTIME_INCIDENT = /^\[(?:source-runtime-defect|runtime-[^\]]*|environment|provider-launch-failure|op-boundary-drift|worker-prompt-stall|settled-terminal[^\]]*)\]/;
+export const LAUNCH_STREAK = 3;
+export const LAUNCH_WINDOW_MS = 3600000;
+
+/** Workflow ids that have a live watchdog process on this host (Windows process list; elsewhere null = unknown). */
+export const liveWatchdogs = ({ platform = process.platform, run = spawnSync } = {}) => {
+  if (platform !== 'win32') return null;
+  const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'watchdog\.mjs' } | ForEach-Object { $_.CommandLine }"],
+  { encoding: 'utf8', windowsHide: true, timeout: 30000 });
+  if (r.status !== 0) return null;
+  const ids = new Set();
+  for (const line of String(r.stdout ?? '').split(/\r?\n/)) { const m = /--workflow\s+"?([^\s"]+)/.exec(line); if (m) ids.add(m[1]); }
+  return ids;
+};
+
+/** Open incidents whose kind says the runtime, not the product, is broken. */
+export const runtimeIncidents = (db, wanted = new Set()) => db.prepare("SELECT incident_id, workflow_id, op_id, last_progress FROM incidents WHERE status='open' ORDER BY updated_at").all()
+  .filter((i) => mine(wanted, i.workflow_id) && RUNTIME_INCIDENT.test(i.last_progress ?? ''));
+
+/** Providers whose agent launches were refused LAUNCH_STREAK+ times inside the window: [{provider, count, lastStep, lastError}]. */
+export const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {}) => {
+  const rows = db.prepare("SELECT workflow_id, payload_json, created_at FROM events WHERE kind='dispatch-rejected' AND created_at > ? ORDER BY seq").all(now - LAUNCH_WINDOW_MS)
+    .filter((r) => mine(wanted, r.workflow_id));
+  const by = new Map();
+  for (const r of rows) {
+    let p = {}; try { p = JSON.parse(r.payload_json); } catch { /* skip */ }
+    const key = p.provider ?? p.model ?? 'unknown';
+    const e = by.get(key) ?? { provider: key, count: 0 };
+    by.set(key, { ...e, count: e.count + 1, lastStep: p.step ?? null, lastError: String(p.error ?? p.signal ?? '').slice(0, 140) });
+  }
+  return [...by.values()].filter((e) => e.count >= LAUNCH_STREAK);
+};
+
 // --- the cycle ---------------------------------------------------------------
-export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS }) => {
+export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, watchdogs = liveWatchdogs }) => {
   const lines = [`===== poll ${ts(Date.now())} =====`];
   const wfs = workflows(db, wanted);
+  const dogs = watchdogs();
   for (const w of wfs) {
     const k = kernelState(db, w.workflow_id);
     lines.push(`${short(w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
+    if (dogs && w.phase === 'running' && !dogs.has(w.workflow_id)) lines.push(`  WATCHDOG-DEAD ${short(w.workflow_id)}: no watchdog process; restart it (node scripts/kernel/watchdog.mjs --repo <repo> --workflow ${w.workflow_id} --repair, detached)`);
   }
+  const running = new Set(wfs.filter((w) => w.phase === 'running').map((w) => w.workflow_id));
+  for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${short(i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);
+  for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
   const tree = orcaTree(db, { repo });
   // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
   // workflow; workflows that already finished are summarized, not listed.
