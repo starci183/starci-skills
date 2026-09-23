@@ -156,11 +156,17 @@ const failureOnScreen = (adapter, screen) => {
   return null;
 };
 
+export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t ]*[>❯❭][ \t ]*(\r?\n|$))`;
+
 // Card-driven readiness: screen must show the provider's prompt pattern
 // (and identity when declared) before anything is sent.
 function awaitReadiness(handle, adapter, { cwd = null } = {}) {
   const spec = adapter?.readiness && typeof adapter.readiness === 'object' ? adapter.readiness : {};
-  const ready = regexp(spec.screenPattern, '(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*[>❯❭]\\s*$)');
+  // A bare prompt glyph on its own line, wherever that line sits: Claude Code
+  // 2.1.280 draws a rule and a status row BELOW its `❯` prompt, so the former
+  // end-of-screen anchor never matched and every Claude kernel timed out at
+  // readiness while it sat ready at its prompt.
+  const ready = regexp(spec.screenPattern, DEFAULT_READY_PATTERN);
   const identity = spec.identityPattern ? regexp(spec.identityPattern, spec.identityPattern) : null;
   const timeoutMs = Number(spec.timeoutMs) || 120000;
   const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
