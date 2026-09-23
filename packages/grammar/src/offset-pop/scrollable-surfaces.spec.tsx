@@ -208,17 +208,15 @@ describe("Offset Pop leaves every scroll region's overflow to Common", () => {
     })
 
     /*
-     * DEFECT (Offset Pop, owned by lane 1): a scrollable SurfaceListCard stops scrolling.
+     * Regression guard: a scrollable SurfaceListCard must keep scrolling.
      *
      * Common renders the list's collection AS its vertical scroll region, so one node carries both
-     * `data-grammar-list="true"` and `data-grammar-scroll-region="vertical"`. The family's
-     * `[data-grammar-list] { overflow: clip }` - meant to clip rows to the rounded shell - reaches that
-     * node from `@layer starci-grammar-offset-pop`, which Common orders after
-     * `starci-grammar-common`, so it beats Common's `overflow-y: auto` whatever the specificity. A
-     * likely fix is to clip only a non-scrolling list (`[data-grammar-list]:not([data-grammar-scroll-region])`)
-     * and let the shell's radius clip the scrolling one. Flip this to `it` once the rule stops reaching it.
+     * `data-grammar-list="true"` and `data-grammar-scroll-region="vertical"`. The family clips a list
+     * to its rounded shell, but `@layer starci-grammar-offset-pop` is ordered after
+     * `starci-grammar-common`, so any family `overflow` reaching this node would beat Common's
+     * `overflow-y: auto` whatever the specificity. Only a non-scrolling list may be clipped.
      */
-    it.fails("takes no overflow from a scrollable SurfaceListCard's collection", () => {
+    it("takes no overflow from a scrollable SurfaceListCard's collection", () => {
         const root = mount(
             <SurfaceListCard label="Rows" isScrollable>
                 <StaticStateRow item={{ id: "a", label: "Row" }} />

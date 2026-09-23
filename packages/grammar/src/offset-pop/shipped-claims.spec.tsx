@@ -78,14 +78,22 @@ const reach = (selector: string) => selector
     .replace(/:focus-within(?![\w-])/g, FOCUSABLE)
     .replace(/:(?:hover|active|focus-visible|focus)(?![\w-])/g, "")
 
-type FamilyRule = { readonly selector: string; readonly declarations: ReadonlyArray<string> }
+type FamilyRule = {
+    readonly selector: string
+    /** Declared property names, in source order. */
+    readonly declarations: ReadonlyArray<string>
+    /** The same declarations with their values. */
+    readonly values: ReadonlyArray<{ readonly property: string; readonly value: string }>
+}
 
 /** Every leaf rule the family ships, one entry per selector in each selector list. */
 const familyRules: ReadonlyArray<FamilyRule> = cssRules(css).flatMap((rule) => {
-    const declarations = rule.body.split(";")
-        .map((declaration) => declaration.split(":")[0]?.trim() ?? "")
-        .filter(Boolean)
-    return selectorList(rule.selector).map((selector) => ({ selector, declarations }))
+    const values = rule.body.split(";")
+        .map((declaration) => declaration.split(":"))
+        .filter((parts) => parts.length >= 2 && (parts[0] ?? "").trim() !== "")
+        .map((parts) => ({ property: (parts[0] ?? "").trim(), value: parts.slice(1).join(":").trim() }))
+    const declarations = values.map((declaration) => declaration.property)
+    return selectorList(rule.selector).map((selector) => ({ selector, declarations, values }))
 })
 
 /** Every state a Common row can be in, so each state hook the family reads has a node to land on. */
@@ -118,6 +126,8 @@ const HOOK_GALLERY = (
         <SurfaceListCard label="Rows">{everyStateRow}</SurfaceListCard>
         <SurfaceListCard label="Nested rows" depth="nested">{everyStateRow}</SurfaceListCard>
         <Rail label="Details">Rail content</Rail>
+        <SectionHeader eyebrow="Eyebrow" title="Section" />
+        <TextAction appearance="tab" href="/tab" isCurrent>Tab</TextAction>
         <NavigationFeatureNav
             identity={<span>Brand</span>}
             navigation={<a href="/learn">Learn</a>}
@@ -168,7 +178,7 @@ const rulesReaching = (element: Element) => familyRules.filter((rule) => element
 
 /**
  * The family's row-action treatment (`:has(:is(a, button):hover)` wash and `:focus-within` ring)
- * names a row that holds an action. See the `it.fails` below for why no Common row does.
+ * names a row that holds an action. See the `it.fails` below for why no Common row does yet.
  */
 const ROW_ACTION = /\[data-grammar-row\](?::focus-within|:has\()/
 
@@ -216,13 +226,14 @@ describe("Shipped Offset Pop rules land on rendered Common hooks", () => {
     })
 
     /*
-     * DEFECT (Offset Pop, owned by lane 1): the row-action treatment is unreachable.
+     * KNOWN GAP, kept on purpose: the row-action treatment has no Common row to land on yet.
      *
-     * `[data-grammar-row]:has(:is(a, button):hover)` and `[data-grammar-row]:focus-within` promise a
-     * hover wash and a focus ring for a row that holds an action. The only Common renderer that emits
-     * `data-grammar-row` is `StaticStateRow`, whose label and description are strings, so no row a
-     * Common renderer draws can ever contain an `a` or `button`. Either Common grows an actionable
-     * row or the family drops the dead selectors. Flip this to `it` when one of them lands.
+     * `[data-grammar-row]:has(:is(a, button):hover)` and `[data-grammar-row]:focus-within` give a
+     * hover wash and a focus ring to a row that holds an action. Today the only Common renderer that
+     * emits `data-grammar-row` is `StaticStateRow`, whose label and description are strings, so no
+     * Common row can contain an `a` or `button`. The family keeps these selectors intentionally for
+     * the interactive rows the navigation lane's List/ListBox will render; flip this to `it` when that
+     * renderer lands and add one of its rows to HOOK_GALLERY.
      */
     it.fails("reaches a rendered Common row with the family's row-action treatment", () => {
         mountGallery(HOOK_GALLERY)
@@ -261,16 +272,43 @@ describe("Shipped Offset Pop paint keeps every Common geometry claim", () => {
     })
 
     /*
-     * DEFECT (Offset Pop, owned by lane 1): `[data-grammar-list] { overflow: clip }` reaches the
-     * scrollable collection. A `SurfaceListCard isScrollable` renders its collection as the vertical
-     * scroll region itself - `data-grammar-list` and `data-grammar-scroll-region="vertical"` on one
-     * node that claims OVERFLOW-3. Common pays that claim with `overflow-y: auto` in
-     * `starci-grammar-common`; the family layer is ordered later, so `overflow: clip` wins regardless
-     * of specificity and the list stops scrolling under Offset Pop. The scrollable-surfaces spec pins
-     * the same defect on the render. Flip this to `it` when the family rule stops reaching the region.
+     * Regression guard: a `SurfaceListCard isScrollable` renders its collection as the vertical scroll
+     * region itself - `data-grammar-list` and `data-grammar-scroll-region="vertical"` on one node that
+     * claims OVERFLOW-3. Common pays that claim with `overflow-y: auto`, and the family layer is ordered
+     * after Common, so any family `overflow` reaching that node would win and stop the list scrolling.
      */
-    it.fails("redeclares no OVERFLOW a Common node claims", () => {
+    it("redeclares no OVERFLOW a Common node claims", () => {
         expect(contradictions("OVERFLOW")).toEqual([])
+    })
+})
+
+/**
+ * Pink as a FILL is the decision accent; pink as TEXT has to stay readable on the family canvas, so
+ * the family routes every accent-coloured text node to its text-safe token instead of `--accent`.
+ */
+const ACCENT_TEXT_NODES = {
+    "Text (accent tone)": "[data-component=\"Text\"][data-tone=\"accent\"]",
+    "SectionHeader eyebrow": "[data-grammar-section-header] .starci-core-section-eyebrow",
+    "TextAction (current tab)": "[data-component=\"TextAction\"][data-appearance=\"tab\"][data-current=\"true\"]",
+} as const
+
+describe("Shipped Offset Pop accent text", () => {
+    it.each(Object.entries(ACCENT_TEXT_NODES))("colours %s with --offset-pop-accent-text", (_name, selector) => {
+        mountGallery(HOOK_GALLERY)
+        const node = document.querySelector(`.grammar-common-root[data-grammar-family="offset-pop"] ${selector}`)
+        expect(node, `the gallery renders no ${selector}`).not.toBeNull()
+        const colours = rulesReaching(node as Element)
+            .flatMap((rule) => rule.values.filter((declaration) => declaration.property === "color"))
+            .map((declaration) => declaration.value)
+        expect(colours.length).toBeGreaterThan(0)
+        expect(new Set(colours)).toEqual(new Set(["var(--offset-pop-accent-text)"]))
+    })
+
+    it("never colours text with the fill accent", () => {
+        const fillAsText = familyRules.flatMap((rule) => rule.values
+            .filter((declaration) => declaration.property === "color" && /var\(--accent\)/.test(declaration.value))
+            .map((declaration) => `${declaration.property}: ${declaration.value} in ${rule.selector}`))
+        expect(fillAsText).toEqual([])
     })
 })
 
