@@ -216,6 +216,46 @@ npx vitest run --project storybook   # stories in Chromium with axe (a11y `todo`
 npm pack --dry-run
 ```
 
+## Contributing
+
+`dist/` is build output and is not tracked in git. Every consumer inside this repository reads it:
+the `file:` apps link this directory, the brand check reads the exported CSS, and the grammar guard
+probe executes the built modules. A merge that changes `src/` does not change `dist/`, so a checkout
+can hold an old build that still looks valid.
+
+**Build stamp.** `npm run build` ends with `scripts/build-stamp.mjs`, which writes
+`dist/.build-stamp.json`: the package version, a digest of the source (everything under `src/`
+except stories, test helpers, specs and tests, plus `tsconfig.build.json`, `scripts/copy-css.mjs`
+and the `exports` and `files` fields of `package.json`), a digest of the built files, and the build
+time. The stamp ships in the tarball.
+
+**Freshness check.** The root `npm run check` runs `scripts/checks/grammar-dist.mjs`. It fails when
+`dist/` is missing, has no stamp, was built from other source or another version, or was edited
+after the build. It also compares every `--*` custom property in each family's dist CSS with the
+source CSS, so a hand-edited token fails too. The brand check (`scripts/checks/brand.mjs`) and the
+grammar guard probe (`scripts/checks/code-patterns/grammar-guards.mjs`) run the same test before
+they read a grammar dist, and refuse a dist that fails it. Every refusal ends with the same fix:
+`run npm run build in packages/grammar`. A registry install carries no `src/`, so it cannot be
+compared. It is reported as `unverifiable` and allowed, but if it carries a stamp, the version and
+built-file digest must still match.
+
+**Why there is no `prepare` script.** npm 11.6.2 installs a `file:` dependency as a symlink
+(a junction on Windows) to this directory. On every consumer `npm install` or `npm ci` it runs this
+package's `prepare` in place, but it does not install this package's devDependencies there. A
+`prepare: npm run build` would therefore fail the consumer's install (`tsc` not found) wherever
+`packages/grammar/node_modules` is absent. Where it is present, the script would wipe and rebuild
+the shared `dist/` on every consumer install. Git dependencies are not a way in either: npm parses
+the `#…::path:packages/grammar` suffix, but pacote ignores it, so a git dependency cannot select
+this subdirectory. A linking consumer builds on purpose, as `starci-academy-fe`'s own `prepare` does
+with `npm run grammar:build`. After pulling a grammar change, run `npm run build` here. Publishing is
+unaffected: `prepack` runs `typecheck` and `test`, and `test` builds first, so a tarball always
+carries a fresh stamp.
+
+**Why `dist/` stays untracked.** Every consumer that reads it can build it, from this directory or
+through a script that calls this one. A tracked `dist/` would need a rebuild in every source commit,
+would conflict in every merge that touches `src/`, and would make a stale build look authoritative
+in git history. The stamp and the check catch what tracking would have hidden.
+
 ## Changelog: 0.5.0
 
 A minor release. Common grows from 42 to 95 renderers, and Offset Pop reaches parity with Core.

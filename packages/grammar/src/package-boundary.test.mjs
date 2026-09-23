@@ -122,11 +122,23 @@ const DEV_ONLY = /(?:^|\/)(?:stories|__test__)\/|\.(?:stories|spec|test)\./
 test("dist holds no stories, test helpers, specs or tests", async () => {
     const files = await walk(new URL("dist/", packageRoot))
     assert.deepEqual(files.filter((file) => DEV_ONLY.test(file)), [])
-    assert.deepEqual((await readdir(new URL("dist/", packageRoot))).sort(), ["common", "core", "heritage", "offset-pop"])
+    assert.deepEqual((await readdir(new URL("dist/", packageRoot))).sort(), [".build-stamp.json", "common", "core", "heritage", "offset-pop"])
 })
 
-/** The published file list: package.json, README, LICENSE, and each family's compiled modules and CSS. */
-const INTENDED = /^(?:package\.json|README\.md|LICENSE|dist\/(?:common|core|heritage|offset-pop)\/(?:[\w-]+\/)*[\w-]+(?:\.[\w-]+)*(?:\.js|\.js\.map|\.d\.ts|\.d\.ts\.map|\.css))$/
+test("the build stamp names this version and the exact source and dist it was built from", async () => {
+    const { sourceDigest, distDigest, STAMP_SCHEMA } = await import("../scripts/build-stamp.mjs")
+    const packageJson = JSON.parse(await readFile(packageUrl, "utf8"))
+    const stamp = JSON.parse(await readFile(new URL("dist/.build-stamp.json", packageRoot), "utf8"))
+    assert.equal(stamp.schema, STAMP_SCHEMA)
+    assert.equal(stamp.package, packageJson.name)
+    assert.equal(stamp.version, packageJson.version)
+    assert.equal(stamp.sourceDigest, sourceDigest(fileURLToPath(packageRoot)), "dist was built from other source: run npm run build in packages/grammar")
+    assert.equal(stamp.distDigest, distDigest(fileURLToPath(packageRoot)), "dist changed after it was built: run npm run build in packages/grammar")
+    assert.ok(!Number.isNaN(Date.parse(stamp.builtAt)))
+})
+
+/** The published file list: package.json, README, LICENSE, the build stamp, and each family's compiled modules and CSS. */
+const INTENDED = /^(?:package\.json|README\.md|LICENSE|dist\/\.build-stamp\.json|dist\/(?:common|core|heritage|offset-pop)\/(?:[\w-]+\/)*[\w-]+(?:\.[\w-]+)*(?:\.js|\.js\.map|\.d\.ts|\.d\.ts\.map|\.css))$/
 
 test("npm pack ships only the intended files, and all of dist", async (t) => {
     const output = execSync("npm pack --dry-run --json --ignore-scripts", {
