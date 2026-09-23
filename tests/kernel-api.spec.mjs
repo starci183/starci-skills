@@ -308,6 +308,27 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   assert.notEqual(api('incident','--workflow',wf,'--resolve','inc-nope').status,0,'an unknown incident is refused');
 });
 
+// Live Modules ran three provision.ask jobs at once (Chatbot, Shell, Accounting);
+// status listed only the op's latest attempt, so the kernel never saw the
+// answers to the other two and kept waiting on them.
+test('status lists every concurrent owner wait of one op by subject, and a later same-subject job replaces one',t=>{
+  const fx=fixture(t),repo=fx.repo(),wf='wf-k7-owner-waits';
+  seedGoal(repo,wf);
+  seed(repo,ledger=>{
+    const at=Date.now();
+    const job=(id,attempt,subject,status='failed',verdict='awaiting-owner')=>ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
+      VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`).run(id,wf,'provision.ask',attempt,json({opId:'provision.ask',params:{subject}}),status,json({verdict}),at+attempt,at+attempt);
+    job('ask-chatbot',2,'Chatbot decisions');
+    job('ask-shell-old',3,'Shell auth');
+    job('ask-accounting',4,'Accounting decisions');
+    job('ask-shell-new',5,'Shell auth','queued',null);
+  });
+  const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
+  assert.equal(r.status,0,r.stderr);
+  assert.deepEqual(out(r).awaitingOwner.map(a=>a.jobId).sort(),['ask-accounting','ask-chatbot'],
+    'every subject still waiting is listed; the re-enqueued Shell ask replaced its older attempt');
+});
+
 test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);

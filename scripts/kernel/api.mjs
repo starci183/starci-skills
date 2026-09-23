@@ -808,13 +808,33 @@ function cmdStatus(ledger, args) {
   const failedRows = db.prepare("SELECT job_id,workflow_id,op_id,status,attempt,result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id").all(workflowId);
   const ownerWaits = failedRows.filter((row) => isAwaitingOwner(db, row));
   const askAnswers = new Map();
-  for (const event of db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded') ORDER BY seq").all(workflowId)) {
+  // The last lifecycle event wins; an ask served again after a supersede is
+  // pending again until it is answered.
+  for (const event of db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded','ask-serving') ORDER BY seq").all(workflowId)) {
     const dispatchId = parseJson(event.payload_json, {})?.dispatchId;
-    if (dispatchId) askAnswers.set(dispatchId, event.kind === 'ask-answered' ? 'answered' : 'superseded');
+    if (!dispatchId) continue;
+    if (event.kind === 'ask-serving') { if (askAnswers.get(dispatchId) === 'superseded') askAnswers.delete(dispatchId); continue; }
+    askAnswers.set(dispatchId, event.kind === 'ask-answered' ? 'answered' : 'superseded');
   }
   const latestAttempt = new Map();
   for (const row of workflowJobs) if (row.op_id) latestAttempt.set(row.op_id, Math.max(latestAttempt.get(row.op_id) ?? 0, row.attempt));
-  const awaitingOwner = ownerWaits.filter((row) => latestAttempt.get(row.op_id) === row.attempt).map((row) => {
+  // One op may hold several owner waits at once - three provision.ask jobs,
+  // one per subject, or one ask per cut slice. A wait is replaced only by a
+  // later job of the same op with the same lineage (params.subject, else the
+  // cut id and ordinal); without either the op's latest attempt waits.
+  const subjectOfJob = (jobId) => {
+    const payload = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json, {}) ?? {};
+    const subject = payload.params?.subject;
+    if (typeof subject === 'string' && subject.trim()) return `subject:${subject.trim()}`;
+    if (payload.cut?.id != null && payload.cut?.ordinal != null) return `cut:${payload.cut.id}#${payload.cut.ordinal}`;
+    return null;
+  };
+  const stillWaits = (row) => {
+    const subject = subjectOfJob(row.job_id);
+    if (!subject) return latestAttempt.get(row.op_id) === row.attempt;
+    return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && subjectOfJob(other.job_id) === subject);
+  };
+  const awaitingOwner = ownerWaits.filter(stillWaits).map((row) => {
     const dispatchId = jobResultOf(row).askDispatchId
       ?? db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? AND outcome='ask' ORDER BY created_at DESC LIMIT 1").get(workflowId, row.op_id, row.attempt)?.dispatch_id
       ?? null;
