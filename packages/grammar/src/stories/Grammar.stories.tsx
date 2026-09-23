@@ -30,19 +30,25 @@ import turtleUrl from './assets/turtle.png';
 
 const meta: Meta = {
   title: 'Grammar/Core anatomy',
-  parameters: { layout: 'fullscreen' },
+  // Pinned to Core with the consumer accent these reference renders were captured with.
+  globals: { grammarFamily: 'core' },
+  parameters: {
+    layout: 'fullscreen',
+    grammar: { bleed: true, rootStyle: { ['--starci-core-accent' as string]: '#2F6BFF' } },
+  },
 };
 export default meta;
 
 type Story = StoryObj;
 
+// NavigationFeatureNav owns the `<nav aria-label="Primary">` landmark; the slot takes bare links.
 const navDestinations = (
-  <nav aria-label="Primary" style={{ display: 'flex', gap: '1.5rem' }}>
+  <div style={{ display: 'flex', gap: '1.5rem' }}>
     <a href="#" aria-current="page">Tasks</a>
     <a href="#">Notifications</a>
     <a href="#">Plan</a>
     <a href="#">Privacy</a>
-  </nav>
+  </div>
 );
 
 const topNav = (

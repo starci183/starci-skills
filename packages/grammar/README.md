@@ -1,79 +1,251 @@
 # `@starci/grammar`
 
-`@starci/grammar` separates one shared, business-free UI contract from sibling visual families.
-Common owns typed props, semantics, renderer anatomy, universal states/scales, and the family
-registry. Core, Heritage, and Offset Pop implement that contract with independently scoped visual
-DNA. The package contains no routes, domain entities, product decisions, or feature-named shells.
+`@starci/grammar` splits a UI kit into one shared contract and several visual families. The
+contract has no business logic. Common owns the typed props, semantics, renderer anatomy, universal
+states and scales, and the family registry. Core, Heritage and Offset Pop are sibling families.
+Each one implements the same contract with its own scoped visual DNA. The package contains no
+routes, domain entities, product decisions or feature-named shells.
 
-## Public entry points
+Common ships **95 renderers**. Every family renders all of them. A family changes presentation
+only: props, DOM, ARIA and keyboard behaviour stay the same.
 
-- `@starci/grammar/common` — shared React renderers, presentation-state helpers, and their CSS. Anonymous layout/action owners include `WorkspaceShell`, `Sidebar`, `Link`, and `TextAction`.
-- `@starci/grammar/core` — the StarCi Core family, its scoped root, DNA, and compatibility aliases.
-- `@starci/grammar/heritage` and `@starci/grammar/offset-pop` — sibling family roots,
-  conformance receipts, and scoped visual overlays.
-- `@starci/grammar/common/styles.css`, `@starci/grammar/core/styles.css`,
-  `@starci/grammar/heritage/styles.css`, and
-  `@starci/grammar/offset-pop/styles.css` — package stylesheets. Short `.css` export aliases are
-  also available.
-
-Install the workspace package while developing locally:
+## Install
 
 ```sh
+npm install @starci/grammar @heroui/react react react-dom
+# while developing inside this repository:
 npm install ./.claude/packages/grammar
 ```
 
-Import components from the focused entry point:
+The package needs Node.js 20 or newer. Its peer dependencies are React 18+ and `@heroui/react`
+3.2+. Load the HeroUI stylesheet once in the app, as HeroUI's own setup describes. Then import
+exactly one Grammar family stylesheet. Each family sheet already imports Common anatomy first.
+
+| Entry point | Root component | Stylesheet |
+| --- | --- | --- |
+| `@starci/grammar/common` | `GrammarRoot` (neutral) | `@starci/grammar/common/styles.css` (`common.css`) |
+| `@starci/grammar/core` | `CoreGrammarRoot` | `@starci/grammar/core/styles.css` (`core.css`) |
+| `@starci/grammar/heritage` | `HeritageGrammarRoot` | `@starci/grammar/heritage/styles.css` (`heritage.css`) |
+| `@starci/grammar/offset-pop` | `OffsetPopGrammarRoot` | `@starci/grammar/offset-pop/styles.css` (`offset-pop.css`) |
+
+The Core and Offset Pop entry points re-export all of Common, so an app imports its components and
+its root from one place. Heritage does not re-export Common. It exports `heritageGrammar`,
+`HeritageGrammarRoot`, its `Brand` extension (`HeritageBrand`), the `HeritageButton` and
+`HeritageHeading` aliases and its conformance, so import the other renderers from
+`@starci/grammar/common`.
+
+## Usage
+
+### Common (neutral structure only)
 
 ```tsx
-import {
-  PageContainer,
-  PrimaryRailLayout,
-  SurfaceCard,
-} from "@starci/grammar/common"
-import { CoreGrammarRoot } from "@starci/grammar/core"
+import { Button, GrammarRoot, PageContainer, SurfaceCard } from "@starci/grammar/common"
+import "@starci/grammar/common/styles.css"
+
+export const App = () => (
+  <GrammarRoot theme="system">
+    <PageContainer>
+      <SurfaceCard label="Welcome"><Button>Start</Button></SurfaceCard>
+    </PageContainer>
+  </GrammarRoot>
+)
+```
+
+### Core
+
+```tsx
+import { CoreGrammarRoot, PageContainer, PrimaryRailLayout, SurfaceCard } from "@starci/grammar/core"
 import "@starci/grammar/core/styles.css"
 
 export const ProductSurface = () => (
-  <CoreGrammarRoot>
+  <CoreGrammarRoot theme="system">
     <PageContainer>
       <PrimaryRailLayout
-        primary={<SurfaceCard ariaLabel="Main">...</SurfaceCard>}
-        rail={<SurfaceCard ariaLabel="Progress">...</SurfaceCard>}
+        primary={<SurfaceCard ariaLabel="Main">…</SurfaceCard>}
+        rail={<SurfaceCard ariaLabel="Progress">…</SurfaceCard>}
       />
     </PageContainer>
   </CoreGrammarRoot>
 )
 ```
 
-`GrammarRoot` from Common is neutral. `CoreGrammarRoot` applies `data-grammar-family="core"` and
-the Core stylesheet imports Common anatomy before adding StarCi light, dark, system, forced-colour,
-and HeroUI-compatible tokens. `STARCI_CORE_DNA` exposes the immutable
-design values, `STARCI_CORE_SPACING_SCALE` exposes the canonical 4px spacing steps,
-`STARCI_CORE_TOKEN_NAMES` exposes their CSS adaptation contract, and
-`STARCI_CORE_TOKEN_DEFAULTS` / `STARCI_CORE_DARK_TOKEN_DEFAULTS` expose the exact packaged values.
+`STARCI_CORE_DNA` exposes the immutable design values. `STARCI_CORE_SPACING_SCALE` exposes the
+4px spacing steps. `STARCI_CORE_TOKEN_NAMES` lists the CSS variables, and
+`STARCI_CORE_TOKEN_DEFAULTS` / `STARCI_CORE_DARK_TOKEN_DEFAULTS` hold their exact packaged values.
 
-Heritage and Offset Pop replace only the neutral family root; every other Common renderer and prop
-contract is inherited. Each family stylesheet imports Common anatomy directly and never imports a
-sibling family stylesheet.
+### Heritage
 
-`IncludedMark` is the purpose-named 20px outlined circle-check for included offering content; it
-inherits foreground and never claims completion. `SurfaceCopyGroup` packages Core's compact `0.5rem`
-title/explanation rhythm. A `SurfaceCard` without `wholeAction` identifies itself as `static`, which
-is the appropriate comparison surface when its short facts must remain visible together.
+```tsx
+import { TopBar } from "@starci/grammar/common"
+import { HeritageBrand, HeritageGrammarRoot } from "@starci/grammar/heritage"
+import "@starci/grammar/heritage/styles.css"
 
-Common components accept ordinary typed React props and keep semantic DOM and accessibility behavior.
-The application translates business data into those props; a family changes presentation only.
-`MediaFrame` presents an already selected asset and never decides whether to generate one. The
-machine-checkable `COMMON_UI_RULE_IDS`/`defineGrammarRuleConformance` boundary verifies that each
-family accounts for the canonical UI X-n catalog without copying the laws into package code.
+export const Masthead = () => (
+  <HeritageGrammarRoot>
+    <TopBar brand={<a href="/"><HeritageBrand name="…" descriptor="…" logo={{ src: "/logo.svg", width: 40, height: 40 }} /></a>} />
+  </HeritageGrammarRoot>
+)
+```
+
+Heritage replaces only the root. It adds one extension, `Brand`, which is non-interactive brand
+content for a destination the consumer owns.
+
+### Offset Pop
+
+```tsx
+import { Button, OffsetPopGrammarRoot, SurfaceCard, Toaster } from "@starci/grammar/offset-pop"
+import "@starci/grammar/offset-pop/styles.css"
+
+export const App = () => (
+  <OffsetPopGrammarRoot theme="system">
+    <SurfaceCard label="Today"><Button variant="primary">Play</Button></SurfaceCard>
+    <Toaster label="Notifications" dismissLabel="Dismiss" />
+  </OffsetPopGrammarRoot>
+)
+```
+
+Offset Pop is a playful family and stays product-neutral. Its signature is an ink outline, a hard
+offset shadow and a pink decision accent. Text that uses the accent is drawn in a text-safe accent
+(`--offset-pop-accent-text`). Reduced motion removes every transform. The DNA is
+`OFFSET_POP_DNA`, which has the same keys as Core's plus two groups: `offset` (`x`, `y`,
+`outlineWidth`, `ink`, `shadowInk`) and `palette` (`pink`, `blush`, `yellow`, `mint`,
+`critical`). It also exports `OFFSET_POP_SPACING_SCALE`, `OFFSET_POP_TOKEN_NAMES`,
+`OFFSET_POP_TOKEN_DEFAULTS`, `OFFSET_POP_DARK_TOKEN_DEFAULTS`, `OFFSET_POP_BAND_TOKEN_NAMES`,
+`offsetPopGrammar` and `offsetPopRuleConformance`.
+
+## Family scope and the overlay portal rule
+
+A family paints only inside its root. Each family stylesheet is scoped to
+`.grammar-common-root[data-grammar-family="<id>"]` inside its own cascade layer:
+`starci-grammar-common` comes first, then `-core`, `-heritage` and `-offset-pop`. No family sheet
+imports a sibling family's sheet. So two families can share a page, each inside its own root, and
+nested roots resolve to the innermost one.
+
+Overlays follow the same rule. `Dialog`, `AlertDialog`, `Drawer`, `Popover`, `DropdownMenu`, and
+the list and calendar popovers of `Select`, `ComboBox`, `DatePicker` and `DateRangePicker` portal
+into the **nearest** `.grammar-common-root`, not into `document.body`
+(`resolveOverlayContainer`, `GRAMMAR_ROOT_SELECTOR`). Because of this, family selectors, tokens,
+`data-grammar-theme` and the forced-colours mapping still reach the overlay surface. Two things
+follow for apps:
+
+- Render overlay triggers inside the family root. An overlay opened from outside every root falls
+  back to `document.body` and loses the family styling.
+- Mount one `<Toaster>` **inside** the family root, usually as the root's last child. Push toasts
+  with `toastQueue.add({ title, tone, action, timeout })`, or give the Toaster its own
+  `createToastQueue()`. A Toaster outside the root renders unstyled.
+
+## Components
+
+Each group below matches a Storybook group. Run `npm run storybook`: every story renders inside
+the family and theme chosen in the toolbar. It shows the default, disabled, invalid, pending and
+selected/current states where they apply. Overlay stories open by default.
+
+**Primitives (25).** Avatar, Badge, Button, CloseButton, Divider, GrammarRoot, Heading, Icon,
+IconButton, IconTile, Image, IncludedMark, Kbd, Label, LeadingNumber, Link, Meter, Progress,
+ProgressCircle, RankArtwork, Skeleton, Spinner, StateMark, Text, TextAction.
+
+**Forms (24).** ButtonGroup, Checkbox, CheckboxGroup, ComboBox, DateField, DatePicker,
+DateRangePicker, Field, Fieldset, FileDropzone, Form, Input, NumberField, OtpInput,
+PressableField, RadioGroup, Rating, SearchField, SegmentedControl, Select, Slider, Switch,
+Textarea, TimeField. Every Field-contract control takes `label`, `description`, `errorMessage`,
+`isRequired`, `isDisabled`, `isReadOnly` and `isInvalid`. `Select`, `ComboBox`, `SearchField` and
+`Form` also take `isPending`. `OtpInput` has no label prop, so name it with a `<label for>`.
+
+**Overlays (9).** Alert, AlertDialog, Dialog, Drawer, DropdownMenu, Popover, Toast, Toaster,
+Tooltip. Dialog, AlertDialog, Drawer, Popover and DropdownMenu are controlled through
+`isOpen`, `defaultOpen` and `onOpenChange`.
+
+**Navigation & Data (14).** Accordion, AvatarGroup, Breadcrumbs, Calendar, DataTable,
+DescriptionList, Disclosure, ListBox, Pagination, Stepper, Subnav, Tabs, TagGroup, Timeline.
+
+**Surfaces (14).** EmptyNotice, FencedCodeBlock, HorizontalScrollRegion, MarkdownArticle,
+MarkdownTableFrame, MediaFrame, Rail, SectionHeader, StaticStateRow, SurfaceAccordionCard,
+SurfaceCard, SurfaceCopyGroup, SurfaceListCard, VerticalScrollRegion.
+
+**Compositions (9).** BottomNav, ChatWorkspace, Footer, NavigationFeatureNav, PageContainer,
+PrimaryRailLayout, Sidebar, TopBar, WorkspaceShell. Storybook also pins three page recipes to
+each family: a settings form, a data list with a filter drawer and pagination, and a mobile home
+with TopBar, BottomNav and a Toast.
+
+`COMMON_GRAMMAR_COMPONENTS` is the frozen registry of all 95 renderers.
+`COMMON_FORMS_COMPONENTS`, `COMMON_OVERLAYS_COMPONENTS` and `COMMON_NAVIGATION_COMPONENTS` are the
+0.5.0 groups. `defineGrammarFamily` builds a new family over the registry. It may replace
+renderers with prop-compatible versions and add extensions whose names don't collide with Common's.
+
+## Theming
+
+- **Tokens.** Each family writes its DNA as CSS custom properties on its root: `--starci-core-*`,
+  `--heritage-*` or `--offset-pop-*`. It feeds those into the Common semantic variables that
+  renderers read: `--accent`, `--accent-foreground`, `--focus`, `--background`, `--surface`,
+  `--surface-secondary`, `--foreground`, `--muted`, `--border`, `--separator`, the status
+  colours and their foregrounds, radii and shadow. To adjust a family, override its tokens on the
+  root, for example `<CoreGrammarRoot style={{ "--starci-core-accent": "#2f6bff" }}>`. The
+  `*_TOKEN_NAMES` / `*_TOKEN_DEFAULTS` exports are the supported list. Values are validated by the
+  family specs, not at runtime.
+- **Spacing.** Every family uses the Common 4px scale (`COMMON_SPACING_SCALE`,
+  `COMMON_SPACING_TOKENS`), and Common's `--grammar-*-gap` / `--grammar-page-inset` variables.
+- **Dark.** `theme` on any root takes `"light"`, `"dark"` or `"system"` (the default), which sets
+  `data-grammar-theme`. `system` follows `prefers-color-scheme`. The dark palette is scoped to the
+  root, so a dark island can sit inside a light page.
+- **Forced colours.** Under `forced-colors: active` each family maps its surfaces, outlines,
+  selection and focus onto system colours. Current and selected decisions remain visible through
+  an edge or outline, not a fill.
+- **Motion.** Under `prefers-reduced-motion: reduce`, Common's component anatomy drops its
+  animations, and Offset Pop also removes its press travel and every other transform.
+- **States.** `PRESENTATION_STATES` (`neutral`, `informative`, `affirmative`, `cautionary`,
+  `negative`, `pending`, `unavailable`) is the render-neutral state vocabulary. Components stamp
+  it as `data-grammar-*` hooks for family CSS.
 
 ## Package checks
 
 ```sh
 npm run typecheck
-npm test
+npm test                 # build + node --test + vitest spec list
+npm run build-storybook  # static Storybook (all 95 renderers + family pages)
+npx vitest run --project storybook   # stories in Chromium with axe (a11y `todo` mode)
 npm pack --dry-run
 ```
 
-The package requires Node.js 20 or newer and has peer dependencies on React 18+ and
-`@heroui/react` 3.2+.
+## Changelog: 0.5.0
+
+A minor release. Common grows from 42 to 95 renderers, and Offset Pop reaches parity with Core.
+
+- **53 new Common renderers.** Core, Heritage and Offset Pop all receive them. They are built on
+  HeroUI v3 / React Aria, and each ships Common anatomy CSS and a spec that renders it under bare
+  Common, Core and Offset Pop.
+  - Forms (20): Field, Fieldset, Form, Textarea, Select, ComboBox, SearchField, NumberField,
+    Checkbox, CheckboxGroup, RadioGroup, Switch, Slider, SegmentedControl, DateField, DatePicker,
+    DateRangePicker, TimeField, FileDropzone, ButtonGroup. They share one Field contract and one
+    44px touch floor.
+  - Overlays and feedback (14): Dialog, AlertDialog, Drawer (side, and bottom sheet with a handle),
+    Popover, DropdownMenu (sections, submenus, checkable items, shortcuts), Toast and Toaster
+    (queue, tones, action, pause on hover and focus, persistent live regions), Alert, Spinner,
+    Skeleton, ProgressCircle, Meter, CloseButton, Kbd.
+  - Navigation, chrome and data (19): Link, Breadcrumbs, Pagination, Stepper, TopBar, BottomNav,
+    Footer, Avatar, AvatarGroup, TagGroup, DataTable, DescriptionList, ListBox, Disclosure,
+    Accordion, Image, Rating, Timeline, Calendar.
+- **Scoped overlay portals.** Overlays portal into the nearest Grammar root, so family styling
+  applies to open surfaces (see the portal rule above).
+- **Offset Pop at Core parity.**
+  - `src/offset-pop/dna.ts` mirrors Core's DNA key for key, plus the `offset` and `palette` groups.
+  - A full light, dark, system-dark and forced-colours token set feeds every Common semantic
+    variable.
+  - Accent text is text-safe: `accentText` is `#b8005f` light and `#ff7ab8` dark. Accent, danger
+    and state foregrounds use ink so they pass WCAG AA.
+  - Error text mixes the critical colour with ink, reaching at least 5.05:1.
+- **Offset Pop component treatment.**
+  - `offset-pop/components-{forms,overlays,navigation}.css` adds the ink outline, hard offset
+    shadow, pink selection and reduced-motion and forced-colours fallbacks.
+  - Interactive rows (ListBox, Select and ComboBox options, selectable DataTable rows) get a
+    yellow hover wash, a 2px pink focus ring and a soft-pink selected fill with a pink leading
+    edge.
+  - Rows are separated by a single seam. Dark-mode selected and current states are fixed.
+- **Conformance.** `offsetPopRuleConformance` audits the family's own rules against their CSS
+  mechanisms and inherits the rest. The package boundary checks the per-family dist modules,
+  checks that no family imports another, and checks that the component CSS is in `dist`.
+- **Core.** Subnav's menu toggle meets a 44px touch floor on coarse pointers and narrow viewports.
+- **Build.** `scripts/copy-css.mjs` copies every `*.css` file in each entry directory.
+  `@internationalized/date` is a dev dependency, used for date values in specs and stories.
+- **Storybook.** The toolbar switches the family (Common, Core, Heritage, Offset Pop) and the
+  theme (light, dark, system). There are stories for all 95 renderers and three page recipes per
+  family. The starter boilerplate is removed.
