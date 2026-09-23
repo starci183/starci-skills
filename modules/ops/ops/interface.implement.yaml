@@ -361,7 +361,8 @@ steps:
     writes: [source, evidence, runningPage]
     action:
       en: Run relevant component/unit, interaction, type, lint and build checks for mapped ACs/states and
-        applicable knowledge. For repairs retain before/after evidence for the original unchanged
+        applicable knowledge, first creating exactly the owner paths and test paths a todo target
+        work.author wrote in planned mode names. For repairs retain before/after evidence for the original unchanged
         expected assertion plus collateral regressions. Fix only within scope; keep failed or
         untested required behavior visible. Fix scoped failures and rerun affected checks. Reuse
         existing authorization and keep secrets outside evidence.

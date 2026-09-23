@@ -157,7 +157,8 @@ steps:
       - target
     writes: [source, evidence]
     action:
-      en: Write or extend one scenario per assertion at the allowlisted spec paths, exercising the slice
+      en: Write or extend one scenario per assertion at the allowlisted spec paths - for a todo target
+        work.author wrote in planned mode, exactly the spec paths its checks name - exercising the slice
         only through its public API - the transport contract a client actually calls - against the
         real stack the suite starts. Cover the positive path, the declared denial, invalid input and
         the applicable concurrency or replay case, and read the persisted effect back through that

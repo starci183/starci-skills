@@ -1402,6 +1402,8 @@ ops:
     writes:
       - node
       - integration
+      - accounts
+      - identity
       - parts
       - evidence
     route:

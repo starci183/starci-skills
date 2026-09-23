@@ -187,13 +187,15 @@ steps:
       - environment
     writes: [source, evidence]
     action:
-      en: Inspect or author the missing seed/delete/resource-management scripts from actual owners. Review
+      en: Inspect or author the missing seed/delete/resource-management scripts from actual owners and, for
+        a todo flow work.author wrote in planned mode, exactly the automation spec its checks name. Review
         dry-run targets and failure behavior, test their guards without destructive product effects,
         and prepare a finally-style cleanup path before the first mutation. The run ledger records
         reused baselines and every created/mutated ID immediately; discover unknown provider
         outcomes by read-only correlation before retries. Reuse is the first choice, never reset a
-        shared password. Planned identity slots must already be in selected scope; write actual
-        provider IDs only after observing creation. Seed prerequisites only, never pre-create the
+        shared password. Planned identity slots are the identity resources the flow's accounts.yaml
+        already names, never new ones; seed exactly their roles and write actual provider IDs only
+        after observing creation. Seed prerequisites only, never pre-create the
         action outcome under test. Record script versions and use sealed credentials at execution
         time, never in tracked source or evidence.
   - reads:

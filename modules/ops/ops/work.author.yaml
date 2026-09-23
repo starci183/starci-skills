@@ -66,13 +66,13 @@ reads:
   - id: source
     path: selected repositories and the modules the referenced design names
     purpose:
-      en: Inspect the actual code an implementation of this node would change, so the declared write scope
-        names files that exist in the shape the design prescribes.
+      en: Inspect the actual code an implementation of this node would change, or confirm that the owning
+        path is absent, so the declared write scope is in the shape the design prescribes.
   - id: scripts
-    path: repository package manifests, task runners and existing check commands
+    path: repository package manifests, task runners, test framework configs and existing check commands
     purpose:
-      en: Read the commands this repository already exposes, so every declared check is a command that can
-        be run verbatim and that actually exercises the assertion it claims.
+      en: Read the commands, test runners and runner configs this repository already exposes, so every
+        declared check is a command that can be run verbatim against the assertion it claims.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:
@@ -99,11 +99,11 @@ writes:
       - blockedBy
     content:
       en: "Author only the fields that make the flat work/implementation@1 or work/uat-flow@1 record
-        launchable: its proves edges to the accepted records it proves, the write scope as real
-        inspected owners/files, one requiresProof demand per observable outcome with a verbatim
-        runnable command, and the exclusive runtime resources those checks need. The authored proof
-        demands include the record-class validator `starci validate` so wrong path, name or schema
-        fails the record's own checks. Preserve every other authored line, including the record's
+        launchable: its proves edges to the accepted records it proves, the write scope as inspected
+        owners or, in planned mode, design-traced owners, one requiresProof demand per observable
+        outcome with a verbatim runnable command, and the exclusive runtime resources those checks
+        need. The authored proof demands include the record-class validator `starci validate` so wrong
+        path, name or schema fails the record's own checks. Preserve every other authored line, including the record's
         title, refs, dependsOn and state. Never write completion, never write the kernel's own
         extension block, never write anything under the record's evidence folder, and never edit
         another record."
@@ -115,6 +115,19 @@ writes:
         outside system, its provider/boundary/endpoints/sandbox and the credential by variable name
         only; the record the tree owes for the declaration, whose live proof is another operation's.
         Never a credential value.
+  - id: accounts
+    path: .starciwork/features/<feature>/uat/<name>/accounts.yaml
+    fields: [schema, disposable, accounts]
+    content:
+      en: The work/disposable-accounts@1 file beside a uat-flow record, one {role, identity} entry per
+        actor role the flow's steps name, each identity an _resources identity id. Never a password.
+  - id: identity
+    path: .starciwork/_resources/identities/<identity>/resource.yaml
+    fields: [schema, id, kind, owner, revision, disposable, custody, roles, blockers]
+    content:
+      en: A planned identity slot as a work/resource@1 of kind identity, disposable, naming the roles the
+        accepted design needs, its sealed custody file by path and a blockers entry naming the
+        implementing op that seeds it. Never a credential value.
   - id: parts
     path: .starciwork/features/<feature>/impl/<repository>/<part>/index.yaml
     fields: [schema, id, title, state, repository, owners, proves, requiresProof, dependsOn]
@@ -133,9 +146,10 @@ writes:
     fields: [id, nodeId, inputDigest, outcome, assertions, provenance, extensions]
     artifacts: [manifest.yaml, result.json]
     content:
-      en: Record which records and which source modules were inspected, the assertion-to-check mapping
-        that was authored, and every scope question that stayed open. Record an honest not-run or
-        failed validator result.
+      en: Record the mode of each record, which records and which source modules were inspected, the
+        design record each planned path traces to, the assertion-to-check mapping that was authored,
+        and every scope question that stayed open. Record an honest not-run or failed validator
+        result.
 steps:
   - reads:
       - application-stacks
@@ -156,10 +170,15 @@ steps:
       - source
     writes: [node]
     action:
-      en: Inspect the actual modules the referenced design names and record the exact files an
-        implementation of this record would change as its owners/write scope. Every path is a file
-        or directory that was opened; a path that cannot be resolved from the design and the source
-        is an open question, never a guess. Never write a path that was not inspected.
+      en: "Resolve the owners/write scope in one of two modes. Existing mode applies when the owning source
+        path exists: inspect the actual modules the referenced design names and record the exact paths
+        an implementation of this record would change, every one a file or directory that was opened.
+        Planned mode applies only when the owning source path does not exist yet and the approved
+        chain still runs its implementing op (backend.implement, interface.implement, e2e.verify or
+        uat.verify) after this one: the owners are the paths the accepted design prescribes - its
+        sds-component owners and the architecture module layout - each traced to that design record
+        by id, and the record stays todo. In both modes a path neither the design nor the source
+        resolves is an open question, never a guess."
   - reads:
       - target
       - specification
@@ -173,18 +192,31 @@ steps:
       - source
     writes: [node]
     action:
-      en: Write one runnable check per proof demand, each a command this repository already exposes, each
-        actually exercising the demand it declares, and each naming the exclusive runtime resources
-        it needs. A missing runner is a reported blocker, never a command written in the hope that
-        it exists. Never invent a runner or a script name.
+      en: Write one runnable check per proof demand, each naming the exclusive runtime resources it needs
+        and each on a runner this repository already exposes - an existing script, or a test
+        framework with its config. In existing mode the check is a command that already exercises the
+        demand. In planned mode the check is that runner's command plus the test path the implementing
+        op must create, and the implementing op creates exactly that test. A runner the repository
+        does not have at all is a reported blocker in both modes; never invent a runner or a script
+        name.
+  - reads:
+      - target
+      - specification
+    writes: [accounts, identity]
+    action:
+      en: For a uat-flow record, name every actor role its steps need in accounts.yaml. A test identity the
+        accepted design needs that no identity resource holds yet is declared as a planned identity
+        slot, which the implementing op seeds before the flow runs; the flow stays todo. A credential
+        for a real outside system is never a planned slot and stays an owner provision.
   - reads:
       - target
       - scripts
     writes: [node, evidence]
     action:
       en: Run the record-class validator `starci validate` over the edited tree and confirm the record
-        still validates and now declares both a write scope and proof demands. Record the
-        demand-to-check mapping and any open question. Build nothing and change no product source;
+        still validates and now declares both a write scope and proof demands; a planned record's
+        missing owner path is a warning there, never a refusal. Record the demand-to-check mapping
+        and any open question. Build nothing and change no product source;
         the kernel launches the record's own work afterwards.
   - reads:
       - target
@@ -232,9 +264,12 @@ proofs:
         An honest not-run or failing validator cannot earn done.
   - id: inspected-scope
     requirement:
-      en: Every path in the write scope was inspected in the actual source and is consistent with the
-        referenced design; every check command exists in the repository and was run or explicitly
-        reported as unrunnable. A fabricated path or command is a failure, not a draft.
+      en: In existing mode every path in the write scope was inspected in the actual source and is
+        consistent with the referenced design, and every check command exists in the repository and was
+        run or explicitly reported as unrunnable. In planned mode the record is todo, the implementing
+        op still follows in the approved chain, every write-scope path and planned test path traces to
+        an accepted design record by id, and every check names a runner and config that exist in the
+        repository. A fabricated path, runner or command is a failure, not a draft.
   - id: preserved-record
     requirement:
       en: In record mode the record's title, refs, dependsOn and state are byte-identical to what was
@@ -260,8 +295,8 @@ blockers:
         instead.
   - code: CHECK_RUNNER_MISSING
     condition:
-      en: A proof demand has no command in this repository that could prove it, so declaring a check would
-        declare a command that does not run.
+      en: A proof demand has no runner in this repository that could prove it - no existing script and no
+        test framework or config - so declaring a check would declare a command that does not run.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
       en: A referenced requirement or design record is missing or not effectively done, so the demands
@@ -278,6 +313,7 @@ placeholders:
   repository: The bound repository the implementation record names
   integration-id: Stable id of one declared integration, the folder its record is named after
   name: Stable slug of the impl/uat record
+  identity: Stable slug of one planned identity slot under _resources/identities/
   part: Stable slug of one child record under impl/<repository>/
 layoutPolicy:
   layout: defined-by-.claude-catalog-never-agent-chosen

@@ -165,7 +165,9 @@ steps:
       - target
     writes: [source, evidence]
     action:
-      en: Add or repair scoped unit tests, then execute the repository's backend unit gate and retain
+      en: Add or repair scoped unit tests - for a todo target work.author wrote in planned mode, create
+        exactly the owner paths and test paths its owners and checks name - then execute the
+        repository's backend unit gate and retain
         command, exit code, counts and sanitized output. Next execute the relevant backend E2E gate
         against the actual backend contract, persistence and authorization boundary;
         browser/frontend UAT is not backend E2E. Positive, denial, invalid-input and applicable
