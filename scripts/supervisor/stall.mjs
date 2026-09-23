@@ -18,12 +18,24 @@
 //   STALLED <wf> idle <min>m: <reason>             no progress for > stallMinutes and the frontier
 //                                                  gives the Kernel nothing to do (or it is actionable
 //                                                  and the Kernel still did not move)
-//   STALE-GATE <wf> <incident> [<kind>] ...        an owner gate whose reason is gone: no owner ask
-//                                                  open here or in the peer it names, a path it waits
-//                                                  for now exists, a peer message arrived after it,
-//                                                  or the jobs it names settled
+//   STALE-GATE <wf> <incident> [<kind>] ...        an owner gate whose reason is gone: a path it waits
+//                                                  for now exists in a landed state (a gate naming a
+//                                                  path is released by nothing else); else no owner
+//                                                  ask open here or in the peer it names, a peer
+//                                                  message after a gate that waits on one, or the
+//                                                  jobs it names settled
+//   UNREAD-PEER <wf> <key> from <peer> ...         a peer message still pending on a gated or waiting
+//                                                  workflow that releases nothing by itself: its
+//                                                  Kernel reads api inbox (not alerted)
 //   GATE <wf> <incident> [<kind>] ... justified    the gate still has its reason (not alerted)
 //   STALE-WAIT <wf> <job> (<op>) <cause>: ...      a queued job waiting on a blocker that settled
+//   PEER-WAIT <wf> <incident> on <peer> justified   a typed peer-wait (api incident --kind peer-wait) whose
+//                                                  peer is running and still moving (not alerted); a
+//                                                  workflow whose frontier is peer-wait on justified
+//                                                  waits is not alerted STALLED either
+//   STALE-PEER-WAIT <wf> <incident> on <peer> ...  the peer finished or left running, its message or
+//                                                  the job the wait names landed after it, or the peer
+//                                                  has been idle past the threshold too
 //
 // modules/supervisor/supervise.yaml (step stall) is the contract for what the
 // supervisor does with each.
@@ -45,6 +57,8 @@ export const PROGRESS_KINDS = ['op-dispatched', 'report-filed', 'report-consumed
   'job-enqueued', 'incident-resolved', 'ask-answered', 'dispatch-reconciled', 'phase-transition', 'run-created', 'goal-defined'];
 /** Incident kinds that hold queued jobs (scripts/kernel/api.mjs OWNER_GATE_KINDS). */
 export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending'];
+/** The typed wait on a peer workflow (scripts/kernel/api.mjs PEER_WAIT, openPeerWaits). */
+export const PEER_WAIT_KIND = 'peer-wait';
 /** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
 export const WORKING_LIVENESS = ['active', 'active-unclassified'];
 const SETTLED = ['succeeded', 'failed', 'cancelled'];
@@ -93,6 +107,26 @@ export function ownerGates(db, workflowId) {
       const payload = parse(raised?.payload_json);
       const holds = Array.isArray(payload.holds) && payload.holds.length ? payload.holds : [row.op_id].filter(Boolean);
       return { incidentId: row.incident_id, kind, text: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), raisedAt: raised?.created_at ?? row.updated_at, holds };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Open peer-wait incidents: {incidentId, peer, holds, text, untilMessage, refs, raisedAt} - the
+ * incident-raised payload `api incident --kind peer-wait --peer` writes.
+ */
+export function peerWaits(db, workflowId) {
+  return db.prepare("SELECT incident_id, op_id, last_progress, updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
+    .map((row) => {
+      const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
+      if (kind !== PEER_WAIT_KIND) return null;
+      const raised = db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1")
+        .get(workflowId, row.incident_id);
+      const payload = parse(raised?.payload_json);
+      return { incidentId: row.incident_id, kind, peer: typeof payload.peer === 'string' ? payload.peer : null,
+        holds: Array.isArray(payload.holds) && payload.holds.length ? payload.holds : [row.op_id].filter(Boolean),
+        text: String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''), untilMessage: payload.untilMessage === true,
+        refs: Array.isArray(payload.refs) ? payload.refs.map(String) : [], raisedAt: raised?.created_at ?? row.updated_at };
     })
     .filter(Boolean);
 }
@@ -169,17 +203,26 @@ export const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? 
   .map((row) => ({ key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, ...(({ from, kind, subject }) => ({ from, kind, subject }))(parse(row.payload_json)) }))
   .filter((m) => peers.includes(m.from)) : []);
 
+/** A gate whose release is a peer's message itself (a heads-up, a reply, a notice), not a record. */
+export const MESSAGE_GATE = /\bheads?-?up\b|\bmessage\b|\bnotif(?:y|ies|ied|ication)\b|\breply\b|\bnotice\b/i;
+
 /**
- * Is one owner gate still justified? {stale, young, reasons, asks, waits, peers}. Past the grace
- * window a gate is stale when
- *   (b) its condition shows up: a path it names landed after it (pathEvidence), a named peer's
- *       message reached this workflow after it, or every job it names (outside what it holds)
- *       settled after it (a job that settled before the gate is its cause, not its release); and/or
+ * Is one owner gate still justified? {stale, young, reasons, asks, waits, peers, unread}. Past the
+ * grace window a gate is stale when
+ *   (b) its condition shows up: a path it names landed after it (pathEvidence), or every job it names
+ *       (outside what it holds) settled after it (a job that settled before the gate is its cause,
+ *       not its release); and/or
  *   (a) it waits on an owner ask (its text names an ask or an owner decision) and no owner ask is
  *       open in its workflow or any peer workflow it names, while no path it names is still
  *       absent or unsettled (a gate that waits for a record nobody wrote yet is waiting on that
  *       record, not on an ask). A peer dependency or a supervisor hold names no ask, so a closed
  *       ask is no evidence against it.
+ * A gate that names a path is released by that path landing and by nothing else. A named peer's
+ * message after the gate releases only a gate that names no checkable path and waits on a message
+ * (MESSAGE_GATE): mia-mia base-repos inc-55060d946270 waited for .starciwork/brand/index.yaml to
+ * settle, and the peer's "brand job admitted" heads-up (pm-a34aec2c6891) read as its release while the
+ * record did not exist yet. A still-pending peer message that releases nothing is returned in
+ * `unread` (stallFindings reports UNREAD-PEER: the Kernel reads its inbox), never as staleness.
  */
 export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now = Date.now(), graceMs = GATE_GRACE_MS }) {
   const peers = namedWorkflows(gate.text).filter((id) => id !== workflowId);
@@ -189,14 +232,21 @@ export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now =
     if (!peerDb) continue;
     try { for (const a of openAskDispatches(peerDb, wf)) asks.push({ workflowId: wf, dispatchId: a.dispatch_id }); } catch { /* not in that ledger */ }
   }
-  const reasons = [], waits = [];
-  for (const rel of namedPaths(gate.text)) {
+  const reasons = [], waits = [], unread = [];
+  const paths = namedPaths(gate.text);
+  for (const rel of paths) {
     const ev = pathEvidence(repo, rel, gate.raisedAt);
     if (ev.landed) reasons.push(`${ev.path} exists${ev.state ? ` (${ev.state})` : ''}, ${ev.created ? `created ${clock(ev.born)}${ev.written - ev.born > 60_000 ? `, written ${clock(ev.written)}` : ''}` : `written ${clock(ev.written)}`} after the gate (${clock(gate.raisedAt)})`);
     else if (ev.waiting) waits.push(`${ev.path} ${ev.exists ? `is ${ev.state}` : 'is absent'}`);
   }
+  const messageReleases = !paths.length && MESSAGE_GATE.test(gate.text);
   for (const m of peerDeliveries(db, workflowId, peers, gate.raisedAt)) {
-    reasons.push(`peer ${m.kind ?? 'message'} ${m.key} from ${m.from} arrived ${clock(m.at)}${m.status === 'applied' ? ' and was acked' : ' (pending)'}: ${clip(m.subject, 60)}`);
+    if (messageReleases) reasons.push(`peer ${m.kind ?? 'message'} ${m.key} from ${m.from} arrived ${clock(m.at)}${m.status === 'applied' ? ' and was acked' : ' (pending)'}: ${clip(m.subject, 60)}`);
+    else if (m.status === 'pending') unread.push(m);
+  }
+  if (paths.length) {
+    const young = now - gate.raisedAt < graceMs;
+    return { stale: !young && reasons.length > 0, young, reasons, asks, waits, peers, unread };
   }
   const jobs = namedJobs(gate.text).filter((id) => !gate.holds.includes(id))
     .map((id) => { for (const wf of [workflowId, ...peers]) { const j = (wf === workflowId ? db : dbOf(wf))?.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(id); if (j) return j; } return null; })
@@ -206,7 +256,40 @@ export function judgeGate({ db, workflowId, gate, repo, dbOf = () => null, now =
   }
   if (ASK_GATE.test(gate.text) && !asks.length && (reasons.length || !waits.length)) reasons.unshift(`no owner ask open in ${[workflowId, ...peers].join(', ')}`);
   const young = now - gate.raisedAt < graceMs;
-  return { stale: !young && reasons.length > 0, young, reasons, asks, waits, peers };
+  return { stale: !young && reasons.length > 0, young, reasons, asks, waits, peers, unread };
+}
+
+/**
+ * Is one peer-wait still justified? {stale, young, unknown, reasons, unread, peerIdleMs, peerProgress}.
+ * A peer wait holds while the awaited peer is running and still moving. Past the grace window it is
+ * stale when the peer finished, was archived or left running; when every job the wait names (its text
+ * and refs) settled after it; or when the peer itself made no progress for the stall threshold - both
+ * workflows then wait and nobody moves. A message from the peer is not staleness (the same rule as
+ * judgeGate): one the Kernel acked while keeping the wait open was read and judged not enough, and a
+ * pending one is returned in `unread` (UNREAD-PEER: the Kernel reads its inbox). A peer outside every
+ * ledger in view cannot be judged (`unknown`, never alerted).
+ */
+export function judgePeerWait({ db, workflowId, wait, dbOf = () => null, now = Date.now(), thresholdMs = DEFAULT_STALL_MINUTES * 60_000, graceMs = GATE_GRACE_MS }) {
+  const young = now - wait.raisedAt < graceMs;
+  const peerDb = wait.peer && wait.peer !== workflowId ? dbOf(wait.peer) : null;
+  const peerRow = peerDb?.prepare('SELECT workflow_id, phase, archived_at FROM workflows WHERE workflow_id=?').get(wait.peer) ?? null;
+  if (!peerRow) return { stale: false, young, unknown: true, reasons: [], unread: [], peerIdleMs: null, peerProgress: null };
+  const reasons = [];
+  const running = peerRow.archived_at == null && peerRow.phase === 'running';
+  if (!running) reasons.push(`peer ${wait.peer} is ${peerRow.archived_at != null ? 'archived' : `phase ${peerRow.phase ?? 'unset'}`}, so it will land nothing more`);
+  const unread = peerDeliveries(db, workflowId, [wait.peer], wait.raisedAt).filter((m) => m.status === 'pending');
+  const jobOf = (id) => peerDb.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(id) ?? db.prepare('SELECT job_id, status, updated_at FROM jobs WHERE job_id=?').get(id);
+  const jobs = [...new Set([...namedJobs(wait.text), ...wait.refs.filter((ref) => /^op-/.test(ref))])].filter((id) => !wait.holds.includes(id))
+    .map(jobOf).filter(Boolean);
+  if (jobs.length && jobs.every((j) => SETTLED.includes(j.status) && j.updated_at > wait.raisedAt)) {
+    reasons.push(`named job(s) settled after the wait: ${jobs.map((j) => `${j.job_id} ${j.status} ${clock(j.updated_at)}`).join(', ')}`);
+  }
+  const peerProgress = lastProgress(peerDb, wait.peer);
+  const peerIdleMs = now - peerProgress.at;
+  if (running && peerIdleMs > thresholdMs) {
+    reasons.push(`peer ${wait.peer} is idle too: no progress for ${minutes(peerIdleMs)}m (last ${peerProgress.kind} ${clock(peerProgress.at)})`);
+  }
+  return { stale: !young && reasons.length > 0, young, unknown: false, reasons, unread, peerIdleMs, peerProgress };
 }
 
 /* ------------------------------------------------------------ the frontier */
@@ -264,6 +347,31 @@ export function stallFindings(db, {
     const queued = queuedJobs(db, wf);
     const gates = ownerGates(db, wf).map((gate) => ({ gate, held: queued.filter((j) => heldBy(gate, j)), verdict: judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }) }));
 
+    const waits = peerWaits(db, wf).map((wait) => ({ wait, held: queued.filter((j) => heldBy(wait, j)), verdict: judgePeerWait({ db, workflowId: wf, wait, dbOf, now, thresholdMs, graceMs }) }));
+    for (const { wait, held, verdict } of waits) {
+      const label = `${wait.incidentId} [${PEER_WAIT_KIND}] on ${wait.peer ?? '?'}${held.length ? ` holds ${held.length} queued job(s)` : wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}`;
+      if (verdict.stale) {
+        out.push({ type: 'STALE-PEER-WAIT', key: `STALE-PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: true,
+          reasons: verdict.reasons, line: `STALE-PEER-WAIT ${wf} ${label} for ${minutes(now - wait.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to re-check the prerequisite and resolve the wait (api incident --resolve), or the peer's Kernel to move` });
+      } else {
+        const why = verdict.young ? `raised ${minutes(now - wait.raisedAt)}m ago (inside the grace window)`
+          : verdict.unknown ? `peer ${wait.peer ?? '?'} is not in any ledger in view; waits on: ${clip(wait.text, 120)}`
+          : `justified: peer ${wait.peer} is running and moved ${minutes(verdict.peerIdleMs)}m ago (${verdict.peerProgress.kind}); waits on: ${clip(wait.text, 120)}`;
+        out.push({ type: 'PEER-WAIT', key: `PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: false,
+          line: `PEER-WAIT ${wf} ${label}: ${why}` });
+      }
+    }
+
+    // A peer message still pending on a gated or waiting workflow releases nothing by itself; its
+    // Kernel has not read it. One UNREAD-PEER line per message, naming what it may concern.
+    const unread = new Map();
+    for (const { gate, verdict } of gates) for (const m of verdict.unread ?? []) unread.set(m.key, { m, by: [...(unread.get(m.key)?.by ?? []), gate.incidentId] });
+    for (const { wait, verdict } of waits) for (const m of verdict.unread ?? []) unread.set(m.key, { m, by: [...(unread.get(m.key)?.by ?? []), wait.incidentId] });
+    for (const { m, by } of unread.values()) {
+      out.push({ type: 'UNREAD-PEER', key: `UNREAD-PEER|${wf}|${m.key}`, workflowId: wf, repo, peerMessage: m.key, alert: false,
+        line: `UNREAD-PEER ${wf} ${m.key} from ${m.from} [${m.kind ?? 'message'}] ${clip(m.subject, 60)}: pending since ${clock(m.at)} (${minutes(now - m.at)}m); ${by.join(', ')} may concern it and still holds; tell its Kernel to read api inbox and act on it` });
+    }
+
     for (const { gate, held, verdict } of gates) {
       const label = gateLabel(gate, held.length);
       if (verdict.stale) {
@@ -312,10 +420,14 @@ export function stallFindings(db, {
         frontier.reason ? clip(frontier.reason, 140) : null,
       ].filter(Boolean).join('; ');
     }
+    // A frontier parked on peer waits that all still hold is the peer's to move, not a stall: the
+    // PEER-WAIT lines explain it and a STALE-PEER-WAIT alerts the moment one stops holding.
+    const peerParked = frontier?.state === PEER_WAIT_KIND && !frontier.actionable && waits.length > 0 && waits.every((w) => !w.verdict.stale);
     out.push({ type: 'STALLED', key: `STALLED|${wf}`, workflowId: wf, repo, idleMinutes: minutes(idleMs), actionable: frontier?.actionable ?? null,
-      justifiedGate: gates.some((g) => !g.verdict.stale && !g.verdict.young), alert: true, line: `STALLED ${wf} ${since}: ${reason}` });
+      justifiedGate: gates.some((g) => !g.verdict.stale && !g.verdict.young), justifiedPeerWait: peerParked, alert: !peerParked,
+      line: `STALLED ${wf} ${since}: ${reason}${peerParked ? ' (justified: every peer-wait still holds)' : ''}` });
   }
   // Stalls first, then the gates and waits that explain them.
-  const order = { STALLED: 0, 'STALE-GATE': 1, 'STALE-WAIT': 2, GATE: 3 };
+  const order = { STALLED: 0, 'STALE-GATE': 1, 'STALE-PEER-WAIT': 1, 'STALE-WAIT': 2, 'UNREAD-PEER': 3, GATE: 4, 'PEER-WAIT': 4 };
   return out.sort((a, b) => order[a.type] - order[b.type] || a.key.localeCompare(b.key));
 }

@@ -90,14 +90,28 @@ loop:
                      names the frontier state, the queued causes and the gates holding them.
           STALE-GATE <wf> <incident> [<kind>]   an open owner-gate / owner-gate-pending incident
                      past a 10-minute grace whose reason is gone: a .starciwork/... record it
-                     names now exists in a landed state and was written after the gate, a peer it
-                     names sent a message after it, every job it names settled, and/or no owner
-                     ask is open in its workflow or the peer it names (while no record it names
-                     is still absent or unsettled).
+                     names now exists in a landed state and was written after the gate (a gate
+                     that names a record is released by that and nothing else); for a gate that
+                     names no record: a peer it names sent a message after a gate that waits on a
+                     message or heads-up, every job it names settled, and/or no owner ask is open
+                     in its workflow or the peer it names.
+          UNREAD-PEER <wf> <key> from <peer> ...   a peer message still pending on a workflow
+                     whose gate or peer-wait it does not release by itself (mia-mia base-repos
+                     inc-55060d946270 read STALE on a "brand job admitted" heads-up while the
+                     brand record it waits for did not exist): printed, never alerted; tell that
+                     Kernel to read api inbox.
           GATE <wf> <incident> ... justified    the gate still has its reason (an open ask it
                      names, a record still absent): printed, never alerted.
           STALE-WAIT <wf> <job> ...             a queued job past stallMinutes whose blocker
                      (dependency-failed seam, --after job, earlier leg) already settled.
+          PEER-WAIT <wf> <incident> [peer-wait] on <peer> ...: justified   a typed peer-wait
+                     (api incident --kind peer-wait) whose peer is running and moved within
+                     stallMinutes: printed, never alerted; a workflow whose frontier is peer-wait
+                     on waits that all hold is not alerted STALLED either.
+          STALE-PEER-WAIT <wf> <incident> [peer-wait] on <peer> ...   past the grace the peer
+                     finished or was archived, every job the wait names settled after the wait,
+                     or the peer itself is idle past stallMinutes too (a message from the peer is
+                     UNREAD-PEER while pending, and the Kernel's call once acked).
         Rules:
           - A STALE-GATE is resolved by its owning Kernel, never by the supervisor: tell that
             Kernel, with the evidence from the line (the landed record and its state, the peer
@@ -108,10 +122,13 @@ loop:
           - STALLED with an actionable frontier is a runtime defect (the wake did not land):
             wake the kernel once, then treat a repeat as a contract-gap.
           - STALE-WAIT goes to its Kernel: retry the blocker, re-point or drop the job.
+          - STALE-PEER-WAIT goes to the waiting Kernel (re-check the prerequisite, resolve the
+            wait or re-record it) and, when the peer is idle too, to the peer's Kernel: the thing
+            it was asked for is its next move.
         This check does not depend on the chat: scripts/kernel/resume-all.mjs (the
         StarCi-Resume-Every10m task) launches scripts/supervisor/stall-alert.mjs detached every
         pass, which runs the same classification over config.yaml supervisor.repos and, for each
-        NEW STALLED / STALE-GATE / STALE-WAIT (deduped by key in <state>/stall-alerts.json, at most
+        NEW STALLED / STALE-GATE / STALE-WAIT / STALE-PEER-WAIT (deduped by key in <state>/stall-alerts.json, at most
         once per finding per hour per channel), appends one "STALL-ALERT ..." message to the
         supervisor channel inbox (id 'main') - so the Monitor on `channel.mjs wait --id main`
         wakes the supervisor even while its own cron ticks starve - and sends the owner one short

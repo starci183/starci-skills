@@ -17,7 +17,7 @@
 // terminal liveness, and the Orca tree findings
 // scripts/checks/check-orca-tree.mjs projects from the same ledger plus a
 // terminal listing (ORCA-TREE lines), and progress: STALLED / STALE-GATE /
-// GATE / STALE-WAIT lines from scripts/supervisor/stall.mjs (threshold
+// GATE / STALE-WAIT / PEER-WAIT / STALE-PEER-WAIT lines from scripts/supervisor/stall.mjs (threshold
 // config.yaml supervisor.stallMinutes, or --stall-minutes). First cycle prints
 // the current state as baseline.
 

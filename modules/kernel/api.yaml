@@ -198,7 +198,7 @@ commands:
     returns:
       ok: true
       phase: '<workflows.phase>'
-      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
+      frontier: '{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-ready|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-owner|peer-wait|handover-due|orphaned-frontier|idle,actionable,openOperations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[] (jobs whose worker asked the coordinator through orca orchestration ask and waits: api questions, then api reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the form from the ask Generate URL button; never re-served, never actionable),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api check + api settle each),wedgedJobs[] (workers past scripts/kernel/terminal-liveness.mjs WEDGE_MINUTES on one shell command still showing no output),deadWorkerJobs[] (running/answering jobs with no filed report whose exact worker liveness is disconnected or gone - after a host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and before worker-question; api reconcile --dead-worker each),queued[],queuedCauses,reason} — actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every state but finished, awaiting-owner (no open operation while at least one ask is unanswered: the answer wakes the Kernel), peer-wait (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a staleOperations row without heldBy'
       'frontier.peerMessageKeys': >-
         [<key>] — pending peer-message inbox rows addressed to this workflow (api notify, the enqueue
         overlap heads-up). Any entry makes the frontier actionable, so the watchdog wakes a turn-idle
@@ -206,6 +206,22 @@ commands:
         worker comes first, and its reason says to read `api inbox` and ack each key with a
         disposition. An ack (or finish) clears it
       peerMessages: '[{key, from, kind, subject, at}] — the same pending rows; empty once the workflow is finished'
+      'frontier.peerWaits': >-
+        [{incidentId, peer, peerPhase, holds[], detail, untilMessage, refs[], since}] — the open
+        peer-wait incidents (api incident --kind peer-wait): work whose preflight cannot pass until a
+        peer workflow lands something. The state reads `peer-wait`, NOT actionable, when no report,
+        settle, worker, peer message, handover move, re-serve or owner wait comes first and every open
+        operation is a queued job a peer-wait holds (none open is the common case: the next approved
+        leg is not enqueued yet). It stands after awaiting-owner and before handover-due and
+        orphaned-frontier; before it existed mia-mia work-and-stacks (inc-0aebf976e625) sat at
+        orphaned-frontier/actionable with zero open operations while brand.decide waited on a peer's
+        Grammar install, and the watchdog re-woke the Kernel for nothing. A peer message from the
+        awaited peer wakes the Kernel (api notify, peerWait) and the frontier reads peer-message.
+        reason names each wait, its peer and what it holds
+      'frontier.peerWaitsDead': >-
+        [<incidentId>] — peer waits whose peer is no longer running (finished, archived, gone): the
+        peer can never meet them, so any entry makes the frontier actionable and reason tells the
+        Kernel to re-check the prerequisite itself, then resolve the wait or raise what is missing
       handover: >-
         {op:handover.review, state:approved|running|awaiting-owner|answered|retired|due|not-started, due,
         inApprovedChain, jobId, ask:{dispatchId, jobId, attempt, state, decision, answeredBy, byOwner, note,
@@ -227,8 +243,8 @@ commands:
       'frontier.queued': >-
         [{jobId, opId, attempt, queuedBecause, blockedBy, detail}] — one row per queued job, in
         created order, naming why it is not running. `queuedBecause` is
-        owner-gate|dependency|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries
-        the id that holds it: {incident} for an owner gate, {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
+        owner-gate|peer-wait|dependency|dependency-failed|max-ops|circuit-open|path-lease|pool-full|ready and `blockedBy` carries
+        the id that holds it: {incident} for an owner gate, {incident, peer} for a peer wait, {op, job} for a dependency, {ceiling, ceilingSource, running} for max-ops,
         {provider, pool} for an open circuit, {path, job} for a path lease, {pool, running,
         maxParallel} for a full pool, and null for `ready`. `ready` means nothing blocks it and the
         Kernel is the only thing left to move it
@@ -242,7 +258,9 @@ commands:
         names a record owned by another job of the workflow is held the same way until one owner of that
         record succeeded. `owner-gate` — an open incident of kind
         owner-gate names this job or its op in --holds (or, without --holds, as its --op): a step
-        only the owner drives holds it, and no admission check can clear that. Then `dependency` — an approved leg that precedes this
+        only the owner drives holds it, and no admission check can clear that. Then `peer-wait` — an open
+        incident of kind peer-wait names this job or its op in --holds (or as its --op): a peer workflow
+        must land something first, and route and dispatch refuse it. Then `dependency` — an approved leg that precedes this
         op has no job settled succeeded (modules/schemas/goal-plan.yaml carries no dependsOn field:
         ordering IS the legs array, so the earlier leg is the dependency). Then the four admission
         checks in the order route and dispatch run them: `max-ops` (the workflow ceiling, refused
@@ -523,6 +541,7 @@ commands:
       capacity block above applies
     refuses:
       - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations, so there is no slot for this decision to be spent on. Prints {ok:false, jobId, kind, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued and `api status` reports it queuedBecause max-ops'
+      - 'peer-wait (field `reason`): an open peer-wait incident holds the job (status queuedBecause peer-wait). Prints {ok:false, jobId, kind, reason:"peer-wait", incident, peer} and exits 1; checked right after owner-gate, nothing is persisted'
       - job-unknown: 'no jobs row for --job'
       - job-reconcile-required: 'effect_unknown remains fenced until api reconcile proves no effect'
       - job-settled: 'a settled job takes no route — the decision was already spent'
@@ -637,6 +656,7 @@ commands:
     refuses:
       - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
       - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, when graphPolicy.prerequisiteState is done, a bound record declaring dependsOn whose effective Work state (engine/index.mjs validateWorkspace) is decidably not done. An unresolved placeholder, a record outside a Work tree or an invalid tree is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:dependency-not-done, record, dependsOn:[{id,state}]}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | bound record <r> depends on <id> (<state>), not done, and <op> graphPolicy.prerequisiteState is done. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'
+      - 'peer-wait (field `reason`): an open peer-wait incident holds the job. Checked right after owner-gate and before max-ops, on a dry run as well as a --spawn. Prints {ok:false, jobId, op, reason:"peer-wait", incident, peer} and exits 1; the job stays queued'
       - job-settled: 'job already settled — one lease, one agent, one verdict (dispatch.yaml oneOpOneAgent)'
       - job-not-queued: 'only a queued job may dispatch; a live attempt keeps its exact worker and lease'
       - job-live-worker: 'queued row still has a connected+writable exact worker; api reconcile must reattach it before any new dispatch'
@@ -985,8 +1005,12 @@ commands:
       'peer-message-sent' {to, key, kind, subject, replyTo} on the sender. `--to peers` sends to
       every current peer (none is ok:true with sent []). A message identical to one still pending
       for that target (same from, kind, subject, body, replyTo) is not written again: its key comes
-      back with deduped:true
-    returns: '{ok:true, workflowId, kind, subject, replyTo, sent:[{to, key, kind, subject, deduped?}]}'
+      back with deduped:true. A new message to a target that holds open peer-wait incidents on the
+      sender resolves each of them marked --until-message ('incident-resolved' {detail, peerMessage,
+      peer, by:peer-message} on the target) and wakes the target's Kernel best-effort with a
+      peer-wait-message transition (kernel-transition-woken); a wait without --until-message stays
+      open for that Kernel to resolve once it has checked the proof
+    returns: '{ok:true, workflowId, kind, subject, replyTo, sent:[{to, key, kind, subject, deduped?, peerWait?:{waits[], resolved[], wake}}]}'
     refuses:
       - workflow-unknown
       - workflow-finished: 'a finished sender sends nothing'
@@ -1291,7 +1315,7 @@ commands:
   # --------------------------------------------------------------------------
 
   incident:
-    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]  |  --workflow <id> --resolve <incidentId> [--detail <s>]'
+    args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]]  |  --workflow <id> --resolve <incidentId> [--detail <s>]'
     reads: 'the workflows row for --workflow'
     ownerGate: >-
       --kind owner-gate parks work on a step only the owner can drive (an
@@ -1304,6 +1328,26 @@ commands:
       exists, the ask is answered), the Kernel runs --resolve and the jobs
       are ready again. Free prose such as "[owner-gate-pending]" in --detail
       holds only the incident's --op; name the rest in --holds
+    peerWait: >-
+      --kind peer-wait --peer <workflowId> records a typed, durable wait on a
+      PEER workflow: the next step (--holds ops or job ids, else --op) cannot
+      pass its preflight until that peer lands something - installs a
+      dependency, writes a record (mia-mia work-and-stacks brand.decide waited
+      on wf-miamia-base-repos' Grammar 0.5.0 install, inc-0aebf976e625). --peer
+      must be a running peer of this workflow (the notify PEER RULE); --refs
+      names the peer messages or jobs the wait is about; --until-message lets
+      the peer's next message resolve it. While it is open, held queued jobs
+      read queuedBecause peer-wait, route and dispatch refuse them with reason
+      peer-wait, and with nothing else to move the frontier reads `peer-wait`
+      (not actionable), so the watchdog lets the Kernel sleep. A message from
+      the peer (api notify) wakes the Kernel and, with --until-message,
+      resolves the wait; otherwise the Kernel re-checks the prerequisite and
+      runs --resolve. A wait whose peer stops running is frontier.peerWaitsDead
+      (actionable). scripts/supervisor/stall.mjs judges each wait: PEER-WAIT
+      while the peer runs and moves, STALE-PEER-WAIT when the peer finished,
+      a named job settled after the wait, or the peer is idle past the stall
+      threshold too; a pending message from the peer is UNREAD-PEER. incident-raised carries {peer,
+      untilMessage, refs}
     resolve: >-
       --resolve <incidentId> sets that open incident's status to resolved and
       appends events 'incident-resolved' {detail}; resolving a resolved
@@ -1316,10 +1360,13 @@ commands:
       recognising that two escalations carry identical evidence, and
       therefore that the retry budget is spent, is the kernel's reading of
       `survey.incidentsOpen` (driver-loop.yaml retry-budget-exhausted)
-    returns: '{ok:true, incidentId, workflowId, kind, status:open, holds?}  |  resolve: {ok:true, incidentId, workflowId, status:resolved, changed}'
+    returns: '{ok:true, incidentId, workflowId, kind, status:open, holds?, peer?, untilMessage?, refs?}  |  resolve: {ok:true, incidentId, workflowId, status:resolved, changed}'
     refuses:
       - workflow-unknown: 'no workflows row'
       - incident-unknown: '--resolve names no incident on this workflow'
+      - peer-wait-peer-missing: '--kind peer-wait without --peer'
+      - peer-wait-kind-mismatch: '--peer or --until-message with a kind other than peer-wait'
+      - 'peer-self / peer-unknown / peer-not-running / peer-not-shared-source: --peer is this workflow, no workflow of this ledger, finished or archived, or shares no source root (notify refuses the same)'
       # an empty --kind or --detail is a usage error (exit 2), not a typed refusal
     usedBy: >-
       plan divergence, retry budgets past their limit, unreconciled op

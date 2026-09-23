@@ -31,6 +31,7 @@
 //   consume-report --repo <path> --job <job_id>
 //   (enqueue also takes [--after <jobId>,...]: jobs that must settle succeeded first)
 //   incident --repo <path> --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
+//   incident --repo <path> --workflow <id> --kind peer-wait --peer <workflowId> --detail <s> [--op <opId>] [--holds ...] [--refs <csv>] [--until-message]
 //   incident --repo <path> --workflow <id> --resolve <incidentId> [--detail <s>]
 //   finish   --repo <path> --workflow <id>
 //
@@ -206,6 +207,7 @@ const usage = (code) => {
   serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]
   retire-ask --workflow <id> --dispatch <id> --reason <text>
   incident --workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...]
+           [--peer <workflowId> [--refs <csv>] [--until-message]]  (--peer only with --kind peer-wait)
   incident --workflow <id> --resolve <incidentId> [--detail <s>]
   provider-health --provider <p> [--recover --reason <text> [--probe]]
            the ledger provider-health row; --recover clears an open circuit (Kernel terminal only)
@@ -220,7 +222,7 @@ const parseArgs = (argv) => {
     const k = argv[i];
     if (!k.startsWith('--')) { a._.push(k); continue; }
     const name = k.slice(2);
-    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe'].includes(name)) { a[name] = true; continue; }
+    if (['json', 'spawn', 'retry-lineage', 'drop', 'to-owner', 'reap', 'deliveries', 'dead-worker', 'now', 'recover', 'probe', 'until-message'].includes(name)) { a[name] = true; continue; }
     const v = argv[++i];
     if (v === undefined) usage(2);
     a[name] = v;
@@ -455,7 +457,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null) => {
 // watchdog remains the coarse five-minute fallback; this path is event-driven
 // and best-effort so a terminal transport failure can never roll back or hide
 // the report row that was already committed.
-const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispatchId }) => {
+const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispatchId, lines = null }) => {
   const db = ledger.db;
   const signal = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
   const terminal = parseJson(signal?.value_json ?? '')?.terminal ?? null;
@@ -484,12 +486,12 @@ const wakeKernelForTransition = (ledger, { workflowId, transition, jobId, dispat
         ...(proof.ok ? {} : { error: proof.sent?.error || proof.sendErrorCode || null }) };
     }
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
-    const prompt = [
+    const prompt = (lines ?? [
       `Durable transition wake for workflow ${workflowId}: ${transition}.`,
       `Operation job ${jobId} filed dispatch ${dispatchId}.`,
       'Re-read canonical api status and survey now; consume, independently check and settle the exact report, release its worker, then continue the approved frontier.',
       'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
-    ].join(' ');
+    ]).join(' ');
     const proof = sendWakeWithProof({ terminal, text: prompt, before: String(read.screen ?? '') });
     const sent = proof.sent ?? {}, delivered = deliveryFieldsOf(proof);
     if (!proof.ok) return { action: 'kernel-wake-failed', terminal, state, error: sent.error || proof.sendErrorCode || null, ...delivered };
@@ -932,6 +934,39 @@ const writePeerMessage = (ledger, { from, to, kind, subject, body, replyTo = nul
   return { to, key, kind, subject };
 };
 /**
+ * A peer message from `peer` just reached `waiter`. Each open peer-wait of `waiter` on `peer` marked
+ * --until-message is resolved (incident-resolved {detail, peerMessage}), and the waiter's Kernel is
+ * woken best-effort: a turn-idle Kernel gets the wake now instead of at the next watchdog tick (the
+ * pending message already makes its frontier peer-message, actionable). Null when `waiter` waits on
+ * nothing from `peer`; otherwise {waits, resolved, wake}.
+ */
+const peerWaitMessageArrived = (ledger, { waiter, peer, key, kind, subject }) => {
+  const db = ledger.db;
+  const waits = openPeerWaits(db, waiter).filter((wait) => wait.peer === peer);
+  if (!waits.length) return null;
+  const resolved = waits.filter((wait) => wait.untilMessage).map((wait) => wait.incidentId);
+  if (resolved.length) {
+    ledger.transaction(() => {
+      const now = Date.now();
+      for (const incidentId of resolved) {
+        db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=? AND status='open'").run(now, incidentId);
+        ledger.appendEvent({ workflowId: waiter, entityType: 'incident', entityId: incidentId, kind: 'incident-resolved',
+          payload: { detail: `peer-wait met by peer message ${key} (${kind}) from ${peer}: ${subject}`, peerMessage: key, peer, by: 'peer-message' } });
+      }
+    });
+  }
+  const wake = wakeKernelForTransition(ledger, {
+    workflowId: waiter, transition: 'peer-wait-message', jobId: null, dispatchId: null,
+    lines: [
+      `Durable transition wake for workflow ${waiter}: peer-wait-message.`,
+      `Peer ${peer} sent ${kind} ${key} (${subject}), which peer-wait ${waits.map((wait) => wait.incidentId).join(', ')} waits on${resolved.length ? `; ${resolved.join(', ')} resolved by it` : ''}.`,
+      'Re-read canonical api status and api inbox now; verify the prerequisite the wait named actually holds before you enqueue the held work, ack the message, and resolve any wait still open once its proof holds (or record a new peer-wait when it does not).',
+      'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
+    ],
+  });
+  return { waits: waits.map((wait) => wait.incidentId), resolved, wake: wake.action };
+};
+/**
  * The enqueue-time overlap heads-up. Every open job of a running peer holding an owned path equal to,
  * above or below one of the new job's paths is returned as {workflowId, jobId, path, ownPath}, and
  * each such peer gets ONE heads-up naming the overlapping job pairs. A job pair already announced
@@ -1043,6 +1078,11 @@ function cmdNotify(ledger, args) {
       sent.push(writePeerMessage(ledger, { from: self, to, kind, subject, body, replyTo, refs, now }));
     }
   });
+  // A target waiting on this workflow (peer-wait) is woken now, and its --until-message waits resolve.
+  for (const message of sent.filter((m) => !m.deduped)) {
+    const arrived = peerWaitMessageArrived(ledger, { waiter: message.to, peer: workflowId, key: message.key, kind, subject });
+    if (arrived) message.peerWait = arrived;
+  }
   const out = { ok: true, workflowId, kind, subject, replyTo, sent };
   emit(out, `notify ${workflowId} [${kind}] ${subject} -> ${sent.map((m) => `${m.to} (${m.key}${m.deduped ? ', already pending' : ''})`).join(', ') || 'no running peer'}`, args.json);
 }
@@ -1253,7 +1293,7 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
 // 'dependency-failed' is a dependency that can no longer succeed on its own: the
 // seam or --after job it waits on settled failed (not an owner wait), so only
 // the Kernel can move it - retry the blocker, re-point the dependant, or drop it.
-const QUEUED_BECAUSE = ['owner-gate', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+const QUEUED_BECAUSE = ['owner-gate', 'peer-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
@@ -1276,6 +1316,37 @@ const ownerGateOf = (gates, job) => {
   const opId = job.op_id ?? jobPayloadOf(job).opId ?? null;
   return gates.find((gate) => gate.holds.includes(job.job_id) || (opId && gate.holds.includes(opId))) ?? null;
 };
+/**
+ * Open peer-wait incidents of a workflow: work that cannot pass its preflight until a PEER workflow
+ * lands something (installs a dependency, writes a record). `api incident --kind peer-wait --peer
+ * <workflowId>` records it; --holds (else --op) names the held ops or jobs, which read queuedBecause
+ * peer-wait, and with nothing else open the frontier reads `peer-wait`, not actionable, instead of
+ * orphaned-frontier (mia-mia wf-miamia-work-and-stacks-mud7kjun, inc-0aebf976e625: brand.decide waited
+ * on wf-miamia-base-repos-mud7kk5c's Grammar install while status re-woke the Kernel for nothing). A
+ * peer message from that peer wakes the Kernel and, with --until-message, resolves the wait
+ * (peerWaitMessageArrived). `peer` is the peer's live row: a wait on a peer that is no longer running
+ * can never be met by it, so it is the Kernel's move again (frontier.peerWaitsDead).
+ */
+const PEER_WAIT = 'peer-wait';
+const openPeerWaits = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress,updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
+  .map((row) => {
+    const kind = /^\[([^\]]+)\]/.exec(row.last_progress ?? '')?.[1] ?? null;
+    if (kind !== PEER_WAIT) return null;
+    const raised = db.prepare("SELECT payload_json,created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
+    const payload = parseJson(raised?.payload_json, {}) ?? {};
+    const peer = typeof payload.peer === 'string' ? payload.peer : null;
+    const peerRow = peer ? getWorkflow(db, peer) : null;
+    return {
+      incidentId: row.incident_id, opId: row.op_id ?? null, peer,
+      holds: Array.isArray(payload.holds) && payload.holds.length ? payload.holds : [row.op_id].filter(Boolean),
+      detail: payload.detail ?? String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''),
+      untilMessage: payload.untilMessage === true, refs: Array.isArray(payload.refs) ? payload.refs : [],
+      since: raised?.created_at ?? row.updated_at,
+      peerPhase: peerRow ? (peerRow.archived_at != null ? 'archived' : peerRow.phase ?? null) : 'unknown',
+      peerRunning: Boolean(peerRow && peerRow.phase === 'running' && peerRow.archived_at == null),
+    };
+  })
+  .filter(Boolean);
 /**
  * The approved leg order for a workflow: the derived plan when one exists, else the approved
  * opChain. modules/schemas/goal-plan.yaml carries no dependsOn field — ordering IS the legs array,
@@ -1323,7 +1394,7 @@ function recordDependencies(repo, workflowJobs) {
   }
   return out;
 }
-function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], recordDeps = new Map() }) {
+function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates = [], peerWaits = [], recordDeps = new Map() }) {
   const payload = jobPayloadOf(job);
   const opId = job.op_id ?? payload.opId ?? null;
 
@@ -1333,6 +1404,14 @@ function queuedBecauseOf(db, job, { legOps, jobsByOp, slots, rtDoc, runningByMod
       queuedBecause: 'owner-gate',
       blockedBy: { incident: gate.incidentId },
       detail: `owner-gate incident ${gate.incidentId} holds it; the Kernel resolves it (api incident --resolve) once the owner's step lands`,
+    };
+  }
+  const peerWait = ownerGateOf(peerWaits, job);
+  if (peerWait) {
+    return {
+      queuedBecause: 'peer-wait',
+      blockedBy: { incident: peerWait.incidentId, peer: peerWait.peer },
+      detail: `peer-wait incident ${peerWait.incidentId} holds it until peer ${peerWait.peer} lands what it waits on (${peerWait.detail.slice(0, 160)}); a peer message from ${peerWait.peer} wakes the Kernel${peerWait.untilMessage ? ' and resolves the wait' : ', which resolves it (api incident --resolve) once the proof holds'}`,
     };
   }
 
@@ -1494,11 +1573,17 @@ function cmdStatus(ledger, args) {
     if (model) runningByModel[model] = (runningByModel[model] ?? 0) + 1;
   }
   const ownerGates = openOwnerGates(db, workflowId);
+  const peerWaits = openPeerWaits(db, workflowId);
   const recordDeps = recordDependencies(path.resolve(args.repo ?? process.cwd()), workflowJobs);
   const queued = workflowJobs.filter((row) => row.status === 'queued').map((row) => ({
     jobId: row.job_id, opId: row.op_id ?? null, attempt: row.attempt,
-    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates, recordDeps }),
+    ...queuedBecauseOf(db, row, { legOps, jobsByOp, slots, rtDoc, runningByModel, ownerGates, peerWaits, recordDeps }),
   }));
+  // Queued jobs a peer-wait holds are the peer's to unblock: when they are all that is open, the
+  // frontier is peer-wait rather than engaged. A wait whose peer is no longer running can never be
+  // met by it, so it is the Kernel's move again.
+  const peerHeld = queued.filter((item) => item.queuedBecause === PEER_WAIT).length;
+  const deadPeerWaits = wf.phase === 'finished' ? [] : peerWaits.filter((wait) => !wait.peerRunning);
   // Ready means the Kernel can move it now: a queued job nothing holds, or a
   // fenced launch to reconcile. A queued job waiting on a leg, a slot or a
   // circuit is not work the Kernel can do this turn.
@@ -1626,7 +1711,7 @@ function cmdStatus(ledger, args) {
     : nudgeReadyWorkers.length > 0 ? 'worker-nudge-ready'
     : wedgedWorkers.length > 0 ? 'worker-wedged'
     : peerMessages.length > 0 ? 'peer-message'
-    : openOperations > 0 ? 'engaged'
+    : openOperations > peerHeld ? 'engaged'
     : wf.phase === 'running' && handover.state === 'answered' ? 'handover-answered'
     : wf.phase === 'running' && handover.state === 'approved' ? 'finish-ready'
     // Nothing open, but a question is with the owner: the workflow waits on
@@ -1636,6 +1721,10 @@ function cmdStatus(ledger, args) {
     // hold yet (a leg whose first job cannot be enqueued before the owner
     // decides - a StarCi Next frontend waiting on brand, inc-103f2028ba77).
     : wf.phase === 'running' && (pendingOwner.length > 0 || ownerGates.length > 0) ? 'awaiting-owner'
+    // A typed wait on a peer workflow (api incident --kind peer-wait): the next approved step cannot
+    // pass its preflight until the peer lands something, so the peer's message, not the watchdog,
+    // wakes the Kernel. Never orphaned-frontier: that re-woke the Kernel for nothing (inc-0aebf976e625).
+    : wf.phase === 'running' && peerWaits.length > 0 ? 'peer-wait'
     : wf.phase === 'running' && handover.due ? 'handover-due'
     : wf.phase === 'running' ? 'orphaned-frontier'
     : 'idle';
@@ -1644,7 +1733,7 @@ function cmdStatus(ledger, args) {
   const stale = staleInputProjection(db, wf);
   const staleOperations = staleOperationsOf(stale.staleInput);
   const staleReady = staleOperations.filter((item) => !item.heldBy);
-  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0;
+  const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0;
   const frontier = {
     state: frontierState,
     actionable,
@@ -1660,6 +1749,8 @@ function cmdStatus(ledger, args) {
     askReserveDispatches: askReserve,
     askOnDemandDispatches: askOnDemand,
     peerMessageKeys: peerMessages.map((message) => message.key),
+    peerWaits: peerWaits.map(({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since }) => ({ incidentId, peer, peerPhase, holds, detail, untilMessage, refs, since })),
+    peerWaitsDead: deadPeerWaits.map((wait) => wait.incidentId),
     queued,
     queuedCauses,
     reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'].includes(frontierState))
@@ -1678,8 +1769,12 @@ function cmdStatus(ledger, args) {
       ? handoverReason(handover, workflowId)
       : frontierState === 'awaiting-owner'
       ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram with a Generate URL button (the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
+      : frontierState === 'peer-wait' || deadPeerWaits.length > 0
+      ? (deadPeerWaits.length
+        ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (api incident --resolve) and continue, or raise what is still missing`
+        : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
       : frontierState === 'orphaned-frontier'
-      ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish'
+      ? 'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned'
       : frontierState === 'worker-nudge-ready'
         ? 'one or more exact running workers are at an idle provider prompt, or hold an unsubmitted paste in their input row, without a report; Kernel must call api nudge for each listed job now (a staged paste gets one Enter)'
       : actionable && readyOperations > 0
@@ -1710,6 +1805,7 @@ function cmdStatus(ledger, args) {
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
+      ...peerWaits.map((wait) => `  peer-wait: ${wait.incidentId} on ${wait.peer} (${wait.peerPhase})${wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${wait.untilMessage ? ' until-message' : ''} — ${wait.detail.slice(0, 160)}`),
       ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
       ...askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
       ...(queued.length ? [`queued{${Object.entries(queuedCauses).map(([cause, n]) => `${cause}:${n}`).join(',')}}`] : []),
@@ -2325,6 +2421,12 @@ async function cmdRoute(ledger, args) {
     emit(out, `route REFUSED for ${jobId} (${kind}): owner-gate — incident ${heldBy.incidentId} holds it until the Kernel resolves it`, args.json);
     process.exit(1);
   }
+  const peerHeldBy = ownerGateOf(openPeerWaits(db, job.workflow_id), job);
+  if (peerHeldBy) {
+    const out = { ok: false, jobId, kind, reason: PEER_WAIT, incident: peerHeldBy.incidentId, peer: peerHeldBy.peer };
+    emit(out, `route REFUSED for ${jobId} (${kind}): peer-wait — incident ${peerHeldBy.incidentId} holds it until peer ${peerHeldBy.peer} lands what it waits on and the wait is resolved`, args.json);
+    process.exit(1);
+  }
   const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
   if (!slots.ok) {
     const out = { ok: false, jobId, kind, reason: 'max-ops', slots };
@@ -2843,6 +2945,12 @@ function cmdDispatch(ledger, args, repo) {
   if (heldBy) {
     const out = { ok: false, jobId, op, reason: 'owner-gate', incident: heldBy.incidentId };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): owner-gate — incident ${heldBy.incidentId} holds it until the Kernel resolves it; job stays queued`, args.json);
+    process.exit(1);
+  }
+  const peerHeldBy = ownerGateOf(openPeerWaits(db, job.workflow_id), job);
+  if (peerHeldBy) {
+    const out = { ok: false, jobId, op, reason: PEER_WAIT, incident: peerHeldBy.incidentId, peer: peerHeldBy.peer };
+    emit(out, `dispatch REFUSED for ${jobId} (${op}): peer-wait — incident ${peerHeldBy.incidentId} holds it until peer ${peerHeldBy.peer} lands what it waits on and the wait is resolved; job stays queued`, args.json);
     process.exit(1);
   }
   const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
@@ -4268,6 +4376,18 @@ function cmdIncident(ledger, args) {
     return;
   }
   const holds = String(args.holds ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+  // A peer-wait names the peer workflow it waits on (openPeerWaits): only a running peer of this
+  // workflow can land the thing and send the message that wakes it.
+  let peerWait = null;
+  if (args.kind === PEER_WAIT) {
+    const peer = typeof args.peer === 'string' ? args.peer.trim() : '';
+    if (!peer) throw Object.assign(new Error('a peer-wait names the workflow it waits on: --peer <workflowId>'), { code: 'peer-wait-peer-missing' });
+    const refusal = peerRefusalOf(db, getWorkflow(db, workflowId), peer);
+    if (refusal) throw Object.assign(new Error(`peer-wait on ${peer} refused: ${refusal.detail}`), { code: refusal.code });
+    peerWait = { peer, untilMessage: args['until-message'] === true, refs: csvList(args.refs) };
+  } else if (args.peer || args['until-message']) {
+    throw Object.assign(new Error('--peer and --until-message go with --kind peer-wait'), { code: 'peer-wait-kind-mismatch' });
+  }
   const incidentId = `inc-${newToken().slice(0, 12)}`;
   ledger.transaction(() => {
     db.prepare(
@@ -4275,11 +4395,11 @@ function cmdIncident(ledger, args) {
     ).run(incidentId, workflowId, args.op ?? null, `[${args.kind}] ${args.detail}`, now);
     ledger.appendEvent({
       workflowId, entityType: 'incident', entityId: incidentId,
-      kind: 'incident-raised', payload: { kind: args.kind, detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}) },
+      kind: 'incident-raised', payload: { kind: args.kind, detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}) },
     });
   });
-  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: 'open', ...(holds.length ? { holds } : {}) };
-  emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}: ${args.detail}`, args.json);
+  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: 'open', ...(holds.length ? { holds } : {}), ...(peerWait ?? {}) };
+  emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWait ? ` on ${peerWait.peer}${peerWait.untilMessage ? ' (until its next message)' : ''}` : ''}: ${args.detail}`, args.json);
 }
 
 /* ---------------------------------------------------------------- finish */

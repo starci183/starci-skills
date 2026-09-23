@@ -302,3 +302,41 @@ test('a peer-dependency gate names no ask, so a closed ask is no evidence, and t
   assert.match(stale.line,/named job\(s\) settled after the gate: op-interface\.draw-da76af80ce succeeded \d\d:\d\d/);
   assert.doesNotMatch(stale.line,/no owner ask open/);
 }));
+
+// Live false positive (2026-09-24, mia-mia): STALE-GATE for wf-miamia-base-repos-mud7kk5c inc-55060d946270
+// because peer heads-up pm-a34aec2c6891 ("Brand job admitted after Grammar 0.5.0 proof") arrived after the
+// gate. The gate waits for .starciwork/brand/index.yaml to SETTLE; the brand job was only admitted and the
+// record did not exist yet. A gate that names a path is released by that path landing and nothing else;
+// a pending peer message is UNREAD-PEER (the Kernel reads its inbox), never STALE-GATE.
+test('a gate naming a record is not released by a peer heads-up while the record is absent; the pending message is UNREAD-PEER',t=>withLedger(t,({repoRoot,ledger})=>{
+  const BASE='wf-miamia-base-repos-mud7kk5c',WORK='wf-miamia-work-and-stacks-mud7kjun';
+  const text=`Supervisor holds interface.scaffold until .starciwork/brand/index.yaml is settled by peer ${WORK} (heads-up when brand lands).`;
+  seedWorkflow(ledger,{id:BASE,now:NOW-600*MIN,events:[
+    {kind:'op-settled',payload:{},created_at:NOW-120*MIN},
+    {kind:'incident-raised',entityType:'incident',entityId:'inc-55060d946270',payload:{kind:'owner-gate',detail:text,holds:['interface.scaffold']},created_at:NOW-180*MIN}]});
+  seedWorkflow(ledger,{id:WORK,now:NOW-600*MIN,events:[{kind:'op-dispatched',payload:{},created_at:NOW-5*MIN}]});
+  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
+    .run('inc-55060d946270',BASE,'interface.scaffold',`[owner-gate] ${text}`,'open',NOW-180*MIN);
+  ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)")
+    .run(BASE,'peer-message','pm-a34aec2c6891',JSON.stringify({from:WORK,kind:'heads-up',subject:'Brand job admitted after Grammar 0.5.0 proof'}),'pending',NOW-20*MIN);
+  const run=()=>stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:()=>frontier({state:'peer-message',actionable:true})});
+  const found=run().filter(f=>f.workflowId===BASE);
+  assert.equal(found.filter(f=>f.type==='STALE-GATE').length,0,'the record the gate waits for does not exist');
+  assert.match(found.find(f=>f.type==='GATE').line,/justified: waits: \.starciwork\/brand\/index\.yaml is absent/);
+  const unread=found.find(f=>f.type==='UNREAD-PEER');
+  assert.equal(unread.alert,false);
+  assert.match(unread.line,/^UNREAD-PEER wf-miamia-base-repos-mud7kk5c pm-a34aec2c6891 from wf-miamia-work-and-stacks-mud7kjun \[heads-up\] Brand job admitted after Grammar 0\.5\.0 proof: pending since \d\d:\d\d \(20m\); inc-55060d946270 may concern it and still holds; tell its Kernel to read api inbox/);
+
+  // Acked, the message is no finding at all; the record landing (settled) is what releases the gate.
+  ledger.db.prepare("UPDATE inbox SET status='applied',applied_at=? WHERE key='pm-a34aec2c6891'").run(NOW-10*MIN);
+  assert.equal(run().filter(f=>f.workflowId===BASE&&['UNREAD-PEER','STALE-GATE'].includes(f.type)).length,0);
+  const file=path.join(repoRoot,'.starciwork','brand','index.yaml');
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  fs.writeFileSync(file,'id: brand\nstate: draft\n');
+  assert.equal(run().filter(f=>f.workflowId===BASE&&f.type==='STALE-GATE').length,0,'a draft record is still waited on');
+  fs.writeFileSync(file,'id: brand\nstate: done\n');
+  const [stale]=run().filter(f=>f.workflowId===BASE&&f.type==='STALE-GATE');
+  assert.match(stale.line,/\.starciwork\/brand\/index\.yaml exists \(done\)/);
+  assert.doesNotMatch(stale.line,/pm-a34aec2c6891/,'the heads-up is not the evidence');
+}));

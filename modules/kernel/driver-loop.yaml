@@ -273,7 +273,13 @@ tick:
       `api reply --message <id> --to-owner` when only the owner can decide -
       the worker then files it as an outcome ask and serve-ask carries it. A
       reply never grants scope, paths, retries or owner intent. `orphaned-frontier` is likewise an
-      immediate technical plan/repair transition, not a reason to yield.
+      immediate technical plan/repair transition, not a reason to yield. When
+      that next approved step cannot pass its preflight until a PEER workflow
+      lands something (installs a dependency, writes a record), do not leave it
+      orphaned: send the peer its `api notify --kind request` and record the
+      wait with `api incident --kind peer-wait --peer <workflowId> --op <op>
+      [--holds <ops|jobs>] [--refs <pm-keys>] [--until-message] --detail <what
+      exactly must land>` (peerWait below).
       `worker-wedged` is not a wait either: api observe each id in
       `frontier.wedgedJobs` once, then api nudge it to interrupt the stuck
       command, or reconcile and re-dispatch the attempt.
@@ -300,6 +306,30 @@ tick:
       it. A pending handover ask is this wait too. `handover-answered`, `finish-ready` and `handover-due`
       are never waits: each is the next handover move (handoverLoop below),
       and `api status` `handover` names it.
+      `peer-wait` (`frontier.peerWaits`: no operation you can move, and an
+      open peer-wait incident) is a legitimate wait: yield naming each wait
+      and its peer; the peer's `api notify` message wakes you (peerWait
+      below). A wait in `frontier.peerWaitsDead` is not: its peer stopped
+      running, so check the prerequisite yourself, then resolve it or raise
+      what is still missing.
+    peerWait: >-
+      A peer-wait is typed and durable (modules/kernel/api.yaml
+      commands.incident.peerWait): --detail names exactly what must land and
+      how you will check it (a version in a lockfile, a record state), --refs
+      the requests you sent. While it is open the held ops never route or
+      dispatch and the frontier sleeps at `peer-wait`, so the watchdog stops
+      re-waking you for nothing (mia-mia work-and-stacks sat at an actionable
+      orphaned-frontier with zero open operations while brand.decide waited on
+      the base-repos workflow's Grammar install, inc-0aebf976e625). When the
+      peer's message arrives (frontier peer-message; with --until-message the
+      wait is already resolved) re-check the prerequisite before you enqueue:
+      it holds -> `api incident --resolve <id>` (if still open) and continue;
+      it does not -> ack the message saying so and keep or re-record the wait.
+      A free-text incident of another kind never parks the frontier; replace
+      one with a peer-wait and resolve it. The supervisor reports a wait as
+      STALE-PEER-WAIT once the peer finished, a named job settled after the
+      wait, or the peer is idle too, and an unread message from it as
+      UNREAD-PEER.
     reconcile: >-
       An `effect_unknown` job is part of the open frontier and remains fenced.
       Before routing it, call `api reconcile --job <id>`. The api reads the

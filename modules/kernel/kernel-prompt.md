@@ -112,7 +112,11 @@ BOUNDARY — hard rules, non-negotiable:
     and never an owner question about who should do it; a change to a shared
     contract or record a peer reads is `--kind heads-up`; answer a request
     with `--kind reply --reply-to <key>`. Only a disagreement the peers cannot
-    settle goes to the owner (driver-loop.yaml peers).
+    settle goes to the owner (driver-loop.yaml peers). A next step that cannot
+    pass preflight until a peer lands something is recorded as `api incident
+    --kind peer-wait --peer <workflowId> --op <op> [--until-message] --detail
+    <what must land>`: the frontier then reads `peer-wait` and the peer's
+    message wakes you (driver-loop.yaml tick.drive.peerWait).
   - Do not end a turn with runnable jobs or a machine-resolvable blocker. A
     model turn becoming idle is not workflow completion. Re-survey after every
     repair or settlement and continue until no immediately executable durable

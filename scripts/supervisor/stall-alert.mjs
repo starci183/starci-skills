@@ -14,8 +14,8 @@
 //
 // Ledgers: config.yaml supervisor.repos plus every --repo (resume-all.mjs
 // resumeRepos), each opened read-only (inspectLedger). Findings come from
-// scripts/supervisor/stall.mjs; only STALLED, STALE-GATE and STALE-WAIT alert
-// (a justified GATE line explains a stall, it is not one).
+// scripts/supervisor/stall.mjs; only STALLED, STALE-GATE, STALE-WAIT and STALE-PEER-WAIT alert
+// (a justified GATE or PEER-WAIT line explains a stall, it is not one).
 //
 // For each finding that is new, or last alerted more than --rate-minutes ago
 // (default 60) on that channel:
@@ -42,7 +42,7 @@ export const ALERT_NAME = 'stall-alert';
 export const ALERT_FILE = fileURLToPath(import.meta.url);
 export const DEFAULT_SUPERVISOR_ID = 'main';
 export const RATE_MS = 60 * 60_000;
-export const ALERT_TYPES = ['STALLED', 'STALE-GATE', 'STALE-WAIT'];
+export const ALERT_TYPES = ['STALLED', 'STALE-GATE', 'STALE-WAIT', 'STALE-PEER-WAIT'];
 const MAX_TEXT = 3900;
 const LOG_CAP = 2 * 1024 * 1024;
 
@@ -72,12 +72,12 @@ const TEXT = {
   en: {
     head: (n) => `⚠️ StarCi supervision: ${n} workflow finding(s) need attention`,
     tail: 'The supervisor was told through its channel inbox.',
-    type: { STALLED: 'stalled', 'STALE-GATE': 'gate whose reason is gone', 'STALE-WAIT': 'waiting on a settled blocker' },
+    type: { STALLED: 'stalled', 'STALE-GATE': 'gate whose reason is gone', 'STALE-WAIT': 'waiting on a settled blocker', 'STALE-PEER-WAIT': 'peer wait that no longer holds' },
   },
   vi: {
     head: (n) => `⚠️ Giám sát StarCi: ${n} vấn đề workflow cần xử lý`,
     tail: 'Đã báo supervisor qua inbox.',
-    type: { STALLED: 'workflow đứng yên', 'STALE-GATE': 'cổng chờ đã hết lý do', 'STALE-WAIT': 'đang chờ việc đã xong' },
+    type: { STALLED: 'workflow đứng yên', 'STALE-GATE': 'cổng chờ đã hết lý do', 'STALE-WAIT': 'đang chờ việc đã xong', 'STALE-PEER-WAIT': 'chờ workflow khác nhưng không còn lý do' },
   },
 };
 export const alertText = (language) => TEXT[language] ?? TEXT.en;
