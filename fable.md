@@ -995,6 +995,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   nguồn/test đã tồn tại (a1, a3 blocked); giao lane nền thêm planned mode, đã báo kernel Collab không lặp retry.
   Kernel Modules đã tự compact (context 24%).
 
+- 09:30 Lane planned mode xong `57273647a`: work.author trên feature greenfield lấy owner theo thiết kế (bản ghi todo), check
+  dùng runner có thật + đường dẫn test mà op implement phải tạo, tài khoản vai trò là identity resource có blockers
+  (không đổi schema). Validator đã khớp work-layout, không cần sửa. Check xanh, spec 126/126. Đã báo kernel Collab.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
