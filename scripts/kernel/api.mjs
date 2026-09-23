@@ -70,6 +70,7 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { markAskClosed } from '../connectors/telegram.mjs';
+import { autoAcceptAsk, supersedeEarlierAsks } from './serve-ask.mjs';
 import { classifyAgentScreen, staleAwareState, DEFAULT_STAGED_PATTERN } from './terminal-liveness.mjs';
 // Pool selection and launch-model resolution, plus the Orca orchestration
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
@@ -4292,12 +4293,27 @@ function ensureAskConnectors() {
 // it to re-serve with serve-ask.mjs, but its hard boundary allows mutations
 // only through api.mjs, so the owner never got a live form. The form itself
 // records ask-serving on bind; this verb only launches it for a real ask.
-function cmdServeAsk(ledger, args, repo) {
+// An ask config.yaml asks.autoAcceptRecommended answers (serve-ask.mjs
+// autoAcceptAsk) is answered here instead, in-process, so the calling Kernel
+// reads the answer in this verb's own output and no form is launched.
+async function cmdServeAsk(ledger, args, repo) {
   const db = ledger.db, workflowId = args.workflow;
   if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
   const dispatchId = args.dispatch ?? null;
   if (dispatchId && !db.prepare("SELECT 1 FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' LIMIT 1").get(workflowId, dispatchId)) {
     throw Object.assign(new Error(`dispatch ${dispatchId} filed no ask report in ${workflowId}`), { code: 'ask-unknown' });
+  }
+  const report = db.prepare(`SELECT * FROM reports WHERE workflow_id=? AND outcome='ask' ${dispatchId ? 'AND dispatch_id=?' : ''} ORDER BY report_id DESC LIMIT 1`)
+    .get(...(dispatchId ? [workflowId, dispatchId] : [workflowId]));
+  const answered = report && db.prepare("SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1").get(workflowId, report.dispatch_id);
+  if (report && !answered) {
+    const auto = await autoAcceptAsk({ ledger, ledgerFile: ledgerFileFor(repo), repo, workflowId, report });
+    if (auto.accepted) {
+      supersedeEarlierAsks(ledger, workflowId, report);
+      const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null, telegram: auto.telegram?.sent ? 'sent' : (auto.telegram?.skipped ?? auto.telegram?.error ?? null) };
+      emit(out, `ask ${report.dispatch_id} auto-accepted by config.yaml asks.autoAcceptRecommended: option ${auto.optionIndex + 1} (${auto.option}), answeredBy ${auto.answeredBy}; no form served. It binds like an owner answer for this business choice: re-enqueue the op with the answer bound (receipt ${auto.receiptPath}); a later owner answer supersedes it`, args.json);
+      return;
+    }
   }
   // With a tunnel configured, the owner answers through response.<domain>:
   // the Kernel keeps the gateway and tunnel up itself (both starts are
@@ -4475,7 +4491,7 @@ async function main() {
       case 'op-contract': return cmdOpContract(ledger, args);
       case 'check': return cmdCheck(ledger, args, repo);
       case 'consume-report': return cmdConsumeReport(ledger, args);
-      case 'serve-ask': return cmdServeAsk(ledger, args, repo);
+      case 'serve-ask': return await cmdServeAsk(ledger, args, repo);
       case 'retire-ask': return await cmdRetireAsk(ledger, args, repo);
       case 'incident': return cmdIncident(ledger, args);
       case 'finish': return cmdFinish(ledger, args);

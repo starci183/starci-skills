@@ -107,3 +107,14 @@ connectors:
     botTokenEnv: TELEGRAM_BOT_TOKEN
     chatId: null
     exposeCredentialAsks: false
+# asks — owner asks that carry a recommended option (question.recommended, or exactly one option
+# marked "(khuyến nghị)" / "(recommended)" / "(đề xuất)"). autoAcceptRecommended: true answers such an
+# ask with its recommendation instead of serving the form: the ledger records ask-answered with
+# answeredBy auto-recommended, the kernel is woken, and Telegram gets one plain message naming the
+# pick. A later owner answer supersedes it. excludes lists the ask classes that always reach the owner:
+#   credential — any ask with secret fields, or of kind credential, account, access or consent;
+#   handover — every handover.review ask (always excluded, even when removed from this list);
+#   or any ask kind: information, authority, business-decision, irreversible-confirmation, ...
+asks:
+  autoAcceptRecommended: false
+  excludes: [credential, irreversible-confirmation, handover]

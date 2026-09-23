@@ -50,7 +50,13 @@ sections:
         outside its excluded classes, is the owner's answer and binds like one; the receipt carries
         the delegate's reason. The handover approval is never delegated: a workflow is done only
         when the owner approves its handover.review ask, and a delegate may answer that ask with
-        feedback or a question, never with the approval. Every operation reaches the owner the same one way: it files its
+        feedback or a question, never with the approval. An ask whose options include a
+        recommendation sets question.recommended (the recommended option's 0-based index in
+        question.options) and question.recommendedReason (why); with config.yaml
+        asks.autoAcceptRecommended on, the runtime answers it with that option instead of serving
+        it, and a receipt whose answeredBy is auto-recommended binds like the owner's answer for
+        that business choice until a later owner answer supersedes it. Credential, excluded-kind
+        and handover asks are never auto-accepted. Every operation reaches the owner the same one way: it files its
         report with outcome ask and the question (api report) and ends its turn; the kernel serves
         it through serve-ask and re-enqueues the operation with the answer bound. No operation asks
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a

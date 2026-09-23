@@ -280,6 +280,10 @@ tick:
       `frontier.askReserveDispatches` (an unanswered ask whose serve-ask form
       expired or was never served) is not a wait either: re-serve each with
       serve-ask --dispatch before yielding; a dead link is not an owner wait.
+      A re-serve config.yaml asks.autoAcceptRecommended answers returns
+      autoAccepted with the recommended option instead of a form: the ask is
+      answered (answeredBy auto-recommended), so re-enqueue the op with it
+      (provisionAsk below).
       `awaiting-owner` (no open operation, at least one unanswered ask) is a
       legitimate wait: yield naming the pending ask dispatch ids; the
       answer's ask-answered wake brings you back. A pending handover ask is
@@ -582,7 +586,21 @@ verdictTable:
       scripts/kernel/serve-ask.mjs detached — it serves the question as a localhost form
       (first free port in 6969..7069, nonce path), writes submitted values to
       sealed custody/.env.local without any agent seeing them, files a
-      sanitized `ask-answered` event, and wakes the kernel. The ask leg stays
+      sanitized `ask-answered` event, and wakes the kernel. With config.yaml
+      asks.autoAcceptRecommended on, an ask that carries a recommended option
+      (question.recommended, or exactly one option marked "(khuyến nghị)",
+      "(recommended)" or "(đề xuất)") and falls in no class of asks.excludes
+      is never served: `api serve-ask` records `ask-answered` with answeredBy
+      auto-recommended (receipt option, optionIndex and a note citing the
+      config key and the recommendedReason) plus an `ask-auto-accepted` audit
+      event, wakes the kernel and tells the owner once on Telegram. That
+      answer binds like an owner answer for a business choice: re-enqueue the
+      op with it bound and record the decision with its source
+      (auto-recommended, the recommendedReason). The owner can reverse it
+      later; a later owner answer supersedes it and is handled like a new
+      ask. A credential ask, an excluded kind and every handover.review ask
+      are always served, and a handover is never auto-accepted: its approval
+      is the owner's own answer. The ask leg stays
       parked meanwhile; runnable frontier ops keep driving. `api status`
       awaitingOwner[] lists every op whose latest attempt waits on the owner
       and whether its ask is answered; an answered one is re-enqueued, and

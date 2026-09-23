@@ -994,8 +994,14 @@ commands:
       nothing itself: it launches scripts/kernel/serve-ask.mjs detached, which
       binds the localhost form and appends ask-serving (ask-serving-expired on
       --ttl, ask-answered on submit). It is how a Kernel clears
-      frontier.askReserveDispatches without leaving the api surface.
-    returns: '{ok:true, workflowId, dispatchId, pid, servedBy}'
+      frontier.askReserveDispatches without leaving the api surface. With
+      config.yaml asks.autoAcceptRecommended on, an ask that carries a
+      recommended option and falls in no class of asks.excludes (credential
+      and handover.review asks always do) is answered in-process instead
+      (scripts/kernel/serve-ask.mjs autoAcceptAsk): the answer receipt,
+      ask-answered with answeredBy auto-recommended, ask-auto-accepted, the
+      kernel wake and one Telegram message; no form is launched.
+    returns: '{ok:true, workflowId, dispatchId, pid, servedBy} | {ok:true, workflowId, dispatchId, autoAccepted:true, optionIndex, option, answeredBy, receiptPath, wake, telegram}'
     refuses:
       - workflow-unknown
       - ask-unknown
@@ -1251,6 +1257,7 @@ askLifecycle:
     - ask-serving-expired: 'the --ttl window closed with no submission. payload {dispatchId}; the URL is dead until a re-serve appends a newer ask-serving'
     - ask-superseded: 'a later ask report for the same (workflow, op) and the same subject (the asking job params.subject, else overlapping question.refs) was served and retires this one; an ask of the same op about another subject stays open. payload {dispatchId: <retired ask>, by: <the ask now serving>, opId}; terminal — a retired ask is closed without an answer and is never relayed to the owner'
     - ask-answered: 'the owner submitted the form. payload {dispatchId, receiptPath, answeredBy, optionIndex, custodyWritten, envWritten, pointersWritten, errors} — names and custody paths only, never values; terminal. The receipt (starci/ask-answer@1) carries option, optionIndex (the picked option''s position in question.options), picks, answeredBy, note and at. On a handover.review ask serve-ask refuses a delegate''s approve (403): only the owner approves a handover'
+    - ask-auto-accepted: 'config.yaml asks.autoAcceptRecommended answered the ask with its recommended option instead of serving it; appended with the ask-answered (answeredBy auto-recommended) it audits. payload {dispatchId, opId, optionIndex, option, recommendedReason, receiptPath, rule {key, autoAcceptRecommended, excludes, source: structured|text}, config {autoAcceptRecommended, excludes, source}}. A handover.review, credential or excluded-kind ask never gets one'
   open: 'an ask report carrying neither ask-answered nor ask-superseded for its dispatch_id; modules/supervisor/supervise.yaml is the reader that tags each open ask live, stale, dead or unserved before it reaches the owner'
 
 # ============================================================================

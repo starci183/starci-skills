@@ -169,9 +169,33 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
   if(telegram.exposeCredentialAsks)warnings.push('telegram.exposeCredentialAsks is true: credential asks are posted as public links; Telegram cloud chats are not end-to-end encrypted.');
   return {secretsFile:connectorSecretsFile(config,root),repos:[...(raw.repos??d.repos)],gateway:{...d.gateway,...(raw.gateway??{})},cloudflare,telegram,warnings};
 }
+/**
+ * config.yaml `asks` — whether an owner ask that carries a recommended option is answered with it
+ * instead of being served (scripts/kernel/serve-ask.mjs autoAcceptAsk). `excludes` names the ask classes
+ * that always reach the owner: `credential` (secret fields, or kind credential/account/access/consent),
+ * `handover` (every handover.review ask — excluded even when the owner drops it from the list) and any
+ * ask kind of modules/ops/ops/provision.ask.yaml.
+ */
+export const ASK_KINDS=Object.freeze(['information','credential','account','access','consent','authority','business-decision','irreversible-confirmation']);
+export const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover']);
+export const ASKS_DEFAULTS=Object.freeze({autoAcceptRecommended:false,excludes:Object.freeze(['credential','irreversible-confirmation','handover'])});
+function validateAsks(asks){
+  if(asks===null)return;
+  const bad=message=>{throw Error(`Invalid config.yaml: asks${message}`);};
+  if(!plain(asks))bad(' must be {autoAcceptRecommended?, excludes?} or null.');
+  for(const key of Object.keys(asks))if(!['autoAcceptRecommended','excludes'].includes(key))bad(` has unknown key ${key} (allowed: autoAcceptRecommended, excludes).`);
+  if(asks.autoAcceptRecommended!==undefined&&typeof asks.autoAcceptRecommended!=='boolean')bad('.autoAcceptRecommended must be true or false.');
+  const excludes=asks.excludes;
+  if(excludes!==undefined&&excludes!==null){
+    if(!Array.isArray(excludes))bad(`.excludes must be a list of ask classes (${ASK_EXCLUDE_CLASSES.join(', ')}).`);
+    for(const entry of excludes)if(typeof entry!=='string'||!ASK_EXCLUDE_CLASSES.includes(entry))bad(`.excludes entry ${JSON.stringify(entry)} is not an ask class (${ASK_EXCLUDE_CLASSES.join(', ')}).`);
+    if(new Set(excludes).size!==excludes.length)bad('.excludes names each class once.');
+  }
+}
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
+  if(config?.asks!==undefined)validateAsks(config.asks);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   if(config?.allocation!==undefined){
@@ -282,3 +306,16 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
 
 /** The owner's standing delegation of ask answers (config.yaml `delegation`), or null when absent or expired. */
 export function activeDelegation(config=loadConfig(),now=Date.now()){const d=config?.delegation;if(!d||Date.parse(d.until)<=now)return null;return {asks:d.asks,until:d.until,excludes:d.excludes??[],note:d.note??null};}
+
+/**
+ * The owner's auto-accept policy for recommended asks (config.yaml `asks`): {autoAcceptRecommended,
+ * excludes, source}. An absent or null block is the default (off). `handover` is always in excludes.
+ * Validates first, so a malformed block throws rather than reading as on.
+ */
+export function askAutoAcceptPolicy(config=loadConfig()){
+  if(config?.asks!==undefined)validateAsks(config.asks);
+  const asks=plain(config?.asks)?config.asks:null;
+  const listed=asks&&Array.isArray(asks.excludes)?asks.excludes:ASKS_DEFAULTS.excludes;
+  const excludes=listed.includes('handover')?[...listed]:[...listed,'handover'];
+  return {autoAcceptRecommended:asks?.autoAcceptRecommended===true,excludes,source:asks?'asks':'default'};
+}

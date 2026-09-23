@@ -2,8 +2,11 @@
 // telegram.mjs — tells the owner about an owner ask over a Telegram bot
 // (docs/connectors.md). The one send point is the KERNEL's ask path:
 // scripts/kernel/serve-ask.mjs calls notifyEvent() the moment the form binds
-// (which is what `api serve-ask` launches). Nothing else is sent: no op
-// progress, no incidents, no finish, and never from the supervisor.
+// (which is what `api serve-ask` launches). The one other message is
+// notifyAutoAccepted: an ask the runtime answered with its recommended option
+// (config.yaml asks.autoAcceptRecommended) is told once, plainly, with no link.
+// Nothing else is sent: no op progress, no incidents, no finish, and never
+// from the supervisor.
 //
 //   node scripts/connectors/telegram.mjs notify --ledger <runtime.sqlite> --workflow <id> --dispatch <id>
 //       re-send the ask message of one served ask (deduped like the automatic send)
@@ -97,6 +100,18 @@ export function askMessage({ workflow, question, link, expiresAt = null, reserve
   else lines.push(`${t.link}: ${link.href}`);
   if (expiresAt) lines.push(`${t.expires}: ${when(expiresAt, language)}`);
   return clip(lines.join('\n'), MAX_TEXT);
+}
+/**
+ * The one plain message for an ask the runtime answered with its recommendation (config.yaml
+ * asks.autoAcceptRecommended; serve-ask.mjs autoAcceptAsk): the pick and the question, no form link.
+ */
+export function autoAcceptedMessage({ workflow, question, label, language }) {
+  const t = textFor(language);
+  const text = clip(String(question?.text ?? '').trim(), 2500), pick = clip(String(label ?? '').trim(), 300);
+  const line = language === 'vi'
+    ? `Đã tự chọn phương án đề xuất: ${pick} — câu hỏi: ${text}. Thầy muốn đổi thì trả lời lại kernel / supervisor.`
+    : `Auto-picked the recommended option: ${pick} — question: ${text}. To change it, answer the kernel / supervisor again.`;
+  return clip([line, '', workflowLine(t, workflow)].join('\n'), MAX_TEXT);
 }
 /* ------------------------------------------------------------ Bot API */
 
@@ -307,6 +322,50 @@ export async function notifyAsk({ ledgerFile, workflowId, dispatchId }, {
     });
   } catch (error) {
     const line = `telegram: ask notification failed: ${redact(error?.message ?? error)}`;
+    try { warn(line); } catch { /* nothing left to do */ }
+    return { ok: false, error: line };
+  }
+}
+
+/**
+ * Tell the owner the runtime answered one ask with its recommended option: ONE plain message, deduped
+ * per ask (`ask-auto-accepted|<workflow>|<dispatch>`), no form link. Never throws; the same guards as
+ * notifyAsk (STARCI_CONNECTORS_OFF, a spec run never reaches the real Bot API, Telegram off = no-op).
+ */
+export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, label }, {
+  config = ownerConfig(), env = process.env, root = configRoot, fetchImpl = fetch, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
+  warn = (line) => process.stderr.write(`${line}\n`), sleepImpl = sleep, now = Date.now(),
+} = {}) {
+  try {
+    if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
+    if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: true, skipped: 'test context' };
+    const settings = telegramSettings({ config, env, root });
+    if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
+    const file = sentFile(env);
+    return await withLock(file, async () => {
+      const store = readJson(file, null) ?? { schema: 'starci/telegram-sent@1', events: {}, asks: {} };
+      store.events ??= {}; store.asks ??= {};
+      const key = `ask-auto-accepted|${workflowId}|${dispatchId}`;
+      if (store.events[key]) return { ok: true, skipped: 'already sent', key };
+      let question = { text: '' }, title = null;
+      try {
+        const handle = inspectLedger({ file: ledgerFile });
+        try {
+          const report = handle.db.prepare("SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+          const rj = parse(report?.report_json, {}) ?? {};
+          question = rj.question ?? { text: rj.summary ?? '' };
+          title = handle.db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null;
+        } finally { try { handle.close(); } catch { /* closed */ } }
+      } catch { /* the message still names the pick */ }
+      const text = autoAcceptedMessage({ workflow: { id: workflowId, title }, question, label, language: settings.language });
+      const sent = await sendMessage({ token: settings.token, apiBase, fetchImpl, sleepImpl, chatId: settings.chatId, text });
+      if (!sent.ok) { warn(`telegram: auto-accept message not sent: ${sent.error}`); return { ok: false, status: sent.status, error: sent.error }; }
+      store.events[key] = now;
+      writeJson(file, store);
+      return { ok: true, sent: 1, key, messageId: sent.messageId };
+    });
+  } catch (error) {
+    const line = `telegram: auto-accept notification failed: ${redact(error?.message ?? error)}`;
     try { warn(line); } catch { /* nothing left to do */ }
     return { ok: false, error: line };
   }

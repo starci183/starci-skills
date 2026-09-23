@@ -44,6 +44,7 @@ export function lossyTextFields(value) {
   const scan = (label, v) => { if (typeof v === 'string') fields.push([label, v]); };
   scan('summary', value?.summary);
   scan('question.text', value?.question?.text);
+  scan('question.recommendedReason', value?.question?.recommendedReason);
   (Array.isArray(value?.question?.options) ? value.question.options : []).forEach((o, i) => scan(`question.options[${i}]`, typeof o === 'string' ? o : o?.label));
   scan('blocker.detail', value?.blocker?.detail);
   (Array.isArray(value?.open) ? value.open : []).forEach((o, i) => scan(`open[${i}]`, o));
@@ -90,6 +91,21 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
   }
   if (value.outcome === 'partial' && (!Array.isArray(value.open) || !value.open.length || value.open.some((o) => !text(o)))) fail("outcome 'partial' requires a nonempty open[] of unfinished items");
   if (value.outcome === 'ask' && (!value.question || !text(value.question.text))) fail("outcome 'ask' requires question.text");
+  // question.recommended: the 0-based index of the option the op recommends, with
+  // question.recommendedReason saying why (config.yaml asks.autoAcceptRecommended
+  // may answer the ask with it; scripts/kernel/ask-recommendation.mjs).
+  if (value.question && typeof value.question === 'object') {
+    const q = value.question, count = Array.isArray(q.options) ? q.options.length : 0;
+    if (q.recommended !== undefined && q.recommended !== null
+      && (!Number.isInteger(q.recommended) || q.recommended < 0 || q.recommended >= count)) {
+      fail(`question.recommended must be the 0-based index of one of question.options (0..${Math.max(count - 1, 0)}), got ${JSON.stringify(q.recommended)}`);
+    }
+    if (q.recommendedReason !== undefined && q.recommendedReason !== null) {
+      if (typeof q.recommendedReason !== 'string') fail('question.recommendedReason must be a string');
+      else if (q.recommendedReason.length > 600) fail('question.recommendedReason exceeds 600 chars');
+      else if (q.recommended === undefined || q.recommended === null) fail('question.recommendedReason needs question.recommended: the index of the option it recommends');
+    }
+  }
   if (value.outcome === 'blocked' && (!value.blocker || !BLOCKER_KINDS.includes(value.blocker.kind) || !text(value.blocker.detail))) fail(`outcome 'blocked' requires blocker {kind <- ${BLOCKER_KINDS.join('|')}, detail}`);
 
   if (policyCommits(commitPolicy) && ['done', 'partial'].includes(value.outcome)) {

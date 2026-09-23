@@ -27,6 +27,15 @@
 // On bind the owner is also told on Telegram when config.yaml
 // connectors.telegram is set up (scripts/connectors/telegram.mjs notifyAsk):
 // the question, its options and the form's link on the public gateway host.
+//
+// Auto-accept (config.yaml asks.autoAcceptRecommended, engine/config.mjs
+// askAutoAcceptPolicy): an ask that carries a recommended option
+// (scripts/kernel/ask-recommendation.mjs) and falls in no excluded class is
+// never served. autoAcceptAsk records the recommendation as the answer: the
+// same starci/ask-answer@1 receipt and `ask-answered` event a submission
+// writes, with answeredBy auto-recommended, plus an `ask-auto-accepted` audit
+// event; it wakes the Kernel and sends the owner one plain Telegram message.
+// `api serve-ask` runs the same function before it would launch the form.
 
 import fs from 'node:fs';
 import http from 'node:http';
@@ -40,9 +49,10 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen } from './terminal-liveness.mjs';
-import { loadConfig, activeDelegation } from '../../engine/config.mjs';
-import { markAskClosed, notifyAsk } from '../connectors/telegram.mjs';
+import { loadConfig, activeDelegation, askAutoAcceptPolicy } from '../../engine/config.mjs';
+import { markAskClosed, notifyAsk, notifyAutoAccepted } from '../connectors/telegram.mjs';
 import { HANDOVER_DECISIONS, HANDOVER_OP, OWNER } from './handover.mjs';
+import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, autoAcceptDecision } from './ask-recommendation.mjs';
 
 // The form speaks the owner's language (config.yaml `language`). Unknown
 // languages fall back to English; the op writes the question itself in the
@@ -119,7 +129,7 @@ const pointerFor = (name) => `${name.replace(/\.[^.]+$/, '').toUpperCase().repla
 // GITHUB_OAUTH_CLIENT_SECRET) is the same secret — one merged field; and a
 // bare `X_FILE` var is a pointer to be derived, not a value to paste, so it
 // becomes a custody field instead of a text input.
-const fieldsOf = (text) => {
+export const fieldsOf = (text) => {
   const files = [...new Set([...text.matchAll(/([\w-]+\.(?:key|txt|json))/g)].map(m => m[1]))];
   let vars = [...new Set([...text.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g)].map(m => m[0]))]
     .filter(v => !/^(JSON|HTTP|URL|API|E2E)$/.test(v));
@@ -431,7 +441,7 @@ ${hasCredentials ? `<h3>${esc(t.credentials)}</h3>\n${fileRows}\n${varRows}` : '
 </body></html>`;
 };
 
-const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath }) => {
+export const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath, answeredBy = OWNER }) => {
   const db = ledger.db;
   const signal = db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId);
   const terminal = parseJson(signal?.value_json ?? '')?.terminal ?? null;
@@ -448,7 +458,9 @@ const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath }) => {
     if (state !== 'turn-idle') return { action: 'kernel-active', terminal, state };
     const prompt = [
       `Durable transition wake for workflow ${workflowId}: ask-answered.`,
-      `The owner answered the parked ask for dispatch ${dispatchId}; sanitized receipt at ${receiptPath}.`,
+      answeredBy === AUTO_ACCEPTED_BY
+        ? `config.yaml ${AUTO_ACCEPT_CONFIG_KEY} answered the parked ask for dispatch ${dispatchId} with its recommended option (answeredBy ${AUTO_ACCEPTED_BY}); it binds like an owner answer for this business choice, record the decision with that source, and a later owner answer supersedes it; receipt at ${receiptPath}.`
+        : `The owner answered the parked ask for dispatch ${dispatchId}; sanitized receipt at ${receiptPath}.`,
       'Re-read canonical api status and survey now; re-verify custody presence for the named provisions, settle or retry the waiting ask op, then continue the approved frontier.',
       'This wake grants no new scope, path, retry or authority and must not duplicate an existing job or bypass an effect fence.',
     ].join(' ');
@@ -463,6 +475,96 @@ const wakeKernel = (ledger, { workflowId, dispatchId, receiptPath }) => {
     return { action: 'kernel-wake-error', terminal, error: String(error?.message ?? error) };
   }
 };
+
+// Parking a replacement ask retires the ones it replaces. An earlier
+// unanswered ask of the SAME op is superseded the moment a later one is
+// served: without the event it stays open forever in every projection of
+// the ledger, and the owner can act on a question the workflow moved past.
+// "The same op" is not enough: one workflow runs several provision.ask jobs
+// at once, one per decision, and a later ask about Accounting once retired
+// the open Chatbot and Shell questions. A replacement asks the same thing:
+// the same params.subject, else overlapping question.refs; only when
+// neither side names its subject does the op alone decide.
+export const supersedeEarlierAsks = (ledger, workflowId, report) => {
+  const db = ledger.db;
+  const newSubject = askSubjectOf(db, report);
+  const superseded = db.prepare(
+    `SELECT r.dispatch_id, r.report_json FROM reports r
+      WHERE r.workflow_id=? AND r.outcome='ask' AND r.op_id IS ? AND r.report_id < ?
+        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
+          AND e.kind IN ('ask-answered','ask-superseded')
+          AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
+      ORDER BY r.report_id`).all(workflowId, report.op_id ?? null, report.report_id)
+    .filter((row) => sameAskSubject(askSubjectOf(db, row), newSubject));
+  if (superseded.length) {
+    ledger.transaction(() => {
+      for (const row of superseded) {
+        ledger.appendEvent({
+          workflowId, entityType: 'report', entityId: row.dispatch_id,
+          kind: 'ask-superseded',
+          payload: { dispatchId: row.dispatch_id, by: report.dispatch_id, opId: report.op_id ?? null },
+        });
+      }
+    });
+  }
+  return superseded.map((row) => row.dispatch_id);
+};
+
+// The owner's auto-accept policy, read fail-closed: a config that cannot be
+// read or validated never turns auto-accept on.
+export const loadAskPolicy = () => { try { return askAutoAcceptPolicy(loadConfig()); } catch { return null; } };
+
+/**
+ * Answer one filed ask with its recommended option when config.yaml `asks` allows it
+ * (asks.autoAcceptRecommended, not excluded; ask-recommendation.mjs autoAcceptDecision). Writes the
+ * starci/ask-answer@1 receipt serve-ask writes on submit, an `ask-answered` event with answeredBy
+ * auto-recommended and an `ask-auto-accepted` audit event, wakes the Kernel and sends one Telegram
+ * message. Returns {accepted:false, why} and writes nothing otherwise. `wake` and `notify` are
+ * injectable for specs.
+ */
+export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, report, policy = loadAskPolicy(), wake = wakeKernel, notify = notifyAutoAccepted, now = Date.now() }) {
+  const db = ledger.db;
+  const rj = parseJson(report.report_json, {}) ?? {};
+  const question = rj.question ?? { text: rj.summary ?? '', options: [] };
+  const optionLabels = (question.options ?? []).map((o) => (typeof o === 'string' ? o : o?.label ?? ''));
+  const secretFields = fieldsOf(`${question.text ?? ''}\n${optionLabels.join('\n')}`);
+  const decision = autoAcceptDecision({ question, opId: report.op_id ?? null, secretFields, policy });
+  if (!decision.accept) return { accepted: false, why: decision.why };
+  const answered = db.prepare(
+    `SELECT 1 FROM events WHERE workflow_id=? AND kind='ask-answered' AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`,
+  ).get(workflowId, report.dispatch_id);
+  if (answered) return { accepted: false, why: 'already-answered' };
+  const { index, label, reason, source } = decision.recommendation;
+  const pickGroup = Array.isArray(question.picks) && question.picks.length === 1 ? question.picks[0] : null;
+  const pickChoice = pickGroup ? (pickGroup.choices ?? [])[index] : null;
+  const picks = pickChoice == null ? null : { [String(pickGroup.id)]: String(typeof pickChoice === 'string' ? pickChoice : pickChoice.id ?? pickChoice.label) };
+  const note = `auto-accepted by config.yaml ${AUTO_ACCEPT_CONFIG_KEY}: recommended option ${index + 1} (${source === 'structured' ? 'question.recommended' : 'marked in the option text'})${reason ? ` because ${reason}` : ''}`;
+  const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', workflowId, 'serve-ask');
+  fs.mkdirSync(receiptDir, { recursive: true });
+  const receiptPath = path.join(receiptDir, `answer-${now}.json`);
+  const receipt = {
+    schema: 'starci/ask-answer@1',
+    workflowId, dispatchId: report.dispatch_id, opId: report.op_id,
+    option: label, optionIndex: index, picks,
+    answeredBy: AUTO_ACCEPTED_BY, autoAccepted: { rule: decision.rule, recommendedReason: reason },
+    custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [],
+    note, at: new Date(now).toISOString(),
+  };
+  fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+  ledger.transaction(() => {
+    ledger.appendEvent({
+      workflowId, entityType: 'report', entityId: report.dispatch_id,
+      kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy: AUTO_ACCEPTED_BY, optionIndex: index, option: label, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
+    });
+    ledger.appendEvent({
+      workflowId, entityType: 'report', entityId: report.dispatch_id,
+      kind: 'ask-auto-accepted', payload: { dispatchId: report.dispatch_id, opId: report.op_id ?? null, optionIndex: index, option: label, recommendedReason: reason, receiptPath, rule: decision.rule, config: { autoAcceptRecommended: policy.autoAcceptRecommended, excludes: [...policy.excludes], source: policy.source ?? null } },
+    });
+  });
+  const woke = wake(ledger, { workflowId, dispatchId: report.dispatch_id, receiptPath, answeredBy: AUTO_ACCEPTED_BY });
+  const telegram = await Promise.resolve(notify({ ledgerFile, workflowId, dispatchId: report.dispatch_id, label })).catch(() => null);
+  return { accepted: true, dispatchId: report.dispatch_id, optionIndex: index, option: label, source, receiptPath, answeredBy: AUTO_ACCEPTED_BY, wake: woke, telegram };
+}
 
 const main = async () => {
   const args = parseArgs(process.argv.slice(2));
@@ -483,35 +585,17 @@ const main = async () => {
   const readonly = Boolean(args.review);
   if (answered && !readonly) { console.error(JSON.stringify({ ok: false, error: `ask ${report.dispatch_id} already answered` })); process.exit(1); }
 
-  // Parking a replacement ask retires the ones it replaces. An earlier
-  // unanswered ask of the SAME op is superseded the moment a later one is
-  // served: without the event it stays open forever in every projection of
-  // the ledger, and the owner can act on a question the workflow moved past.
-  // --review reads; it never retires anything.
-  // "The same op" is not enough: one workflow runs several provision.ask jobs
-  // at once, one per decision, and a later ask about Accounting once retired
-  // the open Chatbot and Shell questions. A replacement asks the same thing:
-  // the same params.subject, else overlapping question.refs; only when
-  // neither side names its subject does the op alone decide.
-  const newSubject = askSubjectOf(db, report);
-  const superseded = readonly ? [] : db.prepare(
-    `SELECT r.dispatch_id, r.report_json FROM reports r
-      WHERE r.workflow_id=? AND r.outcome='ask' AND r.op_id IS ? AND r.report_id < ?
-        AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
-          AND e.kind IN ('ask-answered','ask-superseded')
-          AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
-      ORDER BY r.report_id`).all(args.workflow, report.op_id ?? null, report.report_id)
-    .filter((row) => sameAskSubject(askSubjectOf(db, row), newSubject));
-  if (superseded.length) {
-    ledger.transaction(() => {
-      for (const row of superseded) {
-        ledger.appendEvent({
-          workflowId: args.workflow, entityType: 'report', entityId: row.dispatch_id,
-          kind: 'ask-superseded',
-          payload: { dispatchId: row.dispatch_id, by: report.dispatch_id, opId: report.op_id ?? null },
-        });
-      }
-    });
+  // Parking a replacement ask retires the ones it replaces
+  // (supersedeEarlierAsks). --review reads; it never retires anything.
+  if (!readonly) supersedeEarlierAsks(ledger, args.workflow, report);
+
+  // An ask config.yaml asks.autoAcceptRecommended answers is never served.
+  if (!readonly) {
+    const auto = await autoAcceptAsk({ ledger, ledgerFile: file, repo, workflowId: args.workflow, report });
+    if (auto.accepted) {
+      console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autoAccepted: true, optionIndex: auto.optionIndex, option: auto.option, answeredBy: auto.answeredBy, receiptPath: auto.receiptPath, wake: auto.wake?.action ?? null }));
+      process.exit(0);
+    }
   }
 
   const rj = parseJson(report.report_json, {});

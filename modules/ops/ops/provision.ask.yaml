@@ -81,7 +81,14 @@ steps:
         ids, digests and lineage terms go in question.refs, never in the text. When the ask presents
         alternatives the owner must judge, declare the decision once as question.picks
         ({id, label, choices}); question.options, when present, mirrors those choices in the same order
-        and is not a second question. Each choice carries the image that shows its outcome as
+        and is not a second question. When one option is recommended, set question.recommended
+        to its 0-based index in question.options and question.recommendedReason to one plain
+        sentence saying why, and name the ask kind in question.kind (information, credential,
+        account, access, consent, authority, business-decision, irreversible-confirmation); never
+        mark the recommendation only in the option text. With config.yaml
+        asks.autoAcceptRecommended on, the runtime answers such an ask with the recommended option
+        instead of serving it (answeredBy auto-recommended) unless its class is excluded, so
+        recommend only what the product can carry until the owner reverses it. Each choice carries the image that shows its outcome as
         `image` (the accepted draw, the current implementation render, the proposed direction), every
         path also listed in question.assets; a choice whose outcome has no artifact yet says so in its
         label. The owner compares the artifacts themselves, never a text description or a bare hash;
