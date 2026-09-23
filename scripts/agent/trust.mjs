@@ -301,6 +301,33 @@ export function writeCodexTrust({ file, keys, hooks }) {
   return { ...out, ok: true, attempts: updated.attempts, ...(updated.trail.length ? { trail: updated.trail } : {}) };
 }
 
+// A new Codex release turned every fresh Codex launch into an interactive
+// "Update available! … Press enter to continue" menu: eighteen op launches in
+// three workflows failed readiness or model attestation in three hours while
+// the kernels, started before the release, kept working. The launch must
+// never wait on it, so the top-level check_for_update_on_startup is pinned
+// false in every Codex home, like trust.
+const UPDATE_CHECK_LINE = /^[ \t]*check_for_update_on_startup[ \t]*=.*$/m;
+const topLevelOf = (text) => { const at = String(text ?? '').search(/^[ \t]*\[/m); return at < 0 ? String(text ?? '') : String(text ?? '').slice(0, at); };
+export function writeCodexNoUpdateCheck({ file, hooks }) {
+  const verify = (text) => /^[ \t]*check_for_update_on_startup[ \t]*=[ \t]*false[ \t]*(?:#.*)?\r?$/m.test(topLevelOf(text));
+  const updated = atomicUpdate(file, (text) => {
+    const source = text ?? '';
+    if (verify(source)) return { text: null, result: { written: false } };
+    const eol = source.includes('\r\n') ? '\r\n' : '\n';
+    const top = topLevelOf(source);
+    // An existing key is flipped in place; a new one closes the top-level block,
+    // so the owner's own leading keys stay where they were.
+    const head = top && !top.endsWith('\n') ? `${top}${eol}` : top;
+    const next = UPDATE_CHECK_LINE.test(top)
+      ? top.replace(UPDATE_CHECK_LINE, 'check_for_update_on_startup = false') + source.slice(top.length)
+      : `${head}check_for_update_on_startup = false${eol}${source.slice(top.length)}`;
+    return { text: next, result: { written: true } };
+  }, verify, { hooks });
+  if (!updated.ok) return { file, ok: false, error: updated.error };
+  return { file, ok: true, written: updated.result.written };
+}
+
 /* ------------------------------------------------------------------ launch */
 
 /** The launch cwd as a directory, or null for an Orca selector ('active', 'id:…'). */
@@ -340,6 +367,9 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
       if (!fs.existsSync(home.dir)) continue;
       const file = path.join(home.dir, 'config.toml');
       collect(guard(file, () => writeCodexTrust({ file, keys, hooks })));
+      const noUpdate = guard(file, () => writeCodexNoUpdateCheck({ file, hooks }));
+      (receipt.updateCheck ??= []).push({ file, off: noUpdate.ok === true, ...(noUpdate.written ? { written: true } : {}), ...(noUpdate.ok ? {} : { error: noUpdate.error }) });
+      if (!noUpdate.ok) receipt.errors.push({ file, error: noUpdate.error });
     }
   }
   receipt.status = receipt.errors.length ? 'failed' : (receipt.written.length ? 'written' : 'already');

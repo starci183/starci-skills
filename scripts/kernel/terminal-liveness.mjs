@@ -20,6 +20,11 @@ const INTERACTIVE_GATES = [
     remedy: "open a terminal in <cwd>, run `claude`, pick 'Yes, I trust this folder', then type /exit" },
   { gate: 'claude-bypass-permissions-consent', pattern: /bypass permissions mode[\s\S]*yes, i accept/i,
     remedy: "open a terminal, run `claude --dangerously-skip-permissions`, pick 'Yes, I accept', then type /exit" },
+  // A new Codex release shows "Update available! … 1. Update now 2. Skip 3.
+  // Skip until next version … Press enter to continue" before the prompt; it
+  // stalled every fresh Codex op launch for three hours on 2026-09-23.
+  { gate: 'codex-update-prompt', pattern: /update available![\s\S]*skip until next version/i,
+    remedy: "start `codex` once and pick 'Skip until next version', or set check_for_update_on_startup = false in its config.toml" },
   { gate: 'workspace-trust', pattern: /trust the authors/i,
     remedy: 'open a terminal in <cwd>, start the same agent CLI once, answer its workspace-trust prompt, then quit it' },
   // An agent CLI's own multiple-choice question (Devin's ask dialog, Claude's

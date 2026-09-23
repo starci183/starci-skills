@@ -162,3 +162,16 @@ test('the watchdog never renames terminals', () => {
   const src = fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /terminalRename|keepTitles/);
 });
+
+// A Codex release put its update menu in front of every fresh op launch for
+// three hours; it is a named gate the Codex card lets the runtime answer.
+test('the Codex update menu is an interactive gate the Codex card auto-answers with Skip until next version', async () => {
+  const menu = ['  ✨ Update available! 0.155.1 -> 0.156.1', '  Release notes: https://github.com/openai/codex/releases/latest',
+    '› 1. Update now (runs `npm install -g @openai/codex`)', '  2. Skip', '  3. Skip until next version', '  Press enter to continue'].join('\n');
+  const v = classifyAgentScreen(menu);
+  assert.equal(v.state, 'interactive-gate');
+  assert.equal(v.gate, 'codex-update-prompt');
+  const { parseYaml } = await import('../engine/yaml.mjs');
+  const card = parseYaml(fs.readFileSync(new URL('../modules/models/agents/codex.yaml', import.meta.url), 'utf8'));
+  assert.equal(card.gateAutoAnswer.gates['codex-update-prompt'].select, 'Skip until next version');
+});

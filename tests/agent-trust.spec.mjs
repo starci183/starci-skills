@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {
-  claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,
+  claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,
   assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,
 } from '../scripts/agent/trust.mjs';
 import {gateMenuPosition} from '../scripts/agent/lib.mjs';
@@ -312,4 +312,21 @@ test('a gate outside the allowlist is refused with no keystroke',t=>{
   assert.match(failed.payload.error,/not on the agent card's gateAutoAnswer allowlist/);
   assert.deepEqual(f.orcaState().terminals['fake-terminal-1'].gateKeys,[],'nothing was typed into the gate');
   assert.equal(events.some(e=>e.kind==='gate-auto-approved'),false);
+});
+
+// A new Codex release put an "Update available! ... Press enter to continue"
+// menu in front of every fresh Codex op launch; eighteen launches failed.
+test('the Codex update check is pinned off at top level, before any table, and is idempotent',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'codex-update-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const file=path.join(dir,'config.toml');
+  fs.writeFileSync(file,'model = "gpt-6-sol"\n\n[projects."D:/x"]\ntrust_level = "trusted"\n');
+  assert.equal(writeCodexNoUpdateCheck({file}).ok,true);
+  assert.equal(writeCodexNoUpdateCheck({file}).written,false,'the second call writes nothing');
+  const text=fs.readFileSync(file,'utf8');
+  assert.ok(text.startsWith('model = "gpt-6-sol"'),'the owner leading keys stay first');
+  assert.ok(text.indexOf('check_for_update_on_startup = false')<text.indexOf('[projects'),'a top-level key must precede every table');
+  fs.writeFileSync(file,'check_for_update_on_startup = true\n[projects."D:/x"]\n');
+  writeCodexNoUpdateCheck({file});
+  assert.equal((fs.readFileSync(file,'utf8').match(/check_for_update_on_startup/g)??[]).length,1,'an existing key is flipped, not duplicated');
+  assert.match(fs.readFileSync(file,'utf8'),/^check_for_update_on_startup = false$/m);
 });
