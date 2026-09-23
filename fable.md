@@ -1064,6 +1064,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   status đọc dependsOn của bản ghi Work trong owned_paths; owner đã succeeded thì giải phóng. Live: 6 slice dependency, không
   actionable.
 
+- 09:20 Fork báo 3 lỗi. (1) của trò: workspace.manage prepare vẫn ghi bản ghi scope gốc .starciwork/<scope>/index.yaml mà
+  layout cấm, nên dự án mới (Mia Mia) không bắt đầu được spec-foundation; giao lane nền (đích hợp lệ, schema đóng, spec bắt ghi
+  gốc). (2) lineage retry của cut sai và (3) kernel báo active 3.7 giờ vì dòng spinner cũ: fork làm lane P8. Nivo không dính (3).
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
