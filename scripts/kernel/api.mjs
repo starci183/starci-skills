@@ -10,7 +10,7 @@
 //   hierarchy --repo <path> --workflow <id>
 //   plan     --repo <path> --workflow <id> --file <plan.json>
 //   enqueue  --repo <path> --workflow <id> --op <opId> --paths <csv> [--title <t>] [--risk <r>]
-//            [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+//            [--repository <repo-id>] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
 //   estimate --repo <path> --files <n> [--assertions <n>] [--components <n>] [--records <n>]
 //            [--paths <csv>] [--gear <n>]
 //   route    --repo <path> --job <job_id> [--prefer <pool>] [--avoid <pool>] [--difficulty <d>]
@@ -49,6 +49,7 @@ import {
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import { commitPolicyOf, landedProof, policyCommits, policyPushes } from './settle-landed.mjs';
+import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import {
   spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact,
   awaitSubmission, awaitAttestation,
@@ -62,7 +63,7 @@ import { classifyAgentScreen, staleAwareState } from './terminal-liveness.mjs';
 // wrappers the managed-agent dispatch path drives — one thin wrapper per
 // calls.yaml verb (run-create/task-create/worker-start/dispatch/
 // dispatch-show/worker-show/worker-stop/worker-release).
-import { selectPool, resolveLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
+import { selectPool, resolveLaunchModel, resolveCardLaunchModel, missingHostTools, providerCircuitOf, PROVIDER_HEALTH_SCOPE } from '../agent/models.mjs';
 import { resolveOpParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import { opInputPaths, recordInputs, staleInputs, staleOperationsOf } from './input-digests.mjs';
@@ -156,7 +157,7 @@ const usage = (code) => {
   hierarchy --workflow <id>
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--risk <r>]
-           [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+           [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            [--paths <csv>] [--gear <n>]
            deterministic size class + agent count from runtimes.yaml allocation.slicing
@@ -267,6 +268,7 @@ const goalLegParams = (goal, opId) => {
 };
 const goalJsonOf = (row) => parseJson(row?.json ?? '', {});
 const jobPayloadOf = (row) => parseJson(row?.payload_json ?? '', {});
+const ownedPathsOf = (payload) => (payload?.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
 const jobResultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
 /**
  * A settled attempt that asked the owner a question is a wait, not a failure. Settle records it as
@@ -1235,7 +1237,7 @@ function cmdEstimate(ledger, args) {
 }
 
 /* --------------------------------------------------------------- enqueue */
-function cmdEnqueue(ledger, args) {
+function cmdEnqueue(ledger, args, repo) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -1280,6 +1282,14 @@ function cmdEnqueue(ledger, args) {
   if (custody.length) {
     throw Object.assign(new Error(`--paths names kernel custody ${custody.join(', ')} for ${args.op}; kernel-evidence, kernel-strays and kernel-approvals are the kernel's, never an op's write set`), { code: 'path-kernel-custody' });
   }
+  // The repository the job's bare owned paths land in, recorded so dispatch
+  // and settle resolve them alike (scripts/kernel/target-repo.mjs).
+  const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo });
+  if (!target.ok) {
+    const out = { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail };
+    emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
+    process.exit(1);
+  }
   const records = [...new Set(String(args.records ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
   const cutValues = [args['cut-id'], args['cut-ordinal'], args['cut-total']];
   const hasCut = cutValues.some((value) => value != null);
@@ -1315,6 +1325,7 @@ function cmdEnqueue(ledger, args) {
     const retry = retryLineageFor(db, { workflowId, op: args.op, cut, attempt });
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
+      ...(target.repository ? { repository: target.repository } : {}),
       ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
       ...(cut ? { cut } : {}),
       ...(after.length ? { after } : {}),
@@ -1338,13 +1349,13 @@ function cmdEnqueue(ledger, args) {
     ).run(jobId, workflowId, args.op, attempt, wf.generation ?? 0, JSON.stringify(payload), now, now);
     ledger.appendEvent({
       workflowId, entityType: 'job', entityId: jobId,
-      kind: 'job-enqueued', payload: { opId: args.op, attempt, records: records.length, ownedPaths: ownedPaths.length, risk: payload.risk, cut },
+      kind: 'job-enqueued', payload: { opId: args.op, attempt, records: records.length, ownedPaths: ownedPaths.length, risk: payload.risk, cut, repository: payload.repository ?? null },
     });
     job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   });
 
-  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null };
-  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})`, args.json);
+  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null, repository: payload.repository ?? null };
+  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})`, args.json);
 }
 
 /* ----------------------------------------------------------------- route */
@@ -1618,7 +1629,8 @@ const resolveModel = (target) => {
   if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
   const orca = doc?.launch?.orca ?? {};
-  return { target, provider: doc?.provider ?? null, kind: orca.kind ?? 'unknown', command: orca.command ?? null, profile: path.relative(skillRoot, file) };
+  return { target, provider: doc?.provider ?? null, kind: orca.kind ?? 'unknown', command: orca.command ?? null,
+    requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
 };
 
 // dispatch-op.mjs's packet builder is not exported (it runs main() on import),
@@ -1628,7 +1640,24 @@ const resolveModel = (target) => {
 const ownerLanguage = () => { try { return loadConfig()?.language ?? 'en'; } catch { return 'en'; } };
 const ownerDelegation = () => { try { return activeDelegation(); } catch { return null; } };
 
-const buildPacket = ({ job, payload, model, goal, params }) => ({
+// Each owned path as the packet carries it. A path the target resolver
+// (scripts/kernel/target-repo.mjs) retargets carries its path relative to its
+// repository, that repository's binding role and checkout root, and the
+// declared spelling; a path it leaves where dispatch placed the worker stays
+// {path} exactly as declared.
+const packetOwnedPaths = (payload, placements = []) => (payload.owned_paths ?? []).map((p) => {
+  const entry = typeof p === 'string' ? { path: p } : p;
+  const at = placements.find((x) => x.owned === entry.path);
+  if (!at || at.via === 'placement') return entry;
+  if (at.unresolved) return { ...entry, repository: at.repository, unresolved: true };
+  return { ...entry, declared: entry.path, path: at.path, repository: at.role, root: at.base };
+});
+// An owned path as the worker reads it: bare when it lives in the worker's
+// checkout, rooted at its own checkout otherwise.
+const renderOwnedPath = (p, cwd) => (p.root && path.resolve(p.root) !== path.resolve(cwd)
+  ? `${p.root.replace(/\\/g, '/')}/${p.path}`.replace(/\/\.$/, '') : p.path);
+
+const buildPacket = ({ job, payload, model, goal, params, placements }) => ({
   op: job.op_id ?? payload.opId,
   brief: `modules/ops/ops/${job.op_id ?? payload.opId}.yaml`,
   ...(params && Object.keys(params).length ? { params } : {}),
@@ -1642,7 +1671,7 @@ const buildPacket = ({ job, payload, model, goal, params }) => ({
     owner_language: ownerLanguage(),
     owner_delegation: ownerDelegation(),
     records: payload.records ?? [],
-    owned_paths: (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? { path: p } : p)),
+    owned_paths: packetOwnedPaths(payload, placements),
     ...(payload.cut ? { cut: payload.cut } : {}),
     ...(payload.title ? { title: payload.title } : {}),
     ...(payload.risk ? { risk: payload.risk } : {}),
@@ -1651,7 +1680,10 @@ const buildPacket = ({ job, payload, model, goal, params }) => ({
   returns: { verdict: 'pass|fail|blocked', evidence: ['...paths'], suspicion: 'string?' },
 });
 
-const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
+const buildPrompt = (packet, jobId, repo, priorFailures = [], cwd = repo) => {
+  const owned = packet.context.owned_paths;
+  const unresolved = owned.filter((p) => p.unresolved);
+  const roots = [...new Map(owned.filter((p) => p.root).map((p) => [path.resolve(p.root), p])).values()];
   const entrySkill = path.join(skillRoot, 'CONTEXT.md');
   const brief = path.join(skillRoot, packet.brief);
   const verdictContract = path.join(skillRoot, VERDICT_CONTRACT);
@@ -1677,8 +1709,10 @@ const buildPrompt = (packet, jobId, repo, priorFailures = []) => {
   ...(packet.context.owner_delegation ? [`owner_delegation: the owner delegated ask answers to ${packet.context.owner_delegation.asks} until ${packet.context.owner_delegation.until} (config.yaml delegation); an answer receipt with answeredBy ${packet.context.owner_delegation.asks} inside that window IS the owner's answer, except for the excluded classes ${JSON.stringify(packet.context.owner_delegation.excludes)} which stay owner-only`] : []),
   `records: ${packet.context.records.join(', ') || '(none bound)'}`,
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
-  `owned_paths: ${[...new Set(packet.context.owned_paths.map((p) => p.path))].join(', ') || '(per brief write-ceiling)'}`,
+  ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit, commit and report head in the checkout that holds it (api settle checks it there)`] : []),
+  `owned_paths: ${[...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))].join(', ') || '(per brief write-ceiling)'}`,
   `   only owned_paths may be modified; anything else is out of scope.`,
+  ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (repository ${p.repository} is not bound)`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
   `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
   `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. validateWorkspace):`,
   `  starci-validate → node ${path.join(skillRoot, 'bin', 'starci.mjs')} validate <work-root-or-record-dir> [--json]`,
@@ -1948,7 +1982,14 @@ function cmdDispatch(ledger, args, repo) {
   const briefDoc = briefForAdmission ?? parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
-  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams });
+  const worktree = args.worktree ?? repo;
+  const workerCwd = (() => { const abs = path.resolve(repo, worktree); try { return fs.statSync(abs).isDirectory() ? abs : repo; } catch { return repo; } })();
+  const placements = (() => {
+    try {
+      return ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: workerCwd, timeoutMs: allocationMs('settleGit.commandMs') });
+    } catch { return []; }
+  })();
+  const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements });
   // The law inputs this attempt binds, digested now so survey/status can say
   // when one changed under a settled result (scripts/kernel/input-digests.mjs).
   // A digest failure records nothing rather than refusing the dispatch.
@@ -1964,8 +2005,7 @@ function cmdDispatch(ledger, args, repo) {
       .filter((c) => c && c.exitCode !== 0)
       .map((c) => ({ name: c.name ?? 'unnamed-check', evidence: `attempt ${row.attempt}: ${String(c.evidence ?? '').slice(0, 400)}` }));
   })() : [];
-  const prompt = buildPrompt(packet, jobId, repo, priorFailures);
-  const worktree = args.worktree ?? repo;
+  const prompt = buildPrompt(packet, jobId, repo, priorFailures, workerCwd);
   const title = `[Op] ${op}`;
   // The Task display name is `[Op] <op>` — it hangs under its parent, which
   // says the rest. A command terminal is a flat sidebar row with no parent to
@@ -1976,8 +2016,19 @@ function cmdDispatch(ledger, args, repo) {
   // The composed command is what a spawn would actually run — card env prefix
   // + credential strip + requirements (the --yolo/dangerous flags). Dry-run
   // prints it so reviewers see the injected flags, not just the profile body.
+  // A command-terminal profile without a static command (the Codex
+  // profiles) is card-composed: the agent card's terminalFallback supplies the
+  // binary, modelArgs/effortArgs carry the routed model + effort, and its
+  // bypassArgs make the op unattended — the same composition the Kernel
+  // terminal boots with (modules/models/agents/codex.yaml).
+  const cardLaunch = model.kind === 'command-terminal' && !model.command
+    ? resolveCardLaunchModel({ target: model.target, requestedModel: model.requestedModel, payload })
+    : null;
   const spawnCmd = model.kind === 'command-terminal'
-    ? buildSpawnCommand({ provider: model.provider, command: model.command })
+    ? (cardLaunch?.error
+      ? { error: `${model.target} has no launch model: ${cardLaunch.error}` }
+      : buildSpawnCommand({ provider: model.provider, command: model.command,
+        model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null }))
     : null;
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
@@ -1999,7 +2050,9 @@ function cmdDispatch(ledger, args, repo) {
       ok: true, spawned: false, jobId, packet, prompt,
       leases: opLeaseRequests(payload),
       spawnCommand: spawnCmd
-        ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null, ...(spawnCmd.error ? { error: spawnCmd.error } : {}) }
+        ? { command: spawnCmd.command ?? null, commandSource: spawnCmd.commandSource ?? null,
+          ...(cardLaunch && !cardLaunch.error ? { model: cardLaunch.modelId, effort: cardLaunch.effort, modelSource: cardLaunch.source } : {}),
+          ...(spawnCmd.error ? { error: spawnCmd.error } : {}) }
         : { command: null, error: `${model.target} is launch kind '${model.kind}' — composed by 'orca orchestration worker-start', not terminal create` },
       orca: { worktree, title, terminalTitle, launchKind: model.kind, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
@@ -2010,7 +2063,7 @@ function cmdDispatch(ledger, args, repo) {
       `  brief: ${packet.brief}${briefExists ? '' : ' — MISSING ON DISK'}`,
       `  records: ${packet.context.records.join(', ') || '(none)'}`,
       ...(packet.context.cut ? [`  cut: ${packet.context.cut.id} ${packet.context.cut.ordinal}/${packet.context.cut.total}`] : []),
-      `  owned_paths: ${packet.context.owned_paths.map((p) => p.path).join(', ') || '(none)'}`,
+      `  owned_paths: ${packet.context.owned_paths.map((p) => renderOwnedPath(p, workerCwd)).join(', ') || '(none)'}`,
       `  spawn command: ${out.spawnCommand.command ?? `(none — ${out.spawnCommand.error})`}`,
       ...(out.spawnCommand.commandSource ? [`  command source: ${out.spawnCommand.commandSource}`] : []),
       '  orca commands:', ...out.orca.commands.map((c) => `    $ ${c.cli}`),
@@ -2077,9 +2130,16 @@ function cmdDispatch(ledger, args, repo) {
   }
   // Command-terminal agents still join the workflow's Orca Run. Create the
   // operation Task first, then create/attest the terminal, dispatch that Task
-  // to the exact handle and submit Orca's returned preamble. This gives Qwen
-  // and Devin the same durable Kernel → Task → Dispatch hierarchy as managed
+  // to the exact handle and submit Orca's returned preamble. This gives Qwen,
+  // Devin and Codex the same durable Kernel → Task → Dispatch hierarchy as managed
   // workers without pretending Orca owns their process lifecycle.
+  if (cardLaunch?.error) {
+    const error = `${model.target} has no launch model: ${cardLaunch.error}`;
+    rejectDispatch(ledger, job, jobId, op, model, { step: 'route', error });
+    emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, step: 'route', error },
+      `dispatch REJECTED for ${jobId} (route): ${error}`, args.json);
+    process.exit(1);
+  }
   const run = ensureWorkflowRun(ledger, { job, jobId, payload });
   if (!run.ok) {
     rejectDispatch(ledger, job, jobId, op, model, { step: 'run-create', error: run.error });
@@ -2100,9 +2160,13 @@ function cmdDispatch(ledger, args, repo) {
 
   // spawnAgent assembles the command and attests readiness/model, but prompt
   // delivery is delayed until Orca returns this Task's authoritative preamble.
+  // A card-composed launch pins the routed model and effort on the command
+  // line and spawnAgent attests the model from the rendered terminal before
+  // the Task is dispatched to it.
   const spawned = spawnAgent({
     provider: model.provider, worktree, title: terminalTitle, prompt: null,
     command: model.command, dispatchId: jobId,
+    model: cardLaunch?.modelId ?? null, effort: cardLaunch?.effort ?? null,
   });
   const handle = spawned.terminal ?? null;
   const spawn = { step: spawned.step, error: spawned.error, signal: spawned.signal ?? null, command: spawned.command, handle };
@@ -2165,6 +2229,10 @@ function cmdDispatch(ledger, args, repo) {
   payload.agent = model.provider;
   payload.provider = model.provider;
   payload.model = model.target;
+  if (cardLaunch) {
+    payload.modelId = spawned.modelAttested ?? cardLaunch.modelId;
+    payload.effort = cardLaunch.effort ?? null;
+  }
   payload.hierarchy = payload.hierarchy ?? {
     schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
     parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
@@ -2190,7 +2258,7 @@ function cmdDispatch(ledger, args, repo) {
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'op-dispatched',
-      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+      payload: { op, terminal: handle, dispatch: dispatchId, runId, taskId, model: model.target, ...(cardLaunch ? { modelId: payload.modelId, effort: payload.effort } : {}), worktree, nodeId: payload.hierarchy.nodeId, parentNodeId: payload.hierarchy.parentNodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
     });
   });
   const out = { ok: true, jobId, spawned: true, handle, dispatchId, packet, spawn, hierarchy: payload.hierarchy,
@@ -2663,13 +2731,42 @@ const opCommitPolicy = (op) => {
   try { return commitPolicyOf(parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))); } catch { return null; }
 };
 
+// A job's owned paths resolved per target repository, against the dispatch
+// contract's worktree (where the worker was placed) when it recorded one.
+const contractWorktreeOf = (db, job, repo) => {
+  const context = parseJson(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
+    .get(job.workflow_id, jobOpOf(job), job.attempt)?.context_json);
+  return typeof context?.worktree === 'string' ? path.resolve(repo, context.worktree) : null;
+};
+function jobPlacements(db, job, repo) {
+  const op = jobOpOf(job), payload = jobPayloadOf(job);
+  return ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: contractWorktreeOf(db, job, repo), timeoutMs: allocationMs('settleGit.commandMs') });
+}
+
+// The owned paths a report's files may name: the declared spellings plus each
+// retargeted path as the packet showed it — bare in the worker's or ledger
+// checkout, rooted at its own checkout otherwise (scripts/kernel/target-repo.mjs).
+function reportOwnedPaths(db, job, repo) {
+  const declared = ownedPathsOf(jobPayloadOf(job));
+  let placements = [];
+  try { placements = jobPlacements(db, job, repo); } catch { return declared; }
+  const checkouts = [repo, contractWorktreeOf(db, job, repo)].filter(Boolean).map((p) => path.resolve(p));
+  const resolved = placements.filter((p) => !p.unresolved && p.via !== 'placement').flatMap((p) => {
+    const rooted = path.resolve(p.base, p.path).replace(/\\/g, '/');
+    return checkouts.includes(path.resolve(p.base)) ? [p.path, rooted] : [rooted];
+  });
+  return [...new Set([...declared, ...resolved])];
+}
+
 // The landed proof a pass owes when the op's commitPolicy commits
 // (scripts/kernel/settle-landed.mjs). Null — settle as before — when there is
 // nothing to prove yet: an unknown or inactive job and a pass without a filed
 // done report are refused by the settle transaction itself, and an op without
-// a committing commitPolicy never commits. The target checkout is the
-// dispatch contract's worktree when that is a directory, else the ledger repo;
-// a job whose owned paths sit in no git checkout returns {checked:false}.
+// a committing commitPolicy never commits. Each owned path resolves against
+// its own repository (jobPlacements above; order in
+// scripts/kernel/target-repo.mjs ownedPathPlacements) and the proof runs per
+// repository; a job whose owned paths sit in no git checkout returns
+// {checked:false}.
 function settleLanding(db, jobId, repo, reportAbs) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
@@ -2679,14 +2776,9 @@ function settleLanding(db, jobId, repo, reportAbs) {
   const row = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, reportDispatchIdOf(db, job));
   const envelope = row ? parseJson(row.report_json) : (reportAbs ? parseJson(fs.readFileSync(reportAbs, 'utf8')) : null);
   if (envelope?.outcome !== 'done') return null;
-  const payload = jobPayloadOf(job);
-  const ownedPaths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-  const context = parseJson(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?')
-    .get(job.workflow_id, op, job.attempt)?.context_json);
-  const worktree = typeof context?.worktree === 'string' ? path.resolve(repo, context.worktree) : null;
-  const base = worktree && fs.existsSync(worktree) && fs.statSync(worktree).isDirectory() ? worktree : repo;
   const pushes = policyPushes(policy);
-  const proof = landedProof({ base, ownedPaths, head: envelope.head, branch: envelope.branch, pushes });
+  const placements = jobPlacements(db, job, repo);
+  const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes });
   return { ...proof, op, status: job.status, pushes };
 }
 
@@ -2734,8 +2826,7 @@ function cmdSettle(ledger, args, repo) {
     let envelope = null;
     if (row) envelope = parseJson(row.report_json);
     if (!row && reportAbs) {
-      const ownedPaths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths, identity: reportIdentityOf(db, job) });
+      const valid = validateOpReport(parseJson(fs.readFileSync(reportAbs, 'utf8')), { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job) });
       if (valid.ok) {
         envelope = valid.report;
         db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
@@ -3087,8 +3178,7 @@ function cmdReport(ledger, args, repo) {
   const reportAbs = [path.resolve(args.report), path.resolve(repo, args.report)].find((p) => fs.existsSync(p));
   if (!reportAbs) throw Object.assign(new Error(`report file missing: ${args.report}`), { code: 'report-missing' });
   const parsed = parseJson(fs.readFileSync(reportAbs, 'utf8'));
-  const ownedPaths = (jobPayload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
-  const valid = validateOpReport(parsed, { ownedPaths, identity: reportIdentityOf(db, job), commitPolicy: opCommitPolicy(jobOpOf(job)) });
+  const valid = validateOpReport(parsed, { ownedPaths: reportOwnedPaths(db, job, repo), identity: reportIdentityOf(db, job), commitPolicy: opCommitPolicy(jobOpOf(job)) });
   if (!valid.ok) throw Object.assign(new Error(`report fails starci/op-report@1: ${valid.reasons.join('; ')}`), { code: 'report-invalid' });
   const report = valid.report;
   if (args.outcome && args.outcome !== report.outcome)
@@ -3250,7 +3340,7 @@ async function main() {
       case 'status': return cmdStatus(ledger, args);
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'plan': return cmdPlan(ledger, args);
-      case 'enqueue': return cmdEnqueue(ledger, args);
+      case 'enqueue': return cmdEnqueue(ledger, args, repo);
       case 'estimate': return cmdEstimate(ledger, args);
       case 'route': return await cmdRoute(ledger, args);
       case 'dispatch': return cmdDispatch(ledger, args, repo);

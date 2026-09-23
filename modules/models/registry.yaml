@@ -64,8 +64,10 @@ targets:
       working: gpt-6-luna
       reasoning: gpt-6-sol
     orcaLaunch:
-      kind: managed-agent
-      agent: codex
+      kind: command-terminal
+      adapter: codex
+      dispatch: return-preamble-and-send
+      composition: card-terminal-fallback   # modules/models/agents/codex.yaml terminalFallback command + routed model/effort + bypassArgs
   # Launch-only targets: an explicit `--model gpt-6-sol` or `--model gpt-6-luna` request reaches that one model
   # on the Codex provider window. They are off every automatic chain; allocation routes the codex-agent pool.
   gpt-6-sol:
@@ -75,8 +77,10 @@ targets:
       working: gpt-6-sol
       reasoning: gpt-6-sol
     orcaLaunch:
-      kind: managed-agent
-      agent: codex
+      kind: command-terminal
+      adapter: codex
+      dispatch: return-preamble-and-send
+      composition: card-terminal-fallback   # modules/models/agents/codex.yaml terminalFallback command + routed model/effort + bypassArgs
   gpt-6-luna:
     runtime: codex
     requestedModel: gpt-6-luna
@@ -84,8 +88,10 @@ targets:
       working: gpt-6-luna
       reasoning: gpt-6-luna
     orcaLaunch:
-      kind: managed-agent
-      agent: codex
+      kind: command-terminal
+      adapter: codex
+      dispatch: return-preamble-and-send
+      composition: card-terminal-fallback   # modules/models/agents/codex.yaml terminalFallback command + routed model/effort + bypassArgs
   claude-agent:
     runtime: claude
     requestedModel: claude-opus-5-5

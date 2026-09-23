@@ -1,4 +1,4 @@
-# Profile: codex-agent — the OpenAI managed-agent pool.
+# Profile: codex-agent — the OpenAI Codex pool (unattended command terminals).
 # Business frame: the generalist workhorse with the widest role coverage, the
 # Sol fallback for think work when Claude is unavailable, AND the fleet's only
 # image generator. Owns the entire interface.draw/interface.asset route.
@@ -23,7 +23,20 @@ capacity:
     (modules/models/registry.yaml). One quota cooldown on the provider parks both.
 
 launch:
-  orca: {kind: managed-agent, agent: codex}
+  orca:
+    kind: command-terminal
+    adapter: codex
+    dispatch: return-preamble-and-send
+    composition: card-terminal-fallback   # no static command: modules/models/agents/codex.yaml terminalFallback command + modelArgs/effortArgs (routed model + effort) + bypassArgs
+    unattended: card-bypassArgs   # --ask-for-approval never --sandbox danger-full-access, exactly as the Kernel terminal boots
+  whyCommandTerminal: >-
+    Unattended Codex ops launch with the card bypassArgs. Orca's worker-start has no approval or
+    sandbox flag, so a managed Codex worker ran on Orca's default approval policy and every tool
+    call became an owner "Allow Codex to make changes" notification. A command terminal carries the
+    card command (model + effort + bypassArgs) and joins the Run through orchestration dispatch
+    --return-preamble, like the Qwen and Devin pools. image_gen and browser use are Codex CLI
+    built-ins (codex features: image_generation, browser_use), not Orca features, so the
+    command terminal keeps both host tools.
   hostTools: >-
     modules/models/agents/codex.yaml capabilities.hostTools — image_gen.imagegen and browser-dom. It is
     the only image-capable pool: interface.draw and interface.asset route nowhere else, and asset

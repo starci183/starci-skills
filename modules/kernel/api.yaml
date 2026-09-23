@@ -326,7 +326,7 @@ commands:
   enqueue:
     args: >-
       --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
-      [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
+      [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
     reads: >-
       workflows.phase; existing jobs for {workflow_id, op_id}; the brief
       modules/ops/ops/<opId>.yaml must exist and supplies the `params` block every
@@ -336,7 +336,20 @@ commands:
       jobs row {job_id, workflow_id, op_id, attempt=max(prior attempts)+1
       (1 on first enqueue), generation, kind:'op', status:'queued',
       payload_json:{goal_binding:{revision,identity},records:[--records],
-      owned_paths:[--paths],params?:{<name>:<value>},cut?:{id,ordinal,total}}} + events 'job-enqueued'.
+      owned_paths:[--paths],repository?:<repo-id>,params?:{<name>:<value>},cut?:{id,ordinal,total}}} + events 'job-enqueued'.
+      `repository` is the repository the job's bare owned paths land in
+      (scripts/kernel/target-repo.mjs): --repository resolved through the
+      project binding whose Work owner is --repo (a binding role, repository
+      name or root path; stored as its role), else `fe` for an op every
+      modules/models/kinds.yaml lane delivers on the frontend side
+      (interface.implement, interface.audit, uat.verify) when the binding
+      declares fe, else absent — the job targets where dispatch places it.
+      An owned path may name its repository itself: `repository:<id>/<path>`,
+      an absolute path, `../<repo>/<path>` resolving from --repo into a
+      bound repository, or `<repo-name>/<path>` whose first segment is a
+      bound repository's name (the owner's own name included); the rest is
+      relative to that repository's root. A `.starciwork/` path always lands
+      in the Work owner.
       `cut` marks one bounded execution slice of the SAME approved semantic op;
       all three cut flags are atomic, ordinal is 1-based and total is at least
       two. The goal binding is
@@ -372,6 +385,8 @@ commands:
       - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
       - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
       - path-kernel-custody: 'an owned path under .starciwork/{kernel-evidence,kernel-strays,kernel-approvals} (modules/schemas/work-layout.yaml kernelCustody) — the kernel owns those roots and an op lease on one collides with every sibling op'
+      - repository-unknown: '--repository names no repository the project binding (or, unbound, an existing directory) resolves'
+      - path-repository-unknown: 'an owned path repository:<id>/… names a repository the project binding does not bind'
       - cut-invalid: 'cut flags are partial, empty, non-integral or outside 1 <= ordinal <= total with total >= 2'
       - params-invalid: '--params is not a JSON object, names a param the brief does not declare, carries a value of the wrong type or outside its min/max/enum, sets a `setBy: owner` param the approved goal leg does not carry, or a goal leg carries a `setBy: kernel` param (scripts/route/dispatch-op.mjs resolveOpParams)'
       - 'params-invalid (field `reason`) for a missing `required: true` param: prints {ok:false, workflowId, op, reason:"params-invalid", param, detail} on stdout and exits 1, no job written. detail reads "<op> requires params.<name> (<type>, set by <setBy>): <doc> — none was given; re-run enqueue with --params ''{"<name>": <type>}''" (a `setBy: owner` param names the approved goal leg instead). provision.ask requires params.subject, the one-sentence provision or decision it asks'
@@ -451,7 +466,15 @@ commands:
       owned_path (capacity-1 exclusive write fences, reserveTwoPhase — job
       queued->leased with its fencing token, ttl bounds a crashed worker's
       fence while settle releases early) + budget_reservations taken
-      atomically; contracts row = the rendered packet markdown keyed
+      atomically; the packet's owned_paths resolve per target repository
+      (enqueue `repository` above, scripts/kernel/target-repo.mjs): a path the
+      resolver retargets carries {path relative to its repository, repository
+      role, root checkout, declared}, and the prompt shows it bare when it
+      lives in the worker's checkout (--worktree, else --repo) and rooted at
+      its own checkout otherwise, under a `writes_in` line naming each root;
+      a path it leaves where dispatch placed the worker (no binding, bare
+      paths of an unretargeted op) stays {path} verbatim. api report accepts
+      `files` in either spelling; contracts row = the rendered packet markdown keyed
       (workflow_id,op_id,attempt) with the dispatch_id — the worker's
       dispatch authority, read back via `api op-contract`, written BEFORE the
       job may stand running — whose context_json.inputs
@@ -789,10 +812,17 @@ commands:
     landed: >-
       A `pass` for an op whose manifest policy.commitPolicy commits (a mode
       other than none — scoped-local-commit today) owes a landed proof, run
-      before anything is written (scripts/kernel/settle-landed.mjs). The
-      target checkout is the git checkout holding each owned path, resolved
-      from the dispatch contract's worktree when that is a directory, else
-      from --repo. `git status --porcelain -- <owned_paths>` must be empty,
+      before anything is written (scripts/kernel/settle-landed.mjs). Each
+      owned path resolves against its target repository
+      (scripts/kernel/target-repo.mjs ownedPathPlacements), first match wins:
+      the repository the path names (enqueue above); a `.starciwork/` path in
+      the Work owner; payload.repository; the binding's
+      fe root for a frontend op (a job enqueued before payload.repository
+      existed resolves the same way); else the dispatch contract's worktree
+      when that is a directory, else --repo. A resolved repository is checked
+      in the contract worktree when that worktree is a checkout of it, else
+      at its bound root. Paths are grouped per git checkout and each group is
+      proven there. `git status --porcelain -- <owned_paths>` must be empty,
       and the filed done report's `head` must name a commit that exists and
       is HEAD or an ancestor of it — a checkout ahead of origin passes. A done
       report filed before `api report` required `head` carries none: on a
@@ -807,7 +837,7 @@ commands:
       plain directory) settles without the proof, as does every fail or
       blocked verdict and every op without a committing commitPolicy. A
       proof that ran is recorded as `landed` on the receipt and result_json.
-    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
+    returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?}}'
     refuses:
       - report-missing: 'the --report path is unreadable'
       - pass-report-missing: 'pass requires the exact filed done report; a dead or silent worker cannot earn pass'
@@ -816,8 +846,8 @@ commands:
       - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
       - job-settled: 'job already settled — a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again — it is not a settled status)'
       - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
-      - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes>], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution)'
-      - 'landed-unverifiable (field `reason`): the landed proof could not read git — a status that failed, a detached HEAD with no report branch, or a fetch of origin/<branch> that failed on a pushing policy. Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:status|branch|fetch, error, ...}} and exits 1; never a silent pass'
+      - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes, prefixed <checkout>: when several repositories are checked>], repos:[{repo, role, paths, dirty}], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution)'
+      - 'landed-unverifiable (field `reason`): the landed proof could not read git — a status that failed, a detached HEAD with no report branch, a fetch of origin/<branch> that failed on a pushing policy, or an owned path / payload.repository naming a repository the binding cannot resolve (step repository, detail.unresolved). Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:repository|status|branch|fetch, error, ...}} and exits 1; never a silent pass'
       # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
     usedBy: 'drive.settle — last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 

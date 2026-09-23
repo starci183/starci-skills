@@ -133,7 +133,7 @@ export const kernelState = (db, wf) => {
 // talking to the host, so the listing costs one more read — but a ledger with
 // no kernel signal at all still makes no host call, because there is nothing
 // of ours for Orca to be holding.
-export const orcaTree = (db, { terminals = undefined } = {}) => {
+export const orcaTree = (db, { terminals = undefined, repo = null } = {}) => {
   const anyKernel = db.prepare(
     "SELECT COUNT(*) n FROM signals s JOIN workflows w ON w.workflow_id=s.key WHERE s.scope='kernel' AND w.phase!='finished'").get().n;
   if (terminals === undefined && !anyKernel) return { listed: false, reason: 'no kernel signal', findings: [] };
@@ -143,7 +143,7 @@ export const orcaTree = (db, { terminals = undefined } = {}) => {
   }
   const rows = readTerminals(listing);
   if (!rows) return { listed: false, reason: listing?.error ?? 'terminal-list returned no listing', findings: [] };
-  return { listed: true, count: rows.length, findings: orcaTreeFindings(db, rows) };
+  return { listed: true, count: rows.length, findings: orcaTreeFindings(db, rows, { repo }) };
 };
 
 // Newest direction/artifact images under .starciwork, bounded walk.
@@ -172,7 +172,7 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
     const k = kernelState(db, w.workflow_id);
     lines.push(`${short(w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
   }
-  const tree = orcaTree(db);
+  const tree = orcaTree(db, { repo });
   // TASK_OUTSIDE_RUN is a leak count, not an action per job: one line per
   // workflow; workflows that already finished are summarized, not listed.
   const outside = new Map();

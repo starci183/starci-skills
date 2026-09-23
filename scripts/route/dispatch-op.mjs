@@ -22,9 +22,11 @@
 //   orca terminal create --worktree <selector> --title "[Op] <id>" --command "<text>" --json
 //     -> result.terminal.handle   (modules/host/orca/calls.yaml terminal-create)
 //   orca terminal send --terminal <handle> --text "<prompt>" --enter --json
-//   Command-terminal launch only (qwen/devin profiles); managed-agent profiles
-//   (claude/codex) launch through `orca orchestration worker-start` and refuse
-//   --spawn here — see modules/host/orca/index.yaml managedFallback.
+//   Command-terminal launch only (qwen/devin/codex profiles); managed-agent
+//   profiles (claude) launch through `orca orchestration worker-start` and
+//   refuse --spawn here — see modules/host/orca/index.yaml managedFallback.
+//   A command-terminal profile without a static command (codex) is composed
+//   from its agent card: routed model + effort + the card's bypassArgs.
 //
 // CLI:
 //   node scripts/route/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
@@ -38,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
 import { spawnAgent, buildSpawnCommand } from '../agent/lib.mjs';
+import { resolveCardLaunchModel } from '../agent/models.mjs';
 import { buildContext, renderPromptReads } from '../context/pack.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -181,6 +184,7 @@ function resolveModel(target, modelsDir) {
     target, provider: doc?.provider ?? null,
     kind: orca.kind ?? 'unknown',
     command: orca.command ?? null,
+    requestedModel: doc?.identity?.requestedModel ?? null,
     profile: path.relative(skillRoot, file),
   };
 }
@@ -276,13 +280,20 @@ function main() {
   // terminal command is composed by the agent layer: profile launch command
   // (model+tuning) with the provider card's env prefix injected — devin's
   // ACP strip and qwen's credential refresh can no longer be forgotten.
+  const cardLaunch = model.kind === 'command-terminal' && !model.command
+    ? resolveCardLaunchModel({ target: model.target, requestedModel: model.requestedModel, modelsDir })
+    : null;
+  const launchModel = cardLaunch && !cardLaunch.error ? cardLaunch : null;
   const spawnCmd = model.kind === 'command-terminal'
-    ? buildSpawnCommand({ provider: model.provider, command: model.command })
+    ? (cardLaunch?.error
+      ? { error: `${model.target} has no launch model: ${cardLaunch.error}` }
+      : buildSpawnCommand({ provider: model.provider, command: model.command,
+        model: launchModel?.modelId ?? null, effort: launchModel?.effort ?? null }))
     : null;
   const composedCommand = spawnCmd?.command ?? model.command;
   const orcaCommands = model.kind === 'command-terminal'
     ? [
-      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', composedCommand, '--json'] },
+      { step: 'create', argv: ['terminal', 'create', '--worktree', worktree, '--title', title, '--command', composedCommand ?? '<command>', '--json'] },
       { step: 'read', argv: ['terminal', 'read', '--terminal', '<handle-from-create>', '--screen', '--json'],
         note: 'readiness — verify the prompt landed before sending; a long typed command can leave Enter un-landed (dispatch.yaml launchWindow)' },
       { step: 'send', argv: ['terminal', 'send', '--terminal', '<handle-from-create>', '--text', prompt, '--enter', '--json'] },
@@ -318,9 +329,11 @@ function main() {
       console.error(`--spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`);
       process.exit(1);
     }
+    if (cardLaunch?.error) { console.error(spawnCmd.error); process.exit(1); }
     const spawned = spawnAgent({
       provider: model.provider, worktree: args.worktree ?? undefined,
       title, prompt, command: model.command, dispatchId: args.op,
+      model: launchModel?.modelId ?? null, effort: launchModel?.effort ?? null,
     });
     result.spawn = {
       ok: spawned.ok === true, handle: spawned.terminal ?? null,

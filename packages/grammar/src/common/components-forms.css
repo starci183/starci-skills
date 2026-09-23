@@ -1,0 +1,435 @@
+/*
+ * Common form anatomy: the structure every family inherits for the form and input renderers
+ * (Field, Textarea, Select, ComboBox, SearchField, NumberField, Checkbox, CheckboxGroup, RadioGroup,
+ * Switch, Slider, SegmentedControl, DateField, DatePicker, DateRangePicker, TimeField, FileDropzone,
+ * Fieldset, Form, ButtonGroup).
+ *
+ * Only structure, rhythm and the touch floor live here. Paint resolves through the semantic
+ * variables every family binds (`--field-*`, `--accent`, `--danger`, `--muted`, `--focus`,
+ * `--border`), so Core, Heritage and Offset Pop each get their own look without a Common colour.
+ * Spacing uses the Common 4px scale (0.25 / 0.5 / 0.75 / 1 / 1.5rem).
+ *
+ * `!important` appears only on the few declarations the vendor's field roots also set (display and
+ * gap), the same concession `.starci-core-input` makes: the vendor rule must lose in either import
+ * order.
+ */
+@layer starci-grammar-common {
+    /* --- Field anatomy: label, control, description, error --- */
+    .starci-core-field {
+        display: flex !important;
+        min-width: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--starci-core-field-gap, 0.5rem) !important;
+    }
+
+    .starci-core-field-label {
+        color: var(--foreground, CanvasText);
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-field-required {
+        margin-inline-start: 0.25rem;
+        color: var(--danger, CanvasText);
+    }
+
+    .starci-core-field-description {
+        margin: 0;
+        color: var(--muted, GrayText);
+        font-size: 0.75rem;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-field-error {
+        margin: 0;
+        color: var(--danger, CanvasText);
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-field-error:empty {
+        display: none;
+    }
+
+    .starci-core-field-meta {
+        display: flex;
+        min-width: 0;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .starci-core-field-count {
+        flex-shrink: 0;
+        margin-inline-start: auto;
+        color: var(--muted, GrayText);
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .starci-core-field-count[data-grammar-invalid="true"] {
+        color: var(--danger, CanvasText);
+    }
+
+    .starci-core-field-spinner {
+        flex-shrink: 0;
+    }
+
+    .starci-core-field-control {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+    }
+
+    /* A native or third-party control handed to `Field` reads the same field paint Input reads. */
+    .starci-core-field-control > :where(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"]), select, textarea) {
+        width: 100%;
+        min-width: 0;
+        min-height: 2.25rem;
+        border: var(--field-border-width, 1px) solid var(--field-border, var(--border, ButtonBorder));
+        border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5));
+        padding: 0.5rem 0.75rem;
+        background: var(--field-background, var(--surface, Canvas));
+        color: var(--field-foreground, var(--foreground, CanvasText));
+        box-shadow: var(--field-shadow, none);
+        font: inherit;
+        font-size: 0.875rem;
+    }
+
+    .starci-core-field-control > :where(input, select, textarea):focus-visible {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: 2px;
+    }
+
+    .starci-core-field-control > :where(input, select, textarea):disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .starci-core-field[data-grammar-invalid="true"] > .starci-core-field-control > :where(input, select, textarea) {
+        border-color: var(--danger, CanvasText);
+    }
+
+    /* --- Text-shaped controls fill their field --- */
+    .starci-core-textarea-control {
+        width: 100%;
+        min-width: 0;
+        min-height: 5rem;
+        resize: vertical;
+    }
+
+    .starci-core-select-trigger,
+    .starci-core-combo-box-group,
+    .starci-core-search-field-group,
+    .starci-core-number-field-group,
+    .starci-core-date-group {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .starci-core-select-value,
+    .starci-core-combo-box-input,
+    .starci-core-search-field-input,
+    .starci-core-number-field-input {
+        min-width: 0;
+    }
+
+    .starci-core-date-input {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .starci-core-date-range-separator {
+        flex-shrink: 0;
+        padding-inline: 0.25rem;
+        color: var(--muted, GrayText);
+    }
+
+    /* --- List popover (Select, ComboBox) --- */
+    .starci-core-list-option-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .starci-core-list-option-label {
+        overflow-wrap: anywhere;
+    }
+
+    .starci-core-list-option-description {
+        color: var(--muted, GrayText);
+        font-size: 0.75rem;
+    }
+
+    .starci-core-list-empty {
+        padding: 0.5rem 0.75rem;
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+    }
+
+    /* --- Choices: Checkbox, Radio, Switch --- */
+    .starci-core-choice {
+        min-width: 0;
+    }
+
+    .starci-core-choice-content {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .starci-core-choice-control {
+        flex-shrink: 0;
+    }
+
+    .starci-core-choice-group-options {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    [data-grammar-orientation="horizontal"] > .starci-core-choice-group-options {
+        flex-flow: row wrap;
+        gap: 0.75rem 1rem;
+    }
+
+    /* --- Slider --- */
+    .starci-core-slider {
+        width: 100%;
+    }
+
+    .starci-core-slider-header {
+        display: flex;
+        min-width: 0;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .starci-core-slider-output {
+        color: var(--muted, GrayText);
+        font-size: 0.875rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* --- SegmentedControl --- */
+    .starci-core-segmented-control {
+        align-items: flex-start;
+    }
+
+    .starci-core-segmented-control[data-width="fill"] {
+        align-items: stretch;
+    }
+
+    .starci-core-segmented-control-group {
+        max-width: 100%;
+    }
+
+    .starci-core-segmented-control[data-width="fill"] .starci-core-segment {
+        flex: 1 1 0;
+    }
+
+    .starci-core-segment {
+        min-width: 0;
+        white-space: nowrap;
+    }
+
+    /* --- ButtonGroup --- */
+    .starci-core-button-group {
+        max-width: 100%;
+    }
+
+    .starci-core-button-group[data-width="fill"] {
+        width: 100%;
+    }
+
+    .starci-core-button-group[data-width="fill"] > [data-component="Button"] {
+        flex: 1 1 0;
+    }
+
+    /* --- Fieldset and Form --- */
+    .starci-core-fieldset {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: var(--grammar-row-gap, 0.75rem);
+        margin: 0;
+        border: 0;
+        padding: 0;
+    }
+
+    .starci-core-fieldset-legend {
+        float: left;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        color: var(--foreground, CanvasText);
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .starci-core-fieldset-legend + * {
+        clear: both;
+    }
+
+    .starci-core-fieldset-fields {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: var(--grammar-section-gap, 1rem);
+    }
+
+    .starci-core-fieldset-actions {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: var(--grammar-inline-gap, 0.5rem);
+    }
+
+    .starci-core-form {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: var(--grammar-region-gap, 1.5rem);
+    }
+
+    /* --- FileDropzone: a native file input stretched over the drop target --- */
+    .starci-core-file-dropzone-target {
+        position: relative;
+        display: flex;
+        min-width: 0;
+        min-height: 7rem;
+        align-items: center;
+        justify-content: center;
+        border: 2px dashed var(--border, ButtonBorder);
+        border-radius: var(--field-radius, calc(var(--radius, 0.5rem) * 1.5));
+        padding: 1.5rem;
+        background: var(--field-background, var(--surface, Canvas));
+        color: var(--muted, GrayText);
+        text-align: center;
+        transition:
+            border-color var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1)),
+            background-color var(--starci-core-motion-duration, 180ms) var(--starci-core-motion-easing, cubic-bezier(0.2, 0, 0, 1));
+    }
+
+    .starci-core-file-dropzone-input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .starci-core-file-dropzone-input:disabled {
+        cursor: default;
+    }
+
+    .starci-core-file-dropzone-prompt {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        pointer-events: none;
+    }
+
+    .starci-core-file-dropzone-icon {
+        display: inline-flex;
+        color: var(--foreground, CanvasText);
+    }
+
+    .starci-core-file-dropzone-target[data-grammar-drag="over"] {
+        border-color: var(--accent, Highlight);
+        background: color-mix(in srgb, var(--accent, Highlight) 8%, var(--field-background, var(--surface, Canvas)));
+    }
+
+    .starci-core-file-dropzone-target:has(.starci-core-file-dropzone-input:focus-visible) {
+        outline: 2px solid var(--focus, Highlight);
+        outline-offset: 2px;
+    }
+
+    .starci-core-file-dropzone[data-grammar-invalid="true"] .starci-core-file-dropzone-target {
+        border-color: var(--danger, CanvasText);
+    }
+
+    .starci-core-file-dropzone[data-grammar-disabled="true"] .starci-core-file-dropzone-target {
+        opacity: 0.5;
+    }
+
+    .starci-core-file-dropzone-files {
+        margin: 0;
+        padding-inline-start: 1rem;
+        color: var(--foreground, CanvasText);
+        font-size: 0.875rem;
+        overflow-wrap: anywhere;
+    }
+
+    /* --- Read-only reads as settled, not as unavailable --- */
+    [data-grammar-field="true"][data-grammar-readonly="true"] :where(.starci-core-select-trigger, .starci-core-combo-box-group, .starci-core-search-field-group, .starci-core-number-field-group, .starci-core-date-group, .starci-core-textarea-control) {
+        background: var(--surface-secondary, var(--field-background, Canvas));
+    }
+
+    /*
+     * THE 44px TOUCH FLOOR.
+     *
+     * On a touch pointer or a narrow viewport every pressable part of a form control - the field
+     * box, the choice row (label included, it is part of the hit area), each segment, the stepper
+     * and trigger glyph buttons, list options and calendar days - is at least 44px in both axes that
+     * matter. It is a MINIMUM (`min-*-size`), which the vendor never sets, so no paint changes and no
+     * `!important` is owed. The slider thumb keeps its drawn size and grows an invisible hit area.
+     */
+    @media (pointer: coarse), (max-width: 40rem) {
+        .starci-core-select-trigger,
+        .starci-core-combo-box-group,
+        .starci-core-search-field-group,
+        .starci-core-number-field-group,
+        .starci-core-date-group,
+        .starci-core-choice-content,
+        .starci-core-segment,
+        .starci-core-list-option,
+        .starci-core-button-group > *,
+        .starci-core-field-control > :where(input:not([type="checkbox"], [type="radio"], [type="range"]), select) {
+            min-block-size: var(--starci-core-control-min-size, 2.75rem);
+        }
+
+        .starci-core-number-field-step,
+        .starci-core-combo-box-trigger,
+        .starci-core-search-field-clear,
+        .starci-core-date-trigger,
+        .starci-core-calendar-nav,
+        .starci-core-calendar-cell {
+            min-inline-size: var(--starci-core-control-min-size, 2.75rem);
+            min-block-size: var(--starci-core-control-min-size, 2.75rem);
+        }
+
+        .starci-core-slider-thumb::after {
+            position: absolute;
+            inset-block-start: 50%;
+            inset-inline-start: 50%;
+            width: var(--starci-core-control-min-size, 2.75rem);
+            height: var(--starci-core-control-min-size, 2.75rem);
+            translate: -50% -50%;
+            content: "";
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .starci-core-file-dropzone-target {
+            transition: none;
+        }
+    }
+}
