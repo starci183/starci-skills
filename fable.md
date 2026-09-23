@@ -1048,6 +1048,11 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   sau đó) nên watchdog đánh thức mỗi 5 phút. Vá `0213b58fb`: ask chưa trả lời luôn nằm trong awaitingOwner; không còn op mở +
   có ask chờ = frontier awaiting-owner, không actionable. Live: Modules awaiting-owner, liệt kê ctx_596b59ca7bd4.
 
+- 08:50 Worker composition Collab treo 60 phút trên `... | xargs grep` đọc stdin; spinner làm nó trông active. Vá `45841bcc5`:
+  liveness wedged (lượt > 30 phút, lệnh shell vẫn No output yet), frontier worker-wedged + wedgedJobs; live đúng. Kernel Collab đã
+  dispatch lại composition. Merge P7 `71853d655` (report op commit phải có head; settle pass đòi owned paths sạch; report cũ thiếu
+  head chỉ kiểm owned paths). Check xanh, 86/86. Báo kernel WSPV và Collab nhắc hai worker đang chạy ghi head.
+
 ### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
 
 | Nhóm | Số | Bản chất | Hướng vá |
